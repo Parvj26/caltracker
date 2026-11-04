@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
+import { authStorageKey, pkceVerifierKey } from './auth-keys';
 import type { VerifierStore } from './confirm-link';
 import { largeSecureStore } from './secure-storage';
 
@@ -13,7 +14,7 @@ if (!url || !anonKey) {
 
 // supabase-js's own default key, spelled out so the confirmation retry below addresses the same entry.
 // Changing it would sign everyone out.
-const storageKey = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+const storageKey = authStorageKey(url);
 
 export const supabase = createClient<Database>(url, anonKey, {
   auth: {
@@ -30,7 +31,7 @@ export const supabase = createClient<Database>(url, anonKey, {
 
 // The PKCE verifier key supabase-js reads when exchanging a code without a flow id (our case).
 // completeConfirmation() restores it if a dropped connection made supabase-js delete it.
-const verifierKey = `${storageKey}-code-verifier`;
+const verifierKey = pkceVerifierKey(storageKey);
 export const pkceVerifier: VerifierStore = {
   read: () => largeSecureStore.getItem(verifierKey),
   restore: (verifier) => largeSecureStore.setItem(verifierKey, verifier),
