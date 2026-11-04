@@ -61,6 +61,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - Meal plans / nutrition
 - Habits, tasks, check-ins
 - Coach-themed badge packs
+- Session booking / appointment scheduling (planned for a later version)
 
 ---
 
@@ -165,6 +166,13 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - All logging reads and writes go to an on-device SQLite database kept in sync with Supabase by **PowerSync**.
 - A "Not synced yet" indicator is shown until pending changes upload.
 - Badge calculation runs on the device from shared code, so the badge reveal works offline; the server recalculates on sync and is the source of truth for the collection and totals.
+
+### Coach home (dashboard and iPad)
+- **Today's clients:** clients with a workout assigned today, each with **Log session** (or View when done; "Client is logging" when in progress). No appointment times in V1.
+- **Tiles:** Done this week (completed / assigned, with progress bar), New PRs this week, Workouts today, Missed 2+ workouts.
+- **Needs attention:** clients with no completed workout in ≥ 5 days (Message), programs ending within 7 days (Assign), and clients with no body measurement in ≥ 30 days (Add scan).
+- **Quick search (⌘K on web):** jump to any client.
+- iPad supports portrait and landscape; layouts in the design system spec. Phone app is portrait-only.
 
 ### Coach review (dashboard)
 - **Activity feed:** completed workouts across clients (client, workout, duration, PR count).
@@ -380,7 +388,8 @@ Each phase gets its own detailed implementation plan.
 | 3 | What does the coach pay Everfit per month, and on which plan? | Product owner → coach | Pricing for other coaches |
 | 4 | Does Everfit allow exporting client/workout data? | Developer to research | Possible post-launch import tool |
 | 5 | ~~Product name and domain~~ Resolved: CalTracker, caltracker.app | Product owner | Branding, app store listing |
-| 6 | Badge illustrations: commission an illustrator, license an icon set, or start with simple icons? | Product owner | Section 6 visuals |
+| 6 | Badge illustrations: commission an illustrator, license an icon set, or start with simple icons? (Style is defined in the design system spec.) | Product owner | Section 6 visuals |
+| 10 | Claiming invites by email only: before selling to other coaches, decide whether a client joins via the specific invite link, or chooses when several coaches invited them (prevents one coach intercepting another's new client). | Product owner | Section 3 onboarding |
 | 7 | Which countries are the business and its clients in? | Product owner | Privacy policy, data regulations |
 | 8 | Confirm current Supabase and PowerSync pricing and free-tier limits | Developer | Cost model |
 | 9 | Verify free-exercise-db license file before import | Developer | Section 4 |

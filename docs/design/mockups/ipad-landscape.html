@@ -1,0 +1,99 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Caveat:wght@700&display=swap');
+.ipad{max-width:900px;margin:0 auto 10px;border:12px solid #111;border-radius:28px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.2);font-family:'Bricolage Grotesque',system-ui,sans-serif;color:#121212;background:#fff;aspect-ratio:4/3}
+.k{font-size:12px;opacity:.6}
+h4{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.hand{font-family:Caveat,cursive;font-size:21px;color:#E0408A}
+.lime{background:#C8F169}.pink{background:#FFC9E3}.blue{background:#B9E3FF}.grey{background:#F4F4F4}
+.av{width:44px;height:44px;border-radius:50%;background:#B9E3FF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
+.tabbar{display:flex;justify-content:space-around;border-top:1px solid #EEE;padding:10px 0;font-size:12px;font-weight:700;color:#888}
+.tabbar .on{color:#121212}
+/* Home */
+.home{display:flex;flex-direction:column;height:100%}
+.home .body{flex:1;padding:22px 26px;overflow:hidden}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+.cc{border:2px solid #EDEDED;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.cc .top{display:flex;gap:10px;align-items:center}
+.go{background:#121212;color:#fff;border-radius:16px;padding:14px;text-align:center;font-weight:800;font-size:16px;box-shadow:0 4px 0 #C8F169}
+.done{background:#F4F4F4;border-radius:16px;padding:14px;text-align:center;font-weight:700;font-size:14px}
+.chip{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;display:inline-block}
+/* Session */
+.sess{display:grid;grid-template-columns:230px 1fr;height:100%}
+.list{background:#F6F6F4;padding:16px 12px;border-right:1px solid #EAEAEA}
+.li{display:flex;gap:10px;align-items:center;padding:10px;border-radius:16px;margin-bottom:6px;font-size:14px}
+.li.sel{background:#fff;box-shadow:0 2px 0 #E6E6E6;border:2px solid #121212}
+.log{padding:18px 22px;display:flex;flex-direction:column}
+.exs{display:flex;gap:6px;margin:10px 0 14px;flex-wrap:wrap}
+.ex{border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;background:#F4F4F4}
+.ex.cur{background:#121212;color:#fff}.ex.ok{background:#C8F169}
+.sets{display:grid;grid-template-columns:40px 1fr 1fr 64px;gap:10px;align-items:center}
+.n{font-weight:800;text-align:center;opacity:.5}
+.step{display:flex;align-items:center;justify-content:space-between;background:#F4F4F4;border-radius:16px;padding:6px}
+.step b{font-size:24px}
+.pm{width:40px;height:40px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;box-shadow:0 2px 0 #DDD}
+.step.dn{background:#C8F169}.step.dn .pm{opacity:.35}
+.ck{width:58px;height:58px;border-radius:16px;background:#121212;color:#C8F169;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800}
+.ck.off{background:#EDEDED;color:#AAA}
+.drop .step{background:#FFE3F0}
+.foot{margin-top:auto;display:flex;gap:10px;align-items:center}
+.timer{background:#121212;color:#fff;border-radius:18px;padding:14px 18px;font-weight:800;font-size:20px}
+.acts{display:flex;gap:8px;font-weight:700;font-size:14px}
+.acts span{border:1.5px solid #121212;border-radius:14px;padding:10px 14px}
+.finish{margin-left:auto;background:#E0408A;color:#fff;border-radius:16px;padding:14px 20px;font-weight:800;box-shadow:0 4px 0 #B32C6C}
+.cap{text-align:center;font-weight:700;margin:6px 0 22px}
+</style>
+
+<h2>iPad, redesigned around in-person sessions</h2>
+<p class="subtitle">The iPad is where your trainer logs while you train, so it gets its own layout instead of a squeezed laptop page. No appointment times (booking comes later) — just clients with a workout assigned today.</p>
+
+<div class="ipad"><div class="home">
+  <div class="body">
+    <div class="k">Tuesday 3 November</div>
+    <h4>Today's clients <span class="hand">14 training today</span></h4>
+    <div class="grid">
+      <div class="cc"><div class="top"><span class="av">SL</span><div><b>Sam Lee</b><div class="k">Upper A · 6 exercises</div></div></div><span class="chip pink">Last: bench PR</span><div class="go">Log session</div></div>
+      <div class="cc"><div class="top"><span class="av lime">PR</span><div><b>Priya R.</b><div class="k">Lower B · 5 exercises</div></div></div><span class="chip grey">Knee niggle — see note</span><div class="go">Log session</div></div>
+      <div class="cc"><div class="top"><span class="av pink">JM</span><div><b>Jay M.</b><div class="k">Full Body · done 42 min</div></div></div><span class="chip lime">2 PRs · 🦏</span><div class="done">View workout</div></div>
+      <div class="cc"><div class="top"><span class="av">AK</span><div><b>Alex K.</b><div class="k">Upper B · 6 exercises</div></div></div><span class="chip blue">In progress (client)</span><div class="done">Client is logging</div></div>
+      <div class="cc"><div class="top"><span class="av lime">DW</span><div><b>Dana W.</b><div class="k">Lower A · 5 exercises</div></div></div><span class="chip pink">9 days since last</span><div class="go">Log session</div></div>
+      <div class="cc"><div class="top"><span class="av pink">+</span><div><b>Someone else</b><div class="k">Pick any client</div></div></div><span class="chip grey">Search all 50</span><div class="done">Choose client</div></div>
+    </div>
+  </div>
+  <div class="tabbar"><span class="on">Today</span><span>Clients</span><span>Messages ③</span><span>Community</span><span>More</span></div>
+</div></div>
+<div class="cap">① iPad home — big client cards, one tap to start logging</div>
+
+<div class="ipad"><div class="sess">
+  <div class="list">
+    <div class="k" style="margin:0 0 8px 6px">Today</div>
+    <div class="li sel"><span class="av">SL</span><div><b>Sam Lee</b><div class="k">Upper A · 18 min</div></div></div>
+    <div class="li"><span class="av lime">PR</span><div><b>Priya R.</b><div class="k">Lower B</div></div></div>
+    <div class="li"><span class="av pink">DW</span><div><b>Dana W.</b><div class="k">Lower A</div></div></div>
+    <div class="k" style="margin:14px 6px 0">Switch clients any time — each session keeps its place.</div>
+  </div>
+  <div class="log">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div><div class="k">Sam Lee · Upper A · logged by you</div><h4>Bench press</h4><div class="k">Last time 65 kg × 8 · Coach note: pause at chest</div></div>
+      <span class="chip pink" style="font-size:13px;padding:6px 12px">🎉 PR pace</span>
+    </div>
+    <div class="exs"><span class="ex ok">Warm-up ✓</span><span class="ex cur">Bench press</span><span class="ex">Row</span><span class="ex">OHP</span><span class="ex">Pull-up</span><span class="ex">Curl</span></div>
+    <div class="sets">
+      <span class="k" style="text-align:center">Set</span><span class="k">kg</span><span class="k">Reps</span><span></span>
+      <span class="n">1</span><div class="step dn"><span class="pm">−</span><b>65</b><span class="pm">+</span></div><div class="step dn"><span class="pm">−</span><b>8</b><span class="pm">+</span></div><span class="ck">✓</span>
+      <span class="n">2</span><div class="step dn"><span class="pm">−</span><b>70</b><span class="pm">+</span></div><div class="step dn"><span class="pm">−</span><b>6</b><span class="pm">+</span></div><span class="ck">✓</span>
+      <span class="n">3</span><div class="step"><span class="pm">−</span><b>70</b><span class="pm">+</span></div><div class="step"><span class="pm">−</span><b>6</b><span class="pm">+</span></div><span class="ck off">✓</span>
+      <span class="n">↳</span><div class="step" style="background:#FFE3F0"><span class="pm">−</span><b>50</b><span class="pm">+</span></div><div class="step" style="background:#FFE3F0"><span class="pm">−</span><b>8</b><span class="pm">+</span></div><span class="ck off">✓</span>
+    </div>
+    <div class="foot" style="margin-top:18px">
+      <span class="timer">Rest 1:24</span>
+      <div class="acts"><span>+ Set</span><span>+ Drop</span><span>Swap</span></div>
+      <span class="finish">Finish</span>
+    </div>
+  </div>
+</div></div>
+<div class="cap">② Session mode — client list on the left, logging on the right. Big −/+ steppers (2.5 kg / 1 rep) so he never types between sets.</div>
+
+<div class="options">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>Looks right</h3><p>Write up the design system</p></div></div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)"><div class="letter">~</div><div class="content"><h3>Needs changes</h3><p>Tell me what in the terminal</p></div></div>
+</div>

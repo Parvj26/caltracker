@@ -1,0 +1,86 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Caveat:wght@700&display=swap');
+.dev{border:8px solid #111;border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.2);font-family:'Bricolage Grotesque',system-ui,sans-serif;color:#121212;background:#fff}
+.lap{max-width:1000px;margin:0 auto}
+.wrap{display:grid;grid-template-columns:190px 1fr;min-height:540px}
+.side{background:#F6F6F4;padding:18px 12px;border-right:1px solid #ECECEC}
+.logo{font-weight:800;font-size:19px;margin-bottom:14px}.logo span{background:#C8F169;border-radius:8px;padding:0 6px}
+.search{background:#fff;border:1px solid #E6E6E6;border-radius:12px;padding:8px 10px;font-size:13px;color:#999;margin-bottom:14px;display:flex;justify-content:space-between}
+.search kbd{font-family:inherit;font-size:11px;background:#F2F2F2;border-radius:6px;padding:0 5px;color:#666}
+.nav div{padding:9px 10px;border-radius:12px;font-weight:600;font-size:14px;margin-bottom:2px;display:flex;justify-content:space-between}
+.nav .on{background:#121212;color:#fff}
+.pill{background:#FFC9E3;color:#121212;border-radius:999px;padding:0 7px;font-size:12px;font-weight:800}
+.main{padding:20px 24px}
+h4{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.k{font-size:12px;opacity:.6}
+.hand{font-family:Caveat,cursive;font-size:20px;color:#E0408A}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+.tile{border-radius:18px;padding:12px}
+.big{font-size:26px;font-weight:800;line-height:1.1}
+.lime{background:#C8F169}.pink{background:#FFC9E3}.blue{background:#B9E3FF}.grey{background:#F4F4F4}
+.bar{height:6px;border-radius:3px;background:rgba(0,0,0,.12);margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:#121212}
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+.panel{border:1px solid #ECECEC;border-radius:18px;padding:14px}
+.panel h5{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between}
+.row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #F2F2F2;font-size:13px}
+.av{width:30px;height:30px;border-radius:50%;background:#B9E3FF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}
+.btn{background:#121212;color:#fff;border-radius:12px;padding:7px 12px;font-weight:700;font-size:12px;box-shadow:0 3px 0 #C8F169;margin-left:auto;white-space:nowrap}
+.ghost{border:1.5px solid #121212;border-radius:12px;padding:5px 10px;font-weight:700;font-size:12px;margin-left:auto;white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.ipad{width:420px;margin:24px auto 0}
+.ipad .wrap{grid-template-columns:56px 1fr;min-height:300px}
+.ipad .side{padding:14px 8px;text-align:center;font-size:18px;line-height:2.1}
+.bigbtn{background:#121212;color:#fff;border-radius:16px;padding:14px;font-weight:800;font-size:15px;box-shadow:0 4px 0 #C8F169;text-align:center;margin-left:auto;min-width:130px}
+</style>
+
+<h2>Coach dashboard v2</h2>
+<p class="subtitle">Changes: ① "Today's clients" with Log session buttons up front · ② adherence tile replaces unread messages · ③ quick search (⌘K) · ④ iPad layout below · ⑤ "Needs attention" actions are real buttons.</p>
+
+<div class="dev lap"><div class="wrap">
+  <div class="side">
+    <div class="logo"><span>Cal</span>Tracker</div>
+    <div class="search">Search clients… <kbd>⌘K</kbd></div>
+    <div class="nav">
+      <div class="on">Home</div><div>Clients <span class="k" style="opacity:.5">50</span></div><div>Programs</div><div>Exercises</div>
+      <div>Messages <span class="pill">3</span></div><div>Community</div><div>Progress</div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="k">Tuesday 3 November</div><h4>Morning, Coach <span class="hand">14 clients training today</span></h4>
+    <div class="tiles">
+      <div class="tile lime"><div class="k">Done this week</div><div class="big">38 / 52</div><div class="bar"><i style="width:73%"></i></div></div>
+      <div class="tile pink"><div class="k">New PRs this week</div><div class="big">9</div></div>
+      <div class="tile blue"><div class="k">Workouts today</div><div class="big">6 / 14</div></div>
+      <div class="tile grey"><div class="k">Missed 2+ workouts</div><div class="big">4</div></div>
+    </div>
+    <div class="cols">
+      <div class="panel"><h5>Today's clients <span class="k">all 14 →</span></h5>
+        <div class="row"><span class="av">SL</span><span><b>Sam Lee</b><br><span class="k">Upper A · in person 10:00</span></span><span class="btn">Log session</span></div>
+        <div class="row"><span class="av" style="background:#C8F169">PR</span><span><b>Priya R.</b><br><span class="k">Lower B · in person 11:30</span></span><span class="btn">Log session</span></div>
+        <div class="row"><span class="av" style="background:#FFC9E3">JM</span><span><b>Jay M.</b><br><span class="k">Full Body · done ✓ 42 min · 2 PRs</span></span><span class="ghost">View</span></div>
+        <div class="row"><span class="av">AK</span><span><b>Alex K.</b><br><span class="k">Upper B · not started</span></span><span class="btn">Log session</span></div>
+      </div>
+      <div class="panel"><h5>Needs attention</h5>
+        <div class="row"><span><span class="dot" style="background:#E0408A"></span><b>Dana W.</b> <span class="k">no workout 9 days</span></span><span class="ghost">Message</span></div>
+        <div class="row"><span><span class="dot" style="background:#E0408A"></span><b>Chris P.</b> <span class="k">no workout 6 days</span></span><span class="ghost">Message</span></div>
+        <div class="row"><span><span class="dot" style="background:#FFB020"></span><b>Mo T.</b> <span class="k">program ends Fri</span></span><span class="ghost">Assign</span></div>
+        <div class="row"><span><span class="dot" style="background:#FFB020"></span><b>Lee H.</b> <span class="k">InBody due</span></span><span class="ghost">Add scan</span></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dev ipad"><div class="wrap">
+  <div class="side">🏠<br>👥<br>📋<br>🏋️<br>💬<br>🌐</div>
+  <div class="main" style="padding:14px">
+    <div class="k">iPad · Tuesday</div><h4 style="font-size:20px">Today's clients</h4>
+    <div class="row"><span class="av">SL</span><span><b>Sam Lee</b><br><span class="k">Upper A · 10:00</span></span><span class="bigbtn">Log session</span></div>
+    <div class="row"><span class="av" style="background:#C8F169">PR</span><span><b>Priya R.</b><br><span class="k">Lower B · 11:30</span></span><span class="bigbtn">Log session</span></div>
+  </div>
+</div></div>
+<p class="subtitle" style="text-align:center">iPad: sidebar shrinks to icons, Log session buttons get big for quick tapping between sets.</p>
+
+<div class="options" style="margin-top:18px">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>Looks right</h3><p>Write up the design system</p></div></div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)"><div class="letter">~</div><div class="content"><h3>Needs changes</h3><p>Tell me what in the terminal</p></div></div>
+</div>
