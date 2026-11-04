@@ -49,3 +49,6 @@ pnpm-debug.log*
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Superpowers SDD scratch
+.superpowers/
