@@ -36,12 +36,16 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
    - **Invite user**: set the message body to the contents of `supabase/templates/invite.html`. The link is `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/set-password`.
    - **Reset password** (recommended): the same with `supabase/templates/recovery.html`, link `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/set-password`.
    - Local development applies these files automatically through `supabase/config.toml`; the hosted project does not read them, so paste them by hand. Check `Site URL` (step 2) is `https://staging.caltracker.app`, because the link is built from it.
-5. Cloudflare: `caltracker.app` must be an active zone on the account the API token belongs to. The first deploy creates the `staging.caltracker.app` DNS record and certificate automatically (custom domain in `apps/web/wrangler.jsonc`).
+   - The link only shows a **Continue** button; the one-time token is spent when the coach presses it. Email scanners (Outlook Safe Links and similar) open links but do not click, so they can no longer use the link up. The link format in the templates did not change.
+5. Supabase Dashboard -> Authentication -> Providers (Email) / Policies: set **Minimum password length** to **8**. Local config already says 8 (`minimum_password_length` in `supabase/config.toml`); the hosted project does not read it. The web and mobile apps also require 8.
+6. Cloudflare: `caltracker.app` must be an active zone on the account the API token belongs to. The first deploy creates the `staging.caltracker.app` DNS record and certificate automatically (custom domain in `apps/web/wrangler.jsonc`).
 
 ## Deploy
 
 - Merge a pull request to `main`: the CI workflow runs on the push, and when it finishes green the Deploy staging workflow starts by itself (`workflow_run` trigger, checking out the exact commit CI passed on). If CI is red, nothing is deployed and staging is not migrated. Fix forward with a new pull request.
 - Or GitHub -> Actions -> Deploy staging -> Run workflow, branch `main`, action `deploy`. This skips the CI gate, so use it only for re-running a deploy of a commit you know is good. If you start it from any other branch the run fails immediately with `Run this workflow from main`.
+
+The deploy job first compares the checked-out commit with the tip of `main` (`git ls-remote`). On automatic runs, if a newer commit has been merged meanwhile, it skips with a notice ("a newer commit will deploy") so an older queued deploy never overwrites a newer one. It also fails with an error if the `RESEND_API_KEY` secret is empty, before touching any Edge Function secret.
 
 The `deploy` job: link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy`, build and deploy the web app. Only one deploy runs at a time. The `smoke` job then tests the live site.
 
@@ -54,12 +58,26 @@ The smoke job needs a real staging coach who has a password.
 3. Add the secrets `STAGING_SMOKE_COACH_EMAIL` (that email) and `STAGING_SMOKE_COACH_PASSWORD` (that password).
 4. Re-run Deploy staging (or merge the next change). Until the secrets exist, the automatic smoke job fails by design.
 
+## A coach cannot get in (expired or used-up invite link)
+
+Invite and reset links are valid for 1 hour (`otp_expiry`) and work once. Ways back in, in order of preference:
+
+1. **Self-service**: the coach opens `https://staging.caltracker.app/sign-in`, clicks "Forgot password?", enters their email and follows the emailed link (Continue, then choose a password). The page always says "If that email has an account, we've sent a link", whether or not the account exists. Supabase limits how often an address can be emailed.
+2. **From us**: Actions -> Deploy staging -> `provision-coach` again with the same email. If that coach owns a workspace but has never signed in, a new set-password email is sent (the run says so). Nothing else changes. If they have signed in before, nothing is sent: use option 1.
+3. **Fallback in the dashboard**: Supabase Dashboard -> Authentication -> Users -> the user -> **Send password recovery**.
+
+## Edge Function checks
+
+`pnpm functions:check` syncs the shared code and type-checks `supabase/functions/send-invite/index.ts` with Deno (`pnpm functions:test` runs the tests). Run it before `pnpm functions:deploy`.
+
+Invite sending limits: the dashboard sends 20 invites per call, one call after another (a CSV can hold 200 rows). The function stops after 120 s and reports the rows it did not reach as "Not sent yet — use Resend" without changing them. A Resend click within 2 minutes of the last send changes nothing and sends no email (the earlier link still works); after 2 minutes it sends a new link and the old one stops working.
+
 ## Seed
 
 Actions -> Deploy staging -> Run workflow (branch `main`):
 
 - `action = import-exercises`: loads the ~870 exercise library.
-- `action = provision-coach`: fill `coach_email`, `coach_name`, `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged.
+- `action = provision-coach`: fill `coach_email`, `coach_name`, `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
 
 These use `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The values are passed as environment variables and the key is never printed.
 
