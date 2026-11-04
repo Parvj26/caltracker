@@ -1,7 +1,7 @@
 # CalTracker — Design System (Version 1)
 
 **Date:** 2026-11-03
-**Status:** Draft for review
+**Status:** Approved (2026-11-03)
 **Applies to:** mobile app (phone + iPad), coach web dashboard
 **Product spec:** `2026-11-03-coaching-app-design.md`
 **Approved mockups:** `docs/design/mockups/` (phone, coach dashboard, iPad landscape, iPad portrait)
@@ -46,19 +46,8 @@
 | `celebrate-bg` | `#FFF8D9` | Badge reveal background |
 | `tape` | `#FFE48A` | Sticker-book tape strip |
 
-### Dark
-| Token | Value |
-|---|---|
-| `bg` | `#0F0F10` |
-| `surface` | `#1C1C1E` |
-| `surface-sidebar` | `#161618` |
-| `border` | `#2A2A2D` |
-| `ink` | `#F5F5F5` |
-| `ink-muted` | `#F5F5F5` @ 60% |
-| `celebrate-bg` | `#2A2614` |
-
-- Pastel accents (`lime`, `pink`, `blue`, `drop`, `tape`) keep the same values in dark mode. Text on them is always `#121212`.
-- In dark mode the primary button inverts to a `#F5F5F5` fill with `#121212` text. It keeps the lime base shadow.
+### Dark mode
+Not in Version 1. The app and dashboard are light-only (forced light, ignoring the system setting). Components must read colours only through tokens, never hard-coded values, so dark mode can be added later by supplying a second token set. Text on pastel tiles is always `#121212`.
 
 ### Contrast rules
 - Body text is `ink` on `bg` or `surface` (≥ 15:1).
@@ -183,7 +172,7 @@
 
 ## 10. Implementation
 
-- **Tokens live in one place:** new package `packages/design-tokens` (TypeScript), exporting colours (light/dark), type scale, radii, spacing and shadows.
+- **Tokens live in one place:** new package `packages/design-tokens` (TypeScript), exporting colours (light only in V1; structured so a dark set can be added), type scale, radii, spacing and shadows.
   - **Web:** generates CSS custom properties (`--ct-lime`, …) consumed by CSS Modules. No CSS framework.
   - **Mobile:** a `useTheme()` hook returns the tokens for the current colour scheme, used with React Native `StyleSheet`.
 - Components are built once per platform: React Native for mobile, React for web. They share token names and props where practical.
@@ -193,6 +182,7 @@
 ---
 
 ## 11. Out of scope for this design system version
+- Dark mode (token structure allows adding it later).
 - Custom illustration production (style defined; art sourcing open).
 - Coach-branded themes (later: coach packs / white-labelling).
 - Apple Watch UI.
