@@ -1,3 +1,4 @@
+import { compareByLastName } from '@caltracker/shared';
 import { Card, Chip } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
@@ -49,7 +50,7 @@ export default async function ClientsPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('client_invites')
-      .select('id, email, full_name, sent_at, expires_at, accepted_at, accepted_by')
+      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
   ]);
@@ -58,23 +59,33 @@ export default async function ClientsPage() {
 
   // No direct foreign key links workspace_members to profiles, so load names separately.
   const profiles = members.data.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', members.data.map((m) => m.user_id))
+    ? await supabase.from('profiles').select('id, first_name, last_name, full_name').in('id', members.data.map((m) => m.user_id))
     : { data: [], error: null };
   if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
-  const nameByUser = new Map((profiles.data ?? []).map((p) => [p.id, p.full_name]));
+  const profileByUser = new Map((profiles.data ?? []).map((p) => [p.id, p]));
+  const nameOf = (userId: string) => {
+    const p = profileByUser.get(userId);
+    return { firstName: p?.first_name ?? '', lastName: p?.last_name ?? '' };
+  };
+  // Both lists are sorted by last name, then first name.
+  const clients = [...members.data].sort((a, b) => compareByLastName(nameOf(a.user_id), nameOf(b.user_id)));
 
   // Client emails live in auth.users, which RLS hides; fall back to the accepted invite's email.
   const emailByUser = new Map(
     invites.data.filter((i) => i.accepted_by).map((i) => [i.accepted_by as string, i.email]),
   );
-  const pending = invites.data.filter((i) => i.accepted_at === null);
+  const pending = invites.data
+    .filter((i) => i.accepted_at === null)
+    .sort((a, b) =>
+      compareByLastName({ firstName: a.first_name, lastName: a.last_name }, { firstName: b.first_name, lastName: b.last_name }),
+    );
 
   return (
     <div className={styles.page}>
       <header className={styles.titleRow}>
         <h1 className={styles.title}>Clients</h1>
         <p className={styles.caption}>
-          {count(members.data.length, 'client', 'clients')} · {count(pending.length, 'pending invite', 'pending invites')}
+          {count(clients.length, 'client', 'clients')} · {count(pending.length, 'pending invite', 'pending invites')}
         </p>
       </header>
 
@@ -95,16 +106,16 @@ export default async function ClientsPage() {
               </div>
             </div>
             <div role="rowgroup">
-              {members.data.length === 0 ? (
+              {clients.length === 0 ? (
                 <div role="row" className={styles.emptyRow}>
                   <span role="cell">No clients yet. Add one above.</span>
                 </div>
               ) : (
-                members.data.map((m) => {
+                clients.map((m) => {
                   const joined = m.created_at ? dateFormat.format(new Date(m.created_at)) : '';
                   return (
                     <div role="row" key={m.user_id} className={styles.row}>
-                      <NameCell name={nameByUser.get(m.user_id) ?? ''} toneKey={m.user_id} />
+                      <NameCell name={profileByUser.get(m.user_id)?.full_name ?? ''} toneKey={m.user_id} />
                       <span role="cell" className={styles.email}>{emailByUser.get(m.user_id) ?? ''}</span>
                       <span role="cell" className={styles.meta}>
                         {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}
@@ -152,7 +163,7 @@ export default async function ClientsPage() {
                         <Chip tone={expiry === 'Expired' ? 'amber' : 'grey'}>{expiry}</Chip>
                       </span>
                       <span role="cell" className={styles.actions}>
-                        <ResendButton email={i.email} fullName={i.full_name} />
+                        <ResendButton email={i.email} firstName={i.first_name} lastName={i.last_name} />
                       </span>
                     </div>
                   );

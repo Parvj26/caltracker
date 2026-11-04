@@ -116,6 +116,8 @@
 
 .form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
 .formField { flex: 1 1 200px; }
+/* First and last name share a row, even on a phone; email wraps below when space runs out. */
+.nameField { flex: 1 1 130px; }
 .formButton { flex: none; }
 .status { margin: 0; }
 

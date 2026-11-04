@@ -8,7 +8,13 @@ import { statusView, type StatusView } from './status-copy';
 import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 
-type FieldError = { field: 'fullName' | 'email'; message: string };
+type FieldError = { field: 'firstName' | 'lastName' | 'email'; message: string };
+
+const FIELD_MESSAGES: Record<FieldError['field'], string> = {
+  firstName: 'Enter a first name (1 to 100 characters).',
+  lastName: 'Last name can be at most 100 characters.',
+  email: 'Enter a valid email address.',
+};
 
 export function AddClientForm() {
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
@@ -26,14 +32,17 @@ export function AddClientForm() {
       const value = data.get(name);
       return typeof value === 'string' ? value : '';
     };
-    const parsed = InviteInput.safeParse({ fullName: field('fullName'), email: field('email') });
+    const parsed = InviteInput.safeParse({
+      firstName: field('firstName'),
+      lastName: field('lastName'),
+      email: field('email'),
+    });
     if (!parsed.success) {
-      const emailBad = parsed.error.issues.some((i) => i.path[0] === 'email');
-      setFieldError(
-        emailBad
-          ? { field: 'email', message: 'Enter a valid email address.' }
-          : { field: 'fullName', message: 'Enter a name (1 to 100 characters).' },
-      );
+      // Report the first bad field in form order.
+      const bad = (['firstName', 'lastName', 'email'] as const).find((f) =>
+        parsed.error.issues.some((i) => i.path[0] === f),
+      ) ?? 'firstName';
+      setFieldError({ field: bad, message: FIELD_MESSAGES[bad] });
       return;
     }
     setFieldError(null);
@@ -55,7 +64,8 @@ export function AddClientForm() {
     <section className={styles.panelSection} aria-labelledby="add-client-heading">
       <h2 id="add-client-heading" className={styles.sectionHeading}>Add client</h2>
       <form onSubmit={onSubmit} className={styles.form} noValidate>
-        <TextField label="Name" name="fullName" autoComplete="off" className={styles.formField} {...invalid('fullName')} />
+        <TextField label="First name" name="firstName" autoComplete="off" className={styles.nameField} {...invalid('firstName')} />
+        <TextField label="Last name" name="lastName" autoComplete="off" className={styles.nameField} {...invalid('lastName')} />
         <TextField label="Email" name="email" type="email" autoComplete="off" className={styles.formField} {...invalid('email')} />
         <Button type="submit" pending={pending} className={styles.formButton}>{pending ? 'Sending…' : 'Send invite'}</Button>
       </form>

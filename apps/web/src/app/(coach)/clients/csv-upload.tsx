@@ -4,6 +4,8 @@ import { useState, useTransition } from 'react';
 import {
   CLIENT_CSV_MAX_ROWS,
   EMAIL_HEADERS,
+  FIRST_NAME_HEADERS,
+  LAST_NAME_HEADERS,
   NAME_HEADERS,
   clientCsvTemplate,
   parseClientCsv,
@@ -74,10 +76,12 @@ export function CsvUpload() {
     <section className={styles.panelSection}>
       <h2 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h2>
       <p id="csv-explain" className={styles.explain}>
-        Bring your client list from Everfit or Excel: one row per client with name and email.
+        Bring your client list from Everfit or Excel: one row per client with first name, last name and email.
       </p>
       <div className={styles.csvHelp} id="csv-help" data-csv-headers="">
-        <HeaderList label="Name column, any of:" headers={NAME_HEADERS} />
+        <HeaderList label="First name column, any of:" headers={FIRST_NAME_HEADERS} />
+        <HeaderList label="Last name column (optional), any of:" headers={LAST_NAME_HEADERS} />
+        <HeaderList label="Or one name column, split at the first space:" headers={NAME_HEADERS} />
         <HeaderList label="Email column, any of:" headers={EMAIL_HEADERS} />
         <p className={styles.caption}>Up to {CLIENT_CSV_MAX_ROWS} clients per file.</p>
       </div>
@@ -114,14 +118,15 @@ export function CsvUpload() {
               <div className={styles.previewScroll}>
                 <table aria-label="CSV preview" className={styles.previewTable}>
                   <thead>
-                    <tr><th>Name</th><th>Email</th><th>Status</th></tr>
+                    <tr><th>First name</th><th>Last name</th><th>Email</th><th>Status</th></tr>
                   </thead>
                   <tbody>
                     {parsed.rows.map((r) => {
                       const view = statuses.get(r.email);
                       return (
                         <tr key={r.email}>
-                          <td>{r.fullName}</td>
+                          <td>{r.firstName}</td>
+                          <td>{r.lastName}</td>
                           <td>{r.email}</td>
                           <td>{view ? <StatusChip view={view} /> : null}</td>
                         </tr>
