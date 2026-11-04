@@ -140,6 +140,21 @@ test.describe('/auth/confirm with real tokens', () => {
     });
   }
 
+  // The page already cleans `next`, but the form can be edited by the visitor (or forged), so the server action
+  // must check it again. This submits a tampered hidden field to prove the action-level guard on its own.
+  for (const evil of ['//evil.com', 'https://evil.com', '/\\evil.com']) {
+    test(`the confirm action re-checks a tampered hidden next field (${evil})`, async ({ page }) => {
+      const token = await freshToken('magiclink');
+      await page.goto(`/auth/confirm?token_hash=${token}&type=magiclink&next=/clients`);
+      const next = page.locator('input[name="next"]');
+      await expect(next).toHaveValue('/clients');
+      await next.evaluate((el, value) => ((el as HTMLInputElement).value = value), evil);
+      await expect(next).toHaveValue(evil);
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await expect(page).toHaveURL(/^http:\/\/localhost:3000\/clients$/);
+    });
+  }
+
   test('/auth/confirm honours the allowlisted /set-password', async ({ page }) => {
     const token = await freshToken('recovery');
     await page.goto(`/auth/confirm?token_hash=${token}&type=recovery&next=/set-password`);
