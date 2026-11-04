@@ -10,5 +10,5 @@ const COPY: Record<InviteResultStatus, string> = {
 };
 
 export function statusCopy(status: InviteResultStatus, message?: string): string {
-  return status === 'with_another_coach' && message ? message : COPY[status];
+  return message ?? COPY[status];
 }

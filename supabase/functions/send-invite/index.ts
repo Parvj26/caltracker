@@ -17,8 +17,19 @@ export interface HandlerDeps {
   usesResend?: boolean;
   /** Minimum gap between sends, in ms. Resend allows 2 requests/second. 0 disables pacing. */
   sendIntervalMs?: number;
+  /**
+   * Time budget for one request, in ms (default 120 s). Edge Functions are cut off at 150 s, so rows not
+   * reached in time are reported as `error` ("use Resend") and left untouched instead of half-processed.
+   */
+  budgetMs?: number;
+  /** Clock, injectable for tests. */
+  now?: () => number;
+  /** A resend within this window of the last send changes nothing (default 2 min). */
+  resendCooldownMs?: number;
 }
 
+const DEFAULT_BUDGET_MS = 120_000;
+const DEFAULT_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ANOTHER_COACH_MESSAGE =
   "This person already trains with another coach on CalTracker. They'll need to leave that coach first.";
@@ -53,9 +64,13 @@ export function createHandler(deps: HandlerDeps) {
   const { mailer, supabaseAdmin: admin } = deps;
   const siteUrl = deps.publicSiteUrl?.replace(/\/+$/, '');
   const sendIntervalMs = deps.sendIntervalMs ?? 0;
+  const budgetMs = deps.budgetMs ?? DEFAULT_BUDGET_MS;
+  const clock = deps.now ?? Date.now;
+  const cooldownMs = deps.resendCooldownMs ?? DEFAULT_RESEND_COOLDOWN_MS;
   let lastSendAt = 0;
 
   return async (req: Request): Promise<Response> => {
+    const startedAt = clock();
     if (req.method !== 'POST')
       return json({ error: 'Method not allowed' }, 405);
 
@@ -132,6 +147,15 @@ export function createHandler(deps: HandlerDeps) {
 
     const results: Result[] = [];
     for (const invite of unique) {
+      if (clock() - startedAt >= budgetMs) {
+        // Out of time: touch nothing for this row (no row written, no token rotated).
+        results.push({
+          email: invite.email,
+          status: 'error',
+          message: 'Not sent yet — use Resend',
+        });
+        continue;
+      }
       results.push(await processOne(invite, byEmail.get(invite.email) ?? []));
     }
     return json({ results } satisfies SendInvitesResponse);
@@ -149,20 +173,32 @@ export function createHandler(deps: HandlerDeps) {
         if (clientOf?.workspace_id === workspaceId)
           return { email, status: 'already_member' };
 
-        const token = newToken();
-        const now = new Date();
-        const sentAt = now.toISOString();
-        const expiresAt = new Date(now.getTime() + 14 * DAY_MS);
-        const tokenHash = await sha256Hex(token);
-
         const { data: existing, error: findError } = await admin
           .from('client_invites')
-          .select('id')
+          .select('id, sent_at')
           .eq('workspace_id', workspaceId)
           .eq('email', email)
           .is('accepted_at', null)
           .maybeSingle();
         if (findError) throw findError;
+
+        // Double-click / retry guard: an email went out moments ago, so its link is still good.
+        // Do not rotate the token (that would kill the link already in the inbox) and do not email again.
+        if (existing && Date.now() - new Date(existing.sent_at).getTime() < cooldownMs) {
+          return {
+            email,
+            status: clientOf ? 'with_another_coach' : 'resent',
+            message: clientOf
+              ? ANOTHER_COACH_MESSAGE
+              : 'Already sent a moment ago. The link in that email still works.',
+          };
+        }
+
+        const token = newToken();
+        const now = new Date();
+        const sentAt = now.toISOString();
+        const expiresAt = new Date(now.getTime() + 14 * DAY_MS);
+        const tokenHash = await sha256Hex(token);
 
         if (existing) {
           const { error } = await admin
@@ -205,6 +241,20 @@ export function createHandler(deps: HandlerDeps) {
             'send-invite: email failed',
             err instanceof Error ? err.message : 'unknown',
           );
+          // Nothing was delivered, so Resend must not be blocked by the cooldown: backdate the send.
+          // (expires_at must stay within 14 days of sent_at, so it moves with it.)
+          const backdated = new Date(
+            now.getTime() - cooldownMs - 1000,
+          );
+          await admin
+            .from('client_invites')
+            .update({
+              sent_at: backdated.toISOString(),
+              expires_at: new Date(backdated.getTime() + 14 * DAY_MS).toISOString(),
+            })
+            .eq('workspace_id', workspaceId)
+            .eq('email', email)
+            .is('accepted_at', null);
           return {
             email,
             status: 'error',

@@ -170,7 +170,19 @@ t('new invite is sent, stored with 14-day expiry and emailed', async () => {
   assertEquals(data[0].workspace_name, 'Workspace A');
 });
 
-t('same email again is resent with a new token', async () => {
+async function backdateInvite(ws: string, minutesAgo: number) {
+  const sent = new Date(Date.now() - minutesAgo * 60_000);
+  const { error } = await admin
+    .from('client_invites')
+    .update({
+      sent_at: sent.toISOString(),
+      expires_at: new Date(sent.getTime() + 14 * DAY).toISOString(),
+    })
+    .eq('workspace_id', ws);
+  if (error) throw error;
+}
+
+t('same email again after the cooldown is resent with a new token', async () => {
   const { wsA, jwt } = await setup();
   const { mailer, sent } = fakeMailer();
   const h = handlerWith(mailer);
@@ -179,6 +191,7 @@ t('same email again is resent with a new token', async () => {
     invites: [{ email: 'again@x.com', fullName: 'Again' }],
   };
   await call(h, req, jwt);
+  await backdateInvite(wsA, 3);
   const before = (await openInvites(wsA))[0];
   const res = await call(h, req, jwt);
   assertEquals((await res.json()).results[0].status, 'resent');
@@ -187,6 +200,90 @@ t('same email again is resent with a new token', async () => {
   assert(rows[0].token_hash !== before.token_hash);
   assert(new Date(rows[0].expires_at) >= new Date(before.expires_at));
   assertEquals(sent.length, 2);
+});
+
+t('resend within 2 minutes keeps the token and sends nothing', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const h = handlerWith(mailer);
+  const req = {
+    workspaceId: wsA,
+    invites: [{ email: 'double@x.com', fullName: 'Double' }],
+  };
+  await call(h, req, jwt);
+  const before = (await openInvites(wsA))[0];
+  const res = await call(h, req, jwt);
+  const r = (await res.json()).results[0];
+  assertEquals(r.status, 'resent');
+  assert(String(r.message).includes('Already sent'));
+  const rows = await openInvites(wsA);
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].token_hash, before.token_hash);
+  assertEquals(rows[0].sent_at, before.sent_at);
+  assertEquals(sent.length, 1);
+});
+
+t('a failed send does not block an immediate resend', async () => {
+  const { wsA, jwt } = await setup();
+  let fail = true;
+  const sent: string[] = [];
+  const mailer: Mailer = {
+    send(msg) {
+      if (fail) return Promise.reject(new Error('down'));
+      sent.push(msg.to);
+      return Promise.resolve();
+    },
+  };
+  const h = handlerWith(mailer);
+  const req = {
+    workspaceId: wsA,
+    invites: [{ email: 'retry@x.com', fullName: 'Retry' }],
+  };
+  assertEquals((await (await call(h, req, jwt)).json()).results[0].status, 'error');
+  fail = false;
+  assertEquals((await (await call(h, req, jwt)).json()).results[0].status, 'resent');
+  assertEquals(sent, ['retry@x.com']);
+});
+
+t('stops at the time budget: later rows are error and untouched', async () => {
+  const { wsA, jwt } = await setup();
+  let clock = 0;
+  const sent: string[] = [];
+  const mailer: Mailer = {
+    send(msg) {
+      sent.push(msg.to);
+      clock += 100;
+      return Promise.resolve();
+    },
+  };
+  const handler = createHandler({
+    mailer,
+    supabaseAdmin: admin,
+    supabaseUrl: URL_,
+    anonKey: ANON,
+    publicSiteUrl: 'http://site.test',
+    budgetMs: 250,
+    now: () => clock,
+  });
+  const res = await call(
+    handler,
+    {
+      workspaceId: wsA,
+      invites: ['b1', 'b2', 'b3', 'b4', 'b5'].map((n) => ({
+        email: `${n}@x.com`,
+        fullName: n,
+      })),
+    },
+    jwt,
+  );
+  const results = (await res.json()).results;
+  assertEquals(
+    results.map((r: { status: string }) => r.status),
+    ['sent', 'sent', 'sent', 'error', 'error'],
+  );
+  assertEquals(results[3].message, 'Not sent yet — use Resend');
+  assertEquals(sent.length, 3);
+  assertEquals((await openInvites(wsA)).length, 3);
 });
 
 t('coach of A cannot invite into workspace B (403)', async () => {

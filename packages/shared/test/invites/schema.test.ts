@@ -22,13 +22,13 @@ describe('InviteInput', () => {
 describe('SendInvitesRequest', () => {
   const invite = { email: 'a@b.com', fullName: 'A' };
 
-  it('accepts 200 invites', () => {
-    const invites = Array.from({ length: 200 }, () => invite);
+  it('accepts 50 invites', () => {
+    const invites = Array.from({ length: 50 }, () => invite);
     expect(SendInvitesRequest.safeParse({ workspaceId, invites }).success).toBe(true);
   });
 
-  it('rejects 201 invites', () => {
-    const invites = Array.from({ length: 201 }, () => invite);
+  it('rejects 51 invites', () => {
+    const invites = Array.from({ length: 51 }, () => invite);
     expect(SendInvitesRequest.safeParse({ workspaceId, invites }).success).toBe(false);
   });
 

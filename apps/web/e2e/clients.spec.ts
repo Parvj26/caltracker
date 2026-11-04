@@ -27,8 +27,21 @@ test('add a client: shows under Pending invites, expires in 14 days, then resend
   await expect(row).toBeVisible();
   await expect(row.getByText('Expires in 14 days')).toBeVisible();
 
+  // A resend right after sending changes nothing: the link already in the inbox keeps working.
   await row.getByRole('button', { name: 'Resend' }).click();
-  await expect(row.getByText('Invite re-sent')).toBeVisible();
+  await expect(row.getByText(/Already sent a moment ago/)).toBeVisible();
+});
+
+test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }) => {
+  const run = unique();
+  const lines = ['Name,Email', ...Array.from({ length: 45 }, (_, i) => `Bulk ${i},bulk${i}-${run}@example.com`)];
+  await page.getByLabel('Upload CSV').setInputFiles({
+    name: 'bulk.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(lines.join('\n')),
+  });
+  await page.getByRole('button', { name: 'Send 45 invites' }).click();
+  await expect(page.getByRole('table', { name: 'CSV preview' }).getByText('Invite sent')).toHaveCount(45, { timeout: 60_000 });
 });
 
 test('empty name shows an inline error and sends nothing', async ({ page }) => {

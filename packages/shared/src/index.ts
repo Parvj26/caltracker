@@ -1,6 +1,7 @@
 export type { Database } from './database.types';
 export {
   INVITE_RESULT_STATUSES,
+  INVITE_CHUNK_SIZE,
   InviteInput,
   SendInvitesRequest,
   SendInvitesResponse,

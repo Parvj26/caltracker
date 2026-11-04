@@ -3,12 +3,12 @@ import { createResendMailer } from './mailer.ts';
 
 const msg = { to: 'a@b.com', subject: 's', html: '<p>h</p>', text: 'h' };
 
-function stub(statuses: number[], headers: Record<string, string> = {}) {
+function stub(statuses: number[], headers: Record<string, string> = {}, body429 = 'nope') {
   let calls = 0;
   const fetchFn = ((_url: string | URL | Request, _init?: RequestInit) => {
     const status = statuses[Math.min(calls++, statuses.length - 1)]!;
     return Promise.resolve(
-      new Response(status === 200 ? '{"id":"x"}' : 'nope', {
+      new Response(status === 200 ? '{"id":"x"}' : status === 429 ? body429 : 'nope', {
         status,
         headers: status === 429 ? headers : {},
       }),
@@ -17,8 +17,8 @@ function stub(statuses: number[], headers: Record<string, string> = {}) {
   return { fetchFn, calls: () => calls };
 }
 
-function mailerWith(statuses: number[], headers: Record<string, string> = {}) {
-  const s = stub(statuses, headers);
+function mailerWith(statuses: number[], headers: Record<string, string> = {}, body429 = 'nope') {
+  const s = stub(statuses, headers, body429);
   const sleeps: number[] = [];
   const mailer = createResendMailer({
     apiKey: 'k',
@@ -56,4 +56,32 @@ Deno.test('resend: other errors are not retried', async () => {
   const { mailer, calls } = mailerWith([500]);
   await assertRejects(() => mailer.send(msg), Error, 'Resend responded 500');
   assertEquals(calls(), 1);
+});
+
+Deno.test('resend: retry-after is capped at 5 seconds', async () => {
+  const { mailer, sleeps } = mailerWith([429, 200], { 'retry-after': '600' });
+  await mailer.send(msg);
+  assertEquals(sleeps, [5000]);
+});
+
+Deno.test('resend: a daily quota 429 fails immediately without retrying', async () => {
+  const body = JSON.stringify({ name: 'daily_quota_exceeded', message: 'You have reached your daily email sending quota.' });
+  const { mailer, sleeps, calls } = mailerWith([429, 200], {}, body);
+  await assertRejects(() => mailer.send(msg), Error, '429');
+  assertEquals(calls(), 1);
+  assertEquals(sleeps, []);
+});
+
+Deno.test('resend: a monthly quota 429 (message only) fails immediately', async () => {
+  const body = JSON.stringify({ name: 'rate_limit_exceeded', message: 'Monthly limit reached' });
+  const { mailer, calls } = mailerWith([429, 200], {}, body);
+  await assertRejects(() => mailer.send(msg), Error, '429');
+  assertEquals(calls(), 1);
+});
+
+Deno.test('resend: a plain rate-limit 429 JSON is still retried', async () => {
+  const body = JSON.stringify({ name: 'rate_limit_exceeded', message: 'Too many requests. You can only make 2 requests per second.' });
+  const { mailer, calls } = mailerWith([429, 200], {}, body);
+  await mailer.send(msg);
+  assertEquals(calls(), 2);
 });

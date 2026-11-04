@@ -11,14 +11,30 @@ export interface Mailer {
 
 const RESEND_MAX_RETRIES = 3;
 const RESEND_BACKOFF_MS = [500, 1000, 2000];
+/** Never sleep longer than this on a `retry-after`: the Edge Function has a hard wall-clock limit. */
+const MAX_RETRY_WAIT_MS = 5000;
 
-/** Delay before retrying a 429: the `retry-after` header (seconds) wins, else 500ms -> 1s -> 2s. */
+/** Delay before retrying a 429: the `retry-after` header (seconds, capped at 5 s) wins, else 500ms -> 1s -> 2s. */
 function retryDelayMs(res: Response, attempt: number): number {
   const seconds = Number(res.headers.get('retry-after'));
   if (res.headers.get('retry-after') !== null && Number.isFinite(seconds) && seconds >= 0) {
-    return seconds * 1000;
+    return Math.min(seconds * 1000, MAX_RETRY_WAIT_MS);
   }
   return RESEND_BACKOFF_MS[attempt] ?? 2000;
+}
+
+/**
+ * A 429 can mean "slow down" (retry) or "daily/monthly quota used up" (waiting seconds will not help).
+ * Resend's error JSON has a `name` such as `daily_quota_exceeded` and a `message`.
+ */
+function isQuotaExhausted(bodyText: string): boolean {
+  try {
+    const parsed = JSON.parse(bodyText) as { name?: unknown; message?: unknown };
+    const text = `${typeof parsed.name === 'string' ? parsed.name : ''} ${typeof parsed.message === 'string' ? parsed.message : ''}`;
+    return /quota|daily|monthly/i.test(text);
+  } catch {
+    return false;
+  }
 }
 
 export function createResendMailer(opts: {
@@ -40,8 +56,14 @@ export function createResendMailer(opts: {
           },
           body: JSON.stringify({ from: opts.from, ...msg }),
         });
-        await res.body?.cancel();
-        if (res.ok) return;
+        if (res.ok) {
+          await res.body?.cancel();
+          return;
+        }
+        const bodyText = await res.text().catch(() => '');
+        if (res.status === 429 && isQuotaExhausted(bodyText)) {
+          throw new Error('Resend responded 429 (sending quota used up)');
+        }
         // Resend allows 2 requests per second; back off and retry when it says slow down.
         if (res.status === 429 && attempt < RESEND_MAX_RETRIES) {
           await sleep(retryDelayMs(res, attempt));

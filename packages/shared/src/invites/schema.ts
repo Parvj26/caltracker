@@ -6,9 +6,12 @@ export const InviteInput = z.object({
 });
 export type InviteInput = z.infer<typeof InviteInput>;
 
+/** Invites per send-invite call. The dashboard chunks a bigger batch (CSV upload: 200 rows in total). */
+export const INVITE_CHUNK_SIZE = 20;
+
 export const SendInvitesRequest = z.object({
   workspaceId: z.string().uuid(),
-  invites: z.array(InviteInput).min(1).max(200),
+  invites: z.array(InviteInput).min(1).max(50),
 });
 export type SendInvitesRequest = z.infer<typeof SendInvitesRequest>;
 
