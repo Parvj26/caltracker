@@ -18,6 +18,7 @@
     "e2e:cleanup": "tsx scripts/e2e-helper.ts cleanup"
   },
   "dependencies": {
+    "@caltracker/design-tokens": "workspace:*",
     "@caltracker/shared": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "2.118.0",
