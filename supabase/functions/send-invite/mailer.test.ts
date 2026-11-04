@@ -106,7 +106,8 @@ Deno.test('resend: a request that never answers is aborted and the call fails wi
     fetchFn: h.fetchFn,
     sleep: () => Promise.resolve(),
     attemptTimeoutMs: 20,
-    totalCapMs: 100,
+    totalCapMs: 2000,
+    minAttemptMs: 10,
   });
   const started = Date.now();
   await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
@@ -126,8 +127,185 @@ Deno.test('resend: a timeout followed by a good answer still sends', async () =>
     return Promise.resolve(new Response('{"id":"x"}', { status: 200 }));
   }) as typeof fetch;
   const mailer = createResendMailer({
-    apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve(), attemptTimeoutMs: 20, totalCapMs: 1000,
+    apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve(), attemptTimeoutMs: 20, totalCapMs: 1000, minAttemptMs: 10,
   });
   await mailer.send(msg);
   assertEquals(calls, 2);
+});
+
+// A fake clock: each Resend call "takes" callMs and every sleep advances the clock by what it was asked.
+function fakeClockMailer(opts: { callMs: number; status: number; headers?: Record<string, string>; totalCapMs?: number }) {
+  let clock = 0;
+  const sleeps: number[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    calls++;
+    clock += opts.callMs;
+    return Promise.resolve(new Response('nope', { status: opts.status, headers: opts.headers ?? {} }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k',
+    from: 'f@x.com',
+    fetchFn,
+    now: () => clock,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      clock += ms;
+      return Promise.resolve();
+    },
+    totalCapMs: opts.totalCapMs,
+  });
+  return { mailer, sleeps, calls: () => calls, elapsed: () => clock };
+}
+
+Deno.test('resend: retry waits are clamped so one email never runs past the 20 s total cap', async () => {
+  // Each call takes 6 s and asks to wait 5 s: unclamped this would run 6+5+6+5+6 = 28 s.
+  const f = fakeClockMailer({ callMs: 6000, status: 429, headers: { 'retry-after': '5' } });
+  await assertRejects(() => f.mailer.send(msg), Error);
+  assertEquals(f.elapsed() <= 20_000, true, `ran ${f.elapsed()} ms`);
+  // After 17 s only 3 s are left: a 5 s wait would overrun, so it gives up instead of waiting.
+  assertEquals(f.sleeps, [5000]);
+  assertEquals(f.calls(), 2, 'no request is started once the budget is spent');
+});
+
+Deno.test('resend: fallback backoff stops once a wait would leave too little budget', async () => {
+  // 600 ms call, 500 ms wait, 600 ms call, 1 s wait, 600 ms call: 700 ms of the 4 s budget is left, too little.
+  const f = fakeClockMailer({ callMs: 600, status: 429, totalCapMs: 4000 });
+  await assertRejects(() => f.mailer.send(msg), Error);
+  assertEquals(f.elapsed() <= 4000, true, `ran ${f.elapsed()} ms`);
+  assertEquals(f.sleeps, [500, 1000]);
+  assertEquals(f.calls(), 3);
+});
+
+Deno.test('resend: no timeout retry when too little budget is left', async () => {
+  let clock = 0;
+  const sleeps: number[] = [];
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    clock += 1800; // the attempt ran until (almost) the cap, then timed out
+    return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn, now: () => clock, totalCapMs: 2000,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      clock += ms;
+      return Promise.resolve();
+    },
+  });
+  await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
+  assertEquals(clock <= 2000, true, `ran ${clock} ms`);
+  assertEquals(sleeps, []);
+});
+
+Deno.test('resend: another attempt needs at least 1 s of budget left', async () => {
+  // retry-after 0 means no wait: what matters is how much of the 20 s is left after the first call.
+  const tooLate = fakeClockMailer({ callMs: 19_001, status: 429, headers: { 'retry-after': '0' } });
+  await assertRejects(() => tooLate.mailer.send(msg), Error, '429');
+  assertEquals(tooLate.calls(), 1, 'a retry with under 1 s left could send while we report failure');
+
+  const justInTime = fakeClockMailer({ callMs: 19_000, status: 429, headers: { 'retry-after': '0' } });
+  await assertRejects(() => justInTime.mailer.send(msg), Error, '429');
+  assertEquals(justInTime.calls(), 2);
+});
+
+function recordingFetch(statuses: number[]) {
+  const keys: (string | null)[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, init?: RequestInit) => {
+    keys.push(new Headers(init?.headers).get('idempotency-key'));
+    const status = statuses[Math.min(calls++, statuses.length - 1)]!;
+    return Promise.resolve(new Response(status === 200 ? '{"id":"x"}' : 'nope', { status }));
+  }) as typeof fetch;
+  return { fetchFn, keys };
+}
+
+Deno.test('resend: retries of one email reuse the same Idempotency-Key', async () => {
+  const r = recordingFetch([429, 429, 200]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: r.fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  assertEquals(r.keys.length, 3);
+  assertEquals(typeof r.keys[0] === 'string' && r.keys[0].length > 0, true);
+  assertEquals(new Set(r.keys).size, 1);
+});
+
+Deno.test('resend: a timed-out attempt and its retry share the Idempotency-Key', async () => {
+  const keys: (string | null)[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, init?: RequestInit) => {
+    keys.push(new Headers(init?.headers).get('idempotency-key'));
+    if (calls++ === 0) return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+    return Promise.resolve(new Response('{"id":"x"}', { status: 200 }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  assertEquals(keys.length, 2);
+  assertEquals(keys[0] !== null && keys[0] === keys[1], true);
+});
+
+Deno.test('resend: different emails get different Idempotency-Keys', async () => {
+  const r = recordingFetch([200]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: r.fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  await mailer.send(msg);
+  assertEquals(r.keys.length, 2);
+  assertEquals(r.keys[0] !== null && r.keys[1] !== null && r.keys[0] !== r.keys[1], true);
+});
+
+function sequenceFetch(answers: { status: number; body: string }[]) {
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    const a = answers[Math.min(calls++, answers.length - 1)]!;
+    return Promise.resolve(new Response(a.body, { status: a.status }));
+  }) as typeof fetch;
+  return { fetchFn, calls: () => calls };
+}
+
+const concurrent409 = {
+  status: 409,
+  body: JSON.stringify({ name: 'concurrent_idempotent_requests', message: 'Same idempotency key used while original request is still in progress.' }),
+};
+
+Deno.test('resend: a 409 concurrent_idempotent_requests is retried with backoff (first attempt still in flight)', async () => {
+  const f = sequenceFetch([concurrent409, concurrent409, { status: 200, body: '{"id":"x"}' }]);
+  const sleeps: number[] = [];
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn: f.fetchFn,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    },
+  });
+  await mailer.send(msg);
+  assertEquals(f.calls(), 3);
+  assertEquals(sleeps, [500, 1000]);
+});
+
+Deno.test('resend: a 409 concurrent_idempotent_requests fails once retries or the budget run out', async () => {
+  let clock = 0;
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    calls++;
+    clock += 6000;
+    return Promise.resolve(new Response(concurrent409.body, { status: 409 }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn, now: () => clock,
+    sleep: (ms) => {
+      clock += ms;
+      return Promise.resolve();
+    },
+  });
+  await assertRejects(() => mailer.send(msg), Error, 'Resend responded 409');
+  assertEquals(calls > 1, true);
+  assertEquals(clock <= 20_000, true, `ran ${clock} ms`);
+});
+
+Deno.test('resend: a 409 invalid_idempotent_request is not retried', async () => {
+  const f = sequenceFetch([
+    { status: 409, body: JSON.stringify({ name: 'invalid_idempotent_request', message: 'Same idempotency key used with a different request payload.' }) },
+    { status: 200, body: '{"id":"x"}' },
+  ]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: f.fetchFn, sleep: () => Promise.resolve() });
+  await assertRejects(() => mailer.send(msg), Error, 'Resend responded 409');
+  assertEquals(f.calls(), 1);
 });

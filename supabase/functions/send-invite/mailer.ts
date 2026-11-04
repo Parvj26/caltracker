@@ -17,6 +17,11 @@ const MAX_RETRY_WAIT_MS = 5000;
 const ATTEMPT_TIMEOUT_MS = 10_000;
 /** All attempts, waits included, for one email: a stuck row must not hold up the whole batch. */
 const TOTAL_CAP_MS = 20_000;
+/**
+ * Do not start another attempt with less than this left of the total cap: a request given only a few ms
+ * could still be accepted by Resend while we report it as timed out.
+ */
+const MIN_ATTEMPT_MS = 1000;
 
 /** Delay before retrying a 429: the `retry-after` header (seconds, capped at 5 s) wins, else 500ms -> 1s -> 2s. */
 function retryDelayMs(res: Response, attempt: number): number {
@@ -41,6 +46,20 @@ function isQuotaExhausted(bodyText: string): boolean {
   }
 }
 
+/**
+ * A 409 `concurrent_idempotent_requests` means an earlier attempt with the same Idempotency-Key is still being
+ * processed at Resend (e.g. we timed out on it). It will probably deliver, so wait and ask again. Any other 409
+ * (such as `invalid_idempotent_request`) is a real error.
+ */
+function isConcurrentIdempotentRequest(bodyText: string): boolean {
+  try {
+    const parsed = JSON.parse(bodyText) as { name?: unknown; code?: unknown };
+    return parsed.name === 'concurrent_idempotent_requests' || parsed.code === 'concurrent_idempotent_requests';
+  } catch {
+    return false;
+  }
+}
+
 export function createResendMailer(opts: {
   apiKey: string;
   from: string;
@@ -49,16 +68,35 @@ export function createResendMailer(opts: {
   /** Per-request timeout (default 10 s) and total cap per email (default 20 s); injectable for tests. */
   attemptTimeoutMs?: number;
   totalCapMs?: number;
+  /** Minimum budget left to start a retry (default 1 s); injectable for tests. */
+  minAttemptMs?: number;
+  /** Clock, injectable for tests. */
+  now?: () => number;
 }): Mailer {
   const attemptTimeoutMs = opts.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS;
   const totalCapMs = opts.totalCapMs ?? TOTAL_CAP_MS;
   const fetchFn = opts.fetchFn ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const now = opts.now ?? Date.now;
+  const minAttemptMs = opts.minAttemptMs ?? MIN_ATTEMPT_MS;
   return {
     async send(msg) {
-      const startedAt = Date.now();
+      const startedAt = now();
+      const remainingMs = () => totalCapMs - (now() - startedAt);
+      // Generated once per email and reused on every retry: if Resend accepted a request that then
+      // timed out on our side, the retry is recognised as the same email and not sent twice.
+      const idempotencyKey = crypto.randomUUID();
+      /**
+       * Wait before a retry, but only when a real attempt (at least `minAttemptMs`) still fits in the total cap
+       * after the wait; otherwise give up straight away rather than wait for nothing. False means do not retry.
+       */
+      const waitBeforeRetry = async (ms: number): Promise<boolean> => {
+        if (remainingMs() - ms < minAttemptMs) return false;
+        await sleep(ms);
+        return remainingMs() >= minAttemptMs;
+      };
       for (let attempt = 0; ; attempt++) {
-        const remaining = totalCapMs - (Date.now() - startedAt);
+        const remaining = remainingMs();
         if (remaining <= 0) throw new Error('Resend did not answer in time');
         let res: Response;
         try {
@@ -67,6 +105,7 @@ export function createResendMailer(opts: {
             headers: {
               authorization: `Bearer ${opts.apiKey}`,
               'content-type': 'application/json',
+              'idempotency-key': idempotencyKey,
             },
             body: JSON.stringify({ from: opts.from, ...msg }),
             signal: AbortSignal.timeout(Math.min(attemptTimeoutMs, remaining)),
@@ -75,8 +114,7 @@ export function createResendMailer(opts: {
           const timedOut = err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError');
           if (!timedOut) throw err;
           // A timeout is a failed attempt: retry while attempts and the total cap allow.
-          if (attempt < RESEND_MAX_RETRIES && totalCapMs - (Date.now() - startedAt) > 0) {
-            await sleep(RESEND_BACKOFF_MS[attempt] ?? 2000);
+          if (attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(RESEND_BACKOFF_MS[attempt] ?? 2000))) {
             continue;
           }
           throw new Error('Resend did not answer in time');
@@ -90,8 +128,9 @@ export function createResendMailer(opts: {
           throw new Error('Resend responded 429 (sending quota used up)');
         }
         // Resend allows 2 requests per second; back off and retry when it says slow down.
-        if (res.status === 429 && attempt < RESEND_MAX_RETRIES) {
-          await sleep(retryDelayMs(res, attempt));
+        // Resend is still working on an earlier attempt of this email: back off the same way and ask again.
+        const retryable = res.status === 429 || (res.status === 409 && isConcurrentIdempotentRequest(bodyText));
+        if (retryable && attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(retryDelayMs(res, attempt)))) {
           continue;
         }
         throw new Error(`Resend responded ${res.status}`);

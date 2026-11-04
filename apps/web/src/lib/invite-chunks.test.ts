@@ -33,6 +33,10 @@ describe('sendInChunks', () => {
     expect(results.slice(0, 20).every((r) => r.status === 'sent')).toBe(true);
     expect(results.slice(20).every((r) => r.status === 'error')).toBe(true);
     expect(results).toHaveLength(45);
-    expect(results[25]?.message).toBe('Not sent — add this client again');
+    // The call failed as a whole, so some rows may still have gone out: don't claim they were not sent.
+    expect(results[25]?.message).toBe(
+      'Not confirmed — this invite may have gone out. Check Pending invites, or use Retry failed rows.',
+    );
+    expect(results[25]?.message).not.toMatch(/not sent/i);
   });
 });

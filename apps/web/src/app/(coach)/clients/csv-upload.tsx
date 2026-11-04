@@ -16,6 +16,9 @@ export function CsvUpload() {
   const [pending, startTransition] = useTransition();
 
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
+    // The input is disabled while sending; this guard also covers a change event that slips through,
+    // so a new file can never mix with the outcomes of a send still in flight.
+    if (pending) return;
     const file = event.target.files?.[0];
     setStatuses(new Map());
     setFailed(new Set());
@@ -47,7 +50,7 @@ export function CsvUpload() {
       <h2>Upload CSV</h2>
       <label className={styles.fileLabel}>
         Upload CSV
-        <input type="file" accept=".csv,text/csv" onChange={(e) => void onFile(e)} />
+        <input type="file" accept=".csv,text/csv" disabled={pending} onChange={(e) => void onFile(e)} />
       </label>
       <p className={styles.hint}>Columns: Name, Email. Up to 200 clients.</p>
       {parsed ? (
