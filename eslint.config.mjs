@@ -16,6 +16,8 @@ export default tseslint.config(
       '.superpowers/**',
       '**/.open-next/**',
       '**/.wrangler/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
     ],
   },
   eslint.configs.recommended,
