@@ -79,7 +79,7 @@ export async function provisionCoach(
   let userId: string;
   const invite = await admin.auth.admin.inviteUserByEmail(email, {
     data: { full_name: input.fullName },
-    redirectTo: `${requireEnv('PUBLIC_SITE_URL')}/sign-in`,
+    redirectTo: `${requireEnv('PUBLIC_SITE_URL')}/set-password`,
   });
   if (invite.error) {
     if (invite.error.code !== 'email_exists') throw invite.error;
