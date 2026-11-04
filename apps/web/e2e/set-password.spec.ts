@@ -32,7 +32,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
   });
   const line = out.split('\n').find((l) => l.startsWith('RESULT:'));
   if (!line) throw new Error(`provisionCoach gave no result:\n${out}`);
-  return JSON.parse(line.slice('RESULT:'.length));
+  return JSON.parse(line.slice('RESULT:'.length)) as { userId: string; workspaceId: string };
 }
 
 async function inviteLinkFor(email: string): Promise<string> {

@@ -14,10 +14,11 @@ export function safeNextPath(next: string | null): string {
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get('token_hash');
-  const type = searchParams.get('type') as EmailOtpType | null;
+  const rawType = searchParams.get('type');
+  const type = OTP_TYPES.find((t) => t === rawType);
   const next = safeNextPath(searchParams.get('next'));
 
-  if (tokenHash && type && OTP_TYPES.includes(type)) {
+  if (tokenHash && type) {
     const supabase = await createServerSupabase();
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     if (!error) return NextResponse.redirect(new URL(next, request.url));
