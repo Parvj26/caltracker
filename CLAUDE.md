@@ -25,4 +25,5 @@ Expo (React Native) mobile/iPad app · Next.js coach dashboard · Supabase (Post
 - Test-driven development for shared logic and database policies.
 - Before saying work is done: run typecheck, lint and all tests, and show the output.
 - Scope discipline: anything listed as "not in Version 1" in the spec needs product owner approval before building.
+- Hosting stays portable: the web app runs on Cloudflare Workers via OpenNext, but app code must not use host-specific APIs (Cloudflare KV/R2/D1/bindings, Vercel KV/Blob/Cron, edge-only runtimes). Data, files and background jobs go through Supabase. Moving to Vercel must stay a config + DNS change.
 - Media: no video uploads. Images are compressed on the device (max 1600 px long edge, plus thumbnail) before upload.

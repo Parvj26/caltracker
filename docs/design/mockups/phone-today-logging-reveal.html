@@ -1,0 +1,80 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Caveat:wght@700&display=swap');
+.row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.phone{width:240px;border-radius:32px;padding:14px;box-shadow:0 10px 28px rgba(0,0,0,.18);border:6px solid #111;min-height:470px;box-sizing:border-box;background:#fff;color:#121212;font-family:'Bricolage Grotesque',system-ui,sans-serif}
+.cap{text-align:center;font-weight:700;margin-top:8px;font-size:13px}
+.k{font-size:11px;opacity:.6}
+h4{margin:2px 0 10px;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.hand{font-family:Caveat,cursive;font-size:19px;color:#E0408A;transform:rotate(-3deg);display:inline-block}
+.today{background:#fff;border:2px solid #EDEDED;border-radius:20px;padding:12px}
+.btn{background:#121212;color:#fff;border-radius:16px;padding:12px;text-align:center;font-weight:800;margin-top:10px;box-shadow:0 4px 0 #C8F169;letter-spacing:.03em}
+.tile{border-radius:20px;padding:12px;margin-top:10px}
+.lime{background:#C8F169}.pink{background:#FFC9E3}.blue{background:#B9E3FF}.grey{background:#F4F4F4}
+.animal{display:flex;align-items:center;gap:10px}
+.st{font-size:24px;background:#fff;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff,0 2px 6px rgba(0,0,0,.2)}
+.stickers{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.stickers .st:nth-child(3n+1){transform:rotate(-8deg)}.stickers .st:nth-child(3n+2){transform:rotate(6deg)}.stickers .st:nth-child(3n){transform:rotate(-3deg)}
+.lock{background:transparent;box-shadow:none;border:2px dashed #CFCFCF;filter:grayscale(1);opacity:.45}
+.tape{background:#FFE48A;opacity:.9;width:56px;height:13px;margin:-20px auto 6px;transform:rotate(-4deg)}
+.set{display:grid;grid-template-columns:22px 1fr 1fr 34px;gap:6px;align-items:center;margin-top:6px;font-size:13px}
+.cell{background:#F4F4F4;border-radius:10px;padding:7px;text-align:center;font-weight:700}
+.done{background:#C8F169}
+.chk{width:30px;height:30px;border-radius:10px;background:#121212;color:#C8F169;display:flex;align-items:center;justify-content:center;font-weight:800}
+.chk.off{background:#EDEDED;color:#999}
+.timer{background:#121212;color:#fff;border-radius:16px;padding:10px;text-align:center;margin-top:10px;font-weight:800}
+</style>
+
+<h2>Round 4 — streak back, as a handwritten note at the top</h2>
+<p class="subtitle">Your picks combined: Candy Pop's palette, type and black buttons · "Today" card from Sticker Book · "Last workout" animal tile from Candy Pop · stickers for the collection · streak shown as a handwritten note next to your name ("6 weeks strong!"). I added the <b>workout logging</b> screen so you can see it stays calm while you train.</p>
+
+<div class="row">
+  <div>
+    <div class="phone">
+      <div class="k">Tuesday</div>
+      <h4>Hi Sam <span class="hand">6 weeks strong! 🔥</span></h4>
+      <div class="today"><div class="k">Today</div><b style="font-size:17px">Upper A</b><div class="k" style="opacity:.75">6 exercises · ~45 min</div><div class="btn">START</div></div>
+      <div class="tile blue"><div class="animal"><span style="font-size:36px">🐘</span><div><div class="k">Last workout</div><div style="font-size:19px;font-weight:800">1 elephant</div><div class="k">4,200 kg · next up: rhino 🦏</div></div></div></div>
+      <div class="tile grey" style="margin-top:18px"><div class="tape"></div><div class="k">Sticker book · 7 of 30</div>
+        <div class="stickers"><span class="st">🐘</span><span class="st">🦌</span><span class="st">🐕</span><span class="st lock">🦏</span></div></div>
+    </div>
+    <div class="cap">Home ("Today")</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="k">Upper A · 12:40</div>
+      <h4>Bench press</h4>
+      <div class="k">Last time: 65 kg × 8</div>
+      <div class="set k" style="opacity:.6"><span>Set</span><span>kg</span><span>Reps</span><span></span></div>
+      <div class="set"><span>1</span><span class="cell done">65</span><span class="cell done">8</span><span class="chk">✓</span></div>
+      <div class="set"><span>2</span><span class="cell done">70</span><span class="cell done">6</span><span class="chk">✓</span></div>
+      <div class="set"><span>3</span><span class="cell">70</span><span class="cell">6</span><span class="chk off">✓</span></div>
+      <div class="set" style="padding-left:14px"><span>↳</span><span class="cell" style="background:#FFE3F0">50</span><span class="cell" style="background:#FFE3F0">8</span><span class="chk off">✓</span></div>
+      <div class="k" style="margin-top:8px">+ Set &nbsp;·&nbsp; + Drop &nbsp;·&nbsp; Swap</div>
+      <div class="timer">Rest 1:24</div>
+      <div class="tile pink" style="padding:8px 12px"><b>🎉 New PR!</b> <span class="k" style="opacity:.8">Bench 70 kg × 6</span></div>
+    </div>
+    <div class="cap">Logging (calm, fast)</div>
+  </div>
+
+  <div>
+    <div class="phone" style="background:#FFF8D9">
+      <div class="k" style="text-align:center">Workout complete</div>
+      <h4 style="text-align:center;margin-top:10px">You lifted<br>a rhino!</h4>
+      <div style="display:flex;justify-content:center;margin:16px 0">
+        <span class="st" style="width:120px;height:120px;font-size:70px;transform:rotate(-6deg);box-shadow:0 0 0 6px #fff,0 8px 20px rgba(0,0,0,.25)">🦏</span>
+      </div>
+      <div style="text-align:center;font-weight:800;font-size:18px">4,850 kg</div>
+      <div class="k" style="text-align:center">New sticker for your book · 8 of 30</div>
+      <div class="tile lime" style="text-align:center;font-weight:700">2 personal bests</div>
+      <div class="btn" style="box-shadow:0 4px 0 #FFC9E3">SHARE TO COMMUNITY</div>
+      <div style="text-align:center;margin-top:10px;font-weight:700;font-size:13px">Save image</div>
+    </div>
+    <div class="cap">Badge reveal</div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:18px">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>This is the direction</h3><p>Lock it in; refine details later</p></div></div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)"><div class="letter">~</div><div class="content"><h3>Close — needs tweaks</h3><p>Tell me what in the terminal</p></div></div>
+</div>

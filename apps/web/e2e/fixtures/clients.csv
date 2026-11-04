@@ -1,0 +1,6 @@
+Name,Email
+Alice Example,alice-{{RUN}}@example.com
+Bob Example,bob-{{RUN}}@example.com
+Cara Example,cara-{{RUN}}@example.com
+Dan Invalid,not-an-email
+Alice Again,alice-{{RUN}}@example.com

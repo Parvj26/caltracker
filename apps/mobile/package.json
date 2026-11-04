@@ -1,0 +1,44 @@
+{
+  "name": "mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "env:local": "bash scripts/write-local-env.sh",
+    "e2e": "bash scripts/run-e2e.sh",
+    "e2e:invite": "tsx scripts/e2e-helper.ts invite",
+    "e2e:confirm": "tsx scripts/e2e-helper.ts confirm",
+    "e2e:cleanup": "tsx scripts/e2e-helper.ts cleanup"
+  },
+  "dependencies": {
+    "@caltracker/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "2.118.0",
+    "aes-js": "3.1.2",
+    "expo": "58.0.23",
+    "expo-constants": "58.0.15",
+    "expo-crypto": "58.0.7",
+    "expo-linking": "58.0.16",
+    "expo-router": "58.0.30",
+    "expo-secure-store": "58.0.2",
+    "expo-status-bar": "58.0.4",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.11.1",
+    "react-native-screens": "4.30.1"
+  },
+  "devDependencies": {
+    "@types/aes-js": "3.1.4",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

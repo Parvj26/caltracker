@@ -1,0 +1,88 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Caveat:wght@700&display=swap');
+.row2{display:flex;gap:28px;justify-content:center;flex-wrap:wrap}
+.ipad{width:420px;border:12px solid #111;border-radius:28px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.2);font-family:'Bricolage Grotesque',system-ui,sans-serif;color:#121212;background:#fff;aspect-ratio:3/4;display:flex;flex-direction:column}
+.k{font-size:12px;opacity:.6}
+h4{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.hand{font-family:Caveat,cursive;font-size:19px;color:#E0408A}
+.lime{background:#C8F169}.pink{background:#FFC9E3}.blue{background:#B9E3FF}.grey{background:#F4F4F4}
+.av{width:40px;height:40px;border-radius:50%;background:#B9E3FF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none}
+.body{flex:1;padding:18px;overflow:hidden;display:flex;flex-direction:column}
+.tabbar{display:flex;justify-content:space-around;border-top:1px solid #EEE;padding:10px 0;font-size:11px;font-weight:700;color:#888}.tabbar .on{color:#121212}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.cc{border:2px solid #EDEDED;border-radius:20px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.cc .top{display:flex;gap:8px;align-items:center;font-size:14px}
+.go{background:#121212;color:#fff;border-radius:14px;padding:12px;text-align:center;font-weight:800;box-shadow:0 4px 0 #C8F169}
+.done{background:#F4F4F4;border-radius:14px;padding:12px;text-align:center;font-weight:700;font-size:13px}
+.chip{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;display:inline-block;align-self:flex-start}
+.switch{display:flex;gap:10px;align-items:center;padding:10px 14px;background:#F6F6F4;border-bottom:1px solid #EAEAEA}
+.switch .av{width:44px;height:44px}
+.switch .sel{box-shadow:0 0 0 3px #fff,0 0 0 5px #121212}
+.switch .add{background:#fff;border:2px dashed #CCC;color:#999}
+.exs{display:flex;gap:6px;margin:10px 0 12px;flex-wrap:wrap}
+.ex{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;background:#F4F4F4}.ex.cur{background:#121212;color:#fff}.ex.ok{background:#C8F169}
+.sets{display:grid;grid-template-columns:28px 1fr 1fr 56px;gap:8px;align-items:center}
+.n{font-weight:800;text-align:center;opacity:.5}
+.step{display:flex;align-items:center;justify-content:space-between;background:#F4F4F4;border-radius:14px;padding:5px}
+.step b{font-size:22px}
+.pm{width:38px;height:38px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;box-shadow:0 2px 0 #DDD}
+.step.dn{background:#C8F169}.step.dn .pm{opacity:.35}
+.ck{width:54px;height:54px;border-radius:15px;background:#121212;color:#C8F169;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800}.ck.off{background:#EDEDED;color:#AAA}
+.foot{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.timer{background:#121212;color:#fff;border-radius:16px;padding:12px;font-weight:800;font-size:18px;text-align:center}
+.finish{background:#E0408A;color:#fff;border-radius:16px;padding:12px;font-weight:800;text-align:center;box-shadow:0 4px 0 #B32C6C}
+.acts{display:flex;gap:6px;font-weight:700;font-size:13px;margin-top:12px}.acts span{flex:1;text-align:center;border:1.5px solid #121212;border-radius:12px;padding:9px 0}
+.cap{text-align:center;font-weight:700;margin-top:8px;max-width:420px}
+</style>
+
+<h2>iPad held upright (portrait)</h2>
+<p class="subtitle">Same screens as landscape, rearranged for a narrower screen. Turning the iPad switches between them instantly — nothing is lost mid-session.</p>
+
+<div class="row2">
+  <div>
+    <div class="ipad">
+      <div class="body">
+        <div class="k">Tuesday 3 November</div>
+        <h4>Today's clients <span class="hand">14 today</span></h4>
+        <div class="grid">
+          <div class="cc"><div class="top"><span class="av">SL</span><div><b>Sam Lee</b><div class="k">Upper A</div></div></div><span class="chip pink">Last: bench PR</span><div class="go">Log session</div></div>
+          <div class="cc"><div class="top"><span class="av lime">PR</span><div><b>Priya R.</b><div class="k">Lower B</div></div></div><span class="chip grey">Knee niggle</span><div class="go">Log session</div></div>
+          <div class="cc"><div class="top"><span class="av pink">JM</span><div><b>Jay M.</b><div class="k">Done · 42 min</div></div></div><span class="chip lime">2 PRs · 🦏</span><div class="done">View</div></div>
+          <div class="cc"><div class="top"><span class="av">AK</span><div><b>Alex K.</b><div class="k">Upper B</div></div></div><span class="chip blue">Client logging</span><div class="done">In progress</div></div>
+        </div>
+      </div>
+      <div class="tabbar"><span class="on">Today</span><span>Clients</span><span>Messages ③</span><span>Community</span><span>More</span></div>
+    </div>
+    <div class="cap">① Home — two columns of client cards</div>
+  </div>
+
+  <div>
+    <div class="ipad">
+      <div class="switch">
+        <span class="av sel">SL</span><span class="av lime">PR</span><span class="av pink">DW</span><span class="av add">+</span>
+        <span class="k" style="margin-left:auto">Tap to switch client</span>
+      </div>
+      <div class="body">
+        <div class="k">Sam Lee · Upper A · 18 min · logged by you</div>
+        <h4>Bench press</h4>
+        <div class="k">Last time 65 kg × 8 · Note: pause at chest</div>
+        <div class="exs"><span class="ex ok">Warm-up ✓</span><span class="ex cur">Bench</span><span class="ex">Row</span><span class="ex">OHP</span><span class="ex">Pull-up</span><span class="ex">Curl</span></div>
+        <div class="sets">
+          <span class="k" style="text-align:center">Set</span><span class="k">kg</span><span class="k">Reps</span><span></span>
+          <span class="n">1</span><div class="step dn"><span class="pm">−</span><b>65</b><span class="pm">+</span></div><div class="step dn"><span class="pm">−</span><b>8</b><span class="pm">+</span></div><span class="ck">✓</span>
+          <span class="n">2</span><div class="step dn"><span class="pm">−</span><b>70</b><span class="pm">+</span></div><div class="step dn"><span class="pm">−</span><b>6</b><span class="pm">+</span></div><span class="ck">✓</span>
+          <span class="n">3</span><div class="step"><span class="pm">−</span><b>70</b><span class="pm">+</span></div><div class="step"><span class="pm">−</span><b>6</b><span class="pm">+</span></div><span class="ck off">✓</span>
+          <span class="n">↳</span><div class="step" style="background:#FFE3F0"><span class="pm">−</span><b>50</b><span class="pm">+</span></div><div class="step" style="background:#FFE3F0"><span class="pm">−</span><b>8</b><span class="pm">+</span></div><span class="ck off">✓</span>
+        </div>
+        <div class="acts"><span>+ Set</span><span>+ Drop</span><span>Swap</span></div>
+        <div class="foot" style="margin-top:auto"><span class="timer">Rest 1:24</span><span class="finish">Finish</span></div>
+      </div>
+    </div>
+    <div class="cap">② Session mode — client list becomes a row of photos at the top; logging uses the full width</div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:18px">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>Looks right</h3><p>Write up the design system</p></div></div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)"><div class="letter">~</div><div class="content"><h3>Needs changes</h3><p>Tell me what in the terminal</p></div></div>
+</div>

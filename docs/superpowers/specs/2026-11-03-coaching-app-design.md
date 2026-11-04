@@ -61,6 +61,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - Meal plans / nutrition
 - Habits, tasks, check-ins
 - Coach-themed badge packs
+- Session booking / appointment scheduling (planned for a later version)
 
 ---
 
@@ -155,10 +156,23 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - A workout instance can be in progress by only one person. When the coach starts it, the client sees "Your coach is logging this session" (read-only), and vice versa.
 - Offline edge case: if both sides log the same workout while offline, on sync the first completion wins; the second is saved as a separate workout and the coach is shown both to resolve.
 
+### Forgotten workouts (reminder + auto-finish)
+- **Reminder:** each completed set (re)schedules an on-device local notification for **20 minutes** after that set: "Still training? 💪 Tap to finish your {workout name} workout." Logging another set pushes it back; finishing or discarding the workout cancels it. Scheduled locally, so it works offline.
+- **Auto-finish:** a workout in progress with no activity for **3 hours** is finished automatically, with its end time set to the **last completed set** (so duration is accurate). History, PRs, totals and badges count normally. The badge reveal shows on next app open with the note "We finished {workout name} for you at {time}." The workout can be reopened to add missed sets.
+- Applies equally to coach session logging on iPad (the reminder goes to the coach's device).
+- Auto-finish runs on the device when the app next opens or resumes, and server-side (scheduled job) for workouts whose device never reopens, using the last synced set time.
+
 ### Offline behaviour
 - All logging reads and writes go to an on-device SQLite database kept in sync with Supabase by **PowerSync**.
 - A "Not synced yet" indicator is shown until pending changes upload.
 - Badge calculation runs on the device from shared code, so the badge reveal works offline; the server recalculates on sync and is the source of truth for the collection and totals.
+
+### Coach home (dashboard and iPad)
+- **Today's clients:** clients with a workout assigned today, each with **Log session** (or View when done; "Client is logging" when in progress). No appointment times in V1.
+- **Tiles:** Done this week (completed / assigned, with progress bar), New PRs this week, Workouts today, Missed 2+ workouts.
+- **Needs attention:** clients with no completed workout in ≥ 5 days (Message), programs ending within 7 days (Assign), and clients with no body measurement in ≥ 30 days (Add scan).
+- **Quick search (⌘K on web):** jump to any client.
+- iPad supports portrait and landscape; layouts in the design system spec. Phone app is portrait-only.
 
 ### Coach review (dashboard)
 - **Activity feed:** completed workouts across clients (client, workout, duration, PR count).
@@ -173,15 +187,28 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 ### Volume and comparisons
 - **Workout volume** = Σ (weight × reps) over all completed sets of `weight_reps` exercises, including warm-ups and drops. Bodyweight (`reps`) exercises are excluded in V1.
 - **Weight comparison badge:** after each workout, select the heaviest item from our comparison list whose weight ≤ workout volume, and show the multiple ("4,200 kg ≈ 1 elephant").
-- **Comparison list:** our own list of ~30 animals/objects spanning ~5 kg to ~100,000 kg, with our own illustrations. No Everfit artwork, wording, or list reused.
-- **Distance comparison badge:** for `distance` exercises, compare total distance to landmarks (our own list).
+- **Comparison ladder:** our own list of 30 real animals, common and exotic mixed, from ~4 kg (cat) to ~150,000 kg (blue whale). The exact list and weights are in `docs/design/collection.md`. No Everfit artwork, wording, or list reused.
+- **Distance comparison badge:** for `distance` exercises, compare total distance to landmarks (our own list, in `docs/design/collection.md`).
 
-### Collection ("your zoo")
-- The first time a client's workout reaches a comparison item, that item is added to their collection.
-- The collection screen shows collected items and locked items with the next target ("Next: rhino — 2,300 kg").
+### Collection ("sticker book")
+Three tiers of animal stickers, plus shiny variants. Full list and rules: `docs/design/collection.md`.
+- **Common and Exotic (ladder animals):** the first time a workout's volume reaches a ladder animal, that animal's sticker is added.
+- **Rare finds (achievement-based):** about 10 rare animals, each unlocked by a specific achievement (workout counts, streak lengths, PR counts, lifetime volume). Each locked rare find shows its requirement ("Okapi — 12-week streak").
+- **Ultra-rare random drops:** 3 animals. Each qualifying workout has a **1-in-100** chance of dropping one the client doesn't own yet.
+- **Shiny variants:** every time a workout earns its ladder animal, there is a **1-in-20** chance it comes out as a holographic shiny version of that animal. Shiny versions are collected separately and rendered with an animated foil effect in the app (no extra artwork).
+- **Qualifying workout** (for random drops and shiny rolls): a completed workout with ≥ 5 completed sets. This stops empty workouts from being used to farm drops. Coach-logged workouts qualify.
+- **Fairness and integrity:** random rolls happen on the server when the workout syncs, never on the device. Offline workouts reveal their ladder sticker immediately. Any rare or shiny result appears as a "Surprise!" reveal on next app open after sync.
+- **Never purchasable:** nothing in the collection can be bought, so drops are not loot boxes.
+- The sticker book shows collected stickers, locked ladder animals ("Next: rhino — 2,300 kg"), locked rare finds (silhouette + requirement), and "???" for ultra-rares not yet found.
+- **Showing off:** rare, ultra-rare and shiny reveals use a bigger celebration and can be shared to the community. The share card shows the tier ("Rare find!", "Ultra-rare!", "Shiny!").
+- Coach per-client "disable comparison badges" also disables random drops and shinies for that client.
+- **Animal fact cards:** every sticker (animals and landmarks) has a fact card with the name, one fun fact (≤ 140 characters), where it lives (animals), and for rare and ultra-rare animals a "How rare?" line where a sourced number exists.
+  - The card appears on the reveal screen ("Meet the okapi"), when tapping a sticker in the sticker book (it flips over), and on community share cards.
+  - Facts are stored as data (a table seeded from `docs/design/animal-facts.md`), not hard-coded, so they can change without an app release.
+  - Every fact is checked against a reliable source before release; sources are recorded in `animal-facts.md`.
 
 ### Totals
-- Monthly and lifetime volume totals, each mapped to a comparison item ("This month: 3 school buses").
+- Monthly and lifetime volume totals, each mapped to a ladder animal ("This month: 3 elephants").
 
 ### Other achievements
 - **Personal bests** per exercise, excluding warm-ups: heaviest weight, most reps at a given weight, best estimated 1RM (Epley formula: weight × (1 + reps/30)).
@@ -257,6 +284,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 | Client | New message |
 | Client | Comment on your workout or post |
 | Client | New coach post in community |
+| Client / Coach | Still training? — 20 min after last logged set of an unfinished workout (local, on-device) |
 | Coach | Client completed a workout |
 | Coach | New message |
 | Coach | New community report |
@@ -278,7 +306,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 | Shared logic | TypeScript package used by both apps |
 | Validation | Zod schemas in the shared package |
 | Error monitoring | Sentry |
-| Web hosting | Vercel |
+| Web hosting | Cloudflare Workers via OpenNext (`@opennextjs/cloudflare`); app code stays host-agnostic so it can move to Vercel |
 | Mobile builds/releases | Expo EAS Build, EAS Submit, EAS Update |
 
 ### Repository layout (monorepo, pnpm workspaces + Turborepo)
@@ -302,8 +330,8 @@ supabase/
 
 ### Environments
 - **Local:** Supabase CLI local stack, seed data only.
-- **Staging:** separate Supabase project + Vercel preview + internal app builds. Used by the product owner for testing.
-- **Production:** separate Supabase project, production Vercel deployment, store builds.
+- **Staging:** separate Supabase project + Cloudflare Workers staging deployment + internal app builds. Used by the product owner for testing.
+- **Production:** separate Supabase project, production Cloudflare Workers deployment, store builds.
 - Real client data is never copied into local or staging.
 
 ---
@@ -347,7 +375,7 @@ supabase/
 
 ## 14. Accounts the product owner must create
 
-Apple Developer Program, Google Play Console, Supabase, Vercel, Expo, GitHub, Sentry, PowerSync, domain name. All owned by the product owner.
+Apple Developer Program, Google Play Console, Supabase, Cloudflare, Resend, Expo, GitHub, Sentry, PowerSync, domain name. All owned by the product owner.
 
 ---
 
@@ -373,7 +401,8 @@ Each phase gets its own detailed implementation plan.
 | 3 | What does the coach pay Everfit per month, and on which plan? | Product owner → coach | Pricing for other coaches |
 | 4 | Does Everfit allow exporting client/workout data? | Developer to research | Possible post-launch import tool |
 | 5 | ~~Product name and domain~~ Resolved: CalTracker, caltracker.app | Product owner | Branding, app store listing |
-| 6 | Badge illustrations: commission an illustrator, license an icon set, or start with simple icons? | Product owner | Section 6 visuals |
+| 6 | ~~Badge illustrations~~ Resolved: AI-generated by the product owner using `docs/design/sticker-prompt-pack.md`; Claude processes them into stickers. Fluent Emoji placeholders until then. | Product owner | Section 6 visuals |
+| 10 | **Decide before onboarding a second coach (blocking):** claiming invites by email only — decide whether a client joins via the specific invite link, or chooses when several coaches invited them (prevents one coach intercepting another's new client). | Product owner | Section 3 onboarding |
 | 7 | Which countries are the business and its clients in? | Product owner | Privacy policy, data regulations |
 | 8 | Confirm current Supabase and PowerSync pricing and free-tier limits | Developer | Cost model |
 | 9 | Verify free-exercise-db license file before import | Developer | Section 4 |

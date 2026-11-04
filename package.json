@@ -1,0 +1,37 @@
+{
+  "name": "caltracker",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "check": "turbo typecheck lint test",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter web test:e2e",
+    "test:integration": "pnpm --filter @caltracker/scripts test:integration",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "build": "turbo build",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts",
+    "functions:sync": "bash scripts/sync-functions-shared.sh",
+    "functions:serve": "pnpm functions:sync && supabase functions serve --env-file supabase/functions/.env",
+    "functions:test": "pnpm functions:sync && deno test --allow-all --config supabase/functions/deno.json supabase/functions/",
+    "functions:check": "pnpm functions:sync && deno check --config supabase/functions/deno.json supabase/functions/send-invite/index.ts",
+    "functions:deploy": "pnpm functions:sync && supabase functions deploy send-invite",
+    "import:exercises": "pnpm --filter @caltracker/scripts exec tsx import-exercises.ts",
+    "provision:coach": "pnpm --filter @caltracker/scripts exec tsx provision-coach.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint-config-next": "16.4.5",
+    "eslint": "10.14.0",
+    "prettier": "3.9.10",
+    "turbo": "2.11.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}

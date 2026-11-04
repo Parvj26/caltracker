@@ -1,0 +1,21 @@
+# A deep link without a valid code must show a friendly error, never a hanging spinner or a session.
+appId: app.caltracker.client
+---
+- launchApp:
+    clearState: true
+- openLink: caltracker://auth/confirmed?code=bogus
+- tapOn:
+    text: Open
+    optional: true
+- extendedWaitUntil:
+    visible: "This link didn't work. Sign in instead."
+    timeout: 15000
+- openLink: 'caltracker://auth/confirmed#access_token=evil&refresh_token=evil'
+- tapOn:
+    text: Open
+    optional: true
+- assertVisible:
+    text: "This link didn't work. Sign in instead."
+- tapOn:
+    id: go-sign-in
+- assertVisible: 'Create an account'

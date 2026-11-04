@@ -1,0 +1,46 @@
+# Real round trip: sign up in the app (stores the PKCE verifier), open the emailed confirmation link,
+# Supabase redirects to caltracker://auth/confirmed?code=..., the app exchanges it and links the client.
+appId: app.caltracker.client
+env:
+  EMAIL: e2e-deeplink@x.com
+  PASSWORD: e2e-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: invite, EMAIL: '${EMAIL}', NAME: 'Deep Link' }
+- launchApp:
+    clearState: true
+- tapOn:
+    id: go-sign-up
+- tapOn:
+    id: name-input
+- inputText: Deep Link
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: submit-button
+- tapOn:
+    text: Not Now
+    optional: true
+- assertVisible: 'We sent a link to ${EMAIL}. Tap it, then come back and sign in.'
+- runScript:
+    file: helpers/link.js
+    env: { EMAIL: '${EMAIL}' }
+- openLink: ${output.link}
+- tapOn:
+    text: Open
+    optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to Demo Coaching'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

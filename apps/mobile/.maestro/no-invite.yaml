@@ -1,0 +1,58 @@
+# Client without an invite sees the waiting screen, then gets linked after the coach invites them.
+appId: app.caltracker.client
+env:
+  EMAIL: nobody@x.com
+  PASSWORD: e2e-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- tapOn:
+    id: go-sign-up
+- tapOn:
+    id: name-input
+- inputText: Nobody Here
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: submit-button
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- assertVisible: 'We sent a link to ${EMAIL}. Tap it, then come back and sign in.'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: confirm, EMAIL: '${EMAIL}' }
+- tapOn:
+    id: go-sign-in
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: submit-button
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- assertVisible: 'Ask your coach for an invite'
+- assertVisible: 'Sign out'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: invite, EMAIL: '${EMAIL}', NAME: 'Nobody Here' }
+- tapOn: 'Check again'
+- assertVisible: 'Welcome to Demo Coaching'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

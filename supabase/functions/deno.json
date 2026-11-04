@@ -1,0 +1,11 @@
+{
+  "lock": false,
+  "imports": {
+    "@caltracker/shared": "./_shared/caltracker/index.ts",
+    "zod": "npm:zod@4.6.7",
+    "papaparse": "./_shared/papaparse.ts",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0",
+    "nodemailer": "npm:nodemailer@10.3.1",
+    "@std/assert": "jsr:@std/assert@1.0.13"
+  }
+}

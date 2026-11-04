@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+  db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+      # Start the full stack once: a bare `supabase db start` here makes a later
+      # `supabase start` report "already running" and leave Auth/API stopped.
+      - run: supabase start -x studio,imgproxy,vector,logflare,supavisor
+      - run: bash scripts/reload-auth-templates.sh
+      - run: supabase test db
+      - name: Check generated types are up to date
+        run: supabase gen types typescript --local | diff - packages/shared/src/database.types.ts
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+      - name: Edge Function tests
+        run: |
+          bash scripts/sync-functions-shared.sh
+          eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
+          SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
+            deno test --allow-all --config supabase/functions/deno.json supabase/functions/
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Integration tests
+        run: |
+          eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
+          : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
+          SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
+            PUBLIC_SITE_URL=http://localhost:3000 pnpm test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Start Supabase and seed demo users
+        run: |
+          supabase start -x studio,imgproxy,vector,logflare,supavisor
+          supabase db reset
+          bash scripts/reload-auth-templates.sh
+      - name: Write Edge Function env (invite emails go to the local mail catcher)
+        run: |
+          cat > supabase/functions/.env <<'EOF'
+          PUBLIC_SITE_URL=http://localhost:3000
+          INVITE_FROM_EMAIL=CalTracker <invites@caltracker.app>
+          SMTP_HOST=host.docker.internal
+          SMTP_PORT=54325
+          EOF
+      - name: Write web env
+        run: bash apps/web/scripts/write-local-env.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: pnpm --filter web build
+      - name: End-to-end tests
+        run: pnpm test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

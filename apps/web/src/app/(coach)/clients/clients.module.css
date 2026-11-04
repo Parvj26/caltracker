@@ -1,0 +1,9 @@
+.form { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+.form label, .fileLabel { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
+.form input { padding: 0.6rem; border: 1px solid var(--ink); border-radius: 6px; font: inherit; }
+.form button, .page button { padding: 0.6rem 1rem; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); font: inherit; cursor: pointer; }
+.page section { margin-bottom: 2rem; }
+.table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
+.table th, .table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+.error { color: #b00020; }
+.hint { color: #555; margin: 0.25rem 0; }

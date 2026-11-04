@@ -49,3 +49,9 @@ pnpm-debug.log*
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Superpowers SDD scratch
+.superpowers/
+
+# Generated copy of packages/shared for Edge Functions (scripts/sync-functions-shared.sh)
+supabase/functions/_shared/caltracker/

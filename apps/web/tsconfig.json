@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "jsx": "preserve",
+    "allowJs": false,
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["next-env.d.ts", "src", "e2e", "playwright.config.ts", "vitest.config.ts", "playwright.staging.config.ts", "e2e-staging", "open-next.config.ts", "next.config.ts", "**/*.mts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
