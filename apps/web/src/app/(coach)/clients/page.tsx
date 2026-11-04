@@ -78,6 +78,11 @@ export default async function ClientsPage() {
         </p>
       </header>
 
+      <Card className={styles.addCard}>
+        <AddClientForm />
+        <CsvUpload />
+      </Card>
+
       <Card className={styles.listCard}>
         <section aria-labelledby="clients-heading">
           <h2 id="clients-heading" className={styles.sectionHeading}>Clients</h2>
@@ -92,7 +97,7 @@ export default async function ClientsPage() {
             <div role="rowgroup">
               {members.data.length === 0 ? (
                 <div role="row" className={styles.emptyRow}>
-                  <span role="cell">No clients yet. Add one below.</span>
+                  <span role="cell">No clients yet. Add one above.</span>
                 </div>
               ) : (
                 members.data.map((m) => {
@@ -158,10 +163,6 @@ export default async function ClientsPage() {
         </section>
       </Card>
 
-      <Card className={styles.addCard}>
-        <AddClientForm />
-        <CsvUpload />
-      </Card>
     </div>
   );
 }

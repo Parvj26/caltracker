@@ -22,6 +22,7 @@ test('add a client: shows under Pending invites, expires in 14 days, then resend
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText('Invite sent')).toBeVisible();
+  await expect(page.getByText('Invite sent')).toHaveCSS('border-radius', '999px'); // result chips stay pills
 
   const row = page.getByRole('row').filter({ hasText: email });
   await expect(row).toBeVisible();

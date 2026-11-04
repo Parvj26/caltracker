@@ -120,7 +120,8 @@
 .tone-blue { background: var(--ct-blue); }
 .tone-grey { background: var(--ct-surface); }
 .tone-amber { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber); }
-.chipWrap { white-space: normal; border-radius: var(--ct-radius-input); }
+/* Still a pill: long text wraps inside the rounded shape, with extra inset so the round ends never clip it. */
+.chipWrap { white-space: normal; padding: var(--ct-space-1) var(--ct-space-3-5); }
 
 /* ---------- Hand note ---------- */
 .handNote {

@@ -138,6 +138,11 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
   const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
+  // The add-client form comes before the lists, so it is above the fold on a laptop.
+  const addHeading = page.getByRole('heading', { name: 'Add client' });
+  const clientsBox = (await clients.boundingBox())!;
+  expect((await addHeading.boundingBox())!.y).toBeLessThan(clientsBox.y);
+  await expect(page.getByRole('button', { name: 'Send invite' })).toBeInViewport();
 });
 
 test('bulk CSV invite explains itself and offers an example file that parses into 2 rows', async ({ page }) => {
