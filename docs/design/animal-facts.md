@@ -1,6 +1,6 @@
 # CalTracker Sticker Fun Facts
 
-**Status: All 52 entries verified on 2026-11-04 (see last section for notes).**
+**Status: All 60 entries verified on 2026-11-04 (see last section for notes).**
 
 Fun facts for the sticker reveal screen (each at most 140 characters), with habitat, rarity where relevant, and a source. Rarity figures are as of November 2026. See the end of the file for verification notes.
 
@@ -67,7 +67,7 @@ Fun facts for the sticker reveal screen (each at most 140 characters), with habi
 | Kākāpō | The kākāpō is the world's heaviest parrot, and it can't fly. | Predator-free islands of New Zealand | Critically endangered, 325 birds (Sept 2026) | https://www.doc.govt.nz/nature/native-animals/birds/birds-a-z/kakapo/ |
 | White peacock | White peacocks are a rare white colour form of the Indian peafowl, one of several genetic colour mutations. | Captivity (Indian peafowl is native to South Asia) | — | https://animals.sandiegozoo.org/animals/peafowl |
 
-## Landmarks (9)
+## Landmarks (17)
 
 | Sticker | Fun fact (≤140 chars) | Lives in | How rare? | Source |
 |---|---|---|---|---|
@@ -80,12 +80,21 @@ Fun facts for the sticker reveal screen (each at most 140 characters), with habi
 | Mount Fuji | Mount Fuji is Japan's highest mountain at 3,776 metres, and a UNESCO World Heritage site. | Honshu, Japan | — | https://whc.unesco.org/en/list/1418/ |
 | Mount Everest | In 2020, Nepal and China jointly announced Everest's official height as 8,848.86 metres. | Nepal and China border | — | https://www.aljazeera.com/news/2020/12/8/mt-everest-nepal-china-announce-revised-height-at-8848-metres |
 | Marathon | The marathon distance of 42.195 km traces back to the 1908 London Olympics course. | Athens, Greece (origin of the race) | — | https://worldathletics.org/disciplines/road/marathon |
+| Chichén Itzá, El Castillo | El Castillo has 91 steps on each of its 4 sides. Add the top platform and you get 365, one for every day of the year. | Yucatán, Mexico | — | https://www.britannica.com/story/whats-inside-the-pyramid-at-chichen-itza |
+| Christ the Redeemer | Christ the Redeemer's arms stretch 28 metres wide, and its concrete body is covered in thousands of small soapstone tiles. | Rio de Janeiro, Brazil | — | https://kids.britannica.com/students/article/Christ-the-Redeemer/574650 |
+| Petra Treasury | Petra's Treasury was carved straight out of a cliff of rosy sandstone, and its front is about 39.5 metres tall. | Petra, Jordan | — | https://www.visitpetra.jo/en/Location/2 |
+| Colosseum | The Colosseum, opened in AD 80, is about 48.5 metres tall and was built to seat tens of thousands of fans. | Rome, Italy | — | https://www.britannica.com/topic/Colosseum |
+| Taj Mahal | The Taj Mahal's white marble looks pink at dawn, bright white at midday and glowing by moonlight. | Agra, India | — | https://www.nationalgeographic.com/travel/world-heritage/article/taj-mahal |
+| Great Pyramid of Giza | The Great Pyramid was the tallest human-made structure on Earth for about 3,800 years, until a cathedral spire beat it in 1311. | Giza, Egypt | — | https://www.britannica.com/place/How-long-did-the-Great-Pyramid-of-Giza-hold-the-record-as-the-tallest-man-made-structure-in-the-world |
+| Machu Picchu | Machu Picchu sits about 2,430 metres above sea level, on a saddle between two Andean peaks. | Cusco region, Peru | — | https://whc.unesco.org/en/list/274/ |
+| Great Wall of China | The Great Wall is many walls built over centuries, adding up to about 21,196 km counting every branch. | Northern China | — | https://www.britannica.com/topic/Great-Wall-of-China |
 
 ## Verification notes
 
-All 52 entries were checked on 2026-11-04 against the cited page or, where that page was blocked, against the search-indexed text of the same official source. Changes are listed in the separate change log.
+All 60 entries were checked on 2026-11-04 against the cited page or, where that page was blocked, against the search-indexed text of the same official source. Changes are listed in the separate change log.
 
 - **IUCN statuses** (axolotl, quokka, fennec fox, pangolins, okapi, snowy owl, pink fairy armadillo, tiger, golden snub-nosed monkey, narwhal, pink river dolphin) were confirmed through secondary sources that quote the current Red List entry (NHM, National Geographic, Mongabay, BirdLife, Animal Diversity Web, mammal databases). The IUCN site itself blocks automated fetching, so open each Red List page once by hand before launch.
 - **Kākāpō:** 325 birds confirmed on the DOC page (announced 1 September 2026). Update this count if DOC publishes a new figure.
 - **Eiffel Tower:** The popular "15 cm taller in summer" claim is contradicted by the official site, which says a few millimetres. The fact now follows the official site.
 - **"Lives in"** for Pink fairy armadillo, Marathon and Mount Everest is approximate.
+- **Wonders (added 2026-11-04):** Britannica, UNESCO and Visit Petra pages were blocked for direct fetching (403/451), so these were confirmed through search-indexed text of the same pages. El Castillo's 30 m includes the summit temple; no official page states a height (Britannica gives 24 m to the platform), so the 30 m rests on secondary sources. Open the Britannica and UNESCO pages by hand once before launch. See the change log for contested measures.

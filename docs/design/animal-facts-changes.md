@@ -64,3 +64,25 @@ Cat, Red panda, Koala, Emperor penguin, Snow leopard, Capybara, Giant panda, Gor
 ## Caveats
 - The IUCN Red List site returned 403, so every IUCN category was confirmed through secondary sources that quote the current entry. Spot-check by hand before launch.
 - The Eiffel Tower official page and the Patna Zoo page could not be fetched directly. The Eiffel "few millimetres" wording comes from the official page's indexed text and fact-check articles that quote it.
+
+## Wonders added (2026-11-04)
+Eight distance landmarks added to animal-facts.md and collection.md. Two figures changed (Colosseum, Great Pyramid); the rest held, with notes below.
+
+| Landmark | Draft | Final | Why |
+|---|---|---|---|
+| Colosseum | ≈ 48 | 49 | UNESCO/NHK narration and Lonely Planet give 48.5 m; rounded to 49 so the table rounds the same way as Everest (8,848.86 to 8,849). |
+| Great Pyramid of Giza | ≈ 139 | 138 | Today's height varies by source: Britannica 137 m (449 ft) and 138 m (451.4 ft), Wikipedia 138.5 m, others 138.8 m. 138 sits inside the range. Original height is about 146 to 147 m (NatGeo 146, Britannica 147). |
+| Great Wall of China | ≈ 21,196,000 | 21,196,000 (kept) | 21,196 km is China's 2012 survey (21,196.18 km, 43,721 sites) of all walls from every dynasty, including branches, trenches and overlaps. The Ming wall alone is about 8,851.8 km (UNESCO periodic report, Britannica ~8,850 km), and the main line used to be quoted at about 6,700 km. We kept the full figure because this is the "lifetime goal" badge and the survey is the official total. Extra sources: https://www.livescience.com/20840-great-wall-china-long-thought.html, https://www.bloomberg.com/news/2012/06/05/china-s-great-wall-found-to-measure-more-than-20-000-kilometers.html |
+| Chichén Itzá, El Castillo | ≈ 30 | 30 (kept, weakest source) | 30 m includes the summit temple (about 24 m to the platform plus about 6 m temple). Britannica gives 79 ft (24 m) above the plaza. No official INAH or UNESCO page states a height, so this relies on Wikipedia and travel guides. Decide whether to use 24 m instead. |
+| Petra Treasury | ≈ 40 | 40 (kept) | Visit Petra (Jordan) says 39.5 m; ArchNet measured 38.77 m to the top of the urn. Some sites say 43 m, treated as outliers. The fact text says 39.5 m. |
+| Machu Picchu | ≈ 2,430 | 2,430 (kept) | UNESCO gives 2,430 m; Britannica gives 2,350 m (7,710 ft). We follow UNESCO. |
+| Christ the Redeemer | ≈ 38 | 38 (kept) | 30 m statue plus 8 m pedestal (Britannica, Structurae). Some pages say 39.6 m with a 9.5 m pedestal, and Smithsonian/NatGeo give other figures. |
+| Taj Mahal | ≈ 73 | 73 (kept) | 240 ft (73 m) to the finial; one source says 74 m. |
+
+Other notes:
+- Colosseum capacity is contested (45,000 to 80,000; Britannica entries differ), so the fact says "tens of thousands". Entrance counts also vary (76 or 80), so it is not used.
+- El Castillo's 365 steps (91 per side plus the top step) is Britannica's wording; some writers say the match to the year may be symbolic.
+- "Visible from space" myth for the Great Wall was not used (NASA says it is not visible to the unaided eye from low Earth orbit and not at all from the Moon).
+- Taj Mahal's "22 years to build" was not used because historians question it.
+
+- Review fixes: El Castillo fact now says "91 steps on each of its 4 sides" (91×4 + 1 = 365); Great Pyramid fact corrected — the record ended around 1311 when Lincoln Cathedral's spire surpassed it, not with modern skyscrapers (https://www.guinnessworldrecords.com/world-records/tallest-building-ever).
