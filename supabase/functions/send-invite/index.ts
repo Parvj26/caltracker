@@ -129,6 +129,7 @@ export function createHandler(deps: HandlerDeps) {
       admin.from('profiles').select('full_name').eq('id', userId).single(),
     ]);
     const workspaceName = workspace?.name ?? 'CalTracker';
+    // The subject names the coach in full ("Sam Lee invited you"); the greeting uses the client's first name.
     const coachName = profile?.full_name?.trim() || 'Your coach';
 
     // Dedupe by email so one request cannot race itself.
@@ -163,10 +164,10 @@ export function createHandler(deps: HandlerDeps) {
     return json({ results } satisfies SendInvitesResponse);
 
     async function processOne(
-      invite: { email: string; fullName: string },
+      invite: { email: string; firstName: string; lastName: string },
       memberships: { role: string; workspace_id: string }[],
     ): Promise<Result> {
-      const { email, fullName } = invite;
+      const { email, firstName, lastName } = invite;
       try {
         if (memberships.some((m) => m.role === 'owner' || m.role === 'staff')) {
           return { email, status: 'is_coach' };
@@ -210,7 +211,8 @@ export function createHandler(deps: HandlerDeps) {
             .from('client_invites')
             .update({
               token_hash: tokenHash,
-              full_name: fullName,
+              first_name: firstName,
+              last_name: lastName,
               sent_at: sentAt,
               expires_at: expiresAt.toISOString(),
             })
@@ -223,7 +225,8 @@ export function createHandler(deps: HandlerDeps) {
           const { error } = await admin.from('client_invites').insert({
             workspace_id: workspaceId,
             email,
-            full_name: fullName,
+            first_name: firstName,
+            last_name: lastName,
             token_hash: tokenHash,
             sent_at: sentAt,
             expires_at: expiresAt.toISOString(),
@@ -233,7 +236,7 @@ export function createHandler(deps: HandlerDeps) {
         }
 
         const message = renderInviteEmail({
-          clientName: fullName,
+          clientFirstName: firstName,
           coachName,
           workspaceName,
           acceptUrl: `${siteUrl ?? 'http://localhost:3000'}/invite/${token}`,
