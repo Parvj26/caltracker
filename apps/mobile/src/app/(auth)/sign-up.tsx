@@ -1,8 +1,8 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { AuthShell } from '@/components/auth-shell';
+import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { styles } from '@/lib/styles';
 
 export default function SignUp() {
   const router = useRouter();
@@ -29,20 +29,12 @@ export default function SignUp() {
   }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Create your account</Text>
-      <TextInput
-        testID="name-input"
-        style={styles.input}
-        placeholder="Full name"
-        textContentType="none"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
+    <AuthShell title="Create your account" note="Your coach is waiting!">
+      <TextField testID="name-input" label="Full name" textContentType="none" value={name} onChangeText={setName} />
+      <TextField
         testID="email-input"
-        style={styles.input}
-        placeholder="Email"
+        label="Email"
+        hint="Use the email your coach invited."
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -50,23 +42,24 @@ export default function SignUp() {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
+      <TextField
         testID="password-input"
-        style={styles.input}
-        placeholder="Password (min 8 characters)"
+        label="Password"
+        hint="At least 8 characters."
         secureTextEntry
         autoCapitalize="none"
         textContentType="none"
         value={password}
         onChangeText={setPassword}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable testID="submit-button" style={styles.button} onPress={() => void submit()} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? 'Creating account...' : 'Create account'}</Text>
-      </Pressable>
-      <Link testID="go-sign-in" href="/sign-in" style={[styles.link, styles.linkText]}>
-        I already have an account
-      </Link>
-    </View>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      <Button
+        testID="submit-button"
+        title={busy ? 'Creating account...' : 'Create account'}
+        onPress={() => void submit()}
+        busy={busy}
+      />
+      <TextButton testID="go-sign-in" href="/sign-in" title="I already have an account" />
+    </AuthShell>
   );
 }

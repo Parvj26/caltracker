@@ -1,10 +1,11 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import { Button, ErrorText, Logo, Screen } from '@/components/ui';
 import { LINK_FAILED, completeConfirmation } from '@/lib/confirm-link';
-import { styles } from '@/lib/styles';
 import { supabase } from '@/lib/supabase';
+import { palette } from '@/theme/theme';
 
 // Opened by caltracker://auth/confirmed?code=... from the confirmation email (PKCE flow).
 // A successful exchange fires the session listener, which runs claimWorkspace() and enters the app.
@@ -31,17 +32,16 @@ export default function Confirmed() {
   }, [url, router]);
 
   return (
-    <View style={styles.screen}>
+    <Screen centred>
+      <Logo size="lg" />
       {error ? (
         <>
-          <Text style={styles.error}>{error}</Text>
-          <Pressable testID="go-sign-in" style={styles.button} onPress={() => router.replace('/sign-in')}>
-            <Text style={styles.buttonText}>Go to sign in</Text>
-          </Pressable>
+          <ErrorText>{error}</ErrorText>
+          <Button testID="go-sign-in" title="Go to sign in" onPress={() => router.replace('/sign-in')} />
         </>
       ) : (
-        <ActivityIndicator />
+        <ActivityIndicator color={palette.ink} accessibilityLabel="Confirming your email" />
       )}
-    </View>
+    </Screen>
   );
 }

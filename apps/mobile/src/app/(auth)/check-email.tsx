@@ -1,17 +1,17 @@
-import { Link, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
-import { styles } from '@/lib/styles';
+import { useLocalSearchParams } from 'expo-router';
+import { Text } from 'react-native';
+import { AuthShell } from '@/components/auth-shell';
+import { TextButton } from '@/components/ui';
+import { useTheme } from '@/theme/use-theme';
 
 export default function CheckEmail() {
   const { email } = useLocalSearchParams<{ email?: string }>();
+  const { text } = useTheme();
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Check your email</Text>
-      <Text style={styles.body}>{`We sent a link to ${email ?? 'your email'}. Tap it, then come back and sign in.`}</Text>
-      <Text style={styles.body}>Open the link on this phone. If you open it somewhere else, come back here and sign in.</Text>
-      <Link testID="go-sign-in" href="/sign-in" style={[styles.link, styles.linkText]}>
-        Go to sign in
-      </Link>
-    </View>
+    <AuthShell title="Check your email" note="Almost there!">
+      <Text style={text('body')}>{`We sent a link to ${email ?? 'your email'}. Tap it, then come back and sign in.`}</Text>
+      <Text style={text('body')}>Open the link on this phone. If you open it somewhere else, come back here and sign in.</Text>
+      <TextButton testID="go-sign-in" href="/sign-in" title="Go to sign in" />
+    </AuthShell>
   );
 }

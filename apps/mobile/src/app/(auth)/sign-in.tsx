@@ -1,8 +1,7 @@
-import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { AuthShell } from '@/components/auth-shell';
+import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { styles } from '@/lib/styles';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
@@ -20,12 +19,10 @@ export default function SignIn() {
   }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Sign in</Text>
-      <TextInput
+    <AuthShell title="Sign in" note="Let's train!">
+      <TextField
         testID="email-input"
-        style={styles.input}
-        placeholder="Email"
+        label="Email"
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -33,23 +30,18 @@ export default function SignIn() {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
+      <TextField
         testID="password-input"
-        style={styles.input}
-        placeholder="Password"
+        label="Password"
         secureTextEntry
         autoCapitalize="none"
         textContentType="none"
         value={password}
         onChangeText={setPassword}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable testID="submit-button" style={styles.button} onPress={() => void submit()} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? 'Signing in...' : 'Sign in'}</Text>
-      </Pressable>
-      <Link testID="go-sign-up" href="/sign-up" style={[styles.link, styles.linkText]}>
-        Create an account
-      </Link>
-    </View>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      <Button testID="submit-button" title={busy ? 'Signing in...' : 'Sign in'} onPress={() => void submit()} busy={busy} />
+      <TextButton testID="go-sign-up" href="/sign-up" title="Create an account" />
+    </AuthShell>
   );
 }
