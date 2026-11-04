@@ -14,6 +14,8 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/node_modules/**',
       '.superpowers/**',
+      '**/.open-next/**',
+      '**/.wrangler/**',
     ],
   },
   eslint.configs.recommended,
