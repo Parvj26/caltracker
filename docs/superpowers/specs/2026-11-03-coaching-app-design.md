@@ -187,15 +187,24 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 ### Volume and comparisons
 - **Workout volume** = Σ (weight × reps) over all completed sets of `weight_reps` exercises, including warm-ups and drops. Bodyweight (`reps`) exercises are excluded in V1.
 - **Weight comparison badge:** after each workout, select the heaviest item from our comparison list whose weight ≤ workout volume, and show the multiple ("4,200 kg ≈ 1 elephant").
-- **Comparison list:** our own list of ~30 animals/objects spanning ~5 kg to ~100,000 kg, with our own illustrations. No Everfit artwork, wording, or list reused.
-- **Distance comparison badge:** for `distance` exercises, compare total distance to landmarks (our own list).
+- **Comparison ladder:** our own list of 30 real animals, common and exotic mixed, from ~4 kg (cat) to ~150,000 kg (blue whale). The exact list and weights are in `docs/design/collection.md`. No Everfit artwork, wording, or list reused.
+- **Distance comparison badge:** for `distance` exercises, compare total distance to landmarks (our own list, in `docs/design/collection.md`).
 
-### Collection ("your zoo")
-- The first time a client's workout reaches a comparison item, that item is added to their collection.
-- The collection screen shows collected items and locked items with the next target ("Next: rhino — 2,300 kg").
+### Collection ("sticker book")
+Three tiers of animal stickers, plus shiny variants. Full list and rules: `docs/design/collection.md`.
+- **Common and Exotic (ladder animals):** the first time a workout's volume reaches a ladder animal, that animal's sticker is added.
+- **Rare finds (achievement-based):** about 10 rare animals, each unlocked by a specific achievement (workout counts, streak lengths, PR counts, lifetime volume). Each locked rare find shows its requirement ("Okapi — 12-week streak").
+- **Ultra-rare random drops:** 3 animals. Each qualifying workout has a **1-in-100** chance of dropping one the client doesn't own yet.
+- **Shiny variants:** every time a workout earns its ladder animal, there is a **1-in-20** chance it comes out as a holographic shiny version of that animal. Shiny versions are collected separately and rendered with an animated foil effect in the app (no extra artwork).
+- **Qualifying workout** (for random drops and shiny rolls): a completed workout with ≥ 5 completed sets. This stops empty workouts from being used to farm drops. Coach-logged workouts qualify.
+- **Fairness and integrity:** random rolls happen on the server when the workout syncs, never on the device. Offline workouts reveal their ladder sticker immediately. Any rare or shiny result appears as a "Surprise!" reveal on next app open after sync.
+- **Never purchasable:** nothing in the collection can be bought, so drops are not loot boxes.
+- The sticker book shows collected stickers, locked ladder animals ("Next: rhino — 2,300 kg"), locked rare finds (silhouette + requirement), and "???" for ultra-rares not yet found.
+- **Showing off:** rare, ultra-rare and shiny reveals use a bigger celebration and can be shared to the community. The share card shows the tier ("Rare find!", "Ultra-rare!", "Shiny!").
+- Coach per-client "disable comparison badges" also disables random drops and shinies for that client.
 
 ### Totals
-- Monthly and lifetime volume totals, each mapped to a comparison item ("This month: 3 school buses").
+- Monthly and lifetime volume totals, each mapped to a ladder animal ("This month: 3 elephants").
 
 ### Other achievements
 - **Personal bests** per exercise, excluding warm-ups: heaviest weight, most reps at a given weight, best estimated 1RM (Epley formula: weight × (1 + reps/30)).

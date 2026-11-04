@@ -1,39 +1,30 @@
-import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { LINK_FAILED, completeConfirmation } from '@/lib/confirm-link';
 import { styles } from '@/lib/styles';
+import { supabase } from '@/lib/supabase';
 
-// Opened by caltracker://auth/confirmed from the confirmation email. Supabase appends either
-// #access_token=...&refresh_token=... (implicit) or ?code=... (PKCE). Signing in here triggers the
-// session listener, which runs claimWorkspace() and moves the user into the app.
+// Opened by caltracker://auth/confirmed?code=... from the confirmation email (PKCE flow).
+// A successful exchange fires the session listener, which runs claimWorkspace() and enters the app.
 export default function Confirmed() {
   const router = useRouter();
   const url = Linking.useLinkingURL();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!url) return;
     let cancelled = false;
-    void (async () => {
-      const parsed = new URL(url);
-      const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-      const accessToken = hash.get('access_token');
-      const refreshToken = hash.get('refresh_token');
-      const code = parsed.searchParams.get('code');
-      let message: string | null;
-      if (accessToken && refreshToken) {
-        message = (await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })).error?.message ?? null;
-      } else if (code) {
-        message = (await supabase.auth.exchangeCodeForSession(code)).error?.message ?? null;
-      } else {
-        message = hash.get('error_description') ?? parsed.searchParams.get('error_description') ?? 'This link is no longer valid.';
-      }
+    if (!url) {
+      // No URL arrived (e.g. the screen was opened directly): never leave the spinner hanging.
+      const t = setTimeout(() => setError(LINK_FAILED), 4000);
+      return () => clearTimeout(t);
+    }
+    void completeConfirmation(supabase, url).then((result) => {
       if (cancelled) return;
-      if (message) setError(message);
-      else router.replace('/');
-    })();
+      if (result.ok) router.replace('/');
+      else setError(result.message);
+    });
     return () => {
       cancelled = true;
     };
@@ -44,9 +35,9 @@ export default function Confirmed() {
       {error ? (
         <>
           <Text style={styles.error}>{error}</Text>
-          <Text style={styles.body} onPress={() => router.replace('/sign-in')}>
-            Go to sign in
-          </Text>
+          <Pressable testID="go-sign-in" style={styles.button} onPress={() => router.replace('/sign-in')}>
+            <Text style={styles.buttonText}>Go to sign in</Text>
+          </Pressable>
         </>
       ) : (
         <ActivityIndicator />

@@ -2,6 +2,7 @@
 //   pnpm --filter mobile e2e:invite <email> <name>   create a Demo Coaching invite
 //   pnpm --filter mobile e2e:confirm <email>         mark the user's email as confirmed
 //   pnpm --filter mobile e2e:cleanup <email>         delete the user and their invites
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts confirmlink <email>   confirmation link from Mailpit
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -20,6 +21,10 @@ function serviceClient() {
     key = get('SERVICE_ROLE_KEY');
   }
   if (!url || !key) throw new Error('Run local Supabase (pnpm db:start) or set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+  const host = new URL(url).hostname;
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    throw new Error(`Refusing to run service-role helpers against non-local Supabase host: ${host}`);
+  }
   return createClient<Database>(url, key, { auth: { persistSession: false } });
 }
 
@@ -65,7 +70,22 @@ export async function cleanup(email: string): Promise<void> {
   }
 }
 
-async function run(action: string, email: string, name: string): Promise<void> {
+// Finds the newest confirmation email for `email` in Mailpit (local mail catcher) and returns its verify link.
+export async function confirmLink(email: string): Promise<string> {
+  const base = (process.env.MAILPIT_URL as string | undefined) ?? 'http://127.0.0.1:54324';
+  const search = (await (await fetch(`${base}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()) as {
+    messages: { ID: string }[];
+  };
+  for (const m of search.messages) {
+    const msg = (await (await fetch(`${base}/api/v1/message/${m.ID}`)).json()) as { Text: string; HTML: string };
+    const link = /https?:\/\/[^\s"<>]*\/auth\/v1\/verify\?[^\s"<>]+/.exec(`${msg.Text}\n${msg.HTML}`)?.[0];
+    if (link) return link.replace(/&amp;/g, '&');
+  }
+  throw new Error(`No confirmation email found for ${email}`);
+}
+
+async function run(action: string, email: string, name: string): Promise<string | void> {
+  if (action === 'confirmlink') return confirmLink(email);
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);
@@ -80,14 +100,14 @@ if (cmd === 'serve') {
     const action = u.pathname.slice(1);
     if (action === 'health') return void res.writeHead(200).end('ok');
     run(action, u.searchParams.get('email') ?? '', u.searchParams.get('name') ?? '')
-      .then(() => res.writeHead(200).end('ok'))
+      .then((out) => res.writeHead(200).end(out ?? 'ok'))
       .catch((e: unknown) => res.writeHead(500).end(e instanceof Error ? e.message : String(e)));
   }).listen(port, '127.0.0.1', () => console.log(`e2e helper listening on ${port}`));
 } else if (cmd) {
   const [email, name] = args;
   if (!email) throw new Error(`Usage: e2e-helper.ts ${cmd} <email> [name]`);
   run(cmd, email, name ?? 'E2E Client').then(
-    () => console.log(`${cmd} ok: ${email}`),
+    (out) => console.log(out ?? `${cmd} ok: ${email}`),
     (e: unknown) => {
       console.error(e);
       process.exit(1);

@@ -16,5 +16,8 @@ export const supabase = createClient<Database>(url, anonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE: the code verifier is stored through the same adapter, so a deep link can only complete
+    // a sign-up that started in this app (no injected tokens).
+    flowType: 'pkce',
   },
 });

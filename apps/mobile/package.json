@@ -9,7 +9,7 @@
     "android": "expo run:android",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "test": "echo 'No unit tests yet; device flows run with e2e (Maestro, local only)'",
+    "test": "vitest run",
     "env:local": "bash scripts/write-local-env.sh",
     "e2e": "bash scripts/run-e2e.sh",
     "e2e:invite": "tsx scripts/e2e-helper.ts invite",
@@ -38,6 +38,7 @@
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "tsx": "4.23.15",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
   }
 }
