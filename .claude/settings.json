@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "skill-creator@anthropic-plugin-directory": true,
+    "frontend-design@anthropic-plugin-directory": true,
+    "superpowers@anthropic-plugin-directory": true
+  }
+}
