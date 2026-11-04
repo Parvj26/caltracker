@@ -47,7 +47,7 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
 
 The deploy job first compares the checked-out commit with the tip of `main` (`git ls-remote`). On automatic runs, if a newer commit has been merged meanwhile, it skips with a notice ("a newer commit will deploy") so an older queued deploy never overwrites a newer one. It also fails with an error if the `RESEND_API_KEY` secret is empty, before touching any Edge Function secret.
 
-The `deploy` job: link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy`, build and deploy the web app. Only one deploy runs at a time. The `smoke` job then tests the live site.
+The `deploy` job: build the web app (`cf:build`) first, so a failed build stops before anything on staging changes; then link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy` and deploy the already-built web app (`cf:deploy`). Only one deploy runs at a time. The `smoke` job then tests the live site.
 
 ## Create the smoke coach (after the first deploy)
 

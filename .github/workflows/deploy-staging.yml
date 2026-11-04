@@ -112,6 +112,16 @@ jobs:
       - if: steps.newest.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
+      # Build before anything changes on staging: a failed build stops the deploy with the database, function and
+      # web app all still on the old version, and the gap between the new function and the new web app shrinks to
+      # the few seconds of cf:deploy.
+      - name: Build web app for Cloudflare
+        if: steps.newest.outputs.skip != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+        run: pnpm --filter web cf:build
+
       - name: Link Supabase staging project
         if: steps.newest.outputs.skip != 'true'
         run: supabase link --project-ref "$STAGING_SUPABASE_PROJECT_REF"
@@ -133,13 +143,6 @@ jobs:
       - name: Deploy Edge Functions
         if: steps.newest.outputs.skip != 'true'
         run: pnpm functions:deploy --project-ref "$STAGING_SUPABASE_PROJECT_REF"
-
-      - name: Build web app for Cloudflare
-        if: steps.newest.outputs.skip != 'true'
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        run: pnpm --filter web cf:build
 
       - name: Deploy web app to Cloudflare Workers
         if: steps.newest.outputs.skip != 'true'
