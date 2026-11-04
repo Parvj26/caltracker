@@ -32,7 +32,7 @@
 
 1. **Email case and whitespace** — a coach invites `Sam@Gmail.com ` and the client signs up as `sam@gmail.com`; the invite must still be claimed. (Test in Task 3.)
 2. **Client already linked to another workspace** — coach B invites a client who already belongs to coach A; claiming must not create a second membership, and coach B's dashboard must show the invite as "already with another coach". (Tests in Tasks 3 and 5.)
-3. **Expired or resent invites** — claiming with only an expired invite links nothing; after a resend, the old token's preview page says "expired" and the new one works. (Tests in Tasks 3 and 10.)
+3. **Expired or resent invites** — claiming with only an expired invite links nothing; after a resend, the old token's preview page says "not found" (its hash was replaced) and the new one works. (Tests in Tasks 3 and 10.)
 4. **Messy CSV files** — Excel exports with a BOM, `Name,Email` vs `email,full name` headers, blank lines, duplicate emails and invalid emails must give clear per-row errors, not a crash or silent skip. (Test in Task 4.)
 5. **Coach acting on another coach's workspace** — calling the invite function or writing an exercise override with another workspace's id must be rejected. (Tests in Tasks 2, 5 and 7.)
 
@@ -188,7 +188,7 @@ Verify: `xcrun simctl list runtimes | grep iOS` lists a runtime.
 
 - [ ] **Step 5: Run tests to verify they pass** — `pnpm db:reset && pnpm db:test` → all pass.
 
-- [ ] **Step 6: Seed + types.** `seed.sql` creates demo coach `coach@demo.local` / password `demo-password-123` (confirmed), workspace "Demo Coaching", owner membership. Run `pnpm db:types`; `pnpm typecheck` passes.
+- [ ] **Step 6: Seed + types.** `seed.sql` creates demo coach `coach@demo.local` / password `demo-password-123` (confirmed, profile `full_name` = `Demo Coach`), workspace "Demo Coaching", owner membership; and demo client `client@demo.local` / password `demo-password-123` (confirmed, `full_name` = `Demo Client`) with a `client` membership in "Demo Coaching". Run `pnpm db:types`; `pnpm typecheck` passes.
 
 - [ ] **Step 7: CI db job** — new job `db`: checkout, `supabase/setup-cli` action, `supabase db start`, `supabase test db`, then `supabase gen types typescript --local | diff - packages/shared/src/database.types.ts` (fails if types are stale).
 
@@ -351,7 +351,7 @@ Verify: `xcrun simctl list runtimes | grep iOS` lists a runtime.
   - `mapFreeExercise(e: FreeExercise, overrides: Record<string, TrackingType>): ExerciseInsert` — `ExerciseInsert` is the generated `Database['public']['Tables']['exercises']['Insert']`; `image_paths` = `e.images` prefixed `free-exercise-db/`; `overrides[e.id]` wins over `inferTrackingType`.
   - `youtubeFormSearchUrl(name: string): string`
   - `parseYoutubeUrl(url: string): { videoId: string } | null` — accepts `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/shorts/`, `m.youtube.com`, with or without `www.`/`https`; rejects anything else.
-- Produces (script): `pnpm import:exercises` — downloads `https://raw.githubusercontent.com/yuhonas/free-exercise-db/<PINNED_SHA>/dist/exercises.json` and the referenced images, upserts by `external_id`, uploads images to `exercise-images/free-exercise-db/<path>` skipping existing objects. Idempotent.
+- Produces (script): `pnpm import:exercises` — downloads `https://raw.githubusercontent.com/yuhonas/free-exercise-db/<PINNED_SHA>/dist/exercises.json` and the referenced images, upserts by `external_id`, uploads images to `exercise-images/free-exercise-db/<path>` skipping existing objects. Idempotent. Option `--fixture <dir>` reads `exercises.json` and images from a local directory instead of downloading; commit a 20-exercise fixture at `scripts/fixtures/free-exercise-db/` (must include `Barbell_Squat` and `Plank`) for Task 11's e2e tests.
 
 - [ ] **Step 1: Verify the license.** Open `https://github.com/yuhonas/free-exercise-db/blob/<PINNED_SHA>/LICENSE` (pick the latest commit on `main` and record its SHA in `scripts/import-exercises.ts` as `PINNED_SHA`). Confirm it is the Unlicense. If it is not, stop and tell the product owner.
 
