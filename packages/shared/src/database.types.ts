@@ -84,6 +84,107 @@ export type Database = {
           },
         ]
       }
+      exercise_overrides: {
+        Row: {
+          coach_notes: string | null
+          exercise_id: string
+          updated_at: string | null
+          workspace_id: string
+          youtube_url: string | null
+        }
+        Insert: {
+          coach_notes?: string | null
+          exercise_id: string
+          updated_at?: string | null
+          workspace_id: string
+          youtube_url?: string | null
+        }
+        Update: {
+          coach_notes?: string | null
+          exercise_id?: string
+          updated_at?: string | null
+          workspace_id?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_overrides_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_overrides_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          equipment: string | null
+          external_id: string | null
+          id: string
+          image_paths: string[]
+          instructions: string[]
+          name: string
+          primary_muscles: string[]
+          secondary_muscles: string[]
+          source: string
+          tracking_type: Database["public"]["Enums"]["tracking_type"]
+          workspace_id: string | null
+          youtube_url: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          equipment?: string | null
+          external_id?: string | null
+          id?: string
+          image_paths?: string[]
+          instructions?: string[]
+          name: string
+          primary_muscles?: string[]
+          secondary_muscles?: string[]
+          source: string
+          tracking_type: Database["public"]["Enums"]["tracking_type"]
+          workspace_id?: string | null
+          youtube_url?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          equipment?: string | null
+          external_id?: string | null
+          id?: string
+          image_paths?: string[]
+          instructions?: string[]
+          name?: string
+          primary_muscles?: string[]
+          secondary_muscles?: string[]
+          source?: string
+          tracking_type?: Database["public"]["Enums"]["tracking_type"]
+          workspace_id?: string | null
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercises_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -194,6 +295,7 @@ export type Database = {
     }
     Enums: {
       member_role: "owner" | "staff" | "client"
+      tracking_type: "weight_reps" | "reps" | "time" | "distance"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -325,6 +427,7 @@ export const Constants = {
   public: {
     Enums: {
       member_role: ["owner", "staff", "client"],
+      tracking_type: ["weight_reps", "reps", "time", "distance"],
     },
   },
 } as const
