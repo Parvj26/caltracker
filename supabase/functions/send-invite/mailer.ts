@@ -17,6 +17,11 @@ const MAX_RETRY_WAIT_MS = 5000;
 const ATTEMPT_TIMEOUT_MS = 10_000;
 /** All attempts, waits included, for one email: a stuck row must not hold up the whole batch. */
 const TOTAL_CAP_MS = 20_000;
+/**
+ * Do not start another attempt with less than this left of the total cap: a request given only a few ms
+ * could still be accepted by Resend while we report it as timed out.
+ */
+const MIN_ATTEMPT_MS = 1000;
 
 /** Delay before retrying a 429: the `retry-after` header (seconds, capped at 5 s) wins, else 500ms -> 1s -> 2s. */
 function retryDelayMs(res: Response, attempt: number): number {
@@ -49,6 +54,8 @@ export function createResendMailer(opts: {
   /** Per-request timeout (default 10 s) and total cap per email (default 20 s); injectable for tests. */
   attemptTimeoutMs?: number;
   totalCapMs?: number;
+  /** Minimum budget left to start a retry (default 1 s); injectable for tests. */
+  minAttemptMs?: number;
   /** Clock, injectable for tests. */
   now?: () => number;
 }): Mailer {
@@ -57,6 +64,7 @@ export function createResendMailer(opts: {
   const fetchFn = opts.fetchFn ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = opts.now ?? Date.now;
+  const minAttemptMs = opts.minAttemptMs ?? MIN_ATTEMPT_MS;
   return {
     async send(msg) {
       const startedAt = now();
@@ -64,12 +72,14 @@ export function createResendMailer(opts: {
       // Generated once per email and reused on every retry: if Resend accepted a request that then
       // timed out on our side, the retry is recognised as the same email and not sent twice.
       const idempotencyKey = crypto.randomUUID();
-      /** Wait before a retry, never past the total cap. False when no time is left to try again. */
+      /**
+       * Wait before a retry, but only when a real attempt (at least `minAttemptMs`) still fits in the total cap
+       * after the wait; otherwise give up straight away rather than wait for nothing. False means do not retry.
+       */
       const waitBeforeRetry = async (ms: number): Promise<boolean> => {
-        const left = remainingMs();
-        if (left <= 0) return false;
-        await sleep(Math.min(ms, left));
-        return remainingMs() > 0;
+        if (remainingMs() - ms < minAttemptMs) return false;
+        await sleep(ms);
+        return remainingMs() >= minAttemptMs;
       };
       for (let attempt = 0; ; attempt++) {
         const remaining = remainingMs();

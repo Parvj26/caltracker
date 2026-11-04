@@ -106,7 +106,8 @@ Deno.test('resend: a request that never answers is aborted and the call fails wi
     fetchFn: h.fetchFn,
     sleep: () => Promise.resolve(),
     attemptTimeoutMs: 20,
-    totalCapMs: 100,
+    totalCapMs: 2000,
+    minAttemptMs: 10,
   });
   const started = Date.now();
   await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
@@ -126,7 +127,7 @@ Deno.test('resend: a timeout followed by a good answer still sends', async () =>
     return Promise.resolve(new Response('{"id":"x"}', { status: 200 }));
   }) as typeof fetch;
   const mailer = createResendMailer({
-    apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve(), attemptTimeoutMs: 20, totalCapMs: 1000,
+    apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve(), attemptTimeoutMs: 20, totalCapMs: 1000, minAttemptMs: 10,
   });
   await mailer.send(msg);
   assertEquals(calls, 2);
@@ -162,19 +163,21 @@ Deno.test('resend: retry waits are clamped so one email never runs past the 20 s
   const f = fakeClockMailer({ callMs: 6000, status: 429, headers: { 'retry-after': '5' } });
   await assertRejects(() => f.mailer.send(msg), Error);
   assertEquals(f.elapsed() <= 20_000, true, `ran ${f.elapsed()} ms`);
-  assertEquals(f.sleeps, [5000, 3000]);
+  // After 17 s only 3 s are left: a 5 s wait would overrun, so it gives up instead of waiting.
+  assertEquals(f.sleeps, [5000]);
   assertEquals(f.calls(), 2, 'no request is started once the budget is spent');
 });
 
-Deno.test('resend: fallback backoff is clamped to the remaining budget too', async () => {
-  // 600 ms call, 500 ms wait, 600 ms call, then only 300 ms of the 2 s budget is left for the 1 s wait.
-  const f = fakeClockMailer({ callMs: 600, status: 429, totalCapMs: 2000 });
+Deno.test('resend: fallback backoff stops once a wait would leave too little budget', async () => {
+  // 600 ms call, 500 ms wait, 600 ms call, 1 s wait, 600 ms call: 700 ms of the 4 s budget is left, too little.
+  const f = fakeClockMailer({ callMs: 600, status: 429, totalCapMs: 4000 });
   await assertRejects(() => f.mailer.send(msg), Error);
-  assertEquals(f.elapsed() <= 2000, true, `ran ${f.elapsed()} ms`);
-  assertEquals(f.sleeps, [500, 300]);
+  assertEquals(f.elapsed() <= 4000, true, `ran ${f.elapsed()} ms`);
+  assertEquals(f.sleeps, [500, 1000]);
+  assertEquals(f.calls(), 3);
 });
 
-Deno.test('resend: timeout retries are clamped to the remaining budget', async () => {
+Deno.test('resend: no timeout retry when too little budget is left', async () => {
   let clock = 0;
   const sleeps: number[] = [];
   const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
@@ -191,7 +194,18 @@ Deno.test('resend: timeout retries are clamped to the remaining budget', async (
   });
   await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
   assertEquals(clock <= 2000, true, `ran ${clock} ms`);
-  assertEquals(sleeps, [200]);
+  assertEquals(sleeps, []);
+});
+
+Deno.test('resend: another attempt needs at least 1 s of budget left', async () => {
+  // retry-after 0 means no wait: what matters is how much of the 20 s is left after the first call.
+  const tooLate = fakeClockMailer({ callMs: 19_001, status: 429, headers: { 'retry-after': '0' } });
+  await assertRejects(() => tooLate.mailer.send(msg), Error, '429');
+  assertEquals(tooLate.calls(), 1, 'a retry with under 1 s left could send while we report failure');
+
+  const justInTime = fakeClockMailer({ callMs: 19_000, status: 429, headers: { 'retry-after': '0' } });
+  await assertRejects(() => justInTime.mailer.send(msg), Error, '429');
+  assertEquals(justInTime.calls(), 2);
 });
 
 function recordingFetch(statuses: number[]) {
