@@ -61,6 +61,9 @@ export function createResendMailer(opts: {
     async send(msg) {
       const startedAt = now();
       const remainingMs = () => totalCapMs - (now() - startedAt);
+      // Generated once per email and reused on every retry: if Resend accepted a request that then
+      // timed out on our side, the retry is recognised as the same email and not sent twice.
+      const idempotencyKey = crypto.randomUUID();
       /** Wait before a retry, never past the total cap. False when no time is left to try again. */
       const waitBeforeRetry = async (ms: number): Promise<boolean> => {
         const left = remainingMs();
@@ -78,6 +81,7 @@ export function createResendMailer(opts: {
             headers: {
               authorization: `Bearer ${opts.apiKey}`,
               'content-type': 'application/json',
+              'idempotency-key': idempotencyKey,
             },
             body: JSON.stringify({ from: opts.from, ...msg }),
             signal: AbortSignal.timeout(Math.min(attemptTimeoutMs, remaining)),

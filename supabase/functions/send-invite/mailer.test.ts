@@ -193,3 +193,46 @@ Deno.test('resend: timeout retries are clamped to the remaining budget', async (
   assertEquals(clock <= 2000, true, `ran ${clock} ms`);
   assertEquals(sleeps, [200]);
 });
+
+function recordingFetch(statuses: number[]) {
+  const keys: (string | null)[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, init?: RequestInit) => {
+    keys.push(new Headers(init?.headers).get('idempotency-key'));
+    const status = statuses[Math.min(calls++, statuses.length - 1)]!;
+    return Promise.resolve(new Response(status === 200 ? '{"id":"x"}' : 'nope', { status }));
+  }) as typeof fetch;
+  return { fetchFn, keys };
+}
+
+Deno.test('resend: retries of one email reuse the same Idempotency-Key', async () => {
+  const r = recordingFetch([429, 429, 200]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: r.fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  assertEquals(r.keys.length, 3);
+  assertEquals(typeof r.keys[0] === 'string' && r.keys[0].length > 0, true);
+  assertEquals(new Set(r.keys).size, 1);
+});
+
+Deno.test('resend: a timed-out attempt and its retry share the Idempotency-Key', async () => {
+  const keys: (string | null)[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, init?: RequestInit) => {
+    keys.push(new Headers(init?.headers).get('idempotency-key'));
+    if (calls++ === 0) return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+    return Promise.resolve(new Response('{"id":"x"}', { status: 200 }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  assertEquals(keys.length, 2);
+  assertEquals(keys[0] !== null && keys[0] === keys[1], true);
+});
+
+Deno.test('resend: different emails get different Idempotency-Keys', async () => {
+  const r = recordingFetch([200]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: r.fetchFn, sleep: () => Promise.resolve() });
+  await mailer.send(msg);
+  await mailer.send(msg);
+  assertEquals(r.keys.length, 2);
+  assertEquals(r.keys[0] !== null && r.keys[1] !== null && r.keys[0] !== r.keys[1], true);
+});
