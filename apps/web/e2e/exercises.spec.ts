@@ -75,3 +75,12 @@ test('create a custom exercise and see it under My exercises', async ({ page }) 
     await admin().from('exercises').delete().eq('name', name);
   }
 });
+
+test('out-of-range and absurd ?page values never show an error page', async ({ page }) => {
+  for (const value of ['999', '99999999999999999999999', '-3', 'abc']) {
+    const response = await page.goto(`/exercises?page=${value}`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { name: 'Exercises' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Barbell Squat/ }).or(page.getByText('No exercises match.'))).toBeVisible();
+  }
+});

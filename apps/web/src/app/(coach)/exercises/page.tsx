@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { TRACKING_TYPES } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -6,6 +7,7 @@ import { EQUIPMENT, MUSCLES, TRACKING_LABELS, escapeLike } from './filters';
 import styles from './exercises.module.css';
 
 const PAGE_SIZE = 50;
+const MAX_PAGE = 10_000;
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
@@ -18,28 +20,10 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
   const equipment = one(sp.equipment);
   const tracking = one(sp.tracking);
   const source = one(sp.source);
-  const page = Math.max(1, Number.parseInt(one(sp.page), 10) || 1);
+  const rawPage = /^\d{1,9}$/.test(one(sp.page)) ? Number.parseInt(one(sp.page), 10) : 1;
+  const page = Math.min(MAX_PAGE, Math.max(1, rawPage));
 
   const supabase = await createServerSupabase();
-  let query = supabase
-    .from('exercises')
-    .select('id, name, primary_muscles, image_paths', { count: 'exact' })
-    .order('name', { ascending: true })
-    .order('id', { ascending: true })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-  if (q) query = query.ilike('name', `%${escapeLike(q)}%`);
-  if ((MUSCLES as readonly string[]).includes(muscle)) query = query.contains('primary_muscles', [muscle]);
-  if ((EQUIPMENT as readonly string[]).includes(equipment)) query = query.eq('equipment', equipment);
-  if ((TRACKING_TYPES as readonly string[]).includes(tracking)) {
-    query = query.eq('tracking_type', tracking as (typeof TRACKING_TYPES)[number]);
-  }
-  if (source === 'builtin' || source === 'custom') query = query.eq('source', source);
-
-  const { data, count, error } = await query;
-  if (error) throw new Error(`Could not load exercises: ${error.message}`);
-  const total = count ?? 0;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   const href = (p: number) => {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries({ q, muscle, equipment, tracking, source })) if (v) params.set(k, v);
@@ -47,6 +31,33 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
     const s = params.toString();
     return s ? `/exercises?${s}` : '/exercises';
   };
+
+  function build(head: boolean) {
+    let query = supabase
+      .from('exercises')
+      .select('id, name, primary_muscles, image_paths', { count: 'exact', head });
+    if (q) query = query.ilike('name', `%${escapeLike(q)}%`);
+    if ((MUSCLES as readonly string[]).includes(muscle)) query = query.contains('primary_muscles', [muscle]);
+    if ((EQUIPMENT as readonly string[]).includes(equipment)) query = query.eq('equipment', equipment);
+    if ((TRACKING_TYPES as readonly string[]).includes(tracking)) {
+      query = query.eq('tracking_type', tracking as (typeof TRACKING_TYPES)[number]);
+    }
+    if (source === 'builtin' || source === 'custom') query = query.eq('source', source);
+    return query;
+  }
+
+  const { data, count, error, status } = await build(false)
+    .order('name', { ascending: true })
+    .order('id', { ascending: true })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  if (error && page > 1 && (error.code === 'PGRST103' || status === 416)) {
+    // Requested page is past the end: redirect to the last page (page 1 when nothing matches).
+    const head = await build(true);
+    redirect(href(Math.max(1, Math.ceil((head.count ?? 0) / PAGE_SIZE))));
+  }
+  if (error) throw new Error(`Could not load exercises: ${error.message}`);
+  const total = count ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
