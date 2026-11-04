@@ -12,7 +12,7 @@ export const AUTH_TAGLINE = TAGLINE_LINES.join(' ');
 export function AuthShell({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
     <div className={styles.authShell}>
-      <section className={styles.authPanel}>
+      <section className={styles.authPanel} data-auth-panel="">
         <Logo size="lg" />
         <p className={styles.authTagline}>
           {TAGLINE_LINES.map((line, i) => (
@@ -21,13 +21,13 @@ export function AuthShell({ title, note, children }: { title: string; note?: str
         </p>
         {/* A taste of the dashboard. Decorative only. */}
         <div className={styles.authPreview} aria-hidden="true">
-          <Tile tone="pink" label="New PRs this week" value="🎉 7" className={styles.authPreviewA} />
-          <div className={styles.authPreviewB}>
+          <Tile tone="pink" label="New PRs this week" value="🎉 7" className={styles.authPreviewA} data-preview-tile="" />
+          <div className={styles.authPreviewB} data-preview-tile="">
             <p className={styles.tileLabel}>Done this week</p>
             <p className={styles.tileValue}>86%</p>
             <span className={styles.authBar}><i /></span>
           </div>
-          <Tile tone="blue" label="Workouts today" value="14" className={styles.authPreviewC} />
+          <Tile tone="blue" label="Workouts today" value="14" className={styles.authPreviewC} data-preview-tile="" />
         </div>
       </section>
       <main className={styles.authMain}>

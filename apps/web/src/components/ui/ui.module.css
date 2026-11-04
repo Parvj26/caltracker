@@ -218,35 +218,46 @@
   }
   .authTagline {
     margin-top: auto;
-    font-size: clamp(40px, 4.4vw, 60px);
+    font-size: clamp(34px, 4.2vw, 60px);
     line-height: 1.02;
     letter-spacing: -0.035em;
   }
   .authTagline span { display: block; }
+  /*
+   * Decorative tile cluster, drawn on a 560 x 210 design grid. --u is one grid unit
+   * (100cqi / 560 of the preview's own width), so the whole cluster scales evenly and
+   * always fits the panel, from 900 px windows up to wide screens (max 1 px per unit).
+   */
   .authPreview {
     display: block;
     position: relative;
-    height: 220px;
+    container-type: inline-size;
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 560 / 210;
     margin-top: 40px;
     margin-bottom: auto;
   }
   .authPreviewA,
   .authPreviewB,
   .authPreviewC {
+    --u: calc(100cqi / 560);
     position: absolute;
-    width: 188px;
-    border: 3px solid var(--ct-bg);
-    border-radius: var(--ct-radius-card);
-    padding: var(--ct-space-3-5) var(--ct-space-4);
+    width: calc(188 * var(--u));
+    border: calc(3 * var(--u)) solid var(--ct-bg);
+    border-radius: calc(20 * var(--u));
+    padding: calc(14 * var(--u)) calc(16 * var(--u));
     box-shadow: var(--ct-shadow-sticker);
   }
-  .authPreviewA { left: 0; top: 28px; transform: rotate(-5deg); }
-  .authPreviewB { left: 168px; top: 0; transform: rotate(3deg); background: var(--ct-bg); z-index: 1; }
-  .authPreviewC { left: 336px; top: 52px; transform: rotate(-2deg); }
+  .authPreview .tileLabel { font-size: calc(12 * var(--u)); }
+  .authPreview .tileValue { font-size: calc(26 * var(--u)); margin-top: calc(4 * var(--u)); }
+  .authPreviewA { left: calc(12 * var(--u)); top: calc(34 * var(--u)); transform: rotate(-5deg); }
+  .authPreviewB { left: calc(184 * var(--u)); top: calc(10 * var(--u)); transform: rotate(3deg); background: var(--ct-bg); z-index: 1; }
+  .authPreviewC { left: calc(356 * var(--u)); top: calc(58 * var(--u)); transform: rotate(-2deg); }
   .authBar {
     display: block;
-    height: 8px;
-    margin-top: var(--ct-space-2);
+    height: calc(8 * var(--u));
+    margin-top: calc(8 * var(--u));
     border-radius: var(--ct-radius-pill);
     background: var(--ct-surface);
     overflow: hidden;

@@ -1,7 +1,7 @@
 /* Sign-in (restyled on the UI kit). */
 .signInForm { display: flex; flex-direction: column; gap: var(--ct-space-4); }
 .submit { width: 100%; margin-top: var(--ct-space-2); }
-.forgot { align-self: center; font-weight: var(--ct-weight-section-heading); padding: var(--ct-space-1) var(--ct-space-2); }
+.forgot { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); align-self: center; font-weight: var(--ct-weight-section-heading); padding: var(--ct-space-1) var(--ct-space-2); }
 .notice {
   padding: var(--ct-space-3) var(--ct-space-3-5);
   border-radius: var(--ct-radius-input);
