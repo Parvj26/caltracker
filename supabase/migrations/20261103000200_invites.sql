@@ -7,12 +7,15 @@ create table public.client_invites (
   full_name text not null,
   -- Only the SHA-256 hex hash is stored; the raw token exists only in the email link.
   token_hash text not null unique,
-  expires_at timestamptz not null,
+  -- Server-controlled: coaches cannot write these (see grants); 14-day expiry.
+  expires_at timestamptz not null default now() + interval '14 days',
   sent_at timestamptz not null default now(),
   accepted_at timestamptz,
   accepted_by uuid references auth.users,
   created_by uuid not null references auth.users,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  constraint client_invites_expiry_window
+    check (expires_at > sent_at and expires_at <= sent_at + interval '14 days')
 );
 
 create unique index one_open_invite
@@ -36,9 +39,9 @@ create trigger client_invites_normalize_email
 -- only by claim_invites() and the service role.
 revoke all on table public.client_invites from anon, authenticated;
 grant select, delete on public.client_invites to authenticated;
-grant insert (workspace_id, email, full_name, token_hash, expires_at, sent_at, created_by)
+grant insert (workspace_id, email, full_name, token_hash, created_by)
   on public.client_invites to authenticated;
-grant update (email, full_name, token_hash, expires_at, sent_at)
+grant update (email, full_name, token_hash)
   on public.client_invites to authenticated;
 
 alter table public.client_invites enable row level security;

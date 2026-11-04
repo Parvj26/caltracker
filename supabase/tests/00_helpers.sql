@@ -52,7 +52,7 @@ $$;
 create or replace function tests.create_invite(
   ws uuid, email text, full_name text, created_by uuid, token text,
   expires_at timestamptz default now() + interval '14 days',
-  sent_at timestamptz default now()
+  sent_at timestamptz default null
 ) returns uuid
 language plpgsql
 as $$
@@ -63,7 +63,7 @@ begin
     workspace_id, email, full_name, token_hash, expires_at, sent_at, created_by
   ) values (
     ws, email, full_name, encode(extensions.digest(token, 'sha256'), 'hex'),
-    expires_at, sent_at, created_by
+    expires_at, coalesce(sent_at, least(now(), expires_at - interval '1 second')), created_by
   ) returning id into inv;
   return inv;
 end;

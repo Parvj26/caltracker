@@ -54,7 +54,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           email: string
-          expires_at: string
+          expires_at?: string
           full_name: string
           id?: string
           sent_at?: string

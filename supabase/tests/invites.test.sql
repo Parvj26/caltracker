@@ -1,5 +1,5 @@
 begin;
-select plan(45);
+select plan(51);
 
 -- Fixtures (as postgres)
 select tests.create_user('coach-a@t.local', 'Coach A') as coach_a \gset
@@ -32,17 +32,31 @@ select is((select count(*)::int from public.client_invites), 2, 'coach A sees on
 select is((select count(*)::int from public.client_invites where workspace_id = :'ws_b'), 0,
   'coach A cannot see B''s invites');
 select lives_ok(format($q$insert into public.client_invites
-  (workspace_id, email, full_name, token_hash, expires_at, created_by)
-  values (%L, 'new@t.local', 'New', 'h-new-a', now() + interval '14 days', %L)$q$, :'ws_a', :'coach_a'),
+  (workspace_id, email, full_name, token_hash, created_by)
+  values (%L, 'new@t.local', 'New', 'h-new-a', %L)$q$, :'ws_a', :'coach_a'),
   'coach A inserts an invite into A');
 select throws_ok(format($q$insert into public.client_invites
-  (workspace_id, email, full_name, token_hash, expires_at, created_by)
-  values (%L, 'evil@t.local', 'Evil', 'h-evil-b', now() + interval '14 days', %L)$q$, :'ws_b', :'coach_a'),
+  (workspace_id, email, full_name, token_hash, created_by)
+  values (%L, 'evil@t.local', 'Evil', 'h-evil-b', %L)$q$, :'ws_b', :'coach_a'),
   '42501', null, 'coach A cannot insert an invite into B');
 select throws_ok(format($q$insert into public.client_invites
-  (workspace_id, email, full_name, token_hash, expires_at, created_by)
-  values (%L, 'spoof@t.local', 'Spoof', 'h-spoof', now() + interval '14 days', %L)$q$, :'ws_a', :'coach_b'),
+  (workspace_id, email, full_name, token_hash, created_by)
+  values (%L, 'spoof@t.local', 'Spoof', 'h-spoof', %L)$q$, :'ws_a', :'coach_b'),
   '42501', null, 'coach A cannot insert an invite attributed to someone else');
+select throws_ok(format($q$insert into public.client_invites
+  (workspace_id, email, full_name, token_hash, sent_at, created_by)
+  values (%L, 'ts@t.local', 'Ts', 'h-ts', '2099-01-01', %L)$q$, :'ws_a', :'coach_a'),
+  '42501', null, 'coach cannot set sent_at on insert');
+select throws_ok(format($q$insert into public.client_invites
+  (workspace_id, email, full_name, token_hash, expires_at, created_by)
+  values (%L, 'ex@t.local', 'Ex', 'h-ex', now() + interval '1 year', %L)$q$, :'ws_a', :'coach_a'),
+  '42501', null, 'coach cannot set expires_at on insert');
+select throws_ok(format($q$update public.client_invites set sent_at = '2099-01-01' where id = %L$q$, :'inv_a1'),
+  '42501', null, 'coach cannot update sent_at');
+select throws_ok(format($q$update public.client_invites set expires_at = now() + interval '1 year' where id = %L$q$, :'inv_a1'),
+  '42501', null, 'coach cannot update expires_at');
+select ok((select expires_at = sent_at + interval '14 days' from public.client_invites
+  where token_hash = 'h-new-a'), 'coach insert gets server-set 14-day expiry');
 with u as (update public.client_invites set full_name = 'X One Renamed'
   where id = :'inv_a1' returning 1)
 select is((select count(*)::int from u), 1, 'coach A updates A''s invite');
@@ -58,8 +72,8 @@ select is((select count(*)::int from d), 0, 'coach A cannot delete B''s invite')
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.client_invites), 0, 'client sees 0 invites');
 select throws_ok(format($q$insert into public.client_invites
-  (workspace_id, email, full_name, token_hash, expires_at, created_by)
-  values (%L, 'c@t.local', 'C', 'h-c', now() + interval '14 days', %L)$q$, :'ws_a', :'a1'),
+  (workspace_id, email, full_name, token_hash, created_by)
+  values (%L, 'c@t.local', 'C', 'h-c', %L)$q$, :'ws_a', :'a1'),
   '42501', null, 'client cannot insert invites into own workspace');
 select tests.act_as_anon();
 select throws_ok('select count(*) from public.client_invites', '42501', null,
@@ -161,6 +175,12 @@ select is((select status from public.get_invite_preview('not-a-real-token')), 'n
 select ok((select workspace_name is null and email is null and full_name is null
   from public.get_invite_preview('not-a-real-token')), 'not_found returns null details');
 reset role;
+
+-- Expiry window check (as postgres)
+select throws_ok(format($q$insert into public.client_invites
+  (workspace_id, email, full_name, token_hash, sent_at, expires_at, created_by)
+  values (%L, 'long@t.local', 'Long', 'h-long', now(), now() + interval '15 days', %L)$q$, :'ws_a', :'coach_a'),
+  '23514', null, 'expiry beyond 14 days after sent_at violates the check');
 
 select * from finish();
 rollback;
