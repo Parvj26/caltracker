@@ -49,6 +49,10 @@ The deploy job first compares the checked-out commit with the tip of `main` (`gi
 
 The `deploy` job: build the web app (`cf:build`) first, so a failed build stops before anything on staging changes; then link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy` and deploy the already-built web app (`cf:deploy`). Only one deploy runs at a time. The `smoke` job then tests the live site.
 
+### Short invite gap during a deploy
+
+Between `supabase db push` and the end of `pnpm functions:deploy` (about 1 minute) the database is already new but the OLD send-invite function is still live. Invites sent in that window can fail with "Something went wrong" (the old function writes the old name column); the coach adds those clients again a minute later. (The other direction is covered: the new function still accepts the old dashboard's `fullName` invites for one release, so the few seconds before the new web app is live are fine.) For production deploys, either accept this one-minute gap or deploy during quiet hours.
+
 ## Create the smoke coach (after the first deploy)
 
 The smoke job needs a real staging coach who has a password.
