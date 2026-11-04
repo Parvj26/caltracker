@@ -228,6 +228,29 @@ apps/mobile/src/
 
 ---
 
+### Task 6b: First and last name (product owner request, 2026-11-04)
+
+The product owner asked for a separate last name when inviting clients. Today there is one `full_name` field everywhere.
+
+**Files:**
+- Create: `supabase/migrations/<timestamp>_first_last_name.sql`, `supabase/tests/<n>_first_last_name.test.sql`
+- Modify: `packages/shared/src/invites/{schema.ts,csv.ts}` (+ tests), `packages/shared/src/database.types.ts` (regenerated), `apps/web/src/app/(coach)/clients/{add-client-form.tsx,csv-upload.tsx,page.tsx,resend-button.tsx}`, `supabase/functions/send-invite/index.ts` (+ tests), `apps/mobile/src/app/(auth)/sign-up.tsx`, `scripts/provision-coach.ts` (+ tests), affected e2e and Maestro flows
+
+**Decisions:**
+- `profiles` and `client_invites` get `first_name text not null default ''` and `last_name text not null default ''`. `full_name` stays as a generated column (`trim(first_name || ' ' || last_name)`) so existing reads keep working. Backfill: split existing `full_name` on the first space.
+- The `handle_new_user` trigger reads `first_name`/`last_name` from user metadata and falls back to splitting `full_name`. Column grants mirror today's `full_name` grants.
+- First name is required. Last name is optional (some people use one name), max 100 characters each.
+- CSV accepts `First name` + `Last name` columns (also `first_name`/`last_name`/`Given name`/`Surname`), or the old single `Name` column (split on the first space). Everfit exports use separate columns, so test with that header shape.
+- Emails greet by first name ("Hi Parv"). Lists sort by last name, then first name.
+
+- [ ] **Step 1: Write failing tests:** pgTAP (backfill split, generated full_name, grants, RLS unchanged), shared CSV tests (both header shapes, single-name row, last name empty), schema tests.
+- [ ] **Step 2: Run** → FAIL.
+- [ ] **Step 3: Implement** the migration, shared parsing and validation, the web form (two fields side by side), the CSV preview columns, send-invite greeting, mobile sign-up (two fields) and provision-coach (`--first-name`/`--last-name`; the deploy workflow inputs become `coach_first_name`/`coach_last_name`).
+- [ ] **Step 4: Run** `pnpm check`, `pnpm db:test`, function tests, integration and e2e → PASS.
+- [ ] **Step 5: Commit** `feat: split client and coach names into first and last name`
+
+---
+
 ## Part B: Programs (branch `feature/phase-2-programs`, from `main` after Part A merges)
 
 ### Task 7: Shared units and calendar dates
@@ -565,3 +588,4 @@ apps/mobile/src/
 10. Programs are 1–52 weeks.
 11. Phone tabs in this phase are Today and Workouts only. No Start button until phase 3. ⌘K search and coach home tiles come later.
 12. Muted grey text is never used on pastel tiles (it fails contrast on pink and blue). Tile captions are black.
+13. Names are split into first name (required) and last name (optional) for clients and coaches (Task 6b, requested by the product owner). CSV accepts either separate first/last columns or one Name column.
