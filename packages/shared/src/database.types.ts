@@ -181,6 +181,15 @@ export type Database = {
       }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      lookup_members_by_email: {
+        Args: { emails: string[] }
+        Returns: {
+          email: string
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
     }
     Enums: {

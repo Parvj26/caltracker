@@ -29,3 +29,13 @@ jobs:
       - run: supabase test db
       - name: Check generated types are up to date
         run: supabase gen types typescript --local | diff - packages/shared/src/database.types.ts
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+      - name: Edge Function tests
+        run: |
+          supabase start -x studio,imgproxy,vector,logflare,pooler
+          bash scripts/sync-functions-shared.sh
+          eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
+            deno test --allow-all --config supabase/functions/deno.json supabase/functions/

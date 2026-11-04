@@ -52,3 +52,6 @@ pnpm-debug.log*
 
 # Superpowers SDD scratch
 .superpowers/
+
+# Generated copy of packages/shared for Edge Functions (scripts/sync-functions-shared.sh)
+supabase/functions/_shared/caltracker/
