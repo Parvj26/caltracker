@@ -56,14 +56,18 @@ test('CSV upload previews valid rows and line errors, then sends the valid ones'
   await expect(page.getByText(/Line 6: Duplicate email/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Send 3 invites' }).click();
+  await expect(preview.getByText('Invite sent')).toHaveCount(3);
+
+  const pendingTable = page.getByRole('table', { name: 'Pending invites' });
   for (const who of ['alice', 'bob', 'cara']) {
-    const row = page.getByRole('row').filter({ hasText: `${who}-${run}@example.com` });
-    await expect(row.first()).toBeVisible();
+    // Exactly one pending row each, so the duplicate line produced no second copy.
+    await expect(pendingTable.getByRole('row').filter({ hasText: `${who}-${run}@example.com` })).toHaveCount(1);
   }
-  await expect(page.getByRole('table', { name: 'Pending invites' }).getByText(`bob-${run}@example.com`)).toBeVisible();
+  await expect(pendingTable.getByText('not-an-email')).toHaveCount(0);
 });
 
 test('the demo client is listed under Clients', async ({ page }) => {
-  await expect(page.getByRole('table', { name: 'Clients' })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Clients' }).getByRole('row')).not.toHaveCount(1);
+  const clients = page.getByRole('table', { name: 'Clients' });
+  await expect(clients.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();
+  await expect(page.getByText('No clients yet')).toHaveCount(0);
 });
