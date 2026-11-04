@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseClientCsv } from '../../src/invites/csv';
+import { CLIENT_CSV_MAX_ROWS, EMAIL_HEADERS, NAME_HEADERS, clientCsvTemplate, parseClientCsv } from '../../src/index';
 
 describe('parseClientCsv', () => {
   it('parses a simple file', () => {
@@ -87,5 +87,28 @@ describe('parseClientCsv', () => {
     const { rows, errors } = parseClientCsv(['Name,Email', ...lines].join('\n'));
     expect(rows).toHaveLength(200);
     expect(errors).toEqual([]);
+  });
+});
+
+describe('client CSV constants and template', () => {
+  it('exports the accepted headers and the row limit the parser enforces', () => {
+    expect(CLIENT_CSV_MAX_ROWS).toBe(200);
+    expect(NAME_HEADERS).toEqual(['name', 'full name', 'full_name', 'client name']);
+    expect(EMAIL_HEADERS).toEqual(['email', 'e-mail', 'email address']);
+    const lines = ['Name,Email', ...Array.from({ length: CLIENT_CSV_MAX_ROWS + 1 }, (_, i) => `C ${i},c${i}@x.com`)];
+    const { rows, errors } = parseClientCsv(lines.join('\n'));
+    expect(rows).toHaveLength(CLIENT_CSV_MAX_ROWS);
+    expect(errors).toEqual([{ line: CLIENT_CSV_MAX_ROWS + 2, message: `Maximum ${CLIENT_CSV_MAX_ROWS} clients per upload.` }]);
+  });
+
+  it('builds an example file with a Name,Email header and two valid example.com rows', () => {
+    const template = clientCsvTemplate();
+    const lines = template.trim().split('\n');
+    expect(lines[0]).toBe('Name,Email');
+    expect(lines).toHaveLength(3);
+    const { rows, errors } = parseClientCsv(template);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(r.email).toMatch(/@example\.com$/);
   });
 });

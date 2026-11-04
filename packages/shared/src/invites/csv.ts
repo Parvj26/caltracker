@@ -11,11 +11,26 @@ export interface ParsedClientCsv {
   errors: CsvError[];
 }
 
-const MAX_ROWS = 200;
-const NAME_HEADERS = ['name', 'full name', 'full_name', 'client name'];
-const EMAIL_HEADERS = ['email', 'e-mail', 'email address'];
+/** Most clients one CSV upload may hold. */
+export const CLIENT_CSV_MAX_ROWS = 200;
+/** Accepted header cells (case and surrounding spaces are ignored). The first entry is the preferred spelling. */
+export const NAME_HEADERS: readonly string[] = ['name', 'full name', 'full_name', 'client name'];
+export const EMAIL_HEADERS: readonly string[] = ['email', 'e-mail', 'email address'];
 
-function findColumn(header: string[], accepted: string[]): number {
+const EXAMPLE_ROWS: ReadonlyArray<readonly [string, string]> = [
+  ['Sam Lee', 'sam.lee@example.com'],
+  ['Priya Rao', 'priya.rao@example.com'],
+];
+
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A small example upload: the preferred headers plus two example rows. */
+export function clientCsvTemplate(): string {
+  const header = [NAME_HEADERS[0]!, EMAIL_HEADERS[0]!].map(capitalise).join(',');
+  return [header, ...EXAMPLE_ROWS.map((row) => row.join(','))].join('\n') + '\n';
+}
+
+function findColumn(header: string[], accepted: readonly string[]): number {
   return header.findIndex((cell) => accepted.includes(cell.trim().toLowerCase()));
 }
 
@@ -45,8 +60,8 @@ export function parseClientCsv(text: string): ParsedClientCsv {
   const seen = new Map<string, number>();
 
   for (const [i, { line, cells }] of dataRows.entries()) {
-    if (i >= MAX_ROWS) {
-      errors.push({ line, message: `Maximum ${MAX_ROWS} clients per upload.` });
+    if (i >= CLIENT_CSV_MAX_ROWS) {
+      errors.push({ line, message: `Maximum ${CLIENT_CSV_MAX_ROWS} clients per upload.` });
       break;
     }
     const rawEmail = (cells[emailCol] ?? '').trim();

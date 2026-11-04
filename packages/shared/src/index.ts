@@ -7,7 +7,7 @@ export {
   SendInvitesResponse,
 } from './invites/schema';
 export type { InviteResultStatus } from './invites/schema';
-export { parseClientCsv } from './invites/csv';
+export { CLIENT_CSV_MAX_ROWS, EMAIL_HEADERS, NAME_HEADERS, clientCsvTemplate, parseClientCsv } from './invites/csv';
 export type { CsvError, ParsedClientCsv } from './invites/csv';
 export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
