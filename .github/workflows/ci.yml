@@ -25,7 +25,10 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.67.1
-      - run: supabase db start
+      # Start the full stack once: a bare `supabase db start` here makes a later
+      # `supabase start` report "already running" and leave Auth/API stopped.
+      - run: supabase start -x studio,imgproxy,vector,logflare,supavisor
+      - run: bash scripts/reload-auth-templates.sh
       - run: supabase test db
       - name: Check generated types are up to date
         run: supabase gen types typescript --local | diff - packages/shared/src/database.types.ts
@@ -34,9 +37,9 @@ jobs:
           deno-version: 2.9.8
       - name: Edge Function tests
         run: |
-          supabase start -x studio,imgproxy,vector,logflare,pooler
           bash scripts/sync-functions-shared.sh
           eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
           SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
             deno test --allow-all --config supabase/functions/deno.json supabase/functions/
       - uses: pnpm/action-setup@v4
@@ -48,6 +51,7 @@ jobs:
       - name: Integration tests
         run: |
           eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
+          : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
           SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
             PUBLIC_SITE_URL=http://localhost:3000 pnpm test:integration
 
@@ -65,8 +69,9 @@ jobs:
           cache: pnpm
       - name: Start Supabase and seed demo users
         run: |
-          supabase start -x studio,imgproxy,vector,logflare,pooler
+          supabase start -x studio,imgproxy,vector,logflare,supavisor
           supabase db reset
+          bash scripts/reload-auth-templates.sh
       - name: Write Edge Function env (invite emails go to the local mail catcher)
         run: |
           cat > supabase/functions/.env <<'EOF'

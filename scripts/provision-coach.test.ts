@@ -26,6 +26,16 @@ async function mailSubjectsTo(email: string): Promise<string[]> {
   return body.messages.filter((m) => m.To.some((t) => t.Address.toLowerCase() === email)).map((m) => m.Subject);
 }
 
+// Delivery to Mailpit is asynchronous (slower right after a cold start, as in CI): poll briefly.
+async function waitForSubjects(email: string, match: string, count: number, timeoutMs = 10_000): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const found = (await mailSubjectsTo(email)).filter((s) => s.includes(match));
+    if (found.length >= count || Date.now() > deadline) return found;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
 async function members(userId: string) {
   const { data, error } = await admin
     .from('workspace_members')
@@ -73,8 +83,7 @@ describe('provisionCoach', () => {
     await new Promise((r) => setTimeout(r, 1500));
     const again = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
     expect(again).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false, resent: true });
-    const subjects = await mailSubjectsTo(email);
-    expect(subjects.filter((s) => s.includes('Reset your CalTracker password'))).toHaveLength(1);
+    expect(await waitForSubjects(email, 'Reset your CalTracker password', 1)).toHaveLength(1);
 
     // Once they have signed in there is nothing to re-send.
     const password = 'some-password-123';
