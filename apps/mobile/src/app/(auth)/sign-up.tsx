@@ -42,7 +42,8 @@ export default function SignUp() {
       <TextField
         testID="name-input"
         label="First name"
-        textContentType="none"
+        textContentType="givenName"
+        autoComplete="given-name"
         value={firstName}
         onChangeText={setFirstName}
       />
@@ -50,7 +51,8 @@ export default function SignUp() {
         testID="last-name-input"
         label="Last name"
         hint="Optional if you use one name."
-        textContentType="none"
+        textContentType="familyName"
+        autoComplete="family-name"
         value={lastName}
         onChangeText={setLastName}
       />
