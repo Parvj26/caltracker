@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@caltracker/shared": "workspace:*",
-    "@supabase/supabase-js": "2.118.0"
+    "@supabase/supabase-js": "2.118.0",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
