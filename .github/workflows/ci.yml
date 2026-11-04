@@ -50,3 +50,36 @@ jobs:
           eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
           SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
             PUBLIC_SITE_URL=http://localhost:3000 pnpm test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Start Supabase and seed demo users
+        run: |
+          supabase start -x studio,imgproxy,vector,logflare,pooler
+          supabase db reset
+      - name: Write web env
+        run: bash apps/web/scripts/write-local-env.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: pnpm --filter web build
+      - name: End-to-end tests
+        run: pnpm test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

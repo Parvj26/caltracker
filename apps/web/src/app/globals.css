@@ -1,0 +1,6 @@
+:root {
+  --ink: #121212;
+  --paper: #ffffff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); }
