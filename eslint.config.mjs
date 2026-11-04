@@ -8,6 +8,8 @@ export default tseslint.config(
       '**/database.types.ts',
       '**/.next/**',
       '**/.expo/**',
+      '**/ios/**',
+      '**/android/**',
       '**/dist/**',
       '**/.turbo/**',
       '**/node_modules/**',

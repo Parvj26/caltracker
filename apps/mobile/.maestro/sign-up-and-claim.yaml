@@ -1,0 +1,57 @@
+# Invited client signs up, confirms email, signs in and lands in the coach's workspace.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: e2e-client@x.com
+  PASSWORD: e2e-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: invite, EMAIL: '${EMAIL}', NAME: 'E2E Client' }
+- launchApp:
+    clearState: true
+- tapOn:
+    id: go-sign-up
+- tapOn:
+    id: name-input
+- inputText: E2E Client
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: submit-button
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- assertVisible: 'We sent a link to ${EMAIL}. Tap it, then come back and sign in.'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: confirm, EMAIL: '${EMAIL}' }
+- tapOn:
+    id: go-sign-in
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: submit-button
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- assertVisible: 'Welcome to Demo Coaching'
+- assertVisible: 'Your coach will add your workouts here soon.'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
