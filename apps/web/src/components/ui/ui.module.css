@@ -1,0 +1,262 @@
+/* CalTracker web UI kit. Colours, radii and sizes come only from var(--ct-*) (packages/design-tokens). */
+
+/* ---------- Button ---------- */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-button-min-height);
+  padding: var(--ct-space-3) var(--ct-space-6);
+  border: 0;
+  border-radius: var(--ct-radius-button);
+  font: inherit;
+  font-size: var(--ct-size-button);
+  font-weight: var(--ct-weight-button);
+  letter-spacing: var(--ct-tracking-button);
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+}
+.button:disabled { cursor: not-allowed; opacity: 0.7; }
+
+.primary {
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  box-shadow: 0 var(--ct-base) 0 var(--ct-lime);
+}
+.primary:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-lime); }
+
+.secondary {
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+}
+
+.finish {
+  background: var(--ct-magenta);
+  color: var(--ct-bg);
+  /* White on magenta passes contrast only as large text: at least 19 px bold. */
+  font-size: max(19px, var(--ct-size-button));
+  font-weight: var(--ct-weight-button);
+  box-shadow: 0 var(--ct-base) 0 var(--ct-magenta-deep);
+}
+.finish:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-magenta-deep); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .primary:active:not(:disabled),
+  .secondary:active:not(:disabled),
+  .finish:active:not(:disabled) { transform: translateY(var(--ct-press)); }
+}
+
+/* ---------- Text field ---------- */
+.field { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.fieldLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.fieldLabelText { font-weight: var(--ct-weight-section-heading); font-size: var(--ct-size-body); }
+.input {
+  width: 100%;
+  min-height: var(--ct-button-min-height);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  transition: border-color 80ms ease-out, background-color 80ms ease-out;
+}
+.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus-visible { outline: none; }
+.input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+.hint { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+
+.errorText {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ct-space-2);
+  margin: 0;
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+}
+.errorMarker { color: var(--ct-magenta); font-weight: var(--ct-weight-button); }
+
+/* ---------- Card, tile, chip ---------- */
+.card {
+  background: var(--ct-bg);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  padding: var(--ct-space-6);
+}
+
+.tile {
+  border-radius: var(--ct-radius-card);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  color: var(--ct-ink);
+}
+.tileLabel { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink); }
+.tileValue {
+  margin: var(--ct-space-1) 0 0;
+  font-size: var(--ct-size-big-number);
+  font-weight: var(--ct-weight-big-number);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  padding: 2px var(--ct-space-2-5);
+  border-radius: var(--ct-radius-pill);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tone-lime { background: var(--ct-lime); }
+.tone-pink { background: var(--ct-pink); }
+.tone-blue { background: var(--ct-blue); }
+.tone-grey { background: var(--ct-surface); }
+
+/* ---------- Hand note ---------- */
+.handNote {
+  margin: 0;
+  font-family: var(--ct-font-hand), cursive;
+  font-weight: var(--ct-weight-hand);
+  font-size: var(--ct-size-hand);
+  line-height: 1.1;
+  color: var(--ct-magenta);
+  transform: rotate(var(--ct-rotate-hand));
+  transform-origin: left center;
+}
+
+/* ---------- Logo ---------- */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  font-weight: var(--ct-weight-button);
+  color: var(--ct-ink);
+  line-height: 1;
+  white-space: nowrap;
+}
+.logoMark {
+  background: var(--ct-lime);
+  border-radius: 0.42em;
+  padding: 0.14em 0.3em 0.16em;
+}
+.logo-md { font-size: 19px; }
+.logo-lg { font-size: 34px; letter-spacing: var(--ct-tracking-screen-title); }
+
+/* ---------- Screen title ---------- */
+.screenTitle {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+
+/* ---------- Auth shell ---------- */
+.authShell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ct-bg);
+}
+
+/* Phone and narrow windows: a lime header band with the logo, then the card. */
+.authPanel {
+  position: relative;
+  overflow: hidden;
+  background: var(--ct-lime);
+  padding: 28px var(--ct-space-4) 64px;
+}
+.authPanel .logoMark { box-shadow: 0 0 0 3px var(--ct-bg), var(--ct-shadow-sticker); }
+.authTagline span { display: inline; }
+.authTagline {
+  margin: var(--ct-space-4) 0 0;
+  max-width: 22ch;
+  font-size: 22px;
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.12;
+}
+.authPreview { display: none; }
+
+.authMain {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 var(--ct-space-4) var(--ct-space-6);
+  margin-top: -40px;
+}
+.authCard {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-6);
+}
+.authHeading { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+
+@media (min-width: 900px) {
+  .authShell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  }
+  .authPanel {
+    display: flex;
+    flex-direction: column;
+    padding: 48px 56px;
+    border-radius: 0;
+    min-height: 100dvh;
+  }
+  .authTagline {
+    margin-top: auto;
+    font-size: clamp(40px, 4.4vw, 60px);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+  }
+  .authTagline span { display: block; }
+  .authPreview {
+    display: block;
+    position: relative;
+    height: 220px;
+    margin-top: 40px;
+    margin-bottom: auto;
+  }
+  .authPreviewA,
+  .authPreviewB,
+  .authPreviewC {
+    position: absolute;
+    width: 188px;
+    border: 3px solid var(--ct-bg);
+    border-radius: var(--ct-radius-card);
+    padding: var(--ct-space-3-5) var(--ct-space-4);
+    box-shadow: var(--ct-shadow-sticker);
+  }
+  .authPreviewA { left: 0; top: 28px; transform: rotate(-5deg); }
+  .authPreviewB { left: 168px; top: 0; transform: rotate(3deg); background: var(--ct-bg); z-index: 1; }
+  .authPreviewC { left: 336px; top: 52px; transform: rotate(-2deg); }
+  .authBar {
+    display: block;
+    height: 8px;
+    margin-top: var(--ct-space-2);
+    border-radius: var(--ct-radius-pill);
+    background: var(--ct-surface);
+    overflow: hidden;
+  }
+  .authBar i { display: block; width: 86%; height: 100%; background: var(--ct-ink); }
+
+  .authMain {
+    align-items: center;
+    margin-top: 0;
+    padding: 48px;
+  }
+  .authCard { padding: 40px; }
+}
