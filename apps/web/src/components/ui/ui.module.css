@@ -68,6 +68,8 @@
 .input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
 .input:focus-visible { outline: none; }
 .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+/* The magenta error border hides the ink focus border, so a focused invalid field gets an ink outline instead. */
+.input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .select { cursor: pointer; }
 .textarea { resize: vertical; line-height: 1.4; }
 .hint { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }

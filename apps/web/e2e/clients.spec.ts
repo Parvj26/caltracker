@@ -101,6 +101,10 @@ test('empty first name shows an inline error and sends nothing', async ({ page }
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Enter a first name' })).toBeVisible();
   await expect(page.getByLabel('First name')).toHaveAttribute('aria-invalid', 'true');
+  // Focused while invalid: the magenta border stays, and an ink outline still shows where focus is.
+  await page.getByLabel('First name').focus();
+  await expect(page.getByLabel('First name')).toHaveCSS('outline-style', 'solid');
+  await expect(page.getByLabel('First name')).not.toHaveCSS('outline-width', '0px');
   await expect(page.getByText(email)).toHaveCount(0);
   await page.reload();
   await expect(page.getByText(email)).toHaveCount(0);
