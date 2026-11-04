@@ -49,16 +49,27 @@ export function createResendMailer(opts: {
   /** Per-request timeout (default 10 s) and total cap per email (default 20 s); injectable for tests. */
   attemptTimeoutMs?: number;
   totalCapMs?: number;
+  /** Clock, injectable for tests. */
+  now?: () => number;
 }): Mailer {
   const attemptTimeoutMs = opts.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS;
   const totalCapMs = opts.totalCapMs ?? TOTAL_CAP_MS;
   const fetchFn = opts.fetchFn ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const now = opts.now ?? Date.now;
   return {
     async send(msg) {
-      const startedAt = Date.now();
+      const startedAt = now();
+      const remainingMs = () => totalCapMs - (now() - startedAt);
+      /** Wait before a retry, never past the total cap. False when no time is left to try again. */
+      const waitBeforeRetry = async (ms: number): Promise<boolean> => {
+        const left = remainingMs();
+        if (left <= 0) return false;
+        await sleep(Math.min(ms, left));
+        return remainingMs() > 0;
+      };
       for (let attempt = 0; ; attempt++) {
-        const remaining = totalCapMs - (Date.now() - startedAt);
+        const remaining = remainingMs();
         if (remaining <= 0) throw new Error('Resend did not answer in time');
         let res: Response;
         try {
@@ -75,8 +86,7 @@ export function createResendMailer(opts: {
           const timedOut = err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError');
           if (!timedOut) throw err;
           // A timeout is a failed attempt: retry while attempts and the total cap allow.
-          if (attempt < RESEND_MAX_RETRIES && totalCapMs - (Date.now() - startedAt) > 0) {
-            await sleep(RESEND_BACKOFF_MS[attempt] ?? 2000);
+          if (attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(RESEND_BACKOFF_MS[attempt] ?? 2000))) {
             continue;
           }
           throw new Error('Resend did not answer in time');
@@ -90,8 +100,7 @@ export function createResendMailer(opts: {
           throw new Error('Resend responded 429 (sending quota used up)');
         }
         // Resend allows 2 requests per second; back off and retry when it says slow down.
-        if (res.status === 429 && attempt < RESEND_MAX_RETRIES) {
-          await sleep(retryDelayMs(res, attempt));
+        if (res.status === 429 && attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(retryDelayMs(res, attempt)))) {
           continue;
         }
         throw new Error(`Resend responded ${res.status}`);

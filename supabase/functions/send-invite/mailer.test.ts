@@ -131,3 +131,65 @@ Deno.test('resend: a timeout followed by a good answer still sends', async () =>
   await mailer.send(msg);
   assertEquals(calls, 2);
 });
+
+// A fake clock: each Resend call "takes" callMs and every sleep advances the clock by what it was asked.
+function fakeClockMailer(opts: { callMs: number; status: number; headers?: Record<string, string>; totalCapMs?: number }) {
+  let clock = 0;
+  const sleeps: number[] = [];
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    calls++;
+    clock += opts.callMs;
+    return Promise.resolve(new Response('nope', { status: opts.status, headers: opts.headers ?? {} }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k',
+    from: 'f@x.com',
+    fetchFn,
+    now: () => clock,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      clock += ms;
+      return Promise.resolve();
+    },
+    totalCapMs: opts.totalCapMs,
+  });
+  return { mailer, sleeps, calls: () => calls, elapsed: () => clock };
+}
+
+Deno.test('resend: retry waits are clamped so one email never runs past the 20 s total cap', async () => {
+  // Each call takes 6 s and asks to wait 5 s: unclamped this would run 6+5+6+5+6 = 28 s.
+  const f = fakeClockMailer({ callMs: 6000, status: 429, headers: { 'retry-after': '5' } });
+  await assertRejects(() => f.mailer.send(msg), Error);
+  assertEquals(f.elapsed() <= 20_000, true, `ran ${f.elapsed()} ms`);
+  assertEquals(f.sleeps, [5000, 3000]);
+  assertEquals(f.calls(), 2, 'no request is started once the budget is spent');
+});
+
+Deno.test('resend: fallback backoff is clamped to the remaining budget too', async () => {
+  // 600 ms call, 500 ms wait, 600 ms call, then only 300 ms of the 2 s budget is left for the 1 s wait.
+  const f = fakeClockMailer({ callMs: 600, status: 429, totalCapMs: 2000 });
+  await assertRejects(() => f.mailer.send(msg), Error);
+  assertEquals(f.elapsed() <= 2000, true, `ran ${f.elapsed()} ms`);
+  assertEquals(f.sleeps, [500, 300]);
+});
+
+Deno.test('resend: timeout retries are clamped to the remaining budget', async () => {
+  let clock = 0;
+  const sleeps: number[] = [];
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    clock += 1800; // the attempt ran until (almost) the cap, then timed out
+    return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn, now: () => clock, totalCapMs: 2000,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      clock += ms;
+      return Promise.resolve();
+    },
+  });
+  await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
+  assertEquals(clock <= 2000, true, `ran ${clock} ms`);
+  assertEquals(sleeps, [200]);
+});
