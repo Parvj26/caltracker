@@ -1,6 +1,4 @@
 /* Tokens (--ct-*) are injected by app/layout.tsx from @caltracker/design-tokens. Colours only via var(--ct-*). */
-/* Legacy aliases for phase 1 modules not yet restyled (Tasks 3-5 remove the last uses). */
-:root { --ink: var(--ct-ink); --paper: var(--ct-bg); }
 
 *, *::before, *::after { box-sizing: border-box; }
 

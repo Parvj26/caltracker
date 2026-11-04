@@ -1,18 +1,87 @@
-.filters { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1.5rem; }
-.filters label, .form label { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
-.filters input, .filters select, .form input, .form select, .form textarea { padding: 0.5rem; border: 1px solid var(--ink); border-radius: 6px; font: inherit; }
-.filters button, .form button, .button { padding: 0.55rem 1rem; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); font: inherit; cursor: pointer; text-decoration: none; }
-.grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
-.card { display: flex; flex-direction: column; gap: 0.25rem; height: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; color: inherit; text-decoration: none; }
-.card img, .thumbPlaceholder { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; background: #eee; }
-.muted { color: #555; margin: 0; font-size: 0.9rem; }
-.pager { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
-.form { display: flex; flex-direction: column; gap: 1rem; max-width: 520px; }
-.error { color: #b00020; margin: 0; }
-.images { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; }
-.images img { max-width: 240px; height: auto; border-radius: 6px; }
-.video { width: 100%; max-width: 640px; aspect-ratio: 16 / 9; border: 0; }
-.meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
-.meta dt { font-weight: 600; }
+/* Exercise library. Colours, radii and sizes only via var(--ct-*). */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
+
+.titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.newButton { margin-left: auto; }
+.sectionHeading { margin: 0 0 var(--ct-space-3); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.muted { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+
+/* ---------- Filters ---------- */
+.filterCard { padding: var(--ct-space-4) var(--ct-space-4-5); }
+.filters { display: flex; flex-direction: column; gap: var(--ct-space-3-5); }
+.searchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
+.searchField { flex: 1 1 220px; }
+.searchButton { flex: none; }
+.selectRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--ct-space-3); }
+
+.chipGroup { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-3); }
+.chipGroupLabel { font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.chipRow { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); }
+/* The chip is the visual; the button around it supplies the 44 px tap target and the pressed ring. */
+.chipButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.chipButton > span { padding: var(--ct-space-2) var(--ct-space-3); font-size: 14px; }
+.chipButton[aria-pressed='true'] > span { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.chipOn { font-weight: var(--ct-weight-button); }
+
+/* ---------- Grid ---------- */
+.grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--ct-space-3-5); }
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ct-space-1);
+  height: 100%;
+  padding: var(--ct-space-2-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+.card:hover { border-color: var(--ct-ink); }
+.thumb, .thumbPlaceholder { width: 100%; height: 120px; object-fit: cover; border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.cardName { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.cardChip { margin-top: auto; }
+
+.pager { display: flex; flex-wrap: wrap; gap: var(--ct-space-4); align-items: center; }
+
+/* ---------- Detail ---------- */
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: var(--ct-space-1) var(--ct-space-4); margin: 0; }
+.meta dt { font-weight: var(--ct-weight-section-heading); }
 .meta dd { margin: 0; }
-.section { margin: 1.5rem 0; }
+.images { display: flex; gap: var(--ct-space-3); flex-wrap: wrap; margin-top: var(--ct-space-4); }
+.images img { max-width: 100%; height: auto; border-radius: var(--ct-radius-input); }
+.steps { margin: 0; padding-left: var(--ct-space-6); display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.video { width: 100%; max-width: 640px; aspect-ratio: 16 / 9; border: 0; border-radius: var(--ct-radius-input); }
+
+/* ---------- Forms ---------- */
+.form { display: flex; flex-direction: column; gap: var(--ct-space-3-5); max-width: 520px; }
+.formCard { max-width: 600px; }
+.submit { align-self: flex-start; }
+.saved { margin: 0; font-weight: var(--ct-weight-section-heading); }
+
+@media (max-width: 520px) {
+  .newButton { margin-left: 0; }
+  .meta { grid-template-columns: 1fr; }
+  .meta dd { margin-bottom: var(--ct-space-2); }
+}

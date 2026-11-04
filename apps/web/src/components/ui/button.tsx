@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes } from 'react';
+import Link from 'next/link';
+import type { ButtonHTMLAttributes, ComponentProps } from 'react';
 import { cx } from './cx';
 import styles from './ui.module.css';
 
@@ -20,4 +21,11 @@ export function Button({ variant = 'primary', pending = false, disabled, classNa
       className={cx(styles.button, styles[variant], className)}
     />
   );
+}
+
+export type ButtonLinkProps = ComponentProps<typeof Link> & { variant?: ButtonVariant };
+
+/** A link that looks like a Button (use for navigation and external links). Callers add rel/target for external URLs. */
+export function ButtonLink({ variant = 'primary', className, ...rest }: ButtonLinkProps) {
+  return <Link {...rest} className={cx(styles.button, styles[variant], className)} />;
 }

@@ -4,10 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // Every colour must come from @caltracker/design-tokens via var(--ct-*), so a dark theme can be added later.
-// Files still waiting for their phase 2 restyle. This list may only shrink (Tasks 3-5 empty it).
-const PENDING_RESTYLE = [
-  'app/(coach)/exercises/exercises.module.css',
-];
+// Files still waiting for their phase 2 restyle. This list may only shrink (now empty: every web CSS file is restyled).
+const PENDING_RESTYLE: string[] = [];
 
 const RAW_COLOUR = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
 const srcDir = fileURLToPath(new URL('.', import.meta.url));

@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cx } from './cx';
 import styles from './ui.module.css';
 
@@ -38,6 +38,38 @@ export function TextField({ label, error, hint, className, id, ...rest }: TextFi
       </label>
       {hint ? <p id={hintId} className={styles.hint}>{hint}</p> : null}
       {error ? <ErrorText id={errorId}>{error}</ErrorText> : null}
+    </div>
+  );
+}
+
+type ControlProps = { label: string; hint?: string };
+
+/** Native select styled like TextField. */
+export function SelectField({ label, hint, className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & ControlProps) {
+  const hintId = `${useId()}-hint`;
+  return (
+    <div className={cx(styles.field, className)}>
+      <label className={styles.fieldLabel}>
+        <span className={styles.fieldLabelText}>{label}</span>
+        <select {...rest} aria-describedby={hint ? hintId : undefined} className={cx(styles.input, styles.select)}>
+          {children}
+        </select>
+      </label>
+      {hint ? <p id={hintId} className={styles.hint}>{hint}</p> : null}
+    </div>
+  );
+}
+
+/** Multi-line text field styled like TextField. */
+export function TextAreaField({ label, hint, className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & ControlProps) {
+  const hintId = `${useId()}-hint`;
+  return (
+    <div className={cx(styles.field, className)}>
+      <label className={styles.fieldLabel}>
+        <span className={styles.fieldLabelText}>{label}</span>
+        <textarea {...rest} aria-describedby={hint ? hintId : undefined} className={cx(styles.input, styles.textarea)} />
+      </label>
+      {hint ? <p id={hintId} className={styles.hint}>{hint}</p> : null}
     </div>
   );
 }

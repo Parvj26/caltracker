@@ -4,6 +4,8 @@ import { TRACKING_TYPES } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { EQUIPMENT, MUSCLES, TRACKING_LABELS, escapeLike } from './filters';
+import { Button, ButtonLink, Card, Chip, SelectField, TextField } from '@/components/ui';
+import { TrackingChips } from './tracking-chips';
 import styles from './exercises.module.css';
 
 const PAGE_SIZE = 50;
@@ -35,7 +37,7 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
   function build(head: boolean) {
     let query = supabase
       .from('exercises')
-      .select('id, name, primary_muscles, image_paths', { count: 'exact', head });
+      .select('id, name, primary_muscles, image_paths, tracking_type', { count: 'exact', head });
     if (q) query = query.ilike('name', `%${escapeLike(q)}%`);
     if ((MUSCLES as readonly string[]).includes(muscle)) query = query.contains('primary_muscles', [muscle]);
     if ((EQUIPMENT as readonly string[]).includes(equipment)) query = query.eq('equipment', equipment);
@@ -60,67 +62,52 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div>
-      <h1>Exercises</h1>
-      <p>
-        <Link href="/exercises/new" className={styles.button}>
+    <div className={styles.page}>
+      <header className={styles.titleRow}>
+        <h1 className={styles.title}>Exercises</h1>
+        <p className={styles.caption}>
+          {total} exercise{total === 1 ? '' : 's'}
+        </p>
+        <ButtonLink href="/exercises/new" className={styles.newButton}>
           New custom exercise
-        </Link>
-      </p>
-      <form className={styles.filters} method="get" action="/exercises">
-        <label>
-          Search
-          <input type="search" name="q" defaultValue={q} />
-        </label>
-        <label>
-          Muscle
-          <select name="muscle" defaultValue={muscle}>
-            <option value="">Any</option>
-            {MUSCLES.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Equipment
-          <select name="equipment" defaultValue={equipment}>
-            <option value="">Any</option>
-            {EQUIPMENT.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Tracking type
-          <select name="tracking" defaultValue={tracking}>
-            <option value="">Any</option>
-            {TRACKING_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {TRACKING_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Show
-          <select name="source" defaultValue={source}>
-            <option value="">All</option>
-            <option value="builtin">Built-in</option>
-            <option value="custom">My exercises</option>
-          </select>
-        </label>
-        <button type="submit">Search</button>
-      </form>
+        </ButtonLink>
+      </header>
 
-      <p className={styles.muted}>
-        {total} exercise{total === 1 ? '' : 's'}
-      </p>
+      <Card className={styles.filterCard}>
+        <form className={styles.filters} method="get" action="/exercises">
+          <div className={styles.searchRow}>
+            <TextField label="Search" type="search" name="q" defaultValue={q} className={styles.searchField} />
+            <Button type="submit" className={styles.searchButton}>Search</Button>
+          </div>
+          <div className={styles.selectRow}>
+            <SelectField label="Muscle" name="muscle" defaultValue={muscle}>
+              <option value="">Any</option>
+              {MUSCLES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Equipment" name="equipment" defaultValue={equipment}>
+              <option value="">Any</option>
+              {EQUIPMENT.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Show" name="source" defaultValue={source}>
+              <option value="">All</option>
+              <option value="builtin">Built-in</option>
+              <option value="custom">My exercises</option>
+            </SelectField>
+          </div>
+          <TrackingChips initial={(TRACKING_TYPES as readonly string[]).includes(tracking) ? tracking : ''} />
+        </form>
+      </Card>
+
       {data.length === 0 ? (
-        <p>No exercises match.</p>
+        <p className={styles.empty}>No exercises match.</p>
       ) : (
         <ul className={styles.grid}>
           {data.map((ex) => {
@@ -131,12 +118,13 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
                 <Link href={`/exercises/${ex.id}`} className={styles.card}>
                   {src ? (
                     // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
-                    <img src={src} alt="" width={180} height={120} loading="lazy" />
+                    <img src={src} alt="" width={180} height={120} loading="lazy" className={styles.thumb} />
                   ) : (
                     <div className={styles.thumbPlaceholder} />
                   )}
-                  <strong>{ex.name}</strong>
+                  <strong className={styles.cardName}>{ex.name}</strong>
                   <span className={styles.muted}>{ex.primary_muscles.join(', ')}</span>
+                  <Chip tone="grey" className={styles.cardChip}>{TRACKING_LABELS[ex.tracking_type]}</Chip>
                 </Link>
               </li>
             );
@@ -146,11 +134,11 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
 
       {pages > 1 ? (
         <nav className={styles.pager} aria-label="Pagination">
-          {page > 1 ? <Link href={href(page - 1)}>Previous</Link> : null}
+          {page > 1 ? <ButtonLink variant="secondary" href={href(page - 1)}>Previous</ButtonLink> : null}
           <span>
             Page {page} of {pages}
           </span>
-          {page < pages ? <Link href={href(page + 1)}>Next</Link> : null}
+          {page < pages ? <ButtonLink variant="secondary" href={href(page + 1)}>Next</ButtonLink> : null}
         </nav>
       ) : null}
     </div>

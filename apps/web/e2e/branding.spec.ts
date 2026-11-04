@@ -166,3 +166,41 @@ test('bulk CSV invite explains itself and offers an example file that parses int
   expect(parsed.errors).toEqual([]);
   expect(parsed.rows).toHaveLength(2);
 });
+
+// One test (one sign-in): local Supabase allows 30 sign-ins per 5 minutes and the suite is close to that.
+test('exercise library: list, detail and new-exercise form use the UI kit', async ({ page }) => {
+  await signInAsDemoCoach(page);
+  await page.goto('/exercises');
+  await expect(page.getByLabel('Search')).toBeVisible();
+  const group = page.getByRole('group', { name: 'Tracking type' });
+  const chips = group.getByRole('button');
+  await expect(chips).toHaveCount(4);
+  for (const chip of await chips.all()) {
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await group.getByRole('button', { name: 'Time' }).click();
+  await expect(page).toHaveURL(/tracking=time/);
+  await expect(page.getByRole('group', { name: 'Tracking type' }).getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveCSS('background-color', 'rgb(18, 18, 18)');
+  const firstCard = page.locator('main li a').first();
+  await expect(firstCard).toHaveCSS('border-top-width', '2px');
+  expect((await page.getByLabel('Search').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+  // Detail page.
+  await page.goto('/exercises?q=Barbell Squat');
+  await page.getByRole('link', { name: /Barbell Squat/ }).first().click();
+  const link = page.getByRole('link', { name: 'Watch form on YouTube' });
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(link).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByLabel('Pinned YouTube video')).toHaveCSS('background-color', 'rgb(244, 244, 244)');
+
+  // New-exercise form.
+  await page.goto('/exercises/new');
+  for (const l of ['Name', 'Tracking type', 'Instructions (one step per line)']) {
+    expect((await page.getByLabel(l).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.getByRole('button', { name: 'Create exercise' }).click();
+  await expect(page.locator('main').getByRole('alert')).toContainText('⚠');
+});
