@@ -17,7 +17,8 @@
     "db:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts",
     "functions:sync": "bash scripts/sync-functions-shared.sh",
     "functions:serve": "pnpm functions:sync && supabase functions serve --env-file supabase/functions/.env",
-    "functions:test": "pnpm functions:sync && deno test --allow-all --config supabase/functions/deno.json supabase/functions/"
+    "functions:test": "pnpm functions:sync && deno test --allow-all --config supabase/functions/deno.json supabase/functions/",
+    "functions:deploy": "pnpm functions:sync && supabase functions deploy send-invite"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

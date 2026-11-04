@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Do not run Edge Function serve, test or deploy directly: use the pnpm wrappers
+# (functions:serve, functions:test, functions:deploy) so this sync always runs first.
+# The synced copy is git-ignored, so a fresh checkout or stale copy would otherwise break or ship old code.
 # Edge Functions run in Docker with only supabase/functions mounted, so they cannot
 # import packages/shared directly. Copy its source (no tests) into a git-ignored folder.
 set -euo pipefail
