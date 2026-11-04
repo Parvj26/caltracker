@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 // Every colour must come from @caltracker/design-tokens via var(--ct-*), so a dark theme can be added later.
 // Files still waiting for their phase 2 restyle. This list may only shrink (Tasks 3-5 empty it).
 const PENDING_RESTYLE = [
-  'app/(coach)/clients/clients.module.css',
   'app/(coach)/exercises/exercises.module.css',
 ];
 

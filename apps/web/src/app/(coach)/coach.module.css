@@ -1,5 +1,81 @@
-.header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--ink); }
-.nav { display: flex; gap: 1.25rem; align-items: center; }
-.nav a { color: var(--ink); text-decoration: none; font-weight: 600; }
-.nav button { border: 0; background: none; font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
-.content { padding: 1.5rem; }
+/* Coach dashboard shell: sidebar + content (docs/design/mockups/coach-dashboard.html). Colours only via var(--ct-*). */
+.shell {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-4);
+  padding: var(--ct-space-4-5) var(--ct-space-3);
+  background: var(--ct-surface-sidebar);
+  border-right: 1px solid var(--ct-border);
+  overflow-y: auto;
+}
+
+.brand { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: 0 var(--ct-space-2-5); }
+.logoMark { display: none; }
+.workspace {
+  margin: 0;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-2-5);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.navItem:hover { background: var(--ct-surface); }
+.navItem svg { flex: none; }
+.navItemCurrent,
+.navItemCurrent:hover { background: var(--ct-ink); color: var(--ct-bg); }
+
+.signOut { margin-top: auto; }
+
+.content {
+  min-width: 0;
+  padding: var(--ct-space-6) 32px 48px;
+}
+
+/* Below 900 px the sidebar becomes a 56 px icon rail; the links keep their names via aria-label. */
+@media (max-width: 899.98px) {
+  .shell { grid-template-columns: 56px minmax(0, 1fr); }
+  .sidebar { padding: var(--ct-space-3-5) 6px; align-items: center; }
+  .brand { padding: 0; align-items: center; }
+  .logoFull, .workspace { display: none; }
+  .logoMark { display: inline-flex; font-size: 15px; }
+  .nav { width: 100%; }
+  .navItem { justify-content: center; width: 44px; padding: 0; margin: 0 auto; }
+  .navLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .content { padding: var(--ct-space-4-5) var(--ct-space-4) 40px; }
+}

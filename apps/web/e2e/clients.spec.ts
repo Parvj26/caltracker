@@ -26,6 +26,7 @@ test('add a client: shows under Pending invites, expires in 14 days, then resend
   const row = page.getByRole('row').filter({ hasText: email });
   await expect(row).toBeVisible();
   await expect(row.getByText('Expires in 14 days')).toBeVisible();
+  await expect(row.getByText('Expires in 14 days')).toHaveCSS('border-radius', '999px'); // a grey status chip
 
   // A resend right after sending changes nothing: the link already in the inbox keeps working.
   await row.getByRole('button', { name: 'Resend' }).click();
@@ -35,7 +36,7 @@ test('add a client: shows under Pending invites, expires in 14 days, then resend
 test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }) => {
   const run = unique();
   const lines = ['Name,Email', ...Array.from({ length: 45 }, (_, i) => `Bulk ${i},bulk${i}-${run}@example.com`)];
-  await page.getByLabel('Upload CSV').setInputFiles({
+  await page.getByLabel('Invite many clients from a spreadsheet (CSV)').setInputFiles({
     name: 'bulk.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(lines.join('\n')),
@@ -53,7 +54,7 @@ test('while a CSV is sending, a new file cannot be picked and the send cannot be
     if (route.request().method() === 'POST') await held;
     await route.continue();
   });
-  const fileInput = page.getByLabel('Upload CSV');
+  const fileInput = page.getByLabel('Invite many clients from a spreadsheet (CSV)');
   await fileInput.setInputFiles({
     name: 'busy.csv',
     mimeType: 'text/csv',
@@ -81,7 +82,7 @@ test('empty name shows an inline error and sends nothing', async ({ page }) => {
 test('CSV upload previews valid rows and line errors, then sends the valid ones', async ({ page }) => {
   const run = unique();
   const csv = readFileSync(join(__dirname, 'fixtures', 'clients.csv'), 'utf8').replaceAll('{{RUN}}', run);
-  await page.getByLabel('Upload CSV').setInputFiles({
+  await page.getByLabel('Invite many clients from a spreadsheet (CSV)').setInputFiles({
     name: 'clients.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(csv),

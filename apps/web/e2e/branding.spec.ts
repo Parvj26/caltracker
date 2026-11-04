@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
+import { CLIENT_CSV_MAX_ROWS, EMAIL_HEADERS, NAME_HEADERS, parseClientCsv } from '@caltracker/shared';
 
 test('sign-in page is branded', async ({ page }) => {
   await page.goto('/sign-in');
@@ -77,3 +79,85 @@ for (const p of PAGES) {
     expect(hasOldRed).toBe(false);
   });
 }
+
+async function signInAsDemoCoach(page: Page) {
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill('coach@demo.local');
+  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+}
+
+test('coach shell: sidebar nav marks Clients as the current page and the page uses token card borders', async ({ page }) => {
+  await signInAsDemoCoach(page);
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  for (const name of ['Clients', 'Workouts', 'Programs', 'Exercises']) {
+    await expect(nav.getByRole('link', { name })).toBeVisible();
+  }
+  const clients = nav.getByRole('link', { name: 'Clients' });
+  await expect(clients).toHaveAttribute('aria-current', 'page');
+  await expect(clients).toHaveCSS('background-color', 'rgb(18, 18, 18)');
+  await expect(clients).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(nav.getByRole('link', { name: 'Exercises' })).not.toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+  const cardBorders = await page.evaluate(() => {
+    const token = getComputedStyle(document.documentElement).getPropertyValue('--ct-border').trim();
+    const probe = document.createElement('i');
+    probe.style.color = token;
+    document.body.append(probe);
+    const tokenRgb = getComputedStyle(probe).color;
+    probe.remove();
+    return [...document.querySelectorAll('main *')].filter((el) => {
+      const s = getComputedStyle(el);
+      return s.borderTopStyle === 'solid' && s.borderTopWidth === '2px' && s.borderTopColor === tokenRgb;
+    }).length;
+  });
+  expect(cardBorders).toBeGreaterThanOrEqual(3);
+});
+
+test('coach shell collapses to a labelled icon rail below 900 px', async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await signInAsDemoCoach(page);
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  const sidebar = page.locator('[data-coach-sidebar]');
+  expect((await sidebar.boundingBox())!.width).toBe(56);
+  for (const name of ['Clients', 'Workouts', 'Programs', 'Exercises']) {
+    const link = nav.getByRole('link', { name });
+    await expect(link).toHaveAttribute('aria-label', name);
+    const box = (await link.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+});
+
+test('clients page: clients show round initials avatars', async ({ page }) => {
+  await signInAsDemoCoach(page);
+  const clients = page.getByRole('table', { name: 'Clients' });
+  const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
+  await expect(demo.locator('[data-avatar]')).toHaveText('DC');
+  await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
+});
+
+test('bulk CSV invite explains itself and offers an example file that parses into 2 rows', async ({ page }) => {
+  await signInAsDemoCoach(page);
+  await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeVisible();
+  await expect(
+    page.getByText('Bring your client list from Everfit or Excel: one row per client with name and email.'),
+  ).toBeVisible();
+  for (const header of [...NAME_HEADERS, ...EMAIL_HEADERS]) {
+    await expect(page.locator('[data-csv-headers]').getByText(header, { exact: true })).toBeVisible();
+  }
+  await expect(page.getByText(`Up to ${CLIENT_CSV_MAX_ROWS} clients per file.`)).toBeVisible();
+
+  const link = page.getByRole('link', { name: 'Download example CSV' });
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
+  expect(download.suggestedFilename()).toMatch(/\.csv$/);
+  const text = readFileSync(await download.path(), 'utf8');
+  expect(text.split('\n')[0]).toBe('Name,Email');
+  const parsed = parseClientCsv(text);
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.rows).toHaveLength(2);
+});

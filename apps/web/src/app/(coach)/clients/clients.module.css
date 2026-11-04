@@ -1,9 +1,167 @@
-.form { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
-.form label, .fileLabel { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
-.form input { padding: 0.6rem; border: 1px solid var(--ink); border-radius: 6px; font: inherit; }
-.form button, .page button { padding: 0.6rem 1rem; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); font: inherit; cursor: pointer; }
-.page section { margin-bottom: 2rem; }
-.table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
-.table th, .table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
-.error { color: #b00020; }
-.hint { color: #555; margin: 0.25rem 0; }
+/* Clients page. Colours, radii and sizes only via var(--ct-*). */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-4-5);
+  max-width: 1040px;
+}
+
+.titleRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ct-space-1) var(--ct-space-3); }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption, .explain { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.explain { font-size: var(--ct-size-body); }
+
+.sectionHeading {
+  margin: 0 0 var(--ct-space-2);
+  font-size: var(--ct-size-section-heading);
+  font-weight: var(--ct-weight-section-heading);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Lists (ARIA tables laid out as rows) ---------- */
+.listCard { container-type: inline-size; padding: var(--ct-space-4) var(--ct-space-4-5) var(--ct-space-2); }
+
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: grid;
+  align-items: center;
+  gap: var(--ct-space-1) var(--ct-space-3);
+  padding: var(--ct-space-2-5) 0;
+  border-bottom: 1px solid var(--ct-border);
+}
+.rows [role='rowgroup']:last-child > .row:last-child { border-bottom: 0; }
+/* Every row is its own grid, so tracks are fixed (rem, not auto/em) to keep the columns lined up with the header. */
+.clientRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 7rem; }
+.inviteRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 6.5rem 8.5rem minmax(6rem, 0.7fr); }
+
+.headRow .row {
+  padding: var(--ct-space-1) 0 var(--ct-space-2);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+}
+.headRow .row > :first-child { padding-left: 42px; }
+
+.emptyRow { padding: var(--ct-space-3) 0 var(--ct-space-3-5); color: var(--ct-ink-muted); }
+
+.nameCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
+.name { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.email { overflow-wrap: anywhere; }
+.meta { font-size: 14px; color: var(--ct-ink-muted); white-space: nowrap; }
+.narrowOnly { display: none; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ct-space-2); }
+
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ct-radius-pill);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.avatar-lime { background: var(--ct-lime); }
+.avatar-pink { background: var(--ct-pink); }
+.avatar-blue { background: var(--ct-blue); }
+
+.rowButton {
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3-5);
+  border-radius: var(--ct-radius-input);
+  font-size: 14px;
+}
+
+/* Narrow cards (iPad portrait split, phones): each row stacks into a small block. */
+@container (max-width: 720px) {
+  .headRow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .narrowOnly { display: inline; }
+  .clientRows .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'name meta' 'email email';
+  }
+  .inviteRows .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'name expires' 'email email' 'meta actions';
+  }
+  .nameCell { grid-area: name; }
+  .email { grid-area: email; padding-left: 42px; font-size: 14px; color: var(--ct-ink-muted); }
+  .meta { grid-area: meta; }
+  .inviteRows .meta { padding-left: 42px; }
+  .expires { grid-area: expires; }
+  .actions { grid-area: actions; }
+}
+
+/* ---------- Add client + CSV card ---------- */
+.addCard { display: flex; flex-direction: column; gap: var(--ct-space-6); }
+.panelSection { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.panelSection + .panelSection { padding-top: var(--ct-space-6); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.panelSection .sectionHeading { margin: 0; }
+
+.form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
+.formField { flex: 1 1 200px; }
+.formButton { flex: none; }
+.status { margin: 0; }
+
+.csvHelp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.headerList { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
+.headerListLabel { font-size: 14px; font-weight: var(--ct-weight-section-heading); }
+.headerList ul { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
+/* Chips sit on the grey help box, so give them a white fill to stay visible. */
+.headerList li > span { background: var(--ct-bg); }
+
+.csvActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-4-5); }
+.fileInput { max-width: 100%; font: inherit; font-size: 14px; color: var(--ct-ink-muted); }
+.fileInput::file-selector-button {
+  min-height: var(--ct-tap-min);
+  margin-right: var(--ct-space-3);
+  padding: var(--ct-space-2) var(--ct-space-4);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.fileInput:disabled::file-selector-button { cursor: not-allowed; opacity: 0.7; }
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  font-weight: var(--ct-weight-section-heading);
+}
+
+.lineErrors ul { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
+.lineErrors li { display: flex; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
+.errorMarker { color: var(--ct-magenta); font-weight: var(--ct-weight-button); }
+
+.previewScroll { overflow-x: auto; }
+.previewTable { width: 100%; border-collapse: collapse; }
+.previewTable th, .previewTable td { padding: var(--ct-space-2) var(--ct-space-2-5) var(--ct-space-2) 0; text-align: left; border-bottom: 1px solid var(--ct-border); vertical-align: top; }
+.previewTable th { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.previewTable td:last-child { min-width: 12em; }

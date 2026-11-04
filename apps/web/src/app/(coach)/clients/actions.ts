@@ -1,13 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { SendInvitesRequest, SendInvitesResponse, type InviteInput } from '@caltracker/shared';
+import { CLIENT_CSV_MAX_ROWS, SendInvitesRequest, SendInvitesResponse, type InviteInput } from '@caltracker/shared';
 import { sendInChunks } from '@/lib/invite-chunks';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
 /** Matches the CSV upload limit. */
-const MAX_INVITES_PER_BATCH = 200;
+const MAX_INVITES_PER_BATCH = CLIENT_CSV_MAX_ROWS;
 
 export type SendInvitesOutcome =
   | { ok: true; results: SendInvitesResponse['results'] }
