@@ -15,6 +15,8 @@ export interface ProvisionResult {
   userId: string;
   workspaceId: string;
   created: boolean;
+  /** True when an existing owner had never signed in, so a fresh set-password email was sent. */
+  resent?: boolean;
 }
 
 function requireEnv(name: string): string {
@@ -69,7 +71,19 @@ export async function provisionCoach(
 
   if (existing.length > 0) {
     const owner = existing.find((m) => m.role === 'owner');
-    if (owner) return { userId: owner.user_id, workspaceId: owner.workspace_id, created: false };
+    if (owner) {
+      const base = { userId: owner.user_id, workspaceId: owner.workspace_id, created: false };
+      // The first invite link may have expired or been used up by a link scanner. If this coach has
+      // never signed in, send a fresh set-password (recovery) email through Supabase Auth.
+      const { data: found, error: getError } = await admin.auth.admin.getUserById(owner.user_id);
+      if (getError) throw getError;
+      if (found.user.last_sign_in_at) return base;
+      const { error: resetError } = await admin.auth.resetPasswordForEmail(email, {
+        redirectTo: `${requireEnv('PUBLIC_SITE_URL')}/set-password`,
+      });
+      if (resetError) throw resetError;
+      return { ...base, resent: true };
+    }
     const other = existing[0]!;
     throw new Error(`User is a ${other.role} of another workspace`);
   }
@@ -119,7 +133,9 @@ async function main(): Promise<void> {
   });
   console.log(`User id:      ${r.userId}`);
   console.log(`Workspace id: ${r.workspaceId}`);
-  if (r.created) {
+  if (r.resent) {
+    console.log('Nothing created: this coach already exists but has never signed in. A new set-password email was sent.');
+  } else if (r.created) {
     console.log('Created: workspace and owner membership (invite email sent if the user was new).');
   } else {
     console.log('Nothing created: this user already owns a workspace. Existing workspace returned unchanged (--workspace ignored).');

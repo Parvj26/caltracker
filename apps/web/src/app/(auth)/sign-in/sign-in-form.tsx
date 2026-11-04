@@ -18,6 +18,7 @@ export function SignInForm() {
       </label>
       {state.error ? <p role="alert" className={styles.error}>{state.error}</p> : null}
       <button type="submit" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</button>
+      <a href="/forgot-password">Forgot password?</a>
     </form>
   );
 }

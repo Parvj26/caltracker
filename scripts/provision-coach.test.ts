@@ -19,6 +19,13 @@ afterAll(async () => {
   for (const id of workspaceIds) await admin.from('workspaces').delete().eq('id', id);
 });
 
+async function mailSubjectsTo(email: string): Promise<string[]> {
+  const q = encodeURIComponent(`to:"${email}"`);
+  const res = await fetch(`http://127.0.0.1:54324/api/v1/search?query=${q}`);
+  const body = (await res.json()) as { messages: { Subject: string; To: { Address: string }[] }[] };
+  return body.messages.filter((m) => m.To.some((t) => t.Address.toLowerCase() === email)).map((m) => m.Subject);
+}
+
 async function members(userId: string) {
   const { data, error } = await admin
     .from('workspace_members')
@@ -48,10 +55,37 @@ describe('provisionCoach', () => {
     userIds.push(a.userId);
     workspaceIds.push(a.workspaceId);
     const b = await provisionCoach(admin, { email: email.toUpperCase(), fullName: 'C', workspaceName: 'Two' });
-    expect(b).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false });
+    // Never signed in, so the repeat run re-sends the set-password email (see the test below).
+    expect(b).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false, resent: true });
     expect(await members(a.userId)).toHaveLength(1);
     const { data: ws } = await admin.from('workspaces').select('name').eq('id', a.workspaceId).single();
     expect(ws?.name).toBe('One');
+  });
+
+  it('re-sends a set-password email to an owner who never signed in, and not to one who has', async () => {
+    const email = uniqueEmail();
+    const a = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    userIds.push(a.userId);
+    workspaceIds.push(a.workspaceId);
+    expect(a.resent).toBeUndefined();
+
+    // GoTrue allows one email per address per second.
+    await new Promise((r) => setTimeout(r, 1500));
+    const again = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    expect(again).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false, resent: true });
+    const subjects = await mailSubjectsTo(email);
+    expect(subjects.filter((s) => s.includes('Reset your CalTracker password'))).toHaveLength(1);
+
+    // Once they have signed in there is nothing to re-send.
+    const password = 'some-password-123';
+    await admin.auth.admin.updateUserById(a.userId, { password, email_confirm: true });
+    const anon = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error } = await anon.auth.signInWithPassword({ email, password });
+    expect(error).toBeNull();
+    const third = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    expect(third).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false });
   });
 
   it('provisions an existing user who has no memberships', async () => {

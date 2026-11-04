@@ -8,7 +8,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <h1>Sign in</h1>
       {error === 'link' ? (
         <p role="alert" className={styles.error}>
-          That link has expired or was already used. Ask for a new invite, or sign in below if you already have a password.
+          That link has expired or was already used. Use &quot;Forgot password?&quot; below to get a new link, or sign in if you already have a password.
         </p>
       ) : null}
       <SignInForm />
