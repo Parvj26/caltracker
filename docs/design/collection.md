@@ -74,7 +74,8 @@ Locked rare finds appear in the sticker book as a silhouette with their requirem
 
 Locked ultra-rares show as "???" in the sticker book. Nobody knows which animals they are until someone finds one, which gives the community something to talk about.
 
-## 4. Shiny variants
+## 4. Repeats and shiny variants
+- Every time a workout earns a ladder animal again, its count goes up and the sticker shows **×N** (product owner decision, 2026-11-04).
 - Each time a qualifying workout earns its ladder animal, roll 1-in-20 for a shiny version (only if not already owned shiny).
 - Shiny stickers use the same art with an animated holographic foil overlay in the app, plus a "Shiny!" label.
 - The sticker book shows the shiny count: "Shiny: 4 / 30".
