@@ -6,6 +6,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { AddClientForm } from './add-client-form';
 import { avatarTone, initials } from './avatar';
 import { CsvUpload } from './csv-upload';
+import { newestInviteFirst } from './pending-order';
 import { ResendButton } from './resend-button';
 import styles from './clients.module.css';
 
@@ -50,7 +51,7 @@ export default async function ClientsPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('client_invites')
-      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by')
+      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
   ]);
@@ -67,18 +68,14 @@ export default async function ClientsPage() {
     const p = profileByUser.get(userId);
     return { firstName: p?.first_name ?? '', lastName: p?.last_name ?? '' };
   };
-  // Both lists are sorted by last name, then first name.
+  // Joined clients are sorted by last name, then first name; pending invites newest first (below).
   const clients = [...members.data].sort((a, b) => compareByLastName(nameOf(a.user_id), nameOf(b.user_id)));
 
   // Client emails live in auth.users, which RLS hides; fall back to the accepted invite's email.
   const emailByUser = new Map(
     invites.data.filter((i) => i.accepted_by).map((i) => [i.accepted_by as string, i.email]),
   );
-  const pending = invites.data
-    .filter((i) => i.accepted_at === null)
-    .sort((a, b) =>
-      compareByLastName({ firstName: a.first_name, lastName: a.last_name }, { firstName: b.first_name, lastName: b.last_name }),
-    );
+  const pending = invites.data.filter((i) => i.accepted_at === null).sort(newestInviteFirst);
 
   return (
     <div className={styles.page}>

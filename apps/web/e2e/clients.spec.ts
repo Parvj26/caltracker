@@ -36,6 +36,27 @@ test('add a client: shows under Pending invites, expires in 14 days, then resend
   await expect(row.getByText(/Already sent a moment ago/)).toBeVisible();
 });
 
+test('pending invites are listed newest first, not by last name', async ({ page }) => {
+  const run = unique();
+  const add = async (firstName: string, lastName: string, email: string) => {
+    await page.getByLabel('First name').fill(firstName);
+    await page.getByLabel('Last name').fill(lastName);
+    await page.getByLabel('Email').fill(email);
+    await page.getByRole('button', { name: 'Send invite' }).click();
+    await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: email })).toBeVisible();
+  };
+  // Added first, and first by last name: newest-first must still put it below the later one.
+  const older = `older-${run}@example.com`;
+  const newer = `newer-${run}@example.com`;
+  await add('Ada', 'Aardvark', older);
+  await add('Zoe', 'Zulu', newer);
+  await page.reload();
+  const rows = await page.getByRole('table', { name: 'Pending invites' }).getByRole('row').allTextContents();
+  const at = (email: string) => rows.findIndex((text) => text.includes(email));
+  expect(at(newer)).toBeGreaterThan(-1);
+  expect(at(newer)).toBeLessThan(at(older));
+});
+
 test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }) => {
   const run = unique();
   // Older single Name column: still accepted and split on the first space.
