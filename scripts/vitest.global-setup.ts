@@ -4,7 +4,14 @@ import { execSync } from 'node:child_process';
 // are not already set, so a plain `pnpm test` works without manual exports.
 export default function setup(): void {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
-  const out = execSync('supabase status -o env', { encoding: 'utf8' });
+  let out: string;
+  try {
+    out = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch {
+    throw new Error(
+      "Local Supabase isn't running — run `supabase start` (or pnpm db:start) first.",
+    );
+  }
   const env: Record<string, string> = {};
   for (const line of out.split('\n')) {
     const m = /^([A-Z_]+)="?(.*?)"?$/.exec(line.trim());

@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test:integration": "vitest run"
   },
   "dependencies": {
     "@caltracker/shared": "workspace:*",

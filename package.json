@@ -8,6 +8,7 @@
   "scripts": {
     "check": "turbo typecheck lint test",
     "test": "turbo test",
+    "test:integration": "pnpm --filter @caltracker/scripts test:integration",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "build": "turbo build",
