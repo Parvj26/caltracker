@@ -46,6 +46,20 @@ function isQuotaExhausted(bodyText: string): boolean {
   }
 }
 
+/**
+ * A 409 `concurrent_idempotent_requests` means an earlier attempt with the same Idempotency-Key is still being
+ * processed at Resend (e.g. we timed out on it). It will probably deliver, so wait and ask again. Any other 409
+ * (such as `invalid_idempotent_request`) is a real error.
+ */
+function isConcurrentIdempotentRequest(bodyText: string): boolean {
+  try {
+    const parsed = JSON.parse(bodyText) as { name?: unknown; code?: unknown };
+    return parsed.name === 'concurrent_idempotent_requests' || parsed.code === 'concurrent_idempotent_requests';
+  } catch {
+    return false;
+  }
+}
+
 export function createResendMailer(opts: {
   apiKey: string;
   from: string;
@@ -114,7 +128,9 @@ export function createResendMailer(opts: {
           throw new Error('Resend responded 429 (sending quota used up)');
         }
         // Resend allows 2 requests per second; back off and retry when it says slow down.
-        if (res.status === 429 && attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(retryDelayMs(res, attempt)))) {
+        // Resend is still working on an earlier attempt of this email: back off the same way and ask again.
+        const retryable = res.status === 429 || (res.status === 409 && isConcurrentIdempotentRequest(bodyText));
+        if (retryable && attempt < RESEND_MAX_RETRIES && (await waitBeforeRetry(retryDelayMs(res, attempt)))) {
           continue;
         }
         throw new Error(`Resend responded ${res.status}`);

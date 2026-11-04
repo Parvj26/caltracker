@@ -250,3 +250,62 @@ Deno.test('resend: different emails get different Idempotency-Keys', async () =>
   assertEquals(r.keys.length, 2);
   assertEquals(r.keys[0] !== null && r.keys[1] !== null && r.keys[0] !== r.keys[1], true);
 });
+
+function sequenceFetch(answers: { status: number; body: string }[]) {
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    const a = answers[Math.min(calls++, answers.length - 1)]!;
+    return Promise.resolve(new Response(a.body, { status: a.status }));
+  }) as typeof fetch;
+  return { fetchFn, calls: () => calls };
+}
+
+const concurrent409 = {
+  status: 409,
+  body: JSON.stringify({ name: 'concurrent_idempotent_requests', message: 'Same idempotency key used while original request is still in progress.' }),
+};
+
+Deno.test('resend: a 409 concurrent_idempotent_requests is retried with backoff (first attempt still in flight)', async () => {
+  const f = sequenceFetch([concurrent409, concurrent409, { status: 200, body: '{"id":"x"}' }]);
+  const sleeps: number[] = [];
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn: f.fetchFn,
+    sleep: (ms) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    },
+  });
+  await mailer.send(msg);
+  assertEquals(f.calls(), 3);
+  assertEquals(sleeps, [500, 1000]);
+});
+
+Deno.test('resend: a 409 concurrent_idempotent_requests fails once retries or the budget run out', async () => {
+  let clock = 0;
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, _init?: RequestInit) => {
+    calls++;
+    clock += 6000;
+    return Promise.resolve(new Response(concurrent409.body, { status: 409 }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn, now: () => clock,
+    sleep: (ms) => {
+      clock += ms;
+      return Promise.resolve();
+    },
+  });
+  await assertRejects(() => mailer.send(msg), Error, 'Resend responded 409');
+  assertEquals(calls > 1, true);
+  assertEquals(clock <= 20_000, true, `ran ${clock} ms`);
+});
+
+Deno.test('resend: a 409 invalid_idempotent_request is not retried', async () => {
+  const f = sequenceFetch([
+    { status: 409, body: JSON.stringify({ name: 'invalid_idempotent_request', message: 'Same idempotency key used with a different request payload.' }) },
+    { status: 200, body: '{"id":"x"}' },
+  ]);
+  const mailer = createResendMailer({ apiKey: 'k', from: 'f@x.com', fetchFn: f.fetchFn, sleep: () => Promise.resolve() });
+  await assertRejects(() => mailer.send(msg), Error, 'Resend responded 409');
+  assertEquals(f.calls(), 1);
+});
