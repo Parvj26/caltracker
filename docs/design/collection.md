@@ -80,17 +80,27 @@ Locked ultra-rares show as "???" in the sticker book. Nobody knows which animals
 - The sticker book shows the shiny count: "Shiny: 4 / 30".
 
 ## 5. Distance landmarks (distance badges)
+Ordered smallest to largest. Values marked ≈ still need a source check before they ship (same rule as the animal facts).
+
 | Landmark | Measure (m) |
 |---|---|
+| Chichén Itzá, El Castillo (height) | ≈ 30 |
+| Christ the Redeemer, incl. pedestal (height) | ≈ 38 |
+| Petra, the Treasury (height) | ≈ 40 |
+| Colosseum (height) | ≈ 48 |
+| Taj Mahal (height) | ≈ 73 |
 | Statue of Liberty (height) | 93 |
 | Big Ben tower (height) | 96 |
+| Great Pyramid of Giza (height today) | ≈ 139 |
 | Eiffel Tower (height) | 330 |
 | Empire State Building (height) | 443 |
 | Burj Khalifa (height) | 828 |
+| Machu Picchu (altitude) | ≈ 2,430 |
 | Golden Gate Bridge (length) | 2,737 |
 | Mount Fuji (height) | 3,776 |
 | Mount Everest (height) | 8,849 |
 | Marathon | 42,195 |
+| Great Wall of China (length, lifetime goal) | ≈ 21,196,000 |
 
 ## Qualifying workout
 A completed workout with at least 5 completed sets. This applies to random drops and shiny rolls. Coach-logged workouts count.

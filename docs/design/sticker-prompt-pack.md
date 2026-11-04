@@ -1,6 +1,6 @@
 # Sticker Prompt Pack (AI-generated art)
 
-How to generate CalTracker's animal and landmark stickers with an AI image tool so all 52 images look like one set. The animal list is in `collection.md`.
+How to generate CalTracker's animal and landmark stickers with an AI image tool so all 60 images look like one set. The animal list is in `collection.md`.
 
 ## Which tool
 - **Adobe Firefly** (recommended): Adobe says it's trained on licensed and public-domain content and marks outputs as commercially safe. It has a "Style reference" upload, which keeps the set consistent.
@@ -107,6 +107,14 @@ For landmarks, swap the master prompt's first line to: "A single cute, simplifie
 | mount-fuji.png | Mount Fuji with a snowy peak |
 | mount-everest.png | Mount Everest peak with a little flag |
 | marathon.png | a finish-line banner with a running shoe |
+| chichen-itza.png | the El Castillo step pyramid at Chichén Itzá |
+| christ-the-redeemer.png | the Christ the Redeemer statue on top of a green mountain |
+| petra.png | the Treasury of Petra carved into rosy pink rock |
+| colosseum.png | the Colosseum in Rome |
+| taj-mahal.png | the Taj Mahal with its white dome |
+| great-pyramid.png | the Great Pyramid of Giza with a little sand dune |
+| machu-picchu.png | the Machu Picchu ruins on a green mountain peak |
+| great-wall.png | a section of the Great Wall of China winding over green hills |
 
 ## Quality checklist (before handing over)
 - One animal per image, whole body visible, nothing cut off.
