@@ -3,9 +3,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Button, ErrorText, Logo, Screen } from '@/components/ui';
-import { LINK_FAILED, codeFromLink, completeConfirmation } from '@/lib/confirm-link';
+import { LINK_FAILED, codeFromLink, completeConfirmation, oncePerCode } from '@/lib/confirm-link';
 import { pkceVerifier, supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
+
+// Module level, so it also survives the screen remounting: each code is exchanged once, and a re-run of the
+// effect below (a new router or linking URL) waits for that same exchange instead of starting a second one.
+const confirmCode = oncePerCode((code: string) => completeConfirmation(supabase, code, { verifier: pkceVerifier }));
 
 // Opened by caltracker://auth/confirmed?code=... from the confirmation email (PKCE flow).
 // A successful exchange fires the session listener, which runs claimWorkspace() and enters the app.
@@ -24,7 +28,7 @@ export default function Confirmed() {
       const t = setTimeout(() => setError(LINK_FAILED), 4000);
       return () => clearTimeout(t);
     }
-    void completeConfirmation(supabase, code, { verifier: pkceVerifier }).then((result) => {
+    void confirmCode(code).then((result) => {
       if (cancelled) return;
       if (result.ok) router.replace('/');
       else setError(result.message);

@@ -1,6 +1,6 @@
 import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { LINK_FAILED, codeFromLink, completeConfirmation, type VerifierStore } from './confirm-link';
+import { LINK_FAILED, codeFromLink, completeConfirmation, oncePerCode, type VerifierStore } from './confirm-link';
 
 type Outcome = { error: Error | null } | Error;
 
@@ -137,5 +137,25 @@ describe('completeConfirmation', () => {
       ok: false,
       message: LINK_FAILED,
     });
+  });
+});
+
+describe('oncePerCode', () => {
+  it('runs the exchange once per code, and a repeat call gets the same result', async () => {
+    const confirm = vi.fn((code: string) => Promise.resolve({ ok: true as const, code }));
+    const once = oncePerCode(confirm);
+    const first = once('code-1');
+    const again = once('code-1');
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(again).toBe(first);
+    await expect(again).resolves.toEqual({ ok: true, code: 'code-1' });
+  });
+
+  it('a different code is exchanged on its own', () => {
+    const confirm = vi.fn(() => Promise.resolve({ ok: true as const }));
+    const once = oncePerCode(confirm);
+    void once('code-1');
+    void once('code-2');
+    expect(confirm.mock.calls).toEqual([['code-1'], ['code-2']]);
   });
 });

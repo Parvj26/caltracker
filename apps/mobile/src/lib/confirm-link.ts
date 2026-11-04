@@ -81,3 +81,20 @@ export async function completeConfirmation(
     }
   }
 }
+
+/**
+ * Wraps an exchange so each code is exchanged at most once. A code is single-use and the first attempt deletes
+ * the stored verifier, so a second exchange (the screen's effect re-running, or the screen remounting) would fail
+ * and show an error even though the first one signed the user in. A repeat call gets the first call's promise.
+ */
+export function oncePerCode<R>(confirm: (code: string) => Promise<R>): (code: string) => Promise<R> {
+  const started = new Map<string, Promise<R>>();
+  return (code) => {
+    let attempt = started.get(code);
+    if (!attempt) {
+      attempt = confirm(code);
+      started.set(code, attempt);
+    }
+    return attempt;
+  };
+}
