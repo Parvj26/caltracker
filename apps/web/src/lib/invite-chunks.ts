@@ -2,7 +2,7 @@ import { INVITE_CHUNK_SIZE, type InviteInput, type SendInvitesResponse } from '@
 
 export type InviteRowResult = SendInvitesResponse['results'][number];
 
-const CHUNK_FAILED = "We couldn't send this email. Use Resend to try again.";
+const CHUNK_FAILED = 'Not sent — add this client again';
 
 /**
  * Sends invites to the Edge Function a chunk at a time, one chunk after another, and merges the per-row results.

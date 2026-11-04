@@ -11,12 +11,14 @@ type Parsed = ReturnType<typeof parseClientCsv>;
 export function CsvUpload() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [statuses, setStatuses] = useState<Map<string, string>>(new Map());
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setStatuses(new Map());
+    setFailed(new Set());
     setError(null);
     if (!file) return setParsed(null);
     setParsed(parseClientCsv(await file.text()));
@@ -27,7 +29,16 @@ export function CsvUpload() {
     startTransition(async () => {
       const outcome = await sendInvites(rows);
       if (!outcome.ok) return setError(outcome.error);
-      setStatuses(new Map(outcome.results.map((r) => [r.email, statusCopy(r.status, r.message)])));
+      // Merge, so a retry of the failed rows keeps the results of the rows that already went through.
+      setStatuses((prev) => new Map([...prev, ...outcome.results.map((r): [string, string] => [r.email, statusCopy(r.status, r.message)])]));
+      setFailed((prev) => {
+        const next = new Set(prev);
+        for (const r of outcome.results) {
+          if (r.status === 'error') next.add(r.email);
+          else next.delete(r.email);
+        }
+        return next;
+      });
     });
   }
 
@@ -67,6 +78,10 @@ export function CsvUpload() {
               {statuses.size === 0 ? (
                 <button type="button" disabled={pending} onClick={() => send(parsed.rows)}>
                   {pending ? 'Sending…' : `Send ${parsed.rows.length} invite${parsed.rows.length === 1 ? '' : 's'}`}
+                </button>
+              ) : failed.size > 0 ? (
+                <button type="button" disabled={pending} onClick={() => send(parsed.rows.filter((r) => failed.has(r.email)))}>
+                  {pending ? 'Sending…' : 'Retry failed rows'}
                 </button>
               ) : null}
             </>
