@@ -1,27 +1,30 @@
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Button, ErrorText, Logo, Screen } from '@/components/ui';
-import { LINK_FAILED, completeConfirmation } from '@/lib/confirm-link';
-import { supabase } from '@/lib/supabase';
+import { LINK_FAILED, codeFromLink, completeConfirmation } from '@/lib/confirm-link';
+import { pkceVerifier, supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
 
 // Opened by caltracker://auth/confirmed?code=... from the confirmation email (PKCE flow).
 // A successful exchange fires the session listener, which runs claimWorkspace() and enters the app.
 export default function Confirmed() {
   const router = useRouter();
+  // The route param is set on warm and cold opens; the linking URL is a fallback. Query string only (PKCE).
+  const params = useLocalSearchParams<{ code?: string }>();
   const url = Linking.useLinkingURL();
+  const code = codeFromLink(params.code, url);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!url) {
-      // No URL arrived (e.g. the screen was opened directly): never leave the spinner hanging.
+    if (!code) {
+      // No code arrived (e.g. the screen was opened directly): never leave the spinner hanging.
       const t = setTimeout(() => setError(LINK_FAILED), 4000);
       return () => clearTimeout(t);
     }
-    void completeConfirmation(supabase, url).then((result) => {
+    void completeConfirmation(supabase, code, { verifier: pkceVerifier }).then((result) => {
       if (cancelled) return;
       if (result.ok) router.replace('/');
       else setError(result.message);
@@ -29,7 +32,7 @@ export default function Confirmed() {
     return () => {
       cancelled = true;
     };
-  }, [url, router]);
+  }, [code, router]);
 
   return (
     <Screen centred>
