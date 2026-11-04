@@ -59,10 +59,12 @@ as $$
 declare
   inv uuid;
 begin
+  -- full_name is generated: store the name split the same way as the migration backfill.
   insert into public.client_invites (
-    workspace_id, email, full_name, token_hash, expires_at, sent_at, created_by
+    workspace_id, email, first_name, last_name, token_hash, expires_at, sent_at, created_by
   ) values (
-    ws, email, full_name, encode(extensions.digest(token, 'sha256'), 'hex'),
+    ws, email, (public.split_full_name(full_name))[1], (public.split_full_name(full_name))[2],
+    encode(extensions.digest(token, 'sha256'), 'hex'),
     expires_at, coalesce(sent_at, least(now(), expires_at - interval '1 second')), created_by
   ) returning id into inv;
   return inv;

@@ -8,9 +8,9 @@ declare
 begin
   for u in
     select * from (values
-      (coach, 'coach@demo.local', 'Demo Coach'),
-      (cl, 'client@demo.local', 'Demo Client')
-    ) as t(id, email, full_name)
+      (coach, 'coach@demo.local', 'Demo', 'Coach'),
+      (cl, 'client@demo.local', 'Demo', 'Client')
+    ) as t(id, email, first_name, last_name)
   loop
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -20,7 +20,7 @@ begin
       '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
       u.email, extensions.crypt('demo-password-123', extensions.gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}',
-      jsonb_build_object('full_name', u.full_name, 'email_verified', true),
+      jsonb_build_object('first_name', u.first_name, 'last_name', u.last_name, 'email_verified', true),
       now(), now(), '', '', '', ''
     );
     insert into auth.identities (
