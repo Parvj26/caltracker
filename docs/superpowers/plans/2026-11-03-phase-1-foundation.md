@@ -503,7 +503,7 @@ Verify: `xcrun simctl list runtimes | grep iOS` lists a runtime.
 
 - [ ] **Step 1: Product owner creates accounts** (in their own name): Supabase (project `caltracker-staging`), Vercel (connected to `Parvj26/caltracker`, root `apps/web`), Resend (add domain `caltracker.app` and the DNS records Resend lists at the domain registrar). Shares the keys by adding them as GitHub Actions secrets and Vercel env vars — never in chat or in files.
 - [ ] **Step 2: Write `docs/runbooks/staging.md`:** every secret name and where it lives, how to deploy, how to provision the coach with `pnpm provision:coach`, how to roll back a migration (forward-fix migration only).
-- [ ] **Step 3: CI deploy job** on push to `main` after all checks pass: `supabase link --project-ref $STAGING_REF`, `supabase db push`, `supabase functions deploy send-invite`, set function secrets.
+- [ ] **Step 3: CI deploy job** on push to `main` after all checks pass: `supabase link --project-ref $STAGING_REF`, `supabase db push`, `pnpm functions:deploy` (syncs `packages/shared` into the functions folder, then deploys `send-invite` — never call `supabase functions deploy` directly), set function secrets (including `PUBLIC_SITE_URL`).
 - [ ] **Step 4: Verify** — merge to `main`; CI deploy is green; run `pnpm import:exercises` against staging; provision the product owner as a test coach; invite the product owner's own second email; receive the email; open the invite page on `staging.caltracker.app`; sign up in Expo Go pointed at staging; see "Welcome to …".
 - [ ] **Step 5: Commit** — `chore: add staging deploy pipeline and runbook`
 
