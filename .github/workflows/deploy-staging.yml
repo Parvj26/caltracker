@@ -1,9 +1,13 @@
 name: Deploy staging
 
 # Deploys migrations, the send-invite Edge Function and the web app to staging.
+# Automatic runs start only after the CI workflow succeeds on a push to main (workflow_run), so a red merge never
+# reaches staging. Manual runs must be started from main.
 # Uses repository secrets (GitHub Environments are not available on this plan). See docs/runbooks/staging.md.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -33,9 +37,20 @@ env:
   STAGING_SITE_URL: https://staging.caltracker.app
 
 jobs:
+  require-main:
+    # Fail loudly instead of silently skipping every job when a manual run starts from another branch.
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Run this workflow from main"
+          exit 1
+
   deploy:
-    # Only main or a manual run; manual runs must also be started from main.
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.action == 'deploy')
+    # Manual run from main, or an automatic run after CI passed for a push to main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.action == 'deploy') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-staging
@@ -46,6 +61,9 @@ jobs:
       STAGING_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit CI passed on (workflow_run); the dispatched ref otherwise.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: supabase/setup-cli@v1
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
@@ -88,12 +106,18 @@ jobs:
 
   smoke:
     needs: deploy
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-staging-smoke
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit CI passed on (workflow_run); the dispatched ref otherwise.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -105,10 +129,16 @@ jobs:
       - name: Smoke test staging (includes the session-refresh check)
         run: |
           if [ -z "$STAGING_SMOKE_COACH_EMAIL" ] || [ -z "$STAGING_SMOKE_COACH_PASSWORD" ]; then
-            echo "STAGING_SMOKE_COACH_EMAIL / STAGING_SMOKE_COACH_PASSWORD not set: the sign-in and session-refresh check will be skipped."
+            if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "::warning::STAGING_SMOKE_COACH_EMAIL / STAGING_SMOKE_COACH_PASSWORD not set: the sign-in and session-refresh check will be skipped (allowed on manual runs only)."
+            else
+              echo "::error::STAGING_SMOKE_COACH_EMAIL / STAGING_SMOKE_COACH_PASSWORD are not set, so the session-refresh check cannot run. Add them (see docs/runbooks/staging.md)."
+              exit 1
+            fi
           fi
           pnpm --filter web test:e2e:staging
         env:
+          EVENT_NAME: ${{ github.event_name }}
           STAGING_URL: ${{ env.STAGING_SITE_URL }}
           STAGING_SMOKE_COACH_EMAIL: ${{ secrets.STAGING_SMOKE_COACH_EMAIL }}
           STAGING_SMOKE_COACH_PASSWORD: ${{ secrets.STAGING_SMOKE_COACH_PASSWORD }}
@@ -120,7 +150,7 @@ jobs:
           retention-days: 7
 
   seed-staging:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.action != 'deploy'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.action != 'deploy'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-staging
@@ -131,6 +161,9 @@ jobs:
       PUBLIC_SITE_URL: https://staging.caltracker.app
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit CI passed on (workflow_run); the dispatched ref otherwise.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
