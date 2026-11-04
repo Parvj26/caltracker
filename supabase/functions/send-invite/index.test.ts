@@ -310,3 +310,79 @@ t('one send failure does not abort the other rows', async () => {
   assertEquals((await openInvites(wsA)).length, 2);
   assertEquals(sent.length, 1);
 });
+
+t('refuses to send when RESEND_API_KEY is set but PUBLIC_SITE_URL is not', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const handler = createHandler({
+    mailer,
+    supabaseAdmin: admin,
+    supabaseUrl: URL_,
+    anonKey: ANON,
+    publicSiteUrl: undefined,
+    usesResend: true,
+  });
+  const res = await call(
+    handler,
+    { workspaceId: wsA, invites: [{ email: 'x@x.com', fullName: 'X' }] },
+    jwt,
+  );
+  assertEquals(res.status, 500);
+  assertEquals(await res.json(), { error: 'Server misconfigured' });
+  assertEquals(sent.length, 0);
+  assertEquals((await openInvites(wsA)).length, 0);
+});
+
+t('strips trailing slashes from PUBLIC_SITE_URL in the invite link', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const handler = createHandler({
+    mailer,
+    supabaseAdmin: admin,
+    supabaseUrl: URL_,
+    anonKey: ANON,
+    publicSiteUrl: 'http://site.test//',
+  });
+  const res = await call(
+    handler,
+    { workspaceId: wsA, invites: [{ email: 'x@x.com', fullName: 'X' }] },
+    jwt,
+  );
+  assertEquals(res.status, 200);
+  const link = /http:\/\/site\.test[^\s"<]*/.exec(sent[0]!.text)?.[0];
+  assertEquals(link?.startsWith('http://site.test/invite/'), true);
+});
+
+t('paces sends by sendIntervalMs', async () => {
+  const { wsA, jwt } = await setup();
+  const times: number[] = [];
+  const mailer: Mailer = {
+    send() {
+      times.push(Date.now());
+      return Promise.resolve();
+    },
+  };
+  const handler = createHandler({
+    mailer,
+    supabaseAdmin: admin,
+    supabaseUrl: URL_,
+    anonKey: ANON,
+    publicSiteUrl: 'http://site.test',
+    sendIntervalMs: 200,
+  });
+  await call(
+    handler,
+    {
+      workspaceId: wsA,
+      invites: [
+        { email: 'p1@x.com', fullName: 'P1' },
+        { email: 'p2@x.com', fullName: 'P2' },
+        { email: 'p3@x.com', fullName: 'P3' },
+      ],
+    },
+    jwt,
+  );
+  assertEquals(times.length, 3);
+  assertEquals(times[1]! - times[0]! >= 190, true);
+  assertEquals(times[2]! - times[1]! >= 190, true);
+});

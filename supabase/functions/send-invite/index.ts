@@ -11,7 +11,12 @@ export interface HandlerDeps {
   supabaseAdmin: SupabaseClient;
   supabaseUrl: string;
   anonKey: string;
-  publicSiteUrl: string;
+  /** Undefined means PUBLIC_SITE_URL is not set. */
+  publicSiteUrl: string | undefined;
+  /** True when invites go out through Resend (a real, public site URL is then required). */
+  usesResend?: boolean;
+  /** Minimum gap between sends, in ms. Resend allows 2 requests/second. 0 disables pacing. */
+  sendIntervalMs?: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,10 +51,21 @@ type Result = SendInvitesResponse['results'][number];
 
 export function createHandler(deps: HandlerDeps) {
   const { mailer, supabaseAdmin: admin } = deps;
+  const siteUrl = deps.publicSiteUrl?.replace(/\/+$/, '');
+  const sendIntervalMs = deps.sendIntervalMs ?? 0;
+  let lastSendAt = 0;
 
   return async (req: Request): Promise<Response> => {
     if (req.method !== 'POST')
       return json({ error: 'Method not allowed' }, 405);
+
+    // Real emails with a localhost link would be useless (and misleading), so refuse to send.
+    if (deps.usesResend && !siteUrl) {
+      console.error(
+        'send-invite: RESEND_API_KEY is set but PUBLIC_SITE_URL is not; refusing to send invites',
+      );
+      return json({ error: 'Server misconfigured' }, 500);
+    }
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer '))
@@ -176,10 +192,13 @@ export function createHandler(deps: HandlerDeps) {
           clientName: fullName,
           coachName,
           workspaceName,
-          acceptUrl: `${deps.publicSiteUrl}/invite/${token}`,
+          acceptUrl: `${siteUrl ?? 'http://localhost:3000'}/invite/${token}`,
           expiresAt,
         });
         try {
+          const wait = lastSendAt + sendIntervalMs - Date.now();
+          if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+          lastSendAt = Date.now();
           await mailer.send({ to: email, ...message });
         } catch (err) {
           console.error(
@@ -217,6 +236,7 @@ export function createHandler(deps: HandlerDeps) {
 
 if (import.meta.main) {
   const env = Deno.env;
+  const usesResend = Boolean(env.get('RESEND_API_KEY'));
   Deno.serve(
     createHandler({
       mailer: createMailer(env),
@@ -227,7 +247,12 @@ if (import.meta.main) {
       ),
       supabaseUrl: env.get('SUPABASE_URL')!,
       anonKey: env.get('SUPABASE_ANON_KEY')!,
-      publicSiteUrl: env.get('PUBLIC_SITE_URL') ?? 'http://localhost:3000',
+      publicSiteUrl:
+        env.get('PUBLIC_SITE_URL') ??
+        (usesResend ? undefined : 'http://localhost:3000'),
+      usesResend,
+      // Resend allows 2 requests/second: keep a gap a little over 500ms between sends.
+      sendIntervalMs: usesResend ? 550 : 0,
     }),
   );
 }
