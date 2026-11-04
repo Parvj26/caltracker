@@ -175,6 +175,31 @@ t('new invite is sent, stored with 14-day expiry and emailed', async () => {
   assertEquals([data[0].first_name, data[0].last_name], ['Sam', 'Lee']);
 });
 
+t('legacy { fullName } invites from the old dashboard still work (one release)', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const res = await call(
+    handlerWith(mailer),
+    {
+      workspaceId: wsA,
+      invites: [
+        { email: 'legacy@x.com', fullName: ' Sam  van Lee ' },
+        { email: 'both@x.com', fullName: 'Ignored Name', firstName: 'Kept', lastName: 'Name' },
+      ],
+    },
+    jwt,
+  );
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).results, [
+    { email: 'legacy@x.com', status: 'sent' },
+    { email: 'both@x.com', status: 'sent' },
+  ]);
+  const rows = new Map((await openInvites(wsA)).map((r) => [r.email, r]));
+  assertEquals([rows.get('legacy@x.com')!.first_name, rows.get('legacy@x.com')!.last_name], ['Sam', 'van Lee']);
+  assertEquals([rows.get('both@x.com')!.first_name, rows.get('both@x.com')!.last_name], ['Kept', 'Name']);
+  assert(sent.some((m) => m.to === 'legacy@x.com' && m.text.startsWith('Hi Sam,\n')));
+});
+
 async function backdateInvite(ws: string, minutesAgo: number) {
   const sent = new Date(Date.now() - minutesAgo * 60_000);
   const { error } = await admin

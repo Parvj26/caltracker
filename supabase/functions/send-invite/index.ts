@@ -4,6 +4,7 @@ import {
   type SendInvitesResponse,
 } from '@caltracker/shared';
 import { renderInviteEmail } from './email.ts';
+import { upgradeLegacyInvites } from './legacy.ts';
 import { createMailer, type Mailer } from './mailer.ts';
 
 export interface HandlerDeps {
@@ -106,7 +107,8 @@ export function createHandler(deps: HandlerDeps) {
     } catch {
       return json({ error: 'Invalid JSON body' }, 400);
     }
-    const parsed = SendInvitesRequest.safeParse(raw);
+    // TEMPORARY: also accepts the old `{ fullName }` invites for one release (see legacy.ts).
+    const parsed = SendInvitesRequest.safeParse(upgradeLegacyInvites(raw));
     if (!parsed.success)
       return json(
         { error: 'Invalid request', issues: parsed.error.issues },
