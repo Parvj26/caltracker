@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { CLIENT_CSV_MAX_ROWS, EMAIL_HEADERS, NAME_HEADERS, parseClientCsv } from '@caltracker/shared';
+import {
+  CLIENT_CSV_MAX_ROWS,
+  EMAIL_HEADERS,
+  FIRST_NAME_HEADERS,
+  LAST_NAME_HEADERS,
+  NAME_HEADERS,
+  parseClientCsv,
+} from '@caltracker/shared';
 
 test('sign-in page is branded', async ({ page }) => {
   await page.goto('/sign-in');
@@ -149,11 +156,13 @@ test('bulk CSV invite explains itself and offers an example file that parses int
   await signInAsDemoCoach(page);
   await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeVisible();
   await expect(
-    page.getByText('Bring your client list from Everfit or Excel: one row per client with name and email.'),
+    page.getByText('Bring your client list from Everfit or Excel: one row per client with first name, last name and email.'),
   ).toBeVisible();
-  for (const header of [...NAME_HEADERS, ...EMAIL_HEADERS]) {
+  for (const header of [...FIRST_NAME_HEADERS, ...LAST_NAME_HEADERS, ...NAME_HEADERS, ...EMAIL_HEADERS]) {
     await expect(page.locator('[data-csv-headers]').getByText(header, { exact: true })).toBeVisible();
   }
+  await expect(page.getByText('Last name column (optional), any of:')).toBeVisible();
+  await expect(page.getByText('Or one name column, split at the first space:')).toBeVisible();
   await expect(page.getByText(`Up to ${CLIENT_CSV_MAX_ROWS} clients per file.`)).toBeVisible();
 
   const link = page.getByRole('link', { name: 'Download example CSV' });
@@ -161,7 +170,7 @@ test('bulk CSV invite explains itself and offers an example file that parses int
   const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
   expect(download.suggestedFilename()).toMatch(/\.csv$/);
   const text = readFileSync(await download.path(), 'utf8');
-  expect(text.split('\n')[0]).toBe('Name,Email');
+  expect(text.split('\n')[0]).toBe('First name,Last name,Email');
   const parsed = parseClientCsv(text);
   expect(parsed.errors).toEqual([]);
   expect(parsed.rows).toHaveLength(2);
