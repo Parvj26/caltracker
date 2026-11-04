@@ -13,6 +13,10 @@ const RESEND_MAX_RETRIES = 3;
 const RESEND_BACKOFF_MS = [500, 1000, 2000];
 /** Never sleep longer than this on a `retry-after`: the Edge Function has a hard wall-clock limit. */
 const MAX_RETRY_WAIT_MS = 5000;
+/** One Resend request that takes longer than this is abandoned and counts as a failed attempt. */
+const ATTEMPT_TIMEOUT_MS = 10_000;
+/** All attempts, waits included, for one email: a stuck row must not hold up the whole batch. */
+const TOTAL_CAP_MS = 20_000;
 
 /** Delay before retrying a 429: the `retry-after` header (seconds, capped at 5 s) wins, else 500ms -> 1s -> 2s. */
 function retryDelayMs(res: Response, attempt: number): number {
@@ -42,20 +46,41 @@ export function createResendMailer(opts: {
   from: string;
   fetchFn?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
+  /** Per-request timeout (default 10 s) and total cap per email (default 20 s); injectable for tests. */
+  attemptTimeoutMs?: number;
+  totalCapMs?: number;
 }): Mailer {
+  const attemptTimeoutMs = opts.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS;
+  const totalCapMs = opts.totalCapMs ?? TOTAL_CAP_MS;
   const fetchFn = opts.fetchFn ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   return {
     async send(msg) {
+      const startedAt = Date.now();
       for (let attempt = 0; ; attempt++) {
-        const res = await fetchFn('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${opts.apiKey}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ from: opts.from, ...msg }),
-        });
+        const remaining = totalCapMs - (Date.now() - startedAt);
+        if (remaining <= 0) throw new Error('Resend did not answer in time');
+        let res: Response;
+        try {
+          res = await fetchFn('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${opts.apiKey}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ from: opts.from, ...msg }),
+            signal: AbortSignal.timeout(Math.min(attemptTimeoutMs, remaining)),
+          });
+        } catch (err) {
+          const timedOut = err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError');
+          if (!timedOut) throw err;
+          // A timeout is a failed attempt: retry while attempts and the total cap allow.
+          if (attempt < RESEND_MAX_RETRIES && totalCapMs - (Date.now() - startedAt) > 0) {
+            await sleep(RESEND_BACKOFF_MS[attempt] ?? 2000);
+            continue;
+          }
+          throw new Error('Resend did not answer in time');
+        }
         if (res.ok) {
           await res.body?.cancel();
           return;

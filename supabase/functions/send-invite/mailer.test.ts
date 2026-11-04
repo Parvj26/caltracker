@@ -85,3 +85,49 @@ Deno.test('resend: a plain rate-limit 429 JSON is still retried', async () => {
   await mailer.send(msg);
   assertEquals(calls(), 2);
 });
+
+// A fetch that never answers until its abort signal fires, like a hung connection.
+function hangingFetch() {
+  let calls = 0;
+  const fetchFn = ((_url: string | URL | Request, init?: RequestInit) => {
+    calls++;
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+    });
+  }) as typeof fetch;
+  return { fetchFn, calls: () => calls };
+}
+
+Deno.test('resend: a request that never answers is aborted and the call fails within the total cap', async () => {
+  const h = hangingFetch();
+  const mailer = createResendMailer({
+    apiKey: 'k',
+    from: 'f@x.com',
+    fetchFn: h.fetchFn,
+    sleep: () => Promise.resolve(),
+    attemptTimeoutMs: 20,
+    totalCapMs: 100,
+  });
+  const started = Date.now();
+  await assertRejects(() => mailer.send(msg), Error, 'did not answer in time');
+  assertEquals(h.calls() > 1, true, 'a timeout counts as a failed attempt and is retried');
+  assertEquals(h.calls() <= 4, true);
+  assertEquals(Date.now() - started < 1000, true);
+});
+
+Deno.test('resend: a timeout followed by a good answer still sends', async () => {
+  let calls = 0;
+  const fetchFn = ((_u: string | URL | Request, init?: RequestInit) => {
+    if (calls++ === 0) {
+      return new Promise<Response>((_res, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+      });
+    }
+    return Promise.resolve(new Response('{"id":"x"}', { status: 200 }));
+  }) as typeof fetch;
+  const mailer = createResendMailer({
+    apiKey: 'k', from: 'f@x.com', fetchFn, sleep: () => Promise.resolve(), attemptTimeoutMs: 20, totalCapMs: 1000,
+  });
+  await mailer.send(msg);
+  assertEquals(calls, 2);
+});
