@@ -67,6 +67,14 @@ jobs:
         run: |
           supabase start -x studio,imgproxy,vector,logflare,pooler
           supabase db reset
+      - name: Write Edge Function env (invite emails go to the local mail catcher)
+        run: |
+          cat > supabase/functions/.env <<'EOF'
+          PUBLIC_SITE_URL=http://localhost:3000
+          INVITE_FROM_EMAIL=CalTracker <invites@caltracker.app>
+          SMTP_HOST=host.docker.internal
+          SMTP_PORT=54325
+          EOF
       - name: Write web env
         run: bash apps/web/scripts/write-local-env.sh
       - run: pnpm install --frozen-lockfile
