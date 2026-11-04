@@ -31,10 +31,10 @@ select tests.act_as(:'coach_a');
 select is((select count(*)::int from public.client_invites), 2, 'coach A sees only A''s invites');
 select is((select count(*)::int from public.client_invites where workspace_id = :'ws_b'), 0,
   'coach A cannot see B''s invites');
-select lives_ok(format($q$insert into public.client_invites
+select throws_ok(format($q$insert into public.client_invites
   (workspace_id, email, full_name, token_hash, created_by)
   values (%L, 'new@t.local', 'New', 'h-new-a', %L)$q$, :'ws_a', :'coach_a'),
-  'coach A inserts an invite into A');
+  '42501', null, 'coach A cannot insert an invite directly (writes go through send-invite)');
 select throws_ok(format($q$insert into public.client_invites
   (workspace_id, email, full_name, token_hash, created_by)
   values (%L, 'evil@t.local', 'Evil', 'h-evil-b', %L)$q$, :'ws_b', :'coach_a'),
@@ -56,13 +56,11 @@ select throws_ok(format($q$update public.client_invites set sent_at = '2099-01-0
 select throws_ok(format($q$update public.client_invites set expires_at = now() + interval '1 year' where id = %L$q$, :'inv_a1'),
   '42501', null, 'coach cannot update expires_at');
 select ok((select expires_at = sent_at + interval '14 days' from public.client_invites
-  where token_hash = 'h-new-a'), 'coach insert gets server-set 14-day expiry');
-with u as (update public.client_invites set full_name = 'X One Renamed'
-  where id = :'inv_a1' returning 1)
-select is((select count(*)::int from u), 1, 'coach A updates A''s invite');
-with u as (update public.client_invites set full_name = 'Hacked'
-  where id = :'inv_b1' returning 1)
-select is((select count(*)::int from u), 0, 'coach A cannot update B''s invite');
+  where id = :'inv_a1'), 'invite gets the 14-day expiry window');
+select throws_ok(format($q$update public.client_invites set full_name = 'X One Renamed' where id = %L$q$, :'inv_a1'),
+  '42501', null, 'coach A cannot update A''s invite directly');
+select throws_ok(format($q$update public.client_invites set full_name = 'Hacked' where id = %L$q$, :'inv_b1'),
+  '42501', null, 'coach A cannot update B''s invite');
 with d as (delete from public.client_invites where id = :'inv_a2' returning 1)
 select is((select count(*)::int from d), 1, 'coach A deletes A''s invite');
 with d as (delete from public.client_invites where id = :'inv_b1' returning 1)
