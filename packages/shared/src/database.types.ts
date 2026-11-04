@@ -34,6 +34,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string | null
+          created_by: string
+          email: string
+          expires_at: string
+          full_name: string
+          id: string
+          sent_at: string
+          token_hash: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string | null
+          created_by: string
+          email: string
+          expires_at: string
+          full_name: string
+          id?: string
+          sent_at?: string
+          token_hash: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string | null
+          created_by?: string
+          email?: string
+          expires_at?: string
+          full_name?: string
+          id?: string
+          sent_at?: string
+          token_hash?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -113,6 +163,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_invites: {
+        Args: never
+        Returns: {
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      get_invite_preview: {
+        Args: { token: string }
+        Returns: {
+          email: string
+          full_name: string
+          status: string
+          workspace_name: string
+        }[]
+      }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
       is_member_of: { Args: { ws: string }; Returns: boolean }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }

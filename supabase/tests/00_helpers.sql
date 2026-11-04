@@ -49,6 +49,26 @@ as $$
   values (ws, client, 'client');
 $$;
 
+create or replace function tests.create_invite(
+  ws uuid, email text, full_name text, created_by uuid, token text,
+  expires_at timestamptz default now() + interval '14 days',
+  sent_at timestamptz default now()
+) returns uuid
+language plpgsql
+as $$
+declare
+  inv uuid;
+begin
+  insert into public.client_invites (
+    workspace_id, email, full_name, token_hash, expires_at, sent_at, created_by
+  ) values (
+    ws, email, full_name, encode(extensions.digest(token, 'sha256'), 'hex'),
+    expires_at, sent_at, created_by
+  ) returning id into inv;
+  return inv;
+end;
+$$;
+
 create or replace function tests.act_as(user_id uuid)
 returns void
 language plpgsql
