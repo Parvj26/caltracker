@@ -155,6 +155,12 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - A workout instance can be in progress by only one person. When the coach starts it, the client sees "Your coach is logging this session" (read-only), and vice versa.
 - Offline edge case: if both sides log the same workout while offline, on sync the first completion wins; the second is saved as a separate workout and the coach is shown both to resolve.
 
+### Forgotten workouts (reminder + auto-finish)
+- **Reminder:** each completed set (re)schedules an on-device local notification for **20 minutes** after that set: "Still training? 💪 Tap to finish your {workout name} workout." Logging another set pushes it back; finishing or discarding the workout cancels it. Scheduled locally, so it works offline.
+- **Auto-finish:** a workout in progress with no activity for **3 hours** is finished automatically, with its end time set to the **last completed set** (so duration is accurate). History, PRs, totals and badges count normally. The badge reveal shows on next app open with the note "We finished {workout name} for you at {time}." The workout can be reopened to add missed sets.
+- Applies equally to coach session logging on iPad (the reminder goes to the coach's device).
+- Auto-finish runs on the device when the app next opens or resumes, and server-side (scheduled job) for workouts whose device never reopens, using the last synced set time.
+
 ### Offline behaviour
 - All logging reads and writes go to an on-device SQLite database kept in sync with Supabase by **PowerSync**.
 - A "Not synced yet" indicator is shown until pending changes upload.
@@ -257,6 +263,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 | Client | New message |
 | Client | Comment on your workout or post |
 | Client | New coach post in community |
+| Client / Coach | Still training? — 20 min after last logged set of an unfinished workout (local, on-device) |
 | Coach | Client completed a workout |
 | Coach | New message |
 | Coach | New community report |
