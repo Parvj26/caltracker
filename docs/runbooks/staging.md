@@ -57,7 +57,7 @@ Between `supabase db push` and the end of `pnpm functions:deploy` (about 1 minut
 
 The smoke job needs a real staging coach who has a password.
 
-1. Actions -> Deploy staging -> Run workflow (branch `main`), `action = provision-coach`, with a mailbox you control (for example `smoke@caltracker.app` forwarding to you), a name and a workspace name such as `Smoke Test`.
+1. Actions -> Deploy staging -> Run workflow (branch `main`), `action = provision-coach`, with a mailbox you control (for example `smoke@caltracker.app` forwarding to you), a first name (last name optional) and a workspace name such as `Smoke Test`.
 2. Open the invite email, follow the link (it lands on `/set-password` on staging) and choose a password.
 3. Add the secrets `STAGING_SMOKE_COACH_EMAIL` (that email) and `STAGING_SMOKE_COACH_PASSWORD` (that password).
 4. Re-run Deploy staging (or merge the next change). Until the secrets exist, the automatic smoke job fails by design.
