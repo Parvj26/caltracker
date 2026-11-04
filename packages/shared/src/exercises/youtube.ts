@@ -27,3 +27,8 @@ export function parseYoutubeUrl(input: string): { videoId: string } | null {
   }
   return id !== undefined && VIDEO_ID.test(id) ? { videoId: id } : null;
 }
+
+/** The one form we store: always passes the DB youtube_url domain check. */
+export function canonicalYoutubeUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}

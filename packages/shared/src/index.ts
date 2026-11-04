@@ -12,4 +12,5 @@ export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
 export { FREE_EXERCISE_DB_IMAGE_PREFIX, mapFreeExercise } from './exercises/free-exercise-db';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
-export { parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
+export { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
+export { CustomExerciseInput, ExerciseOverrideInput, OptionalYoutubeUrl, YOUTUBE_URL_ERROR } from './exercises/schema';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseYoutubeUrl, youtubeFormSearchUrl } from '../../src/exercises/youtube';
+import { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from '../../src/exercises/youtube';
 
 describe('youtubeFormSearchUrl', () => {
   it('builds an encoded search url', () => {
@@ -39,5 +39,11 @@ describe('parseYoutubeUrl', () => {
     'https://youtube.com/channel/dQw4w9WgXcQ',
   ])('rejects %s', (url) => {
     expect(parseYoutubeUrl(url)).toBeNull();
+  });
+});
+
+describe('canonicalYoutubeUrl', () => {
+  it('builds the https watch url', () => {
+    expect(canonicalYoutubeUrl('dQw4w9WgXcQ')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
   });
 });
