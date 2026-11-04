@@ -44,6 +44,30 @@ test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }
   await expect(page.getByRole('table', { name: 'CSV preview' }).getByText('Invite sent')).toHaveCount(45, { timeout: 60_000 });
 });
 
+test('while a CSV is sending, a new file cannot be picked and the send cannot be restarted', async ({ page }) => {
+  const run = unique();
+  // Hold the send (a server action POST to this page) until the checks below have run.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route('**/clients', async (route) => {
+    if (route.request().method() === 'POST') await held;
+    await route.continue();
+  });
+  const fileInput = page.getByLabel('Upload CSV');
+  await fileInput.setInputFiles({
+    name: 'busy.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`Name,Email\nBusy One,busy1-${run}@example.com\nBusy Two,busy2-${run}@example.com`),
+  });
+  await page.getByRole('button', { name: 'Send 2 invites' }).click();
+  await expect(page.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+  await expect(fileInput).toBeDisabled();
+
+  release();
+  await expect(page.getByRole('table', { name: 'CSV preview' }).getByText('Invite sent')).toHaveCount(2);
+  await expect(fileInput).toBeEnabled();
+});
+
 test('empty name shows an inline error and sends nothing', async ({ page }) => {
   const email = `noname-${unique()}@example.com`;
   await page.getByLabel('Email').fill(email);
