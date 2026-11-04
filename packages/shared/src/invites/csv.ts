@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { NAME_MAX_LENGTH, splitFullName } from '../names';
 import { InviteInput } from './schema';
 
 export interface CsvError {
@@ -14,19 +15,22 @@ export interface ParsedClientCsv {
 /** Most clients one CSV upload may hold. */
 export const CLIENT_CSV_MAX_ROWS = 200;
 /** Accepted header cells (case and surrounding spaces are ignored). The first entry is the preferred spelling. */
+export const FIRST_NAME_HEADERS: readonly string[] = ['first name', 'first_name', 'given name'];
+export const LAST_NAME_HEADERS: readonly string[] = ['last name', 'last_name', 'surname'];
+/** A single name column (older files): split on the first space, unless a last name column is also present. */
 export const NAME_HEADERS: readonly string[] = ['name', 'full name', 'full_name', 'client name'];
 export const EMAIL_HEADERS: readonly string[] = ['email', 'e-mail', 'email address'];
 
-const EXAMPLE_ROWS: ReadonlyArray<readonly [string, string]> = [
-  ['Sam Lee', 'sam.lee@example.com'],
-  ['Priya Rao', 'priya.rao@example.com'],
+const EXAMPLE_ROWS: ReadonlyArray<readonly [string, string, string]> = [
+  ['Sam', 'Lee', 'sam.lee@example.com'],
+  ['Priya', 'Rao', 'priya.rao@example.com'],
 ];
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** A small example upload: the preferred headers plus two example rows. */
 export function clientCsvTemplate(): string {
-  const header = [NAME_HEADERS[0]!, EMAIL_HEADERS[0]!].map(capitalise).join(',');
+  const header = [FIRST_NAME_HEADERS[0]!, LAST_NAME_HEADERS[0]!, EMAIL_HEADERS[0]!].map(capitalise).join(',');
   return [header, ...EXAMPLE_ROWS.map((row) => row.join(','))].join('\n') + '\n';
 }
 
@@ -53,7 +57,16 @@ export function parseClientCsv(text: string): ParsedClientCsv {
       errors: [{ line: 1, message: 'Could not find an email column. Expected a header like "Email".' }],
     };
   }
+  const firstCol = findColumn(headerRow.cells, FIRST_NAME_HEADERS);
+  const lastCol = findColumn(headerRow.cells, LAST_NAME_HEADERS);
   const nameCol = findColumn(headerRow.cells, NAME_HEADERS);
+  const cell = (cells: string[], col: number) => (col === -1 ? '' : (cells[col] ?? ''));
+  const names = (cells: string[]) => {
+    if (firstCol !== -1) return { firstName: cell(cells, firstCol), lastName: cell(cells, lastCol) };
+    // "Name" next to a "Surname" column holds the first name; on its own it holds the whole name.
+    if (lastCol !== -1) return { firstName: cell(cells, nameCol), lastName: cell(cells, lastCol) };
+    return splitFullName(cell(cells, nameCol));
+  };
 
   const rows: InviteInput[] = [];
   const errors: CsvError[] = [];
@@ -65,13 +78,16 @@ export function parseClientCsv(text: string): ParsedClientCsv {
       break;
     }
     const rawEmail = (cells[emailCol] ?? '').trim();
-    const rawName = nameCol === -1 ? '' : (cells[nameCol] ?? '');
-    const result = InviteInput.safeParse({ email: rawEmail, fullName: rawName });
+    const result = InviteInput.safeParse({ email: rawEmail, ...names(cells) });
     if (!result.success) {
-      const emailBad = result.error.issues.some((issue) => issue.path[0] === 'email');
+      const badField = (field: string) => result.error.issues.some((issue) => issue.path[0] === field);
       errors.push({
         line,
-        message: emailBad ? `Invalid email: ${rawEmail}` : `Invalid name on line ${line}: a name of 1 to 100 characters is required`,
+        message: badField('email')
+          ? `Invalid email: ${rawEmail}`
+          : badField('firstName')
+            ? `Invalid name on line ${line}: a first name of 1 to ${NAME_MAX_LENGTH} characters is required`
+            : `Invalid name on line ${line}: the last name can be at most ${NAME_MAX_LENGTH} characters`,
       });
       continue;
     }
