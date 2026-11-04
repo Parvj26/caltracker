@@ -16,6 +16,15 @@ How to generate CalTracker's animal and landmark stickers with an AI image tool 
 4. **Save** each pick as a PNG, at least 1024×1024, named `animal-name.png` (e.g. `red-panda.png`), into one folder.
 5. **Hand the folder to Claude.** The processing script removes backgrounds, adds the white die-cut border and shadow, and exports app-ready sizes. You don't need to do any editing.
 
+## ChatGPT quick-start (chosen route: your ChatGPT subscription, by hand)
+1. Start **one new chat** and keep using it for the whole set, so the style stays consistent.
+2. **First message:** paste the master prompt below with `[SUBJECT]` replaced by the capybara line. Add at the end: "Output as a PNG with a transparent background. Make 1 image."
+3. If it isn't cute enough, say what to change ("rounder, bigger eyes, thicker outline") until you love it. Then do the same for **corgi** and **okapi**. These three are your anchors.
+4. **Every next animal:** "Same exact style as the capybara, corgi and okapi above: [SUBJECT]. Transparent PNG." Use the subject lines from the tables below.
+5. Download each image and name it exactly as the table says, e.g. `red-panda.png`. Save everything into `~/Desktop/caltracker-stickers/`.
+6. If ChatGPT says you've hit an image limit, stop and continue later **in the same chat**.
+7. When the folder is complete, or partly done, tell Claude. It will check names, flag any that drift in style, and process them into app stickers.
+
 ## Master prompt (use for every animal)
 > A single cute chibi **[SUBJECT]** sticker illustration. Big head, small body, large glossy dark eyes with a white highlight, tiny smile, soft rosy cheeks. Rounded, chunky, simple shapes. Flat colours with very soft shading, thick dark outline (#121212) around the whole character. Playful and lovable, like a premium collectible sticker. Centered, full body, facing slightly toward the viewer, plain pure white background, no text, no border, no shadow, no props unless described.
 
