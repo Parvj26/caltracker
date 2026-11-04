@@ -31,6 +31,32 @@ Mailpit (http://127.0.0.1:54324), and its link opens `caltracker://auth/confirme
 where the app is installed. In Expo Go, either use the link `exp://<ip>:8081/--/auth/confirmed...` or
 simply confirm with `pnpm --filter mobile e2e:confirm <email>`, then sign in.
 
+## Install on your own iPhone against staging (free Apple ID)
+
+Expo Go cannot open the app's `caltracker://` confirmation link, so for real sign-ups against
+staging install the app itself from Xcode. A free Apple ID is enough; the install works for 7 days,
+then repeat the last step.
+
+1. Xcode -> Settings -> Accounts -> **+** -> sign in with your Apple ID.
+2. Plug the iPhone into the Mac, unlock it and tap **Trust**. On the iPhone: Settings -> Privacy &
+   Security -> **Developer Mode** -> on (the phone restarts).
+3. Point the app at staging (asks for the staging **anon** key; never use the service_role key):
+   ```bash
+   pnpm --filter mobile env:staging
+   ```
+4. Build and install a Release build (JS embedded, no Mac needed afterwards):
+   ```bash
+   pnpm --filter mobile exec expo run:ios --configuration Release --device
+   ```
+   Pick the iPhone from the list. If Xcode reports a signing error, open
+   `apps/mobile/ios/CalTracker.xcworkspace`, select the CalTracker target -> Signing & Capabilities ->
+   Team = your Apple ID ("Personal Team"), then run the command again.
+5. First launch only: iPhone Settings -> General -> VPN & Device Management -> your Apple ID -> **Trust**.
+6. Test: invite your own address (e.g. `you+client@gmail.com`) from https://staging.caltracker.app,
+   sign up with it in the app, open the confirmation email **on the iPhone** (the link opens the app).
+
+Switch back to local with `pnpm --filter mobile env:local` and rebuild.
+
 ## Maestro end-to-end tests (iOS simulator, local only, not in CI)
 
 Needs Xcode with an iOS simulator, Maestro 2.x and Java 17 (`brew install openjdk@17`).

@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "env:local": "bash scripts/write-local-env.sh",
+    "env:staging": "bash scripts/write-staging-env.sh",
     "e2e": "bash scripts/run-e2e.sh",
     "e2e:invite": "tsx scripts/e2e-helper.ts invite",
     "e2e:confirm": "tsx scripts/e2e-helper.ts confirm",
