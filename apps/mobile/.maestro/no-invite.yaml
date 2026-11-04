@@ -13,7 +13,10 @@ env:
     id: go-sign-up
 - tapOn:
     id: name-input
-- inputText: Nobody Here
+- inputText: Nobody
+- tapOn:
+    id: last-name-input
+- inputText: Here
 - tapOn:
     id: email-input
 - inputText: ${EMAIL}

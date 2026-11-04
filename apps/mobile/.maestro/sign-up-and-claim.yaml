@@ -17,7 +17,10 @@ env:
     id: go-sign-up
 - tapOn:
     id: name-input
-- inputText: E2E Client
+- inputText: E2E
+- tapOn:
+    id: last-name-input
+- inputText: Client
 - tapOn:
     id: email-input
 - inputText: ${EMAIL}
