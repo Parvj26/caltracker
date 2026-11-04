@@ -44,3 +44,33 @@ for (const [width, height] of [[1024, 768], [1180, 820], [1280, 800]] as const) 
     }
   });
 }
+
+const OLD_ERROR_RED = 'rgb(176, 0, 32)';
+const PAGES = [
+  { name: 'forgot-password', path: '/forgot-password', signInAs: null },
+  { name: 'set-password', path: '/set-password', signInAs: null },
+  { name: 'auth confirm (error state)', path: '/auth/confirm', signInAs: null },
+  { name: 'not-a-coach', path: '/not-a-coach', signInAs: 'client@demo.local' },
+  { name: 'invite (not found)', path: '/invite/not-a-real-token', signInAs: null },
+] as const;
+
+for (const p of PAGES) {
+  test(`${p.name} page is branded`, async ({ page }) => {
+    if (p.signInAs) {
+      await page.goto('/sign-in');
+      await page.getByLabel('Email').fill(p.signInAs);
+      await page.getByLabel('Password').fill('demo-password-123');
+      await page.getByRole('button', { name: 'Sign in' }).click();
+      await expect(page.getByRole('heading', { name: /This dashboard is for coaches/ })).toBeVisible();
+    }
+    await page.goto(p.path);
+    await expect(page.getByLabel('CalTracker').first()).toBeVisible();
+    const bodyFont = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+    expect(bodyFont).toContain('Bricolage');
+    const hasOldRed = await page.evaluate(
+      (red) => [...document.querySelectorAll('*')].some((el) => getComputedStyle(el).color === red),
+      OLD_ERROR_RED,
+    );
+    expect(hasOldRed).toBe(false);
+  });
+}

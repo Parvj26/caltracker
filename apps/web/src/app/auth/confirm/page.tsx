@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { AuthShell, Button } from '@/components/ui';
 import styles from '../../(auth)/sign-in/sign-in.module.css';
 import { safeNextPath } from '@/lib/safe-next';
 import { isOtpType } from '@/lib/otp-type';
@@ -15,15 +16,14 @@ export default async function ConfirmPage({
   const { token_hash, type, next } = await searchParams;
   if (!token_hash || !isOtpType(type)) redirect('/sign-in?error=link');
   return (
-    <main className={styles.main}>
-      <h1>Continue to CalTracker</h1>
-      <p>Press Continue to finish signing in.</p>
-      <form action={confirmLink} className={styles.form}>
+    <AuthShell title="Continue to CalTracker">
+      <p className={styles.lead}>Press Continue to finish signing in.</p>
+      <form action={confirmLink} className={styles.signInForm}>
         <input type="hidden" name="token_hash" value={token_hash} />
         <input type="hidden" name="type" value={type} />
         <input type="hidden" name="next" value={safeNextPath(next)} />
-        <button type="submit">Continue</button>
+        <Button type="submit" className={styles.submit}>Continue</Button>
       </form>
-    </main>
+    </AuthShell>
   );
 }

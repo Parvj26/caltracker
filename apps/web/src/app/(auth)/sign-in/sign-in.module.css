@@ -8,10 +8,4 @@
   background: var(--ct-drop);
 }
 
-/* Legacy classes still used by forgot-password, set-password and auth/confirm until Task 3 moves them to AuthShell. */
-.main { max-width: 22rem; margin: 6rem auto; padding: 0 var(--ct-space-4); }
-.form { display: flex; flex-direction: column; gap: var(--ct-space-4); }
-.form label { display: flex; flex-direction: column; gap: var(--ct-space-1); font-weight: var(--ct-weight-section-heading); }
-.form input { padding: var(--ct-space-2-5); border: 1px solid var(--ct-ink); border-radius: 6px; font: inherit; }
-.form button { padding: var(--ct-space-3); border: 0; border-radius: 6px; background: var(--ct-ink); color: var(--ct-bg); font: inherit; cursor: pointer; }
-.error { margin: 0; color: var(--ct-ink); }
+.lead { margin: 0; }

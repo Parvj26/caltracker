@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { AuthShell } from '@/components/ui';
 import styles from './invite.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -47,30 +48,29 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   const { token } = await params;
   const preview = await loadPreview(token);
 
+  const valid = preview.status === 'valid' && preview.workspace_name && preview.email;
+  if (valid) {
+    return (
+      <AuthShell title={`${preview.workspace_name} invited you to CalTracker`} note="Let's get moving!">
+        <p className={styles.lead}>
+          Download the CalTracker app and sign up with <strong>{preview.email}</strong>.
+        </p>
+        <div className={styles.buttons}>
+          <StoreButton label="App Store" href={process.env.NEXT_PUBLIC_APP_STORE_URL || undefined} />
+          <StoreButton label="Google Play" href={process.env.NEXT_PUBLIC_PLAY_STORE_URL || undefined} />
+        </div>
+      </AuthShell>
+    );
+  }
+  const [title, message] =
+    preview.status === 'expired'
+      ? ['Invite expired', 'This invite has expired. Ask your coach to send a new one.']
+      : preview.status === 'accepted'
+        ? ['Invite already used', 'This invite has already been used. Open the CalTracker app and sign in.']
+        : ['Invite not valid', "This invite link isn't valid. Check the link in your email or ask your coach to send a new one."];
   return (
-    <main className={styles.page}>
-      <div className={styles.card}>
-        {preview.status === 'valid' && preview.workspace_name && preview.email ? (
-          <>
-            <h1>{`${preview.workspace_name} invited you to CalTracker`}</h1>
-            <p>
-              Download the CalTracker app and sign up with <strong>{preview.email}</strong>.
-            </p>
-            <div className={styles.buttons}>
-              <StoreButton label="App Store" href={process.env.NEXT_PUBLIC_APP_STORE_URL || undefined} />
-              <StoreButton label="Google Play" href={process.env.NEXT_PUBLIC_PLAY_STORE_URL || undefined} />
-            </div>
-          </>
-        ) : preview.status === 'expired' ? (
-          <p>This invite has expired. Ask your coach to send a new one.</p>
-        ) : preview.status === 'accepted' ? (
-          <p>This invite has already been used. Open the CalTracker app and sign in.</p>
-        ) : (
-          <p>
-            This invite link isn&apos;t valid. Check the link in your email or ask your coach to send a new one.
-          </p>
-        )}
-      </div>
-    </main>
+    <AuthShell title={title}>
+      <p className={styles.lead}>{message}</p>
+    </AuthShell>
   );
 }

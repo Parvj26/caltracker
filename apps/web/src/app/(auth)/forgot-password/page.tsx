@@ -1,13 +1,13 @@
-import styles from '../sign-in/sign-in.module.css';
+import { AuthShell } from '@/components/ui';
 import { ForgotPasswordForm } from './forgot-password-form';
+import styles from '../sign-in/sign-in.module.css';
 
 export default function ForgotPasswordPage() {
   return (
-    <main className={styles.main}>
-      <h1>Forgot your password?</h1>
-      <p>Enter your email and we will send you a link to choose a new one.</p>
+    <AuthShell title="Forgot your password?">
+      <p className={styles.lead}>Enter your email and we will send you a link to choose a new one.</p>
       <ForgotPasswordForm />
-      <p><a href="/sign-in">Back to sign in</a></p>
-    </main>
+      <a href="/sign-in" className={styles.forgot}>Back to sign in</a>
+    </AuthShell>
   );
 }
