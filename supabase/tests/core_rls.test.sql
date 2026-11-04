@@ -1,5 +1,5 @@
 begin;
-select plan(25);
+select plan(33);
 
 -- Fixtures (as postgres)
 select tests.create_user('coach-a@t.local', 'Coach A') as coach_a \gset
@@ -26,6 +26,14 @@ select ok(not has_table_privilege('authenticated', 'public.workspace_members', '
   and not has_table_privilege('authenticated', 'public.workspace_members', 'delete'),
   'authenticated cannot write workspace_members');
 
+select ok(not has_table_privilege('anon', 'public.profiles', 'select,insert,update,delete'), 'anon has no privileges on profiles');
+select ok(not has_table_privilege('anon', 'public.workspaces', 'select,insert,update,delete'), 'anon has no privileges on workspaces');
+select ok(not has_table_privilege('anon', 'public.workspace_members', 'select,insert,update,delete'), 'anon has no privileges on workspace_members');
+select ok(not has_table_privilege('authenticated', 'public.profiles', 'insert,delete'), 'authenticated cannot insert/delete profiles');
+select ok(not has_table_privilege('authenticated', 'public.workspaces', 'insert,delete'), 'authenticated cannot insert/delete workspaces');
+select ok(not has_column_privilege('authenticated', 'public.profiles', 'id', 'update'), 'authenticated cannot update profiles.id');
+select ok(not has_column_privilege('authenticated', 'public.workspaces', 'id', 'update'), 'authenticated cannot update workspaces.id');
+
 -- profiles as A1
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.profiles where id = :'a1'), 1, 'A1 selects own profile');
@@ -47,8 +55,10 @@ select is((select count(*)::int from public.profiles where id = :'b1'), 0, 'coac
 select tests.act_as(:'a1');
 select results_eq($$select id from public.workspaces$$, array[:'ws_a'::uuid], 'A1 sees exactly workspace A');
 update public.workspaces set name = 'Hacked' where id = :'ws_a';
+update public.workspaces set badge_style = 'plain' where id = :'ws_a';
 reset role;
 select is((select name from public.workspaces where id = :'ws_a'), 'Workspace A', 'A1 cannot update workspace A');
+select is((select badge_style from public.workspaces where id = :'ws_a'), 'animals', 'A1 cannot update workspace A badge_style');
 
 select tests.act_as(:'coach_a');
 select results_eq($$select id from public.workspaces$$, array[:'ws_a'::uuid], 'coach A sees exactly workspace A');
