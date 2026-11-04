@@ -293,7 +293,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 | Shared logic | TypeScript package used by both apps |
 | Validation | Zod schemas in the shared package |
 | Error monitoring | Sentry |
-| Web hosting | Vercel |
+| Web hosting | Cloudflare Workers via OpenNext (`@opennextjs/cloudflare`); app code stays host-agnostic so it can move to Vercel |
 | Mobile builds/releases | Expo EAS Build, EAS Submit, EAS Update |
 
 ### Repository layout (monorepo, pnpm workspaces + Turborepo)
@@ -317,8 +317,8 @@ supabase/
 
 ### Environments
 - **Local:** Supabase CLI local stack, seed data only.
-- **Staging:** separate Supabase project + Vercel preview + internal app builds. Used by the product owner for testing.
-- **Production:** separate Supabase project, production Vercel deployment, store builds.
+- **Staging:** separate Supabase project + Cloudflare Workers staging deployment + internal app builds. Used by the product owner for testing.
+- **Production:** separate Supabase project, production Cloudflare Workers deployment, store builds.
 - Real client data is never copied into local or staging.
 
 ---
@@ -362,7 +362,7 @@ supabase/
 
 ## 14. Accounts the product owner must create
 
-Apple Developer Program, Google Play Console, Supabase, Vercel, Expo, GitHub, Sentry, PowerSync, domain name. All owned by the product owner.
+Apple Developer Program, Google Play Console, Supabase, Cloudflare, Resend, Expo, GitHub, Sentry, PowerSync, domain name. All owned by the product owner.
 
 ---
 
