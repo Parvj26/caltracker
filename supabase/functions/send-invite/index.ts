@@ -19,7 +19,7 @@ export interface HandlerDeps {
   sendIntervalMs?: number;
   /**
    * Time budget for one request, in ms (default 120 s). Edge Functions are cut off at 150 s, so rows not
-   * reached in time are reported as `error` ("use Resend") and left untouched instead of half-processed.
+   * reached in time are reported as `error` ("add this client again") and left untouched instead of half-processed.
    */
   budgetMs?: number;
   /** Clock, injectable for tests. */
@@ -31,6 +31,8 @@ export interface HandlerDeps {
 const DEFAULT_BUDGET_MS = 120_000;
 const DEFAULT_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Shown for rows that were never written (no Pending row exists, so there is no Resend button). */
+const NOT_SENT_MESSAGE = 'Not sent — add this client again';
 const ANOTHER_COACH_MESSAGE =
   "This person already trains with another coach on CalTracker. They'll need to leave that coach first.";
 
@@ -152,7 +154,7 @@ export function createHandler(deps: HandlerDeps) {
         results.push({
           email: invite.email,
           status: 'error',
-          message: 'Not sent yet — use Resend',
+          message: NOT_SENT_MESSAGE,
         });
         continue;
       }
@@ -184,14 +186,15 @@ export function createHandler(deps: HandlerDeps) {
 
         // Double-click / retry guard: an email went out moments ago, so its link is still good.
         // Do not rotate the token (that would kill the link already in the inbox) and do not email again.
+        const sentMomentAgo = (): Result => ({
+          email,
+          status: clientOf ? 'with_another_coach' : 'resent',
+          message: clientOf
+            ? ANOTHER_COACH_MESSAGE
+            : 'Already sent a moment ago. The link in that email still works.',
+        });
         if (existing && Date.now() - new Date(existing.sent_at).getTime() < cooldownMs) {
-          return {
-            email,
-            status: clientOf ? 'with_another_coach' : 'resent',
-            message: clientOf
-              ? ANOTHER_COACH_MESSAGE
-              : 'Already sent a moment ago. The link in that email still works.',
-          };
+          return sentMomentAgo();
         }
 
         const token = newToken();
@@ -201,7 +204,9 @@ export function createHandler(deps: HandlerDeps) {
         const tokenHash = await sha256Hex(token);
 
         if (existing) {
-          const { error } = await admin
+          // Only rotate if nobody else did since we read the row (compare-and-swap on sent_at).
+          // Otherwise a concurrent request already sent a fresh link, and rotating again would kill it.
+          const { data: rotated, error } = await admin
             .from('client_invites')
             .update({
               token_hash: tokenHash,
@@ -209,8 +214,11 @@ export function createHandler(deps: HandlerDeps) {
               sent_at: sentAt,
               expires_at: expiresAt.toISOString(),
             })
-            .eq('id', existing.id);
+            .eq('id', existing.id)
+            .eq('sent_at', existing.sent_at)
+            .select('id');
           if (error) throw error;
+          if (!rotated || rotated.length === 0) return sentMomentAgo();
         } else {
           const { error } = await admin.from('client_invites').insert({
             workspace_id: workspaceId,

@@ -281,7 +281,7 @@ t('stops at the time budget: later rows are error and untouched', async () => {
     results.map((r: { status: string }) => r.status),
     ['sent', 'sent', 'sent', 'error', 'error'],
   );
-  assertEquals(results[3].message, 'Not sent yet — use Resend');
+  assertEquals(results[3].message, 'Not sent — add this client again');
   assertEquals(sent.length, 3);
   assertEquals((await openInvites(wsA)).length, 3);
 });
@@ -482,4 +482,62 @@ t('paces sends by sendIntervalMs', async () => {
   assertEquals(times.length, 3);
   assertEquals(times[1]! - times[0]! >= 190, true);
   assertEquals(times[2]! - times[1]! >= 190, true);
+});
+
+t('a concurrent rotation between read and update sends nothing and rotates the token only once', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const req = { workspaceId: wsA, invites: [{ email: 'race@x.com', fullName: 'Race' }] };
+  await call(handlerWith(mailer), req, jwt);
+  await backdateInvite(wsA, 3);
+  sent.length = 0;
+
+  // Another request rotates the token right after ours has read the row and before our update runs.
+  let concurrentHash = '';
+  const concurrentRotation = async () => {
+    concurrentHash = 'concurrent-' + uid();
+    const { error } = await admin
+      .from('client_invites')
+      .update({ token_hash: concurrentHash, sent_at: new Date().toISOString() })
+      .eq('workspace_id', wsA);
+    if (error) throw error;
+  };
+  let fromCalls = 0;
+  const racing = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop !== 'from') return Reflect.get(target, prop, receiver);
+      return (table: string) => {
+        const builder = target.from(table);
+        if (table !== 'client_invites' || ++fromCalls !== 2) return builder; // call 1 is the read
+        const origUpdate = builder.update.bind(builder);
+        // deno-lint-ignore no-explicit-any
+        const delayed = (inner: any): any =>
+          new Proxy(inner, {
+            get(t, k) {
+              if (k === 'then')
+                return (res: never, rej: never) =>
+                  concurrentRotation().then(() => t.then(res, rej));
+              const v = t[k];
+              // deno-lint-ignore no-explicit-any
+              return typeof v === 'function' ? (...a: any[]) => { const r = v.apply(t, a); return r === t ? delayed(t) : r; } : v;
+            },
+          });
+        // deno-lint-ignore no-explicit-any
+        builder.update = ((payload: any) => delayed(origUpdate(payload))) as typeof builder.update;
+        return builder;
+      };
+    },
+  }) as SupabaseClient;
+
+  const handler = createHandler({
+    mailer, supabaseAdmin: racing, supabaseUrl: URL_, anonKey: ANON, publicSiteUrl: 'http://site.test',
+  });
+  const res = await call(handler, req, jwt);
+  const result = (await res.json()).results[0];
+  assertEquals(result.status, 'resent');
+  assertEquals(result.message, 'Already sent a moment ago. The link in that email still works.');
+  assertEquals(sent.length, 0);
+  const rows = await openInvites(wsA);
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].token_hash, concurrentHash); // our request did not overwrite the concurrent one
 });
