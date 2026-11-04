@@ -202,6 +202,10 @@ Three tiers of animal stickers, plus shiny variants. Full list and rules: `docs/
 - The sticker book shows collected stickers, locked ladder animals ("Next: rhino — 2,300 kg"), locked rare finds (silhouette + requirement), and "???" for ultra-rares not yet found.
 - **Showing off:** rare, ultra-rare and shiny reveals use a bigger celebration and can be shared to the community. The share card shows the tier ("Rare find!", "Ultra-rare!", "Shiny!").
 - Coach per-client "disable comparison badges" also disables random drops and shinies for that client.
+- **Animal fact cards:** every sticker (animals and landmarks) has a fact card with the name, one fun fact (≤ 140 characters), where it lives (animals), and for rare and ultra-rare animals a "How rare?" line where a sourced number exists.
+  - The card appears on the reveal screen ("Meet the okapi"), when tapping a sticker in the sticker book (it flips over), and on community share cards.
+  - Facts are stored as data (a table seeded from `docs/design/animal-facts.md`), not hard-coded, so they can change without an app release.
+  - Every fact is checked against a reliable source before release; sources are recorded in `animal-facts.md`.
 
 ### Totals
 - Monthly and lifetime volume totals, each mapped to a ladder animal ("This month: 3 elephants").
