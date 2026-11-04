@@ -90,9 +90,13 @@ describe('importExercises', () => {
 
   it('downloads from the (stubbed) GitHub host', async () => {
     const { port } = server.address() as AddressInfo;
+    const paths = subset.flatMap((e) => e.images.map((i) => `free-exercise-db/${i}`));
+    const removed = await admin.storage.from('exercise-images').remove(paths);
+    expect(removed.error).toBeNull();
     const summary = await importExercises(admin, { rawBase: `http://127.0.0.1:${port}`, log: quiet });
     expect(summary.exercises).toBe(3);
     expect(summary.imagesFailed).toBe(0);
+    expect(summary.imagesUploaded).toBe(imageCount());
     const { rows, objects } = await state();
     expect(rows).toHaveLength(3);
     expect(objects).toBe(imageCount());
