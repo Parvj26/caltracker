@@ -48,23 +48,23 @@ async function members(userId: string) {
 describe('provisionCoach', () => {
   it('creates user, workspace and owner membership for a new email', async () => {
     const email = uniqueEmail();
-    const r = await provisionCoach(admin, { email, fullName: 'Test Coach', workspaceName: 'Test Gym' });
+    const r = await provisionCoach(admin, { email, firstName: ' Test ', lastName: ' Coach ', workspaceName: 'Test Gym' });
     userIds.push(r.userId);
     workspaceIds.push(r.workspaceId);
     expect(r.created).toBe(true);
     expect(await members(r.userId)).toEqual([{ workspace_id: r.workspaceId, role: 'owner' }]);
     const { data: ws } = await admin.from('workspaces').select('name').eq('id', r.workspaceId).single();
     expect(ws?.name).toBe('Test Gym');
-    const { data: p } = await admin.from('profiles').select('full_name').eq('id', r.userId).single();
-    expect(p?.full_name).toBe('Test Coach');
+    const { data: p } = await admin.from('profiles').select('first_name, last_name, full_name').eq('id', r.userId).single();
+    expect(p).toEqual({ first_name: 'Test', last_name: 'Coach', full_name: 'Test Coach' });
   });
 
   it('is idempotent and ignores a different workspace name', async () => {
     const email = uniqueEmail();
-    const a = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'One' });
+    const a = await provisionCoach(admin, { email, firstName: 'C', workspaceName: 'One' });
     userIds.push(a.userId);
     workspaceIds.push(a.workspaceId);
-    const b = await provisionCoach(admin, { email: email.toUpperCase(), fullName: 'C', workspaceName: 'Two' });
+    const b = await provisionCoach(admin, { email: email.toUpperCase(), firstName: 'C', workspaceName: 'Two' });
     // Never signed in, so the repeat run re-sends the set-password email (see the test below).
     expect(b).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false, resent: true });
     expect(await members(a.userId)).toHaveLength(1);
@@ -74,14 +74,14 @@ describe('provisionCoach', () => {
 
   it('re-sends a set-password email to an owner who never signed in, and not to one who has', async () => {
     const email = uniqueEmail();
-    const a = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    const a = await provisionCoach(admin, { email, firstName: 'C', workspaceName: 'Resend Gym' });
     userIds.push(a.userId);
     workspaceIds.push(a.workspaceId);
     expect(a.resent).toBeUndefined();
 
     // GoTrue allows one email per address per second.
     await new Promise((r) => setTimeout(r, 1500));
-    const again = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    const again = await provisionCoach(admin, { email, firstName: 'C', workspaceName: 'Resend Gym' });
     expect(again).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false, resent: true });
     expect(await waitForSubjects(email, 'Reset your CalTracker password', 1)).toHaveLength(1);
 
@@ -93,7 +93,7 @@ describe('provisionCoach', () => {
     });
     const { error } = await anon.auth.signInWithPassword({ email, password });
     expect(error).toBeNull();
-    const third = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Resend Gym' });
+    const third = await provisionCoach(admin, { email, firstName: 'C', workspaceName: 'Resend Gym' });
     expect(third).toEqual({ userId: a.userId, workspaceId: a.workspaceId, created: false });
   });
 
@@ -102,7 +102,7 @@ describe('provisionCoach', () => {
     const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
     expect(error).toBeNull();
     userIds.push(data.user!.id);
-    const r = await provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Late' });
+    const r = await provisionCoach(admin, { email, firstName: 'C', workspaceName: 'Late' });
     workspaceIds.push(r.workspaceId);
     expect(r.userId).toBe(data.user!.id);
     expect(r.created).toBe(true);
@@ -117,7 +117,7 @@ describe('provisionCoach', () => {
     workspaceIds.push(ws!.id);
     await admin.from('workspace_members').insert({ workspace_id: ws!.id, user_id: data.user!.id, role: 'client' });
     await expect(
-      provisionCoach(admin, { email, fullName: 'C', workspaceName: 'Mine' }),
+      provisionCoach(admin, { email, firstName: 'C', workspaceName: 'Mine' }),
     ).rejects.toThrow('User is a client of another workspace');
   });
 });

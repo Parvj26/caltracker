@@ -22,7 +22,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
     const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const r = await provisionCoach(admin, { email: process.argv[1], fullName: 'Fresh Coach', workspaceName: 'Fresh Gym' });
+    const r = await provisionCoach(admin, { email: process.argv[1], firstName: 'Fresh', lastName: 'Coach', workspaceName: 'Fresh Gym' });
     console.log('RESULT:' + JSON.stringify(r));
   `;
   const out = execFileSync('pnpm', ['--filter', '@caltracker/scripts', 'exec', 'tsx', '--input-type=module', '-e', code, email], {

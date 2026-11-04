@@ -77,7 +77,7 @@ Invite sending limits: the dashboard sends 20 invites per call, one call after a
 Actions -> Deploy staging -> Run workflow (branch `main`):
 
 - `action = import-exercises`: loads the ~870 exercise library.
-- `action = provision-coach`: fill `coach_email`, `coach_name`, `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
+- `action = provision-coach`: fill `coach_email`, `coach_first_name`, `coach_last_name` (optional) and `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
 
 These use `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The values are passed as environment variables and the key is never printed.
 

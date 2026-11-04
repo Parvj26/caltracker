@@ -20,8 +20,12 @@ on:
         description: 'provision-coach: coach email'
         type: string
         required: false
-      coach_name:
-        description: 'provision-coach: coach full name'
+      coach_first_name:
+        description: 'provision-coach: coach first name'
+        type: string
+        required: false
+      coach_last_name:
+        description: 'provision-coach: coach last name (optional)'
         type: string
         required: false
       workspace_name:
@@ -225,11 +229,12 @@ jobs:
         if: inputs.action == 'provision-coach'
         env:
           COACH_EMAIL: ${{ inputs.coach_email }}
-          COACH_NAME: ${{ inputs.coach_name }}
+          COACH_FIRST_NAME: ${{ inputs.coach_first_name }}
+          COACH_LAST_NAME: ${{ inputs.coach_last_name }}
           WORKSPACE_NAME: ${{ inputs.workspace_name }}
         run: |
-          if [ -z "$COACH_EMAIL" ] || [ -z "$COACH_NAME" ] || [ -z "$WORKSPACE_NAME" ]; then
-            echo "::error::coach_email, coach_name and workspace_name are all required for provision-coach."
+          if [ -z "$COACH_EMAIL" ] || [ -z "$COACH_FIRST_NAME" ] || [ -z "$WORKSPACE_NAME" ]; then
+            echo "::error::coach_email, coach_first_name and workspace_name are all required for provision-coach (coach_last_name is optional)."
             exit 1
           fi
-          pnpm provision:coach --email "$COACH_EMAIL" --name "$COACH_NAME" --workspace "$WORKSPACE_NAME"
+          pnpm provision:coach --email "$COACH_EMAIL" --first-name "$COACH_FIRST_NAME" --last-name "$COACH_LAST_NAME" --workspace "$WORKSPACE_NAME"
