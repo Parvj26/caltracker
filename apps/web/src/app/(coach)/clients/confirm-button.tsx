@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import type { SimpleOutcome } from './actions';
@@ -20,6 +21,7 @@ type Props = {
 
 /** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
 export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId }: Props) {
+  const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -58,6 +60,11 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
         // Escape must not close it mid-request, or an error would land in a closed dialog.
         onCancel={(e) => {
           if (pending) e.preventDefault();
+        }}
+        // After a failure the page may be out of date (for example the invite was accepted meanwhile): refresh it
+        // once the coach has read the message.
+        onClose={() => {
+          if (error) router.refresh();
         }}
       >
         <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>

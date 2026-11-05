@@ -68,9 +68,11 @@ export async function cancelInvite(inviteId: string): Promise<SimpleOutcome> {
     .eq('workspace_id', workspaceId)
     .is('accepted_at', null)
     .select('id');
-  revalidatePath('/clients');
   if (error) return { ok: false, error: "Couldn't cancel this invite. Please try again." };
   // Nothing deleted: they accepted a moment ago (or it was already cancelled), so the link can't be stopped here.
+  // Don't refresh the page yet: the row (and the dialog showing this message) would vanish. The dialog refreshes
+  // the page when it is closed.
   if (data.length === 0) return { ok: false, error: 'This invite was already used or cancelled. If they joined, remove them from Clients instead.' };
+  revalidatePath('/clients');
   return { ok: true };
 }

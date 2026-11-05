@@ -167,5 +167,8 @@ test('cancelling an invite that was accepted meanwhile says so instead of preten
   const dialog = page.getByRole('dialog', { name: 'Cancel this invite?' });
   await dialog.getByRole('button', { name: 'Cancel invite' }).click();
   await expect(dialog.getByText('This invite was already used or cancelled. If they joined, remove them from Clients instead.')).toBeVisible();
+  // Closing the dialog refreshes the page: the accepted invite is no longer pending.
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: invite.email })).toHaveCount(0);
   await admin.from('client_invites').delete().eq('email', invite.email);
 });
