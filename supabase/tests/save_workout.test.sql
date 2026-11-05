@@ -93,6 +93,9 @@ select tests.sw_doc(:'inst_a1', 'A1 Day (edited)', jsonb_build_array(
     tests.sw_ex(:'inst_we', :'ex_a', jsonb_build_array(
       tests.sw_set(:'inst_set0', 'normal', 8, 70), tests.sw_set(:'inst_set1', 'drop', null, null, 0, true),
       tests.sw_set(:'snew', 'normal', 6, 70))))))) as doc_inst \gset
+-- The same doc under a new name: what client A1 tries to save. A name that differs from the stored one means a
+-- save that wrongly went through would show.
+select jsonb_set(:'doc_inst'::jsonb, '{name}', '"A1 renamed by client"') as doc_inst_client \gset
 
 -- A one-block doc with one exercise, for the guard cases.
 \set gw '5a000000-0000-4000-8000-000000000002'
@@ -249,12 +252,16 @@ select results_eq(
   format($$values (%L::uuid, 'SW B Library')$$, :'ws_b'),
   'B''s workout is unchanged');
 select is((select count(*)::int from public.workout_blocks where workout_id = :'lib_b'), 1, 'B''s blocks are unchanged');
-select is((select count(*)::int from public.workouts where id = :'gw'), 0, 'nothing was created by the refused saves');
+select is(
+  (select count(*)::int from public.workout_blocks where id = :'gb')
+    + (select count(*)::int from public.workout_exercises where id = :'ge')
+    + (select count(*)::int from public.workout_sets where id = :'gs'),
+  0, 'the block, exercise and set the refused save into B''s workout carried were not created');
 
 -- ---------------------------------------------------------------------------------------------
 -- Clients and anon cannot save
 select tests.act_as(:'a1');
-select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_inst'),
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_inst_client'),
   '42501', null, 'client A1 cannot save, not even their own instance');
 reset role;
 select is((select name from public.workouts where id = :'inst_a1'), 'A1 Day (edited)', 'A1''s refused save changed nothing');
