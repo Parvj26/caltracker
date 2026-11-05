@@ -69,12 +69,14 @@ async function makeInvite(opts: Opts = {}) {
   return { token, email, id: data.id };
 }
 
-test('valid invite shows workspace, email and Coming soon store buttons, signed out', async ({ page }) => {
+test('valid invite offers Open in CalTracker, then the store buttons, signed out', async ({ page }) => {
   const { token, email } = await makeInvite();
   await page.goto(`/invite/${token}`);
   await expect(page).toHaveURL(new RegExp(`/invite/${token}$`)); // not redirected to /sign-in
   await expect(page.getByRole('heading', { name: 'Demo Coaching invited you to CalTracker' })).toBeVisible();
-  await expect(page.getByText('Download the CalTracker app and sign up with')).toBeVisible();
+  await expect(page.getByText('Already have the app? Open it and join. You only need to choose a password.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open in CalTracker' })).toHaveAttribute('href', `caltracker://invite/${token}`);
+  await expect(page.getByText("Don't have it yet? Install CalTracker, then tap the link in your email again.")).toBeVisible();
   await expect(page.locator('strong', { hasText: email })).toBeVisible();
   await expect(page.getByText('Coming soon')).toHaveCount(2);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
