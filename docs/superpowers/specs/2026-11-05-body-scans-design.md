@@ -105,6 +105,8 @@ like this:
 ## Out of scope
 
 - Automatic InBody sync, file import and photo reading of printouts (not in Version 1).
-- Strength charts (best set and estimated 1RM per exercise) and weekly volume charts. The main spec lists these under
-  progress. They are a small follow-up once PRs exist, and they share the chart component built here.
+- Strength charts are not in this phase. They are approved for go-live (PO, 2026-11-05) and are built right after stickers/PRs, reusing this chart component:
+  - Each exercise gets a per-exercise line of estimated 1RM (Epley, warm-ups excluded) over time, with the best set ("145 lb × 6") as a second series.
+  - The coach picks the exercise from a dropdown on the client's Progress section, and the client sees the same chart in the app's Progress screen.
+  - The series is built by a shared pure function from `personal_records` and the logs, with unit tests.
 - Progress photos (not in Version 1).
