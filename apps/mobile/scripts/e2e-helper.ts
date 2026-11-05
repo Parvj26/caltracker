@@ -2,6 +2,7 @@
 //   pnpm --filter mobile e2e:invite <email> <name>   create a Demo Coaching invite
 //   pnpm --filter mobile e2e:confirm <email>         mark the user's email as confirmed
 //   pnpm --filter mobile e2e:cleanup <email>         delete the user and their invites
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts remove <email>   the coach removes this client (Past clients)
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts confirmlink <email>   confirmation link from Mailpit
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts invitelink <email> <name>   invite + its caltracker://invite link
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
@@ -68,6 +69,18 @@ export async function confirm(email: string): Promise<void> {
   if (error) throw error;
 }
 
+/** What the dashboard's Remove does (remove_client needs a signed-in coach, so the helper writes the same rows). */
+export async function remove(email: string): Promise<void> {
+  const id = await findUserId(email);
+  if (!id) throw new Error(`No user with email ${email}`);
+  const { data: m, error } = await admin.from('workspace_members').select('workspace_id').eq('user_id', id).eq('role', 'client').single();
+  if (error) throw error;
+  const { error: pastErr } = await admin.from('past_clients').upsert({ workspace_id: m.workspace_id, user_id: id, email });
+  if (pastErr) throw pastErr;
+  const { error: delErr } = await admin.from('workspace_members').delete().eq('user_id', id).eq('role', 'client');
+  if (delErr) throw delErr;
+}
+
 export async function cleanup(email: string): Promise<void> {
   // Invites first: accepted_by references auth.users without cascade. Memberships cascade from the user.
   const { error } = await admin.from('client_invites').delete().eq('email', email);
@@ -99,6 +112,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);
+  else if (action === 'remove') await remove(email);
   else throw new Error(`Unknown action ${action}`);
 }
 
