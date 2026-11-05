@@ -44,6 +44,12 @@ describe('ladder', () => {
     expect(formatMultiple(12.4, 'Giraffe')).toBe('≈ 12 Giraffes');
     expect(formatMultiple(2.5, 'Walrus')).toBe('≈ 2.5 Walruses');
   });
+  it('keeps Sheep, Moose and Bison unchanged and rounds 9.96 up to 10', () => {
+    expect(formatMultiple(2.5, 'Sheep')).toBe('≈ 2.5 Sheep');
+    expect(formatMultiple(2.5, 'Moose')).toBe('≈ 2.5 Moose');
+    expect(formatMultiple(2.5, 'Bison')).toBe('≈ 2.5 Bison');
+    expect(formatMultiple(9.96, 'Giraffe')).toBe('≈ 10 Giraffes');
+  });
   it('qualifies at 5 completed sets', () => {
     const sets = (n: number) => Array.from({ length: n }, () => ({ w: 50, r: 5 }));
     expect(isQualifying(mkLog([{ sets: sets(4) }]))).toBe(false);
@@ -86,6 +92,17 @@ describe('prs', () => {
     expect(detectPrs(mkLog([{ sets: [{ w: 100, r: 5 }] }]), history, new Set())).toEqual([]);
     expect(detectPrs(mkLog([{ trackingType: 'distance', sets: [{ w: 100, r: 9 }] }]), history, new Set())).toEqual([]);
   });
+  it('a tie is not a PR', () => {
+    expect(detectPrs(mkLog([{ sets: [{ w: 100, r: 5 }, { w: 100, r: 5 }] }]), history, new Set())).toEqual([]);
+  });
+  it('several sets of one exercise give one record per kind, from the best set', () => {
+    const prs = detectPrs(mkLog([{ sets: [{ w: 100, r: 6 }, { w: 100, r: 7 }, { w: 110, r: 5 }] }]), history, new Set());
+    expect(prs.filter((p) => p.kind === 'heaviest')).toHaveLength(1);
+    expect(prs.find((p) => p.kind === 'heaviest')).toMatchObject({ valueKg: 110, reps: 5 });
+    expect(prs.find((p) => p.kind === 'e1rm')).toMatchObject({ valueKg: epley1rm(110, 5), reps: 5 });
+    expect(prs.filter((p) => p.kind === 'reps_at_weight')).toHaveLength(1);
+    expect(prs.find((p) => p.kind === 'reps_at_weight')).toMatchObject({ valueKg: 100, reps: 7 });
+  });
   it('judges each exercise on its own history', () => {
     expect(detectPrs(mkLog([{ exerciseId: EX_B, sets: [{ w: 300, r: 5 }] }]), history, new Set())).toEqual([]);
   });
@@ -110,6 +127,9 @@ describe('streakWeeks', () => {
   it('a gap resets current and keeps best', () => {
     const w = ['2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', '2026-10-26', '2026-11-02'];
     expect(streakWeeks(w, '2026-11-02')).toEqual({ current: 2, best: 4 });
+  });
+  it('ignores duplicate week keys', () => {
+    expect(streakWeeks(['2026-10-26', '2026-10-26', '2026-11-02', '2026-11-02'], '2026-11-02')).toEqual({ current: 2, best: 2 });
   });
   it('an empty current week does not break the streak yet', () => {
     expect(streakWeeks(['2026-10-19', '2026-10-26'], '2026-11-02')).toEqual({ current: 2, best: 2 });
@@ -199,6 +219,10 @@ describe('computeAward', () => {
     const same = computeAward(base({ statsBefore: stats({ workouts: 10, streak: 4 }), statsAfter: stats({ workouts: 11, streak: 4 }) }));
     expect(same.landmarks).toEqual([]);
     expect(same.milestone).toBeNull();
+  });
+  it('a streak restarting at 1 earns the first landmark again', () => {
+    const a = computeAward(base({ statsBefore: stats({ streak: 0, bestStreak: 6 }), statsAfter: stats({ streak: 1, bestStreak: 6 }) }));
+    expect(a.landmarks).toEqual(['chichen-itza']);
   });
   it('reveal order: ladder, drop, rare, landmark, milestone', () => {
     const cards = revealCards({
