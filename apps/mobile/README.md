@@ -20,7 +20,21 @@ pnpm --filter mobile env:local       # writes apps/mobile/.env.local (simulator:
 The app has two tabs in this phase. **Today** shows the workouts assigned for today plus a week calendar;
 **Workouts** lists the client's workouts, and tapping one opens a read-only detail. There is no Start button yet.
 
-## Try it on a real phone (Expo Go)
+## Install a dev build on your iPhone
+
+We use dev builds on the iPhone, not Expo Go, because Expo Go cannot open `caltracker://` links (invite
+and email confirmation). Short version (full steps in "Install on your own iPhone against staging" below):
+
+```bash
+pnpm --filter mobile env:staging     # staging URL + anon key only; it refuses a service_role key
+pnpm --filter mobile exec expo prebuild
+# Xcode: open apps/mobile/ios/CalTracker.xcworkspace, set Signing & Capabilities -> Team to your Apple ID
+pnpm --filter mobile exec expo run:ios --configuration Release --device <udid>
+```
+
+A free Apple ID install lasts 7 days; run the last command again to renew it.
+
+## Try it on a real phone (Expo Go, quick look only)
 
 The phone cannot reach `127.0.0.1` on your Mac. Use the Mac's wifi IP (System Settings > Network),
 on the same wifi as the phone:

@@ -21,4 +21,10 @@ Locally Playwright reuses a running `next dev`; in CI (`CI=true`) it runs `next 
 - A client's calendar (from the Clients page) lets the coach add, move, edit and delete single workouts, or remove a program from the calendar.
 
 The e2e tests need the built-in exercises (for example Barbell Squat), so run `pnpm import:exercises` after `pnpm db:reset`.
+The import needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the shell:
+
+```
+eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
+SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY pnpm import:exercises
+```
 The staging smoke test (`pnpm --filter web test:e2e:staging`) also opens `/workouts` and `/programs` when `STAGING_SMOKE_COACH_*` is set.
