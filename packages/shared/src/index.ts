@@ -165,3 +165,20 @@ export type {
   WorkoutStatus,
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
+export {
+  EXERCISE_ALIASES,
+  MUSCLE_CHIP_MUSCLES,
+  buildExerciseIndex,
+  equipmentChipOf,
+  normalizeSearchText,
+  searchExercises,
+} from './exercises/search';
+export type {
+  EquipmentChip,
+  ExerciseIndex,
+  ExerciseIndexRow,
+  MuscleChip,
+  SearchBoosts,
+  SearchFilters,
+  SearchHit,
+} from './exercises/search';
