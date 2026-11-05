@@ -1,17 +1,28 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { localToday, type Units } from '@caltracker/shared';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import { within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
+import {
+  cacheTodayDetail,
+  fetchLogsForDays,
+  readCachedDetail,
+  readCachedToday,
+  type CachedDetail,
+  type LogForDay,
+} from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { START_BLOCKED, useActiveLog } from '@/lib/use-active-log';
 import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
   fetchAnyWorkout,
   fetchMyCoachName,
   fetchMyUnits,
   fetchNextWorkout,
+  fetchWorkoutDetail,
   fetchWorkoutsBetween,
   LOAD_FAILED,
   setMyUnits,
@@ -19,28 +30,74 @@ import {
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
+/** How long Start waits for the server before using the copy saved on the phone. */
+const DETAIL_WAIT_MS = 5000;
+const START_FAILED = 'Couldn’t open this workout. Check your connection and try again.';
+
 type TodayData =
   | { kind: 'first-time'; coachName: string | null; units: Units }
-  | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null };
+  | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null; logs: LogForDay[]; offline: boolean };
+
+const summaryOf = (d: CachedDetail): WorkoutSummary => ({
+  id: d.doc.id,
+  name: d.doc.name,
+  scheduledOn: d.scheduledOn,
+  exerciseCount: d.doc.blocks.reduce((n, b) => n + b.exercises.length, 0),
+  programName: null,
+});
+
+/** Saves today's workouts on the phone, so Start works with poor signal later. Best effort. */
+async function cacheToday(today: IsoDate, workouts: WorkoutSummary[]): Promise<void> {
+  try {
+    const details = await Promise.all(workouts.map((w) => fetchWorkoutDetail(w.id)));
+    await cacheTodayDetail(today, details.filter((d): d is CachedDetail => d !== null));
+  } catch {
+    // the previous copy stays; Start fetches the workout itself when there is signal
+  }
+}
 
 async function loadToday(): Promise<TodayData> {
   // "Today" is the phone's own date, never the server's.
   const today = localToday();
-  const [workouts, any] = await Promise.all([fetchWorkoutsBetween(today, today), fetchAnyWorkout()]);
+  let workouts: WorkoutSummary[];
+  let any: WorkoutSummary[];
+  try {
+    [workouts, any] = await Promise.all([fetchWorkoutsBetween(today, today), fetchAnyWorkout()]);
+  } catch (e) {
+    // No signal: show today's workouts saved on the phone, if any, so they can still be started.
+    const cached = await readCachedToday(today);
+    if (cached.length === 0) throw e;
+    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs: [], offline: true };
+  }
   if (workouts.length === 0 && isFirstTimeClient(any)) {
     const [coachName, units] = await Promise.all([fetchMyCoachName(), fetchMyUnits()]);
     return { kind: 'first-time', coachName, units };
   }
-  const next = workouts.length === 0 ? await fetchNextWorkout(today) : null;
-  return { kind: 'today', workouts, next };
+  void cacheToday(today, workouts);
+  const [next, logs] = await Promise.all([
+    workouts.length === 0 ? fetchNextWorkout(today) : Promise.resolve(null),
+    // "Done ✓" is a bonus: Today still shows when it can't be read.
+    fetchLogsForDays(today, today).catch(() => [] as LogForDay[]),
+  ]);
+  return { kind: 'today', workouts, next, logs, offline: false };
+}
+
+/** The planned workout to start from: the server's copy, or the one saved on the phone without signal. */
+async function workoutToStart(id: string): Promise<WorkoutDoc | null> {
+  const fresh = await within(fetchWorkoutDetail(id), DETAIL_WAIT_MS);
+  if (fresh) return fresh.doc;
+  return (await readCachedDetail(localToday(), id))?.doc ?? null;
 }
 
 export default function Today() {
   const { workspace } = useSession();
   const { text, space } = useTheme();
+  const router = useRouter();
+  const { log: active, banner, dismissBanner, start } = useActiveLog();
   const [data, setData] = useState<TodayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [starting, setStarting] = useState<string | null>(null);
   // Loads can overlap (focus + pull to refresh): only the latest answer is shown.
   const latest = useRef(0);
 
@@ -79,6 +136,44 @@ export default function Today() {
     }
   }
 
+  const inProgress = active?.status === 'in_progress' ? active : null;
+  const statuses = useMemo(
+    () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active),
+    [data, active],
+  );
+
+  const openLog = useCallback((id: string) => router.push({ pathname: '/log/[id]', params: { id } }), [router]);
+
+  async function startWorkout(w: WorkoutSummary) {
+    if (starting) return;
+    if (inProgress) {
+      // Only one workout at a time: carry on with the one already going.
+      if (inProgress.workoutId === w.id) {
+        openLog(inProgress.id);
+        return;
+      }
+      Alert.alert(`${inProgress.name} is still going`, 'Finish or discard it before starting another workout.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Resume ${inProgress.name}`, onPress: () => openLog(inProgress.id) },
+      ]);
+      return;
+    }
+    setStarting(w.id);
+    try {
+      const doc = await workoutToStart(w.id);
+      if (!doc) {
+        Alert.alert(START_FAILED);
+        return;
+      }
+      const log = await start(doc);
+      openLog(log.id);
+    } catch (e) {
+      Alert.alert(e instanceof Error && e.message === START_BLOCKED ? START_BLOCKED : START_FAILED);
+    } finally {
+      setStarting(null);
+    }
+  }
+
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
       <View style={{ gap: space[1] }}>
@@ -87,6 +182,17 @@ export default function Today() {
           Today
         </Text>
       </View>
+
+      {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
+
+      {banner ? (
+        <Card>
+          <Text testID="auto-finish-note" style={text('sectionHeading')}>
+            {banner}
+          </Text>
+          <TextButton testID="auto-finish-ok" title="OK" onPress={dismissBanner} />
+        </Card>
+      ) : null}
 
       {error ? (
         <Card>
@@ -106,8 +212,20 @@ export default function Today() {
         />
       ) : null}
 
+      {data?.kind === 'today' && data.offline ? (
+        <Text style={text('caption')}>No connection. These are today’s workouts saved on your phone.</Text>
+      ) : null}
+
       {data?.kind === 'today' && data.workouts.length > 0
-        ? data.workouts.map((w) => <TodayCard key={w.id} workout={w} />)
+        ? data.workouts.map((w) => (
+            <TodayCard
+              key={w.id}
+              workout={w}
+              status={statuses[w.id] ?? null}
+              starting={starting === w.id}
+              onStart={() => void startWorkout(w)}
+            />
+          ))
         : null}
 
       {data?.kind === 'today' && data.workouts.length === 0 ? (
@@ -124,7 +242,38 @@ export default function Today() {
   );
 }
 
-function TodayCard({ workout }: { workout: WorkoutSummary }) {
+/** "Resume {name}" at the top of Today while a workout is in progress. */
+function ResumeBanner({ name, onPress }: { name: string; onPress: () => void }) {
+  const { text, space, radius } = useTheme();
+  return (
+    <Pressable
+      testID="resume-banner"
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.resume,
+        { borderRadius: radius.card, padding: space[4.5], gap: space[1] },
+        pressed && styles.pressed,
+      ]}
+    >
+      {/* Text on a pastel tile is always ink, never muted. */}
+      <Text style={[text('caption'), styles.ink]}>Workout in progress</Text>
+      <Text style={text('sectionHeading')}>{`Resume ${name}`}</Text>
+    </Pressable>
+  );
+}
+
+function TodayCard({
+  workout,
+  status,
+  starting,
+  onStart,
+}: {
+  workout: WorkoutSummary;
+  status: WorkoutStatus | null;
+  starting: boolean;
+  onStart: () => void;
+}) {
   const { text, space, radius } = useTheme();
   const router = useRouter();
   const count = `${workout.exerciseCount} ${workout.exerciseCount === 1 ? 'exercise' : 'exercises'}`;
@@ -137,13 +286,25 @@ function TodayCard({ workout }: { workout: WorkoutSummary }) {
           <View
             style={[styles.chip, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}
           >
-            <Text style={[text('caption'), styles.chipText]} accessibilityLabel={`Program: ${workout.programName}`}>
+            <Text style={[text('caption'), styles.ink]} accessibilityLabel={`Program: ${workout.programName}`}>
               {workout.programName}
             </Text>
           </View>
         ) : null}
+        {status?.kind === 'done' ? (
+          <Text testID={`done-${workout.id}`} style={text('sectionHeading')}>
+            {`Done ✓ · ${formatLogDuration(status.durationS)}`}
+          </Text>
+        ) : null}
       </View>
-      {/* Phase 2 is view only: logging (the Start button) arrives in phase 3. */}
+      {status?.kind === 'done' ? null : (
+        <Button
+          title={status?.kind === 'in_progress' ? 'Resume' : 'Start'}
+          testID={`start-${workout.id}`}
+          onPress={onStart}
+          busy={starting}
+        />
+      )}
       <Button
         variant="secondary"
         title="View workout"
@@ -155,7 +316,8 @@ function TodayCard({ workout }: { workout: WorkoutSummary }) {
 }
 
 const styles = StyleSheet.create({
-  // Text on a pastel tile is always ink, never muted.
   chip: { alignSelf: 'flex-start', backgroundColor: palette.blue },
-  chipText: { color: palette.ink },
+  resume: { backgroundColor: palette.lime },
+  pressed: { opacity: 0.75 },
+  ink: { color: palette.ink },
 });

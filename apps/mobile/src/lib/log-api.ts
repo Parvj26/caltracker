@@ -8,6 +8,7 @@ import {
   WorkoutDoc,
   logRowToDoc,
   type Database,
+  type ExercisePick,
   type IsoDate,
   type LogStatus,
   type LogTreeRow,
@@ -101,6 +102,22 @@ export async function fetchLastResults(exerciseIds: string[]): Promise<LastResul
   return out;
 }
 
+/**
+ * The client's log in progress on the server, if any. Used before starting a new one when the phone has none
+ * (another phone, or a reinstall), so Start resumes it instead of colliding with the one-in-progress rule.
+ */
+export async function fetchInProgressLog(): Promise<WorkoutLogDoc | null> {
+  const { data, error } = await supabase
+    .from('workout_logs')
+    .select(LOG_TREE_SELECT)
+    .eq('client_id', await myId())
+    .eq('status', 'in_progress')
+    .maybeSingle();
+  if (error) throw failed('log in progress', error);
+  if (!data) return null;
+  return logRowToDoc(data as unknown as LogTreeRow);
+}
+
 export type LogComment = { id: string; authorId: string | null; body: string; createdAt: string };
 
 /** The coach's comments on a log, oldest first. */
@@ -115,7 +132,16 @@ export async function fetchComments(logId: string): Promise<LogComment[]> {
   return data.map((c) => ({ id: c.id, authorId: c.author_id, body: c.body, createdAt: c.created_at }));
 }
 
-export type LogForDay = { id: string; workoutId: string; scheduledOn: IsoDate; status: LogStatus; name: string };
+export type LogForDay = {
+  id: string;
+  workoutId: string;
+  scheduledOn: IsoDate;
+  status: LogStatus;
+  name: string;
+  startedAt: string;
+  finishedAt: string | null;
+  lastActivityAt: string;
+};
 
 /**
  * The client's logs of planned workouts scheduled from `from` to `to` inclusive, for "Done ✓" and "Resume".
@@ -124,7 +150,7 @@ export type LogForDay = { id: string; workoutId: string; scheduledOn: IsoDate; s
 export async function fetchLogsForDays(from: IsoDate, to: IsoDate): Promise<LogForDay[]> {
   const { data, error } = await supabase
     .from('workout_logs')
-    .select('id, workout_id, status, name, workouts!inner(scheduled_on)')
+    .select('id, workout_id, status, name, started_at, finished_at, last_activity_at, workouts!inner(scheduled_on)')
     .eq('client_id', await myId())
     .neq('status', 'discarded')
     .gte('workouts.scheduled_on', from)
@@ -134,7 +160,16 @@ export async function fetchLogsForDays(from: IsoDate, to: IsoDate): Promise<LogF
   for (const row of data) {
     const scheduledOn = row.workouts.scheduled_on;
     if (row.workout_id === null || scheduledOn === null) continue;
-    out.push({ id: row.id, workoutId: row.workout_id, scheduledOn, status: row.status, name: row.name });
+    out.push({
+      id: row.id,
+      workoutId: row.workout_id,
+      scheduledOn,
+      status: row.status,
+      name: row.name,
+      startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      lastActivityAt: row.last_activity_at,
+    });
   }
   return out;
 }
@@ -150,20 +185,49 @@ export async function cacheTodayDetail(today: IsoDate, details: CachedDetail[]):
   await AsyncStorage.setItem(detailKey(await myId()), JSON.stringify(value));
 }
 
+async function readCache(today: IsoDate): Promise<Record<string, CachedDetail>> {
+  const raw = await AsyncStorage.getItem(detailKey(await myId()));
+  if (raw === null) return {};
+  const value = JSON.parse(raw) as { date?: unknown; details?: Record<string, CachedDetail> };
+  return value.date === today && typeof value.details === 'object' && value.details !== null ? value.details : {};
+}
+
+function validDetail(hit: CachedDetail | undefined): CachedDetail | null {
+  if (!hit || typeof hit.scheduledOn !== 'string') return null;
+  const doc = WorkoutDoc.safeParse(hit.doc);
+  if (!doc.success) return null;
+  const videoUrls = typeof hit.videoUrls === 'object' && hit.videoUrls !== null ? hit.videoUrls : {};
+  return { doc: doc.data, scheduledOn: hit.scheduledOn, videoUrls };
+}
+
+/** Every workout cached for today, by name, for showing Today without signal. Empty on any failure. */
+export async function readCachedToday(today: IsoDate): Promise<CachedDetail[]> {
+  try {
+    return Object.values(await readCache(today))
+      .map(validDetail)
+      .filter((d): d is CachedDetail => d !== null)
+      .sort((a, b) => a.doc.name.localeCompare(b.doc.name));
+  } catch {
+    return [];
+  }
+}
+
 /** Today's cached copy of a workout, or null when it is not cached, from another day, or unreadable. */
 export async function readCachedDetail(today: IsoDate, workoutId: string): Promise<CachedDetail | null> {
   try {
-    const raw = await AsyncStorage.getItem(detailKey(await myId()));
-    if (raw === null) return null;
-    const value = JSON.parse(raw) as { date?: unknown; details?: Record<string, CachedDetail> };
-    if (value.date !== today) return null;
-    const hit = value.details?.[workoutId];
-    if (!hit || typeof hit.scheduledOn !== 'string') return null;
-    const doc = WorkoutDoc.safeParse(hit.doc);
-    if (!doc.success) return null;
-    const videoUrls = typeof hit.videoUrls === 'object' && hit.videoUrls !== null ? hit.videoUrls : {};
-    return { doc: doc.data, scheduledOn: hit.scheduledOn, videoUrls };
+    return validDetail((await readCache(today))[workoutId]);
   } catch {
     return null; // a cache miss is never worth failing the screen over
   }
+}
+
+/** Built-in exercises plus the coach's own (RLS limits custom ones to the client's workspace), by name. */
+export async function searchExercises(query: string): Promise<ExercisePick[]> {
+  // Drop the LIKE wildcards and the escape character so typed text only ever matches itself.
+  const q = query.trim().slice(0, 100).replace(/[%_\\]/g, '');
+  let request = supabase.from('exercises').select('id, name, tracking_type');
+  if (q) request = request.ilike('name', `%${q}%`);
+  const { data, error } = await request.order('name').limit(30);
+  if (error) throw failed('search exercises', error);
+  return data.map((e) => ({ id: e.id, name: e.name, trackingType: e.tracking_type }));
 }

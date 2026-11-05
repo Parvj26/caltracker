@@ -417,3 +417,32 @@ describe('createLogSync', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('onStatus', () => {
+  it('reports each change of status once: pending on push, synced after the upload, offline after two network failures', async () => {
+    const store = await storeWith(sampleLog({ revision: 1 }));
+    const seen: string[] = [];
+    let fail = true;
+    const save = vi.fn((doc: WorkoutLogDoc) => (fail ? Promise.reject(networkError()) : Promise.resolve(applied(doc))));
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onStatus: (s) => seen.push(s) });
+    sync.push();
+    sync.push();
+    expect(seen).toEqual(['pending']);
+    await vi.advanceTimersByTimeAsync(SYNC_DEBOUNCE_MS); // first failure: still pending
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]); // second failure: offline
+    expect(seen).toEqual(['pending', 'offline']);
+    fail = false;
+    await sync.flushNow();
+    expect(seen).toEqual(['pending', 'offline', 'synced']);
+  });
+
+  it('is silent after stop()', async () => {
+    const store = await storeWith(sampleLog({ revision: 1 }));
+    const seen: string[] = [];
+    const sync = createLogSync({ save: vi.fn(), fetchLog: vi.fn(), store, onStatus: (s) => seen.push(s) });
+    sync.stop();
+    sync.push();
+    await sync.flushNow();
+    expect(seen).toEqual([]);
+  });
+});

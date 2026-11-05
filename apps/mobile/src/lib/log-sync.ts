@@ -39,6 +39,8 @@ export type LogSyncDeps = {
    * correct either way, but the screen would otherwise show an older doc.
    */
   onAdopt?: (doc: WorkoutLogDoc) => void;
+  /** Called whenever status() changes (for the "Not synced yet" pill). Never after stop(). */
+  onStatus?: (status: SyncStatus) => void;
 };
 
 export type LogSync = {
@@ -85,6 +87,16 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
 
   let current: SyncStatus = 'synced';
   let stopped = false;
+  function setStatus(next: SyncStatus) {
+    if (next === current) return;
+    current = next;
+    if (stopped) return;
+    try {
+      deps.onStatus?.(next);
+    } catch (e) {
+      console.warn(`[log-sync] onStatus failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   let failures = 0;
   let networkFailures = 0;
   let cancelDebounce: (() => void) | null = null;
@@ -122,7 +134,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
     let adopted: WorkoutLogDoc | null = null;
     const finish = (status: SyncStatus): SyncResult => {
       // A push that arrived during this run is still waiting for its debounce: not synced yet.
-      current = status === 'synced' && cancelDebounce !== null ? 'pending' : status;
+      setStatus(status === 'synced' && cancelDebounce !== null ? 'pending' : status);
       return { status: current, adopted };
     };
 
@@ -200,7 +212,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
   return {
     push() {
       if (stopped) return;
-      if (current === 'synced') current = 'pending';
+      if (current === 'synced') setStatus('pending');
       cancelDebounce?.();
       cancelDebounce = schedule(() => {
         cancelDebounce = null;
