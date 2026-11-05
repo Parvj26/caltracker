@@ -17,7 +17,7 @@ export function LibraryPanel({ library }: { library: LibraryWorkout[] }) {
     <section className={styles.library} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.sectionHeading}>Library</h2>
       {library.length === 0 ? (
-        <EmptyLibrary className={styles.caption} />
+        <EmptyLibrary className={styles.caption} forProgram />
       ) : (
         <>
           <p className={styles.caption}>Drag a workout onto a day, or use a day&apos;s + button.</p>

@@ -13,13 +13,15 @@ type Props = {
   library: LibraryWorkout[];
   onPick: (workout: LibraryWorkout) => void;
   onClose: () => void;
+  /** On a program the empty library also explains that programs are built from it. */
+  forProgram?: boolean;
 };
 
 /**
  * Pick a library workout for one day, in a native modal dialog (focus is trapped and Escape closes it). This is the
  * keyboard and touch path; dragging from the library panel does the same with a mouse.
  */
-export function WorkoutPicker({ cellLabel, library, onPick, onClose }: Props) {
+export function WorkoutPicker({ cellLabel, library, onPick, onClose, forProgram = false }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const resultsId = useId();
@@ -53,7 +55,7 @@ export function WorkoutPicker({ cellLabel, library, onPick, onClose }: Props) {
       <ul id={resultsId} className={styles.results}>
         {library.length === 0 ? (
           <li className={styles.emptyLibrary}>
-            <EmptyLibrary className={styles.caption} />
+            <EmptyLibrary className={styles.caption} forProgram={forProgram} />
           </li>
         ) : results.length === 0 ? (
           <li className={styles.caption}>No workouts match.</li>

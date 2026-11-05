@@ -7,16 +7,20 @@ import { EmptyLibrary } from '@/components/empty-library';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { STALE_DEPLOY_MESSAGE, failureMessage, isStaleDeployError } from '@/lib/action-errors';
 import { matchesSearch } from '../../programs/[id]/search';
 import { scheduleWorkout } from './actions';
 import styles from '@/components/calendar/calendar.module.css';
 
 type LibraryWorkout = { id: string; name: string };
 
+const MAYBE_SENT = 'Check the calendar before adding again: the first try may have gone through.';
+
 /**
  * "+ Add workout": one library workout on one day (today or later). The new workout's id is made once each time the
- * dialog opens, so a double click or a retry adds it only once.
+ * dialog opens, so a double click or a retry adds it only once. schedule_workout treats a reused id as "already
+ * added" and keeps the first day, so after a failure that may have reached the server, changing the workout or day
+ * makes a fresh id (and the coach is told to check the calendar first).
  */
 export function AddWorkoutDialog({
   clientId,
@@ -38,7 +42,9 @@ export function AddWorkoutDialog({
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<LibraryWorkout | null>(null);
   const [date, setDate] = useState<string>(today);
-  const [newId] = useState(() => crypto.randomUUID());
+  const [newId, setNewId] = useState(() => crypto.randomUUID());
+  // The workout and day of a try that failed without a clear answer: it may have been added anyway.
+  const [uncertain, setUncertain] = useState<{ workoutId: string; date: string } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -56,6 +62,15 @@ export function AddWorkoutDialog({
   const dateError = !parsed.success ? 'Pick a date.' : scheduleDateError(parsed.data, today);
   const results = library.filter((w) => matchesSearch(w.name, query));
 
+  /** A different workout or day after an unclear failure gets its own id, so it isn't mistaken for the first try. */
+  function rechoose(workoutId: string | undefined, nextDate: string) {
+    if (uncertain && (uncertain.workoutId !== workoutId || uncertain.date !== nextDate)) {
+      setNewId(crypto.randomUUID());
+      setUncertain(null);
+    }
+    setError(null);
+  }
+
   async function add() {
     if (busy.current || !picked || !parsed.success || dateError) return;
     busy.current = true;
@@ -69,8 +84,9 @@ export function AddWorkoutDialog({
       }
       setError(outcome.error);
     } catch (e) {
-      // The same id is kept, so trying again can't add it twice.
+      // Retrying the same choice reuses the id, so it can't add it twice.
       setError(failureMessage(e, "Couldn't add the workout. Check your connection and try again."));
+      if (!isStaleDeployError(e)) setUncertain({ workoutId: picked.id, date: parsed.data });
     } finally {
       busy.current = false;
       setPending(false);
@@ -112,7 +128,7 @@ export function AddWorkoutDialog({
                   aria-pressed={picked?.id === w.id}
                   onClick={() => {
                     setPicked(w);
-                    setError(null);
+                    rechoose(w.id, date);
                   }}
                 >
                   <span>{w.name}</span>
@@ -128,7 +144,7 @@ export function AddWorkoutDialog({
             value={date}
             onChange={(e) => {
               setDate(e.target.value);
-              setError(null);
+              rechoose(picked?.id, e.target.value);
             }}
             {...(dateError ? { error: dateError } : {})}
           />
@@ -140,6 +156,12 @@ export function AddWorkoutDialog({
         </>
       )}
       {error ? <ErrorText>{error}</ErrorText> : null}
+      {uncertain ? (
+        <p className={styles.pastNote}>
+          <span aria-hidden="true" className={styles.pastMarker}>●</span>
+          <span>{MAYBE_SENT}</span>
+        </p>
+      ) : null}
       <div className={styles.dialogActions}>
         {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>

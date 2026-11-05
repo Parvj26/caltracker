@@ -219,6 +219,10 @@ function DayCell({
           onClick={onAdd}
         >
           <span aria-hidden="true">+</span>
+          {/* The title is a mouse-only tooltip; this shows the same words to keyboard users on focus. */}
+          <span aria-hidden="true" className={styles.addTip}>
+            Add workout to {formatShortDay(date)}
+          </span>
         </button>
       ) : null}
     </div>

@@ -92,9 +92,9 @@ export function ProgramDetails({
       let count: number;
       try {
         count = await countSlotsBeyondWeek(program.id, parsed.data.weeks);
-      } catch {
+      } catch (e) {
         setPending(false);
-        setFormError("Couldn't check the weeks you're removing. Please try again.");
+        setFormError(failureMessage(e, "Couldn't check the weeks you're removing. Please try again."));
         return;
       }
       setPending(false);

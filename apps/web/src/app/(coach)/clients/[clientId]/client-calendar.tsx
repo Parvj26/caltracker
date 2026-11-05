@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import { localToday } from '@caltracker/shared';
+import { useEffect, useState } from 'react';
 import type { IsoDate } from '@caltracker/shared';
 import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
+import { useLocalToday } from '@/lib/local-today';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
 import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
@@ -32,18 +32,9 @@ export type PickerProgram = { id: string; name: string; weeks: number; slots: { 
 type LibraryWorkout = { id: string; name: string };
 
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
-const subscribe = () => () => {};
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 /** Messages from the server that are meant for the coach (anything else gets the generic undo message). */
 const forCoach = (message: string) => message.startsWith('You ') || message.startsWith('Pick ') || message.includes('date looks wrong');
-
-/**
- * Today in the coach's browser. The server (UTC on Workers) renders UTC's date first and the browser corrects it
- * right after hydration, so a coach in Auckland or Los Angeles sees their own date (Review Focus 3).
- */
-export function useLocalToday(): IsoDate {
-  return useSyncExternalStore(subscribe, () => localToday(), () => localToday('UTC'));
-}
 
 /**
  * One client's month: assign a program, add single library workouts ("+ Add workout" or a day's "+"), and move

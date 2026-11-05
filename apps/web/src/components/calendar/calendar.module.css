@@ -114,6 +114,25 @@
   cursor: pointer;
 }
 .addButton:hover { color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.addButton { position: relative; }
+.addTip {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--ct-space-1));
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
+.addButton:focus-visible .addTip { display: block; }
 /* With a mouse, a day's "+" shows on hover and focus (and always on today); touch screens always show it. It stays
    in the layout and in the tab order while hidden, so keyboard users land on it and it appears. */
 @media (hover: hover) {

@@ -280,6 +280,7 @@ export function ProgramGrid({
         <WorkoutPicker
           cellLabel={cellLabel(picker.week, picker.day)}
           library={library}
+          forProgram
           onPick={(w) => {
             addSlot(w, picker.week, picker.day);
             setPicker(null);

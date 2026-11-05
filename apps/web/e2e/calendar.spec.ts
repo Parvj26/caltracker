@@ -559,6 +559,11 @@ test('each day\'s "+" says which day it adds to; past days have none', async ({ 
   const todayPlus = day(page, today).getByRole('button', { name: `Add workout to ${fmt(today, true)}`, exact: true });
   await expect(todayPlus).toBeVisible();
   await expect(todayPlus).toHaveAttribute('title', `Add workout to ${fmt(today, true)}`);
+  // Keyboard users see the same words when it has focus.
+  const tip = day(page, today).getByText(`Add workout to ${fmt(today, true)}`, { exact: true });
+  await expect(tip).toBeHidden();
+  await todayPlus.focus();
+  await expect(tip).toBeVisible();
 
   await page.goto(calendarUrl(monthOf(tomorrow)));
   await expect(day(page, tomorrow).getByRole('button', { name: `Add workout to ${fmt(tomorrow, true)}`, exact: true })).toHaveCount(1);
@@ -629,4 +634,44 @@ test('a past workout can be deleted, but not moved or edited', async ({ page }) 
   await expect(day(page, pastDate).getByText(workout, { exact: true })).toHaveCount(0);
   const left = await admin.from('workouts').select('id').eq('id', seeded.data.id);
   expect(left.data).toEqual([]);
+});
+
+test('+ Add workout: after an unclear failure, a different day gets a fresh id and a warning to check first', async ({ page }) => {
+  const workout = `Unclear ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await page.goto(calendarUrl());
+  const month = nextMonth(monthOf(await browserToday(page)));
+  const first = `${month}-10`;
+  const second = `${month}-17`;
+
+  // The first Add reaches the server (which adds it), but the browser gets an error back.
+  const pageUrl = new RegExp(`/clients/${clientId}(\\?.*)?$`);
+  let lost = false;
+  await page.route(pageUrl, async (route) => {
+    if (route.request().method() !== 'POST' || lost) return route.continue();
+    lost = true;
+    await route.fetch();
+    await route.fulfill({ status: 500, body: 'lost' });
+  });
+  const dialog = await openAddWorkout(page);
+  await dialog.getByLabel('Search workouts').fill(workout);
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
+  await dialog.getByLabel('Date').fill(first);
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(dialog.getByText("Couldn't add the workout. Check your connection and try again.")).toBeVisible();
+  const note = dialog.getByText('Check the calendar before adding again: the first try may have gone through.');
+  await expect(note).toBeVisible();
+  await page.unroute(pageUrl);
+
+  // A different day: the note goes, and the add lands on that day (not silently on the first one).
+  await dialog.getByLabel('Date').fill(second);
+  await expect(note).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(`Added ${workout} to ${fmt(second, true)}.`)).toBeVisible();
+
+  const { data } = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId).order('scheduled_on');
+  expect(data).toEqual([{ scheduled_on: first }, { scheduled_on: second }]);
 });

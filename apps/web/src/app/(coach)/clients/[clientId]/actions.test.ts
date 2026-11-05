@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // of the server's UTC date.
 type Call = { op: string; rpc?: string; payload?: unknown };
 const calls: Call[] = [];
+let rpcError: { code: string; message: string } | null = null;
 
 function query(): unknown {
   const call: Call = { op: 'select' };
@@ -24,7 +25,7 @@ const supabase = {
   from: query,
   rpc: (name: string, payload: unknown) => {
     calls.push({ op: 'rpc', rpc: name, payload });
-    return Promise.resolve({ data: ASSIGNMENT, error: null });
+    return Promise.resolve({ data: rpcError ? null : ASSIGNMENT, error: rpcError });
   },
 };
 
@@ -42,6 +43,7 @@ const NEW_ID = '00000000-0000-4000-8000-000000000005';
 
 beforeEach(() => {
   calls.length = 0;
+  rpcError = null;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
 });
@@ -68,6 +70,14 @@ describe('scheduleWorkout', () => {
     expect(await scheduleWorkout({ ...input, today: '2026-11-06' })).toMatchObject({ ok: false });
     // Los Angeles is still on the 4th, so the 4th is fine there.
     expect(await scheduleWorkout({ ...input, date: '2026-11-04', today: '2026-11-04' })).toEqual({ ok: true });
+  });
+
+  it('says clearly when the same id was already used for a different workout or day', async () => {
+    rpcError = { code: '23505', message: 'duplicate key value violates unique constraint "workouts_pkey"' };
+    expect(await scheduleWorkout(input)).toEqual({
+      ok: false,
+      error: 'This add was already sent with a different workout or day. Close this, check the calendar, then add again if needed.',
+    });
   });
 
   it('refuses a "today" more than a day from UTC', async () => {

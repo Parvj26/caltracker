@@ -87,7 +87,16 @@ export async function scheduleWorkout(input: ScheduleWorkoutInput): Promise<Outc
     p_client_id: clientId,
     p_date: date,
   });
-  if (error) return { ok: false, error: error.code === '42501' ? NOT_A_CLIENT : GENERIC };
+  if (error) {
+    if (error.code === '42501') return { ok: false, error: NOT_A_CLIENT };
+    if (error.code === '23505') {
+      return {
+        ok: false,
+        error: 'This add was already sent with a different workout or day. Close this, check the calendar, then add again if needed.',
+      };
+    }
+    return { ok: false, error: GENERIC };
+  }
   refreshCalendar();
   return { ok: true };
 }
