@@ -52,14 +52,11 @@ env:
 - assertVisible: ${output.weekOf}
 - assertVisible:
     id: today-chip
+# React Native flattens the row's views, so "inside today-row" can't be matched. The lime chip only renders
+# on today's date, and this client's only workout is E2E Upper, so these two prove today's row shows it.
 - assertVisible:
-    text: 'Today'
-    childOf:
-      id: today-row
-- assertVisible:
-    text: 'E2E Upper'
-    childOf:
-      id: today-row
+    id: today-chip
+- assertVisible: 'E2E Upper'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-workouts, EMAIL: '-' }

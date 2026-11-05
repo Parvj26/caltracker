@@ -33,6 +33,10 @@ env:
 - assertVisible:
     id: last-name-input
     text: Tester
+# iOS offers "Use Strong Password?" on a hidden new-password field, and that sheet swallows typed text.
+# Show the password first: a visible field gets no sheet, and the test still types the known password.
+- tapOn:
+    id: toggle-password
 - tapOn:
     id: password-input
 - inputText: ${PASSWORD}
