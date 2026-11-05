@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { memoryStorage, sampleLog } from './log-fixtures';
-import { createLogStore, logStoreKey } from './log-store';
+import { applyEdit, createLogStore, logStoreKey } from './log-store';
 
 describe('createLogStore', () => {
   it('returns an equal log after storing it, under the per-user key', async () => {
@@ -51,5 +51,29 @@ describe('createLogStore', () => {
     expect(await store.load()).toMatchObject({ log: { revision: 2 }, lastSyncedRevision: 1 });
     await store.update(() => null);
     expect(await store.load()).toBeNull();
+  });
+});
+
+describe('applyEdit', () => {
+  it('builds the edit from the stored doc and keeps lastSyncedRevision', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    // The sync adopted the server's doc at revision 7 while the screen still showed revision 5.
+    await store.save({ log: sampleLog({ revision: 7, name: 'Server copy' }), lastSyncedRevision: 7 });
+    const next = await applyEdit(store, (log) => ({ ...log, notes: 'Ticked', revision: log.revision + 1 }));
+    expect(next).toMatchObject({ log: { revision: 8, name: 'Server copy', notes: 'Ticked' }, lastSyncedRevision: 7 });
+    expect(await store.load()).toEqual(next);
+  });
+
+  it('raises the revision above the stored one even if the op did not', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    await store.save({ log: sampleLog({ revision: 7 }), lastSyncedRevision: 7 });
+    expect(await applyEdit(store, (log) => ({ ...log, notes: 'x', revision: 5 }))).toMatchObject({ log: { revision: 8 } });
+  });
+
+  it('leaves the store alone when the op changes nothing or nothing is stored', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    expect(await applyEdit(store, (log) => ({ ...log, revision: log.revision + 1 }))).toBeNull();
+    await store.save({ log: sampleLog({ revision: 3 }), lastSyncedRevision: 3 });
+    expect(await applyEdit(store, (log) => log)).toMatchObject({ log: { revision: 3 } });
   });
 });

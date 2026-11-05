@@ -1,8 +1,10 @@
 // Background upload of the active workout log ("offline-lite": no PowerSync).
-// The phone's copy in the log store is the source of truth while training. The screen writes each change to the
-// store and calls push(); this module sends the whole doc to save_workout_log a second later, retries with
-// backoff while there is no signal, and survives restarts because everything it needs is in the store.
-// The app should call push() (or flushNow()) on start and whenever it comes back to the foreground.
+// The phone's copy in the log store is the source of truth while training. The screen makes every change with
+// applyEdit (log-store.ts), which builds it from the stored doc, never from React state, and then calls push().
+// This module sends the whole doc to save_workout_log a second later, retries with backoff while there is no
+// signal, and survives restarts because everything it needs is in the store.
+// The app should call push() (or flushNow()) on start and whenever it comes back to the foreground, show the doc
+// passed to onAdopt whenever the server's copy replaces the phone's, and call stop() on sign-out or a user change.
 //
 // Server contract (global-constraints "SYNC SEMANTICS"): save returns { applied, revision, status }, and
 // revision is the phone's own counter that the server never changes.
@@ -31,12 +33,20 @@ export type LogSyncDeps = {
   now?: () => number;
   /** Runs fn after ms and returns a cancel function. Defaults to setTimeout. */
   schedule?: (fn: () => void, ms: number) => () => void;
+  /**
+   * Called on every adopt, including ones during a background retry or a debounced push, with the server's doc
+   * that now replaces the phone's copy. The screen must show it: edits are built from the store, so they stay
+   * correct either way, but the screen would otherwise show an older doc.
+   */
+  onAdopt?: (doc: WorkoutLogDoc) => void;
 };
 
 export type LogSync = {
   push(): void;
   flushNow(): Promise<SyncResult>;
   status(): SyncStatus;
+  /** Cancels the timers and makes every later push or flush a no-op. For sign-out and a change of user. */
+  stop(): void;
 };
 
 export type RefusalResolution = { kind: 'push' } | { kind: 'adopt'; stored: StoredLog } | { kind: 'retry' };
@@ -74,6 +84,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
   const schedule = deps.schedule ?? defaultSchedule;
 
   let current: SyncStatus = 'synced';
+  let stopped = false;
   let failures = 0;
   let networkFailures = 0;
   let cancelDebounce: (() => void) | null = null;
@@ -83,6 +94,8 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
 
   function scheduleRetry() {
     cancelRetry?.();
+    cancelRetry = null;
+    if (stopped) return;
     const delay = RETRY_BACKOFF_MS[Math.min(failures, RETRY_BACKOFF_MS.length - 1)];
     failures += 1;
     cancelRetry = schedule(() => {
@@ -103,16 +116,19 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
   }
 
   async function run(): Promise<SyncResult> {
+    if (stopped) return { status: current, adopted: null };
     cancelRetry?.();
     cancelRetry = null;
     let adopted: WorkoutLogDoc | null = null;
     const finish = (status: SyncStatus): SyncResult => {
-      current = status;
-      return { status, adopted };
+      // A push that arrived during this run is still waiting for its debounce: not synced yet.
+      current = status === 'synced' && cancelDebounce !== null ? 'pending' : status;
+      return { status: current, adopted };
     };
 
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
+        if (stopped) return { status: current, adopted };
         const stored = await prepare();
         if (stored === null || isSynced(stored)) {
           failures = 0;
@@ -149,6 +165,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
         if (d?.kind === 'adopt') {
           adopted = d.stored.log;
           failures = 0;
+          if (!stopped) notifyAdopt(adopted);
         }
         // 'push', after adopting, or gone: go round again.
       }
@@ -162,7 +179,17 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
     }
   }
 
+  function notifyAdopt(doc: WorkoutLogDoc) {
+    try {
+      deps.onAdopt?.(doc);
+    } catch (e) {
+      // A screen error must never stop the upload.
+      console.warn(`[log-sync] onAdopt failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   function flushNow(): Promise<SyncResult> {
+    if (stopped) return Promise.resolve({ status: current, adopted: null });
     cancelDebounce?.();
     cancelDebounce = null;
     const next = queue.then(run, run);
@@ -172,6 +199,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
 
   return {
     push() {
+      if (stopped) return;
       if (current === 'synced') current = 'pending';
       cancelDebounce?.();
       cancelDebounce = schedule(() => {
@@ -181,5 +209,12 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
     },
     flushNow,
     status: () => current,
+    stop() {
+      stopped = true;
+      cancelDebounce?.();
+      cancelDebounce = null;
+      cancelRetry?.();
+      cancelRetry = null;
+    },
   };
 }

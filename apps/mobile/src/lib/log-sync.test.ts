@@ -316,4 +316,104 @@ describe('createLogSync', () => {
     );
     expect(await store.load()).toBeNull();
   });
+  it('tells the screen when a background retry adopts the server doc', async () => {
+    const store = await storeWith(sampleLog({ revision: 5 }), 4);
+    const server = sampleLog({ revision: 7, name: 'Server copy' });
+    const save = vi
+      .fn<(doc: WorkoutLogDoc) => Promise<SaveLogResult>>()
+      .mockRejectedValueOnce(networkError())
+      .mockResolvedValue({ applied: false, revision: 7, status: 'in_progress' });
+    const onAdopt = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onAdopt });
+    sync.push(); // debounced, so the screen never sees a flushNow result for any of this
+    await vi.advanceTimersByTimeAsync(SYNC_DEBOUNCE_MS);
+    expect(onAdopt).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]);
+    expect(onAdopt).toHaveBeenCalledTimes(1);
+    expect(onAdopt).toHaveBeenCalledWith(server);
+    expect(await store.load()).toEqual({ log: server, lastSyncedRevision: 7 });
+  });
+
+  it('keeps syncing when the screen throws from onAdopt', async () => {
+    const store = await storeWith(sampleLog({ revision: 5 }), 4);
+    const server = sampleLog({ revision: 7 });
+    const sync = createLogSync({
+      save: vi.fn((): Promise<SaveLogResult> => Promise.resolve({ applied: false, revision: 7, status: 'in_progress' })),
+      fetchLog: vi.fn(() => Promise.resolve(server)),
+      store,
+      onAdopt: () => {
+        throw new Error('screen bug');
+      },
+    });
+    expect(await sync.flushNow()).toEqual({ status: 'synced', adopted: server });
+  });
+
+  it('pushes when the phone moved on while a refused save was fetching the server doc', async () => {
+    const store = await storeWith(sampleLog({ revision: 6 }), 5);
+    let resolveFetch: (doc: WorkoutLogDoc) => void = () => undefined;
+    const fetchLog = vi.fn(() => new Promise<WorkoutLogDoc | null>((r) => (resolveFetch = r)));
+    const save = vi
+      .fn<(doc: WorkoutLogDoc) => Promise<SaveLogResult>>()
+      .mockResolvedValueOnce({ applied: false, revision: 6, status: 'in_progress' })
+      .mockImplementation((doc) => Promise.resolve(applied(doc)));
+    const onAdopt = vi.fn();
+    const sync = createLogSync({ save, fetchLog, store, onAdopt });
+
+    const flushing = sync.flushNow();
+    await vi.waitFor(() => expect(fetchLog).toHaveBeenCalled());
+    await store.update((s) => (s ? { ...s, log: { ...s.log, revision: 7, notes: 'Ticked meanwhile' } } : s));
+    resolveFetch(sampleLog({ revision: 6 }));
+
+    expect(await flushing).toEqual({ status: 'synced', adopted: null });
+    expect(onAdopt).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ revision: 7, notes: 'Ticked meanwhile' }));
+    expect(await store.load()).toMatchObject({ log: { revision: 7 }, lastSyncedRevision: 7 });
+  });
+
+  it('stays pending, not synced, while a push that arrived during a save waits for its debounce', async () => {
+    const store = await storeWith(sampleLog({ revision: 1 }));
+    const { save, calls } = deferredSave();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+    const flushing = sync.flushNow();
+    await vi.advanceTimersByTimeAsync(0);
+    sync.push();
+    calls[0].resolve(applied(calls[0].doc));
+    expect((await flushing).status).toBe('pending');
+    expect(sync.status()).toBe('pending');
+    await vi.advanceTimersByTimeAsync(SYNC_DEBOUNCE_MS);
+    expect(sync.status()).toBe('synced');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('stop() cancels waiting pushes and retries and makes later calls do nothing', async () => {
+    const store = await storeWith(sampleLog({ revision: 2 }));
+    const save = vi.fn(() => Promise.reject(networkError()));
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+
+    sync.push();
+    sync.stop();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(save).toHaveBeenCalledTimes(0);
+
+    sync.push();
+    expect(await sync.flushNow()).toEqual({ status: 'pending', adopted: null });
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(save).toHaveBeenCalledTimes(0);
+    expect(await store.load()).toMatchObject({ log: { revision: 2 }, lastSyncedRevision: 0 });
+  });
+
+  it('stop() during a failing save leaves no retry behind', async () => {
+    const store = await storeWith(sampleLog({ revision: 2 }));
+    let rejectSave: (e: Error) => void = () => undefined;
+    const save = vi.fn(() => new Promise<SaveLogResult>((_r, reject) => (rejectSave = reject)));
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+    const flushing = sync.flushNow();
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    sync.stop();
+    rejectSave(networkError());
+    await flushing;
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
 });

@@ -72,3 +72,18 @@ export function createLogStore(storage: KeyValueStorage, userId: string): LogSto
       }),
   };
 }
+
+/**
+ * Makes one edit to the stored log. The edit is always built from the stored doc (never from screen state)
+ * with an op from packages/shared, so a server doc adopted meanwhile is edited rather than overwritten, and the
+ * revision always rises above the stored one so the sync sends it. Returns the new stored log, or null when
+ * no log is stored (the edit is then dropped). Call push() on the sync afterwards.
+ */
+export function applyEdit(store: LogStore, op: (log: WorkoutLogDoc) => WorkoutLogDoc): Promise<StoredLog | null> {
+  return store.update((s) => {
+    if (s === null) return null;
+    const next = op(s.log);
+    if (next === s.log) return s;
+    return { ...s, log: next.revision > s.log.revision ? next : { ...next, revision: s.log.revision + 1 } };
+  });
+}
