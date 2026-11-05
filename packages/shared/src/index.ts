@@ -99,3 +99,13 @@ export {
   programStartError,
   scheduleDateError,
 } from './programs/date-rules';
+export {
+  LOG_STATUSES,
+  LogBlockDoc,
+  LogExerciseDoc,
+  LogSetDoc,
+  LogSetTarget,
+  WorkoutLogDoc,
+} from './logs/schema';
+export type { LogStatus } from './logs/schema';
+export { emptyLog, prefillActuals, startLogFromWorkout } from './logs/start';
