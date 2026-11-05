@@ -37,3 +37,27 @@ export {
   passwordBytes,
 } from './invites/accept';
 export type { AcceptInviteReason } from './invites/accept';
+export {
+  KG_PER_LB,
+  M_PER_MILE,
+  distanceUnitFor,
+  formatDistance,
+  formatDuration,
+  formatWeight,
+  fromKg,
+  toKg,
+  toMeters,
+} from './units/units';
+export type { DistanceUnit, Units } from './units/units';
+export {
+  IsoDateSchema,
+  addDays,
+  diffDays,
+  isoWeekday,
+  localToday,
+  monthGrid,
+  programDayToDate,
+  programEndDate,
+  startOfWeek,
+} from './dates/dates';
+export type { IsoDate } from './dates/dates';
