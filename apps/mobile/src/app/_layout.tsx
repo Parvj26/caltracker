@@ -34,6 +34,8 @@ function RootStack() {
       </Stack.Protected>
       <Stack.Screen name="index" />
       <Stack.Screen name="auth/confirmed" />
+      {/* Reachable signed in or out: it handles both (see the screen). */}
+      <Stack.Screen name="invite/[token]" />
     </Stack>
   );
 }
