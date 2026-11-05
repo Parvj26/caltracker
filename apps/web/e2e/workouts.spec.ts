@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { COACH_EMAIL, pickExercise, serviceClient, setRow, signInAsCoach } from './helpers';
+import { pickExercise, serviceClient, setRow, signInAsCoach } from './helpers';
 
-// Workout library and builder (phase 2 Task 14). The pounds test changes the demo coach's units, so this file runs
-// its tests one after another, never alongside each other.
-test.describe.configure({ mode: 'serial' });
+// Workout library and builder (phase 2 Task 14). The pounds test uses its own coach in its own workspace, so it never
+// changes the shared demo coach's units while other files run alongside it.
 
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -91,24 +90,44 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
 });
 
 test.describe('pounds round trip', () => {
-  let coachId: string;
+  const email = `lb-coach-${unique()}@example.test`;
+  const password = 'lb-coach-password-123';
   const name = `Pounds ${unique()}`;
+  let coachId: string | undefined;
+  let workspaceId: string | undefined;
 
   test.beforeAll(async () => {
-    const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
-    if (error) throw error;
-    coachId = data.users.find((u) => u.email === COACH_EMAIL)!.id;
-    const r = await admin.from('profiles').update({ units: 'lb' }).eq('id', coachId);
-    if (r.error) throw r.error;
+    const user = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { first_name: 'Pound', last_name: 'Coach' },
+    });
+    if (user.error) throw user.error;
+    coachId = user.data.user.id;
+    const ws = await admin.from('workspaces').insert({ name: `Pounds Gym ${unique()}` }).select('id').single();
+    if (ws.error) throw ws.error;
+    workspaceId = ws.data.id;
+    const member = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: coachId, role: 'owner' });
+    if (member.error) throw member.error;
+    const units = await admin.from('profiles').update({ units: 'lb' }).eq('id', coachId);
+    if (units.error) throw units.error;
   });
 
   test.afterAll(async () => {
-    await admin.from('profiles').update({ units: 'kg' }).eq('id', coachId);
-    await admin.from('workouts').delete().eq('name', name);
+    if (workspaceId) {
+      await admin.from('workouts').delete().eq('workspace_id', workspaceId);
+      await admin.from('workspaces').delete().eq('id', workspaceId);
+    }
+    if (coachId) await admin.auth.admin.deleteUser(coachId);
   });
 
   test('135 lb is still 135 lb after save and reload', async ({ page }) => {
-    await signInAsCoach(page);
+    await page.goto('/sign-in');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/clients$/);
     await page.goto('/workouts/new');
     await page.getByLabel('Workout name').fill(name);
     await pickExercise(page, '+ Exercise', 'Barbell Squat');

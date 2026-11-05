@@ -20,7 +20,7 @@ export default async function globalSetup() {
     env: process.env,
   });
 
-  // An interrupted pounds test (workouts.spec.ts) could leave the shared demo coach in lb; every run starts in kg.
+  // Every run starts with the shared demo coach in kg (the pounds test uses its own coach, but a manual change could stick).
   const admin = createClient<Database>(env.API_URL!, env.SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
