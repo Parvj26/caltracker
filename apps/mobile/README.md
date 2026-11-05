@@ -107,3 +107,14 @@ It checks the Today and Workouts tabs and the calendar. Run just this flow with
 `pnpm --filter mobile exec maestro test .maestro/calendar.yaml`.
 
 `pnpm check` (typecheck, lint, test) needs neither Supabase nor a simulator.
+
+## Workout logging flows
+
+Clients start today's workout, tick sets (a rest timer runs between sets), and finish to see a summary. Closing the app mid-workout offers Resume on reopen. A workout left open is finished automatically by a `pg_cron` job in the database.
+
+New Maestro flows in `.maestro/`:
+- `log-workout.yaml`: start, tick sets, finish and see the summary.
+- `log-resume.yaml`: leave mid-workout, reopen and resume.
+- `log-unplanned.yaml`: log a workout that was not on the calendar.
+
+They need the built-in exercises (`pnpm import:exercises`) and run with the rest through `bash scripts/run-e2e.sh`.

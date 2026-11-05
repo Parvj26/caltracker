@@ -28,3 +28,10 @@ eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
 SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY pnpm import:exercises
 ```
 The staging smoke test (`pnpm --filter web test:e2e:staging`) also opens `/workouts` and `/programs` when `STAGING_SMOKE_COACH_*` is set.
+
+## Workout logging (coach side)
+
+- `/activity`: recent client workouts. Open one to see planned vs. actual, add a comment, and correct a typo in a logged set.
+- Clients log from the phone app. Any workout still open after a long idle time is finished automatically by a `pg_cron` job (migration `20261105000900_log_auto_finish.sql`); check it with `select * from cron.job;`.
+- Playwright runs with 2 workers (set in `playwright.config.ts`), because more workers exhaust the local auth container.
+- The staging smoke test also opens `/activity` when `STAGING_SMOKE_COACH_*` is set.
