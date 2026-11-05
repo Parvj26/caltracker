@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatDistance, formatDuration, formatWeight, fromKg, toKg, toMeters } from '../../src/units/units';
+import {
+  formatClock,
+  formatDistance,
+  formatDuration,
+  formatWeight,
+  fromKg,
+  fromMeters,
+  parseClock,
+  toKg,
+  toMeters,
+} from '../../src/units/units';
 
 describe('weight', () => {
   it('converts 135 lb to 61.235 kg and back', () => {
@@ -37,5 +47,43 @@ describe('formatDuration', () => {
     expect(formatDuration(45)).toBe('45 s');
     expect(formatDuration(90)).toBe('1:30');
     expect(formatDuration(3600)).toBe('1:00:00');
+  });
+});
+
+describe('fromMeters', () => {
+  it('converts metres to km or miles, rounded to 2 decimals', () => {
+    expect(fromMeters(2500, 'km')).toBe(2.5);
+    expect(fromMeters(1609.34, 'mi')).toBe(1);
+    expect(fromMeters(5000, 'mi')).toBe(3.11);
+  });
+  it('round trips what toMeters stored', () => {
+    for (const v of [0.01, 0.5, 1, 3.1, 10, 42.2]) {
+      expect(fromMeters(toMeters(v, 'km'), 'km')).toBe(v);
+      expect(fromMeters(toMeters(v, 'mi'), 'mi')).toBe(v);
+    }
+  });
+});
+
+describe('clock durations', () => {
+  it('formats seconds as m:ss or h:mm:ss', () => {
+    expect(formatClock(0)).toBe('0:00');
+    expect(formatClock(45)).toBe('0:45');
+    expect(formatClock(90)).toBe('1:30');
+    expect(formatClock(3725)).toBe('1:02:05');
+  });
+  it('parses plain seconds, m:ss and h:mm:ss', () => {
+    expect(parseClock('90')).toBe(90);
+    expect(parseClock(' 1:30 ')).toBe(90);
+    expect(parseClock('0:45')).toBe(45);
+    expect(parseClock('1:02:05')).toBe(3725);
+    expect(parseClock('2:')).toBe(120);
+  });
+  it('returns null for blank text and NaN for text it cannot read', () => {
+    expect(parseClock('')).toBeNull();
+    expect(parseClock('  ')).toBeNull();
+    expect(parseClock('abc')).toBeNaN();
+    expect(parseClock('1:75')).toBeNaN();
+    expect(parseClock('-5')).toBeNaN();
+    expect(parseClock('1.5')).toBeNaN();
   });
 });

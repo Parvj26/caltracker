@@ -53,6 +53,12 @@ describe('WorkoutDoc', () => {
     expect(r.name).toBe('Upper A');
   });
 
+  it('asks for a name when it is blank', () => {
+    expect(messages({ ...doc([block('straight', [exercise([set()])])]), name: '   ' })).toEqual([
+      { message: 'Enter a name.', path: ['name'] },
+    ]);
+  });
+
   it('requires at least one block', () => {
     expect(messages(doc([])).map((m) => m.message)).toContain('Add at least one exercise.');
   });

@@ -64,7 +64,7 @@ const SET_FIELDS_BY_TARGET: ReadonlyArray<{ field: TargetField; keys: ReadonlyAr
 export const WorkoutDoc = z
   .object({
     id: z.uuid(),
-    name: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1, 'Enter a name.').max(100, 'Keep the name to 100 characters.'),
     notes: z.string().max(2000).nullable(),
     blocks: z.array(WorkoutBlockDoc).min(1, 'Add at least one exercise.').max(30),
   })

@@ -41,10 +41,13 @@ export {
   KG_PER_LB,
   M_PER_MILE,
   distanceUnitFor,
+  formatClock,
   formatDistance,
   formatDuration,
   formatWeight,
   fromKg,
+  fromMeters,
+  parseClock,
   toKg,
   toMeters,
 } from './units/units';
@@ -64,6 +67,8 @@ export type { IsoDate } from './dates/dates';
 export { BLOCK_KINDS, SET_TYPES, WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } from './workouts/schema';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
+export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
+export type { WorkoutTreeRow, WorkoutTreeSetRow } from './workouts/tree';
 export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget } from './workouts/targets';
 export {
   addDrop,

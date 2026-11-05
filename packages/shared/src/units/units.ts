@@ -37,6 +37,11 @@ export function toMeters(value: number, unit: DistanceUnit): number {
   return round(unit === 'km' ? value * 1000 : value * M_PER_MILE, 2);
 }
 
+/** Converts stored metres to km or miles for an input, rounded to 2 decimals. */
+export function fromMeters(m: number, unit: DistanceUnit): number {
+  return round(unit === 'km' ? m / 1000 : m / M_PER_MILE, 2);
+}
+
 export function formatDistance(m: number, units: Units): string {
   if (units === 'kg') {
     return m < 1000 ? `${trim(m, 2)} m` : `${trim(m / 1000, 2)} km`;
@@ -53,4 +58,27 @@ export function formatDuration(seconds: number): string {
   const ss = String(s).padStart(2, '0');
   if (h === 0) return `${m}:${ss}`;
   return `${h}:${String(m).padStart(2, '0')}:${ss}`;
+}
+
+/** Seconds as a clock for inputs: '0:45', '1:30', '1:02:05'. */
+export function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const ss = String(total % 60).padStart(2, '0');
+  return h === 0 ? `${m}:${ss}` : `${h}:${String(m).padStart(2, '0')}:${ss}`;
+}
+
+/**
+ * Reads '90', '1:30' or '1:02:05' as seconds. Blank text is null (no value); text it cannot read is NaN.
+ * Minutes and seconds after the first part must be below 60.
+ */
+export function parseClock(text: string): number | null {
+  const t = text.trim();
+  if (t === '') return null;
+  const parts = t.split(':');
+  if (parts.length > 3 || !parts.every((p, i) => /^\d*$/.test(p) && (i === 0 ? p !== '' : true))) return NaN;
+  const nums = parts.map((p) => (p === '' ? 0 : Number(p)));
+  if (nums.slice(1).some((n) => n >= 60)) return NaN;
+  return nums.reduce((acc, n) => acc * 60 + n, 0);
 }
