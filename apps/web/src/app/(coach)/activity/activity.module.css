@@ -1,0 +1,50 @@
+/* Activity feed. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall (--ct-tap-min). */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
+
+.titleRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2) var(--ct-space-3); }
+.titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+
+.filter { display: flex; align-items: flex-end; gap: var(--ct-space-2); margin-left: auto; }
+
+.smallButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.smallButton:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+
+.listCard { padding: var(--ct-space-2) var(--ct-space-4-5); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  padding: var(--ct-space-2-5) var(--ct-space-2);
+  text-align: left;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+}
+.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.table td:first-child, .table th:first-child { padding-left: 0; }
+.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.workoutCell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
+.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
+
+.pager { display: flex; align-items: center; gap: var(--ct-space-3); }

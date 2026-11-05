@@ -88,3 +88,78 @@ export async function createProgram(
   }
   if (slots.length > 0) await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 }
+
+export type SeedLogOptions = {
+  workspaceId: string;
+  clientId: string;
+  name: string;
+  /** The planned (client calendar) workout this log follows; omit for an unplanned log. */
+  plannedWorkoutId?: string | null;
+  status?: 'in_progress' | 'completed' | 'discarded';
+  /** ISO timestamps. A completed log needs finishedAt. */
+  startedAt: string;
+  finishedAt?: string | null;
+  autoFinished?: boolean;
+  /** Completed sets of Barbell Squat at `weightKg` x `reps` (default 3 at 60 x 8 = 1,440 kg). */
+  sets?: number;
+  weightKg?: number;
+  reps?: number;
+};
+
+/**
+ * Inserts a finished (or in-progress, or discarded) workout log with one Barbell Squat exercise, straight into the
+ * tables with the service role (the phone's save_workout_log needs the client's own session). Returns the log id;
+ * delete it with `admin.from('workout_logs').delete().eq('id', id)` (the tree goes with it).
+ */
+export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions): Promise<string> {
+  const status = o.status ?? 'completed';
+  const sets = o.sets ?? 3;
+  const finishedAt = o.finishedAt ?? (status === 'in_progress' ? null : o.startedAt);
+  const exercise = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
+  if (exercise.error) throw exercise.error;
+
+  const log = await admin
+    .from('workout_logs')
+    .insert({
+      workspace_id: o.workspaceId,
+      client_id: o.clientId,
+      workout_id: o.plannedWorkoutId ?? null,
+      name: o.name,
+      status,
+      started_at: o.startedAt,
+      finished_at: finishedAt,
+      last_activity_at: finishedAt ?? o.startedAt,
+      auto_finished: o.autoFinished ?? false,
+    })
+    .select('id')
+    .single();
+  if (log.error) throw log.error;
+  const logId = log.data.id;
+
+  const block = await admin.from('log_blocks').insert({ log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0 }).select('id').single();
+  if (block.error) throw block.error;
+  const ex = await admin
+    .from('log_exercises')
+    .insert({ block_id: block.data.id, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0, exercise_id: exercise.data.id })
+    .select('id')
+    .single();
+  if (ex.error) throw ex.error;
+  if (sets > 0) {
+    const rows = Array.from({ length: sets }, (_, position) => ({
+      log_exercise_id: ex.data.id,
+      log_id: logId,
+      workspace_id: o.workspaceId,
+      client_id: o.clientId,
+      position,
+      target_reps_min: 8,
+      target_reps_max: 8,
+      target_weight_kg: o.weightKg ?? 60,
+      actual_reps: o.reps ?? 8,
+      actual_weight_kg: o.weightKg ?? 60,
+      completed_at: finishedAt ?? o.startedAt,
+    }));
+    const inserted = await admin.from('log_sets').insert(rows);
+    if (inserted.error) throw inserted.error;
+  }
+  return logId;
+}

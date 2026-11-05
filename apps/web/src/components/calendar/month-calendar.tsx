@@ -25,7 +25,16 @@ import { cx } from '@/components/ui/cx';
 import { formatLongDay, formatMonth, formatShortDay, shiftMonth } from './format';
 import styles from './calendar.module.css';
 
-export type CalendarItem = { id: string; name: string; programName: string | null };
+export type CalendarItem = {
+  id: string;
+  name: string;
+  programName: string | null;
+  /**
+   * The finished log of this planned workout: a string once done, null when none is finished, absent when the
+   * calendar doesn't track logging. Matched by the planned workout, never by the log's finish date.
+   */
+  logId?: string | null;
+};
 
 type Props = {
   /** "YYYY-MM". */
@@ -38,6 +47,8 @@ type Props = {
    * before `editableFrom`, so the controls can offer less there.
    */
   renderItem: (item: CalendarItem, date: IsoDate, editable: boolean) => ReactNode;
+  /** Where an item's finished log lives, for its "✓" link. */
+  logHref?: (logId: string) => string;
   /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
@@ -79,7 +90,7 @@ const announcements: Announcements = {
  * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
  * button and the item controls from renderItem are the non-drag path.
  */
-export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay, editableFrom }: Props) {
+export function MonthCalendar({ month, days, today, renderItem, logHref, onDropItem, onAddToDay, editableFrom }: Props) {
   const pathname = usePathname();
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
@@ -145,6 +156,8 @@ export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAd
                           isToday={date === today}
                           draggable={draggable && editable}
                           renderItem={renderItem}
+                          logHref={logHref}
+                          today={today}
                           editable={editable}
                           {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
                         />
@@ -172,9 +185,13 @@ function DayCell({
   draggable,
   editable,
   renderItem,
+  logHref,
+  today,
   onAdd,
 }: {
   date: IsoDate;
+  today: IsoDate | null;
+  logHref: Props['logHref'];
   items: CalendarItem[];
   inMonth: boolean;
   isToday: boolean;
@@ -205,6 +222,8 @@ function DayCell({
               draggable={draggable}
               editable={editable}
               renderItem={renderItem}
+              logHref={logHref}
+              missed={item.logId === null && today !== null && date < today}
             />
           ))}
         </ul>
@@ -235,8 +254,13 @@ function DayItem({
   draggable,
   editable,
   renderItem,
+  logHref,
+  missed,
 }: {
   item: CalendarItem;
+  logHref: Props['logHref'];
+  /** Planned, its day has passed (in the viewer's zone) and no finished log. */
+  missed: boolean;
   date: IsoDate;
   draggable: boolean;
   editable: boolean;
@@ -245,7 +269,7 @@ function DayItem({
   const data: DragData = { item, from: date };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
   return (
-    <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging)}>
+    <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed)}>
       <div className={styles.itemRow}>
         {draggable ? (
           <button
@@ -262,8 +286,14 @@ function DayItem({
           // Read-only calendar: the name is plain text.
           <span className={styles.itemHandle}>{item.name}</span>
         )}
+        {item.logId && logHref ? (
+          <Link href={logHref(item.logId)} className={styles.doneLink} aria-label={`Done: view the ${item.name} log`} title="Done">
+            <span aria-hidden="true">✓</span>
+          </Link>
+        ) : null}
         {renderItem(item, date, editable)}
       </div>
+      {missed ? <span className={styles.missedNote}>Missed</span> : null}
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
     </li>
   );

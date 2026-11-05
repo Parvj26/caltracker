@@ -34,6 +34,11 @@ export const NAV_ICONS = {
       <path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H19M9 8.5h6" />
     </Icon>
   ),
+  activity: (
+    <Icon>
+      <path d="M3 12h4l3-7 4 14 3-7h4" />
+    </Icon>
+  ),
   signOut: (
     <Icon>
       <path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16.5 14.5 12 10 7.5M14.5 12H4" />
