@@ -55,3 +55,36 @@ export async function createWorkout(page: Page, name: string): Promise<void> {
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
   await expect(page.getByText('Saved')).toBeVisible();
 }
+
+/** One day of the program grid, e.g. programCell(page, 1, 4) is "Week 1, Day 4". */
+export function programCell(page: Page, week: number, day: number): Locator {
+  return page.getByRole('group', { name: `Week ${week}, Day ${day}`, exact: true });
+}
+
+/**
+ * Creates a program through the UI, then puts library workouts on it with each cell's "+" button (the keyboard and
+ * touch path). Ends on the program page with every change saved.
+ */
+export async function createProgram(
+  page: Page,
+  name: string,
+  weeks: number,
+  slots: { week: number; day: number; workoutName: string }[],
+): Promise<void> {
+  await page.goto('/programs/new');
+  await page.getByLabel('Program name').fill(name);
+  await page.getByLabel('Weeks', { exact: true }).fill(String(weeks));
+  await page.getByRole('button', { name: 'Create program' }).click();
+  await expect(page).toHaveURL(/\/programs\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+
+  for (const slot of slots) {
+    await page.getByRole('button', { name: `Add a workout to week ${slot.week}, day ${slot.day}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Add a workout to Week ${slot.week}, Day ${slot.day}` });
+    await dialog.getByLabel('Search workouts').fill(slot.workoutName);
+    await dialog.getByRole('button', { name: slot.workoutName, exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(programCell(page, slot.week, slot.day).getByRole('button', { name: slot.workoutName, exact: true })).toBeVisible();
+  }
+  if (slots.length > 0) await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+}
