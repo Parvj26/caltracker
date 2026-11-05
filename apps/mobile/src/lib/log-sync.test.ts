@@ -412,6 +412,25 @@ describe('createLogSync', () => {
     expect(await store.load()).toMatchObject({ log: { revision: 2 }, lastSyncedRevision: 0 });
   });
 
+  it('stop() while a pending log uploads never sends the active log under the next sign-in', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    const finished = sampleLog({ revision: 3, status: 'completed', finishedAt: '2026-11-05T10:00:00.000Z' });
+    await store.save({ log: finished, lastSyncedRevision: 0 });
+    await store.park();
+    const active = sampleLog({ id: '00000000-0000-4000-8000-000000000999', revision: 2 });
+    await store.save({ log: active, lastSyncedRevision: 0 });
+    const { save, calls } = deferredSave();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+    const flushing = sync.flushNow();
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].doc.id).toBe(finished.id);
+    sync.stop(); // signed out while the pending upload is on the wire
+    calls[0].resolve(applied(calls[0].doc));
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(calls).toHaveLength(1); // the active log was never sent
+    await flushing;
+  });
+
   it('stop() during a failing save leaves no retry behind', async () => {
     const store = await storeWith(sampleLog({ revision: 2 }));
     let rejectSave: (e: Error) => void = () => undefined;

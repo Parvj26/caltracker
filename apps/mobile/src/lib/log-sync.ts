@@ -182,6 +182,8 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
 
   /** save(), with the not-a-client refusal as a value instead of an error. */
   async function send(doc: WorkoutLogDoc): Promise<SaveLogResult | 'gone'> {
+    // Never upload after stop(): a save now would go out under whoever is signed in next.
+    if (stopped) throw new Error('log sync stopped');
     try {
       return await save(doc);
     } catch (e) {
@@ -253,6 +255,8 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
           scheduleRetry();
           return finish('pending');
         }
+        // Signed out while the pending list was uploading: the shared client may already belong to the next user.
+        if (stopped) return { status: current, adopted };
         const stored = await prepare();
         const recheck = recheckNext && stored !== null && stored.log.status === 'in_progress';
         recheckNext = false;
