@@ -25,9 +25,14 @@ export default function SummaryScreen() {
   const router = useRouter();
   const { text, space, radius } = useTheme();
   const units = useUnits();
-  const { finishedLog, log: active, reopen } = useActiveLog();
+  const { finishedLog, log: active, pending, reopen } = useActiveLog();
+  // The phone's own copy first (it works with no signal): just finished, or still waiting to upload.
   const local =
-    finishedLog?.id === id ? finishedLog : active?.id === id && active.status === 'completed' ? active : null;
+    finishedLog?.id === id
+      ? finishedLog
+      : active?.id === id && active.status === 'completed'
+        ? active
+        : (pending.find((p) => p.id === id && p.status === 'completed') ?? null);
 
   const [remote, setRemote] = useState<Remote>({ kind: 'loading' });
   const [comments, setComments] = useState<Comments>({ kind: 'loading' });

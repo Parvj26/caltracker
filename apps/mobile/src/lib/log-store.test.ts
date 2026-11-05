@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { memoryStorage, sampleLog } from './log-fixtures';
-import { applyEdit, createLogStore, logStoreKey } from './log-store';
+import { applyEdit, applyLiveEdit, createLogStore, logStoreKey, parkAction } from './log-store';
 
 describe('createLogStore', () => {
   it('returns an equal log after storing it, under the per-user key', async () => {
@@ -19,18 +19,21 @@ describe('createLogStore', () => {
     expect(await createLogStore(memoryStorage(), 'user-1').load()).toBeNull();
   });
 
-  it('returns null for a corrupt value and removes it', async () => {
+  it('returns null for a corrupt value and keeps it aside, never deleting it', async () => {
     const storage = memoryStorage();
     storage.map.set('caltracker.activeLog.user-1', '{not json');
     expect(await createLogStore(storage, 'user-1').load()).toBeNull();
     expect(storage.map.has('caltracker.activeLog.user-1')).toBe(false);
+    expect(storage.map.get('caltracker.activeLog.user-1.corrupt')).toBe('{not json');
   });
 
-  it('treats a value that is JSON but not a stored log as corrupt', async () => {
+  it('treats a value that is JSON but not a stored log as corrupt, and keeps it', async () => {
     const storage = memoryStorage();
-    storage.map.set('caltracker.activeLog.user-1', JSON.stringify({ log: { id: 'x' }, lastSyncedRevision: 0 }));
+    const raw = JSON.stringify({ log: { id: 'x' }, lastSyncedRevision: 0 });
+    storage.map.set('caltracker.activeLog.user-1', raw);
     expect(await createLogStore(storage, 'user-1').load()).toBeNull();
     expect(storage.map.has('caltracker.activeLog.user-1')).toBe(false);
+    expect(storage.map.get('caltracker.activeLog.user-1.corrupt')).toBe(raw);
   });
 
   it('clears the stored log', async () => {
@@ -75,5 +78,93 @@ describe('applyEdit', () => {
     expect(await applyEdit(store, (log) => ({ ...log, revision: log.revision + 1 }))).toBeNull();
     await store.save({ log: sampleLog({ revision: 3 }), lastSyncedRevision: 3 });
     expect(await applyEdit(store, (log) => log)).toMatchObject({ log: { revision: 3 } });
+  });
+});
+
+describe('parkAction', () => {
+  it('keeps nothing, a log in progress, or a finished log already uploaded', () => {
+    expect(parkAction(null)).toBe('keep');
+    expect(parkAction({ log: sampleLog({ revision: 4 }), lastSyncedRevision: 1 })).toBe('keep');
+    expect(parkAction({ log: sampleLog({ status: 'completed', revision: 4 }), lastSyncedRevision: 4 })).toBe('keep');
+  });
+
+  it('parks a finished or discarded log waiting to upload, and drops a discard the server never saw', () => {
+    expect(parkAction({ log: sampleLog({ status: 'completed', revision: 4 }), lastSyncedRevision: 0 })).toBe('park');
+    expect(parkAction({ log: sampleLog({ status: 'discarded', revision: 4 }), lastSyncedRevision: 2 })).toBe('park');
+    expect(parkAction({ log: sampleLog({ status: 'discarded', revision: 2 }), lastSyncedRevision: 0 })).toBe('drop');
+  });
+});
+
+describe('park and the pending list', () => {
+  const finished = (n: number, revision = 3) =>
+    sampleLog({ id: `00000000-0000-4000-8000-0000000009${String(n).padStart(2, '0')}`, status: 'completed', revision });
+
+  it('moves a finished log waiting to upload to the pending list and frees the active slot, keeping its sets', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    const log = finished(1);
+    await store.save({ log, lastSyncedRevision: 1 });
+    expect(await store.park()).toBeNull();
+    expect(await store.load()).toBeNull();
+    expect(await store.loadPending()).toEqual([{ log, lastSyncedRevision: 1 }]);
+    // Survives a restart.
+    expect(await createLogStore(storage, 'user-1').loadPending()).toEqual([{ log, lastSyncedRevision: 1 }]);
+  });
+
+  it('keeps several, oldest first, replaces a log already pending, and removes one by id', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    await store.save({ log: finished(1), lastSyncedRevision: 0 });
+    await store.park();
+    await store.save({ log: finished(2), lastSyncedRevision: 0 });
+    await store.park();
+    // The same log again (the app died between the two writes of an earlier park).
+    await store.save({ log: finished(1, 4), lastSyncedRevision: 0 });
+    await store.park();
+    expect((await store.loadPending()).map((p) => [p.log.id, p.log.revision])).toEqual([
+      [finished(2).id, 3],
+      [finished(1).id, 4],
+    ]);
+    await store.removePending(finished(2).id);
+    expect((await store.loadPending()).map((p) => p.log.id)).toEqual([finished(1).id]);
+    await store.removePending(finished(1).id);
+    expect(await store.loadPending()).toEqual([]);
+  });
+
+  it('drops a discarded log the server never saw, and leaves a log in progress where it is', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    await store.save({ log: sampleLog({ status: 'discarded', revision: 2 }), lastSyncedRevision: 0 });
+    expect(await store.park()).toBeNull();
+    expect(await store.loadPending()).toEqual([]);
+    const live = { log: sampleLog({ revision: 2 }), lastSyncedRevision: 0 };
+    await store.save(live);
+    expect(await store.park()).toEqual(live);
+    expect(await store.load()).toEqual(live);
+  });
+
+  it('keeps the latest rejected copy under its own key', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    await store.keepRejected(sampleLog({ name: 'First' }));
+    await store.keepRejected(sampleLog({ name: 'Second' }));
+    const kept = JSON.parse(storage.map.get('caltracker.activeLog.user-1.rejected') ?? '{}') as { log?: { name?: string } };
+    expect(kept.log?.name).toBe('Second');
+  });
+});
+
+describe('applyLiveEdit', () => {
+  it('edits a log in progress', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    await store.save({ log: sampleLog({ revision: 3 }), lastSyncedRevision: 3 });
+    expect(await applyLiveEdit(store, (log) => ({ ...log, notes: 'x', revision: log.revision + 1 }))).toMatchObject({
+      log: { notes: 'x', revision: 4 },
+    });
+  });
+
+  it('refuses an edit once the stored log is finished, e.g. an untick just after an automatic finish', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    const done = { log: sampleLog({ status: 'completed', autoFinished: true, revision: 5 }), lastSyncedRevision: 4 };
+    await store.save(done);
+    expect(await applyLiveEdit(store, (log) => ({ ...log, notes: 'x', revision: log.revision + 1 }))).toEqual(done);
+    expect(await store.load()).toEqual(done);
   });
 });

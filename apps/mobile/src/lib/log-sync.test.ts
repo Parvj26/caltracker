@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AUTO_FINISH_IDLE_MS, type WorkoutLogDoc } from '@caltracker/shared';
 import { memoryStorage, sampleLog } from './log-fixtures';
 import { createLogStore, type LogStore } from './log-store';
-import { RETRY_BACKOFF_MS, SYNC_DEBOUNCE_MS, createLogSync, resolveRefusal, type SaveLogResult } from './log-sync';
+import {
+  NOT_A_CLIENT,
+  RETRY_BACKOFF_MS,
+  SYNC_DEBOUNCE_MS,
+  createLogSync,
+  isNotAClient,
+  lostCompletedSets,
+  resolveRefusal,
+  type SaveLogResult,
+} from './log-sync';
 
 const networkError = () => new TypeError('Network request failed');
 const applied = (doc: WorkoutLogDoc): SaveLogResult => ({ applied: true, revision: doc.revision, status: doc.status });
@@ -444,5 +453,241 @@ describe('onStatus', () => {
     sync.push();
     await sync.flushNow();
     expect(seen).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Final review fixes: removed clients (I1), refusals that would drop ticked sets (I2), the pending list (I3).
+
+/** What log-api throws for save_workout_log's 42501 with hint 'not_a_client'. */
+const notAClient = () =>
+  Object.assign(new Error('save_workout_log: Only a current client of this coach can save workouts.'), {
+    code: '42501',
+    hint: NOT_A_CLIENT,
+  });
+const sid = (n: number) => `00000000-0000-4000-8000-0000000005${String(n).padStart(2, '0')}`;
+/** The sample log with sets 0..n-1 in its one exercise, the given ones ticked. */
+function withTicked(over: Partial<WorkoutLogDoc>, sets: number, ticked: number[]): WorkoutLogDoc {
+  const log = sampleLog(over);
+  const ex = log.blocks[0].exercises[0];
+  const proto = ex.sets[0];
+  ex.sets = Array.from({ length: sets }, (_, i) => ({
+    ...proto,
+    id: sid(i),
+    completedAt: ticked.includes(i) ? '2026-11-05T09:10:00.000Z' : null,
+  }));
+  return log;
+}
+const rejectedCopy = (storage: Map<string, string>) =>
+  (JSON.parse(storage.get('caltracker.activeLog.user-1.rejected') ?? 'null') as { log: WorkoutLogDoc } | null)?.log ?? null;
+
+describe('lostCompletedSets', () => {
+  it('lists the sets ticked on the phone that the server copy lacks or has not ticked', () => {
+    const local = withTicked({}, 4, [0, 1, 3]);
+    const server = withTicked({}, 3, [0]);
+    expect(lostCompletedSets(local, server)).toEqual([sid(1), sid(3)]);
+  });
+
+  it('is empty when the server has every ticked set (more, or different actuals, lose nothing)', () => {
+    const local = withTicked({}, 2, [0]);
+    const server = withTicked({}, 3, [0, 1, 2]);
+    expect(lostCompletedSets(local, server)).toEqual([]);
+    expect(lostCompletedSets(withTicked({}, 2, []), withTicked({}, 1, []))).toEqual([]);
+  });
+});
+
+describe('isNotAClient', () => {
+  it('is true only for the not_a_client hint, never for other errors', () => {
+    expect(isNotAClient(notAClient())).toBe(true);
+    expect(isNotAClient(Object.assign(new Error('permission denied for function'), { code: '42501' }))).toBe(false);
+    expect(isNotAClient(networkError())).toBe(false);
+    expect(isNotAClient(null)).toBe(false);
+  });
+});
+
+describe('createLogSync: a removed client (I1)', () => {
+  it('drops the log from the phone, keeps a copy, tells the screen once and never retries', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    const log = withTicked({ revision: 4 }, 2, [0]);
+    await store.save({ log, lastSyncedRevision: 2 });
+    const save = vi.fn(() => Promise.reject(notAClient()));
+    const fetchLog = vi.fn();
+    const onGone = vi.fn();
+    const sync = createLogSync({ save, fetchLog, store, onGone });
+
+    expect((await sync.flushNow()).status).toBe('synced');
+    expect(await store.load()).toBeNull();
+    expect(rejectedCopy(storage.map)).toEqual(log);
+    expect(onGone).toHaveBeenCalledTimes(1);
+    expect(onGone).toHaveBeenCalledWith(log);
+    expect(fetchLog).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('recheck() sends a synced log in progress once, so a removal is noticed without a new edit', async () => {
+    const store = await storeWith(sampleLog({ revision: 3 }), 3);
+    const save = vi.fn(() => Promise.reject(notAClient()));
+    const onGone = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onGone });
+    await sync.flushNow();
+    expect(save).not.toHaveBeenCalled(); // synced: a normal flush sends nothing
+    await sync.recheck();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(onGone).toHaveBeenCalledTimes(1);
+    expect(await store.load()).toBeNull();
+  });
+
+  it('recheck() of a client still with their coach keeps the log (the same revision is refused and adopted)', async () => {
+    const log = sampleLog({ revision: 3 });
+    const store = await storeWith(log, 3);
+    const save = vi.fn(() => Promise.resolve<SaveLogResult>({ applied: false, revision: 3, status: 'in_progress' }));
+    const onRejected = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(log)), store, onRejected });
+    expect((await sync.recheck()).status).toBe('synced');
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(await store.load()).toEqual({ log, lastSyncedRevision: 3 });
+    expect(onRejected).not.toHaveBeenCalled();
+  });
+
+  it('keeps retrying other errors, including a 42501 without the hint', async () => {
+    const store = await storeWith(sampleLog({ revision: 2 }), 1);
+    const save = vi.fn(() => Promise.reject(Object.assign(new Error('permission denied'), { code: '42501' })));
+    const onGone = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onGone });
+    expect((await sync.flushNow()).status).toBe('pending');
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(onGone).not.toHaveBeenCalled();
+    expect(await store.load()).not.toBeNull();
+  });
+});
+
+describe('createLogSync: a refusal that would drop ticked sets (I2)', () => {
+  it('keeps the phone copy and tells the client when the adopted server doc lacks sets ticked on the phone', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    // The phone ticked sets 1 and 2 offline; the coach corrected the log meanwhile, which locks it.
+    const local = withTicked({ revision: 6, status: 'completed', finishedAt: '2026-11-05T09:20:00.000Z' }, 3, [0, 1, 2]);
+    const server = withTicked({ revision: 4, status: 'completed', finishedAt: '2026-11-05T09:12:00.000Z' }, 3, [0]);
+    await store.save({ log: local, lastSyncedRevision: 4 });
+    const save = vi.fn(() => Promise.resolve<SaveLogResult>({ applied: false, revision: 4, status: 'completed' }));
+    const onRejected = vi.fn();
+    const onAdopt = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onRejected, onAdopt });
+
+    const result = await sync.flushNow();
+    expect(result.adopted).toEqual(server);
+    expect(onAdopt).toHaveBeenCalledWith(server);
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(onRejected).toHaveBeenCalledWith(local, [sid(1), sid(2)]);
+    expect(rejectedCopy(storage.map)).toEqual(local);
+  });
+
+  it('says nothing and keeps no copy when the server doc has every ticked set', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    const local = withTicked({ revision: 6 }, 2, [0]);
+    const server = withTicked({ revision: 7, status: 'completed', finishedAt: '2026-11-05T09:12:00.000Z' }, 2, [0, 1]);
+    await store.save({ log: local, lastSyncedRevision: 5 });
+    const save = vi.fn(() => Promise.resolve<SaveLogResult>({ applied: false, revision: 7, status: 'completed' }));
+    const onRejected = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onRejected });
+    await sync.flushNow();
+    expect(onRejected).not.toHaveBeenCalled();
+    expect(storage.map.has('caltracker.activeLog.user-1.rejected')).toBe(false);
+  });
+});
+
+describe('createLogSync: the pending list (I3)', () => {
+  const firstId = '00000000-0000-4000-8000-000000000901';
+  async function parked(storage = memoryStorage()) {
+    const store = createLogStore(storage, 'user-1');
+    // Finished with no signal, then parked when the next workout started.
+    const first = withTicked({ id: firstId, revision: 5, status: 'completed', finishedAt: '2026-11-05T09:12:00.000Z' }, 2, [0, 1]);
+    await store.save({ log: first, lastSyncedRevision: 2 });
+    await store.park();
+    const second = sampleLog({ revision: 1 });
+    await store.save({ log: second, lastSyncedRevision: 0 });
+    return { store, storage, first, second };
+  }
+
+  it('uploads the parked log first, then the new one, and empties the pending list', async () => {
+    const { store, first, second } = await parked();
+    const save = vi.fn((doc: WorkoutLogDoc) => Promise.resolve(applied(doc)));
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+    expect((await sync.flushNow()).status).toBe('synced');
+    expect(save.mock.calls.map(([d]) => d.id)).toEqual([first.id, second.id]);
+    expect(await store.loadPending()).toEqual([]);
+    expect(await store.load()).toMatchObject({ log: { id: second.id }, lastSyncedRevision: 1 });
+  });
+
+  it('keeps the parked log, with its sets, while there is no signal, and sends it when there is', async () => {
+    const { store, first } = await parked();
+    const save = vi
+      .fn<(doc: WorkoutLogDoc) => Promise<SaveLogResult>>()
+      .mockRejectedValueOnce(networkError())
+      .mockImplementation((doc) => Promise.resolve(applied(doc)));
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store });
+    expect((await sync.flushNow()).status).toBe('pending');
+    expect(await store.loadPending()).toEqual([{ log: first, lastSyncedRevision: 2 }]);
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]);
+    expect(sync.status()).toBe('synced');
+    expect(save.mock.calls[1]?.[0]).toEqual(first);
+    expect(await store.loadPending()).toEqual([]);
+  });
+
+  it('settles a refused parked log by the server copy, keeping the phone copy when that loses ticked sets', async () => {
+    const { store, storage, first } = await parked();
+    const server = withTicked({ id: firstId, revision: 2, status: 'completed', finishedAt: '2026-11-05T09:12:00.000Z' }, 2, [0]);
+    const save = vi.fn((doc: WorkoutLogDoc) =>
+      Promise.resolve<SaveLogResult>(doc.id === firstId ? { applied: false, revision: 2, status: 'completed' } : applied(doc)),
+    );
+    const onRejected = vi.fn();
+    const onAdopt = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onRejected, onAdopt });
+    expect((await sync.flushNow()).status).toBe('synced');
+    expect(await store.loadPending()).toEqual([]);
+    expect(onRejected).toHaveBeenCalledWith(first, [sid(1)]);
+    expect(onAdopt).not.toHaveBeenCalled(); // the screen shows the new workout, not this one
+    expect(rejectedCopy(storage.map)).toEqual(first);
+  });
+
+  it('waits, sending nothing else, when a refused parked log has no readable server copy', async () => {
+    const { store, first } = await parked();
+    const save = vi.fn(() => Promise.resolve<SaveLogResult>({ applied: false, revision: 9, status: 'completed' }));
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(null)), store });
+    expect((await sync.flushNow()).status).toBe('pending');
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(await store.loadPending()).toEqual([{ log: first, lastSyncedRevision: 2 }]);
+  });
+
+  it('drops a parked log of a removed client and tells the screen', async () => {
+    const { store, first } = await parked();
+    const save = vi.fn(() => Promise.reject(notAClient()));
+    const onGone = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onGone });
+    await sync.flushNow();
+    expect(await store.loadPending()).toEqual([]);
+    expect(onGone).toHaveBeenNthCalledWith(1, first);
+    expect(onGone).toHaveBeenCalledTimes(2); // the new workout is refused the same way
+    expect(await store.load()).toBeNull();
+  });
+});
+
+describe('createLogSync: housekeeping after its own auto-finish (M4)', () => {
+  it('tells the screen when a retry finishes a forgotten workout, even though it then uploads and leaves the store', async () => {
+    const log = sampleLog({ revision: 2 });
+    const store = await storeWith(log, 2);
+    const save = vi.fn((doc: WorkoutLogDoc) => Promise.resolve(applied(doc)));
+    const onAutoFinish = vi.fn();
+    const now = () => Date.parse(log.lastActivityAt) + AUTO_FINISH_IDLE_MS;
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, now, onAutoFinish });
+    await sync.flushNow();
+    expect(onAutoFinish).toHaveBeenCalledTimes(1);
+    expect(onAutoFinish).toHaveBeenCalledWith(expect.objectContaining({ id: log.id, status: 'completed', autoFinished: true }));
+    expect(await store.load()).toBeNull();
   });
 });

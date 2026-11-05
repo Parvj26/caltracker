@@ -4,8 +4,13 @@
 // The log store (log-store.ts) is the truth; React state here is only a mirror of it:
 //   * every change goes through applyEdit(store, op), built from the stored doc, then sync.push()
 //   * a new log is written with store.save({ log, lastSyncedRevision: 0 }), then pushed
-//   * when the sync adopts the server's doc, or finishes uploading, the store is read again
+//   * when the sync adopts the server's doc, or finishes uploading, the store is read again, and a log that
+//     stopped being in progress meanwhile gets the same housekeeping as a finish here (logChange)
 //   * on open and on return to the app: finish a forgotten workout (shared rules), then flushNow()
+//   * whenever the coach link changes, sync.recheck(): a client the coach removed gets a final refusal, and
+//     the log leaves the phone with a one-time note, instead of being retried (and resumed) forever
+//   * Start never waits on the network for a finished workout: one still uploading moves to the store's
+//     pending list (store.park()) and the sync sends it first
 //   * a new signed-in user gets a new store and sync; the old sync is stopped and its notifications cancelled
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
@@ -16,8 +21,11 @@ import { discardLog, finishLog, reopenLog, toggleSet, type WorkoutDoc, type Work
 import {
   finishedFrom,
   foregroundCheck,
+  goneNote,
   keepEnded,
   keepFinished,
+  logChange,
+  rejectedNote,
   reopenFrom,
   startOrResume,
   within,
@@ -33,17 +41,13 @@ import {
   scheduleReminder,
   scheduleRestEnd,
 } from './log-notifications';
-import { applyEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
+import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
 import { createLogSync, type LogSync, type SyncStatus } from './log-sync';
 import { useSession } from './session';
 
-/** Shown when a finished workout still has to upload and the phone has no signal to send it. */
-export const START_BLOCKED =
-  'Your last workout hasn’t uploaded yet. Connect to the internet, then start this one.';
-
 /** "Add missed sets" needs the server's copy once the finished log has uploaded. */
 export const REOPEN_OFFLINE = 'Couldn’t open this workout again. Check your connection and try again.';
-/** The server or the 24 h limit said no. */
+/** The server, or the 24 h limit on "Add missed sets", said no. */
 export const REOPEN_REFUSED = 'This workout can’t be changed any more.';
 /** Another finished workout still waiting to upload holds the phone's one slot. */
 export const REOPEN_WAITING = 'Your last workout hasn’t uploaded yet. Connect to the internet, then try again.';
@@ -61,10 +65,15 @@ export type Rest = { logId: string; endsAt: number };
 export type ActiveLog = {
   /** The stored log: in progress, or finished and still uploading. Null when there is none. */
   log: WorkoutLogDoc | null;
+  /** Earlier finished workouts still waiting to upload (moved aside when a new one started), oldest first. */
+  pending: WorkoutLogDoc[];
   /** False until the phone's copy has been read. */
   ready: boolean;
   syncStatus: SyncStatus;
-  /** One-time note after a forgotten workout was finished automatically. */
+  /**
+   * One-time note: a forgotten workout was finished automatically, the coach removed the client so a workout
+   * wasn't saved, or the server's copy replaced sets ticked on the phone.
+   */
   banner: string | null;
   dismissBanner: () => void;
   /** The planned workout last finished here, until Today's list from the server includes it. */
@@ -82,7 +91,7 @@ export type ActiveLog = {
   startEmpty: (name: string) => Promise<WorkoutLogDoc>;
   /** The workout in progress, read from the phone, or null. */
   resume: () => Promise<WorkoutLogDoc | null>;
-  /** One edit with an op from @caltracker/shared. */
+  /** One edit with an op from @caltracker/shared. Refused once the stored log is no longer in progress. */
   op: (fn: (log: WorkoutLogDoc) => WorkoutLogDoc) => Promise<void>;
   /**
    * Ticks or unticks a set, decided from the stored doc. Returns the new state (true = ticked) or null when the
@@ -115,11 +124,19 @@ const unsynced = (s: StoredLog | null): boolean =>
   s !== null && s.log.status !== 'in_progress' && s.log.revision > s.lastSyncedRevision;
 
 export function ActiveLogProvider({ children }: { children: ReactNode }) {
-  const userId = useSession().session?.user.id ?? null;
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const workspaceId = session.workspace?.workspaceId ?? null;
+  // The coach's business name for the "no longer with" note, remembered past the moment the link is gone.
+  const coachName = useRef<string | null>(null);
+  coachName.current = session.removedFromWorkspace ?? session.workspace?.workspaceName ?? coachName.current;
   const current = useRef<Instance | null>(null);
   const starting = useRef<Promise<WorkoutLogDoc> | null>(null);
   const restRef = useRef<Rest | null>(null);
-  const [log, setLog] = useState<WorkoutLogDoc | null>(null);
+  // What the screens were last shown, so a change made by the sync can be told apart (logChange).
+  const shown = useRef<WorkoutLogDoc | null>(null);
+  const [log, setLogState] = useState<WorkoutLogDoc | null>(null);
+  const [pending, setPending] = useState<WorkoutLogDoc[]>([]);
   const [ready, setReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [banner, setBanner] = useState<string | null>(null);
@@ -130,6 +147,10 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   const setRest = useCallback((next: Rest | null) => {
     restRef.current = next;
     setRestState(next);
+  }, []);
+  const setLog = useCallback((next: WorkoutLogDoc | null) => {
+    shown.current = next;
+    setLogState(next);
   }, []);
 
   const clearNotifications = useCallback(() => {
@@ -174,6 +195,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setLog(null);
+    setPending([]);
     setReady(false);
     setSyncStatus('synced');
     setBanner(null);
@@ -190,11 +212,22 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       setFinished((f) => keepFinished(f, doc));
       setFinishedLog((e) => keepEnded(e, doc));
     };
+    /** Housekeeping when the log changed behind the screen's back (see logChange). */
+    const changedTo = (next: WorkoutLogDoc | null) => {
+      const change = logChange(shown.current, next);
+      if (change.banner) setBanner(change.banner);
+      if (change.ended) ended(change.ended);
+      else if (change.clearTimers) clearNotifications();
+    };
     const reload = async () => {
-      const s = await store.load();
+      const [s, waiting] = await Promise.all([store.load(), store.loadPending()]);
       if (!mine()) return;
-      setLog(s?.log ?? null);
-      replaced(s?.log ?? null);
+      const next = s?.log ?? null;
+      // The sync may have adopted a finished server copy, or dropped the log (removed client).
+      changedTo(next);
+      setLog(next);
+      setPending(waiting.map((p) => p.log));
+      replaced(next);
     };
     const sync = createLogSync({
       save: saveLog,
@@ -210,6 +243,19 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
         setSyncStatus(s);
         if (s === 'synced') void reload();
       },
+      onRejected: (local) => {
+        if (mine()) setBanner(rejectedNote(local.name));
+      },
+      onGone: () => {
+        if (!mine()) return;
+        setBanner(goneNote(coachName.current));
+        void reload();
+      },
+      onAutoFinish: (doc) => {
+        if (!mine()) return;
+        changedTo(doc);
+        setLog(doc);
+      },
     });
     const me: Instance = { store, sync, reload };
     current.current = me;
@@ -218,6 +264,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       const s = await checkStale(store);
       if (!mine()) return;
       setLog(s?.log ?? null);
+      setPending((await store.loadPending()).map((p) => p.log));
       setReady(true);
       await sync.flushNow();
       await reload(); // a finished log that has uploaded is gone from the store now
@@ -236,7 +283,14 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       if (current.current === me) current.current = null;
       starting.current = null;
     };
-  }, [userId, checkStale, setRest]);
+  }, [userId, checkStale, setRest, setLog, ended, clearNotifications]);
+
+  // The coach link changed (removed, or another coach): send the log once to learn whether it can still be saved.
+  const sessionLoading = session.loading;
+  useEffect(() => {
+    if (sessionLoading || !userId) return;
+    void current.current?.sync.recheck();
+  }, [sessionLoading, userId, workspaceId]);
 
   const begin = useCallback(
     (from: WorkoutDoc | string): Promise<WorkoutLogDoc> => {
@@ -247,10 +301,22 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
 
       const run = async (): Promise<WorkoutLogDoc> => {
         let stored = await checkStale(me.store);
+        // A finished workout still waiting to upload: try once, then move it aside (the sync keeps sending it)
+        // so the new one can start with no signal. A discard the server never saw is simply dropped.
+        const freeSlot = async () => {
+          if (!unsynced(stored)) return;
+          await within(me.sync.flushNow(), UPLOAD_BEFORE_START_MS);
+          stored = await me.store.park();
+          if (current.current === me) setPending((await me.store.loadPending()).map((p) => p.log));
+        };
+        await freeSlot();
         if (stored === null || (stored.log.status !== 'in_progress' && !unsynced(stored))) {
           // Nothing on this phone. Another phone (or a reinstall) may have a workout in progress on the server:
-          // resume it, or finish it first when it was forgotten, so there is never a second one.
-          const remote = await within(fetchInProgressLog(), REMOTE_CHECK_MS);
+          // resume it, or finish it first when it was forgotten, so there is never a second one. A log moved
+          // aside above may still be in progress there until its finish uploads: that one is not resumed.
+          const waiting = new Set((await me.store.loadPending()).map((p) => p.log.id));
+          const found = await within(fetchInProgressLog(), REMOTE_CHECK_MS);
+          const remote = found && !waiting.has(found.id) ? found : null;
           if (remote) {
             const checked = foregroundCheck(remote, Date.now());
             stored = { log: checked ? checked.log : remote, lastSyncedRevision: remote.revision };
@@ -262,12 +328,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-        // A finished workout still waiting to upload would be overwritten by a new one: send it first.
-        if (unsynced(stored)) {
-          await within(me.sync.flushNow(), UPLOAD_BEFORE_START_MS);
-          stored = await me.store.load();
-          if (unsynced(stored)) throw new Error(START_BLOCKED);
-        }
+        await freeSlot(); // the server's forgotten workout, just finished here, must upload too
         const existing = stored?.log.status === 'in_progress' ? stored.log : null;
         const next = startOrResume(existing, from, randomUUID, nowIso());
         if (next !== existing) {
@@ -287,7 +348,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       p.then(clear, clear);
       return p;
     },
-    [checkStale, ended],
+    [checkStale, ended, setLog],
   );
 
   const resume = useCallback(async () => {
@@ -297,14 +358,17 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     return s?.log.status === 'in_progress' ? s.log : null;
   }, []);
 
-  const op = useCallback(async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => {
-    const me = current.current;
-    if (!me) return;
-    const s = await applyEdit(me.store, fn);
-    if (current.current !== me || !s) return;
-    setLog(s.log);
-    me.sync.push();
-  }, []);
+  const op = useCallback(
+    async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => {
+      const me = current.current;
+      if (!me) return;
+      const s = await applyLiveEdit(me.store, fn);
+      if (current.current !== me || !s) return;
+      setLog(s.log);
+      me.sync.push();
+    },
+    [setLog],
+  );
 
   const tick = useCallback(
     async (setId: string): Promise<boolean | null> => {
@@ -332,7 +396,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       void me.sync.flushNow().then(me.reload);
       return true;
     },
-    [ended],
+    [ended, setLog],
   );
 
   const reopen = useCallback(async (logId: string): Promise<WorkoutLogDoc> => {
@@ -342,7 +406,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       new Error(s?.log.status === 'in_progress' ? finishOtherFirst(s.log.name) : REOPEN_WAITING);
 
     const stored = await me.store.load();
-    const from = reopenFrom(stored, logId);
+    const from = reopenFrom(stored, logId, await me.store.loadPending());
     if (from.kind === 'blocked') throw blocked(stored);
     if (from.kind === 'fetch') {
       // The finished log has uploaded and left the phone: start again from the server's copy, which holds the
@@ -351,8 +415,9 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       if (!server) throw new Error(REOPEN_OFFLINE);
       const other = await within(fetchInProgressLog(), REMOTE_CHECK_MS);
       if (other && other.id !== logId) throw new Error(finishOtherFirst(other.name));
+      const waiting = await me.store.loadPending();
       const placed = await me.store.update((s) =>
-        reopenFrom(s, logId).kind === 'fetch' ? { log: server, lastSyncedRevision: server.revision } : s,
+        reopenFrom(s, logId, waiting).kind === 'fetch' ? { log: server, lastSyncedRevision: server.revision } : s,
       );
       if (placed?.log.id !== logId) throw blocked(placed);
     }
@@ -366,7 +431,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     me.sync.push();
     scheduleReminder(s.log.name, s.log.id);
     return s.log;
-  }, []);
+  }, [setLog]);
 
   const startRest = useCallback(
     (logId: string, seconds: number) => {
@@ -406,6 +471,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ActiveLog>(
     () => ({
       log,
+      pending,
       ready,
       syncStatus,
       banner,
@@ -429,6 +495,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     }),
     [
       log,
+      pending,
       ready,
       syncStatus,
       banner,

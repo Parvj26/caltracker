@@ -24,11 +24,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Keeps the server's message (so log-sync can tell a dropped connection, e.g. "TypeError: Network request
- * failed", from a refusal) and logs it for developers. Screens show their own plain words, never this.
+ * failed", from a refusal), its SQLSTATE code and its hint (save_workout_log's 'not_a_client', see
+ * log-sync isNotAClient), and logs it for developers. Screens show their own plain words, never this.
  */
-function failed(what: string, error: { message: string }): Error {
+function failed(what: string, error: { message: string; code?: string; hint?: string }): Error {
   console.warn(`[logs] ${what}: ${error.message}`);
-  return new Error(`${what}: ${error.message}`);
+  return Object.assign(new Error(`${what}: ${error.message}`), { code: error.code, hint: error.hint });
 }
 
 async function myId(): Promise<string> {
@@ -172,6 +173,35 @@ export async function fetchLogsForDays(from: IsoDate, to: IsoDate): Promise<LogF
     });
   }
   return out;
+}
+
+const todayLogsKey = (userId: string) => `caltracker.todayLogs.${userId}`;
+
+/** Keeps today's logs (from fetchLogsForDays) on the phone, so Today offline still shows Done ✓ and Resume. */
+export async function cacheTodayLogs(today: IsoDate, logs: LogForDay[]): Promise<void> {
+  await AsyncStorage.setItem(todayLogsKey(await myId()), JSON.stringify({ date: today, logs }));
+}
+
+/** Today's cached logs, or none when they are from another day or unreadable. */
+export async function readCachedTodayLogs(today: IsoDate): Promise<LogForDay[]> {
+  try {
+    const raw = await AsyncStorage.getItem(todayLogsKey(await myId()));
+    if (raw === null) return [];
+    const value = JSON.parse(raw) as { date?: unknown; logs?: unknown };
+    if (value.date !== today || !Array.isArray(value.logs)) return [];
+    return value.logs.filter(
+      (l): l is LogForDay =>
+        typeof l === 'object' &&
+        l !== null &&
+        typeof (l as LogForDay).id === 'string' &&
+        typeof (l as LogForDay).workoutId === 'string' &&
+        LOG_STATUSES.includes((l as LogForDay).status) &&
+        typeof (l as LogForDay).startedAt === 'string' &&
+        typeof (l as LogForDay).lastActivityAt === 'string',
+    );
+  } catch {
+    return []; // a cache miss is never worth failing the screen over
+  }
 }
 
 /** What the workout detail screen needs to start a workout (the shape fetchWorkoutDetail returns). */

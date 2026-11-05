@@ -8,6 +8,9 @@ import {
   finishedIsLoaded,
   keepEnded,
   keepFinished,
+  goneNote,
+  logChange,
+  rejectedNote,
   reopenFrom,
   summaryLines,
   foregroundCheck,
@@ -311,5 +314,55 @@ describe('formatCommentTime', () => {
   it('reads the day and time in the phone time zone', () => {
     expect(formatCommentTime(new Date(2026, 10, 5, 10, 40).toISOString())).toBe('5 Nov · 10:40 AM');
     expect(formatCommentTime(new Date(2026, 0, 31, 23, 5).toISOString())).toBe('31 Jan · 11:05 PM');
+  });
+});
+
+describe('final review fixes', () => {
+  const W = '00000000-0000-4000-8000-000000000903';
+  const lastTick = new Date(2026, 10, 5, 10, 40).toISOString();
+
+  it('words the removed-client and lost-sets notes', () => {
+    expect(goneNote('Iron Gym')).toBe('You’re no longer with Iron Gym, so this workout wasn’t saved.');
+    expect(goneNote(null)).toBe('You’re no longer with your coach, so this workout wasn’t saved.');
+    expect(rejectedNote('Upper A')).toBe(
+      'Some sets from Upper A couldn’t be saved because the workout was already changed by your coach or on another device.',
+    );
+  });
+
+  it('logChange: a log the sync finished automatically ends here, with its note and no timers left', () => {
+    const prev = sampleLog({ name: 'Upper A' });
+    const next = { ...prev, status: 'completed' as const, autoFinished: true, finishedAt: lastTick, revision: 2 };
+    expect(logChange(prev, next)).toEqual({ ended: next, clearTimers: true, banner: 'We finished Upper A for you at 10:40 AM.' });
+  });
+
+  it('logChange: an adopted manual finish or discard ends with no note; a dropped log only clears the timers', () => {
+    const prev = sampleLog();
+    const done = { ...prev, status: 'completed' as const, finishedAt: lastTick };
+    expect(logChange(prev, done)).toEqual({ ended: done, clearTimers: true, banner: null });
+    const gone = { ...prev, status: 'discarded' as const };
+    expect(logChange(prev, gone)).toEqual({ ended: gone, clearTimers: true, banner: null });
+    expect(logChange(prev, null)).toEqual({ ended: null, clearTimers: true, banner: null });
+  });
+
+  it('logChange: nothing to do while still in progress, or when nothing was in progress', () => {
+    const prev = sampleLog();
+    expect(logChange(prev, { ...prev, revision: 5 })).toEqual({ ended: null, clearTimers: false, banner: null });
+    const done = sampleLog({ status: 'completed', finishedAt: lastTick });
+    expect(logChange(done, null)).toEqual({ ended: null, clearTimers: false, banner: null });
+    expect(logChange(null, sampleLog())).toEqual({ ended: null, clearTimers: false, banner: null });
+  });
+
+  it('workoutStatuses: a finished log waiting to upload keeps its Done ✓, so it is not started twice offline', () => {
+    const waiting = sampleLog({ id: 'log-p', workoutId: W, status: 'completed', finishedAt: '2026-11-05T09:40:00.000Z' });
+    expect(workoutStatuses([], null, null, [waiting])[W]).toEqual({ kind: 'done', logId: 'log-p', durationS: 40 * 60 });
+    // The phone's active copy still wins.
+    const again = sampleLog({ id: 'log-q', workoutId: W });
+    expect(workoutStatuses([], again, null, [waiting])[W]).toEqual({ kind: 'in_progress', logId: 'log-q' });
+  });
+
+  it('reopenFrom: a log still waiting in the pending list cannot be reopened yet', () => {
+    const waiting = sampleLog({ id: 'log-p', name: 'Upper A', status: 'completed', autoFinished: true, finishedAt: lastTick });
+    expect(reopenFrom(null, 'log-p', [{ log: waiting }])).toEqual({ kind: 'blocked', name: 'Upper A' });
+    expect(reopenFrom(null, 'log-x', [{ log: waiting }])).toEqual({ kind: 'fetch' });
   });
 });

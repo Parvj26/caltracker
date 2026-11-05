@@ -58,11 +58,45 @@ export function formatTimeOfDay(iso: string): string {
 export function foregroundCheck(log: WorkoutLogDoc, nowMs: number): { log: WorkoutLogDoc; banner: string | null } | null {
   if (!shouldAutoFinish(log, nowMs)) return null;
   const next = autoFinish(log);
-  const banner =
-    next.status === 'completed' && next.finishedAt !== null
-      ? `We finished ${next.name} for you at ${formatTimeOfDay(next.finishedAt)}.`
-      : null;
-  return { log: next, banner };
+  return { log: next, banner: autoFinishNote(next) };
+}
+
+/** "We finished Upper A for you at 10:40 AM." for a log finished automatically; null for anything else. */
+function autoFinishNote(log: WorkoutLogDoc): string | null {
+  return log.status === 'completed' && log.autoFinished && log.finishedAt !== null
+    ? `We finished ${log.name} for you at ${formatTimeOfDay(log.finishedAt)}.`
+    : null;
+}
+
+/** The one-time note after the coach removed the client and a workout could not be saved. */
+export function goneNote(coach: string | null): string {
+  return `You’re no longer with ${coach ?? 'your coach'}, so this workout wasn’t saved.`;
+}
+
+/** The one-time note after the server's copy of a workout replaced sets ticked on the phone. */
+export function rejectedNote(name: string): string {
+  return `Some sets from ${name} couldn’t be saved because the workout was already changed by your coach or on another device.`;
+}
+
+export type LogChange = {
+  /** The log that has just stopped being in progress on this phone (for ended(): Done ✓ and the summary). */
+  ended: WorkoutLogDoc | null;
+  /** True when the workout in progress has gone: its reminder and rest alarm must not fire. */
+  clearTimers: boolean;
+  /** "We finished … for you at …" when it was finished automatically. */
+  banner: string | null;
+};
+
+/**
+ * What the screens must do when the stored log changes behind their back: the sync finished a forgotten workout
+ * on a retry, adopted a server copy that is finished, or dropped the log (removed client). Pure. Changes made
+ * by the screen itself (finish, discard, reopen) do their own housekeeping; running this too does no harm.
+ */
+export function logChange(prev: WorkoutLogDoc | null, next: WorkoutLogDoc | null): LogChange {
+  if (prev?.status !== 'in_progress') return { ended: null, clearTimers: false, banner: null };
+  if (next === null || next.id !== prev.id) return { ended: null, clearTimers: true, banner: null };
+  if (next.status === 'in_progress') return { ended: null, clearTimers: false, banner: null };
+  return { ended: next, clearTimers: true, banner: autoFinishNote(next) };
 }
 
 export type ActualField = 'reps' | 'weight' | 'duration' | 'distance';
@@ -173,7 +207,14 @@ export type ReopenFrom = { kind: 'local' } | { kind: 'fetch' } | { kind: 'blocke
  * the phone has nothing that matters (the finished log has uploaded and been cleared). Another workout in
  * progress, or another finished one still waiting to upload, blocks it: the phone holds one log at a time.
  */
-export function reopenFrom(stored: { log: WorkoutLogDoc; lastSyncedRevision: number } | null, logId: string): ReopenFrom {
+export function reopenFrom(
+  stored: { log: WorkoutLogDoc; lastSyncedRevision: number } | null,
+  logId: string,
+  /** Finished logs still waiting to upload (the store's pending list). One of them can't be reopened yet. */
+  pending: readonly { log: WorkoutLogDoc }[] = [],
+): ReopenFrom {
+  const waiting = pending.find((p) => p.log.id === logId);
+  if (waiting && stored?.log.id !== logId) return { kind: 'blocked', name: waiting.log.name };
   if (stored === null) return { kind: 'fetch' };
   if (stored.log.id === logId) return { kind: 'local' };
   const busy = stored.log.status === 'in_progress' || stored.log.revision > stored.lastSyncedRevision;
@@ -183,16 +224,22 @@ export function reopenFrom(stored: { log: WorkoutLogDoc; lastSyncedRevision: num
 /**
  * Per planned workout id: done (with its duration) or in progress. Server logs are matched by the planned
  * workout they belong to (fetched by its scheduled date, never by the finish time). The workout just finished
- * here keeps its Done ✓ after the phone's copy is cleared on upload and before Today's list catches up; the
- * phone's own copy wins over both, since it may be newer than what has uploaded.
+ * here keeps its Done ✓ after the phone's copy is cleared on upload and before Today's list catches up, and so
+ * do finished logs still waiting to upload (pending), so they are never started twice; the phone's own copy
+ * wins over all of them, since it may be newer than what has uploaded.
  */
 export function workoutStatuses(
   server: readonly LogTimes[],
   local: WorkoutLogDoc | null,
   finished: FinishedNote | null = null,
+  pending: readonly WorkoutLogDoc[] = [],
 ): Record<string, WorkoutStatus> {
   const out: Record<string, WorkoutStatus> = {};
   for (const l of server) {
+    const s = l.workoutId ? statusOf(l) : null;
+    if (s && l.workoutId) out[l.workoutId] = s;
+  }
+  for (const l of pending) {
     const s = l.workoutId ? statusOf(l) : null;
     if (s && l.workoutId) out[l.workoutId] = s;
   }

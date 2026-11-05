@@ -8,7 +8,7 @@ import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { workoutStatuses } from '@/lib/active-log-logic';
 import { fetchLogsForDays, type LogForDay } from '@/lib/log-api';
-import { START_BLOCKED, useActiveLog } from '@/lib/use-active-log';
+import { useActiveLog } from '@/lib/use-active-log';
 import { formatDayMonth, groupByDay, weekdayShort, type WorkoutSummary } from '@/lib/workouts';
 import { LOAD_FAILED, fetchWorkoutsBetween } from '@/lib/workouts-api';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -92,8 +92,8 @@ export default function Workouts() {
       const log = await startEmpty(name);
       setNaming(false);
       openLog(log.id);
-    } catch (e) {
-      Alert.alert(e instanceof Error && e.message === START_BLOCKED ? START_BLOCKED : START_FAILED);
+    } catch {
+      Alert.alert(START_FAILED);
     } finally {
       startingRef.current = false;
       setStarting(false);

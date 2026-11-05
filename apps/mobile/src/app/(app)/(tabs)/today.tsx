@@ -8,15 +8,17 @@ import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import {
   cacheTodayDetail,
+  cacheTodayLogs,
   fetchLogsForDays,
   readCachedDetail,
   readCachedToday,
+  readCachedTodayLogs,
   type CachedDetail,
   type LogForDay,
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
-import { START_BLOCKED, useActiveLog } from '@/lib/use-active-log';
+import { useActiveLog } from '@/lib/use-active-log';
 import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
   fetchAnyWorkout,
@@ -68,7 +70,9 @@ async function loadToday(): Promise<TodayData> {
     // No signal: show today's workouts saved on the phone, if any, so they can still be started.
     const cached = await readCachedToday(today);
     if (cached.length === 0) throw e;
-    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs: [], offline: true };
+    // Today's logs as last read, so a workout finished earlier today keeps its Done ✓ after a restart.
+    const logs = await readCachedTodayLogs(today);
+    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true };
   }
   if (workouts.length === 0 && isFirstTimeClient(any)) {
     const [coachName, units] = await Promise.all([fetchMyCoachName(), fetchMyUnits()]);
@@ -77,8 +81,14 @@ async function loadToday(): Promise<TodayData> {
   void cacheToday(today, workouts);
   const [next, logs] = await Promise.all([
     workouts.length === 0 ? fetchNextWorkout(today) : Promise.resolve(null),
-    // "Done ✓" is a bonus: Today still shows when it can't be read.
-    fetchLogsForDays(today, today).catch(() => [] as LogForDay[]),
+    // "Done ✓" is a bonus: Today still shows when it can't be read (then the copy saved on the phone is used).
+    fetchLogsForDays(today, today).then(
+      (l) => {
+        void cacheTodayLogs(today, l).catch(() => undefined);
+        return l;
+      },
+      () => readCachedTodayLogs(today),
+    ),
   ]);
   return { kind: 'today', workouts, next, logs, offline: false };
 }
@@ -94,7 +104,7 @@ export default function Today() {
   const { workspace } = useSession();
   const { text, space } = useTheme();
   const router = useRouter();
-  const { log: active, banner, dismissBanner, start, finished, forgetFinished, syncStatus } = useActiveLog();
+  const { log: active, pending, banner, dismissBanner, start, finished, forgetFinished, syncStatus } = useActiveLog();
   const [data, setData] = useState<TodayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -159,8 +169,8 @@ export default function Today() {
 
   const inProgress = active?.status === 'in_progress' ? active : null;
   const statuses = useMemo(
-    () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active, finished),
-    [data, active, finished],
+    () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active, finished, pending),
+    [data, active, finished, pending],
   );
 
   const openLog = useCallback(
@@ -205,8 +215,8 @@ export default function Today() {
       }
       const log = await start(doc);
       openLog(log.id);
-    } catch (e) {
-      Alert.alert(e instanceof Error && e.message === START_BLOCKED ? START_BLOCKED : START_FAILED);
+    } catch {
+      Alert.alert(START_FAILED);
     } finally {
       startingRef.current = false;
       setStarting(null);

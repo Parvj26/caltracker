@@ -98,11 +98,34 @@ export function restOverHaptic(): void {
   Vibration.vibrate();
 }
 
-/** The log a tapped reminder belongs to, so the app can open it. Returns an unsubscribe function. */
+function reminderLogId(r: Notifications.NotificationResponse): string | null {
+  const data = r.notification.request.content.data as Partial<NotificationData> | undefined;
+  return data?.kind === 'reminder' && typeof data.logId === 'string' ? data.logId : null;
+}
+
+/**
+ * The log a tapped reminder belongs to, so the app can open it. Returns an unsubscribe function.
+ * Also covers the tap that launched the app from closed, which the listener misses: that response is read once
+ * on start-up and then cleared, so it never opens the log again on a later mount.
+ */
 export function onReminderTapped(open: (logId: string) => void): () => void {
+  let active = true;
   const sub = Notifications.addNotificationResponseReceivedListener((r) => {
-    const data = r.notification.request.content.data as Partial<NotificationData> | undefined;
-    if (data?.kind === 'reminder' && typeof data.logId === 'string') open(data.logId);
+    const id = reminderLogId(r);
+    if (!id) return;
+    Notifications.clearLastNotificationResponseAsync().catch(warn('clear last response'));
+    open(id);
   });
-  return () => sub.remove();
+  Notifications.getLastNotificationResponseAsync()
+    .then(async (r) => {
+      const id = r ? reminderLogId(r) : null;
+      if (!id) return;
+      await Notifications.clearLastNotificationResponseAsync();
+      if (active) open(id);
+    })
+    .catch(warn('last response'));
+  return () => {
+    active = false;
+    sub.remove();
+  };
 }
