@@ -45,7 +45,11 @@
   - A log with no activity for 3 hours is finished automatically, ending at the last ticked set's time.
     - The phone does this on open/resume, and shows the note "We finished {name} for you at {time}."
     - A server job does it hourly for phones that never reopen.
-  - An auto-finished log can be reopened to add missed sets within 24 hours of finishing.
+  - An auto-finished log can be reopened to add missed sets ("Add missed sets") within 24 hours of finishing.
+  - Sets ticked on the phone are never lost to an automatic finish: the phone's copy of an auto-finished or auto-discarded log that the coach hasn't corrected is always accepted when it reaches the server, however late (product owner decision, 5 Nov). Only the client's own "Add missed sets" button has the 24-hour limit.
+  - When the server's copy wins anyway (the coach corrected the workout, or it was finished by hand on another device) and the phone had ticked sets the server lacks, the phone keeps its copy for support and shows: "Some sets from {name} couldn't be saved because the workout was already changed by your coach or on another device."
+  - If the coach removes the client, a workout still on the phone can't be saved: it leaves the phone (a copy is kept) with the note "You're no longer with {coach}, so this workout wasn't saved."
+  - Finishing or discarding with no signal never blocks the next Start: a finished workout still waiting to upload is set aside and keeps uploading in the background, and a discarded one the server never saw is dropped.
 - **Comments:** the finished workout's view shows the coach's comments, newest last. Comments are read-only for the client in 3a.
 
 ## What the coach sees (dashboard)
@@ -82,11 +86,12 @@ A log is a **separate tree** from the planned workout:
   - **`save_workout_log(p_doc jsonb) returns jsonb`**, security definer:
     - The caller must be the log's client and a current client of the workspace. A planned `workout_id` must be their own instance.
     - It upserts the whole tree by id. **It ignores a doc whose `revision` ≤ the stored revision** (stale retries are harmless) and returns the stored revision.
-    - Allowed status changes: `in_progress` → `completed`/`discarded`, and `completed` → `in_progress` only when `auto_finished` and within 24 h.
+    - Allowed status changes: `in_progress` → `completed`/`discarded`, and any change to a `completed`/`discarded` log that is `auto_finished` and not corrected, at any time. Manually finished or discarded logs and corrected logs are locked. (The 24 h limit on "Add missed sets" is checked on the phone by `canReopen`.)
+    - A caller who is no longer a client of the workspace gets 42501 with hint `not_a_client`, which the phone treats as final.
     - It validates the doc's structure with the same rules as `save_workout`, plus actual-value ranges.
   - **`correct_workout_log(p_log_id uuid, p_sets jsonb)`**, security definer, coach of the workspace only, completed logs only. It updates actual values of the given sets and stamps `corrected_at`/`corrected_by`.
   - **Comments:** coach insert/delete under RLS (`is_coach_of`). Clients select only.
-  - **`last_results(p_exercise_ids uuid[])`**, invoker. For the caller's own completed logs, it returns the most recent log's completed sets per exercise.
+  - **`last_results(p_exercise_ids uuid[])`**, invoker. Per exercise, it returns the completed sets from the caller's most recent completed log in which that exercise has at least one completed set (so an exercise skipped last time still shows its previous result).
   - **`auto_finish_stale_logs()`**, definer, not callable by `authenticated`. It sets `completed`, `auto_finished`, and `finished_at` = the last `completed_at` (or `started_at`) for in-progress logs idle more than 3 h with at least one completed set. Idle logs with none are set to `discarded`. Scheduled hourly with `pg_cron`.
 
 ## Shared logic (`packages/shared/src/logs/`, pure and tested)

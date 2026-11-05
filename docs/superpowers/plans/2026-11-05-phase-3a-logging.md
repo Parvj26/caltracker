@@ -323,7 +323,7 @@ apps/web/e2e/logs.spec.ts
     - The caller must be `is_coach_of` the log's workspace, otherwise 42501. The log must be `completed`, otherwise 23514 `'Only finished workouts can be corrected.'`
     - It updates only those actual columns of sets in that log, sets `corrected_at = now()`, `corrected_by = auth.uid()` and `revision = revision + 1`, and returns the new revision.
   - **`public.last_results(p_exercise_ids uuid[]) returns table (exercise_id uuid, finished_at timestamptz, set_type public.set_type, actual_reps smallint, actual_weight_kg numeric, actual_duration_s int, actual_distance_m numeric, position smallint)`**, security invoker.
-    - For each exercise id, it returns the completed sets from the caller's most recent `completed` log containing that exercise, ordered by position.
+    - For each exercise id, it returns the completed sets from the caller's most recent `completed` log in which that exercise has at least one completed set, ordered by position. (An exercise skipped last time therefore still shows its previous result.)
 
 - [ ] **Step 1: Write failing pgTAP:**
   - **Insert and re-save:**
@@ -333,7 +333,7 @@ apps/web/e2e/logs.spec.ts
   - **Status rules:**
     - Finishing with 0 completed sets gives 23514 with the exact message.
     - A second new in-progress doc for A1 gives 23505 (Review Focus 3).
-    - `completed` → `in_progress` on a non-auto-finished log gives 23514. On an auto-finished log within 24 h it is allowed; after 24 h (`finished_at` set back by `interval '25 hours'` as postgres) it gives 23514.
+    - `completed` → `in_progress` on a non-auto-finished log gives 23514. On an auto-finished log it is allowed; after the final-review product owner decision it is allowed after 24 h too (`finished_at` set back by `interval '25 hours'` as postgres), as long as the log was not corrected.
   - **Authorization:**
     - A1 saving a doc for A2's instance gives 42501.
     - B1 saving with A's workout gives 42501.
@@ -346,7 +346,7 @@ apps/web/e2e/logs.spec.ts
     - Coach A's `correct_workout_log` updates actuals and `corrected_by`, and the revision rises.
     - Coach B gets 42501, A1 gets 42501, and an in-progress log gives 23514.
     - After a correction, A1 saving its old revision changes nothing.
-  - **`last_results`** for A1 returns the sets of the newest completed log only. For B1 it returns nothing of A's.
+  - **`last_results`** for A1 returns the sets of the newest completed log that has a completed set of that exercise only. For B1 it returns nothing of A's.
 - [ ] **Step 2: Run.** Expected: FAIL. **Step 3: Implement.** **Step 4: Run** `pnpm db:reset`, the re-import, then `pnpm db:test && pnpm db:types`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(db): add saving, correcting and last-result functions for logs`
 
