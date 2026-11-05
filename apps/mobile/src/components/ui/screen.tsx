@@ -3,6 +3,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -30,7 +31,21 @@ export function useRevealOnFocus(): RevealField {
  * Content scrolls, so large Dynamic Type sizes reflow instead of being cut off. A focused field is
  * scrolled near the top, so the next field stays visible above the keyboard.
  */
-export function Screen({ children, centred = false }: { children: ReactNode; centred?: boolean }) {
+export function Screen({
+  children,
+  centred = false,
+  inTabs = false,
+  refreshing,
+  onRefresh,
+}: {
+  children: ReactNode;
+  centred?: boolean;
+  /** Inside the tab bar, which already keeps clear of the home indicator. */
+  inTabs?: boolean;
+  /** Pull to refresh, when both are given. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const columnRef = useRef<HostInstance>(null);
   const focused = useRef<RefObject<HostInstance | null> | null>(null);
@@ -65,13 +80,18 @@ export function Screen({ children, centred = false }: { children: ReactNode; cen
 
   return (
     <RevealContext.Provider value={value}>
-      <SafeAreaView style={styles.fill} edges={['top', 'bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.fill} edges={inTabs ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']}>
         <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             ref={scrollRef}
             style={styles.fill}
             contentContainerStyle={[styles.content, centred && styles.centred]}
             keyboardShouldPersistTaps="handled"
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} tintColor={palette.ink} />
+              ) : undefined
+            }
           >
             <View ref={columnRef} style={styles.column}>
               {children}
