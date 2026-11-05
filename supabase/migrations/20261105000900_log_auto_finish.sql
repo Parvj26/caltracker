@@ -6,24 +6,37 @@
 create function public.auto_finish_stale_logs() returns integer
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_count integer;
+  v_id uuid;
+  v_log public.workout_logs%rowtype;
+  v_last_set_at timestamptz;
+  v_count integer := 0;
 begin
-  with stale as (
-    select l.id,
-      (select max(s.completed_at) from public.log_sets s where s.log_id = l.id and s.completed_at is not null) as last_set_at
-    from public.workout_logs l
+  for v_id in
+    select l.id from public.workout_logs l
     where l.status = 'in_progress' and l.last_activity_at < now() - interval '3 hours'
-  ), changed as (
-    update public.workout_logs l
-    set status = case when stale.last_set_at is not null
+    order by l.last_activity_at
+  loop
+    -- Same lock as save_workout_log, so a phone save and this job never touch one log at once.
+    perform pg_advisory_xact_lock(hashtextextended('save_workout_log:' || v_id::text, 0));
+
+    -- Look again under the lock: a save may have landed since the list was read.
+    select * into v_log from public.workout_logs l
+    where l.id = v_id and l.status = 'in_progress' and l.last_activity_at < now() - interval '3 hours'
+    for update;
+    if not found then
+      continue;
+    end if;
+
+    select max(s.completed_at) into v_last_set_at from public.log_sets s where s.log_id = v_id;
+
+    update public.workout_logs
+    set status = case when v_last_set_at is not null
           then 'completed'::public.log_status else 'discarded'::public.log_status end,
         auto_finished = true,
-        finished_at = stale.last_set_at
-    from stale
-    where l.id = stale.id
-    returning 1
-  )
-  select count(*) into v_count from changed;
+        finished_at = v_last_set_at
+    where id = v_id;
+    v_count := v_count + 1;
+  end loop;
   return v_count;
 end;
 $$;

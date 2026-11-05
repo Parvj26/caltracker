@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 -- Fixtures (as postgres)
 select tests.create_user('af-coach@t.local', 'Coach') as coach \gset
@@ -23,6 +23,9 @@ update public.workout_logs set last_activity_at = now() - interval '4 hours', re
 -- L3: idle 2 h, left alone.
 select tests.create_log(:'ws', :'c3', null, 'in_progress') as l3 \gset
 update public.workout_logs set last_activity_at = now() - interval '2 hours' where id = :'l3';
+-- L4: already completed by the phone, old last activity: the job must leave it alone.
+select tests.create_log(:'ws', :'c3') as l4 \gset
+update public.workout_logs set last_activity_at = now() - interval '5 hours' where id = :'l4';
 
 select ok(not has_function_privilege('authenticated', 'public.auto_finish_stale_logs()', 'execute'),
   'authenticated cannot run the auto-finish job');
@@ -42,6 +45,8 @@ select ok((select auto_finished from public.workout_logs where id = :'l2'), 'L2 
 select is((select revision from public.workout_logs where id = :'l2'), 0, 'L2 revision is untouched');
 select results_eq(format($q$select status::text, auto_finished, revision, finished_at is null from public.workout_logs where id = %L$q$, :'l3'),
   $q$values ('in_progress', false, 0, true)$q$, 'L3 (idle 2 h) is unchanged');
+select results_eq(format($q$select status::text, auto_finished, revision from public.workout_logs where id = %L$q$, :'l4'),
+  $q$values ('completed', false, 0)$q$, 'a log the phone already completed keeps auto_finished false');
 select is(public.auto_finish_stale_logs(), 0, 'running again changes nothing');
 
 select is((select count(*)::int from cron.job where jobname = 'auto-finish-stale-logs'), 1,
