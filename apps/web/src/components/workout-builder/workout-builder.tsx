@@ -20,7 +20,10 @@ import {
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
 import { saveWorkout, type SaveIssue } from '@/app/(coach)/workouts/actions';
+import { ReloadButton } from '@/components/reload-button';
+import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
 import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
+import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { BlockEditor, type BlockActions } from './block-editor';
 import { ExercisePicker } from './exercise-picker';
 import styles from './builder.module.css';
@@ -44,6 +47,12 @@ type Picker =
   | { kind: 'swap'; blockId: string; exId: string; name: string };
 
 const makeId = () => crypto.randomUUID();
+
+/**
+ * A new library workout moves to /workouts/[id] after its first save, which mounts a fresh builder. This remembers
+ * that save (in this browser tab only) so the new page still shows "✓ Saved" for the rest of its few seconds.
+ */
+let lastNewSave: { id: string; at: number } | null = null;
 
 /**
  * Turns schema issue paths (indexes into the saved doc) into keys by row id, so a message stays on its row even if
@@ -85,6 +94,9 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
   const [doc, setDoc] = useState<WorkoutDoc>(initial);
   const [savedJson, setSavedJson] = useState(() => JSON.stringify(initial));
   const [everSaved, setEverSaved] = useState(!isNew);
+  const [savedAt, setSavedAt] = useState<number | null>(() =>
+    lastNewSave?.id === initial.id && Date.now() - lastNewSave.at < SAVED_CHIP_MS ? lastNewSave.at : null,
+  );
   const [errors, setErrors] = useState<Map<string, string[]>>(new Map());
   const [formError, setFormError] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
@@ -119,8 +131,8 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       let outcome: Awaited<ReturnType<typeof saveWorkout>>;
       try {
         outcome = await saveWorkout(parsed.data);
-      } catch {
-        setFormError("Couldn't save. Check your connection and try again.");
+      } catch (e) {
+        setFormError(failureMessage(e, "Couldn't save. Check your connection and try again."));
         return;
       }
       if (!outcome.ok) {
@@ -133,8 +145,13 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       setSavedJson(JSON.stringify(parsed.data));
       setDoc((cur) => (cur === snapshot ? parsed.data : cur));
       setEverSaved(true);
+      const at = Date.now();
+      setSavedAt(at);
       if (onSaved) onSaved(outcome.id);
-      else if (mode === 'library' && isNew) router.replace(`/workouts/${outcome.id}`);
+      else if (mode === 'library' && isNew) {
+        lastNewSave = { id: outcome.id, at };
+        router.replace(`/workouts/${outcome.id}`);
+      }
     });
   }
 
@@ -193,8 +210,6 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
             ? `Swap ${picker.name}`
             : '';
 
-  const status = pending ? 'Saving…' : dirty ? 'You have changes to save.' : everSaved ? 'Saved' : '';
-
   return (
     <div className={styles.builder}>
       {mode !== 'library' ? (
@@ -251,13 +266,14 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       </div>
 
       <div className={styles.saveBar}>
-        <p role="status" className={styles.status}>{status}</p>
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m}>{m}</ErrorText>
         ))}
         {formError ? <ErrorText>{formError}</ErrorText> : null}
+        {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
         <Button onClick={save} pending={pending}>
-          Save workout
+          {pending ? 'Saving…' : 'Save workout'}
         </Button>
       </div>
 

@@ -1,0 +1,11 @@
+/* Save status beside a Save button. Colours only via var(--ct-*). */
+.status { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); margin: 0; }
+.quiet { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

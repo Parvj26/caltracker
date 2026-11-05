@@ -16,39 +16,31 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { PROGRAM_WEEKS_MAX, ProgramInput } from '@caltracker/shared';
-import { Button, Card, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { PROGRAM_WEEKS_MAX } from '@caltracker/shared';
+import { ReloadButton } from '@/components/reload-button';
+import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import {
-  addProgramWorkout,
-  countSlotsBeyondWeek,
-  moveProgramWorkout,
-  removeProgramWorkout,
-  updateProgram,
-} from '../actions';
-import { matchesSearch } from './search';
-import { shrinkWarning } from './shrink-warning';
+import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { addProgramWorkout, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
+import { DAYS, cellLabel, chipDomId, focusSoon } from './grid-ids';
+import { LibraryPanel } from './library-panel';
+import { MoveSlotDialog } from './move-slot-dialog';
+import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
 import styles from '../programs.module.css';
 
 export type Slot = { id: string; week: number; day: number; position: number; workoutId: string; workoutName: string };
 export type LibraryWorkout = { id: string; name: string };
-type Program = { id: string; name: string; description: string | null; weeks: number };
+export type Program = { id: string; name: string; description: string | null; weeks: number };
 
 /** What is being dragged: a library workout (adds a slot) or an existing slot (moves it). */
-type DragData = { kind: 'library'; workout: LibraryWorkout } | { kind: 'slot'; slot: Slot };
+export type DragData = { kind: 'library'; workout: LibraryWorkout } | { kind: 'slot'; slot: Slot };
 type DropData = { week: number; day: number };
 
-const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
-const cellLabel = (week: number, day: number) => `Week ${week}, Day ${day}`;
 const cellId = (week: number, day: number) => `cell-${week}-${day}`;
 /** DOM ids, so focus can land somewhere sensible after a chip moves or disappears. */
 const addButtonDomId = (week: number, day: number) => `program-add-${week}-${day}`;
-const chipDomId = (slotId: string) => `program-chip-${slotId}`;
-const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
-/** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
-const errorProp = (message: string | undefined) => (message ? { error: message } : {});
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 
 // Pointer first (exact for the mouse); the keyboard sensor has no pointer, so fall back to overlap.
@@ -110,7 +102,8 @@ export function ProgramGrid({
   );
 
   useEffect(() => {
-    if (!toast) return;
+    // The reload prompt stays until the coach acts on it.
+    if (!toast || toast === STALE_DEPLOY_MESSAGE) return;
     const timer = setTimeout(() => setToast(null), 8000);
     return () => clearTimeout(timer);
   }, [toast]);
@@ -121,9 +114,9 @@ export function ProgramGrid({
     setInFlight((n) => n + 1);
     save()
       .then(() => setSavedOnce(true))
-      .catch(() => {
+      .catch((e: unknown) => {
         setSlots(undo);
-        setToast(SAVE_ERROR);
+        setToast(failureMessage(e, SAVE_ERROR));
       })
       .finally(() => setInFlight((n) => n - 1));
   }
@@ -185,9 +178,9 @@ export function ProgramGrid({
       const outcome = await updateProgram(program.id, { ...savedDetails.current, weeks: next });
       if (!outcome.ok) throw new Error(outcome.error);
       setSavedOnce(true);
-    } catch {
+    } catch (e) {
       setWeeks(next - 1);
-      setToast("Couldn't add a week, so it was undone. Please try again.");
+      setToast(failureMessage(e, "Couldn't add a week, so it was undone. Please try again."));
     } finally {
       setAddingWeek(false);
     }
@@ -287,6 +280,7 @@ export function ProgramGrid({
         <WorkoutPicker
           cellLabel={cellLabel(picker.week, picker.day)}
           library={library}
+          forProgram
           onPick={(w) => {
             addSlot(w, picker.week, picker.day);
             setPicker(null);
@@ -296,7 +290,7 @@ export function ProgramGrid({
       ) : null}
 
       {moving ? (
-        <MoveDialog
+        <MoveSlotDialog
           slot={moving}
           weeks={weeks}
           onMove={(week, day) => {
@@ -311,6 +305,7 @@ export function ProgramGrid({
         {toast ? (
           <div className={styles.toast}>
             <span>{toast}</span>
+            {toast === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
             <button type="button" className={styles.smallButton} onClick={() => setToast(null)}>
               Dismiss
             </button>
@@ -318,207 +313,6 @@ export function ProgramGrid({
         ) : null}
       </div>
     </div>
-  );
-}
-
-/* ---------- Details (name, description, weeks) ---------- */
-
-function ProgramDetails({
-  program,
-  weeks,
-  onSaved,
-}: {
-  program: Program;
-  /** The saved length; the field follows it when "+ Add week" changes it. */
-  weeks: number;
-  onSaved: (details: { name: string; description: string | null }, weeks: number, removed: number, expected: number) => void;
-}) {
-  const [name, setName] = useState(program.name);
-  const [description, setDescription] = useState(program.description ?? '');
-  const [weeksText, setWeeksText] = useState(String(program.weeks));
-  const [errors, setErrors] = useState<Partial<Record<'name' | 'description' | 'weeks', string>>>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [confirm, setConfirm] = useState<{ input: ProgramInput; count: number } | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-
-  const [shownWeeks, setShownWeeks] = useState(weeks);
-  if (shownWeeks !== weeks) {
-    setShownWeeks(weeks);
-    setWeeksText(String(weeks));
-  }
-  useEffect(() => {
-    if (confirm && !dialogRef.current?.open) dialogRef.current?.showModal();
-  }, [confirm]);
-
-  async function save(input: ProgramInput, expected: number) {
-    setPending(true);
-    setFormError(null);
-    try {
-      const outcome = await updateProgram(program.id, input);
-      if (!outcome.ok) {
-        setFormError(outcome.error);
-        return;
-      }
-      onSaved({ name: input.name, description: input.description }, input.weeks, outcome.removedSlots, expected);
-    } catch {
-      setFormError("Couldn't save. Please try again.");
-    } finally {
-      setPending(false);
-      dialogRef.current?.close();
-    }
-  }
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const parsed = ProgramInput.safeParse({
-      name,
-      description: description.trim() === '' ? null : description,
-      weeks: weeksText.trim() === '' ? Number.NaN : Number(weeksText),
-    });
-    if (!parsed.success) {
-      const next: typeof errors = {};
-      for (const issue of parsed.error.issues) {
-        const key = issue.path[0];
-        if ((key === 'name' || key === 'description' || key === 'weeks') && !next[key]) next[key] = issue.message;
-      }
-      setErrors(next);
-      return;
-    }
-    setErrors({});
-    // Shrinking removes the workouts in the cut weeks: say how many first (Review Focus 5).
-    if (parsed.data.weeks < weeks) {
-      setPending(true);
-      let count: number;
-      try {
-        count = await countSlotsBeyondWeek(program.id, parsed.data.weeks);
-      } catch {
-        setPending(false);
-        setFormError("Couldn't check the weeks you're removing. Please try again.");
-        return;
-      }
-      setPending(false);
-      if (count > 0) {
-        setConfirm({ input: parsed.data, count });
-        return;
-      }
-    }
-    await save(parsed.data, 0);
-  }
-
-  return (
-    <Card className={styles.formCard}>
-      <form className={styles.detailsForm} onSubmit={(e) => void submit(e)} noValidate>
-        <TextField
-          label="Program name"
-          value={name}
-          maxLength={100}
-          onChange={(e) => setName(e.target.value)}
-          {...errorProp(errors.name)}
-          className={styles.nameField}
-        />
-        <TextField
-          label="Weeks"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={PROGRAM_WEEKS_MAX}
-          value={weeksText}
-          onChange={(e) => setWeeksText(e.target.value)}
-          {...errorProp(errors.weeks)}
-          className={styles.weeksField}
-        />
-        <TextAreaField
-          label="Description"
-          value={description}
-          maxLength={2000}
-          rows={2}
-          onChange={(e) => setDescription(e.target.value)}
-          className={styles.descriptionField}
-        />
-        {errors.description ? <ErrorText>{errors.description}</ErrorText> : null}
-        {formError ? <ErrorText className={styles.fullRow}>{formError}</ErrorText> : null}
-        <div className={styles.fullRow}>
-          <Button type="submit" variant="secondary" pending={pending && !confirm}>
-            {pending && !confirm ? 'Saving…' : 'Save details'}
-          </Button>
-        </div>
-      </form>
-
-      <dialog
-        ref={dialogRef}
-        className={styles.dialog}
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        onCancel={(e) => {
-          if (pending) e.preventDefault();
-        }}
-        onClose={() => setConfirm(null)}
-      >
-        <h2 id={titleId} className={styles.dialogTitle}>Remove workouts?</h2>
-        <p id={bodyId} className={styles.dialogBody}>
-          {confirm ? shrinkWarning(weeks, confirm.input.weeks, confirm.count) : null}
-        </p>
-        <div className={styles.dialogActions}>
-          <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-            Cancel
-          </Button>
-          <Button onClick={() => {
-              if (confirm) void save(confirm.input, confirm.count);
-            }} pending={pending}>
-            {pending ? 'Saving…' : 'Remove and save'}
-          </Button>
-        </div>
-      </dialog>
-    </Card>
-  );
-}
-
-/* ---------- Library panel ---------- */
-
-function LibraryPanel({ library }: { library: LibraryWorkout[] }) {
-  const [query, setQuery] = useState('');
-  const headingId = useId();
-  const results = library.filter((w) => matchesSearch(w.name, query));
-  return (
-    <section className={styles.library} aria-labelledby={headingId}>
-      <h2 id={headingId} className={styles.sectionHeading}>Library</h2>
-      <p className={styles.caption}>Drag a workout onto a day, or use a day&apos;s + button.</p>
-      <label className={styles.searchLabel}>
-        <span>Search library</span>
-        <input type="search" className={styles.input} value={query} onChange={(e) => setQuery(e.target.value)} />
-      </label>
-      <ul className={styles.libraryList}>
-        {library.length === 0 ? (
-          <li className={styles.caption}>No workouts in your library yet.</li>
-        ) : results.length === 0 ? (
-          <li className={styles.caption}>No workouts match.</li>
-        ) : null}
-        {results.map((w) => (
-          <LibraryItem key={w.id} workout={w} />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function LibraryItem({ workout }: { workout: LibraryWorkout }) {
-  const data: DragData = { kind: 'library', workout };
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `library-${workout.id}`, data });
-  return (
-    <li>
-      <button
-        type="button"
-        ref={setNodeRef}
-        {...attributes}
-        {...listeners}
-        className={cx(styles.libraryItem, isDragging && styles.dragging)}
-      >
-        {workout.name}
-      </button>
-    </li>
   );
 }
 
@@ -671,58 +465,5 @@ function SlotChip({ slot, onMove, onRemove }: { slot: Slot; onMove: () => void; 
         </ul>
       ) : null}
     </li>
-  );
-}
-
-/* ---------- Move to… ---------- */
-
-function MoveDialog({
-  slot,
-  weeks,
-  onMove,
-  onClose,
-}: {
-  slot: Slot;
-  weeks: number;
-  onMove: (week: number, day: number) => void;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const [week, setWeek] = useState(Math.min(slot.week, weeks));
-  const [day, setDay] = useState(slot.day);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    // The menu that opened this is gone, and the chip remounts in its new day: focus the chip there.
-    return () => {
-      focusSoon(chipDomId(slot.id));
-    };
-  }, [slot.id]);
-
-  return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>Move {slot.workoutName}</h2>
-      <p className={styles.dialogBody}>Now on {cellLabel(slot.week, slot.day)}.</p>
-      <div className={styles.moveFields}>
-        <SelectField label="Week" value={week} onChange={(e) => setWeek(Number(e.target.value))}>
-          {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => (
-            <option key={w} value={w}>Week {w}</option>
-          ))}
-        </SelectField>
-        <SelectField label="Day" value={day} onChange={(e) => setDay(Number(e.target.value))}>
-          {DAYS.map((d) => (
-            <option key={d} value={d}>Day {d}</option>
-          ))}
-        </SelectField>
-      </div>
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
-          Cancel
-        </Button>
-        <Button onClick={() => onMove(week, day)}>Move</Button>
-      </div>
-    </dialog>
   );
 }

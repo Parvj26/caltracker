@@ -114,6 +114,34 @@
   cursor: pointer;
 }
 .addButton:hover { color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.addButton { position: relative; }
+.addTip {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--ct-space-1));
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
+.addButton:focus-visible .addTip { display: block; }
+/* With a mouse, a day's "+" shows on hover and focus (and always on today); touch screens always show it. It stays
+   in the layout and in the tab order while hidden, so keyboard users land on it and it appears. */
+@media (hover: hover) {
+  .addButton { opacity: 0; transition: opacity 120ms ease-out; }
+  .day:hover .addButton, .day:focus-within .addButton, .today .addButton { opacity: 1; }
+}
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .addButton { transition: none; }
+}
 
 /* ---------- Item menu ---------- */
 .menuButton {
@@ -173,6 +201,31 @@
   line-height: 1.15;
 }
 .titleActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin-left: auto; }
+.titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+
+/* ---------- Empty calendar: two big choices (side by side, stacked when narrow) ---------- */
+.emptyState { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--ct-space-3); }
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ct-space-1);
+  min-height: 96px;
+  padding: var(--ct-space-4) var(--ct-space-4-5);
+  border: 0;
+  border-radius: var(--ct-radius-card);
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) transparent;
+}
+.choice:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.choiceLime { background: var(--ct-lime); }
+.choiceBlue { background: var(--ct-blue); }
+.choiceTitle { font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.choiceBody { color: var(--ct-ink); }
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .status { margin: 0; min-height: 1.5em; color: var(--ct-ink-muted); }
@@ -207,6 +260,37 @@
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
 .preview { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.searchLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
+.input {
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+}
+.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.results { max-height: 220px; min-height: 88px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.result {
+  display: flex;
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.result:hover { background: var(--ct-surface); }
+/* Text on a pastel fill is always ink. */
+.result[aria-pressed='true'] { background: var(--ct-lime); font-weight: var(--ct-weight-section-heading); }
 /* Amber marks a warning; the text itself stays ink. */
 .pastNote {
   display: flex;

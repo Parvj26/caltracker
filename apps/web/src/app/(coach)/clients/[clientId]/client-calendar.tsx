@@ -1,17 +1,22 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
-import { IsoDateSchema, localToday } from '@caltracker/shared';
+import { useEffect, useState } from 'react';
 import type { IsoDate } from '@caltracker/shared';
-import { calendarAddDomId, calendarItemDomId, MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
-import { formatDayMonth, formatShortDay } from '@/components/calendar/format';
-import { Button, Card, TextField } from '@/components/ui';
+import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
+import { formatShortDay } from '@/components/calendar/format';
+import { ReloadButton } from '@/components/reload-button';
+import { Button } from '@/components/ui';
+import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
+import { useLocalToday } from '@/lib/local-today';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
-import { deleteClientWorkout, moveClientWorkout, scheduleWorkout, unassignProgram } from './actions';
+import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
+import { AddWorkoutDialog } from './add-workout-dialog';
 import { AssignDialog } from './assign-dialog';
+import { AssignmentsPanel } from './assignments-panel';
+import { CalendarEmptyState } from './calendar-empty-state';
 import type { ClientRef } from './client';
+import { DeleteDialog, ItemMenu, MoveDialog } from './item-menu';
 import styles from '@/components/calendar/calendar.module.css';
 
 export type CalendarEntry = CalendarItem & { date: IsoDate };
@@ -27,23 +32,16 @@ export type PickerProgram = { id: string; name: string; weeks: number; slots: { 
 type LibraryWorkout = { id: string; name: string };
 
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
-const subscribe = () => () => {};
-const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
+/** Messages from the server that are meant for the coach (anything else gets the generic undo message). */
+const forCoach = (message: string) => message.startsWith('You ') || message.startsWith('Pick ') || message.includes('date looks wrong');
 
 /**
- * Today in the coach's browser. The server (UTC on Workers) renders UTC's date first and the browser corrects it
- * right after hydration, so a coach in Auckland or Los Angeles sees their own date (Review Focus 3).
- */
-export function useLocalToday(): IsoDate {
-  return useSyncExternalStore(subscribe, () => localToday(), () => localToday('UTC'));
-}
-
-/**
- * One client's month: assign a program, add single library workouts with each day's "+", and move (drag or
- * "Move to…"), edit or delete single workouts. Moves and deletes show at once and are undone, with a message, if
- * saving fails; the server re-sends the calendar after every change. A past client's calendar is read-only: no
- * assigning, adding, moving, editing or removing.
+ * One client's month: assign a program, add single library workouts ("+ Add workout" or a day's "+"), and move
+ * (drag or "Move to…"), edit or delete single workouts. Single workouts go on today or later, so past days are
+ * read-only except for Delete (to clear a missed workout). Moves and deletes show at once and are undone, with a message, if saving fails; the server re-sends the
+ * calendar after every change. A past client's calendar is read-only: no assigning, adding, moving, editing or
+ * removing.
  */
 export function ClientCalendar({
   client,
@@ -71,6 +69,7 @@ export function ClientCalendar({
     setItems(entries);
   }
   const [assigning, setAssigning] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);
@@ -90,7 +89,8 @@ export function ClientCalendar({
   }, [inFlight]);
 
   useEffect(() => {
-    if (!toast) return;
+    // The reload prompt stays until the coach acts on it.
+    if (!toast || toast === STALE_DEPLOY_MESSAGE) return;
     const timer = setTimeout(() => setToast(null), 8000);
     return () => clearTimeout(timer);
   }, [toast]);
@@ -106,18 +106,22 @@ export function ClientCalendar({
       .then(() => setSavedOnce(true))
       .catch((e: unknown) => {
         setItems(undo);
-        setToast(e instanceof Error && e.message.startsWith('You ') ? e.message : SAVE_ERROR);
+        if (isStaleDeployError(e)) setToast(STALE_DEPLOY_MESSAGE);
+        else setToast(e instanceof Error && forCoach(e.message) ? e.message : SAVE_ERROR);
       })
       .finally(() => setInFlight((n) => n - 1));
   }
 
   function move(itemId: string, date: IsoDate) {
     const entry = items.find((x) => x.id === itemId);
-    if (!entry || entry.date === date) return;
+    if (!entry || entry.date === date || date < today) return;
     const from = entry.date;
     optimistic(
       (s) => s.map((x) => (x.id === itemId ? { ...x, date } : x)),
-      () => moveClientWorkout({ workoutId: itemId, date }),
+      async () => {
+        const outcome = await moveClientWorkout({ workoutId: itemId, date, today });
+        if (!outcome.ok) throw new Error(outcome.error);
+      },
       (s) => s.map((x) => (x.id === itemId ? { ...x, date: from } : x)),
     );
   }
@@ -135,7 +139,7 @@ export function ClientCalendar({
     optimistic(
       (s) => (s.some((x) => x.id === newId) ? s : [...s, entry]),
       async () => {
-        const outcome = await scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date });
+        const outcome = await scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date, today });
         if (!outcome.ok) throw new Error(outcome.error);
       },
       (s) => s.filter((x) => x.id !== newId),
@@ -145,21 +149,40 @@ export function ClientCalendar({
   const days: Record<IsoDate, CalendarItem[]> = {};
   for (const { date, ...item } of items) (days[date] ??= []).push(item);
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
+  // Empty: nothing in the month on screen and no program still running.
+  const empty =
+    !readOnly && !items.some((x) => x.date.startsWith(`${month}-`)) && !assignments.some((a) => a.endDate >= today);
 
   return (
     <>
       <header className={styles.titleRow}>
-        <h1 className={styles.title}>{client.name}</h1>
-        {client.removedAt !== null ? (
-          <p className={styles.caption}>
-            Past client · removed <LocalDate iso={client.removedAt} />
-          </p>
-        ) : (
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>{client.name}</h1>
+          {readOnly ? (
+            <p className={styles.caption}>
+              Past client · removed <LocalDate iso={client.removedAt!} />
+            </p>
+          ) : (
+            <p className={styles.caption}>Assign a program to plan weeks at once, or add a single workout to any day.</p>
+          )}
+        </div>
+        {readOnly ? null : (
           <div className={styles.titleActions}>
-            <Button onClick={() => setAssigning(true)}>Assign program</Button>
+            <Button variant="secondary" onClick={() => setAssigning(true)}>
+              Assign program
+            </Button>
+            <Button onClick={() => setAdding(true)}>+ Add workout</Button>
           </div>
         )}
       </header>
+
+      {empty ? (
+        <CalendarEmptyState
+          firstName={client.firstName}
+          onAssign={() => setAssigning(true)}
+          onAdd={() => setAdding(true)}
+        />
+      ) : null}
 
       <AssignmentsPanel assignments={assignments} today={today} readOnly={readOnly} onMessage={setToast} />
 
@@ -174,16 +197,22 @@ export function ClientCalendar({
           month={month}
           days={days}
           today={today}
+          editableFrom={today}
           onDropItem={move}
           onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
-          renderItem={(item, date) => (
-            <ItemMenu
-              item={item}
-              editHref={`/clients/${client.id}/workouts/${item.id}`}
-              onMove={() => setMoving({ ...item, date })}
-              onDelete={() => setDeleting({ ...item, date })}
-            />
-          )}
+          renderItem={(item, date, editable) =>
+            editable ? (
+              <ItemMenu
+                item={item}
+                editHref={`/clients/${client.id}/workouts/${item.id}`}
+                onMove={() => setMoving({ ...item, date })}
+                onDelete={() => setDeleting({ ...item, date })}
+              />
+            ) : (
+              // A past day: no moving or editing, but a missed workout can still be cleared.
+              <ItemMenu item={item} onDelete={() => setDeleting({ ...item, date })} />
+            )
+          }
         />
       )}
 
@@ -198,6 +227,19 @@ export function ClientCalendar({
             setToast(`Assigned ${programName}: ${workoutsText(count)} added.`);
           }}
           onClose={() => setAssigning(false)}
+        />
+      ) : null}
+
+      {adding ? (
+        <AddWorkoutDialog
+          clientId={client.id}
+          library={library}
+          today={today}
+          onAdded={(workout, date) => {
+            setAdding(false);
+            setToast(`Added ${workout.name} to ${formatShortDay(date)}.`);
+          }}
+          onClose={() => setAdding(false)}
         />
       ) : null}
 
@@ -216,6 +258,7 @@ export function ClientCalendar({
       {moving ? (
         <MoveDialog
           entry={moving}
+          today={today}
           onMove={(date) => {
             move(moving.id, date);
             setMoving(null);
@@ -240,6 +283,7 @@ export function ClientCalendar({
         {toast ? (
           <div className={styles.toast}>
             <span>{toast}</span>
+            {toast === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
             <button type="button" className={styles.smallButton} onClick={() => setToast(null)}>
               Dismiss
             </button>
@@ -247,326 +291,5 @@ export function ClientCalendar({
         ) : null}
       </div>
     </>
-  );
-}
-
-/* ---------- Assigned programs ---------- */
-
-function AssignmentsPanel({
-  assignments,
-  today,
-  readOnly,
-  onMessage,
-}: {
-  assignments: AssignmentSummary[];
-  today: IsoDate;
-  readOnly: boolean;
-  onMessage: (message: string) => void;
-}) {
-  const headingId = useId();
-  const [removing, setRemoving] = useState<AssignmentSummary | null>(null);
-  return (
-    <Card className={styles.panel}>
-      <section aria-labelledby={headingId}>
-        <h2 id={headingId} className={styles.sectionHeading}>Assigned programs</h2>
-        {assignments.length === 0 ? (
-          <p className={styles.caption}>
-            {readOnly ? 'No programs assigned.' : 'No programs assigned. Use Assign program to add one.'}
-          </p>
-        ) : (
-          <ul className={styles.assignments}>
-            {assignments.map((a) => (
-              <li key={a.id} className={styles.assignment}>
-                <span className={styles.assignmentName}>
-                  {`${a.programName} · ${formatDayMonth(a.startDate)} – ${formatDayMonth(a.endDate)}`}
-                </span>
-                {readOnly ? null : (
-                  <Button
-                    variant="secondary"
-                    aria-label={`Remove ${a.programName} from calendar`}
-                    onClick={() => setRemoving(a)}
-                  >
-                    Remove from calendar
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {removing ? (
-        <UnassignDialog
-          assignment={removing}
-          today={today}
-          onDone={(removed) => {
-            setRemoving(null);
-            if (removed !== null) onMessage(`Removed ${workoutsText(removed)}.`);
-          }}
-          onError={(message) => {
-            setRemoving(null);
-            onMessage(message);
-          }}
-        />
-      ) : null}
-    </Card>
-  );
-}
-
-function UnassignDialog({
-  assignment,
-  today,
-  onDone,
-  onError,
-}: {
-  assignment: AssignmentSummary;
-  today: IsoDate;
-  /** `removed` is null when the coach cancelled. */
-  onDone: (removed: number | null) => void;
-  onError: (message: string) => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  const [pending, setPending] = useState(false);
-  const upcoming = assignment.dates.filter((d) => d >= today).length;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
-
-  async function confirm() {
-    if (pending) return;
-    setPending(true);
-    try {
-      // From the coach's own today, as the browser sees it.
-      const { removed } = await unassignProgram({ assignmentId: assignment.id, fromDate: today });
-      onDone(removed);
-    } catch {
-      onError("Couldn't remove the program. Please try again.");
-    }
-  }
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      aria-describedby={bodyId}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
-      onClose={() => onDone(null)}
-    >
-      <h2 id={titleId} className={styles.dialogTitle}>Remove {assignment.programName} from the calendar?</h2>
-      <p id={bodyId} className={styles.dialogBody}>
-        Removes {upcoming} upcoming {upcoming === 1 ? 'workout' : 'workouts'} from {formatShortDay(today)}. Past workouts
-        stay.
-      </p>
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-          Cancel
-        </Button>
-        <Button onClick={() => void confirm()} pending={pending}>
-          {pending ? 'Removing…' : 'Remove'}
-        </Button>
-      </div>
-    </dialog>
-  );
-}
-
-/* ---------- One item's menu ---------- */
-
-function ItemMenu({
-  item,
-  editHref,
-  onMove,
-  onDelete,
-}: {
-  item: CalendarItem;
-  editHref: string;
-  onMove: () => void;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuId = useId();
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const itemsRef = useRef<(HTMLElement | null)[]>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    itemsRef.current[0]?.focus();
-    const outside = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', outside);
-    return () => document.removeEventListener('pointerdown', outside);
-  }, [open]);
-
-  function onMenuKey(e: KeyboardEvent<HTMLUListElement>) {
-    const els = itemsRef.current.filter((x): x is HTMLElement => x !== null);
-    const at = els.indexOf(document.activeElement as HTMLElement);
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpen(false);
-      buttonRef.current?.focus();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const step = e.key === 'ArrowDown' ? 1 : -1;
-      els[(at + step + els.length) % els.length]?.focus();
-    } else if (e.key === 'Tab') {
-      setOpen(false);
-    }
-  }
-
-  return (
-    <div ref={wrapRef}>
-      <button
-        type="button"
-        ref={buttonRef}
-        className={styles.menuButton}
-        aria-label={`Options for ${item.name}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span aria-hidden="true">⋯</span>
-      </button>
-      {open ? (
-        <ul id={menuId} role="menu" aria-label={`Options for ${item.name}`} className={styles.menu} onKeyDown={onMenuKey}>
-          <li role="none">
-            <Link href={editHref} role="menuitem" ref={(el) => {
-                itemsRef.current[0] = el;
-              }} className={styles.menuItem}>
-              Edit
-            </Link>
-          </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                itemsRef.current[1] = el;
-              }}
-              className={styles.menuItem}
-              onClick={() => {
-                setOpen(false);
-                onMove();
-              }}
-            >
-              Move to…
-            </button>
-          </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                itemsRef.current[2] = el;
-              }}
-              className={styles.menuItem}
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-            >
-              Delete
-            </button>
-          </li>
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-/* ---------- Move to… and Delete ---------- */
-
-function MoveDialog({ entry, onMove, onClose }: { entry: CalendarEntry; onMove: (date: IsoDate) => void; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const [date, setDate] = useState(entry.date);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    // The item remounts on its new day: put focus back on it there.
-    return () => {
-      focusSoon(calendarItemDomId(entry.id));
-    };
-  }, [entry.id]);
-
-  function submit() {
-    const parsed = IsoDateSchema.safeParse(date);
-    if (!parsed.success) {
-      setError('Pick a date.');
-      return;
-    }
-    onMove(parsed.data);
-  }
-
-  return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>Move {entry.name}</h2>
-      <p className={styles.dialogBody}>Now on {formatShortDay(entry.date)}.</p>
-      <TextField
-        label="Date"
-        type="date"
-        value={date}
-        onChange={(e) => {
-          setDate(e.target.value);
-          setError(null);
-        }}
-        {...(error ? { error } : {})}
-      />
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>Move</Button>
-      </div>
-    </dialog>
-  );
-}
-
-function DeleteDialog({
-  entry,
-  clientName,
-  onDelete,
-  onClose,
-}: {
-  entry: CalendarEntry;
-  clientName: string;
-  onDelete: () => void;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    // The menu that opened this is gone: back to the item if it is still there, else to its day's "+".
-    return () => {
-      requestAnimationFrame(() =>
-        (document.getElementById(calendarItemDomId(entry.id)) ?? document.getElementById(calendarAddDomId(entry.date)))?.focus(),
-      );
-    };
-  }, [entry.id, entry.date]);
-  return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} aria-describedby={bodyId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>Delete {entry.name}?</h2>
-      <p id={bodyId} className={styles.dialogBody}>
-        Removes it from {clientName}&apos;s calendar on {formatShortDay(entry.date)}. Your library isn&apos;t changed.
-      </p>
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
-          Cancel
-        </Button>
-        <Button onClick={onDelete}>Delete</Button>
-      </div>
-    </dialog>
   );
 }

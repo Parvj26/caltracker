@@ -18,6 +18,8 @@ export const AssignProgramInput = z.object({
   programId: z.string().uuid(),
   clientId: z.string().uuid(),
   startDate: IsoDateSchema,
+  /** The coach's today, from their browser (see date-rules). */
+  today: IsoDateSchema,
 });
 export type AssignProgramInput = z.infer<typeof AssignProgramInput>;
 
@@ -27,5 +29,7 @@ export const ScheduleWorkoutInput = z.object({
   workoutId: z.string().uuid(),
   clientId: z.string().uuid(),
   date: IsoDateSchema,
+  /** The coach's today, from their browser (see date-rules). */
+  today: IsoDateSchema,
 });
 export type ScheduleWorkoutInput = z.infer<typeof ScheduleWorkoutInput>;

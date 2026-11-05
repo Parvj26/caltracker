@@ -89,3 +89,13 @@ export {
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
+export {
+  BAD_TODAY_ERROR,
+  PAST_DATE_ERROR,
+  PROGRAM_START_DAYS_BACK,
+  PROGRAM_START_ERROR,
+  earliestProgramStart,
+  isPlausibleToday,
+  programStartError,
+  scheduleDateError,
+} from './programs/date-rules';

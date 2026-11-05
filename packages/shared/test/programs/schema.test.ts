@@ -46,7 +46,7 @@ describe('ProgramInput', () => {
 });
 
 describe('AssignProgramInput', () => {
-  const valid = { assignmentId: A, programId: B, clientId: C, startDate: '2026-03-02' };
+  const valid = { assignmentId: A, programId: B, clientId: C, startDate: '2026-03-02', today: '2026-03-01' };
 
   it('accepts uuids and a real date', () => {
     expect(AssignProgramInput.parse(valid)).toEqual(valid);
@@ -61,10 +61,15 @@ describe('AssignProgramInput', () => {
   it.each(['assignmentId', 'programId', 'clientId'] as const)('rejects a non-uuid %s', (key) => {
     expect(AssignProgramInput.safeParse({ ...valid, [key]: 'not-a-uuid' }).success).toBe(false);
   });
+
+  it("needs the browser's today as a real date", () => {
+    expect(AssignProgramInput.safeParse({ ...valid, today: undefined }).success).toBe(false);
+    expect(AssignProgramInput.safeParse({ ...valid, today: '2026-02-30' }).success).toBe(false);
+  });
 });
 
 describe('ScheduleWorkoutInput', () => {
-  const valid = { newId: A, workoutId: B, clientId: C, date: '2026-12-31' };
+  const valid = { newId: A, workoutId: B, clientId: C, date: '2026-12-31', today: '2026-12-30' };
 
   it('accepts uuids and a real date', () => {
     expect(ScheduleWorkoutInput.parse(valid)).toEqual(valid);
@@ -77,5 +82,10 @@ describe('ScheduleWorkoutInput', () => {
 
   it.each(['newId', 'workoutId', 'clientId'] as const)('rejects a non-uuid %s', (key) => {
     expect(ScheduleWorkoutInput.safeParse({ ...valid, [key]: '123' }).success).toBe(false);
+  });
+
+  it("needs the browser's today as a real date", () => {
+    expect(ScheduleWorkoutInput.safeParse({ ...valid, today: undefined }).success).toBe(false);
+    expect(ScheduleWorkoutInput.safeParse({ ...valid, today: '12/30/2026' }).success).toBe(false);
   });
 });

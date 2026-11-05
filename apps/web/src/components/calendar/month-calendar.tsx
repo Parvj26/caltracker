@@ -33,12 +33,20 @@ type Props = {
   days: Record<IsoDate, CalendarItem[]>;
   /** The viewer's own today (computed in the browser), or null before it is known. */
   today: IsoDate | null;
-  /** Extra controls shown on each item, beside its name (for example an options menu). */
-  renderItem: (item: CalendarItem, date: IsoDate) => ReactNode;
+  /**
+   * Extra controls shown on each item, beside its name (for example an options menu). `editable` is false on days
+   * before `editableFrom`, so the controls can offer less there.
+   */
+  renderItem: (item: CalendarItem, date: IsoDate, editable: boolean) => ReactNode;
   /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
   onAddToDay?: (date: IsoDate) => void;
+  /**
+   * Days before this are read-only: no "+", not a drop target, and their items can't be dragged (renderItem is
+   * told, so it can offer fewer controls).
+   */
+  editableFrom?: IsoDate;
 };
 
 type DragData = { item: CalendarItem; from: IsoDate };
@@ -71,7 +79,7 @@ const announcements: Announcements = {
  * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
  * button and the item controls from renderItem are the non-drag path.
  */
-export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay }: Props) {
+export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay, editableFrom }: Props) {
   const pathname = usePathname();
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
@@ -126,19 +134,23 @@ export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAd
             <tbody>
               {weeks.map((week) => (
                 <tr key={week[0]}>
-                  {week.map((date) => (
-                    <td key={date}>
-                      <DayCell
-                        date={date}
-                        items={days[date] ?? NONE}
-                        inMonth={date.startsWith(`${month}-`)}
-                        isToday={date === today}
-                        draggable={draggable}
-                        renderItem={renderItem}
-                        {...(onAddToDay ? { onAdd: () => onAddToDay(date) } : {})}
-                      />
-                    </td>
-                  ))}
+                  {week.map((date) => {
+                    const editable = editableFrom === undefined || date >= editableFrom;
+                    return (
+                      <td key={date}>
+                        <DayCell
+                          date={date}
+                          items={days[date] ?? NONE}
+                          inMonth={date.startsWith(`${month}-`)}
+                          isToday={date === today}
+                          draggable={draggable && editable}
+                          renderItem={renderItem}
+                          editable={editable}
+                          {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -158,6 +170,7 @@ function DayCell({
   inMonth,
   isToday,
   draggable,
+  editable,
   renderItem,
   onAdd,
 }: {
@@ -166,6 +179,7 @@ function DayCell({
   inMonth: boolean;
   isToday: boolean;
   draggable: boolean;
+  editable: boolean;
   renderItem: Props['renderItem'];
   onAdd?: () => void;
 }) {
@@ -184,7 +198,14 @@ function DayCell({
       {items.length > 0 ? (
         <ul className={styles.items}>
           {items.map((item) => (
-            <DayItem key={item.id} item={item} date={date} draggable={draggable} renderItem={renderItem} />
+            <DayItem
+              key={item.id}
+              item={item}
+              date={date}
+              draggable={draggable}
+              editable={editable}
+              renderItem={renderItem}
+            />
           ))}
         </ul>
       ) : null}
@@ -193,10 +214,15 @@ function DayCell({
           type="button"
           id={calendarAddDomId(date)}
           className={styles.addButton}
-          aria-label={`Add a workout to ${formatShortDay(date)}`}
+          aria-label={`Add workout to ${formatShortDay(date)}`}
+          title={`Add workout to ${formatShortDay(date)}`}
           onClick={onAdd}
         >
-          +
+          <span aria-hidden="true">+</span>
+          {/* The title is a mouse-only tooltip; this shows the same words to keyboard users on focus. */}
+          <span aria-hidden="true" className={styles.addTip}>
+            Add workout to {formatShortDay(date)}
+          </span>
         </button>
       ) : null}
     </div>
@@ -207,11 +233,13 @@ function DayItem({
   item,
   date,
   draggable,
+  editable,
   renderItem,
 }: {
   item: CalendarItem;
   date: IsoDate;
   draggable: boolean;
+  editable: boolean;
   renderItem: Props['renderItem'];
 }) {
   const data: DragData = { item, from: date };
@@ -234,7 +262,7 @@ function DayItem({
           // Read-only calendar: the name is plain text.
           <span className={styles.itemHandle}>{item.name}</span>
         )}
-        {renderItem(item, date)}
+        {renderItem(item, date, editable)}
       </div>
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
     </li>

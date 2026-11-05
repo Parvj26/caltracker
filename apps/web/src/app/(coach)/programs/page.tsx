@@ -27,8 +27,12 @@ export default async function ProgramsPage() {
   return (
     <div className={styles.page}>
       <header className={styles.titleRow}>
-        <h1 className={styles.title}>Programs</h1>
-        <p className={styles.caption}>Weeks of library workouts, ready to assign to a client from a start date.</p>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>Programs</h1>
+          <p className={styles.caption}>
+            A program arranges workouts into weeks. Assign it to a client and every workout lands on their calendar.
+          </p>
+        </div>
         <div className={styles.titleActions}>
           <ButtonLink href="/programs/new">New program</ButtonLink>
         </div>

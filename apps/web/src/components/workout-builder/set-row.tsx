@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type InputHTMLAttributes } from 'react';
+import { useId, useState, type InputHTMLAttributes } from 'react';
 import {
   TARGET_FIELDS,
   distanceUnitFor,
@@ -14,6 +14,7 @@ import {
 import type { TrackingType, Units, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
+import { gridTemplate, setColumns } from './set-columns';
 import styles from './builder.module.css';
 
 export type SetPatch = Partial<Omit<WorkoutSetDoc, 'id'>>;
@@ -88,10 +89,12 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
   const [range, setRange] = useState(
     set.targetRepsMin !== null && set.targetRepsMax !== null && set.targetRepsMin !== set.targetRepsMax,
   );
+  const toggleHintId = useId();
+  const toggleHint = range ? 'Use one rep count' : 'Use a rep range, e.g. 8–10';
 
   return (
     <div role="group" aria-label={name} className={cx(styles.setRow, isDrop && styles.dropRow)}>
-      <div className={styles.setCells}>
+      <div className={styles.setCells} style={{ gridTemplateColumns: gridTemplate(setColumns(trackingType, showRest)) }}>
         <span className={styles.setLabel} aria-hidden="true">{label}</span>
 
         {isDrop ? (
@@ -115,7 +118,8 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
                 <NumberInput
                   label="Min reps"
                   inputMode="numeric"
-                  className={styles.narrow}
+                  placeholder="min"
+                  className={styles.rangeInput}
                   value={set.targetRepsMin}
                   format={String}
                   parse={parseWhole}
@@ -125,7 +129,8 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
                 <NumberInput
                   label="Max reps"
                   inputMode="numeric"
-                  className={styles.narrow}
+                  placeholder="max"
+                  className={styles.rangeInput}
                   value={set.targetRepsMax}
                   format={String}
                   parse={parseWhole}
@@ -136,6 +141,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               <NumberInput
                 label="Reps"
                 inputMode="numeric"
+                placeholder="reps"
                 className={styles.narrow}
                 value={set.targetRepsMin ?? set.targetRepsMax}
                 format={String}
@@ -143,18 +149,23 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
                 onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
               />
             )}
+            {/* Its label says what it switches to ("8–10" for a range, "Single" for one count), so no aria-pressed. */}
             <button
               type="button"
               className={cx(styles.smallButton, styles.toggle)}
-              aria-pressed={range}
+              title={toggleHint}
+              aria-describedby={toggleHintId}
               onClick={() => {
                 // Leaving range mode keeps one number: the minimum.
                 if (range) onChange({ targetRepsMax: set.targetRepsMin ?? set.targetRepsMax, targetRepsMin: set.targetRepsMin ?? set.targetRepsMax });
                 setRange(!range);
               }}
             >
-              Range
+              {range ? 'Single' : '8–10'}
             </button>
+            <span id={toggleHintId} className={styles.visuallyHidden}>
+              {toggleHint}
+            </span>
           </div>
         ) : null}
 
@@ -163,6 +174,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
             <NumberInput
               label={`Weight (${units})`}
               inputMode="decimal"
+              placeholder={units}
               className={styles.narrow}
               value={set.targetWeightKg}
               format={(kg) => String(kgToInput(kg, units))}
@@ -191,6 +203,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
             <NumberInput
               label={`Distance (${distanceUnit})`}
               inputMode="decimal"
+              placeholder={distanceUnit}
               className={styles.narrow}
               value={set.targetDistanceM}
               format={(m) => String(fromMeters(m, distanceUnit))}
@@ -208,7 +221,6 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
           </label>
         ) : showRest ? (
           <label className={styles.unitField}>
-            <span className={styles.cellCaption} aria-hidden="true">Rest</span>
             <NumberInput
               label="Rest (m:ss)"
               inputMode="numeric"
@@ -220,7 +232,10 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               onCommit={(n) => onChange({ restSeconds: n ?? 0 })}
             />
           </label>
-        ) : null}
+        ) : (
+          // This exercise has no rest (it runs straight into the next one): keep the column's place.
+          <span />
+        )}
 
         <input
           type="text"

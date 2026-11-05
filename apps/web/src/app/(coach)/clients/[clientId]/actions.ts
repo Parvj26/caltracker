@@ -1,7 +1,16 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { AssignProgramInput, IsoDateSchema, ScheduleWorkoutInput } from '@caltracker/shared';
+import {
+  AssignProgramInput,
+  BAD_TODAY_ERROR,
+  IsoDateSchema,
+  ScheduleWorkoutInput,
+  isPlausibleToday,
+  localToday,
+  programStartError,
+  scheduleDateError,
+} from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -21,11 +30,20 @@ const NOT_A_CLIENT = "You can't add workouts for this client. They may no longer
 
 const refreshCalendar = () => revalidatePath('/clients/[clientId]', 'page');
 
+/**
+ * Date rules (single workouts today or later, programs from up to 7 days back) are measured from the coach's own
+ * today, which only the browser knows. The browser sends it; it must be within a day of UTC's date here, so it can't
+ * be moved far to get round the rules.
+ */
+const todayError = (today: string) => (isPlausibleToday(today, localToday('UTC')) ? null : BAD_TODAY_ERROR);
+
 export async function assignProgram(input: AssignProgramInput): Promise<Outcome<{ count: number }>> {
   await requireCoach();
   const parsed = AssignProgramInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Pick a program and a valid start date.' };
-  const { assignmentId, programId, clientId, startDate } = parsed.data;
+  const { assignmentId, programId, clientId, startDate, today } = parsed.data;
+  const dateError = todayError(today) ?? programStartError(startDate, today);
+  if (dateError) return { ok: false, error: dateError };
 
   const supabase = await createServerSupabase();
   const { data: id, error } = await supabase.rpc('assign_program', {
@@ -58,7 +76,9 @@ export async function scheduleWorkout(input: ScheduleWorkoutInput): Promise<Outc
   await requireCoach();
   const parsed = ScheduleWorkoutInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Pick a workout and a valid date.' };
-  const { newId, workoutId, clientId, date } = parsed.data;
+  const { newId, workoutId, clientId, date, today } = parsed.data;
+  const dateError = todayError(today) ?? scheduleDateError(date, today);
+  if (dateError) return { ok: false, error: dateError };
 
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('schedule_workout', {
@@ -67,16 +87,31 @@ export async function scheduleWorkout(input: ScheduleWorkoutInput): Promise<Outc
     p_client_id: clientId,
     p_date: date,
   });
-  if (error) return { ok: false, error: error.code === '42501' ? NOT_A_CLIENT : GENERIC };
+  if (error) {
+    if (error.code === '42501') return { ok: false, error: NOT_A_CLIENT };
+    if (error.code === '23505') {
+      return {
+        ok: false,
+        error: 'This add was already sent with a different workout or day. Close this, check the calendar, then add again if needed.',
+      };
+    }
+    return { ok: false, error: GENERIC };
+  }
   refreshCalendar();
   return { ok: true };
 }
 
-/** Moves one calendar workout to another day. Throws on failure: the calendar has already moved it and rolls back. */
-export async function moveClientWorkout(input: { workoutId: string; date: IsoDate }): Promise<void> {
+/**
+ * Moves one calendar workout to today or a later day (`today` is the browser's). A refusal comes back as an outcome
+ * so the calendar can show why; other failures throw. Either way the calendar has already moved it and rolls back.
+ */
+export async function moveClientWorkout(input: { workoutId: string; date: IsoDate; today: IsoDate }): Promise<Outcome> {
   const { workspaceId } = await requireCoach();
   const date = IsoDateSchema.safeParse(input.date);
-  if (!isUuid(input.workoutId) || !date.success) throw new Error('Invalid move');
+  const today = IsoDateSchema.safeParse(input.today);
+  if (!isUuid(input.workoutId) || !date.success || !today.success) throw new Error('Invalid move');
+  const dateError = todayError(today.data) ?? scheduleDateError(date.data, today.data);
+  if (dateError) return { ok: false, error: dateError };
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('workouts')
@@ -88,6 +123,7 @@ export async function moveClientWorkout(input: { workoutId: string; date: IsoDat
   if (error) throw new Error(`Could not move the workout: ${error.message}`);
   if (data.length === 0) throw new Error('Workout not found');
   refreshCalendar();
+  return { ok: true };
 }
 
 /** Deletes one calendar workout (never a library workout). Throws on failure; one that is already gone is fine. */

@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { TRACKING_TYPE_LABELS, setLabels } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
+import { gridTemplate, setColumns } from './set-columns';
 import { SetRow, type SetPatch } from './set-row';
 import styles from './builder.module.css';
 
@@ -114,6 +115,7 @@ export function BlockEditor({ block, index, count, units, errors, actions }: Pro
         const nonDrop = rounds(ex);
         // In a superset the rest after a round sits on its last exercise; the others go straight on.
         const showRest = !superset || ei === block.exercises.length - 1;
+        const columns = setColumns(ex.trackingType, showRest);
         return (
           <div key={ex.id} className={styles.exercise}>
             {superset ? (
@@ -139,6 +141,12 @@ export function BlockEditor({ block, index, count, units, errors, actions }: Pro
               <ErrorText key={m}>{m}</ErrorText>
             ))}
             <div className={styles.sets}>
+              {/* Sighted coaches' column labels; each input already carries its own name for screen readers. */}
+              <div className={styles.columnCaptions} style={{ gridTemplateColumns: gridTemplate(columns) }} aria-hidden="true">
+                {columns.map((c) => (
+                  <span key={c.key}>{c.caption}</span>
+                ))}
+              </div>
               {ex.sets.map((s, si) => (
                 <SetRow
                   key={s.id}
