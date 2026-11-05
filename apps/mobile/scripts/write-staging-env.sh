@@ -11,6 +11,16 @@ case "$ANON_KEY" in
   eyJ*) ;;
   *) echo "That does not look like an anon key (it should start with eyJ)." >&2; exit 1 ;;
 esac
+# The service_role key also starts with eyJ, and it must never ship in the app: it bypasses every security rule.
+# Read the key's "role" claim (the middle part of the JWT) and accept only the anon key.
+ROLE=$(node -e '
+  const part = process.argv[1].split(".")[1] || "";
+  try { console.log(JSON.parse(Buffer.from(part, "base64url").toString()).role || ""); } catch { console.log(""); }
+' "$ANON_KEY")
+if [ "$ROLE" != "anon" ]; then
+  echo "That is not the anon key (its role is '${ROLE:-unknown}'). Copy the key labelled 'anon public', never 'service_role'." >&2
+  exit 1
+fi
 cat > .env.local <<EOT
 EXPO_PUBLIC_SUPABASE_URL=$STAGING_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY

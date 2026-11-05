@@ -45,7 +45,7 @@
 }
 .rows [role='rowgroup']:last-child > .row:last-child { border-bottom: 0; }
 /* Every row is its own grid, so tracks are fixed (rem, not auto/em) to keep the columns lined up with the header. */
-.clientRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 7rem; }
+.clientRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 7rem minmax(6rem, 0.6fr); }
 .inviteRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 6.5rem 8.5rem minmax(6rem, 0.7fr); }
 
 .headRow .row {
@@ -94,7 +94,7 @@
   .narrowOnly { display: inline; }
   .clientRows .row {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'name meta' 'email email';
+    grid-template-areas: 'name meta' 'email email' 'actions actions';
   }
   .inviteRows .row {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -199,3 +199,28 @@
 .previewTable th, .previewTable td { padding: var(--ct-space-2) var(--ct-space-2-5) var(--ct-space-2) 0; text-align: left; border-bottom: 1px solid var(--ct-border); vertical-align: top; }
 .previewTable th { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .previewTable td:last-child { min-width: 12em; }
+
+/* ---------- Confirm dialog (Remove client, Cancel invite) ---------- */
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: var(--ct-space-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.dialogBody { margin: 0; }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+
+/* ---------- Past clients ---------- */
+.pastRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem minmax(7rem, 0.7fr); }
+@container (max-width: 720px) {
+  .pastRows .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'name meta' 'email email' 'actions actions';
+  }
+}
+.pastSection { display: flex; flex-direction: column; gap: var(--ct-space-3); }

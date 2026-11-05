@@ -13,14 +13,15 @@ type Client = Pick<SupabaseClient<Database>, 'rpc' | 'functions' | 'auth'>;
 
 export type InviteDetails =
   | { status: 'valid'; workspaceName: string; email: string; firstName: string; lastName: string }
-  | { status: 'expired' | 'used' | 'not_found' | 'offline' };
+  | { status: 'expired' | 'used' | 'not_found' | 'offline' | 'server' };
 
 /** What the coach entered for this invite, so the Join screen can pre-fill it. Never throws. */
 export async function loadInvite(client: Client, token: string | undefined): Promise<InviteDetails> {
   if (!token || !INVITE_TOKEN_PATTERN.test(token)) return { status: 'not_found' };
   try {
     const { data, error } = await client.rpc('get_invite_preview', { token });
-    if (error) return { status: 'offline' };
+    // A response with an error code came from the server (it refused); no code means the request never got through.
+    if (error) return { status: error.code ? 'server' : 'offline' };
     const row = data[0];
     if (!row) return { status: 'not_found' };
     if (row.status === 'valid' && row.workspace_name && row.email) {

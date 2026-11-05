@@ -65,9 +65,14 @@ describe('loadInvite', () => {
     expect(await loadInvite(fakeClient({ preview: new TypeError('Network request failed') }).client, token)).toEqual({
       status: 'offline',
     });
-    expect(await loadInvite(fakeClient({ preview: { data: null, error: { message: 'x' } } }).client, token)).toEqual({
-      status: 'offline',
-    });
+    expect(
+      await loadInvite(fakeClient({ preview: { data: null, error: { message: 'TypeError: Network request failed', code: '' } } }).client, token),
+    ).toEqual({ status: 'offline' });
+  });
+
+  it('reports a server refusal as server, not as a connection problem', async () => {
+    const refused = { message: 'permission denied for function get_invite_preview', code: '42501' };
+    expect(await loadInvite(fakeClient({ preview: { data: null, error: refused } }).client, token)).toEqual({ status: 'server' });
   });
 });
 

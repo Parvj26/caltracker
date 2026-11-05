@@ -191,6 +191,50 @@ export type Database = {
           },
         ]
       }
+      past_clients: {
+        Row: {
+          email: string
+          first_name: string
+          full_name: string | null
+          joined_at: string | null
+          last_name: string
+          removed_at: string
+          removed_by: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          email: string
+          first_name?: string
+          full_name?: string | null
+          joined_at?: string | null
+          last_name?: string
+          removed_at?: string
+          removed_by?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          email?: string
+          first_name?: string
+          full_name?: string | null
+          joined_at?: string | null
+          last_name?: string
+          removed_at?: string
+          removed_by?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "past_clients_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -323,6 +367,17 @@ export type Database = {
           user_id: string
           workspace_id: string
         }[]
+      }
+      my_removal: {
+        Args: never
+        Returns: {
+          removed_at: string
+          workspace_name: string
+        }[]
+      }
+      remove_client: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: undefined
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }

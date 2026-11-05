@@ -7,7 +7,9 @@ import { AddClientForm } from './add-client-form';
 import { avatarTone, initials } from './avatar';
 import { CsvUpload } from './csv-upload';
 import { newestInviteFirst } from './pending-order';
+import { PastClients } from './past-clients';
 import { ResendButton } from './resend-button';
+import { CancelInviteButton, RemoveClientButton } from './row-actions';
 import styles from './clients.module.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -42,7 +44,7 @@ export default async function ClientsPage() {
   const { workspaceId } = await requireCoach();
   const supabase = await createServerSupabase();
 
-  const [members, invites] = await Promise.all([
+  const [members, invites, past] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('user_id, created_at')
@@ -54,7 +56,13 @@ export default async function ClientsPage() {
       .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
+    supabase
+      .from('past_clients')
+      .select('user_id, email, first_name, last_name, full_name, removed_at')
+      .eq('workspace_id', workspaceId)
+      .order('removed_at', { ascending: false }),
   ]);
+  if (past.error) throw new Error(`Could not load past clients: ${past.error.message}`);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (invites.error) throw new Error(`Could not load invites: ${invites.error.message}`);
 
@@ -93,13 +101,14 @@ export default async function ClientsPage() {
 
       <Card className={styles.listCard}>
         <section aria-labelledby="clients-heading">
-          <h2 id="clients-heading" className={styles.sectionHeading}>Clients</h2>
+          <h2 id="clients-heading" tabIndex={-1} className={styles.sectionHeading}>Clients</h2>
           <div role="table" aria-label="Clients" className={cx(styles.rows, styles.clientRows)}>
             <div role="rowgroup" className={styles.headRow}>
               <div role="row" className={styles.row}>
                 <span role="columnheader">Name</span>
                 <span role="columnheader">Email</span>
                 <span role="columnheader">Joined</span>
+                <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
               </div>
             </div>
             <div role="rowgroup">
@@ -110,14 +119,18 @@ export default async function ClientsPage() {
               ) : (
                 clients.map((m) => {
                   const joined = m.created_at ? dateFormat.format(new Date(m.created_at)) : '';
+                  const name = profileByUser.get(m.user_id)?.full_name ?? '';
                   return (
                     <div role="row" key={m.user_id} className={styles.row}>
-                      <NameCell name={profileByUser.get(m.user_id)?.full_name ?? ''} toneKey={m.user_id} />
+                      <NameCell name={name} toneKey={m.user_id} />
                       <span role="cell" className={styles.email}>{emailByUser.get(m.user_id) ?? ''}</span>
                       <span role="cell" className={styles.meta}>
                         {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}
                         {joined}
                       </span>
+                      <div role="cell" className={styles.actions}>
+                        <RemoveClientButton userId={m.user_id} name={name} />
+                      </div>
                     </div>
                   );
                 })
@@ -129,7 +142,7 @@ export default async function ClientsPage() {
 
       <Card className={styles.listCard}>
         <section aria-labelledby="pending-heading">
-          <h2 id="pending-heading" className={styles.sectionHeading}>Pending invites</h2>
+          <h2 id="pending-heading" tabIndex={-1} className={styles.sectionHeading}>Pending invites</h2>
           <div role="table" aria-label="Pending invites" className={cx(styles.rows, styles.inviteRows)}>
             <div role="rowgroup" className={styles.headRow}>
               <div role="row" className={styles.row}>
@@ -159,9 +172,10 @@ export default async function ClientsPage() {
                       <span role="cell" className={styles.expires}>
                         <Chip tone={expiry === 'Expired' ? 'amber' : 'grey'}>{expiry}</Chip>
                       </span>
-                      <span role="cell" className={styles.actions}>
+                      <div role="cell" className={styles.actions}>
                         <ResendButton email={i.email} firstName={i.first_name} lastName={i.last_name} />
-                      </span>
+                        <CancelInviteButton inviteId={i.id} email={i.email} />
+                      </div>
                     </div>
                   );
                 })
@@ -171,6 +185,42 @@ export default async function ClientsPage() {
         </section>
       </Card>
 
+      {past.data.length > 0 ? (
+        <Card className={styles.listCard}>
+          <PastClients count={past.data.length}>
+            <div role="table" aria-label="Past clients" className={cx(styles.rows, styles.pastRows)}>
+              <div role="rowgroup" className={styles.headRow}>
+                <div role="row" className={styles.row}>
+                  <span role="columnheader">Name</span>
+                  <span role="columnheader">Email</span>
+                  <span role="columnheader">Removed</span>
+                  <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
+                </div>
+              </div>
+              <div role="rowgroup">
+                {past.data.map((p) => (
+                  <div role="row" key={p.user_id} className={styles.row}>
+                    <NameCell name={p.full_name ?? ''} toneKey={p.user_id} />
+                    <span role="cell" className={styles.email}>{p.email}</span>
+                    <span role="cell" className={styles.meta}>
+                      {`Removed ${dateFormat.format(new Date(p.removed_at))}`}
+                    </span>
+                    <div role="cell" className={styles.actions}>
+                      <ResendButton
+                        email={p.email}
+                        firstName={p.first_name || p.email.split('@')[0] || 'Client'}
+                        lastName={p.last_name}
+                        label="Re-invite"
+                        ariaLabel={`Re-invite ${p.full_name || p.email}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </PastClients>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,50 @@
+# A signed-in client whom the coach removes sees "You're no longer connected to..." when the app comes back.
+appId: app.caltracker.client
+env:
+  EMAIL: e2e-removed@x.com
+  PASSWORD: e2e-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/invite-link.js
+    env: { EMAIL: '${EMAIL}', NAME: 'Removed Client' }
+- launchApp:
+    clearState: true
+- openLink: ${output.link}
+- repeat:
+    times: 3
+    while:
+      notVisible: 'Join Demo Coaching'
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+- extendedWaitUntil:
+    visible: 'Join Demo Coaching'
+    timeout: 20000
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- tapOn:
+    id: join-button
+- tapOn:
+    text: Not Now
+    optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to Demo Coaching'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: remove, EMAIL: '${EMAIL}' }
+# Leave the app and come back: the foreground check notices the removal.
+- pressKey: home
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "You're no longer connected to Demo Coaching. If that's a mistake, ask your coach to invite you again."
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

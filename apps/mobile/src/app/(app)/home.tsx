@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme/use-theme';
 
 export default function Home() {
-  const { workspace, claimError, recheck } = useSession();
+  const { workspace, removedFromWorkspace, claimError, recheck } = useSession();
   const { text, space } = useTheme();
   const [checking, setChecking] = useState(false);
 
@@ -33,7 +33,11 @@ export default function Home() {
             <Text style={text('screenTitle')} accessibilityRole="header">
               Ask your coach for an invite
             </Text>
-            <Text style={text('body')}>Your coach needs to invite this email before you can join their workspace.</Text>
+            <Text style={text('body')} testID="no-coach-explain">
+              {removedFromWorkspace
+                ? `You're no longer connected to ${removedFromWorkspace}. If that's a mistake, ask your coach to invite you again.`
+                : 'Your coach needs to invite this email before you can join their workspace.'}
+            </Text>
             {claimError ? <ErrorText>{claimError}</ErrorText> : null}
             <Button testID="check-again" title="Check again" onPress={() => void checkAgain()} busy={checking} />
           </>
