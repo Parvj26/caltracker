@@ -47,13 +47,17 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
 
 The deploy job first compares the checked-out commit with the tip of `main` (`git ls-remote`). On automatic runs, if a newer commit has been merged meanwhile, it skips with a notice ("a newer commit will deploy") so an older queued deploy never overwrites a newer one. It also fails with an error if the `RESEND_API_KEY` secret is empty, before touching any Edge Function secret.
 
-The `deploy` job: link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy`, build and deploy the web app. Only one deploy runs at a time. The `smoke` job then tests the live site.
+The `deploy` job: build the web app (`cf:build`) first, so a failed build stops before anything on staging changes; then link the Supabase project, `supabase db push`, set Edge Function secrets (`PUBLIC_SITE_URL`, `RESEND_API_KEY`, `INVITE_FROM_EMAIL`), `pnpm functions:deploy` and deploy the already-built web app (`cf:deploy`). Only one deploy runs at a time. The `smoke` job then tests the live site.
+
+### Short invite gap during a deploy
+
+Between `supabase db push` and the end of `pnpm functions:deploy` (about 1 minute) the database is already new but the OLD send-invite function is still live. Invites sent in that window can fail with "Something went wrong" (the old function writes the old name column); the coach adds those clients again a minute later. (The other direction is covered: the new function still accepts the old dashboard's `fullName` invites for one release, so the few seconds before the new web app is live are fine.) For production deploys, either accept this one-minute gap or deploy during quiet hours.
 
 ## Create the smoke coach (after the first deploy)
 
 The smoke job needs a real staging coach who has a password.
 
-1. Actions -> Deploy staging -> Run workflow (branch `main`), `action = provision-coach`, with a mailbox you control (for example `smoke@caltracker.app` forwarding to you), a name and a workspace name such as `Smoke Test`.
+1. Actions -> Deploy staging -> Run workflow (branch `main`), `action = provision-coach`, with a mailbox you control (for example `smoke@caltracker.app` forwarding to you), a first name (last name optional) and a workspace name such as `Smoke Test`.
 2. Open the invite email, follow the link (it lands on `/set-password` on staging) and choose a password.
 3. Add the secrets `STAGING_SMOKE_COACH_EMAIL` (that email) and `STAGING_SMOKE_COACH_PASSWORD` (that password).
 4. Re-run Deploy staging (or merge the next change). Until the secrets exist, the automatic smoke job fails by design.
@@ -77,7 +81,7 @@ Invite sending limits: the dashboard sends 20 invites per call, one call after a
 Actions -> Deploy staging -> Run workflow (branch `main`):
 
 - `action = import-exercises`: loads the ~870 exercise library.
-- `action = provision-coach`: fill `coach_email`, `coach_name`, `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
+- `action = provision-coach`: fill `coach_email`, `coach_first_name`, `coach_last_name` (optional) and `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
 
 These use `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The values are passed as environment variables and the key is never printed.
 

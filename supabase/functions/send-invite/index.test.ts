@@ -36,13 +36,13 @@ const uid = () => crypto.randomUUID().slice(0, 8);
 const userIds: string[] = [];
 const workspaceIds: string[] = [];
 
-async function makeUser(label: string, fullName: string) {
+async function makeUser(label: string, firstName: string, lastName: string) {
   const email = `${label}-${uid()}@test.local`;
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password: PASSWORD,
     email_confirm: true,
-    user_metadata: { full_name: fullName },
+    user_metadata: { first_name: firstName, last_name: lastName },
   });
   if (error) throw error;
   userIds.push(data.user.id);
@@ -79,8 +79,8 @@ async function jwtFor(email: string) {
 }
 
 async function setup() {
-  const coachA = await makeUser('coacha', 'Demo Coach');
-  const coachB = await makeUser('coachb', 'Other Coach');
+  const coachA = await makeUser('coacha', 'Demo', 'Coach');
+  const coachB = await makeUser('coachb', 'Other', 'Coach');
   const wsA = await makeWorkspace(coachA.id, 'Workspace A');
   const wsB = await makeWorkspace(coachB.id, 'Workspace B');
   const jwt = await jwtFor(coachA.email);
@@ -150,7 +150,7 @@ t('new invite is sent, stored with 14-day expiry and emailed', async () => {
     handlerWith(mailer),
     {
       workspaceId: wsA,
-      invites: [{ email: 'New@X.com', fullName: 'New' }],
+      invites: [{ email: 'New@X.com', firstName: ' Sam ', lastName: ' Lee ' }],
     },
     jwt,
   );
@@ -159,15 +159,45 @@ t('new invite is sent, stored with 14-day expiry and emailed', async () => {
   assertEquals(body.results, [{ email: 'new@x.com', status: 'sent' }]);
   const rows = await openInvites(wsA);
   assertEquals(rows.length, 1);
+  assertEquals([rows[0].first_name, rows[0].last_name, rows[0].full_name], ['Sam', 'Lee', 'Sam Lee']);
   const diff = new Date(rows[0].expires_at).getTime() - Date.now();
   assert(Math.abs(diff - 14 * DAY) < 60_000, `expiry off: ${diff}`);
   assertEquals(sent.length, 1);
   assertEquals(sent[0].subject, 'Demo Coach invited you to CalTracker');
+  // Greets the client by first name only.
+  assert(sent[0].text.startsWith('Hi Sam,\n'), sent[0].text);
+  assert(sent[0].html.startsWith('<p>Hi Sam,</p>'), sent[0].html);
   assert(sent[0].text.includes('/invite/'));
   const token = sent[0].text.match(/\/invite\/([A-Za-z0-9_-]+)/)![1];
   const { data } = await admin.rpc('get_invite_preview', { token });
   assertEquals(data[0].status, 'valid');
   assertEquals(data[0].workspace_name, 'Workspace A');
+  assertEquals([data[0].first_name, data[0].last_name], ['Sam', 'Lee']);
+});
+
+t('legacy { fullName } invites from the old dashboard still work (one release)', async () => {
+  const { wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const res = await call(
+    handlerWith(mailer),
+    {
+      workspaceId: wsA,
+      invites: [
+        { email: 'legacy@x.com', fullName: ' Sam  van Lee ' },
+        { email: 'both@x.com', fullName: 'Ignored Name', firstName: 'Kept', lastName: 'Name' },
+      ],
+    },
+    jwt,
+  );
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).results, [
+    { email: 'legacy@x.com', status: 'sent' },
+    { email: 'both@x.com', status: 'sent' },
+  ]);
+  const rows = new Map((await openInvites(wsA)).map((r) => [r.email, r]));
+  assertEquals([rows.get('legacy@x.com')!.first_name, rows.get('legacy@x.com')!.last_name], ['Sam', 'van Lee']);
+  assertEquals([rows.get('both@x.com')!.first_name, rows.get('both@x.com')!.last_name], ['Kept', 'Name']);
+  assert(sent.some((m) => m.to === 'legacy@x.com' && m.text.startsWith('Hi Sam,\n')));
 });
 
 async function backdateInvite(ws: string, minutesAgo: number) {
@@ -188,15 +218,23 @@ t('same email again after the cooldown is resent with a new token', async () => 
   const h = handlerWith(mailer);
   const req = {
     workspaceId: wsA,
-    invites: [{ email: 'again@x.com', fullName: 'Again' }],
+    invites: [{ email: 'again@x.com', firstName: 'Again' }],
   };
   await call(h, req, jwt);
   await backdateInvite(wsA, 3);
   const before = (await openInvites(wsA))[0];
-  const res = await call(h, req, jwt);
+  assertEquals([before.first_name, before.last_name], ['Again', '']);
+  // A resend also stores the name the coach entered this time.
+  const res = await call(
+    h,
+    { ...req, invites: [{ email: 'again@x.com', firstName: 'Agnes', lastName: 'Gain' }] },
+    jwt,
+  );
   assertEquals((await res.json()).results[0].status, 'resent');
   const rows = await openInvites(wsA);
   assertEquals(rows.length, 1);
+  assertEquals([rows[0].first_name, rows[0].last_name], ['Agnes', 'Gain']);
+  assert(sent[1].text.startsWith('Hi Agnes,'), sent[1].text);
   assert(rows[0].token_hash !== before.token_hash);
   assert(new Date(rows[0].expires_at) >= new Date(before.expires_at));
   assertEquals(sent.length, 2);
@@ -208,7 +246,7 @@ t('resend within 2 minutes keeps the token and sends nothing', async () => {
   const h = handlerWith(mailer);
   const req = {
     workspaceId: wsA,
-    invites: [{ email: 'double@x.com', fullName: 'Double' }],
+    invites: [{ email: 'double@x.com', firstName: 'Double' }],
   };
   await call(h, req, jwt);
   const before = (await openInvites(wsA))[0];
@@ -237,7 +275,7 @@ t('a failed send does not block an immediate resend', async () => {
   const h = handlerWith(mailer);
   const req = {
     workspaceId: wsA,
-    invites: [{ email: 'retry@x.com', fullName: 'Retry' }],
+    invites: [{ email: 'retry@x.com', firstName: 'Retry' }],
   };
   assertEquals((await (await call(h, req, jwt)).json()).results[0].status, 'error');
   fail = false;
@@ -271,7 +309,7 @@ t('stops at the time budget: later rows are error and untouched', async () => {
       workspaceId: wsA,
       invites: ['b1', 'b2', 'b3', 'b4', 'b5'].map((n) => ({
         email: `${n}@x.com`,
-        fullName: n,
+        firstName: n,
       })),
     },
     jwt,
@@ -293,7 +331,7 @@ t('coach of A cannot invite into workspace B (403)', async () => {
     handlerWith(mailer),
     {
       workspaceId: wsB,
-      invites: [{ email: 'x@x.com', fullName: 'X' }],
+      invites: [{ email: 'x@x.com', firstName: 'X' }],
     },
     jwt,
   );
@@ -307,7 +345,7 @@ t('missing Authorization header is 401', async () => {
   const { wsA } = await setup();
   const res = await call(handlerWith(fakeMailer().mailer), {
     workspaceId: wsA,
-    invites: [{ email: 'x@x.com', fullName: 'X' }],
+    invites: [{ email: 'x@x.com', firstName: 'X' }],
   });
   assertEquals(res.status, 401);
   await res.body?.cancel();
@@ -326,14 +364,14 @@ t('empty invites list is 400', async () => {
 
 t('existing client of this workspace is already_member, no email', async () => {
   const { wsA, jwt } = await setup();
-  const c = await makeUser('client', 'Client');
+  const c = await makeUser('client', 'Client', 'One');
   await addClient(wsA, c.id);
   const { mailer, sent } = fakeMailer();
   const res = await call(
     handlerWith(mailer),
     {
       workspaceId: wsA,
-      invites: [{ email: c.email, fullName: 'C' }],
+      invites: [{ email: c.email, firstName: 'C' }],
     },
     jwt,
   );
@@ -346,14 +384,14 @@ t(
   'client of another coach: invite created, email sent, warning status',
   async () => {
     const { wsA, wsB, jwt } = await setup();
-    const c = await makeUser('client', 'Client');
+    const c = await makeUser('client', 'Client', 'One');
     await addClient(wsB, c.id);
     const { mailer, sent } = fakeMailer();
     const res = await call(
       handlerWith(mailer),
       {
         workspaceId: wsA,
-        invites: [{ email: c.email, fullName: 'C' }],
+        invites: [{ email: c.email, firstName: 'C' }],
       },
       jwt,
     );
@@ -375,7 +413,7 @@ t('email of a coach is is_coach, no row, no email', async () => {
     handlerWith(mailer),
     {
       workspaceId: wsA,
-      invites: [{ email: coachB.email, fullName: 'B' }],
+      invites: [{ email: coachB.email, firstName: 'B' }],
     },
     jwt,
   );
@@ -392,8 +430,8 @@ t('one send failure does not abort the other rows', async () => {
     {
       workspaceId: wsA,
       invites: [
-        { email: 'bad@x.com', fullName: 'Bad' },
-        { email: 'good@x.com', fullName: 'Good' },
+        { email: 'bad@x.com', firstName: 'Bad' },
+        { email: 'good@x.com', firstName: 'Good' },
       ],
     },
     jwt,
@@ -421,7 +459,7 @@ t('refuses to send when RESEND_API_KEY is set but PUBLIC_SITE_URL is not', async
   });
   const res = await call(
     handler,
-    { workspaceId: wsA, invites: [{ email: 'x@x.com', fullName: 'X' }] },
+    { workspaceId: wsA, invites: [{ email: 'x@x.com', firstName: 'X' }] },
     jwt,
   );
   assertEquals(res.status, 500);
@@ -442,7 +480,7 @@ t('strips trailing slashes from PUBLIC_SITE_URL in the invite link', async () =>
   });
   const res = await call(
     handler,
-    { workspaceId: wsA, invites: [{ email: 'x@x.com', fullName: 'X' }] },
+    { workspaceId: wsA, invites: [{ email: 'x@x.com', firstName: 'X' }] },
     jwt,
   );
   assertEquals(res.status, 200);
@@ -472,9 +510,9 @@ t('paces sends by sendIntervalMs', async () => {
     {
       workspaceId: wsA,
       invites: [
-        { email: 'p1@x.com', fullName: 'P1' },
-        { email: 'p2@x.com', fullName: 'P2' },
-        { email: 'p3@x.com', fullName: 'P3' },
+        { email: 'p1@x.com', firstName: 'P1' },
+        { email: 'p2@x.com', firstName: 'P2' },
+        { email: 'p3@x.com', firstName: 'P3' },
       ],
     },
     jwt,
@@ -487,7 +525,7 @@ t('paces sends by sendIntervalMs', async () => {
 t('a concurrent rotation between read and update sends nothing and rotates the token only once', async () => {
   const { wsA, jwt } = await setup();
   const { mailer, sent } = fakeMailer();
-  const req = { workspaceId: wsA, invites: [{ email: 'race@x.com', fullName: 'Race' }] };
+  const req = { workspaceId: wsA, invites: [{ email: 'race@x.com', firstName: 'Race' }] };
   await call(handlerWith(mailer), req, jwt);
   await backdateInvite(wsA, 3);
   sent.length = 0;

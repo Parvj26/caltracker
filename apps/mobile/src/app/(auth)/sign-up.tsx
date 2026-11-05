@@ -1,12 +1,14 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { FirstName, LastName } from '@caltracker/shared';
+import { AuthShell } from '@/components/auth-shell';
+import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
-import { styles } from '@/lib/styles';
 
 export default function SignUp() {
   const router = useRouter();
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,14 +16,20 @@ export default function SignUp() {
 
   async function submit() {
     const cleanEmail = email.trim();
-    if (!name.trim()) return setError('Enter your name.');
+    const first = FirstName.safeParse(firstName);
+    if (!first.success) return setError('Enter your first name (up to 100 characters).');
+    const last = LastName.safeParse(lastName);
+    if (!last.success) return setError('Last name can be at most 100 characters.');
     if (password.length < 8) return setError('Password must be at least 8 characters.');
     setBusy(true);
     setError(null);
     const { error: err } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
-      options: { data: { full_name: name.trim() }, emailRedirectTo: 'caltracker://auth/confirmed' },
+      options: {
+        data: { first_name: first.data, last_name: last.data },
+        emailRedirectTo: 'caltracker://auth/confirmed',
+      },
     });
     setBusy(false);
     if (err) return setError(err.message);
@@ -29,20 +37,29 @@ export default function SignUp() {
   }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Create your account</Text>
-      <TextInput
+    <AuthShell title="Create your account" note="Your coach is waiting!">
+      {/* "name-input" is the first name: the Maestro flows have always used that id. */}
+      <TextField
         testID="name-input"
-        style={styles.input}
-        placeholder="Full name"
-        textContentType="none"
-        value={name}
-        onChangeText={setName}
+        label="First name"
+        textContentType="givenName"
+        autoComplete="given-name"
+        value={firstName}
+        onChangeText={setFirstName}
       />
-      <TextInput
+      <TextField
+        testID="last-name-input"
+        label="Last name"
+        hint="Optional if you use one name."
+        textContentType="familyName"
+        autoComplete="family-name"
+        value={lastName}
+        onChangeText={setLastName}
+      />
+      <TextField
         testID="email-input"
-        style={styles.input}
-        placeholder="Email"
+        label="Email"
+        hint="Use the email your coach invited."
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -50,23 +67,24 @@ export default function SignUp() {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
+      <TextField
         testID="password-input"
-        style={styles.input}
-        placeholder="Password (min 8 characters)"
+        label="Password"
+        hint="At least 8 characters."
         secureTextEntry
         autoCapitalize="none"
         textContentType="none"
         value={password}
         onChangeText={setPassword}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable testID="submit-button" style={styles.button} onPress={() => void submit()} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? 'Creating account...' : 'Create account'}</Text>
-      </Pressable>
-      <Link testID="go-sign-in" href="/sign-in" style={[styles.link, styles.linkText]}>
-        I already have an account
-      </Link>
-    </View>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      <Button
+        testID="submit-button"
+        title={busy ? 'Creating account...' : 'Create account'}
+        onPress={() => void submit()}
+        busy={busy}
+      />
+      <TextButton testID="go-sign-in" href="/sign-in" title="I already have an account" />
+    </AuthShell>
   );
 }

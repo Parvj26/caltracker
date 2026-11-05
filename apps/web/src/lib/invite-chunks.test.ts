@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sendInChunks } from './invite-chunks';
 
-const invites = (n: number) => Array.from({ length: n }, (_, i) => ({ email: `c${i}@x.com`, fullName: `C${i}` }));
+const invites = (n: number) => Array.from({ length: n }, (_, i) => ({ email: `c${i}@x.com`, firstName: `C${i}`, lastName: '' }));
 
 describe('sendInChunks', () => {
   it('calls sequentially in chunks of 20 and merges results in order', async () => {

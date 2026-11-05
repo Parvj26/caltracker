@@ -1,12 +1,12 @@
-import styles from '../sign-in/sign-in.module.css';
+import { AuthShell } from '@/components/ui';
 import { SetPasswordForm } from './set-password-form';
+import styles from '../sign-in/sign-in.module.css';
 
 export default function SetPasswordPage() {
   return (
-    <main className={styles.main}>
-      <h1>Set your password</h1>
-      <p>Choose a password (at least 8 characters). You will use it with your email to sign in.</p>
+    <AuthShell title="Set your password">
+      <p className={styles.lead}>Choose a password (at least 8 characters). You will use it with your email to sign in.</p>
       <SetPasswordForm />
-    </main>
+    </AuthShell>
   );
 }

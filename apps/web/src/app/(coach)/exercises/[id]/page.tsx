@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { parseYoutubeUrl, youtubeFormSearchUrl } from '@caltracker/shared';
+import { ButtonLink, Card, Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ExerciseForm } from '../exercise-form';
@@ -35,84 +36,103 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
   const imageUrl = (path: string) => supabase.storage.from('exercise-images').getPublicUrl(path).data.publicUrl;
 
   return (
-    <div>
-      <h1>{ex.name}</h1>
-      <dl className={styles.meta}>
-        <dt>Tracking type</dt>
-        <dd>{TRACKING_LABELS[ex.tracking_type]}</dd>
-        <dt>Primary muscles</dt>
-        <dd>{ex.primary_muscles.join(', ') || 'None listed'}</dd>
-        <dt>Equipment</dt>
-        <dd>{ex.equipment ?? 'None'}</dd>
-      </dl>
+    <div className={styles.page}>
+      <header className={styles.titleRow}>
+        <h1 className={styles.title}>{ex.name}</h1>
+        <Chip tone="lime">{TRACKING_LABELS[ex.tracking_type]}</Chip>
+      </header>
 
-      {ex.image_paths.length > 0 ? (
-        <div className={styles.images}>
-          {ex.image_paths.map((p) => (
-            // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
-            <img key={p} src={imageUrl(p)} alt={`${ex.name} demonstration`} width={240} height={160} loading="lazy" />
-          ))}
-        </div>
-      ) : null}
+      <Card>
+        <dl className={styles.meta}>
+          <dt>Tracking type</dt>
+          <dd>{TRACKING_LABELS[ex.tracking_type]}</dd>
+          <dt>Primary muscles</dt>
+          <dd>{ex.primary_muscles.join(', ') || 'None listed'}</dd>
+          <dt>Equipment</dt>
+          <dd>{ex.equipment ?? 'None'}</dd>
+        </dl>
+
+        {ex.image_paths.length > 0 ? (
+          <div className={styles.images}>
+            {ex.image_paths.map((p) => (
+              // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
+              <img key={p} src={imageUrl(p)} alt={`${ex.name} demonstration`} width={240} height={160} loading="lazy" />
+            ))}
+          </div>
+        ) : null}
+      </Card>
 
       {ex.instructions.length > 0 ? (
-        <section className={styles.section}>
-          <h2>Instructions</h2>
-          <ol>
-            {ex.instructions.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </section>
+        <Card>
+          <section>
+            <h2 className={styles.sectionHeading}>Instructions</h2>
+            <ol className={styles.steps}>
+              {ex.instructions.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          </section>
+        </Card>
       ) : null}
 
-      <section className={styles.section}>
-        <h2>Video</h2>
-        {videoId ? (
-          <iframe
-            className={styles.video}
-            src={`https://www.youtube-nocookie.com/embed/${videoId}`}
-            title={`${ex.name} form video`}
-            allow="encrypted-media; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-          />
-        ) : (
-          <a href={youtubeFormSearchUrl(ex.name)} target="_blank" rel="noopener noreferrer">
-            Watch form on YouTube
-          </a>
-        )}
-      </section>
+      <Card>
+        <section>
+          <h2 className={styles.sectionHeading}>Video</h2>
+          {videoId ? (
+            <iframe
+              className={styles.video}
+              src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+              title={`${ex.name} form video`}
+              allow="encrypted-media; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+            />
+          ) : (
+            <ButtonLink
+              variant="secondary"
+              href={youtubeFormSearchUrl(ex.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Watch form on YouTube
+            </ButtonLink>
+          )}
+        </section>
+      </Card>
 
       {!isCustom && override.data?.coach_notes ? (
-        <section className={styles.section}>
-          <h2>Your notes</h2>
-          <p>{override.data.coach_notes}</p>
-        </section>
+        <Card>
+          <section>
+            <h2 className={styles.sectionHeading}>Your notes</h2>
+            <p className={styles.notes}>{override.data.coach_notes}</p>
+          </section>
+        </Card>
       ) : null}
 
-      <section className={styles.section}>
-        <h2>{isCustom ? 'Edit exercise' : 'Your video and notes'}</h2>
-        {isCustom ? (
-          <ExerciseForm
-            exerciseId={ex.id}
-            initial={{
-              name: ex.name,
-              trackingType: ex.tracking_type,
-              primaryMuscles: ex.primary_muscles,
-              equipment: ex.equipment,
-              instructions: ex.instructions,
-              youtubeUrl: ex.youtube_url,
-            }}
-          />
-        ) : (
-          <OverrideForm
-            exerciseId={ex.id}
-            youtubeUrl={override.data?.youtube_url ?? null}
-            coachNotes={override.data?.coach_notes ?? null}
-          />
-        )}
-      </section>
+      <Card>
+        <section>
+          <h2 className={styles.sectionHeading}>{isCustom ? 'Edit exercise' : 'Your video and notes'}</h2>
+          {isCustom ? (
+            <ExerciseForm
+              exerciseId={ex.id}
+              initial={{
+                name: ex.name,
+                trackingType: ex.tracking_type,
+                primaryMuscles: ex.primary_muscles,
+                equipment: ex.equipment,
+                instructions: ex.instructions,
+                youtubeUrl: ex.youtube_url,
+              }}
+            />
+          ) : (
+            <OverrideForm
+              exerciseId={ex.id}
+              youtubeUrl={override.data?.youtube_url ?? null}
+              coachNotes={override.data?.coach_notes ?? null}
+            />
+          )}
+        </section>
+      </Card>
     </div>
   );
 }

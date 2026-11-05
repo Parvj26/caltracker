@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
 import { saveOverride } from '../actions';
 import { formText } from '../form-text';
 import styles from '../exercises.module.css';
@@ -34,23 +35,11 @@ export function OverrideForm({
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
-      <label>
-        Pinned YouTube video
-        <input name="youtubeUrl" defaultValue={youtubeUrl ?? ''} placeholder="https://youtu.be/..." />
-      </label>
-      <label>
-        Coaching notes
-        <textarea name="coachNotes" rows={4} defaultValue={coachNotes ?? ''} />
-      </label>
-      {error ? (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      ) : null}
-      {saved ? <p role="status">Saved</p> : null}
-      <button type="submit" disabled={pending}>
-        Save
-      </button>
+      <TextField label="Pinned YouTube video" name="youtubeUrl" defaultValue={youtubeUrl ?? ''} placeholder="https://youtu.be/..." />
+      <TextAreaField label="Coaching notes" name="coachNotes" rows={4} defaultValue={coachNotes ?? ''} />
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      {saved ? <p role="status" className={styles.saved}>Saved</p> : null}
+      <Button type="submit" pending={pending} className={styles.submit}>Save</Button>
     </form>
   );
 }

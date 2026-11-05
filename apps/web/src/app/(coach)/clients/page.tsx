@@ -1,7 +1,12 @@
+import { compareByLastName } from '@caltracker/shared';
+import { Card, Chip } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { AddClientForm } from './add-client-form';
+import { avatarTone, initials } from './avatar';
 import { CsvUpload } from './csv-upload';
+import { newestInviteFirst } from './pending-order';
 import { ResendButton } from './resend-button';
 import styles from './clients.module.css';
 
@@ -13,6 +18,25 @@ function expiryLabel(expiresAt: string): string {
   if (days <= 0) return 'Expired';
   return `Expires in ${days} day${days === 1 ? '' : 's'}`;
 }
+
+function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
+  return (
+    <span aria-hidden="true" data-avatar="" className={cx(styles.avatar, styles[`avatar-${avatarTone(toneKey)}`])}>
+      {initials(name)}
+    </span>
+  );
+}
+
+function NameCell({ name, toneKey }: { name: string; toneKey: string }) {
+  return (
+    <div role="cell" className={styles.nameCell}>
+      <Avatar name={name} toneKey={toneKey} />
+      <span className={styles.name}>{name}</span>
+    </div>
+  );
+}
+
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export default async function ClientsPage() {
   const { workspaceId } = await requireCoach();
@@ -27,7 +51,7 @@ export default async function ClientsPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('client_invites')
-      .select('id, email, full_name, sent_at, expires_at, accepted_at, accepted_by')
+      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
   ]);
@@ -36,69 +60,117 @@ export default async function ClientsPage() {
 
   // No direct foreign key links workspace_members to profiles, so load names separately.
   const profiles = members.data.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', members.data.map((m) => m.user_id))
+    ? await supabase.from('profiles').select('id, first_name, last_name, full_name').in('id', members.data.map((m) => m.user_id))
     : { data: [], error: null };
   if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
-  const nameByUser = new Map((profiles.data ?? []).map((p) => [p.id, p.full_name]));
+  const profileByUser = new Map((profiles.data ?? []).map((p) => [p.id, p]));
+  const nameOf = (userId: string) => {
+    const p = profileByUser.get(userId);
+    return { firstName: p?.first_name ?? '', lastName: p?.last_name ?? '' };
+  };
+  // Joined clients are sorted by last name, then first name; pending invites newest first (below).
+  const clients = [...members.data].sort((a, b) => compareByLastName(nameOf(a.user_id), nameOf(b.user_id)));
 
   // Client emails live in auth.users, which RLS hides; fall back to the accepted invite's email.
   const emailByUser = new Map(
     invites.data.filter((i) => i.accepted_by).map((i) => [i.accepted_by as string, i.email]),
   );
-  const pending = invites.data.filter((i) => i.accepted_at === null);
+  const pending = invites.data.filter((i) => i.accepted_at === null).sort(newestInviteFirst);
 
   return (
     <div className={styles.page}>
-      <h1>Clients</h1>
+      <header className={styles.titleRow}>
+        <h1 className={styles.title}>Clients</h1>
+        <p className={styles.caption}>
+          {count(clients.length, 'client', 'clients')} · {count(pending.length, 'pending invite', 'pending invites')}
+        </p>
+      </header>
 
-      <section>
-        <h2>Clients</h2>
-        <table aria-label="Clients" className={styles.table}>
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Joined</th></tr>
-          </thead>
-          <tbody>
-            {members.data.length === 0 ? (
-              <tr><td colSpan={3}>No clients yet. Add one below.</td></tr>
-            ) : (
-              members.data.map((m) => (
-                <tr key={m.user_id}>
-                  <td>{nameByUser.get(m.user_id) ?? ''}</td>
-                  <td>{emailByUser.get(m.user_id) ?? ''}</td>
-                  <td>{m.created_at ? dateFormat.format(new Date(m.created_at)) : ""}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+      <Card className={styles.addCard}>
+        <AddClientForm />
+        <CsvUpload />
+      </Card>
 
-      <section>
-        <h2>Pending invites</h2>
-        <table aria-label="Pending invites" className={styles.table}>
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Sent</th><th>Expires</th><th></th></tr>
-          </thead>
-          <tbody>
-            {pending.length === 0 ? (
-              <tr><td colSpan={5}>No pending invites.</td></tr>
-            ) : (
-              pending.map((i) => (
-                <tr key={i.id}>
-                  <td>{i.full_name}</td>
-                  <td>{i.email}</td>
-                  <td>{dateFormat.format(new Date(i.sent_at))}</td>
-                  <td>{expiryLabel(i.expires_at)}</td>
-                  <td><ResendButton email={i.email} fullName={i.full_name} /></td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
+      <Card className={styles.listCard}>
+        <section aria-labelledby="clients-heading">
+          <h2 id="clients-heading" className={styles.sectionHeading}>Clients</h2>
+          <div role="table" aria-label="Clients" className={cx(styles.rows, styles.clientRows)}>
+            <div role="rowgroup" className={styles.headRow}>
+              <div role="row" className={styles.row}>
+                <span role="columnheader">Name</span>
+                <span role="columnheader">Email</span>
+                <span role="columnheader">Joined</span>
+              </div>
+            </div>
+            <div role="rowgroup">
+              {clients.length === 0 ? (
+                <div role="row" className={styles.emptyRow}>
+                  <span role="cell">No clients yet. Add one above.</span>
+                </div>
+              ) : (
+                clients.map((m) => {
+                  const joined = m.created_at ? dateFormat.format(new Date(m.created_at)) : '';
+                  return (
+                    <div role="row" key={m.user_id} className={styles.row}>
+                      <NameCell name={profileByUser.get(m.user_id)?.full_name ?? ''} toneKey={m.user_id} />
+                      <span role="cell" className={styles.email}>{emailByUser.get(m.user_id) ?? ''}</span>
+                      <span role="cell" className={styles.meta}>
+                        {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}
+                        {joined}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      </Card>
 
-      <AddClientForm />
-      <CsvUpload />
+      <Card className={styles.listCard}>
+        <section aria-labelledby="pending-heading">
+          <h2 id="pending-heading" className={styles.sectionHeading}>Pending invites</h2>
+          <div role="table" aria-label="Pending invites" className={cx(styles.rows, styles.inviteRows)}>
+            <div role="rowgroup" className={styles.headRow}>
+              <div role="row" className={styles.row}>
+                <span role="columnheader">Name</span>
+                <span role="columnheader">Email</span>
+                <span role="columnheader">Sent</span>
+                <span role="columnheader">Expires</span>
+                <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
+              </div>
+            </div>
+            <div role="rowgroup">
+              {pending.length === 0 ? (
+                <div role="row" className={styles.emptyRow}>
+                  <span role="cell">No pending invites.</span>
+                </div>
+              ) : (
+                pending.map((i) => {
+                  const expiry = expiryLabel(i.expires_at);
+                  return (
+                    <div role="row" key={i.id} className={styles.row}>
+                      <NameCell name={i.full_name} toneKey={i.email} />
+                      <span role="cell" className={styles.email}>{i.email}</span>
+                      <span role="cell" className={styles.meta}>
+                        <span aria-hidden="true" className={styles.narrowOnly}>Sent </span>
+                        {dateFormat.format(new Date(i.sent_at))}
+                      </span>
+                      <span role="cell" className={styles.expires}>
+                        <Chip tone={expiry === 'Expired' ? 'amber' : 'grey'}>{expiry}</Chip>
+                      </span>
+                      <span role="cell" className={styles.actions}>
+                        <ResendButton email={i.email} firstName={i.first_name} lastName={i.last_name} />
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      </Card>
+
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CustomExerciseInput, TRACKING_TYPES } from '@caltracker/shared';
+import { Button, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
 import { createCustomExercise, updateCustomExercise } from './actions';
 import { EQUIPMENT, TRACKING_LABELS } from './filters';
 import { formText } from './form-text';
@@ -67,50 +68,28 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
-      <label>
-        Name
-        <input name="name" defaultValue={initial.name} maxLength={100} />
-      </label>
-      <label>
-        Tracking type
-        <select name="trackingType" defaultValue={initial.trackingType}>
-          {TRACKING_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {TRACKING_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Primary muscles (comma separated)
-        <input name="primaryMuscles" defaultValue={initial.primaryMuscles.join(', ')} />
-      </label>
-      <label>
-        Equipment
-        <input name="equipment" list="equipment-options" defaultValue={initial.equipment ?? ''} />
-        <datalist id="equipment-options">
-          {EQUIPMENT.map((e) => (
-            <option key={e} value={e} />
-          ))}
-        </datalist>
-      </label>
-      <label>
-        Instructions (one step per line)
-        <textarea name="instructions" rows={5} defaultValue={initial.instructions.join('\n')} />
-      </label>
-      <label>
-        YouTube URL (optional)
-        <input name="youtubeUrl" defaultValue={initial.youtubeUrl ?? ''} />
-      </label>
-      {error ? (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      ) : null}
-      {saved ? <p role="status">Saved</p> : null}
-      <button type="submit" disabled={pending}>
+      <TextField label="Name" name="name" defaultValue={initial.name} maxLength={100} />
+      <SelectField label="Tracking type" name="trackingType" defaultValue={initial.trackingType}>
+        {TRACKING_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {TRACKING_LABELS[t]}
+          </option>
+        ))}
+      </SelectField>
+      <TextField label="Primary muscles (comma separated)" name="primaryMuscles" defaultValue={initial.primaryMuscles.join(', ')} />
+      <TextField label="Equipment" name="equipment" list="equipment-options" defaultValue={initial.equipment ?? ''} />
+      <datalist id="equipment-options">
+        {EQUIPMENT.map((e) => (
+          <option key={e} value={e} />
+        ))}
+      </datalist>
+      <TextAreaField label="Instructions (one step per line)" name="instructions" rows={5} defaultValue={initial.instructions.join('\n')} />
+      <TextField label="YouTube URL (optional)" name="youtubeUrl" defaultValue={initial.youtubeUrl ?? ''} />
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      {saved ? <p role="status" className={styles.saved}>Saved</p> : null}
+      <Button type="submit" pending={pending} className={styles.submit}>
         {exerciseId ? 'Save changes' : 'Create exercise'}
-      </button>
+      </Button>
     </form>
   );
 }

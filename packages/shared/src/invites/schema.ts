@@ -1,8 +1,15 @@
 import { z } from 'zod';
+import { NAME_MAX_LENGTH } from '../names';
+
+/** Required: 1 to 100 characters after trimming. */
+export const FirstName = z.string().trim().min(1).max(NAME_MAX_LENGTH);
+/** Optional (some people use one name): up to 100 characters after trimming. */
+export const LastName = z.string().trim().max(NAME_MAX_LENGTH);
 
 export const InviteInput = z.object({
   email: z.string().trim().toLowerCase().email(),
-  fullName: z.string().trim().min(1).max(100),
+  firstName: FirstName,
+  lastName: LastName.default(''),
 });
 export type InviteInput = z.infer<typeof InviteInput>;
 

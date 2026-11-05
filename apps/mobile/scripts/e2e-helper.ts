@@ -8,7 +8,7 @@ import { execSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@caltracker/shared';
+import { splitFullName, type Database } from '@caltracker/shared';
 
 function serviceClient() {
   // Expo's process.env typing is loose (any); cast to the real shape.
@@ -45,7 +45,8 @@ export async function invite(email: string, name: string): Promise<void> {
   const { error: insErr } = await admin.from('client_invites').insert({
     workspace_id: ws.id,
     email,
-    full_name: name,
+    first_name: splitFullName(name).firstName,
+    last_name: splitFullName(name).lastName,
     created_by: coachId,
     token_hash: createHash('sha256').update(randomBytes(32)).digest('hex'),
   });

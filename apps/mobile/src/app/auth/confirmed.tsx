@@ -1,26 +1,34 @@
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { LINK_FAILED, completeConfirmation } from '@/lib/confirm-link';
-import { styles } from '@/lib/styles';
-import { supabase } from '@/lib/supabase';
+import { ActivityIndicator } from 'react-native';
+import { Button, ErrorText, Logo, Screen } from '@/components/ui';
+import { LINK_FAILED, codeFromLink, completeConfirmation, oncePerCode } from '@/lib/confirm-link';
+import { pkceVerifier, supabase } from '@/lib/supabase';
+import { palette } from '@/theme/theme';
+
+// Module level, so it also survives the screen remounting: each code is exchanged once, and a re-run of the
+// effect below (a new router or linking URL) waits for that same exchange instead of starting a second one.
+const confirmCode = oncePerCode((code: string) => completeConfirmation(supabase, code, { verifier: pkceVerifier }));
 
 // Opened by caltracker://auth/confirmed?code=... from the confirmation email (PKCE flow).
 // A successful exchange fires the session listener, which runs claimWorkspace() and enters the app.
 export default function Confirmed() {
   const router = useRouter();
+  // The route param is set on warm and cold opens; the linking URL is a fallback. Query string only (PKCE).
+  const params = useLocalSearchParams<{ code?: string }>();
   const url = Linking.useLinkingURL();
+  const code = codeFromLink(params.code, url);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!url) {
-      // No URL arrived (e.g. the screen was opened directly): never leave the spinner hanging.
+    if (!code) {
+      // No code arrived (e.g. the screen was opened directly): never leave the spinner hanging.
       const t = setTimeout(() => setError(LINK_FAILED), 4000);
       return () => clearTimeout(t);
     }
-    void completeConfirmation(supabase, url).then((result) => {
+    void confirmCode(code).then((result) => {
       if (cancelled) return;
       if (result.ok) router.replace('/');
       else setError(result.message);
@@ -28,20 +36,19 @@ export default function Confirmed() {
     return () => {
       cancelled = true;
     };
-  }, [url, router]);
+  }, [code, router]);
 
   return (
-    <View style={styles.screen}>
+    <Screen centred>
+      <Logo size="lg" />
       {error ? (
         <>
-          <Text style={styles.error}>{error}</Text>
-          <Pressable testID="go-sign-in" style={styles.button} onPress={() => router.replace('/sign-in')}>
-            <Text style={styles.buttonText}>Go to sign in</Text>
-          </Pressable>
+          <ErrorText>{error}</ErrorText>
+          <Button testID="go-sign-in" title="Go to sign in" onPress={() => router.replace('/sign-in')} />
         </>
       ) : (
-        <ActivityIndicator />
+        <ActivityIndicator color={palette.ink} accessibilityLabel="Confirming your email" />
       )}
-    </View>
+    </Screen>
   );
 }

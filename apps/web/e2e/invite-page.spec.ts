@@ -54,7 +54,8 @@ async function makeInvite(opts: Opts = {}) {
     .insert({
       workspace_id: workspaceId,
       email,
-      full_name: 'Invitee Person',
+      first_name: 'Invitee',
+      last_name: 'Person',
       token_hash: sha256(token),
       sent_at: sentAt.toISOString(),
       expires_at: expiresAt.toISOString(),

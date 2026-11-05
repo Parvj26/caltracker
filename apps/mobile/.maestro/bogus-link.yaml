@@ -4,9 +4,15 @@ appId: app.caltracker.client
 - launchApp:
     clearState: true
 - openLink: caltracker://auth/confirmed?code=bogus
-- tapOn:
-    text: Open
-    optional: true
+# The "Open in CalTracker?" prompt can appear late, so keep looking for it a few times.
+- repeat:
+    times: 3
+    while:
+      notVisible: "This link didn't work. Sign in instead."
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
 - extendedWaitUntil:
     visible: "This link didn't work. Sign in instead."
     timeout: 15000

@@ -40,9 +40,9 @@ select is((select count(*)::int from public.profiles where id = :'a1'), 1, 'A1 s
 select is((select count(*)::int from public.profiles where id = :'a2'), 1, 'A1 sees A2 (same workspace)');
 select is((select full_name from public.profiles where id = :'a2'), 'Client A2', 'A1 reads A2 full_name');
 select is((select count(*)::int from public.profiles where id = :'b1'), 0, 'A1 cannot see B1');
-update public.profiles set full_name = 'A1 Renamed' where id = :'a1';
+update public.profiles set first_name = 'A1', last_name = 'Renamed' where id = :'a1';
 select is((select full_name from public.profiles where id = :'a1'), 'A1 Renamed', 'A1 updates own profile');
-update public.profiles set full_name = 'Hacked' where id = :'a2';
+update public.profiles set first_name = 'Hacked' where id = :'a2';
 reset role;
 select is((select full_name from public.profiles where id = :'a2'), 'Client A2', 'A1 cannot update A2 profile');
 

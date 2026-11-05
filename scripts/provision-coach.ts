@@ -1,13 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@caltracker/shared';
+import { FirstName, LastName, NAME_MAX_LENGTH, type Database } from '@caltracker/shared';
 
 type Admin = SupabaseClient<Database>;
 
 export interface ProvisionInput {
   email: string;
-  fullName: string;
+  firstName: string;
+  /** Optional: some people use one name. */
+  lastName?: string;
   workspaceName: string;
 }
 
@@ -92,7 +94,7 @@ export async function provisionCoach(
   // workspace insert failed.
   let userId: string;
   const invite = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: input.fullName },
+    data: { first_name: input.firstName.trim(), last_name: (input.lastName ?? '').trim() },
     redirectTo: `${requireEnv('PUBLIC_SITE_URL')}/set-password`,
   });
   if (invite.error) {
@@ -108,17 +110,33 @@ export async function provisionCoach(
   return { userId, workspaceId, created: true };
 }
 
-async function main(): Promise<void> {
+const USAGE =
+  'Usage: provision:coach --email <email> --first-name "<first name>" [--last-name "<last name>"] --workspace "<workspace name>"';
+
+/** Reads the command-line options. Throws the usage text when a required option is missing. */
+export function parseProvisionArgs(args: string[]): Required<ProvisionInput> {
   const { values } = parseArgs({
+    args,
     options: {
       email: { type: 'string' },
-      name: { type: 'string' },
+      'first-name': { type: 'string' },
+      'last-name': { type: 'string' },
       workspace: { type: 'string' },
     },
   });
-  if (!values.email || !values.name || !values.workspace) {
-    throw new Error('Usage: provision:coach --email <email> --name "<full name>" --workspace "<workspace name>"');
+  const email = values.email?.trim();
+  const workspaceName = values.workspace?.trim();
+  if (!email || !values['first-name']?.trim() || !workspaceName) throw new Error(USAGE);
+  const firstName = FirstName.safeParse(values['first-name']);
+  const lastName = LastName.safeParse(values['last-name'] ?? '');
+  if (!firstName.success || !lastName.success) {
+    throw new Error(`First and last name can be at most ${NAME_MAX_LENGTH} characters each.`);
   }
+  return { email, firstName: firstName.data, lastName: lastName.data, workspaceName };
+}
+
+async function main(): Promise<void> {
+  const input = parseProvisionArgs(process.argv.slice(2));
   const url = requireEnv('SUPABASE_URL');
   const key = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   requireEnv('PUBLIC_SITE_URL');
@@ -126,11 +144,7 @@ async function main(): Promise<void> {
   const admin = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const r = await provisionCoach(admin, {
-    email: values.email,
-    fullName: values.name,
-    workspaceName: values.workspace,
-  });
+  const r = await provisionCoach(admin, input);
   console.log(`User id:      ${r.userId}`);
   console.log(`Workspace id: ${r.workspaceId}`);
   if (r.resent) {

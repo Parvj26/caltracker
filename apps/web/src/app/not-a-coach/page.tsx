@@ -1,12 +1,11 @@
-import styles from '../(coach)/coach.module.css';
+import { AuthShell, Button } from '@/components/ui';
 
 export default function NotACoachPage() {
   return (
-    <main className={styles.content}>
-      <h1>This dashboard is for coaches. Clients use the CalTracker app.</h1>
+    <AuthShell title="This dashboard is for coaches. Clients use the CalTracker app.">
       <form action="/auth/sign-out" method="post">
-        <button type="submit">Sign out</button>
+        <Button type="submit" variant="secondary">Sign out</Button>
       </form>
-    </main>
+    </AuthShell>
   );
 }

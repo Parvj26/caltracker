@@ -42,8 +42,10 @@ export type Database = {
           created_by: string
           email: string
           expires_at: string
+          first_name: string
           full_name: string
           id: string
+          last_name: string
           sent_at: string
           token_hash: string
           workspace_id: string
@@ -55,8 +57,10 @@ export type Database = {
           created_by: string
           email: string
           expires_at?: string
-          full_name: string
+          first_name?: string
+          full_name?: string
           id?: string
+          last_name?: string
           sent_at?: string
           token_hash: string
           workspace_id: string
@@ -68,8 +72,10 @@ export type Database = {
           created_by?: string
           email?: string
           expires_at?: string
+          first_name?: string
           full_name?: string
           id?: string
+          last_name?: string
           sent_at?: string
           token_hash?: string
           workspace_id?: string
@@ -189,22 +195,28 @@ export type Database = {
         Row: {
           avatar_path: string | null
           created_at: string | null
+          first_name: string
           full_name: string
           id: string
+          last_name: string
           units: string
         }
         Insert: {
           avatar_path?: string | null
           created_at?: string | null
+          first_name?: string
           full_name?: string
           id: string
+          last_name?: string
           units?: string
         }
         Update: {
           avatar_path?: string | null
           created_at?: string | null
+          first_name?: string
           full_name?: string
           id?: string
+          last_name?: string
           units?: string
         }
         Relationships: []
@@ -275,7 +287,9 @@ export type Database = {
         Args: { token: string }
         Returns: {
           email: string
+          first_name: string
           full_name: string
+          last_name: string
           status: string
           workspace_name: string
         }[]
@@ -292,6 +306,7 @@ export type Database = {
         }[]
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
+      split_full_name: { Args: { name: string }; Returns: string[] }
     }
     Enums: {
       member_role: "owner" | "staff" | "client"

@@ -1,15 +1,21 @@
-import type { Metadata } from 'next';
-import { Bricolage_Grotesque } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Bricolage_Grotesque, Caveat } from 'next/font/google';
+import { toCssVariables } from '@caltracker/design-tokens';
 import './globals.css';
 
-const font = Bricolage_Grotesque({ subsets: ['latin'], display: 'swap' });
+const sans = Bricolage_Grotesque({ subsets: ['latin'], weight: ['500', '700', '800'], variable: '--ct-font-sans' });
+const hand = Caveat({ subsets: ['latin'], weight: '700', variable: '--ct-font-hand' });
 
 export const metadata: Metadata = { title: 'CalTracker', description: 'Coach dashboard' };
+export const viewport: Viewport = { colorScheme: 'light' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={font.className}>{children}</body>
+    <html lang="en" className={`${sans.variable} ${hand.variable}`}>
+      <head>
+        <style id="ct-tokens">{toCssVariables()}</style>
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

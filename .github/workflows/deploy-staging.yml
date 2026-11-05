@@ -20,8 +20,12 @@ on:
         description: 'provision-coach: coach email'
         type: string
         required: false
-      coach_name:
-        description: 'provision-coach: coach full name'
+      coach_first_name:
+        description: 'provision-coach: coach first name'
+        type: string
+        required: false
+      coach_last_name:
+        description: 'provision-coach: coach last name (optional)'
         type: string
         required: false
       workspace_name:
@@ -108,6 +112,16 @@ jobs:
       - if: steps.newest.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
+      # Build before anything changes on staging: a failed build stops the deploy with the database, function and
+      # web app all still on the old version, and the gap between the new function and the new web app shrinks to
+      # the few seconds of cf:deploy.
+      - name: Build web app for Cloudflare
+        if: steps.newest.outputs.skip != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+        run: pnpm --filter web cf:build
+
       - name: Link Supabase staging project
         if: steps.newest.outputs.skip != 'true'
         run: supabase link --project-ref "$STAGING_SUPABASE_PROJECT_REF"
@@ -129,13 +143,6 @@ jobs:
       - name: Deploy Edge Functions
         if: steps.newest.outputs.skip != 'true'
         run: pnpm functions:deploy --project-ref "$STAGING_SUPABASE_PROJECT_REF"
-
-      - name: Build web app for Cloudflare
-        if: steps.newest.outputs.skip != 'true'
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        run: pnpm --filter web cf:build
 
       - name: Deploy web app to Cloudflare Workers
         if: steps.newest.outputs.skip != 'true'
@@ -225,11 +232,12 @@ jobs:
         if: inputs.action == 'provision-coach'
         env:
           COACH_EMAIL: ${{ inputs.coach_email }}
-          COACH_NAME: ${{ inputs.coach_name }}
+          COACH_FIRST_NAME: ${{ inputs.coach_first_name }}
+          COACH_LAST_NAME: ${{ inputs.coach_last_name }}
           WORKSPACE_NAME: ${{ inputs.workspace_name }}
         run: |
-          if [ -z "$COACH_EMAIL" ] || [ -z "$COACH_NAME" ] || [ -z "$WORKSPACE_NAME" ]; then
-            echo "::error::coach_email, coach_name and workspace_name are all required for provision-coach."
+          if [ -z "$COACH_EMAIL" ] || [ -z "$COACH_FIRST_NAME" ] || [ -z "$WORKSPACE_NAME" ]; then
+            echo "::error::coach_email, coach_first_name and workspace_name are all required for provision-coach (coach_last_name is optional)."
             exit 1
           fi
-          pnpm provision:coach --email "$COACH_EMAIL" --name "$COACH_NAME" --workspace "$WORKSPACE_NAME"
+          pnpm provision:coach --email "$COACH_EMAIL" --first-name "$COACH_FIRST_NAME" --last-name "$COACH_LAST_NAME" --workspace "$WORKSPACE_NAME"

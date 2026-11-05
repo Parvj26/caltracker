@@ -17,16 +17,17 @@ env:
     id: go-sign-up
 - tapOn:
     id: name-input
-- inputText: E2E Client
+- inputText: E2E
+- tapOn:
+    id: last-name-input
+- inputText: Client
 - tapOn:
     id: email-input
 - inputText: ${EMAIL}
 - tapOn:
     id: password-input
 - inputText: ${PASSWORD}
-- hideKeyboard
-- tapOn:
-    id: submit-button
+- runFlow: helpers/submit.yaml
 # iOS may offer to save the password; dismiss it if shown.
 - tapOn:
     text: Not Now
@@ -43,9 +44,7 @@ env:
 - tapOn:
     id: password-input
 - inputText: ${PASSWORD}
-- hideKeyboard
-- tapOn:
-    id: submit-button
+- runFlow: helpers/submit.yaml
 # iOS may offer to save the password; dismiss it if shown.
 - tapOn:
     text: Not Now

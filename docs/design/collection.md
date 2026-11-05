@@ -74,23 +74,34 @@ Locked rare finds appear in the sticker book as a silhouette with their requirem
 
 Locked ultra-rares show as "???" in the sticker book. Nobody knows which animals they are until someone finds one, which gives the community something to talk about.
 
-## 4. Shiny variants
+## 4. Repeats and shiny variants
+- Every time a workout earns a ladder animal again, its count goes up and the sticker shows **×N** (product owner decision, 2026-11-04).
 - Each time a qualifying workout earns its ladder animal, roll 1-in-20 for a shiny version (only if not already owned shiny).
 - Shiny stickers use the same art with an animated holographic foil overlay in the app, plus a "Shiny!" label.
 - The sticker book shows the shiny count: "Shiny: 4 / 30".
 
 ## 5. Distance landmarks (distance badges)
+Ordered smallest to largest. All values are source-checked (see the change log for contested figures).
+
 | Landmark | Measure (m) |
 |---|---|
+| Chichén Itzá, El Castillo (height) | 30 |
+| Christ the Redeemer, incl. pedestal (height) | 38 |
+| Petra, the Treasury (height) | 40 |
+| Colosseum (height) | 49 |
+| Taj Mahal (height) | 73 |
 | Statue of Liberty (height) | 93 |
 | Big Ben tower (height) | 96 |
+| Great Pyramid of Giza (height today) | 138 |
 | Eiffel Tower (height) | 330 |
 | Empire State Building (height) | 443 |
 | Burj Khalifa (height) | 828 |
+| Machu Picchu (altitude) | 2,430 |
 | Golden Gate Bridge (length) | 2,737 |
 | Mount Fuji (height) | 3,776 |
 | Mount Everest (height) | 8,849 |
 | Marathon | 42,195 |
+| Great Wall of China (length, lifetime goal) | 21,196,000 |
 
 ## Qualifying workout
 A completed workout with at least 5 completed sets. This applies to random drops and shiny rolls. Coach-logged workouts count.
