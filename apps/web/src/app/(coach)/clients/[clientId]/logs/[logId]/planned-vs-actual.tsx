@@ -7,6 +7,7 @@ import {
   formatLogSetTarget,
   formatWeight,
   fromMeters,
+  isAddedExercise,
   kgToInput,
   type LogSetDoc,
   type TrackingType,
@@ -66,15 +67,15 @@ export function PlannedVsActual({
   swappedFrom: Readonly<Record<string, string>>;
   edit?: Edit | undefined;
 }) {
-  const planned = log.workoutId !== null;
   const distUnit = distanceUnitFor(units);
   return (
     <div className={styles.exercises}>
       {log.blocks.flatMap((block) =>
         block.exercises.map((ex) => {
           const swapped = ex.swappedFromExerciseId ? (swappedFrom[ex.swappedFromExerciseId] ?? 'another exercise') : null;
-          // Only a log that followed a plan can have added exercises; an unplanned one is all the client's own.
-          const added = planned && ex.plannedWorkoutExerciseId === null;
+          // Only a log that followed a plan (even one deleted since) has added exercises; an unplanned one is all
+          // the client's own.
+          const added = isAddedExercise(log, ex);
           return (
             <section key={ex.id} className={styles.exercise}>
               <header className={styles.exerciseHead}>

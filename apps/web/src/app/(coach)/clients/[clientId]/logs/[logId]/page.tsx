@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { completedSetCount, formatLogDuration, formatLogVolume, logDurationS, logVolumeKg } from '@caltracker/shared';
+import { completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Chip } from '@/components/ui';
@@ -72,7 +72,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
         <div className={styles.chips}>
           {log.status !== 'completed' ? <Chip>{log.status === 'in_progress' ? 'In progress' : 'Discarded'}</Chip> : null}
           {log.autoFinished ? <Chip tone="amber">Auto-finished</Chip> : null}
-          {log.workoutId === null ? <Chip>Unplanned</Chip> : null}
+          {isPlannedLog(log) ? null : <Chip>Unplanned</Chip>}
           {correctedAt ? (
             <Chip tone="blue">
               Edited by coach · <LocalDate iso={correctedAt} />

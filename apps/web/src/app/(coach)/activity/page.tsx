@@ -4,6 +4,7 @@ import {
   completedSetCount,
   formatLogDuration,
   formatLogVolume,
+  isPlannedLog,
   logDurationS,
   logRowToDoc,
   logVolumeKg,
@@ -70,6 +71,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       sets: completedSetCount(log),
       volumeKg: logVolumeKg(log),
       seconds: logDurationS(log),
+      planned: isPlannedLog(log),
     };
   });
   const hasNext = logs.data.length > PAGE_SIZE;
@@ -125,7 +127,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ row, clientName, sets, volumeKg, seconds }) => (
+              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned }) => (
                 <tr key={row.id}>
                   <td>{clientName}</td>
                   <td>
@@ -134,7 +136,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                         {row.name}
                       </Link>
                       {row.auto_finished ? <Chip tone="amber">Auto-finished</Chip> : null}
-                      {row.workout_id === null ? <Chip>Unplanned</Chip> : null}
+                      {planned ? null : <Chip>Unplanned</Chip>}
                     </div>
                   </td>
                   <td className={styles.numeric}>{row.finished_at ? <LocalDateTime iso={row.finished_at} /> : null}</td>
