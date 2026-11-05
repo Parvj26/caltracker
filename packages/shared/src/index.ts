@@ -122,3 +122,15 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
+export {
+  AUTO_FINISH_IDLE_MS,
+  REMINDER_DELAY_MS,
+  REOPEN_WINDOW_MS,
+  autoFinish,
+  autoFinishTime,
+  canReopen,
+  completedSetCount,
+  logDurationS,
+  logVolumeKg,
+  shouldAutoFinish,
+} from './logs/summary';
