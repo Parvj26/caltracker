@@ -38,3 +38,36 @@ export async function sendInvites(invites: InviteInput[]): Promise<SendInvitesOu
   revalidatePath('/clients');
   return { ok: true, results };
 }
+
+export type SimpleOutcome = { ok: true } | { ok: false; error: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Removes a client from the coach's workspace (soft: they move to Past clients). */
+export async function removeClient(userId: string): Promise<SimpleOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(userId)) return { ok: false, error: 'Something went wrong. Please try again.' };
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('remove_client', { p_workspace_id: workspaceId, p_user_id: userId });
+  revalidatePath('/clients');
+  // P0002: already removed (for example in another tab), which is the outcome the coach wanted.
+  if (error && error.code !== 'P0002') return { ok: false, error: "Couldn't remove this client. Please try again." };
+  return { ok: true };
+}
+
+/** Deletes a pending invite, so the link in the email stops working. Accepted invites are never touched. */
+export async function cancelInvite(inviteId: string): Promise<SimpleOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(inviteId)) return { ok: false, error: 'Something went wrong. Please try again.' };
+  const supabase = await createServerSupabase();
+  // RLS also limits this to the coach's own workspace.
+  const { error } = await supabase
+    .from('client_invites')
+    .delete()
+    .eq('id', inviteId)
+    .eq('workspace_id', workspaceId)
+    .is('accepted_at', null);
+  revalidatePath('/clients');
+  if (error) return { ok: false, error: "Couldn't cancel this invite. Please try again." };
+  return { ok: true };
+}
