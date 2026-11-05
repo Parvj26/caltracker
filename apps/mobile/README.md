@@ -81,4 +81,8 @@ pnpm --filter mobile e2e:confirm <email>          # mark email confirmed
 pnpm --filter mobile e2e:cleanup <email>          # delete user and invites
 ```
 
+`calendar.yaml` signs in as the seed client (`client@demo.local`) and needs the built-in exercises
+(`pnpm import:exercises`, for Barbell Squat). It assigns an "E2E Program" through the seed coach and deletes every
+"E2E " workout, program and assignment at the end (`assign` and `cleanup-workouts` helper actions).
+
 `pnpm check` (typecheck, lint, test) needs neither Supabase nor a simulator.

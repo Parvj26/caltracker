@@ -2,6 +2,8 @@
 # Runs the Maestro flows against the app installed on the booted iOS simulator.
 # Starts the local helper bridge (service-role fixtures) for the duration of the run.
 # Local only: needs `pnpm db:start` and the app installed (see README).
+# Runs every flow in .maestro/ (including calendar.yaml, which also needs `pnpm import:exercises`),
+# or only the flows passed as arguments.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
