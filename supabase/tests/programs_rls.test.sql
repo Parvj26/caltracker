@@ -1,5 +1,5 @@
 begin;
-select plan(36);
+select plan(53);
 
 -- Fixtures (as postgres)
 select tests.create_user('pg-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -21,8 +21,11 @@ insert into public.programs (id, workspace_id, name, weeks) values
   (:'prog_a', :'ws_a', 'A Program', 4),
   (:'prog_b', :'ws_b', 'B Program', 4),
   (:'prog_a6', :'ws_a', 'A Six Weeks', 6);
-insert into public.program_workouts (id, program_id, week, day, position, workout_id)
-  values (gen_random_uuid(), :'prog_b', 1, 1, 0, :'lib_b');
+select gen_random_uuid() as slot_b1 \gset
+select gen_random_uuid() as slot_b2 \gset
+insert into public.program_workouts (id, program_id, week, day, position, workout_id) values
+  (:'slot_b1', :'prog_b', 1, 1, 0, :'lib_b'),
+  (:'slot_b2', :'prog_b', 2, 4, 0, :'lib_b');
 select gen_random_uuid() as slot_a \gset
 insert into public.program_workouts (id, program_id, week, day, position, workout_id)
   values (:'slot_a', :'prog_a', 1, 1, 0, :'lib_a1');
@@ -88,20 +91,51 @@ select throws_ok(format($q$insert into public.programs (workspace_id, name) valu
   '42501', null, 'coach A cannot create a program in workspace B');
 select is((select count(*)::int from public.program_workouts where program_id = :'prog_a'), 2, 'prog_a holds 2 slots before delete');
 select lives_ok(format($q$delete from public.program_workouts where id = %L$q$, :'slot_a'), 'coach A can remove a slot');
-select is((select set_program_weeks(:'prog_b', 1::smallint)), 0, 'set_program_weeks on B program removes nothing (RLS)');
-select is((select weeks::int from public.programs where id = :'prog_b'), null, 'B program stays invisible and unchanged to coach A');
+select ok(public.is_library_workout_of(:'lib_a1', :'ws_a'), 'is_library_workout_of is true for coach A and A library workout');
+-- Cross-workspace writes against B's program and slots (each checked as postgres afterwards)
+select is((select public.set_program_weeks(:'prog_b', 1::smallint)), 0, 'coach A set_program_weeks on B program removes nothing');
+with u as (update public.programs set name = 'hacked', weeks = 2 where id = :'prog_b' returning 1)
+select is((select count(*)::int from u), 0, 'coach A updates 0 of B programs');
+with d as (delete from public.programs where id = :'prog_b' returning 1)
+select is((select count(*)::int from d), 0, 'coach A deletes 0 of B programs');
+select throws_ok(format($q$insert into public.program_workouts (id, program_id, week, day, position, workout_id) values (gen_random_uuid(), %L, 3, 1, 0, %L)$q$, :'prog_b', :'lib_b'),
+  '42501', null, 'coach A cannot insert a slot into B program');
+with u as (update public.program_workouts set week = 3, day = 2 where id in (:'slot_b1', :'slot_b2') returning 1)
+select is((select count(*)::int from u), 0, 'coach A updates 0 of B slots');
+with d as (delete from public.program_workouts where id in (:'slot_b1', :'slot_b2') returning 1)
+select is((select count(*)::int from d), 0, 'coach A deletes 0 of B slots');
 reset role;
-select is((select weeks::int from public.programs where id = :'prog_b'), 4, 'B program weeks still 4');
+select is((select count(*)::int from public.program_workouts where program_id = :'prog_b'), 2, 'B program still has both slots');
+select is((select weeks::int || '/' || name from public.programs where id = :'prog_b'), '4/B Program', 'B program weeks and name unchanged');
+select is((select week::int || '/' || day::int from public.program_workouts where id = :'slot_b1'), '1/1', 'B slot 1 unchanged');
+select is((select week::int || '/' || day::int from public.program_workouts where id = :'slot_b2'), '2/4', 'B slot 2 (week 2) survived and is unchanged');
+
+-- Coach B asking about workspace A
+select tests.act_as(:'coach_b');
+select ok(not public.is_library_workout_of(:'lib_a1', :'ws_a'), 'is_library_workout_of is false for coach B asking about workspace A');
+reset role;
 
 -- Client A1 sees nothing and writes nothing
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.programs) + (select count(*)::int from public.program_workouts), 0,
   'client A1 sees no programs or slots');
+select ok(not public.is_library_workout_of(:'lib_a1', :'ws_a'), 'is_library_workout_of is false for client A1');
+select throws_ok(format($q$insert into public.program_workouts (id, program_id, week, day, position, workout_id) values (gen_random_uuid(), %L, 3, 1, 0, %L)$q$, :'prog_a', :'lib_a1'),
+  '42501', null, 'client A1 cannot insert a slot');
+with u as (update public.program_workouts set week = 4, day = 7 where program_id = :'prog_a' returning 1)
+select is((select count(*)::int from u), 0, 'client A1 updates 0 slots');
+with d as (delete from public.program_workouts where program_id = :'prog_a' returning 1)
+select is((select count(*)::int from d), 0, 'client A1 deletes 0 slots');
+with d as (delete from public.programs where id = :'prog_a' returning 1)
+select is((select count(*)::int from d), 0, 'client A1 deletes 0 programs');
 select throws_ok(format($q$insert into public.programs (workspace_id, name) values (%L, 'x')$q$, :'ws_a'),
   '42501', null, 'client A1 cannot create a program');
 with u as (update public.programs set name = 'hacked' returning 1)
 select is((select count(*)::int from u), 0, 'client A1 updates 0 programs');
 reset role;
+select is((select week::int || '/' || day::int from public.program_workouts where program_id = :'prog_a'), '2/3',
+  'A slot untouched by client A1');
+select is((select name from public.programs where id = :'prog_a'), 'Renamed', 'A program untouched by client A1');
 
 -- set_program_weeks shrink
 insert into public.program_workouts (program_id, week, day, position, workout_id) values
@@ -111,6 +145,7 @@ select is((select public.set_program_weeks(:'prog_a6', 4::smallint)), 2, 'set_pr
 reset role;
 select is((select array_agg(week order by week) from public.program_workouts where program_id = :'prog_a6'), array[2::smallint],
   'only the week-2 slot remains');
+select is((select weeks::int from public.programs where id = :'prog_a6'), 4, 'program weeks is now 4');
 
 -- Cascades
 delete from public.workouts where id = :'lib_a2';
