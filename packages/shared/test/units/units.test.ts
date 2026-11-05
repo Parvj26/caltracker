@@ -6,6 +6,7 @@ import {
   formatWeight,
   fromKg,
   fromMeters,
+  kgToInput,
   parseClock,
   toKg,
   toMeters,
@@ -85,5 +86,17 @@ describe('clock durations', () => {
     expect(parseClock('1:75')).toBeNaN();
     expect(parseClock('-5')).toBeNaN();
     expect(parseClock('1.5')).toBeNaN();
+  });
+});
+
+describe('kgToInput', () => {
+  it('shows a kg coach the kilograms they typed, to 3 decimals', () => {
+    expect(kgToInput(61.25, 'kg')).toBe(61.25);
+    expect(kgToInput(60, 'kg')).toBe(60);
+    expect(kgToInput(61.2345, 'kg')).toBe(61.235);
+  });
+  it('shows a lb coach pounds to 1 decimal, so 135 lb stays 135', () => {
+    expect(kgToInput(61.235, 'lb')).toBe(135);
+    expect(kgToInput(toKg(135.5, 'lb'), 'lb')).toBe(135.5);
   });
 });

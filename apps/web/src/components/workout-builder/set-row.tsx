@@ -5,8 +5,8 @@ import {
   TARGET_FIELDS,
   distanceUnitFor,
   formatClock,
-  fromKg,
   fromMeters,
+  kgToInput,
   parseClock,
   toKg,
   toMeters,
@@ -165,7 +165,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               inputMode="decimal"
               className={styles.narrow}
               value={set.targetWeightKg}
-              format={(kg) => String(fromKg(kg, units))}
+              format={(kg) => String(kgToInput(kg, units))}
               parse={parseDecimal}
               onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
             />

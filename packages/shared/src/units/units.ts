@@ -24,6 +24,14 @@ export function fromKg(kg: number, unit: Units): number {
   return round(unit === 'lb' ? kg / KG_PER_LB : kg, 1);
 }
 
+/**
+ * The number an editable weight box shows. kg: the stored value to 3 decimals, so 61.25 typed stays 61.25.
+ * lb: fromKg to 1 decimal, so 135 lb (stored 61.235 kg) reads back as 135.
+ */
+export function kgToInput(kg: number, unit: Units): number {
+  return unit === 'kg' ? round(kg, 3) : fromKg(kg, unit);
+}
+
 export function formatWeight(kg: number, unit: Units): string {
   return `${trim(fromKg(kg, unit), 1)} ${unit}`;
 }

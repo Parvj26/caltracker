@@ -31,6 +31,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
     await row.getByLabel('Max reps').fill('10');
     await row.getByLabel('Weight (kg)').fill('60');
   }
+  // A kg coach keeps the precision they typed (not rounded to 61.3).
+  const set3Weight = setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)');
+  await set3Weight.fill('61.25');
+  await set3Weight.blur();
+  await expect(set3Weight).toHaveValue('61.25');
   await page.getByRole('button', { name: '+ Set', exact: true }).click();
   await setRow(page, 'Barbell Squat', 'set 1').getByLabel('Set type').selectOption('warmup');
   await expect(setRow(page, 'Barbell Squat', 'warm-up set')).toBeVisible();
@@ -56,11 +61,12 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await page.reload();
   await expect(page.getByLabel('Workout name')).toHaveValue(name);
   await expect(setRow(page, 'Barbell Squat', 'warm-up set').getByLabel('Set type')).toHaveValue('warmup');
-  for (const n of [1, 2, 3]) {
+  // After the warm-up was added first, the old set 3 (61.25 kg) is set 2 and its copy (+ Set) is set 3.
+  for (const [n, kg] of [[1, '60'], [2, '61.25'], [3, '61.25']] as const) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
     await expect(row.getByLabel('Min reps')).toHaveValue('8');
     await expect(row.getByLabel('Max reps')).toHaveValue('10');
-    await expect(row.getByLabel('Weight (kg)')).toHaveValue('60');
+    await expect(row.getByLabel('Weight (kg)')).toHaveValue(kg);
   }
   await expect(drop).toBeVisible();
   await expect(drop.getByText('↳')).toBeVisible();

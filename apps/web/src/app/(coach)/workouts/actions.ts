@@ -48,9 +48,16 @@ export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: 
   if (!UUID.test(id)) return { ok: false, error: "Couldn't find that workout." };
   const supabase = await createServerSupabase();
   // Program slots go with it (on delete cascade). Clients' calendar copies are separate rows and stay.
-  const { data, error } = await supabase.from('workouts').delete().eq('id', id).eq('workspace_id', workspaceId).select('id');
+  // Library workouts only: a client's calendar copy is edited and deleted from that client's calendar.
+  const { data, error } = await supabase
+    .from('workouts')
+    .delete()
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .is('client_id', null)
+    .select('id');
   if (error) return { ok: false, error: "Couldn't delete. Please try again." };
-  if (data.length === 0) return { ok: false, error: "Couldn't find that workout." };
+  if (data.length === 0) return { ok: false, error: "Couldn't find that workout in your library. It may already be deleted." };
 
   revalidatePath('/workouts');
   revalidatePath('/programs', 'layout');
@@ -58,16 +65,17 @@ export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-/** How many programs use this library workout (a program using it twice counts once). */
+/** How many programs use this library workout (a program using it twice counts once). Client copies count 0. */
 export async function countProgramUses(id: string): Promise<number> {
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return 0;
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('program_workouts')
-    .select('program_id')
+    .select('program_id, workouts!inner(client_id)')
     .eq('workout_id', id)
-    .eq('workspace_id', workspaceId);
+    .eq('workspace_id', workspaceId)
+    .is('workouts.client_id', null);
   if (error) throw new Error(`Could not count programs: ${error.message}`);
   return new Set(data.map((r) => r.program_id)).size;
 }

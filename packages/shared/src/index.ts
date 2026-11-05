@@ -47,6 +47,7 @@ export {
   formatWeight,
   fromKg,
   fromMeters,
+  kgToInput,
   parseClock,
   toKg,
   toMeters,
