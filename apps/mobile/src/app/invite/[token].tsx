@@ -119,8 +119,9 @@ export default function JoinInvite() {
       </AuthShell>
     );
   }
-  // Already signed in with the invited email: signing in links the coach, so just go in.
-  if (session) return <Redirect href="/" />;
+  // Already signed in with the invited email (e.g. a removed client tapping a new invite). Tapping the link is the
+  // client's choice, so accept the invite now; opening the app on its own never joins a coach.
+  if (session) return <AcceptAndEnter />;
 
   const offerSignIn = failure !== null && SIGN_IN_REASONS.includes(failure.reason);
   return (
@@ -173,6 +174,27 @@ export default function JoinInvite() {
       ) : (
         <Button testID="join-button" title={busy ? 'Joining...' : 'Join'} onPress={() => void submit()} busy={busy} />
       )}
+    </AuthShell>
+  );
+}
+
+/** Accepts the pending invite for the signed-in email once, then enters the app. */
+function AcceptAndEnter() {
+  const { recheck } = useSession();
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void recheck().finally(() => {
+      if (!cancelled) setDone(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [recheck]);
+  if (done) return <Redirect href="/" />;
+  return (
+    <AuthShell title="Your invite">
+      <ActivityIndicator color={palette.ink} accessibilityLabel="Joining your coach" />
     </AuthShell>
   );
 }

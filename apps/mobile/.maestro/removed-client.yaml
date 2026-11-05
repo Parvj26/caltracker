@@ -49,6 +49,23 @@ env:
 - extendedWaitUntil:
     visible: "You're no longer connected to Demo Coaching. If that's a mistake, ask your coach to invite you again."
     timeout: 20000
+# The coach re-invites them: tapping the new link while still signed in accepts it and goes straight in
+# (no "Check again" needed).
+- runScript:
+    file: helpers/invite-link.js
+    env: { EMAIL: '${EMAIL}', NAME: 'Removed Client' }
+- openLink: ${output.link}
+- repeat:
+    times: 3
+    while:
+      notVisible: 'Welcome to Demo Coaching'
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to Demo Coaching'
+    timeout: 20000
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
