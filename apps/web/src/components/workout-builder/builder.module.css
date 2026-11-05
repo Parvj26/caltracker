@@ -1,0 +1,168 @@
+/* Workout builder. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall. */
+.builder { display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
+
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.modeBanner {
+  margin: 0;
+  padding: var(--ct-space-3) var(--ct-space-4);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-blue);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+}
+
+.details { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
+
+.input {
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+}
+.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+.input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.input::placeholder { color: var(--ct-ink-muted); }
+
+.smallButton {
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.smallButton:hover:not(:disabled) { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.smallButton:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
+
+/* ---------- Blocks ---------- */
+.blocks { display: flex; flex-direction: column; gap: var(--ct-space-3-5); }
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-4) var(--ct-space-4-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+}
+.blockHeader, .exerciseHeader { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
+.blockNumber {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-lime);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+}
+.blockTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.blockTools { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); margin-left: auto; }
+.exercise { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.exercise + .exercise { padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.exerciseName { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.exerciseFooter, .blockFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.exerciseNote { flex: 1 1 240px; display: flex; }
+.exerciseNote .input { width: 100%; }
+
+/* ---------- Set rows ---------- */
+.sets { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.setRow { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-1) var(--ct-space-2); border-radius: var(--ct-radius-input); }
+.dropRow { margin-left: var(--ct-space-6); background: var(--ct-drop); }
+.setCells { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.setLabel { width: 24px; text-align: center; font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
+.dropTag { width: 7rem; font-weight: var(--ct-weight-section-heading); }
+.typeSelect { width: 7rem; cursor: pointer; }
+.reps { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
+.narrow { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.unitField { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
+.cellCaption { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.toggle { font-size: var(--ct-size-caption); }
+.toggle[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); }
+.check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
+.noteInput { flex: 1 1 160px; min-width: 8rem; }
+.rowActions { display: flex; gap: var(--ct-space-1); }
+.rowError { padding-left: var(--ct-space-6); }
+
+.addRow { display: flex; flex-wrap: wrap; gap: var(--ct-space-3); }
+
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-3) 0;
+  background: var(--ct-bg);
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+}
+.status { margin: 0 auto 0 0; color: var(--ct-ink-muted); }
+
+/* ---------- Exercise picker ---------- */
+.dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(640px, calc(100dvh - 32px));
+  padding: var(--ct-space-6);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); }
+.searchLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
+.selectedList { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+.selectedList li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  padding-left: var(--ct-space-3);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-lime);
+  font-weight: var(--ct-weight-section-heading);
+}
+.selectedList .smallButton { box-shadow: none; border-radius: var(--ct-radius-pill); }
+.results { flex: 1; min-height: 120px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.result {
+  display: flex;
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.result:hover { background: var(--ct-surface); }
+.result[aria-pressed='true'] { background: var(--ct-lime); }
+/* Text on a pastel fill is always ink. */
+.result[aria-pressed='true'] .caption { color: var(--ct-ink); }

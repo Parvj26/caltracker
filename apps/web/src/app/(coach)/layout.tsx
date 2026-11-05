@@ -4,7 +4,7 @@ import { NAV_ICONS } from './nav-icons';
 import { NavLink } from './nav-link';
 import styles from './coach.module.css';
 
-// Workouts and Programs arrive with the program builder (phase 2 Tasks 14-16); until then they 404.
+// Programs arrives with the program builder (phase 2 Task 15); until then it 404s.
 const NAV = [
   { href: '/clients', label: 'Clients', icon: 'clients' },
   { href: '/workouts', label: 'Workouts', icon: 'workouts' },
