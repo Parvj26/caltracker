@@ -51,74 +51,85 @@ export function createHandler({ supabaseAdmin: admin }: HandlerDeps) {
     if (!parsed.success) return refuse('invalid_request', 400);
     const { token, password, firstName, lastName } = parsed.data;
 
-    const { data: rows, error: lookupError } = await admin.rpc('invite_for_join', { token });
-    if (lookupError) {
-      logFailure('invite lookup', lookupError);
-      return serverError();
-    }
-    const row = (Array.isArray(rows) ? rows[0] : rows) as JoinRow | undefined;
-    if (!row || row.status === 'not_found' || !row.invite_id || !row.email) return refuse('not_found');
-    if (row.status !== 'valid') return refuse(row.status);
-    if (row.user_is_coach) return refuse('coach_account');
-    // Someone already uses this account: never change its password. Signing in links the coach.
-    if (row.user_id && row.user_confirmed) return refuse('account_exists');
-
     const metadata = { first_name: firstName, last_name: lastName };
-    let userId: string;
-    let createdHere = false;
-    if (row.user_id) {
-      // Signed up once but never confirmed. Holding the token proves the inbox, so take the account over:
-      // a new password locks out anyone who registered this email without owning it.
-      const { error } = await admin.auth.admin.updateUserById(row.user_id, {
-        password,
-        email_confirm: true,
-        user_metadata: metadata,
-      });
-      if (error) {
-        logFailure('confirm unconfirmed account', error);
-        return serverError();
-      }
-      const { error: profileError } = await admin
-        .from('profiles')
-        .update({ first_name: firstName, last_name: lastName })
-        .eq('id', row.user_id);
-      if (profileError) logFailure('profile name update', profileError);
-      userId = row.user_id;
-    } else {
-      const { data, error } = await admin.auth.admin.createUser({
-        email: row.email,
-        password,
-        email_confirm: true,
-        user_metadata: metadata,
-      });
-      if (error || !data.user) {
-        // Usually a second tap on Join that created the account a moment ago (Auth reports that as
-        // email_exists or as a database error, depending on timing), so look again before giving up.
-        if (error?.code === 'email_exists' || (await accountNowExists(token))) return refuse('account_exists');
-        logFailure('create account', error);
-        return serverError();
-      }
-      userId = data.user.id;
-      createdHere = true;
-    }
 
-    const { data: outcome, error: acceptError } = await admin.rpc('accept_invite_for', {
-      p_invite_id: row.invite_id,
-      p_user_id: userId,
-    });
-    if (acceptError || outcome !== 'ok') {
+    // Two passes at most: if someone else creates an account with this email between our lookup and our
+    // createUser, look again and take the path that fits what now exists.
+    for (let pass = 0; pass < 2; pass++) {
+      const { data: rows, error: lookupError } = await admin.rpc('invite_for_join', { token });
+      if (lookupError) {
+        logFailure('invite lookup', lookupError);
+        return serverError();
+      }
+      const row = (Array.isArray(rows) ? rows[0] : rows) as JoinRow | undefined;
+      if (!row || row.status === 'not_found' || !row.invite_id || !row.email) return refuse('not_found');
+      if (row.status !== 'valid') return refuse(row.status);
+      if (row.user_is_coach) return refuse('coach_account');
+      // Someone already uses this account: never change its password. Signing in links the coach.
+      if (row.user_id && row.user_confirmed) return refuse('account_exists');
+
+      let userId: string;
+      let createdHere = false;
+      if (row.user_id) {
+        // Signed up once but never confirmed. Holding the token proves the inbox, so take the account over:
+        // a new password locks out anyone who registered this email without owning it.
+        const { error } = await admin.auth.admin.updateUserById(row.user_id, {
+          password,
+          email_confirm: true,
+          user_metadata: metadata,
+        });
+        if (error) {
+          if (error.code === 'weak_password') return refuse('weak_password');
+          logFailure('confirm unconfirmed account', error);
+          return serverError();
+        }
+        const { error: profileError } = await admin
+          .from('profiles')
+          .update({ first_name: firstName, last_name: lastName })
+          .eq('id', row.user_id);
+        if (profileError) logFailure('profile name update', profileError);
+        userId = row.user_id;
+      } else {
+        const { data, error } = await admin.auth.admin.createUser({
+          email: row.email,
+          password,
+          email_confirm: true,
+          user_metadata: metadata,
+        });
+        if (error || !data.user) {
+          if (error?.code === 'weak_password') return refuse('weak_password');
+          // An account with this email appeared a moment ago (a second tap on Join, or a regular sign-up).
+          // Auth reports that as email_exists or as a database error depending on timing: look again.
+          if (error?.code === 'email_exists' || (await accountNowExists(token))) continue;
+          logFailure('create account', error);
+          return serverError();
+        }
+        userId = data.user.id;
+        createdHere = true;
+      }
+
+      const { data: outcome, error: acceptError } = await admin.rpc('accept_invite_for', {
+        p_invite_id: row.invite_id,
+        p_user_id: userId,
+      });
+      if (!acceptError && outcome === 'ok') return json({ ok: true, email: row.email });
+
       if (acceptError) logFailure('accept', acceptError);
-      // Don't leave behind an account nobody asked for.
       if (createdHere) {
+        // Don't leave behind an account nobody asked for.
         const { error } = await admin.auth.admin.deleteUser(userId);
         if (error) logFailure('remove unused account', error);
+      } else if (outcome === 'used' || outcome === 'expired' || outcome === 'not_found') {
+        // The invite changed under us (another tap, a resend or a cancel), but the account is now confirmed with
+        // the password just chosen. Signing in works, and links the coach if an open invite remains.
+        return refuse('account_exists');
       }
       if (outcome === 'used' || outcome === 'expired' || outcome === 'not_found') return refuse(outcome);
       if (outcome === 'coach_account' || outcome === 'other_coach') return refuse(outcome);
       if (outcome) logFailure('accept', new Error(String(outcome)));
       return serverError();
     }
-    return json({ ok: true, email: row.email });
+    return refuse('account_exists');
   };
 }
 

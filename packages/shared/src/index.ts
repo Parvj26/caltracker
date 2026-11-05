@@ -34,5 +34,6 @@ export {
   INVITE_TOKEN_PATTERN,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  passwordBytes,
 } from './invites/accept';
 export type { AcceptInviteReason } from './invites/accept';

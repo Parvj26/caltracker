@@ -211,11 +211,8 @@ t('two taps on Join at once: exactly one succeeds and one account exists', async
   const { token } = await makeInvite(ws, ownerId, to);
   const results = await Promise.all([join(token), join(token), join(token)].map(async (r) => (await r).json()));
   assertEquals(results.filter((r) => r.ok).length, 1, JSON.stringify(results));
-  // The other taps get the friendly "sign in instead", not an error.
-  assertEquals(results.filter((r) => !r.ok), [
-    { ok: false, reason: 'account_exists' },
-    { ok: false, reason: 'account_exists' },
-  ]);
+  // The other taps get a "sign in instead" reason (which one depends on timing), never an error.
+  for (const r of results.filter((r) => !r.ok)) assert(['account_exists', 'used'].includes(r.reason), JSON.stringify(r));
   const user = await findUser(to);
   assert(user);
   assertEquals(await membership(user.id), [{ workspace_id: ws, role: 'client' }]);
@@ -233,4 +230,77 @@ t('rejects a short password, a blank first name, bad JSON and other methods', as
   assertEquals((await call('{not json')).status, 400);
   assertEquals((await call(null, 'GET')).status, 405);
   assertEquals(await findUser(to), undefined, 'nothing was created');
+});
+
+/** A fresh service-role client whose Auth admin calls can be patched for one test. */
+function patchableAdmin() {
+  return createClient(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+t('a regular sign-up lands between our lookup and createUser: takes the unconfirmed path instead', async () => {
+  const { ws, ownerId } = await makeWorkspace('Join I');
+  const to = email('between');
+  const { token } = await makeInvite(ws, ownerId, to);
+  const patched = patchableAdmin();
+  const realCreate = patched.auth.admin.createUser.bind(patched.auth.admin);
+  let first = true;
+  patched.auth.admin.createUser = async (attrs) => {
+    if (first) {
+      first = false;
+      // Someone signs up the normal way (unconfirmed) a moment before our createUser runs.
+      await makeUser(to, { confirmed: false, password: 'squatter-pass-1' });
+    }
+    return realCreate(attrs);
+  };
+  const res = await createHandler({ supabaseAdmin: patched })(
+    new Request('http://localhost/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify({ token, password: PASSWORD, firstName: 'Sam', lastName: 'Lee' }),
+    }),
+  );
+  assertEquals(await res.json(), { ok: true, email: to });
+  assert(await canSignIn(to, PASSWORD));
+  assert(!(await canSignIn(to, 'squatter-pass-1')));
+});
+
+t('two taps on Join for an unconfirmed account: one joins, the other is sent to sign in, the password works', async () => {
+  const { ws, ownerId } = await makeWorkspace('Join J');
+  const to = email('unconfirmed-race');
+  const userId = await makeUser(to, { confirmed: false, password: 'squatter-pass-1' });
+  const { token } = await makeInvite(ws, ownerId, to);
+  const results = await Promise.all([join(token), join(token)].map(async (r) => (await r).json()));
+  assertEquals(results.filter((r) => r.ok).length, 1, JSON.stringify(results));
+  for (const r of results.filter((r) => !r.ok)) assert(['account_exists', 'used'].includes(r.reason), JSON.stringify(r));
+  assert(await canSignIn(to, PASSWORD));
+  assertEquals(await membership(userId), [{ workspace_id: ws, role: 'client' }]);
+});
+
+t('a password Auth refuses comes back as weak_password, not a generic error', async () => {
+  const { ws, ownerId } = await makeWorkspace('Join K');
+  const to = email('weak');
+  await makeUser(to, { confirmed: false });
+  const { token } = await makeInvite(ws, ownerId, to);
+  const patched = patchableAdmin();
+  // Hosted projects can require more than our 8 characters; simulate Auth refusing the password.
+  patched.auth.admin.updateUserById = () =>
+    Promise.resolve({
+      data: { user: null },
+      error: Object.assign(new Error('Password is known to be weak'), { code: 'weak_password', status: 422 }),
+    }) as never;
+  const res = await createHandler({ supabaseAdmin: patched })(
+    new Request('http://localhost/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify({ token, password: PASSWORD, firstName: 'Sam', lastName: 'Lee' }),
+    }),
+  );
+  assertEquals(await res.json(), { ok: false, reason: 'weak_password' });
+});
+
+t('a password over 72 bytes is refused up front', async () => {
+  const { ws, ownerId } = await makeWorkspace('Join L');
+  const to = email('bytes');
+  const { token } = await makeInvite(ws, ownerId, to);
+  const res = await join(token, { password: 'é'.repeat(37) });
+  assertEquals(res.status, 400);
+  assertEquals(await findUser(to), undefined);
 });

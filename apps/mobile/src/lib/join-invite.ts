@@ -92,6 +92,8 @@ export function joinMessage(reason: JoinFailure['reason'], workspaceName: string
       return 'This email is a coach account. Ask your coach to invite a different email.';
     case 'other_coach':
       return 'This account already trains with another coach on CalTracker.';
+    case 'weak_password':
+      return 'Choose a stronger password: make it longer, or mix in numbers and symbols.';
     case 'invalid_request':
       return 'Check your name and password, then try again.';
     case 'offline':

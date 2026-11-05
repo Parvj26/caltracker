@@ -1,5 +1,5 @@
-import { FirstName, LastName, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@caltracker/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { FirstName, LastName, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordBytes } from '@caltracker/shared';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { AuthShell } from '@/components/auth-shell';
@@ -56,7 +56,8 @@ export default function JoinInvite() {
     const last = LastName.safeParse(lastName);
     if (!last.success) return setError('Last name can be at most 100 characters.');
     if (password.length < PASSWORD_MIN_LENGTH) return setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
-    if (password.length > PASSWORD_MAX_LENGTH) return setError(`Password can be at most ${PASSWORD_MAX_LENGTH} characters.`);
+    // The limit counts bytes: accented letters and emoji take more than one.
+    if (passwordBytes(password) > PASSWORD_MAX_LENGTH) return setError('That password is too long. Try a shorter one.');
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -118,15 +119,8 @@ export default function JoinInvite() {
       </AuthShell>
     );
   }
-  if (session) {
-    // Already signed in with the invited email: signing in already linked the coach.
-    return (
-      <AuthShell title={`Join ${invite.workspaceName}`}>
-        <Text style={text('body')}>{`You're already signed in as ${invite.email}.`}</Text>
-        <Button testID="go-home" title="Continue" onPress={() => router.replace('/')} />
-      </AuthShell>
-    );
-  }
+  // Already signed in with the invited email: signing in links the coach, so just go in.
+  if (session) return <Redirect href="/" />;
 
   const offerSignIn = failure !== null && SIGN_IN_REASONS.includes(failure.reason);
   return (

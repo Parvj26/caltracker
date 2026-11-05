@@ -6,6 +6,7 @@ import {
   INVITE_TOKEN_PATTERN,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  passwordBytes,
 } from '../../src/invites/accept';
 
 // Same shape as send-invite's tokens: 32 random bytes, base64url, no padding (43 characters).
@@ -50,6 +51,13 @@ describe('AcceptInviteRequest', () => {
     expect(AcceptInviteRequest.safeParse({ ...valid, password: 'x'.repeat(73) }).success).toBe(false);
   });
 
+  it('counts the 72 limit in bytes, so accented and emoji passwords cannot overflow it', () => {
+    expect(passwordBytes('é')).toBe(2);
+    expect(passwordBytes('💪')).toBe(4);
+    expect(AcceptInviteRequest.safeParse({ ...valid, password: 'é'.repeat(36) }).success).toBe(true);
+    expect(AcceptInviteRequest.safeParse({ ...valid, password: 'é'.repeat(37) }).success).toBe(false);
+  });
+
   it('requires a first name and caps both names at 100 characters', () => {
     expect(AcceptInviteRequest.safeParse({ ...valid, firstName: '  ' }).success).toBe(false);
     expect(AcceptInviteRequest.safeParse({ ...valid, firstName: 'x'.repeat(101) }).success).toBe(false);
@@ -75,7 +83,7 @@ describe('AcceptInviteResponse', () => {
 
   it('lists every reason the Join screen handles', () => {
     expect([...ACCEPT_INVITE_REASONS].sort()).toEqual(
-      ['account_exists', 'coach_account', 'expired', 'invalid_request', 'not_found', 'other_coach', 'used'].sort(),
+      ['account_exists', 'coach_account', 'expired', 'invalid_request', 'not_found', 'other_coach', 'used', 'weak_password'].sort(),
     );
   });
 });

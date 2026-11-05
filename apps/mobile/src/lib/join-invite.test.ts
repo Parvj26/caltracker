@@ -131,6 +131,7 @@ describe('joinMessage', () => {
       'account_exists',
       'coach_account',
       'other_coach',
+      'weak_password',
       'invalid_request',
       'offline',
       'server',
