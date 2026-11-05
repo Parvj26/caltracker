@@ -51,11 +51,22 @@ export function monthGrid(month: string): IsoDate[][] {
   return Array.from({ length: rows }, (_, w) => Array.from({ length: 7 }, (_, i) => addDays(start, w * 7 + i)));
 }
 
-/** Today's date in the given time zone (default: the viewer's own). */
+/**
+ * Today's date in the given time zone (default: the viewer's own).
+ * Built from formatToParts rather than relying on a locale printing YYYY-MM-DD, which not every
+ * JavaScript engine does (Hermes, React Native's engine, ships limited locale data).
+ */
 export function localToday(timeZone?: string): IsoDate {
-  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-    new Date(),
-  );
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    numberingSystem: 'latn',
+  }).formatToParts(new Date());
+  const part = (type: 'year' | 'month' | 'day') => Number(parts.find((p) => p.type === type)?.value);
+  const [y, m, d] = [part('year'), part('month'), part('day')];
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 export function programDayToDate(start: IsoDate, week: number, day: number): IsoDate {

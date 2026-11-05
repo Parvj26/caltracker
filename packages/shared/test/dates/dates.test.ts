@@ -59,6 +59,27 @@ describe('localToday', () => {
     expect(localToday('Pacific/Auckland')).toBe('2026-11-05');
     expect(localToday('America/Los_Angeles')).toBe('2026-11-04');
   });
+
+  it('always returns YYYY-MM-DD, in the device zone too', () => {
+    expect(localToday()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(localToday('Pacific/Auckland')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("does not rely on the locale's own date format (Hermes may not honour en-CA)", () => {
+    // Fake only Date: faking Intl too would bypass the spy below.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-04T12:00:00Z'));
+    // A runtime with limited locale data might format en-CA like en-US.
+    // `format` is a getter that returns a bound function (TypeScript types it as a method, so patch it by hand).
+    const proto = Intl.DateTimeFormat.prototype;
+    const original = Object.getOwnPropertyDescriptor(proto, 'format');
+    Object.defineProperty(proto, 'format', { configurable: true, get: () => () => '1/4/2026' });
+    try {
+      expect(localToday('UTC')).toBe('2026-01-04');
+    } finally {
+      if (original) Object.defineProperty(proto, 'format', original);
+    }
+  });
 });
 
 describe('IsoDateSchema', () => {
