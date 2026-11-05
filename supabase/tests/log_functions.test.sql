@@ -1,5 +1,5 @@
 begin;
-select plan(94);
+select plan(112);
 
 -- Fixtures (as postgres)
 select tests.create_user('lf-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -17,6 +17,7 @@ select tests.add_client(:'ws_b', :'b1');
 
 select tests.create_exercise(null, 'LF Builtin') as ex_bi \gset
 select tests.create_exercise(null, 'LF Builtin Two') as ex_bi2 \gset
+select tests.create_exercise(null, 'LF Builtin Three') as ex_bi3 \gset
 select tests.create_exercise(:'ws_b', 'LF B Custom') as ex_b \gset
 
 select tests.create_workout(:'ws_a', 'A1 Day', :'a1', '2026-11-10', :'ex_bi') as inst_a1 \gset
@@ -82,6 +83,20 @@ $$;
 \set s1 '6b000000-0000-4000-8000-000000000501'
 \set s2 '6b000000-0000-4000-8000-000000000502'
 \set s3 '6b000000-0000-4000-8000-000000000503'
+\set s4 '6b000000-0000-4000-8000-000000000504'
+\set l3s2 '6b000000-0000-4000-8000-000000000351'
+\set l5 '6b000000-0000-4000-8000-000000000005'
+\set l5b '6b000000-0000-4000-8000-0000000005b0'
+\set l5e '6b000000-0000-4000-8000-0000000005e0'
+\set l5s '6b000000-0000-4000-8000-000000000550'
+\set l6 '6b000000-0000-4000-8000-000000000006'
+\set l6b '6b000000-0000-4000-8000-0000000006b0'
+\set l6e '6b000000-0000-4000-8000-0000000006e0'
+\set l6s '6b000000-0000-4000-8000-000000000650'
+\set l7 '6b000000-0000-4000-8000-000000000007'
+\set l7b '6b000000-0000-4000-8000-0000000007b0'
+\set l7e '6b000000-0000-4000-8000-0000000007e0'
+\set l7s '6b000000-0000-4000-8000-000000000750'
 \set gb '6b000000-0000-4000-8000-0000000009b0'
 \set ge '6b000000-0000-4000-8000-0000000009e0'
 \set gs '6b000000-0000-4000-8000-000000000900'
@@ -118,8 +133,13 @@ select tests.lg_one(:'l1', :'inst_a1', 'completed', 4, :'b1x', :'e1x', :'ex_bi',
 select tests.lg_one(:'l1', :'inst_a1', 'completed', 5, :'b1x', :'e1x', :'ex_bi', jsonb_build_array(
   tests.lg_set(:'s1', 'normal', 8, 60, true), tests.lg_set(:'s3', 'normal', 8, 60, false))) as l1_finish \gset
 select jsonb_set(:'l1_v3'::jsonb, '{revision}', '6') as l1_reopen6 \gset
-select jsonb_set(:'l1_finish'::jsonb, '{revision}', '7') as l1_finish7 \gset
-select jsonb_set(:'l1_v3'::jsonb, '{revision}', '8') as l1_reopen8 \gset
+-- v6: three completed sets (the phone kept going after the server finished it).
+select tests.lg_one(:'l1', :'inst_a1', 'completed', 6, :'b1x', :'e1x', :'ex_bi', jsonb_build_array(
+  tests.lg_set(:'s1', 'normal', 8, 60, true), tests.lg_set(:'s3', 'normal', 8, 60, true),
+  tests.lg_set(:'s4', 'normal', 8, 60, true))) as l1_more6 \gset
+select jsonb_set(jsonb_set(:'l1_more6'::jsonb, '{revision}', '7'), '{status}', '"in_progress"') as l1_reopen7 \gset
+select jsonb_set(:'l1_more6'::jsonb, '{revision}', '8') as l1_finish8 \gset
+select jsonb_set(:'l1_reopen7'::jsonb, '{revision}', '9') as l1_reopen9 \gset
 
 -- Guard docs (a fresh log id each, so nothing collides with L1).
 select tests.lg_one(:'lx', :'inst_a1', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
@@ -147,8 +167,6 @@ select tests.lg_one(:'lx', :'inst_a2', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
   jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false))) as doc_a2_inst \gset
 select tests.lg_one(:'lx', :'lib_a', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
   jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false))) as doc_library \gset
-select tests.lg_one(:'lx', :'inst_a1', 'completed', 1, :'gb', :'ge', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, true))) as doc_insert_completed \gset
 select tests.lg_one(:'l2', null, 'in_progress', 1, :'gb', :'ge', :'ex_bi',
   jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false))) as doc_second_active \gset
 
@@ -216,8 +234,8 @@ select throws_ok(format('update public.log_sets set to_failure = true where id =
 -- ---------------------------------------------------------------------------------------------
 -- Insert and re-save
 select tests.act_as(:'a1');
-select is(public.save_workout_log(:'l1_v1'::jsonb), '{"revision": 1, "status": "in_progress"}'::jsonb,
-  'a new in-progress doc returns revision 1');
+select is(public.save_workout_log(:'l1_v1'::jsonb), '{"applied": true, "revision": 1, "status": "in_progress"}'::jsonb,
+  'a new in-progress doc is applied at revision 1');
 reset role;
 select results_eq(
   format($$select workspace_id, client_id, workout_id, logged_by, status::text, revision, name, finished_at
@@ -237,17 +255,17 @@ select is((select count(*)::int from public.log_sets where log_id = :'l1' and wo
   2, 'every set inherits the log''s workspace and client');
 
 select tests.act_as(:'a1');
-select is(public.save_workout_log(:'l1_v2'::jsonb), '{"revision": 2, "status": "in_progress"}'::jsonb,
-  'revision 2 is accepted');
+select is(public.save_workout_log(:'l1_v2'::jsonb), '{"applied": true, "revision": 2, "status": "in_progress"}'::jsonb,
+  'revision 2 is applied');
 select ok((select completed_at is not null and actual_reps = 8 and actual_weight_kg = 60
   from public.log_sets where id = :'s1'), 'the completed set is stored');
-select is(public.save_workout_log(:'l1_v1'::jsonb), '{"revision": 2, "status": "in_progress"}'::jsonb,
-  'a stale revision returns the stored revision');
+select is(public.save_workout_log(:'l1_v1'::jsonb), '{"applied": false, "revision": 2, "status": "in_progress"}'::jsonb,
+  'a stale revision returns applied=false with the stored revision');
 select ok((select completed_at is not null from public.log_sets where id = :'s1'), 'a stale revision changes nothing');
-select is(public.save_workout_log(:'l1_v2'::jsonb), '{"revision": 2, "status": "in_progress"}'::jsonb,
-  'the same revision again is ignored too');
-select is(public.save_workout_log(:'l1_v3'::jsonb), '{"revision": 3, "status": "in_progress"}'::jsonb,
-  'revision 3 is accepted');
+select is(public.save_workout_log(:'l1_v2'::jsonb), '{"applied": false, "revision": 2, "status": "in_progress"}'::jsonb,
+  'the same revision again is not applied either');
+select is(public.save_workout_log(:'l1_v3'::jsonb), '{"applied": true, "revision": 3, "status": "in_progress"}'::jsonb,
+  'revision 3 is applied');
 select results_eq(
   format($$select id, position::int from public.log_sets where log_id = %L order by position$$, :'l1'),
   format($$values (%L::uuid, 0), (%L::uuid, 1)$$, :'s1', :'s3'),
@@ -267,49 +285,90 @@ select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_norma
   'Only drop sets can be "to failure".', 'to failure on a normal set is refused');
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_dup'), '23514',
   format('Row %s appears twice in the log.', :'gs'), 'a doc with a repeated id is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)', jsonb_set(:'doc_lead_drop'::jsonb, '{revision}', '0')),
+  '23514', 'Revision must be at least 1.', 'a new log with revision 0 is refused');
 
 -- ---------------------------------------------------------------------------------------------
--- Status rules
+-- Inserting a finished or discarded log (a workout done with no signal)
+select is(public.save_workout_log(tests.lg_one(:'l5', null, 'completed', 4, :'l5b', :'l5e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l5s', 'normal', 8, 50, true)))), '{"applied": true, "revision": 4, "status": "completed"}'::jsonb,
+  'a new log can arrive already completed');
+reset role;
+select ok((select finished_at is not null and not auto_finished and revision = 4 from public.workout_logs where id = :'l5'),
+  'the inserted completed log has finished_at set');
+select is((select count(*)::int from public.log_sets where log_id = :'l5' and completed_at is not null), 1,
+  'its completed set is stored');
+select tests.act_as(:'a1');
+select is(public.save_workout_log(tests.lg_one(:'l6', null, 'discarded', 2, :'l6b', :'l6e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l6s', 'normal', 8, 50, false)))), '{"applied": true, "revision": 2, "status": "discarded"}'::jsonb,
+  'a new log can arrive discarded');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)', tests.lg_one(:'l7', null, 'completed', 1, :'l7b',
+  :'l7e', :'ex_bi3', jsonb_build_array(tests.lg_set(:'l7s', 'normal', 8, 50, false)))), '23514',
+  'Complete at least one set to finish.', 'a new completed log needs a completed set');
+
+-- ---------------------------------------------------------------------------------------------
+-- Status rules on L1 (revision 3, in progress)
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'l1_empty_finish'), '23514',
   'Complete at least one set to finish.', 'finishing with no completed sets is refused');
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_second_active'), '23505', null,
   'a second in-progress log for the same client is refused');
 select is((select revision from public.workout_logs where id = :'l1'), 3, 'refused saves left L1 at revision 3');
 
-select is(public.save_workout_log(:'l1_finish'::jsonb), '{"revision": 5, "status": "completed"}'::jsonb,
-  'finishing with a completed set is accepted');
+select is(public.save_workout_log(:'l1_finish'::jsonb), '{"applied": true, "revision": 5, "status": "completed"}'::jsonb,
+  'finishing with a completed set is applied');
 select ok((select finished_at is not null and not auto_finished from public.workout_logs where id = :'l1'),
   'finishing always sets finished_at, even when the doc has none');
-select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'l1_reopen6'), '23514',
-  'This workout can no longer be changed.', 'a finished log that was not auto-finished cannot be reopened');
-select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_insert_completed'), '23514',
-  'This workout can no longer be changed.', 'a new log must start in progress');
+select is(public.save_workout_log(:'l1_reopen6'::jsonb), '{"applied": false, "revision": 5, "status": "completed"}'::jsonb,
+  'a manually completed log is locked: a higher revision returns applied=false');
+select is(public.save_workout_log(:'l1_more6'::jsonb), '{"applied": false, "revision": 5, "status": "completed"}'::jsonb,
+  'a manually completed log is locked to a higher-revision completed doc too');
+select is((select status::text from public.workout_logs where id = :'l1'), 'completed', 'the locked log is unchanged');
 
+-- The server auto-finished it (simulated) while the phone kept logging.
 reset role;
-update public.workout_logs set auto_finished = true, finished_at = now() - interval '2 hours' where id = :'l1';
+update public.workout_logs set auto_finished = true, finished_at = now() - interval '1 hour' where id = :'l1';
 select tests.act_as(:'a1');
-select is(public.save_workout_log(:'l1_reopen6'::jsonb), '{"revision": 6, "status": "in_progress"}'::jsonb,
+select is(public.save_workout_log(:'l1_more6'::jsonb), '{"applied": true, "revision": 6, "status": "completed"}'::jsonb,
+  'after an auto-finish, the phone''s higher-revision doc is applied');
+select is((select count(*)::int from public.log_sets where log_id = :'l1' and completed_at is not null), 3,
+  'the sets the phone added after the auto-finish are stored');
+select is((select auto_finished from public.workout_logs where id = :'l1'), true,
+  'a completed -> completed save keeps auto_finished');
+select is(public.save_workout_log(:'l1_reopen7'::jsonb), '{"applied": true, "revision": 7, "status": "in_progress"}'::jsonb,
   'an auto-finished log can be reopened within 24 h');
-select is(public.save_workout_log(:'l1_finish7'::jsonb), '{"revision": 7, "status": "completed"}'::jsonb,
+select is((select auto_finished from public.workout_logs where id = :'l1'), true, 'a reopen keeps auto_finished');
+select is(public.save_workout_log(:'l1_finish8'::jsonb), '{"applied": true, "revision": 8, "status": "completed"}'::jsonb,
   'the reopened log finishes again');
+select is((select auto_finished from public.workout_logs where id = :'l1'), false,
+  'finishing from in progress takes auto_finished from the doc');
+
 reset role;
 update public.workout_logs set auto_finished = true, finished_at = now() - interval '25 hours' where id = :'l1';
 select tests.act_as(:'a1');
-select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'l1_reopen8'), '23514',
-  'This workout can no longer be changed.', 'an auto-finished log cannot be reopened after 24 h');
+select is(public.save_workout_log(:'l1_reopen9'::jsonb), '{"applied": false, "revision": 8, "status": "completed"}'::jsonb,
+  'an auto-finished log is locked after 24 h');
 
--- Discarded is final.
-select is(public.save_workout_log(tests.lg_one(:'l3', null, 'in_progress', 1, :'l3b', :'l3e', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '{"revision": 1, "status": "in_progress"}'::jsonb,
+-- Discarded: manual is final, automatic is not.
+select is(public.save_workout_log(tests.lg_one(:'l3', null, 'in_progress', 1, :'l3b', :'l3e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '{"applied": true, "revision": 1, "status": "in_progress"}'::jsonb,
   'an unplanned log is saved in the client''s only workspace');
 select is((select workspace_id from public.workout_logs where id = :'l3'), :'ws_a'::uuid,
   'the unplanned log is in workspace A');
-select is(public.save_workout_log(tests.lg_one(:'l3', null, 'discarded', 2, :'l3b', :'l3e', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '{"revision": 2, "status": "discarded"}'::jsonb,
+select is(public.save_workout_log(tests.lg_one(:'l3', null, 'discarded', 2, :'l3b', :'l3e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '{"applied": true, "revision": 2, "status": "discarded"}'::jsonb,
   'an in-progress log can be discarded');
-select throws_ok(format('select public.save_workout_log(%L::jsonb)', tests.lg_one(:'l3', null, 'in_progress', 3, :'l3b',
-  :'l3e', :'ex_bi', jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '23514',
-  'This workout can no longer be changed.', 'a discarded log cannot be resumed');
+select is(public.save_workout_log(tests.lg_one(:'l3', null, 'in_progress', 3, :'l3b', :'l3e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true)))), '{"applied": false, "revision": 2, "status": "discarded"}'::jsonb,
+  'a manually discarded log is locked');
+reset role;
+update public.workout_logs set auto_finished = true, last_activity_at = now() - interval '1 hour' where id = :'l3';
+select tests.act_as(:'a1');
+select is(public.save_workout_log(tests.lg_one(:'l3', null, 'completed', 3, :'l3b', :'l3e', :'ex_bi3',
+  jsonb_build_array(tests.lg_set(:'l3s', 'normal', 8, 50, true), tests.lg_set(:'l3s2', 'normal', 8, 50, true)))),
+  '{"applied": true, "revision": 3, "status": "completed"}'::jsonb,
+  'after an auto-discard, the phone''s higher-revision doc is applied');
+select ok((select finished_at is not null and auto_finished from public.workout_logs where id = :'l3'),
+  'the formerly auto-discarded log is completed with finished_at, keeping auto_finished');
 
 -- ---------------------------------------------------------------------------------------------
 -- Authorization and hijacked ids
@@ -349,11 +408,14 @@ select throws_ok(format('select public.save_workout_log(%L::jsonb)',
   'a coach is not a client and cannot log for themselves');
 reset role;
 
--- A3 starts a log, then is removed.
+-- A3 finishes a workout (auto-finished, so still changeable), sees it in last_results, then is removed.
 select tests.act_as(:'a3');
-select is(public.save_workout_log(tests.lg_one(:'la3', :'inst_a3', 'in_progress', 1, :'a3b', :'a3e', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'a3s', 'normal', 8, 60, false)))), '{"revision": 1, "status": "in_progress"}'::jsonb,
-  'A3 starts a log while a client');
+select is(public.save_workout_log(tests.lg_doc(:'la3', :'inst_a3', 'completed', 1, jsonb_build_array(
+  tests.lg_block(:'a3b', 'straight', jsonb_build_array(tests.lg_ex(:'a3e', :'ex_bi', jsonb_build_array(
+    tests.lg_set(:'a3s', 'normal', 8, 60, true)))))), true)), '{"applied": true, "revision": 1, "status": "completed"}'::jsonb,
+  'A3 saves a finished log while a client');
+select is((select count(*)::int from public.last_results(array[:'ex_bi']::uuid[])), 1,
+  'while a client, A3 sees their last result');
 reset role;
 delete from public.workspace_members where workspace_id = :'ws_a' and user_id = :'a3';
 select tests.act_as(:'a3');
@@ -372,7 +434,7 @@ select is((select revision from public.workout_logs where id = :'la3'), 1, 'the 
 -- Plan changes mid-session
 select tests.act_as(:'a2');
 select is(public.save_workout_log(tests.lg_one(:'la2', :'inst_a2', 'in_progress', 1, :'a2b', :'a2e', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'a2s', 'normal', 8, 60, false)))), '{"revision": 1, "status": "in_progress"}'::jsonb,
+  jsonb_build_array(tests.lg_set(:'a2s', 'normal', 8, 60, false)))), '{"applied": true, "revision": 1, "status": "in_progress"}'::jsonb,
   'A2 starts a log for their instance');
 reset role;
 update public.workout_sets set target_weight_kg = 100 where workout_id = :'inst_a2';
@@ -383,7 +445,7 @@ select results_eq(format($$select workout_id, revision from public.workout_logs 
   $$values (null::uuid, 1)$$, 'deleting the plan keeps the log with workout_id null');
 select tests.act_as(:'a2');
 select is(public.save_workout_log(tests.lg_one(:'la2', :'inst_a2', 'in_progress', 2, :'a2b', :'a2e', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'a2s', 'normal', 8, 60, true)))), '{"revision": 2, "status": "in_progress"}'::jsonb,
+  jsonb_build_array(tests.lg_set(:'a2s', 'normal', 8, 60, true)))), '{"applied": true, "revision": 2, "status": "in_progress"}'::jsonb,
   'a retry that still names the deleted plan saves');
 select is((select workout_id from public.workout_logs where id = :'la2'), null::uuid, 'the log stays unlinked');
 -- Revision 3 moves the set into a new exercise in a new block; the old exercise gets a new set.
@@ -391,7 +453,7 @@ select is(public.save_workout_log(tests.lg_doc(:'la2', :'inst_a2', 'in_progress'
   tests.lg_block(:'a2b', 'straight', jsonb_build_array(tests.lg_ex(:'a2e', :'ex_bi', jsonb_build_array(
     tests.lg_set(:'a2s2', 'normal', 5, 40, false))))),
   tests.lg_block(:'a2b2', 'straight', jsonb_build_array(tests.lg_ex(:'a2e2', :'ex_bi2', jsonb_build_array(
-    tests.lg_set(:'a2s', 'normal', 8, 60, true)))))))), '{"revision": 3, "status": "in_progress"}'::jsonb,
+    tests.lg_set(:'a2s', 'normal', 8, 60, true)))))))), '{"applied": true, "revision": 3, "status": "in_progress"}'::jsonb,
   'a set can move to another exercise of the same log');
 reset role;
 select results_eq(
@@ -402,24 +464,30 @@ select is((select count(*)::int from public.log_sets where log_id = :'la2'), 2, 
 -- A first upload whose plan was deleted before it reached the server.
 select tests.act_as(:'b1');
 select is(public.save_workout_log(tests.lg_one(:'lb1', :'gone', 'in_progress', 1, :'bb', :'be', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'bs', 'normal', 8, 60, false)))), '{"revision": 1, "status": "in_progress"}'::jsonb,
+  jsonb_build_array(tests.lg_set(:'bs', 'normal', 8, 60, false)))), '{"applied": true, "revision": 1, "status": "in_progress"}'::jsonb,
   'a first upload naming a plan that no longer exists still saves');
 reset role;
 select results_eq(format($$select workspace_id, workout_id from public.workout_logs where id = %L$$, :'lb1'),
   format($$values (%L::uuid, null::uuid)$$, :'ws_b'), 'it is saved unlinked in the client''s only workspace');
+select tests.act_as(:'b1');
+select is(public.save_workout_log(tests.lg_one(:'lb1', :'gone', 'completed', 2, :'bb', :'be', :'ex_bi',
+  jsonb_build_array(tests.lg_set(:'bs', 'normal', 5, 30, true)))), '{"applied": true, "revision": 2, "status": "completed"}'::jsonb,
+  'B1 finishes their log');
+reset role;
 
 -- ---------------------------------------------------------------------------------------------
--- Corrections (L1 is completed, revision 7)
+-- Corrections. L1 is completed at revision 8; make it auto-finished within 24 h, so only the correction locks it.
+update public.workout_logs set auto_finished = true, finished_at = now() - interval '1 hour' where id = :'l1';
 select tests.act_as(:'coach_a');
 select is(public.correct_workout_log(:'l1', jsonb_build_array(
   jsonb_build_object('id', :'s1', 'actualReps', 10, 'actualWeightKg', 62.5, 'actualDurationS', null,
-    'actualDistanceM', null))), 8, 'a correction returns the new revision');
+    'actualDistanceM', null))), 1, 'a correction returns the number of sets updated');
 reset role;
 select results_eq(format($$select actual_reps::int, actual_weight_kg from public.log_sets where id = %L$$, :'s1'),
   $$values (10, 62.500::numeric(7,3))$$, 'the corrected actuals are stored');
 select results_eq(
   format($$select corrected_by, corrected_at is not null, revision from public.workout_logs where id = %L$$, :'l1'),
-  format($$values (%L::uuid, true, 8)$$, :'coach_a'), 'the log records who corrected it and its revision rises');
+  format($$values (%L::uuid, true, 8)$$, :'coach_a'), 'the log records who corrected it and its revision is unchanged');
 
 select tests.act_as(:'coach_b');
 select throws_ok(format('select public.correct_workout_log(%L, %L::jsonb)', :'l1',
@@ -436,12 +504,18 @@ select throws_ok(format('select public.correct_workout_log(%L, %L::jsonb)', :'la
 select throws_ok(format('select public.correct_workout_log(%L, %L::jsonb)', :'l1',
   jsonb_build_array(jsonb_build_object('id', :'log_a2_set', 'actualReps', 1))), '23514',
   format('Row %s belongs to another log.', :'log_a2_set'), 'a correction cannot touch another log''s set');
+select throws_ok(format('select public.correct_workout_log(%L, %L::jsonb)', :'log_a2', '[]'), '23514',
+  'Nothing to correct.', 'an empty correction is refused');
+select throws_ok(format('select public.correct_workout_log(%L, null)', :'log_a2'), '23514',
+  'Nothing to correct.', 'a missing correction is refused');
 reset role;
-select is((select actual_reps::int from public.log_sets where id = :'log_a2_set'), 8, 'the other log''s set is unchanged');
+select results_eq(format($$select actual_reps::int, corrected_at, corrected_by from public.log_sets s
+    join public.workout_logs l on l.id = s.log_id where s.id = %L$$, :'log_a2_set'),
+  $$values (8, null::timestamptz, null::uuid)$$, 'refused corrections changed and stamped nothing');
 
 select tests.act_as(:'a1');
-select is(public.save_workout_log(:'l1_finish7'::jsonb), '{"revision": 8, "status": "completed"}'::jsonb,
-  'after a correction, the phone''s old revision returns the server''s');
+select is(public.save_workout_log(:'l1_reopen9'::jsonb), '{"applied": false, "revision": 8, "status": "completed"}'::jsonb,
+  'a corrected auto-finished log is locked: the phone gets applied=false');
 select is((select actual_reps::int from public.log_sets where id = :'s1'), 10, 'the correction is kept');
 reset role;
 
@@ -457,17 +531,21 @@ select tests.act_as(:'a1');
 select results_eq(
   format($$select exercise_id, finished_at, set_type::text, actual_reps::int, actual_weight_kg, position::int
     from public.last_results(array[%L, %L]::uuid[])$$, :'ex_bi', :'ex_bi2'),
-  format($$select %L::uuid, finished_at, 'normal', 10, 62.500::numeric(7,3), 0 from public.workout_logs where id = %L$$,
-    :'ex_bi', :'l1'),
-  'last_results returns the completed sets of the newest finished log only');
+  format($$select %L::uuid, l.finished_at, 'normal', v.reps, v.kg, v.pos from public.workout_logs l,
+    (values (10, 62.500::numeric(7,3), 0), (8, 60.000, 1), (8, 60.000, 2)) v(reps, kg, pos) where l.id = %L
+    order by v.pos$$, :'ex_bi', :'l1'),
+  'last_results returns the completed sets of A1''s newest finished log only, not A2''s newer one');
 reset role;
 select tests.act_as(:'b1');
-select is((select count(*)::int from public.last_results(array[:'ex_bi']::uuid[])), 0,
-  'B1 gets none of workspace A''s results');
+select results_eq(
+  format($$select exercise_id, finished_at, actual_reps::int, actual_weight_kg from public.last_results(array[%L]::uuid[])$$,
+    :'ex_bi'),
+  format($$select %L::uuid, finished_at, 5, 30.000::numeric(7,3) from public.workout_logs where id = %L$$, :'ex_bi', :'lb1'),
+  'B1 gets only their own result, none of workspace A''s');
 reset role;
 select tests.act_as(:'a3');
 select is((select count(*)::int from public.last_results(array[:'ex_bi']::uuid[])), 0,
-  'a removed client gets no results');
+  'a removed client no longer gets their result');
 reset role;
 
 select * from finish();

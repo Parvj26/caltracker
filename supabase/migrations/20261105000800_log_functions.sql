@@ -51,8 +51,19 @@ alter table public.log_sets
 --   * every block, exercise and set id in the doc is new or already belongs to this log (no hijacking another
 --     log's rows by id), and every exercise is usable in the workspace.
 --
--- Stale protection: when the stored revision is already >= the doc's, nothing changes and the stored
--- revision and status come back, so the phone can adopt the server's doc (e.g. after a coach correction).
+-- Sync semantics (global-constraints "SYNC SEMANTICS"). It returns { applied, revision, status }.
+--   * A new log may arrive as in_progress, completed (>= 1 completed set) or discarded, with revision >= 1,
+--     so a workout started and finished with no signal still saves.
+--   * revision is the phone's counter only; server actions (auto-finish, coach correction) never change it.
+--     A change applies only when doc.revision > stored revision.
+--   * The client may change a log while it is in_progress, or while it is completed/discarded with
+--     auto_finished, not corrected, and within 24 h (from finished_at, or last_activity_at when discarded):
+--     the phone's data wins over an automatic finish. Manually finished or corrected logs are locked.
+--   * A refused change (stale or locked) is not an error: nothing changes and applied=false comes back with
+--     the stored revision and status, and the phone adopts the server's doc. Errors are for malformed docs
+--     (23514) and authorization (42501).
+--   * auto_finished follows the doc only on an in_progress -> completed/discarded change (or an insert as
+--     completed/discarded); otherwise the stored value is kept, so a reopen does not erase it.
 --
 -- Rows are matched by id; positions are 0-based doc indexes; this log's rows that the doc no longer has are
 -- deleted. A row that moved to another parent within the log is deleted and re-inserted, because parent
@@ -73,6 +84,7 @@ declare
   v_workspace_id uuid;
   v_workspaces uuid[];
   v_finished_at timestamptz;
+  v_auto_finished boolean;
   v_block jsonb;
   v_block_pos bigint;
   v_block_id uuid;
@@ -136,19 +148,21 @@ begin
     raise exception 'Only a current client of this coach can save workouts.' using errcode = '42501';
   end if;
 
-  -- A stale or repeated upload: keep the newer server copy.
-  if v_exists and v_log.revision >= v_revision then
-    return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+  if v_revision < 1 then
+    raise exception 'Revision must be at least 1.' using errcode = '23514';
   end if;
 
-  -- Status changes.
-  if not (
-    (not v_exists and v_status = 'in_progress')
-    or (v_exists and v_log.status = 'in_progress')
-    or (v_exists and v_log.status = 'completed' and v_status = 'in_progress' and v_log.auto_finished
-        and now() - v_log.finished_at < interval '24 hours')
+  -- Stale, repeated or locked: keep the server copy and tell the phone to adopt it.
+  if v_exists and (
+    v_revision <= v_log.revision
+    or not (
+      v_log.status = 'in_progress'
+      or (v_log.auto_finished and v_log.corrected_at is null
+          and now() - case v_log.status when 'completed' then v_log.finished_at else v_log.last_activity_at end
+            < interval '24 hours')
+    )
   ) then
-    raise exception 'This workout can no longer be changed.' using errcode = '23514';
+    return jsonb_build_object('applied', false, 'revision', v_log.revision, 'status', v_log.status);
   end if;
 
   -- Document guards, before any write. Messages match WorkoutLogDoc / WorkoutDoc in packages/shared.
@@ -213,6 +227,13 @@ begin
   if v_status = 'completed' then
     v_finished_at := coalesce(v_finished_at, now());
   end if;
+  if (not v_exists or v_log.status = 'in_progress') and v_status <> 'in_progress' then
+    v_auto_finished := coalesce((p_doc ->> 'autoFinished')::boolean, false);
+  elsif v_exists then
+    v_auto_finished := v_log.auto_finished;
+  else
+    v_auto_finished := false;
+  end if;
 
   if v_exists then
     -- workout_id, started_at and the owner columns stay as first saved.
@@ -221,7 +242,7 @@ begin
       status = v_status,
       finished_at = v_finished_at,
       last_activity_at = coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()),
-      auto_finished = coalesce((p_doc ->> 'autoFinished')::boolean, false),
+      auto_finished = v_auto_finished,
       revision = v_revision,
       notes = p_doc ->> 'notes'
     where l.id = v_log_id;
@@ -231,7 +252,7 @@ begin
     values (v_log_id, v_workspace_id, v_uid, v_workout_id, btrim(p_doc ->> 'name'), v_status,
       coalesce((p_doc ->> 'startedAt')::timestamptz, now()), v_finished_at,
       coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()),
-      coalesce((p_doc ->> 'autoFinished')::boolean, false), v_uid, v_revision, p_doc ->> 'notes');
+      v_auto_finished, v_uid, v_revision, p_doc ->> 'notes');
   end if;
 
   -- The tree. Owner columns come from inherit_log_owner; each update is guarded to rows of this log.
@@ -322,7 +343,7 @@ begin
   delete from public.log_exercises e where e.log_id = v_log_id and not (e.id = any (v_ex_ids));
   delete from public.log_blocks b where b.log_id = v_log_id and not (b.id = any (v_block_ids));
 
-  return jsonb_build_object('revision', v_revision, 'status', v_status);
+  return jsonb_build_object('applied', true, 'revision', v_revision, 'status', v_status);
 end;
 $$;
 
@@ -331,14 +352,15 @@ grant execute on function public.save_workout_log(jsonb) to authenticated;
 
 -- correct_workout_log: a coach fixes typos in a finished log's actuals. p_sets is an array of
 -- { id, actualReps, actualWeightKg, actualDurationS, actualDistanceM }; a key left out keeps its value.
--- The revision rises, so the client's phone adopts the corrected doc instead of overwriting it.
+-- It returns the number of sets updated. It never changes revision (the phone's counter); corrected_at locks
+-- the log for the client instead, so the phone's next save returns applied=false and it adopts this doc.
 create function public.correct_workout_log(p_log_id uuid, p_sets jsonb) returns integer
 language plpgsql security definer set search_path = '' as $$
 declare
   v_log public.workout_logs%rowtype;
   v_set jsonb;
   v_set_id uuid;
-  v_revision integer;
+  v_count integer := 0;
 begin
   select * into v_log from public.workout_logs l where l.id = p_log_id for update;
   if not found or not public.is_coach_of(v_log.workspace_id) then
@@ -347,8 +369,8 @@ begin
   if v_log.status <> 'completed' then
     raise exception 'Only finished workouts can be corrected.' using errcode = '23514';
   end if;
-  if jsonb_typeof(p_sets) is distinct from 'array' then
-    raise exception 'p_sets must be an array.' using errcode = '22023';
+  if jsonb_typeof(p_sets) is distinct from 'array' or jsonb_array_length(p_sets) = 0 then
+    raise exception 'Nothing to correct.' using errcode = '23514';
   end if;
 
   for v_set in select value from jsonb_array_elements(p_sets) loop
@@ -365,13 +387,11 @@ begin
     if not found then
       raise exception 'Row % belongs to another log.', v_set_id using errcode = '23514';
     end if;
+    v_count := v_count + 1;
   end loop;
 
-  update public.workout_logs l
-  set corrected_at = now(), corrected_by = auth.uid(), revision = l.revision + 1
-  where l.id = p_log_id
-  returning l.revision into v_revision;
-  return v_revision;
+  update public.workout_logs l set corrected_at = now(), corrected_by = auth.uid() where l.id = p_log_id;
+  return v_count;
 end;
 $$;
 
