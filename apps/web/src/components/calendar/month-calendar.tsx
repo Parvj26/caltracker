@@ -39,6 +39,11 @@ type Props = {
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
   onAddToDay?: (date: IsoDate) => void;
+  /**
+   * Days before this are read-only: no "+", not a drop target, and their items can't be dragged or changed
+   * (renderItem is not called for them).
+   */
+  editableFrom?: IsoDate;
 };
 
 type DragData = { item: CalendarItem; from: IsoDate };
@@ -46,6 +51,7 @@ type DropData = { date: IsoDate };
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const NONE: CalendarItem[] = [];
+const noControls = () => null;
 
 // Pointer first (exact for the mouse); the keyboard sensor has no pointer, so fall back to overlap.
 const collision: CollisionDetection = (args) => {
@@ -71,7 +77,7 @@ const announcements: Announcements = {
  * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
  * button and the item controls from renderItem are the non-drag path.
  */
-export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay }: Props) {
+export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay, editableFrom }: Props) {
   const pathname = usePathname();
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
@@ -126,19 +132,22 @@ export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAd
             <tbody>
               {weeks.map((week) => (
                 <tr key={week[0]}>
-                  {week.map((date) => (
-                    <td key={date}>
-                      <DayCell
-                        date={date}
-                        items={days[date] ?? NONE}
-                        inMonth={date.startsWith(`${month}-`)}
-                        isToday={date === today}
-                        draggable={draggable}
-                        renderItem={renderItem}
-                        {...(onAddToDay ? { onAdd: () => onAddToDay(date) } : {})}
-                      />
-                    </td>
-                  ))}
+                  {week.map((date) => {
+                    const editable = editableFrom === undefined || date >= editableFrom;
+                    return (
+                      <td key={date}>
+                        <DayCell
+                          date={date}
+                          items={days[date] ?? NONE}
+                          inMonth={date.startsWith(`${month}-`)}
+                          isToday={date === today}
+                          draggable={draggable && editable}
+                          renderItem={editable ? renderItem : noControls}
+                          {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -193,10 +202,11 @@ function DayCell({
           type="button"
           id={calendarAddDomId(date)}
           className={styles.addButton}
-          aria-label={`Add a workout to ${formatShortDay(date)}`}
+          aria-label={`Add workout to ${formatShortDay(date)}`}
+          title={`Add workout to ${formatShortDay(date)}`}
           onClick={onAdd}
         >
-          +
+          <span aria-hidden="true">+</span>
         </button>
       ) : null}
     </div>

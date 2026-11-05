@@ -110,12 +110,6 @@ test('assign a program from next Monday; a double click still copies it once', a
   await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
   await expect(dialog.getByText(`2 workouts from ${fmt(monday, true)} to ${fmt(end, true)}`)).toBeVisible();
 
-  // A start date in the past is allowed, with a note.
-  await dialog.getByLabel('Start date').fill(addDays(monday, -14));
-  await expect(dialog.getByText('This start date is in the past. Workouts before today will show as missed later.')).toBeVisible();
-  await dialog.getByLabel('Start date').fill(monday);
-  await expect(dialog.getByText('This start date is in the past.', { exact: false })).toHaveCount(0);
-
   await dialog.getByRole('button', { name: 'Assign', exact: true }).dblclick();
   await expect(dialog).toBeHidden();
 
@@ -232,7 +226,7 @@ async function drag(page: Page, from: Locator, to: Locator) {
 }
 
 async function addFromLibrary(page: Page, date: string, workout: string) {
-  await day(page, date).getByRole('button', { name: `Add a workout to ${fmt(date, true)}`, exact: true }).click();
+  await day(page, date).getByRole('button', { name: `Add workout to ${fmt(date, true)}`, exact: true }).click();
   const picker = page.getByRole('dialog', { name: `Add a workout to ${fmt(date, true)}` });
   await picker.getByLabel('Search workouts').fill(workout);
   await picker.getByRole('button', { name: workout, exact: true }).click();
@@ -279,7 +273,12 @@ test('move one item with "Move to…", drag another, then delete one', async ({ 
   await day(page, d(10)).getByRole('button', { name: `Options for ${first}`, exact: true }).click();
   await day(page, d(10)).getByRole('menuitem', { name: 'Move to…' }).click();
   const move = page.getByRole('dialog', { name: `Move ${first}` });
+  // Single workouts go on today or later.
+  await move.getByLabel('Date').fill(addDays(await browserToday(page), -1));
+  await expect(move.getByText('Pick today or a later date.')).toBeVisible();
+  await expect(move.getByRole('button', { name: 'Move', exact: true })).toBeDisabled();
   await move.getByLabel('Date').fill(d(15));
+  await expect(move.getByText('Pick today or a later date.')).toHaveCount(0);
   await move.getByRole('button', { name: 'Move', exact: true }).click();
   await expect(move).toBeHidden();
   await expect(item(page, d(15), first)).toBeVisible();
@@ -351,7 +350,10 @@ test('remove a program from the calendar from today on', async ({ page }) => {
   expect(await countOnCalendar(page, workout, [monday, addDays(monday, 2)])).toBe(0);
   // The past workout stays, and the assignment records when it was stopped.
   await page.goto(calendarUrl(monthOf(pastDate)));
-  await expect(item(page, pastDate, workout)).toHaveCount(1);
+  await expect(day(page, pastDate).getByText(workout, { exact: true })).toHaveCount(1);
+  // Past days are read-only: no dragging, no options menu.
+  await expect(item(page, pastDate, workout)).toHaveCount(0);
+  await expect(day(page, pastDate).getByRole('button', { name: `Options for ${workout}` })).toHaveCount(0);
   const left = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId);
   expect(left.data).toEqual([{ scheduled_on: pastDate }]);
   const after = await admin.from('program_assignments').select('cancelled_on').eq('id', assignment.data.id).single();
@@ -424,7 +426,10 @@ test('a past client opens read-only from Past clients; their workout editor is a
   await page.goto(`/clients/${pastId}?month=${month}`);
   await expect(day(page, date).getByText(workout, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Assign program' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^Add a workout to / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Add workout to / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '+ Add workout' })).toHaveCount(0);
+  await expect(page.getByText('Assign a program to plan weeks at once', { exact: false })).toHaveCount(0);
+  await expect(page.getByText(/^Nothing on .*'s calendar yet$/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: `Options for ${workout}` })).toHaveCount(0);
   await expect(day(page, date).getByRole('button', { name: workout })).toHaveCount(0);
   await expect(day(page, date).getByRole('link', { name: workout })).toHaveCount(0);
@@ -443,4 +448,149 @@ test('a coach gets a 404 for someone who is not their client', async ({ page }) 
   }
   const res = await page.goto(`/clients/${clientId}/workouts/${randomUUID()}`);
   expect(res?.status()).toBe(404);
+});
+
+/* ---------- Clarity update: header actions, empty state, day "+", date rules ---------- */
+
+async function openAddWorkout(page: Page) {
+  await page.getByRole('button', { name: '+ Add workout', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add a workout' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test('the header has Assign program and + Add workout, with a hint', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto(calendarUrl());
+  await expect(page.getByRole('button', { name: 'Assign program', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '+ Add workout', exact: true })).toBeVisible();
+  await expect(page.getByText('Assign a program to plan weeks at once, or add a single workout to any day.')).toBeVisible();
+});
+
+test('+ Add workout: pick a workout and a date; a double click adds it once', async ({ page }) => {
+  const workout = `Header add ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await page.goto(calendarUrl());
+  const today = await browserToday(page);
+  const date = `${nextMonth(monthOf(today))}-12`;
+
+  const dialog = await openAddWorkout(page);
+  await expect(dialog.getByLabel('Date')).toHaveValue(today);
+  await expect(dialog.getByLabel('Date')).toHaveAttribute('min', today);
+  const add = dialog.getByRole('button', { name: 'Add', exact: true });
+  // Nothing picked yet.
+  await expect(add).toBeDisabled();
+
+  // Yesterday is refused.
+  await dialog.getByLabel('Date').fill(addDays(today, -1));
+  await expect(dialog.getByText('Pick today or a later date.')).toBeVisible();
+
+  await dialog.getByLabel('Search workouts').fill(workout);
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
+  await expect(dialog.getByRole('button', { name: workout, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(add).toBeDisabled();
+  await dialog.getByLabel('Date').fill(date);
+  await expect(dialog.getByText('Pick today or a later date.')).toHaveCount(0);
+  await add.dblclick();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(`Added ${workout} to ${fmt(date, true)}.`)).toBeVisible();
+
+  await page.goto(calendarUrl(monthOf(date)));
+  await expect(item(page, date, workout)).toHaveCount(1);
+  const { data } = await admin.from('workouts').select('scheduled_on, assignment_id').eq('name', workout).eq('client_id', clientId);
+  expect(data).toEqual([{ scheduled_on: date, assignment_id: null }]);
+});
+
+test('a client with nothing scheduled sees the two choice tiles, and each opens its dialog', async ({ page }) => {
+  const lastName = `Fresh${unique()}`;
+  const user = await admin.auth.admin.createUser({
+    email: `fresh-${unique()}@example.com`,
+    password: 'client-password-123',
+    email_confirm: true,
+    user_metadata: { first_name: 'Robin', last_name: lastName },
+  });
+  if (user.error) throw user.error;
+  const freshId = user.data.user.id;
+  created.users.push(freshId);
+  const member = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: freshId, role: 'client' });
+  if (member.error) throw member.error;
+
+  await signInAsCoach(page);
+  await page.goto(`/clients/${freshId}`);
+  const empty = page.getByRole('region', { name: "Nothing on Robin's calendar yet" });
+  await expect(empty).toBeVisible();
+  const assignTile = empty.getByRole('button', { name: 'Assign a program', exact: true });
+  const addTile = empty.getByRole('button', { name: 'Add a single workout', exact: true });
+  await expect(assignTile).toHaveAccessibleDescription('Fill several weeks at once.');
+  await expect(addTile).toHaveAccessibleDescription('Pick a day and a workout.');
+
+  await assignTile.click();
+  const assign = page.getByRole('dialog', { name: 'Assign a program' });
+  await expect(assign).toBeVisible();
+  await assign.getByRole('button', { name: 'Cancel' }).click();
+  await expect(assign).toBeHidden();
+
+  await addTile.click();
+  const add = page.getByRole('dialog', { name: 'Add a workout' });
+  await expect(add).toBeVisible();
+  await add.getByRole('button', { name: 'Cancel' }).click();
+  await expect(add).toBeHidden();
+
+  // Once something is on this month, the empty state goes.
+  const today = await browserToday(page);
+  const seeded = await admin
+    .from('workouts')
+    .insert({ workspace_id: workspaceId, client_id: freshId, scheduled_on: today, name: `First ${unique()}` });
+  if (seeded.error) throw seeded.error;
+  await page.goto(`/clients/${freshId}?month=${monthOf(today)}`);
+  await expect(page.getByRole('heading', { level: 1, name: `Robin ${lastName}` })).toBeVisible();
+  await expect(page.getByText(/^Nothing on .*'s calendar yet$/)).toHaveCount(0);
+});
+
+test('each day\'s "+" says which day it adds to; past days have none', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto(calendarUrl());
+  const today = await browserToday(page);
+  const yesterday = addDays(today, -1);
+  const tomorrow = addDays(today, 1);
+
+  await page.goto(calendarUrl(monthOf(today)));
+  const todayPlus = day(page, today).getByRole('button', { name: `Add workout to ${fmt(today, true)}`, exact: true });
+  await expect(todayPlus).toBeVisible();
+  await expect(todayPlus).toHaveAttribute('title', `Add workout to ${fmt(today, true)}`);
+
+  await page.goto(calendarUrl(monthOf(tomorrow)));
+  await expect(day(page, tomorrow).getByRole('button', { name: `Add workout to ${fmt(tomorrow, true)}`, exact: true })).toHaveCount(1);
+
+  await page.goto(calendarUrl(monthOf(yesterday)));
+  await expect(day(page, yesterday).getByRole('button', { name: /^Add workout to / })).toHaveCount(0);
+});
+
+test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigned with a note', async ({ page }) => {
+  const workout = `Late start ${unique()}`;
+  const program = `Late start prog ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await createProgram(page, program, 1, [{ week: 1, day: 1, workoutName: workout }]);
+  await page.goto(calendarUrl());
+  const today = await browserToday(page);
+
+  const dialog = await openAssign(page, program);
+  await expect(dialog.getByLabel('Start date')).toHaveAttribute('min', addDays(today, -7));
+  await dialog.getByLabel('Start date').fill(addDays(today, -8));
+  await expect(dialog.getByText('Programs can start up to 7 days ago.')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toBeDisabled();
+
+  await dialog.getByLabel('Start date').fill(addDays(today, -3));
+  await expect(dialog.getByText('Programs can start up to 7 days ago.')).toHaveCount(0);
+  await expect(dialog.getByText('This start date is in the past. Workouts before today will show as missed later.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  const { data } = await admin.from('program_assignments').select('start_date').eq('program_name', program);
+  expect(data).toEqual([{ start_date: addDays(today, -3) }]);
 });
