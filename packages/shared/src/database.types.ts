@@ -1030,6 +1030,10 @@ export type Database = {
         }
         Returns: string
       }
+      correct_workout_log: {
+        Args: { p_log_id: string; p_sets: Json }
+        Returns: number
+      }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {
         Args: { token: string }
@@ -1070,6 +1074,19 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      last_results: {
+        Args: { p_exercise_ids: string[] }
+        Returns: {
+          actual_distance_m: number
+          actual_duration_s: number
+          actual_reps: number
+          actual_weight_kg: number
+          exercise_id: string
+          finished_at: string
+          position: number
+          set_type: Database["public"]["Enums"]["set_type"]
+        }[]
+      }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
@@ -1094,6 +1111,7 @@ export type Database = {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
       }
+      save_workout_log: { Args: { p_doc: Json }; Returns: Json }
       schedule_workout: {
         Args: {
           p_client_id: string
