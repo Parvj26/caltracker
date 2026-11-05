@@ -265,6 +265,98 @@ export type Database = {
         }
         Relationships: []
       }
+      program_workouts: {
+        Row: {
+          created_at: string
+          day: number
+          id: string
+          position: number
+          program_id: string
+          updated_at: string
+          week: number
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          day: number
+          id?: string
+          position?: number
+          program_id: string
+          updated_at?: string
+          week: number
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          day?: number
+          id?: string
+          position?: number
+          program_id?: string
+          updated_at?: string
+          week?: number
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_workouts_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_workouts_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          weeks: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          weeks?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          weeks?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_blocks: {
         Row: {
           client_id: string | null
@@ -580,6 +672,10 @@ export type Database = {
       }
       is_client_in: { Args: { uid: string; ws: string }; Returns: boolean }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
+      is_library_workout_of: {
+        Args: { w: string; ws: string }
+        Returns: boolean
+      }
       is_member_of: { Args: { ws: string }; Returns: boolean }
       lookup_members_by_email: {
         Args: { emails: string[] }
@@ -604,6 +700,10 @@ export type Database = {
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
+      }
+      set_program_weeks: {
+        Args: { p_program_id: string; p_weeks: number }
+        Returns: number
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
