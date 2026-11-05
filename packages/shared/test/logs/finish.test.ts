@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { completeSet, discardLog, finishLog, toggleSet } from '../../src/logs/ops';
+import { completeSet, discardLog, finishLog, reopenLog, toggleSet } from '../../src/logs/ops';
+import { autoFinish } from '../../src/logs/summary';
 import { WorkoutLogDoc } from '../../src/logs/schema';
 import { startLogFromWorkout } from '../../src/logs/start';
 import { fixtureWorkout, uuid } from './fixture';
@@ -80,5 +81,38 @@ describe('toggleSet', () => {
     const r = toggleSet(log, uuid(), T1);
     expect(r).toEqual({ log, completed: null });
     expect(r.log).toBe(log);
+  });
+});
+
+describe('reopenLog', () => {
+  const autoFinished = () => {
+    const log = fresh();
+    return autoFinish(completeSet(log, firstSetId(log), T1)); // finishedAt = T1
+  };
+  const hoursAfterT1 = (h: number) => new Date(Date.parse(T1) + h * 3600 * 1000).toISOString();
+
+  it('puts an auto-finished log back in progress within 24 h: no finish time, activity now, revision + 1', () => {
+    const done = autoFinished();
+    const now = hoursAfterT1(5);
+    const open = reopenLog(done, now);
+    expect(open.status).toBe('in_progress');
+    expect(open.finishedAt).toBeNull();
+    expect(open.autoFinished).toBe(false);
+    expect(open.lastActivityAt).toBe(now);
+    expect(open.revision).toBe(done.revision + 1);
+    // The ticked sets are kept, so the client only adds the missed ones.
+    expect(open.blocks).toEqual(done.blocks);
+    expect(WorkoutLogDoc.safeParse(open).success).toBe(true);
+  });
+
+  it('refuses after 24 h, a manual finish, a discarded log and one in progress (same object back)', () => {
+    const late = autoFinished();
+    expect(reopenLog(late, hoursAfterT1(24))).toBe(late);
+    const log = fresh();
+    const manual = finishLog(completeSet(log, firstSetId(log), T1), T2);
+    expect(reopenLog(manual, T2)).toBe(manual);
+    const gone = discardLog(log, T1);
+    expect(reopenLog(gone, T2)).toBe(gone);
+    expect(reopenLog(log, T2)).toBe(log);
   });
 });

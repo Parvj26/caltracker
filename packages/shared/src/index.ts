@@ -119,6 +119,7 @@ export {
   discardLog,
   finishLog,
   removeLogExercise,
+  reopenLog,
   removeLogSet,
   setExerciseNote,
   swapLogExercise,
@@ -127,7 +128,7 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
-export { formatLastResult, formatLogDuration, formatLogSetTarget } from './logs/format';
+export { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from './logs/format';
 export type { ResultSet } from './logs/format';
 export {
   AUTO_FINISH_IDLE_MS,

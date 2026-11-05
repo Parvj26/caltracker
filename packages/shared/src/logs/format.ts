@@ -67,3 +67,11 @@ export function formatLogDuration(seconds: number): string {
   const m = minutes % 60;
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
+
+/** A workout's total volume (logVolumeKg) in the viewer's units, thousands grouped: "8,420 lb lifted". */
+export function formatLogVolume(volumeKg: number, units: Units): string {
+  const [whole = '', rest = ''] = formatWeight(volumeKg, units).split(' ');
+  const [int = '', dec] = whole.split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${dec === undefined ? grouped : `${grouped}.${dec}`} ${rest} lifted`;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatLastResult, formatLogDuration, formatLogSetTarget } from '../../src/logs/format';
+import { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from '../../src/logs/format';
 import type { LogSetTarget } from '../../src/logs/schema';
 import { toKg } from '../../src/units/units';
 
@@ -69,5 +69,19 @@ describe('formatLogDuration', () => {
     expect(formatLogDuration(60 * 60)).toBe('1 h');
     expect(formatLogDuration(65 * 60)).toBe('1 h 5 min');
     expect(formatLogDuration(2 * 3600 + 59 * 60 + 50)).toBe('3 h');
+  });
+});
+
+describe('formatLogVolume', () => {
+  it('converts to the client units and groups thousands: "8,420 lb lifted"', () => {
+    expect(formatLogVolume(toKg(8420, 'lb'), 'lb')).toBe('8,420 lb lifted');
+    expect(formatLogVolume(1440, 'lb')).toBe('3,174.7 lb lifted');
+    expect(formatLogVolume(1440, 'kg')).toBe('1,440 kg lifted');
+    expect(formatLogVolume(1234567.5, 'kg')).toBe('1,234,567.5 kg lifted');
+  });
+
+  it('keeps small totals as they are', () => {
+    expect(formatLogVolume(0, 'kg')).toBe('0 kg lifted');
+    expect(formatLogVolume(960.4, 'kg')).toBe('960.4 kg lifted');
   });
 });

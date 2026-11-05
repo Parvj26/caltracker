@@ -1,6 +1,7 @@
 import type { ExercisePick } from '../workouts/doc-ops';
 import { TARGET_FIELDS } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
+import { canReopen } from './summary';
 
 const DEFAULT_SETS = 3;
 const MAX_SETS = 30;
@@ -286,6 +287,24 @@ export function finishLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
 export function discardLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
   if (log.status !== 'in_progress') return log;
   return { ...log, status: 'discarded', lastActivityAt: nowIso, revision: log.revision + 1 };
+}
+
+/**
+ * "Add missed sets": puts a log finished automatically back in progress, within 24 h of its finish (canReopen).
+ * The finish time and the auto-finished flag are cleared and the activity time is now, so the idle timers start
+ * again; the ticked sets are kept. Refused (same object back) for anything canReopen refuses. The server keeps
+ * its stored auto_finished either way.
+ */
+export function reopenLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
+  if (!canReopen(log, Date.parse(nowIso))) return log;
+  return {
+    ...log,
+    status: 'in_progress',
+    finishedAt: null,
+    autoFinished: false,
+    lastActivityAt: nowIso,
+    revision: log.revision + 1,
+  };
 }
 
 /**
