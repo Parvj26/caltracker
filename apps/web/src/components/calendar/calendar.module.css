@@ -63,6 +63,8 @@
 .singleItem { background: var(--ct-blue); }
 .itemRow { display: flex; align-items: stretch; }
 .itemHandle {
+  display: flex;
+  align-items: center;
   flex: 1;
   min-width: 0;
   min-height: var(--ct-tap-min);

@@ -206,7 +206,7 @@ export default async function ClientsPage() {
               <div role="rowgroup">
                 {past.data.map((p) => (
                   <div role="row" key={p.user_id} className={styles.row}>
-                    <NameCell name={p.full_name ?? ''} toneKey={p.user_id} />
+                    <NameCell name={p.full_name || p.email} toneKey={p.user_id} href={`/clients/${p.user_id}`} />
                     <span role="cell" className={styles.email}>{p.email}</span>
                     <span role="cell" className={styles.meta}>
                       {`Removed ${dateFormat.format(new Date(p.removed_at))}`}

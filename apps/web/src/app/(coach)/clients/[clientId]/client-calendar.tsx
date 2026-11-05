@@ -9,7 +9,9 @@ import { formatDayMonth, formatShortDay } from '@/components/calendar/format';
 import { Button, Card, TextField } from '@/components/ui';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
 import { deleteClientWorkout, moveClientWorkout, scheduleWorkout, unassignProgram } from './actions';
+import { LocalDate } from '../../workouts/local-date';
 import { AssignDialog } from './assign-dialog';
+import type { ClientRef } from './client';
 import styles from '@/components/calendar/calendar.module.css';
 
 export type CalendarEntry = CalendarItem & { date: IsoDate };
@@ -40,7 +42,8 @@ export function useLocalToday(): IsoDate {
 /**
  * One client's month: assign a program, add single library workouts with each day's "+", and move (drag or
  * "Move to…"), edit or delete single workouts. Moves and deletes show at once and are undone, with a message, if
- * saving fails; the server re-sends the calendar after every change.
+ * saving fails; the server re-sends the calendar after every change. A past client's calendar is read-only: no
+ * assigning, adding, moving, editing or removing.
  */
 export function ClientCalendar({
   client,
@@ -50,7 +53,7 @@ export function ClientCalendar({
   library,
   programs,
 }: {
-  client: { id: string; name: string };
+  client: ClientRef;
   month: string | null;
   entries: CalendarEntry[];
   assignments: AssignmentSummary[];
@@ -58,6 +61,7 @@ export function ClientCalendar({
   programs: PickerProgram[];
 }) {
   const today = useLocalToday();
+  const readOnly = client.removedAt !== null;
   const month = monthParam ?? today.slice(0, 7);
   const [items, setItems] = useState(entries);
   const [shown, setShown] = useState(entries);
@@ -146,32 +150,42 @@ export function ClientCalendar({
     <>
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{client.name}</h1>
-        <div className={styles.titleActions}>
-          <Button onClick={() => setAssigning(true)}>Assign program</Button>
-        </div>
+        {client.removedAt !== null ? (
+          <p className={styles.caption}>
+            Past client · removed <LocalDate iso={client.removedAt} />
+          </p>
+        ) : (
+          <div className={styles.titleActions}>
+            <Button onClick={() => setAssigning(true)}>Assign program</Button>
+          </div>
+        )}
       </header>
 
-      <AssignmentsPanel assignments={assignments} today={today} onError={setToast} />
+      <AssignmentsPanel assignments={assignments} today={today} readOnly={readOnly} onMessage={setToast} />
 
       <p role="status" className={styles.status}>
         {status}
       </p>
 
-      <MonthCalendar
-        month={month}
-        days={days}
-        today={today}
-        onDropItem={move}
-        onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
-        renderItem={(item, date) => (
-          <ItemMenu
-            item={item}
-            editHref={`/clients/${client.id}/workouts/${item.id}`}
-            onMove={() => setMoving({ ...item, date })}
-            onDelete={() => setDeleting({ ...item, date })}
-          />
-        )}
-      />
+      {readOnly ? (
+        <MonthCalendar month={month} days={days} today={today} renderItem={() => null} />
+      ) : (
+        <MonthCalendar
+          month={month}
+          days={days}
+          today={today}
+          onDropItem={move}
+          onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
+          renderItem={(item, date) => (
+            <ItemMenu
+              item={item}
+              editHref={`/clients/${client.id}/workouts/${item.id}`}
+              onMove={() => setMoving({ ...item, date })}
+              onDelete={() => setDeleting({ ...item, date })}
+            />
+          )}
+        />
+      )}
 
       {assigning ? (
         <AssignDialog
@@ -241,11 +255,13 @@ export function ClientCalendar({
 function AssignmentsPanel({
   assignments,
   today,
-  onError,
+  readOnly,
+  onMessage,
 }: {
   assignments: AssignmentSummary[];
   today: IsoDate;
-  onError: (message: string) => void;
+  readOnly: boolean;
+  onMessage: (message: string) => void;
 }) {
   const headingId = useId();
   const [removing, setRemoving] = useState<AssignmentSummary | null>(null);
@@ -254,7 +270,9 @@ function AssignmentsPanel({
       <section aria-labelledby={headingId}>
         <h2 id={headingId} className={styles.sectionHeading}>Assigned programs</h2>
         {assignments.length === 0 ? (
-          <p className={styles.caption}>No programs assigned. Use Assign program to add one.</p>
+          <p className={styles.caption}>
+            {readOnly ? 'No programs assigned.' : 'No programs assigned. Use Assign program to add one.'}
+          </p>
         ) : (
           <ul className={styles.assignments}>
             {assignments.map((a) => (
@@ -262,13 +280,15 @@ function AssignmentsPanel({
                 <span className={styles.assignmentName}>
                   {`${a.programName} · ${formatDayMonth(a.startDate)} – ${formatDayMonth(a.endDate)}`}
                 </span>
-                <Button
-                  variant="secondary"
-                  aria-label={`Remove ${a.programName} from calendar`}
-                  onClick={() => setRemoving(a)}
-                >
-                  Remove from calendar
-                </Button>
+                {readOnly ? null : (
+                  <Button
+                    variant="secondary"
+                    aria-label={`Remove ${a.programName} from calendar`}
+                    onClick={() => setRemoving(a)}
+                  >
+                    Remove from calendar
+                  </Button>
+                )}
               </li>
             ))}
           </ul>
@@ -278,10 +298,13 @@ function AssignmentsPanel({
         <UnassignDialog
           assignment={removing}
           today={today}
-          onDone={() => setRemoving(null)}
+          onDone={(removed) => {
+            setRemoving(null);
+            if (removed !== null) onMessage(`Removed ${workoutsText(removed)}.`);
+          }}
           onError={(message) => {
             setRemoving(null);
-            onError(message);
+            onMessage(message);
           }}
         />
       ) : null}
@@ -297,7 +320,8 @@ function UnassignDialog({
 }: {
   assignment: AssignmentSummary;
   today: IsoDate;
-  onDone: () => void;
+  /** `removed` is null when the coach cancelled. */
+  onDone: (removed: number | null) => void;
   onError: (message: string) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -316,8 +340,8 @@ function UnassignDialog({
     setPending(true);
     try {
       // From the coach's own today, as the browser sees it.
-      await unassignProgram({ assignmentId: assignment.id, fromDate: today });
-      onDone();
+      const { removed } = await unassignProgram({ assignmentId: assignment.id, fromDate: today });
+      onDone(removed);
     } catch {
       onError("Couldn't remove the program. Please try again.");
     }
@@ -332,7 +356,7 @@ function UnassignDialog({
       onCancel={(e) => {
         if (pending) e.preventDefault();
       }}
-      onClose={onDone}
+      onClose={() => onDone(null)}
     >
       <h2 id={titleId} className={styles.dialogTitle}>Remove {assignment.programName} from the calendar?</h2>
       <p id={bodyId} className={styles.dialogBody}>

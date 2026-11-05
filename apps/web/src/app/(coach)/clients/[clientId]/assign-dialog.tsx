@@ -22,8 +22,9 @@ export function assignPreview(program: PickerProgram, start: IsoDate): string {
 
 /**
  * Assign a program to the client from a start date; the database copies its workouts onto the calendar. The
- * assignment id is made here, once per dialog and per choice of program and date, so a double click or a retry
- * sends the same id and the program is copied only once (Review Focus 4).
+ * assignment id is made once each time the dialog opens, so a double click or a retry sends the same id and the
+ * program is copied only once (Review Focus 4). If a first try did go through and the coach then changes the program
+ * or date, the database refuses the reused id (23505) and the coach is told, instead of getting a second copy.
  */
 export function AssignDialog({
   clientId,
@@ -45,7 +46,7 @@ export function AssignDialog({
   const titleId = useId();
   const [programId, setProgramId] = useState(programs[0]?.id ?? '');
   const [startDate, setStartDate] = useState(() => nextMonday(today));
-  const [assignmentId, setAssignmentId] = useState(() => crypto.randomUUID());
+  const [assignmentId] = useState(() => crypto.randomUUID());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -63,11 +64,6 @@ export function AssignDialog({
   const validStart = IsoDateSchema.safeParse(startDate).success;
   const inPast = validStart && startDate < today;
 
-  /** A different program or date is a different assignment, so it gets its own id. */
-  function changed() {
-    setAssignmentId(crypto.randomUUID());
-    setError(null);
-  }
 
   async function assign() {
     if (busy.current || !program || !validStart) return;
@@ -113,7 +109,7 @@ export function AssignDialog({
             value={programId}
             onChange={(e) => {
               setProgramId(e.target.value);
-              changed();
+              setError(null);
             }}
           >
             {programs.map((p) => (
@@ -128,7 +124,7 @@ export function AssignDialog({
             value={startDate}
             onChange={(e) => {
               setStartDate(e.target.value);
-              changed();
+              setError(null);
             }}
             {...(validStart ? {} : { error: 'Pick a start date.' })}
           />

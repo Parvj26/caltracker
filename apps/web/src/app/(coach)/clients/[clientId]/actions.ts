@@ -37,7 +37,11 @@ export async function assignProgram(input: AssignProgramInput): Promise<Outcome<
   if (error) {
     if (error.code === '42501') return { ok: false, error: NOT_A_CLIENT };
     if (error.code === '23505') {
-      return { ok: false, error: 'That assignment was already saved with other details. Close this and try again.' };
+      return {
+        ok: false,
+        error:
+          'Assign was already sent with a different program or start date. Close this, check the calendar, then assign again if needed.',
+      };
     }
     return { ok: false, error: GENERIC };
   }
@@ -103,10 +107,14 @@ export async function deleteClientWorkout(workoutId: string): Promise<void> {
 
 /**
  * Removes an assignment's workouts on or after `fromDate` (the coach's own today, from the browser). Past ones stay.
- * When nothing is left the database deletes the assignment, so a retry finds it gone: that counts as 0 removed.
+ * When nothing is left the database deletes the assignment, so a retry (say, after a lost response) finds it gone.
+ * unassign_program answers 42501 both for that and for an assignment this coach can't touch. To tell them apart the
+ * assignment is looked up by id alone under RLS (no workspace filter): still visible means it exists and the refusal
+ * stands, so it is an error. Not visible means it is gone, or it was never this coach's to see; the dialog only sends
+ * ids the page listed, and a made-up id changes nothing and learns nothing, so both count as 0 removed.
  */
 export async function unassignProgram(input: { assignmentId: string; fromDate: IsoDate }): Promise<{ removed: number }> {
-  const { workspaceId } = await requireCoach();
+  await requireCoach();
   const fromDate = IsoDateSchema.safeParse(input.fromDate);
   if (!isUuid(input.assignmentId) || !fromDate.success) throw new Error('Invalid request');
   const supabase = await createServerSupabase();
@@ -120,7 +128,6 @@ export async function unassignProgram(input: { assignmentId: string; fromDate: I
         .from('program_assignments')
         .select('id')
         .eq('id', input.assignmentId)
-        .eq('workspace_id', workspaceId)
         .maybeSingle();
       if (!readError && !still) {
         refreshCalendar();

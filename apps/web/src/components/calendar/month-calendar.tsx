@@ -35,7 +35,7 @@ type Props = {
   today: IsoDate | null;
   /** Extra controls shown on each item, beside its name (for example an options menu). */
   renderItem: (item: CalendarItem, date: IsoDate) => ReactNode;
-  /** Present: items can be dragged onto other days. */
+  /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
   onAddToDay?: (date: IsoDate) => void;
@@ -219,16 +219,21 @@ function DayItem({
   return (
     <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging)}>
       <div className={styles.itemRow}>
-        <button
-          type="button"
-          id={calendarItemDomId(item.id)}
-          ref={setNodeRef}
-          {...attributes}
-          {...listeners}
-          className={cx(styles.itemHandle, draggable && styles.grab)}
-        >
-          {item.name}
-        </button>
+        {draggable ? (
+          <button
+            type="button"
+            id={calendarItemDomId(item.id)}
+            ref={setNodeRef}
+            {...attributes}
+            {...listeners}
+            className={cx(styles.itemHandle, styles.grab)}
+          >
+            {item.name}
+          </button>
+        ) : (
+          // Read-only calendar: the name is plain text.
+          <span className={styles.itemHandle}>{item.name}</span>
+        )}
         {renderItem(item, date)}
       </div>
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}

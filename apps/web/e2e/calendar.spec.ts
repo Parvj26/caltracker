@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { createProgram, createWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Client calendar and assignment (phase 2 Task 16). Every test builds its own workouts and programs with unique
 // names, so tests can share the demo client and still run side by side.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-const created: { workouts: string[]; programs: string[] } = { workouts: [], programs: [] };
+const created: { workouts: string[]; programs: string[]; users: string[] } = { workouts: [], programs: [], users: [] };
 let clientId: string;
+let workspaceId: string;
 
 test.beforeAll(async () => {
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
@@ -15,9 +16,14 @@ test.beforeAll(async () => {
   const client = data.users.find((u) => u.email === 'client@demo.local');
   if (!client) throw new Error('Demo client client@demo.local not found; run pnpm db:reset.');
   clientId = client.id;
+  const ws = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (ws.error) throw ws.error;
+  workspaceId = ws.data.id;
 });
 
 test.afterAll(async () => {
+  // Deleting a user also deletes their workouts and past_clients row.
+  for (const id of created.users) await admin.auth.admin.deleteUser(id);
   if (created.workouts.length) {
     // Client copies first (they keep the library name), then assignments, programs and library workouts.
     await admin.from('workouts').delete().in('name', created.workouts).not('client_id', 'is', null);
@@ -53,12 +59,12 @@ const day = (page: Page, date: string): Locator => page.locator(`[data-date="${d
 const item = (page: Page, date: string, name: string): Locator =>
   day(page, date).getByRole('button', { name, exact: true });
 
-/** How many items called `name` are on the calendar in the given days, across the months they fall in. */
+/** How many items called `name` are on the given days, opening each day's own month. */
 async function countOnCalendar(page: Page, name: string, dates: string[]): Promise<number> {
   let total = 0;
   for (const month of [...new Set(dates.map(monthOf))]) {
     await page.goto(calendarUrl(month));
-    total += await page.locator(`[data-date^="${month}-"]`).getByRole('button', { name, exact: true }).count();
+    for (const date of dates.filter((d) => monthOf(d) === month)) total += await item(page, date, name).count();
   }
   return total;
 }
@@ -123,6 +129,53 @@ test('assign a program from next Monday; a double click still copies it once', a
 
   const { count } = await admin.from('program_assignments').select('id', { count: 'exact', head: true }).eq('program_name', program);
   expect(count).toBe(1);
+  const copies = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('name', workout).eq('client_id', clientId);
+  expect(copies.count).toBe(2);
+});
+
+test('a lost response, then a different date, then the same date again still copies the program once', async ({ page }) => {
+  const workout = `Retry ${unique()}`;
+  const program = `Retry prog ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await createProgram(page, program, 1, [
+    { week: 1, day: 1, workoutName: workout },
+    { week: 1, day: 4, workoutName: workout },
+  ]);
+  await page.goto(calendarUrl());
+  const monday = nextMonday(await browserToday(page));
+
+  // The first Assign reaches the server (which assigns), but the browser gets an error back.
+  const pageUrl = new RegExp(`/clients/${clientId}(\\?.*)?$`);
+  let lost = false;
+  await page.route(pageUrl, async (route) => {
+    if (route.request().method() !== 'POST' || lost) return route.continue();
+    lost = true;
+    await route.fetch();
+    await route.fulfill({ status: 500, body: 'lost' });
+  });
+  const dialog = await openAssign(page, program);
+  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(dialog.getByText("Couldn't assign. Check your connection and try again.")).toBeVisible();
+  await page.unroute(pageUrl);
+
+  // A different date with the same dialog is refused, not copied a second time.
+  await dialog.getByLabel('Start date').fill(addDays(monday, 7));
+  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(dialog.getByText('Assign was already sent with a different program or start date.', { exact: false })).toBeVisible();
+
+  // Back to the first date: the retry finds the assignment already made.
+  await dialog.getByLabel('Start date').fill(monday);
+  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  const assignments = await admin.from('program_assignments').select('id, start_date').eq('program_name', program);
+  expect(assignments.data).toEqual([{ id: expect.any(String), start_date: monday }]);
+  const { count } = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('name', workout).eq('client_id', clientId);
+  expect(count).toBe(2);
 });
 
 test("editing the library workout leaves the client's copy alone, and the other way round", async ({ page }) => {
@@ -272,32 +325,112 @@ test('remove a program from the calendar from today on', async ({ page }) => {
   const monday = await assignFromNextMonday(page, program);
   const today = await browserToday(page);
 
+  // A workout of this assignment from three days ago (as if the program had started earlier).
+  const assignment = await admin.from('program_assignments').select('id').eq('program_name', program).single();
+  if (assignment.error) throw assignment.error;
+  const pastDate = addDays(today, -3);
+  const seeded = await admin.from('workouts').insert({
+    workspace_id: workspaceId,
+    client_id: clientId,
+    scheduled_on: pastDate,
+    assignment_id: assignment.data.id,
+    name: workout,
+  });
+  if (seeded.error) throw seeded.error;
+  await page.reload();
+
   const panel = page.getByRole('region', { name: 'Assigned programs' });
   await panel.getByRole('button', { name: `Remove ${program} from calendar`, exact: true }).click();
   const confirm = page.getByRole('dialog', { name: `Remove ${program} from the calendar?` });
   await expect(confirm.getByText(`Removes 2 upcoming workouts from ${fmt(today, true)}. Past workouts stay.`)).toBeVisible();
   await confirm.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(confirm).toBeHidden();
+  await expect(page.getByText('Removed 2 workouts.')).toBeVisible();
   await expect(panel.getByText(program)).toHaveCount(0);
 
   expect(await countOnCalendar(page, workout, [monday, addDays(monday, 2)])).toBe(0);
-  const { count } = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('name', workout).eq('client_id', clientId);
-  expect(count).toBe(0);
+  // The past workout stays, and the assignment records when it was stopped.
+  await page.goto(calendarUrl(monthOf(pastDate)));
+  await expect(item(page, pastDate, workout)).toHaveCount(1);
+  const left = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId);
+  expect(left.data).toEqual([{ scheduled_on: pastDate }]);
+  const after = await admin.from('program_assignments').select('cancelled_on').eq('id', assignment.data.id).single();
+  expect(after.data?.cancelled_on).toBe(today);
 });
 
-test('"today" is the browser\'s own date (Auckland)', async ({ browser }) => {
-  const context = await browser.newContext({ timezoneId: 'Pacific/Auckland' });
+/** Opens November 2026 with the browser clock pinned to `instant`, in `timezoneId`; returns the date marked today. */
+async function todayCellAt(browser: Browser, timezoneId: string, instant: string): Promise<Locator> {
+  const context = await browser.newContext({ timezoneId });
   const page = await context.newPage();
-  try {
-    await signInAsCoach(page);
-    await page.goto(calendarUrl());
-    const expected = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date());
-    const today = page.locator('[aria-current="date"]');
-    await expect(today).toHaveCount(1);
-    await expect(today).toHaveAttribute('data-date', expected);
-  } finally {
-    await context.close();
-  }
+  await signInAsCoach(page);
+  await page.clock.setFixedTime(new Date(instant));
+  await page.goto(calendarUrl('2026-11'));
+  const today = page.locator('[aria-current="date"]');
+  await expect(today).toHaveCount(1);
+  return today;
+}
+
+test('"today" is the browser\'s own date: Auckland is already tomorrow', async ({ browser }) => {
+  // 11:30 UTC on 4 Nov is 00:30 on 5 Nov in Auckland (NZDT, UTC+13).
+  const today = await todayCellAt(browser, 'Pacific/Auckland', '2026-11-04T11:30:00Z');
+  await expect(today).toHaveAttribute('data-date', '2026-11-05');
+  await today.page().context().close();
+});
+
+test('"today" is the browser\'s own date: Los Angeles at 9 pm is still yesterday', async ({ browser }) => {
+  // 05:00 UTC on 5 Nov is 21:00 on 4 Nov in Los Angeles (PST, UTC-8).
+  const today = await todayCellAt(browser, 'America/Los_Angeles', '2026-11-05T05:00:00Z');
+  await expect(today).toHaveAttribute('data-date', '2026-11-04');
+  await today.page().context().close();
+});
+
+test('a past client opens read-only from Past clients; their workout editor is a 404', async ({ page }) => {
+  const workout = `History ${unique()}`;
+  const email = `past-${unique()}@example.com`;
+  const user = await admin.auth.admin.createUser({
+    email,
+    password: 'client-password-123',
+    email_confirm: true,
+    user_metadata: { first_name: 'Pat', last_name: `Past${unique()}` },
+  });
+  if (user.error) throw user.error;
+  const pastId = user.data.user.id;
+  created.users.push(pastId);
+  const lastName = user.data.user.user_metadata.last_name as string;
+  const member = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: pastId, role: 'client' });
+  if (member.error) throw member.error;
+  const month = '2026-11';
+  const date = `${month}-11`;
+  const copy = await admin
+    .from('workouts')
+    .insert({ workspace_id: workspaceId, client_id: pastId, scheduled_on: date, name: workout })
+    .select('id')
+    .single();
+  if (copy.error) throw copy.error;
+  // Removed, as remove_client does it: a past_clients row and no membership.
+  const past = await admin
+    .from('past_clients')
+    .insert({ workspace_id: workspaceId, user_id: pastId, email, first_name: 'Pat', last_name: lastName });
+  if (past.error) throw past.error;
+  const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', pastId);
+  if (gone.error) throw gone.error;
+
+  await signInAsCoach(page);
+  await page.getByRole('heading', { name: /Past clients \(\d+\)/ }).getByRole('button').click();
+  await page.getByRole('table', { name: 'Past clients' }).getByRole('link', { name: `Pat ${lastName}`, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${pastId}$`));
+  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
+
+  await page.goto(`/clients/${pastId}?month=${month}`);
+  await expect(day(page, date).getByText(workout, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Assign program' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Add a workout to / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `Options for ${workout}` })).toHaveCount(0);
+  await expect(day(page, date).getByRole('button', { name: workout })).toHaveCount(0);
+  await expect(day(page, date).getByRole('link', { name: workout })).toHaveCount(0);
+
+  const res = await page.goto(`/clients/${pastId}/workouts/${copy.data.id}`);
+  expect(res?.status()).toBe(404);
 });
 
 test('a coach gets a 404 for someone who is not their client', async ({ page }) => {

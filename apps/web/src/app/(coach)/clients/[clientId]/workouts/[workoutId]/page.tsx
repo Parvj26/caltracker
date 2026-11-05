@@ -16,8 +16,9 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
     loadClient(supabase, workspaceId, clientId),
     loadWorkoutDoc(supabase, workoutId),
   ]);
-  // RLS already limits workouts to this coach's workspace; the copy must also belong to this client.
-  if (!client || !loaded || loaded.clientId !== client.id || !loaded.scheduledOn) notFound();
+  // RLS already limits workouts to this coach's workspace; the copy must also belong to this client, who must still
+  // be a client (a past client's calendar is read-only).
+  if (!client || client.removedAt !== null || !loaded || loaded.clientId !== client.id || !loaded.scheduledOn) notFound();
 
   return (
     <div className={styles.page}>
