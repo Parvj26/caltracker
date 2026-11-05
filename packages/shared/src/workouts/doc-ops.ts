@@ -8,6 +8,7 @@ const DEFAULT_ROUNDS = 3;
 const DEFAULT_REST = 90;
 const MAX_SETS = 20;
 const MAX_EXERCISES = 10;
+const MAX_BLOCKS = 30;
 
 type Patch = Partial<Omit<WorkoutSetDoc, 'id'>>;
 
@@ -70,6 +71,7 @@ export function emptyWorkout(makeId: () => string, name = ''): WorkoutDoc {
 }
 
 export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string): WorkoutDoc {
+  if (doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
     kind: 'straight',
@@ -80,6 +82,7 @@ export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () =
 
 export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string): WorkoutDoc {
   if (exs.length < 2) throw new Error('A superset needs at least two exercises.');
+  if (exs.length > MAX_EXERCISES || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
     kind: 'superset',
@@ -139,7 +142,9 @@ export function removeExercise(doc: WorkoutDoc, blockId: string, workoutExercise
   return mapBlock(doc, blockId, (b) => ({ ...b, kind, exercises }));
 }
 
+/** In a superset a set is a round, so adding one adds a round to every exercise. */
 export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, makeId: () => string): WorkoutDoc {
+  if (doc.blocks.find((b) => b.id === blockId)?.kind === 'superset') return addRound(doc, blockId, makeId);
   return mapExercise(doc, blockId, workoutExerciseId, (e) => {
     if (e.sets.length >= MAX_SETS) return e;
     const from = lastNonDrop(e.sets);
@@ -192,7 +197,32 @@ export function addDrop(
   });
 }
 
+function removeNthRound(e: WorkoutExerciseDoc, n: number): WorkoutExerciseDoc {
+  let seen = -1;
+  const sets: WorkoutSetDoc[] = [];
+  let skipping = false;
+  for (const s of e.sets) {
+    if (s.setType !== 'drop') {
+      seen += 1;
+      skipping = seen === n;
+    }
+    if (!skipping) sets.push(s);
+  }
+  return { ...e, sets };
+}
+
+/** In a superset, removing a non-drop set removes that round from every exercise. */
 export function removeSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, setId: string): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  if (block?.kind === 'superset') {
+    const ex = block.exercises.find((e) => e.id === workoutExerciseId);
+    const target = ex?.sets.find((s) => s.id === setId);
+    if (ex && target && target.setType !== 'drop') {
+      if (ex.sets.filter((s) => s.setType !== 'drop').length <= 1) return doc;
+      const n = ex.sets.filter((s) => s.setType !== 'drop').findIndex((s) => s.id === setId);
+      return mapBlock(doc, blockId, (b) => ({ ...b, exercises: b.exercises.map((e) => removeNthRound(e, n)) }));
+    }
+  }
   return mapExercise(doc, blockId, workoutExerciseId, (e) => {
     const i = e.sets.findIndex((s) => s.id === setId);
     if (i < 0) return e;
@@ -211,14 +241,20 @@ export function updateSet(
   setId: string,
   patch: Patch,
 ): WorkoutDoc {
-  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({
-    ...e,
-    sets: e.sets.map((s) => {
-      if (s.id !== setId) return s;
-      const next = { ...s, ...patch };
-      return next.setType === 'drop' ? { ...next, restSeconds: 0 } : next;
-    }),
-  }));
+  const block = doc.blocks.find((b) => b.id === blockId);
+  const ex = block?.exercises.find((e) => e.id === workoutExerciseId);
+  if (!block || !ex) return doc;
+  const sets = ex.sets.map((s) => {
+    if (s.id !== setId) return s;
+    const next = { ...s, ...patch };
+    return next.setType === 'drop' ? { ...next, restSeconds: 0 } : { ...next, toFailure: false };
+  });
+  if (sets[0]?.setType === 'drop') return doc;
+  if (block.kind === 'superset') {
+    const count = (xs: readonly WorkoutSetDoc[]) => xs.filter((s) => s.setType !== 'drop').length;
+    if (count(sets) !== count(ex.sets)) return doc;
+  }
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets }));
 }
 
 export function replaceExercise(

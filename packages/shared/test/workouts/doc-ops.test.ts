@@ -285,3 +285,98 @@ describe('immutability', () => {
     for (const o of outs) expect(WorkoutDoc.safeParse(o).success).toBe(true);
   });
 });
+
+describe('superset keeps equal rounds', () => {
+  it('addSet in a superset adds a round to every exercise', () => {
+    const d = base();
+    const sb = d.blocks[1]!;
+    const out = valid(addSet(d, sb.id, sb.exercises[0]!.id, makeId));
+    for (const e of out.blocks[1]!.exercises) expect(nonDrop(e.sets)).toHaveLength(4);
+  });
+
+  it('removeSet of a non-drop set removes that round everywhere, with its drops', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a, b] = sb.exercises;
+    d = addDrop(d, sb.id, a!.id, a!.sets[1]!.id, makeId);
+    const out = valid(removeSet(d, sb.id, a!.id, a!.sets[1]!.id));
+    const [oa, ob] = out.blocks[1]!.exercises;
+    expect(oa!.sets.map((s) => s.id)).toEqual([a!.sets[0]!.id, a!.sets[2]!.id]);
+    expect(ob!.sets.map((s) => s.id)).toEqual([b!.sets[0]!.id, b!.sets[2]!.id]);
+  });
+
+  it('removeSet is a no-op with one round left; removing a drop stays local', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const a = sb.exercises[0]!;
+    d = addDrop(d, sb.id, a.id, a.sets[0]!.id, makeId);
+    const drop = d.blocks[1]!.exercises[0]!.sets[1]!;
+    const local = valid(removeSet(d, sb.id, a.id, drop.id));
+    expect(local.blocks[1]!.exercises[0]!.sets).toHaveLength(3);
+    expect(local.blocks[1]!.exercises[1]!.sets).toHaveLength(3);
+    d = valid(removeRound(removeRound(local, sb.id), sb.id));
+    expect(removeSet(d, sb.id, a.id, d.blocks[1]!.exercises[0]!.sets[0]!.id)).toEqual(d);
+  });
+});
+
+describe('updateSet validity', () => {
+  it('a drop changed to normal clears toFailure', () => {
+    let d = base();
+    const b = d.blocks[0]!;
+    const ex = b.exercises[0]!;
+    d = addDrop(d, b.id, ex.id, ex.sets[0]!.id, makeId);
+    const drop = d.blocks[0]!.exercises[0]!.sets[1]!;
+    d = valid(updateSet(d, b.id, ex.id, drop.id, { toFailure: true }));
+    expect(d.blocks[0]!.exercises[0]!.sets[1]!.toFailure).toBe(true);
+    const out = valid(updateSet(d, b.id, ex.id, drop.id, { setType: 'normal' }));
+    expect(out.blocks[0]!.exercises[0]!.sets[1]).toMatchObject({ setType: 'normal', toFailure: false });
+  });
+
+  it('refuses to make the first set a drop', () => {
+    const d = base();
+    const b = d.blocks[0]!;
+    const ex = b.exercises[0]!;
+    expect(updateSet(d, b.id, ex.id, ex.sets[0]!.id, { setType: 'drop' })).toEqual(d);
+  });
+
+  it('in a superset refuses changes to the round count but allows warmup/normal', () => {
+    const d = base();
+    const sb = d.blocks[1]!;
+    const ex = sb.exercises[0]!;
+    expect(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'drop' })).toEqual(d);
+    const out = valid(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'warmup' }));
+    expect(out.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('warmup');
+    expect(valid(updateSet(out, sb.id, ex.id, ex.sets[1]!.id, { setType: 'normal' })).blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('normal');
+  });
+});
+
+describe('caps', () => {
+  it('MAX_SETS: addSet, addRound and addDrop stop at 20', () => {
+    let d = base();
+    const st = d.blocks[0]!;
+    const ex = st.exercises[0]!;
+    for (let i = 0; i < 25; i++) d = addSet(d, st.id, ex.id, makeId);
+    expect(valid(d).blocks[0]!.exercises[0]!.sets).toHaveLength(20);
+    expect(addDrop(d, st.id, ex.id, ex.sets[0]!.id, makeId)).toEqual(d);
+    const sb = d.blocks[1]!;
+    for (let i = 0; i < 25; i++) d = addRound(d, sb.id, makeId);
+    for (const e of valid(d).blocks[1]!.exercises) expect(e.sets).toHaveLength(20);
+  });
+
+  it('MAX_EXERCISES: superset stops at 10 exercises', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    for (let i = 0; i < 12; i++) d = addExerciseToSuperset(d, sb.id, pick(20 + i), makeId);
+    expect(valid(d).blocks[1]!.exercises).toHaveLength(10);
+    const many = Array.from({ length: 11 }, (_, i) => pick(40 + i));
+    const e = emptyWorkout(makeId, 'A');
+    expect(addSuperset(e, many, makeId)).toEqual(e);
+  });
+
+  it('blocks stop at 30', () => {
+    let d = emptyWorkout(makeId, 'A');
+    for (let i = 0; i < 35; i++) d = addStraightBlock(d, pick(1), makeId);
+    expect(valid(d).blocks).toHaveLength(30);
+    expect(addSuperset(d, [pick(1), pick(2)], makeId)).toEqual(d);
+  });
+});
