@@ -88,3 +88,4 @@ export {
   updateSet,
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
+export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
