@@ -138,6 +138,34 @@ describe('workoutRowToDoc', () => {
     expect(doc.blocks[0]!.exercises[0]!.sets[0]!.targetDistanceM).toBe(2000.5);
   });
 
+  it('drops targets the exercise no longer tracks after its tracking type changed', () => {
+    // The exercise was weight and reps when the sets were written; the coach has since made it time.
+    const doc = workoutRowToDoc({
+      ...row,
+      workout_blocks: [
+        {
+          ...row.workout_blocks[1]!,
+          id: id(60),
+          kind: 'straight',
+          workout_exercises: [
+            {
+              ...row.workout_blocks[1]!.workout_exercises[0]!,
+              exercises: { name: 'Plank', tracking_type: 'time' },
+              workout_sets: [
+                set(61, 0, { target_reps_min: 8, target_reps_max: 10, target_weight_kg: '60.000', target_duration_s: 45 }),
+                set(62, 1, { target_distance_m: '100.00' }),
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(WorkoutDoc.parse(doc)).toEqual(doc);
+    const sets = doc.blocks[0]!.exercises[0]!.sets;
+    expect(sets[0]).toMatchObject({ targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, targetDurationS: 45, targetDistanceM: null });
+    expect(sets[1]).toMatchObject({ targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, targetDurationS: null, targetDistanceM: null });
+  });
+
   it('does not mutate the row', () => {
     const before = JSON.stringify(row);
     workoutRowToDoc(row);

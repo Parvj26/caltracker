@@ -1,5 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType, WorkoutDoc } from './schema';
+import { TARGET_FIELDS } from './targets';
 
 /**
  * PostgREST nested select for one workout with its blocks, exercises (and their names) and sets.
@@ -63,25 +64,33 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
     blocks: byPosition(row.workout_blocks).map((b) => ({
       id: b.id,
       kind: b.kind,
-      exercises: byPosition(b.workout_exercises).map((e) => ({
-        id: e.id,
-        exerciseId: e.exercise_id,
-        exerciseName: e.exercises?.name ?? '',
-        trackingType: e.exercises?.tracking_type ?? 'weight_reps',
-        note: e.note,
-        sets: byPosition(e.workout_sets).map((s) => ({
-          id: s.id,
-          setType: s.set_type,
-          targetRepsMin: s.target_reps_min,
-          targetRepsMax: s.target_reps_max,
-          targetWeightKg: num(s.target_weight_kg),
-          targetDurationS: s.target_duration_s,
-          targetDistanceM: num(s.target_distance_m),
-          toFailure: s.to_failure,
-          restSeconds: s.rest_seconds,
-          note: s.note,
-        })),
-      })),
+      exercises: byPosition(b.workout_exercises).map((e) => {
+        const trackingType = e.exercises?.tracking_type ?? 'weight_reps';
+        // The tracking type is read live from the exercise, but the sets were written for whatever
+        // type it had then. Drop targets the current type doesn't use, so the doc stays valid and
+        // the coach can still open and save the workout after changing an exercise's type.
+        const allowed = TARGET_FIELDS[trackingType];
+        const keep = <T>(field: (typeof allowed)[number], v: T | null): T | null => (allowed.includes(field) ? v : null);
+        return {
+          id: e.id,
+          exerciseId: e.exercise_id,
+          exerciseName: e.exercises?.name ?? '',
+          trackingType,
+          note: e.note,
+          sets: byPosition(e.workout_sets).map((s) => ({
+            id: s.id,
+            setType: s.set_type,
+            targetRepsMin: keep('reps', s.target_reps_min),
+            targetRepsMax: keep('reps', s.target_reps_max),
+            targetWeightKg: keep('weight', num(s.target_weight_kg)),
+            targetDurationS: keep('duration', s.target_duration_s),
+            targetDistanceM: keep('distance', num(s.target_distance_m)),
+            toFailure: s.to_failure,
+            restSeconds: s.rest_seconds,
+            note: s.note,
+          })),
+        };
+      }),
     })),
   };
 }
