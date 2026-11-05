@@ -92,6 +92,50 @@ begin
 end;
 $$;
 
+-- A built-in exercise when ws is null, otherwise a custom exercise of ws.
+create or replace function tests.create_exercise(
+  ws uuid, name text, tt public.tracking_type default 'weight_reps'
+) returns uuid
+language plpgsql
+as $$
+declare
+  ex uuid;
+begin
+  insert into public.exercises (workspace_id, source, name, tracking_type)
+  values (ws, case when ws is null then 'builtin' else 'custom' end, name, tt)
+  returning id into ex;
+  return ex;
+end;
+$$;
+
+-- A workout with 1 straight block, 1 exercise (a new built-in when ex is null) and two sets:
+-- normal (8 reps, 60 kg, rest 90) then a drop to failure. A library workout when client is null.
+create or replace function tests.create_workout(
+  ws uuid, name text, client uuid default null, on_date date default null, ex uuid default null
+) returns uuid
+language plpgsql
+as $$
+declare
+  w uuid;
+  b uuid;
+  we uuid;
+begin
+  if ex is null then
+    ex := tests.create_exercise(null, name || ' exercise');
+  end if;
+  insert into public.workouts (workspace_id, client_id, scheduled_on, name)
+  values (ws, client, on_date, name) returning id into w;
+  insert into public.workout_blocks (workout_id, position, kind) values (w, 0, 'straight') returning id into b;
+  insert into public.workout_exercises (block_id, position, exercise_id) values (b, 0, ex) returning id into we;
+  insert into public.workout_sets (workout_exercise_id, position, set_type, target_reps_min, target_reps_max,
+    target_weight_kg, rest_seconds)
+  values (we, 0, 'normal', 8, 8, 60, 90);
+  insert into public.workout_sets (workout_exercise_id, position, set_type, to_failure)
+  values (we, 1, 'drop', true);
+  return w;
+end;
+$$;
+
 grant usage on schema tests to anon, authenticated;
 grant execute on all functions in schema tests to anon, authenticated;
 

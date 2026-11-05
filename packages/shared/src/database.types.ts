@@ -265,6 +265,226 @@ export type Database = {
         }
         Relationships: []
       }
+      workout_blocks: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["block_kind"]
+          position: number
+          updated_at: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["block_kind"]
+          position: number
+          updated_at?: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["block_kind"]
+          position?: number
+          updated_at?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_blocks_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_exercises: {
+        Row: {
+          block_id: string
+          client_id: string | null
+          created_at: string
+          exercise_id: string
+          id: string
+          note: string | null
+          position: number
+          updated_at: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          block_id: string
+          client_id?: string | null
+          created_at?: string
+          exercise_id: string
+          id?: string
+          note?: string | null
+          position: number
+          updated_at?: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          block_id?: string
+          client_id?: string | null
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          note?: string | null
+          position?: number
+          updated_at?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_exercises_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "workout_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_sets: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          position: number
+          rest_seconds: number
+          set_type: Database["public"]["Enums"]["set_type"]
+          target_distance_m: number | null
+          target_duration_s: number | null
+          target_reps_max: number | null
+          target_reps_min: number | null
+          target_weight_kg: number | null
+          to_failure: boolean
+          updated_at: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          position: number
+          rest_seconds?: number
+          set_type?: Database["public"]["Enums"]["set_type"]
+          target_distance_m?: number | null
+          target_duration_s?: number | null
+          target_reps_max?: number | null
+          target_reps_min?: number | null
+          target_weight_kg?: number | null
+          to_failure?: boolean
+          updated_at?: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          position?: number
+          rest_seconds?: number
+          set_type?: Database["public"]["Enums"]["set_type"]
+          target_distance_m?: number | null
+          target_duration_s?: number | null
+          target_reps_max?: number | null
+          target_reps_min?: number | null
+          target_weight_kg?: number | null
+          to_failure?: boolean
+          updated_at?: string
+          workout_exercise_id?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_sets_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workouts: {
+        Row: {
+          assignment_id: string | null
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          scheduled_on: string | null
+          source_workout_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assignment_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          scheduled_on?: string | null
+          source_workout_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assignment_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          scheduled_on?: string | null
+          source_workout_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workouts_source_workout_id_fkey"
+            columns: ["source_workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workouts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string | null
@@ -331,6 +551,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {
         Args: { token: string }
         Returns: {
@@ -357,6 +578,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      is_client_in: { Args: { uid: string; ws: string }; Returns: boolean }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
       is_member_of: { Args: { ws: string }; Returns: boolean }
       lookup_members_by_email: {
@@ -383,7 +605,9 @@ export type Database = {
       split_full_name: { Args: { name: string }; Returns: string[] }
     }
     Enums: {
+      block_kind: "straight" | "superset"
       member_role: "owner" | "staff" | "client"
+      set_type: "normal" | "warmup" | "drop"
       tracking_type: "weight_reps" | "reps" | "time" | "distance"
     }
     CompositeTypes: {
@@ -515,7 +739,9 @@ export const Constants = {
   },
   public: {
     Enums: {
+      block_kind: ["straight", "superset"],
       member_role: ["owner", "staff", "client"],
+      set_type: ["normal", "warmup", "drop"],
       tracking_type: ["weight_reps", "reps", "time", "distance"],
     },
   },
