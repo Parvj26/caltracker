@@ -152,8 +152,13 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Send invite' })).toBeInViewport();
 });
 
-test('bulk CSV invite explains itself and offers an example file that parses into 2 rows', async ({ page }) => {
+test('bulk CSV invite is folded under its heading, then explains itself and offers an example file', async ({ page }) => {
   await signInAsDemoCoach(page);
+  // Folded by default: only the heading shows, and clicking it opens the section.
+  const toggle = page.getByText('Invite many clients from a spreadsheet (CSV)', { exact: true });
+  await expect(toggle).toBeVisible();
+  await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeHidden();
+  await toggle.click();
   await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeVisible();
   await expect(
     page.getByText('Bring your client list from Everfit or Excel: one row per client with first name, last name and email.'),

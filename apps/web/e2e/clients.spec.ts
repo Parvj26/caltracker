@@ -16,6 +16,12 @@ test.beforeEach(async ({ page }) => {
   await signInAsCoach(page);
 });
 
+
+/** The CSV section is folded under its heading; open it first. */
+async function openCsvSection(page: Page) {
+  await page.getByText('Invite many clients from a spreadsheet (CSV)', { exact: true }).click();
+}
+
 test('add a client: shows under Pending invites, expires in 14 days, then resend', async ({ page }) => {
   const email = `new-${unique()}@example.com`;
   await page.getByLabel('First name').fill('New');
@@ -61,6 +67,7 @@ test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }
   const run = unique();
   // Older single Name column: still accepted and split on the first space.
   const lines = ['Name,Email', ...Array.from({ length: 45 }, (_, i) => `Bulk ${i},bulk${i}-${run}@example.com`)];
+  await openCsvSection(page);
   await page.getByLabel('Invite many clients from a spreadsheet (CSV)').setInputFiles({
     name: 'bulk.csv',
     mimeType: 'text/csv',
@@ -79,6 +86,7 @@ test('while a CSV is sending, a new file cannot be picked and the send cannot be
     if (route.request().method() === 'POST') await held;
     await route.continue();
   });
+  await openCsvSection(page);
   const fileInput = page.getByLabel('Invite many clients from a spreadsheet (CSV)');
   await fileInput.setInputFiles({
     name: 'busy.csv',
@@ -113,6 +121,7 @@ test('empty first name shows an inline error and sends nothing', async ({ page }
 test('CSV upload previews valid rows and line errors, then sends the valid ones', async ({ page }) => {
   const run = unique();
   const csv = readFileSync(join(__dirname, 'fixtures', 'clients.csv'), 'utf8').replaceAll('{{RUN}}', run);
+  await openCsvSection(page);
   await page.getByLabel('Invite many clients from a spreadsheet (CSV)').setInputFiles({
     name: 'clients.csv',
     mimeType: 'text/csv',

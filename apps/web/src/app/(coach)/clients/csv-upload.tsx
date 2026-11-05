@@ -74,23 +74,27 @@ export function CsvUpload() {
 
   return (
     <section className={styles.panelSection}>
-      <h2 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h2>
+      {/* Folded by default: the heading is the toggle, so the page leads with single invites. */}
+      <details className={styles.csvDetails}>
+      <summary className={styles.csvSummary}>
+        <h2 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h2>
+      </summary>
       <p id="csv-explain" className={styles.explain}>
         Bring your client list from Everfit or Excel: one row per client with first name, last name and email.
       </p>
+      <p id="csv-limit" className={styles.caption}>Up to {CLIENT_CSV_MAX_ROWS} clients per file.</p>
       <div className={styles.csvHelp} id="csv-help" data-csv-headers="">
         <HeaderList label="First name column, any of:" headers={FIRST_NAME_HEADERS} />
         <HeaderList label="Last name column (optional), any of:" headers={LAST_NAME_HEADERS} />
         <HeaderList label="Or one name column, split at the first space:" headers={NAME_HEADERS} />
         <HeaderList label="Email column, any of:" headers={EMAIL_HEADERS} />
-        <p className={styles.caption}>Up to {CLIENT_CSV_MAX_ROWS} clients per file.</p>
       </div>
       <div className={styles.csvActions}>
         <input
           type="file"
           accept=".csv,text/csv"
           aria-labelledby="csv-heading"
-          aria-describedby="csv-explain csv-help"
+          aria-describedby="csv-explain csv-limit csv-help"
           className={styles.fileInput}
           disabled={pending}
           onChange={(e) => void onFile(e)}
@@ -149,6 +153,7 @@ export function CsvUpload() {
         </>
       ) : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
+      </details>
     </section>
   );
 }
