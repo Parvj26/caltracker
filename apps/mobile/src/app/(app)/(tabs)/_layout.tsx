@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
+import { borderWidth, radius, space, typeScale } from '@caltracker/design-tokens';
 import { fontFamilyFor } from '@/theme/fonts';
 import { palette } from '@/theme/theme';
 
@@ -26,7 +27,11 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: palette.inkMuted,
         tabBarShowLabel: true,
         tabBarStyle: { backgroundColor: palette.bg, borderTopColor: palette.border },
-        tabBarLabelStyle: { fontFamily: fontFamilyFor('sans', 700), fontSize: 12 },
+        // Caption size at section-heading weight, so short labels stay readable. Colour comes from the tint.
+        tabBarLabelStyle: {
+          fontFamily: fontFamilyFor('sans', typeScale.sectionHeading.weight),
+          fontSize: typeScale.caption.size.phone,
+        },
         sceneStyle: { backgroundColor: palette.bg },
       }}
     >
@@ -47,7 +52,13 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  todayIcon: { width: 20, height: 20, borderRadius: 10, borderWidth: 2.5 },
-  calendarIcon: { width: 20, height: 19, borderRadius: 4, borderWidth: 2.5, overflow: 'hidden' },
-  calendarBar: { height: 4 },
+  todayIcon: { width: space[4.5], height: space[4.5], borderRadius: radius.pill, borderWidth: borderWidth.card },
+  calendarIcon: {
+    width: space[4.5],
+    height: space[4.5],
+    borderRadius: space[1],
+    borderWidth: borderWidth.card,
+    overflow: 'hidden',
+  },
+  calendarBar: { height: space[1] },
 });

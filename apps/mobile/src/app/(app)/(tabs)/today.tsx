@@ -13,6 +13,7 @@ import {
   fetchMyUnits,
   fetchNextWorkout,
   fetchWorkoutsBetween,
+  LOAD_FAILED,
   setMyUnits,
 } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
@@ -50,9 +51,9 @@ export default function Today() {
       if (ticket !== latest.current) return;
       setData(next);
       setError(null);
-    } catch (e) {
+    } catch {
       if (ticket !== latest.current) return;
-      setError(e instanceof Error ? e.message : 'Could not load today. Try again.');
+      setError(LOAD_FAILED);
     }
   }, []);
 

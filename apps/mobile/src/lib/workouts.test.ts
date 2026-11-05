@@ -5,6 +5,7 @@ import {
   initials,
   isFirstTimeClient,
   resolveVideoUrls,
+  supersetLetters,
   toWorkoutSummary,
   type WorkoutSummary,
 } from './workouts';
@@ -125,5 +126,21 @@ describe('initials', () => {
     expect(initials('Mia van der Berg')).toBe('MB');
     expect(initials('Cher')).toBe('C');
     expect(initials('  ')).toBe('?');
+  });
+});
+
+describe('supersetLetters', () => {
+  it('letters supersets only, counted among supersets (first A, second B)', () => {
+    expect(supersetLetters([{ kind: 'straight' }, { kind: 'straight' }, { kind: 'superset' }, { kind: 'straight' }, { kind: 'superset' }])).toEqual([
+      null,
+      null,
+      'A',
+      null,
+      'B',
+    ]);
+  });
+
+  it('is empty for a workout with no blocks', () => {
+    expect(supersetLetters([])).toEqual([]);
   });
 });

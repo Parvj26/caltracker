@@ -5,7 +5,7 @@ import { tapTarget } from '@caltracker/design-tokens';
 import { addDays, localToday, startOfWeek, type IsoDate } from '@caltracker/shared';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { formatDayMonth, groupByDay, weekdayShort, type WorkoutSummary } from '@/lib/workouts';
-import { fetchWorkoutsBetween } from '@/lib/workouts-api';
+import { LOAD_FAILED, fetchWorkoutsBetween } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -26,9 +26,9 @@ export default function Workouts() {
       if (ticket !== latest.current) return;
       setItems({ weekStart: from, workouts });
       setError(null);
-    } catch (e) {
+    } catch {
       if (ticket !== latest.current) return;
-      setError(e instanceof Error ? e.message : 'Could not load your workouts. Try again.');
+      setError(LOAD_FAILED);
     }
   }, []);
 
@@ -76,11 +76,13 @@ export default function Workouts() {
           return (
             <View
               key={day.date}
+              testID={isToday ? 'today-row' : `day-${day.date}`}
               style={[styles.day, { gap: space[3], paddingVertical: space[2] }, i > 0 && styles.dayDivider]}
             >
               <View style={[styles.dayLabel, { gap: space[1] }]}>
                 <Text style={text('caption')}>{weekdayShort(day.date)}</Text>
                 <View
+                  testID={isToday ? 'today-chip' : undefined}
                   style={[
                     styles.dateChip,
                     { borderRadius: radius.pill, paddingHorizontal: space[2] },
@@ -126,6 +128,7 @@ function WorkoutRow({ workout }: { workout: WorkoutSummary }) {
   const router = useRouter();
   return (
     <Pressable
+      testID={`workout-row-${workout.id}`}
       onPress={() => router.push({ pathname: '/workout/[id]', params: { id: workout.id } })}
       accessibilityRole="button"
       accessibilityHint="Opens the workout"
@@ -155,12 +158,13 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.75 },
   day: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap' },
-  dayDivider: { borderTopWidth: 1, borderTopColor: palette.border },
-  dayLabel: { minWidth: 84, minHeight: tapTarget.min, justifyContent: 'center' },
+  dayDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
+  // Wide enough for a date chip and "Today"; at large text sizes the workouts wrap below instead of squeezing.
+  dayLabel: { minWidth: tapTarget.min * 2, minHeight: tapTarget.min, justifyContent: 'center' },
   dateChip: { alignSelf: 'flex-start' },
   // Lime marks today; the word "Today" says it too, so colour is never the only signal.
   dateChipToday: { backgroundColor: palette.lime },
-  dayItems: { flex: 1, minWidth: 160, justifyContent: 'center', minHeight: tapTarget.min },
+  dayItems: { flex: 1, minWidth: tapTarget.min * 4, justifyContent: 'center', minHeight: tapTarget.min },
   rest: { color: palette.inkMuted },
   workoutRow: {
     flexDirection: 'row',

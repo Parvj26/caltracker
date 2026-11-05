@@ -6,6 +6,16 @@ import type { IsoDate, Units, WorkoutDoc, WorkoutTreeRow } from '@caltracker/sha
 import { supabase } from './supabase';
 import { WORKOUT_SUMMARY_SELECT, resolveVideoUrls, toWorkoutSummary, type WorkoutSummary, type WorkoutSummaryRow } from './workouts';
 
+/** What the client sees when a read fails: plain words, never the server's message. */
+export const LOAD_FAILED = 'Something went wrong. Pull down to try again.';
+export const SAVE_UNITS_FAILED = 'Could not save your units. Try again.';
+
+/** Keeps the server's detail in the developer log and gives the screen plain words. */
+function failed(what: string, error: { message: string }, shown: string = LOAD_FAILED): Error {
+  console.warn(`[workouts] ${what}: ${error.message}`);
+  return new Error(shown);
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function myId(): Promise<string> {
@@ -31,7 +41,7 @@ export async function fetchWorkoutsBetween(from: IsoDate, to: IsoDate): Promise<
     .lte('scheduled_on', to)
     .order('scheduled_on')
     .order('name');
-  if (error) throw new Error(`Could not load your workouts: ${error.message}`);
+  if (error) throw failed('workouts between', error);
   return summaries(data);
 }
 
@@ -42,14 +52,14 @@ export async function fetchNextWorkout(after: IsoDate): Promise<WorkoutSummary |
     .order('scheduled_on')
     .order('name')
     .limit(1);
-  if (error) throw new Error(`Could not load your next workout: ${error.message}`);
+  if (error) throw failed('next workout', error);
   return summaries(data)[0] ?? null;
 }
 
 /** At most one workout from any date: enough for isFirstTimeClient(). */
 export async function fetchAnyWorkout(): Promise<WorkoutSummary[]> {
   const { data, error } = await summaryQuery(await myId()).limit(1);
-  if (error) throw new Error(`Could not load your workouts: ${error.message}`);
+  if (error) throw failed('any workout', error);
   return summaries(data);
 }
 
@@ -64,7 +74,7 @@ export async function fetchWorkoutDetail(
     .eq('id', id)
     .eq('client_id', await myId())
     .maybeSingle();
-  if (error) throw new Error(`Could not load this workout: ${error.message}`);
+  if (error) throw failed('workout detail', error);
   if (!data) return null;
   // Built by concatenation, so supabase-js cannot infer the shape; WorkoutTreeRow describes it.
   const row = data as unknown as WorkoutTreeRow & { workspace_id: string };
@@ -91,14 +101,14 @@ export async function fetchWorkoutDetail(
 /** The signed-in user's own display units. */
 export async function fetchMyUnits(): Promise<Units> {
   const { data, error } = await supabase.from('profiles').select('units').eq('id', await myId()).single();
-  if (error) throw new Error(`Could not load your units: ${error.message}`);
+  if (error) throw failed('units', error);
   return data.units === 'lb' ? 'lb' : 'kg';
 }
 
 /** Saves the signed-in user's own display units (the database only lets anyone change their own). */
 export async function setMyUnits(units: Units): Promise<void> {
   const { error } = await supabase.from('profiles').update({ units }).eq('id', await myId());
-  if (error) throw new Error(`Could not save your units: ${error.message}`);
+  if (error) throw failed('save units', error, SAVE_UNITS_FAILED);
 }
 
 /** The name of the client's coach (the workspace owner), or null if there is none or it can't be read. */

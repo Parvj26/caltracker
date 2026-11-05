@@ -13,14 +13,12 @@ import {
   type WorkoutExerciseDoc,
 } from '@caltracker/shared';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
-import { formatDayLabel } from '@/lib/workouts';
+import { formatDayLabel, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 type Detail = { doc: WorkoutDoc; scheduledOn: IsoDate; videoUrls: Record<string, string>; units: Units };
-
-const BLOCK_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /** Read-only workout: blocks, exercises and set targets in the client's own units. No logging in phase 2. */
 export default function WorkoutDetail() {
@@ -35,8 +33,9 @@ export default function WorkoutDetail() {
     try {
       const [found, units] = await Promise.all([fetchWorkoutDetail(id ?? ''), fetchMyUnits()]);
       setDetail(found ? { ...found, units } : 'missing');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load this workout. Try again.');
+    } catch {
+      // workouts-api logs the detail; the client only ever sees plain words.
+      setError('Something went wrong. Try again.');
     }
   }, [id]);
 
@@ -44,6 +43,7 @@ export default function WorkoutDetail() {
     void load();
   }, [load]);
 
+  const letters = detail && detail !== 'missing' ? supersetLetters(detail.doc.blocks) : [];
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
 
   return (
@@ -80,7 +80,7 @@ export default function WorkoutDetail() {
             <BlockCard
               key={block.id}
               block={block}
-              letter={BLOCK_LETTERS[i] ?? String(i + 1)}
+              letter={letters[i] ?? null}
               units={detail.units}
               videoUrls={detail.videoUrls}
             />
@@ -98,7 +98,8 @@ function BlockCard({
   videoUrls,
 }: {
   block: WorkoutBlockDoc;
-  letter: string;
+  /** The superset's letter (A for the first superset, B for the second), null for straight sets. */
+  letter: string | null;
   units: Units;
   videoUrls: Record<string, string>;
 }) {
@@ -116,7 +117,7 @@ function BlockCard({
         <View key={ex.id} style={{ gap: space[2] }}>
           <ExerciseSection
             exercise={ex}
-            label={superset ? `${letter}${i + 1}` : null}
+            label={superset && letter ? `${letter}${i + 1}` : null}
             units={units}
             videoUrl={videoUrls[ex.exerciseId]}
           />
@@ -159,6 +160,7 @@ function ExerciseSection({
         return (
           <View
             key={set.id}
+            testID={drop ? 'drop-set' : undefined}
             style={[
               styles.setRow,
               { gap: space[3], paddingVertical: space[2], paddingHorizontal: space[3], borderRadius: radius.input },
@@ -166,14 +168,15 @@ function ExerciseSection({
             ]}
           >
             <Text
-              style={[text('sectionHeading'), styles.setLabel]}
+              style={[text('sectionHeading'), styles.setLabel, drop && styles.inkText]}
               accessibilityLabel={drop ? 'Drop set' : labels[i] === 'W' ? 'Warm-up' : `Set ${labels[i]}`}
             >
               {labels[i]}
             </Text>
             <View style={[styles.flex, { gap: space[1] }]}>
-              <Text style={text('body')}>{formatSetTarget(set, exercise.trackingType, units)}</Text>
-              {rest ? <Text style={text('caption')}>{rest}</Text> : null}
+              {/* Text on the drop pastel is always ink, never muted. */}
+              <Text style={[text('body'), drop && styles.inkText]}>{formatSetTarget(set, exercise.trackingType, units)}</Text>
+              {rest ? <Text style={[text('caption'), drop && styles.inkText]}>{rest}</Text> : null}
               {set.note ? <Text style={[text('caption'), drop && styles.inkText]}>{set.note}</Text> : null}
             </View>
           </View>

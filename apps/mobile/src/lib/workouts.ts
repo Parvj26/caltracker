@@ -90,3 +90,19 @@ export function initials(name: string): string {
   const last = words.length > 1 ? words[words.length - 1].charAt(0) : '';
   return (first + last).toUpperCase();
 }
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/**
+ * Letter per block for labelling superset exercises (A1, A2…): supersets are lettered in order among
+ * supersets only (first A, second B); straight blocks get null. The web builder numbers blocks and has no letters.
+ */
+export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' }>): Array<string | null> {
+  let n = 0;
+  return blocks.map((b) => {
+    if (b.kind !== 'superset') return null;
+    const letter = LETTERS[n % 26] + (n >= 26 ? String(Math.floor(n / 26) + 1) : '');
+    n += 1;
+    return letter;
+  });
+}

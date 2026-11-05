@@ -95,8 +95,8 @@ function UnitsCard({ units, onChange }: { units: Units; onChange: (units: Units)
     setError(null);
     try {
       await onChange(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save your units. Try again.');
+    } catch {
+      setError('Could not save your units. Try again.');
     }
   }
 

@@ -36,7 +36,10 @@ env:
     visible: 'Barbell Squat'
     timeout: 20000
 - assertVisible: '8 reps · 60 kg'
-- assertVisible: '↳'
+# The drop row's label is read as "Drop set" (iOS shows the accessibility label, not the ↳ glyph).
+- assertVisible:
+    id: drop-set
+- assertVisible: 'Drop set'
 - assertVisible: 'To failure'
 # Read only in phase 2: there is no Start button.
 - assertNotVisible: 'Start'
@@ -44,9 +47,19 @@ env:
     id: back
 - tapOn:
     id: tab-workouts
-- assertVisible: 'Week of .*'
-- assertVisible: 'Today'
-- assertVisible: 'E2E Upper'
+- runScript:
+    file: helpers/week-of.js
+- assertVisible: ${output.weekOf}
+- assertVisible:
+    id: today-chip
+- assertVisible:
+    text: 'Today'
+    childOf:
+      id: today-row
+- assertVisible:
+    text: 'E2E Upper'
+    childOf:
+      id: today-row
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-workouts, EMAIL: '-' }
