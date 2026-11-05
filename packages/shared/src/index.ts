@@ -138,6 +138,8 @@ export {
   autoFinishTime,
   canReopen,
   completedSetCount,
+  isAddedExercise,
+  isPlannedLog,
   logDurationS,
   logVolumeKg,
   shouldAutoFinish,

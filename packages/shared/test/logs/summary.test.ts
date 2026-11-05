@@ -9,6 +9,8 @@ import {
   autoFinishTime,
   canReopen,
   completedSetCount,
+  isAddedExercise,
+  isPlannedLog,
   logDurationS,
   logVolumeKg,
   shouldAutoFinish,
@@ -99,6 +101,9 @@ describe('log summary', () => {
     expect(autoFinishTime(log)).toBe(T0);
     const out = autoFinish(log);
     expect(out.status).toBe('discarded');
+    // Marked automatic like the server job's discard, so both say the same about what happened.
+    expect(out.autoFinished).toBe(true);
+    expect(out.finishedAt).toBeNull();
     expect(out.revision).toBe(log.revision + 1);
   });
 
@@ -109,5 +114,34 @@ describe('log summary', () => {
     expect(canReopen(log, Date.parse(fin) + 24 * H)).toBe(false);
     expect(canReopen({ ...log, autoFinished: false }, Date.parse(fin) + H)).toBe(false);
     expect(canReopen({ ...log, status: 'discarded' }, Date.parse(fin) + H)).toBe(false);
+  });
+});
+
+describe('planned or not', () => {
+  it('a log from a plan is planned, and only its exercises with no planned link are added', () => {
+    const log = base();
+    expect(isPlannedLog(log)).toBe(true);
+    const ex = log.blocks[0]!.exercises[0]!;
+    expect(isAddedExercise(log, ex)).toBe(false);
+    const added = { ...ex, id: uuid(), plannedWorkoutExerciseId: null };
+    expect(isAddedExercise(log, added)).toBe(true);
+  });
+
+  it('stays planned after the plan is deleted (workoutId null), since its exercises keep their planned link', () => {
+    const log = { ...base(), workoutId: null };
+    expect(isPlannedLog(log)).toBe(true);
+    expect(isAddedExercise(log, log.blocks[0]!.exercises[0]!)).toBe(false);
+  });
+
+  it('a log with no planned exercise is unplanned, and nothing in it counts as added', () => {
+    const log = base();
+    const blocks = log.blocks.map((b) => ({
+      ...b,
+      exercises: b.exercises.map((e) => ({ ...e, plannedWorkoutExerciseId: null })),
+    }));
+    const unplanned = { ...log, workoutId: null, blocks };
+    expect(isPlannedLog(unplanned)).toBe(false);
+    expect(isAddedExercise(unplanned, blocks[0]!.exercises[0]!)).toBe(false);
+    expect(isPlannedLog({ ...unplanned, blocks: [] })).toBe(false);
   });
 });

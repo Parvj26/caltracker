@@ -1,4 +1,4 @@
-import type { LogSetDoc, WorkoutLogDoc } from './schema';
+import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
 
 export const AUTO_FINISH_IDLE_MS = 3 * 60 * 60 * 1000;
 export const REMINDER_DELAY_MS = 20 * 60 * 1000;
@@ -48,9 +48,14 @@ export function autoFinishTime(log: WorkoutLogDoc): string {
   return best ?? log.startedAt;
 }
 
+/**
+ * Finishes a forgotten workout (shouldAutoFinish) the way the server's hourly job does: completed at its last
+ * ticked set, or discarded when nothing was ticked. Both are marked autoFinished, like the job's result, so the
+ * server keeps accepting the phone's data for them.
+ */
 export function autoFinish(log: WorkoutLogDoc): WorkoutLogDoc {
   if (completedSetCount(log) === 0) {
-    return { ...log, status: 'discarded', revision: log.revision + 1 };
+    return { ...log, status: 'discarded', autoFinished: true, revision: log.revision + 1 };
   }
   return {
     ...log,
@@ -68,4 +73,17 @@ export function canReopen(log: WorkoutLogDoc, nowMs: number): boolean {
     log.finishedAt !== null &&
     nowMs - Date.parse(log.finishedAt) < REOPEN_WINDOW_MS
   );
+}
+
+/**
+ * True when the log followed a plan: any of its exercises came from a planned one. Decided from the log itself,
+ * not workoutId, so a log keeps being "planned" after the coach deletes the plan (workoutId becomes null).
+ */
+export function isPlannedLog(log: Pick<WorkoutLogDoc, 'blocks'>): boolean {
+  return log.blocks.some((b) => b.exercises.some((e) => e.plannedWorkoutExerciseId !== null));
+}
+
+/** "Added": an exercise the client added to a planned log. In an unplanned log nothing counts as added. */
+export function isAddedExercise(log: Pick<WorkoutLogDoc, 'blocks'>, ex: Pick<LogExerciseDoc, 'plannedWorkoutExerciseId'>): boolean {
+  return ex.plannedWorkoutExerciseId === null && isPlannedLog(log);
 }
