@@ -7,6 +7,8 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts invitelink <email> <name>   invite + its caltracker://invite link
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign <email>   the coach assigns "E2E Upper" to this client today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -111,12 +113,25 @@ export async function cleanup(email: string): Promise<void> {
   }
 }
 
+type PlanSet = Omit<WorkoutDoc['blocks'][number]['exercises'][number]['sets'][number], 'id'>;
+
+const NO_EXTRA = { targetDurationS: null, targetDistanceM: null, note: null };
+const squatSet = (restSeconds: number): PlanSet => ({
+  ...NO_EXTRA,
+  setType: 'normal',
+  targetRepsMin: 8,
+  targetRepsMax: 8,
+  targetWeightKg: 60,
+  toFailure: false,
+  restSeconds,
+});
+
 /**
- * What the coach does on the dashboard: save a library workout "E2E Upper" (Barbell Squat, 8 reps @ 60 kg, then a
- * drop to failure), put it on Day 1 of a 1-week program "E2E Program", and assign that to the client starting
- * today in this Mac's time zone (the simulator's). Clears earlier E2E rows first, so it can be rerun.
+ * What the coach does on the dashboard: save a library workout `name` of Barbell Squat with these sets, put it on
+ * Day 1 of a 1-week program "E2E Program", and assign that to the client starting today in this Mac's time zone
+ * (the simulator's). Clears earlier E2E rows first, so it can be rerun.
  */
-export async function assign(email: string): Promise<void> {
+async function assignWorkout(email: string, name: string, sets: PlanSet[]): Promise<void> {
   await cleanupWorkouts();
   const clientId = await findUserId(email);
   if (!clientId) throw new Error(`No user with email ${email}`);
@@ -133,10 +148,9 @@ export async function assign(email: string): Promise<void> {
       .single();
     if (exErr) throw new Error(`Barbell Squat not found (run pnpm import:exercises): ${exErr.message}`);
 
-    const set = { targetDurationS: null, targetDistanceM: null, note: null };
     const doc: WorkoutDoc = {
       id: randomUUID(),
-      name: 'E2E Upper',
+      name,
       notes: null,
       blocks: [
         {
@@ -149,10 +163,7 @@ export async function assign(email: string): Promise<void> {
               exerciseName: squat.name,
               trackingType: squat.tracking_type,
               note: null,
-              sets: [
-                { ...set, id: randomUUID(), setType: 'normal', targetRepsMin: 8, targetRepsMax: 8, targetWeightKg: 60, toFailure: false, restSeconds: 90 },
-                { ...set, id: randomUUID(), setType: 'drop', targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, toFailure: true, restSeconds: 0 },
-              ],
+              sets: sets.map((s) => ({ ...s, id: randomUUID() })),
             },
           ],
         },
@@ -183,6 +194,32 @@ export async function assign(email: string): Promise<void> {
   } finally {
     await coach.auth.signOut();
   }
+}
+
+/** "E2E Upper": Barbell Squat, 8 reps @ 60 kg, then a drop to failure. */
+export function assign(email: string): Promise<void> {
+  return assignWorkout(email, 'E2E Upper', [
+    squatSet(90),
+    { ...NO_EXTRA, setType: 'drop', targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, toFailure: true, restSeconds: 0 },
+  ]);
+}
+
+/** "E2E Log": Barbell Squat 3 × 8 @ 60 kg with 90 s rests, for the logging flows. Starts with no logs left over. */
+export async function assignToday(email: string): Promise<void> {
+  await cleanupLogs(email);
+  await assignWorkout(email, 'E2E Log', [squatSet(90), squatSet(90), squatSet(90)]);
+}
+
+/** The only account whose logs the flows may delete. */
+const DEMO_CLIENT = 'client@demo.local';
+
+/** Deletes every workout log of the seed demo client (blocks, sets and comments cascade). Nobody else's. */
+export async function cleanupLogs(email: string): Promise<void> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-logs only clears ${DEMO_CLIENT}`);
+  const id = await findUserId(DEMO_CLIENT);
+  if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
+  const { error } = await admin.from('workout_logs').delete().eq('client_id', id);
+  if (error) throw error;
 }
 
 /** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */
@@ -222,6 +259,8 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'remove') await remove(email);
   else if (action === 'assign') await assign(email);
   else if (action === 'cleanup-workouts') await cleanupWorkouts();
+  else if (action === 'assign-today') await assignToday(email);
+  else if (action === 'cleanup-logs') await cleanupLogs(email);
   else throw new Error(`Unknown action ${action}`);
 }
 

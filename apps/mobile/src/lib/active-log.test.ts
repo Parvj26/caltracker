@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
 import {
+  finishPrompt,
+  formatCommentTime,
+  finishQuestion,
   finishedFrom,
   finishedIsLoaded,
+  keepEnded,
+  keepFinished,
+  reopenFrom,
+  summaryLines,
   foregroundCheck,
   formatTimeOfDay,
   parseActualInput,
@@ -207,5 +214,102 @@ describe('recently finished workout (Done ✓ survives the upload)', () => {
     expect(finishedIsLoaded(finished, [{ id: 'other' }])).toBe(false);
     expect(finishedIsLoaded(finished, [{ id: 'log-9' }])).toBe(true);
     expect(finishedIsLoaded(null, [{ id: 'log-9' }])).toBe(false);
+  });
+});
+
+describe('after the server replaces the phone copy (adopt or reload)', () => {
+  const W = '00000000-0000-4000-8000-000000000903';
+  const done = sampleLog({ id: 'log-9', workoutId: W, status: 'completed', finishedAt: '2026-11-05T09:45:00.000Z' });
+  const note = finishedFrom(done);
+
+  it('forgets the remembered Done ✓ when that log comes back not completed (discarded elsewhere, reopened)', () => {
+    expect(keepFinished(note, { ...done, status: 'discarded', finishedAt: null })).toBeNull();
+    expect(keepFinished(note, { ...done, status: 'in_progress', finishedAt: null })).toBeNull();
+  });
+
+  it('keeps it for the same log still completed, for another log, or with nothing stored', () => {
+    expect(keepFinished(note, done)).toBe(note);
+    expect(keepFinished(note, sampleLog({ id: 'other', status: 'discarded' }))).toBe(note);
+    expect(keepFinished(note, null)).toBe(note);
+    expect(keepFinished(null, done)).toBeNull();
+  });
+
+  it('keeps the remembered summary log in step: the newer completed copy, or forgotten when not completed', () => {
+    const corrected = { ...done, revision: 9 };
+    expect(keepEnded(done, corrected)).toBe(corrected);
+    expect(keepEnded(done, { ...done, status: 'discarded', finishedAt: null })).toBeNull();
+    expect(keepEnded(done, sampleLog({ id: 'other' }))).toBe(done);
+    expect(keepEnded(done, null)).toBe(done);
+    expect(keepEnded(null, done)).toBeNull();
+  });
+});
+
+describe('finishPrompt', () => {
+  const twoSets = (firstDone: boolean, secondDone: boolean) => {
+    const base = sampleLog();
+    const ex = base.blocks[0].exercises[0];
+    const set = ex.sets[0];
+    const sets = [
+      { ...set, completedAt: firstDone ? NOW : null },
+      { ...set, id: '00000000-0000-4000-8000-000000000099', completedAt: secondDone ? NOW : null },
+    ];
+    return { ...base, blocks: [{ ...base.blocks[0], exercises: [{ ...ex, sets }] }] };
+  };
+
+  it('refuses with no ticked set (the shared finish rule), so the client can only discard or keep going', () => {
+    expect(finishPrompt(twoSets(false, false), NOW)).toEqual({ kind: 'none-done' });
+  });
+
+  it('asks first when some sets are not ticked, and finishes straight away when all are', () => {
+    expect(finishPrompt(twoSets(true, false), NOW)).toEqual({ kind: 'unticked', count: 1 });
+    expect(finishPrompt(twoSets(true, true), NOW)).toEqual({ kind: 'ready' });
+  });
+
+  it('words the question with the exact copy', () => {
+    expect(finishQuestion(3)).toBe('Finish with 3 sets not done? They won’t count.');
+    expect(finishQuestion(1)).toBe('Finish with 1 set not done? It won’t count.');
+  });
+});
+
+describe('summaryLines', () => {
+  const done = sampleLog({ status: 'completed', startedAt: '2026-11-05T09:00:00.000Z', finishedAt: '2026-11-05T09:53:00.000Z' });
+
+  it('gives duration, volume in the client units and the completed sets', () => {
+    expect(summaryLines(done, 'kg')).toEqual({ duration: '53 min', volume: '480 kg lifted', sets: '1 set completed' });
+    expect(summaryLines(done, 'lb').volume).toBe('1,058.2 lb lifted');
+  });
+
+  it('leaves the volume out when nothing weighted was lifted', () => {
+    const ex = done.blocks[0].exercises[0];
+    const bodyweight = { ...done, blocks: [{ ...done.blocks[0], exercises: [{ ...ex, trackingType: 'reps' as const }] }] };
+    expect(summaryLines(bodyweight, 'kg').volume).toBeNull();
+  });
+});
+
+describe('reopenFrom', () => {
+  const done = sampleLog({ id: 'log-9', status: 'completed', autoFinished: true, finishedAt: NOW });
+
+  it('reopens the copy on the phone when it is that log', () => {
+    expect(reopenFrom({ log: done, lastSyncedRevision: 0 }, 'log-9')).toEqual({ kind: 'local' });
+  });
+
+  it('fetches the server copy when the phone has nothing, or only an uploaded finished log', () => {
+    expect(reopenFrom(null, 'log-9')).toEqual({ kind: 'fetch' });
+    const other = sampleLog({ id: 'other', status: 'completed', revision: 4 });
+    expect(reopenFrom({ log: other, lastSyncedRevision: 4 }, 'log-9')).toEqual({ kind: 'fetch' });
+  });
+
+  it('is blocked by another workout in progress, or another finished one still uploading', () => {
+    const going = sampleLog({ id: 'other', name: 'Lower B' });
+    expect(reopenFrom({ log: going, lastSyncedRevision: 1 }, 'log-9')).toEqual({ kind: 'blocked', name: 'Lower B' });
+    const waiting = sampleLog({ id: 'other', name: 'Lower B', status: 'completed', revision: 5 });
+    expect(reopenFrom({ log: waiting, lastSyncedRevision: 4 }, 'log-9')).toEqual({ kind: 'blocked', name: 'Lower B' });
+  });
+});
+
+describe('formatCommentTime', () => {
+  it('reads the day and time in the phone time zone', () => {
+    expect(formatCommentTime(new Date(2026, 10, 5, 10, 40).toISOString())).toBe('5 Nov · 10:40 AM');
+    expect(formatCommentTime(new Date(2026, 0, 31, 23, 5).toISOString())).toBe('31 Jan · 11:05 PM');
   });
 });

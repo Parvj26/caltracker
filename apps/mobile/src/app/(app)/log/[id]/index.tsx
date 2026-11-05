@@ -26,6 +26,7 @@ import { RestSheet } from '@/components/log/rest-sheet';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen, TextButton } from '@/components/ui';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
+import { finishPrompt, finishQuestion } from '@/lib/active-log-logic';
 import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
@@ -134,22 +135,34 @@ export default function LogScreen() {
     onAddSet: (ex) => void op((l) => addLogSet(l, ex.id, randomUUID, nowIso())),
   };
 
+  const discardNow = () => void discard().then(back);
   const confirmDiscard = () =>
     Alert.alert('Discard this workout?', 'Your ticked sets won’t be saved.', [
       { text: 'Keep going', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => void discard().then(back),
-      },
+      { text: 'Discard', style: 'destructive', onPress: discardNow },
     ]);
 
-  const doFinish = async () => {
-    // Task 9 adds the "sets not done" confirmation and the summary screen; until then Finish returns to Today.
-    if (await finish()) {
-      back();
+  const finishNow = async () => {
+    // The summary replaces this screen, so Done (or back) on it returns to where the workout was started.
+    if (await finish()) router.replace({ pathname: '/log/[id]/summary', params: { id: log.id } });
+  };
+
+  const doFinish = () => {
+    // Asked from what this screen shows; finish() then decides again from the stored doc with the shared rules.
+    const prompt = finishPrompt(log, nowIso());
+    if (prompt.kind === 'none-done') {
+      // A workout with nothing ticked can't be finished: the only ways out are Discard or keep going.
+      Alert.alert('Complete at least one set to finish.', undefined, [
+        { text: 'Keep going', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: discardNow },
+      ]);
+    } else if (prompt.kind === 'unticked') {
+      Alert.alert(finishQuestion(prompt.count), undefined, [
+        { text: 'Keep going', style: 'cancel' },
+        { text: 'Finish', onPress: () => void finishNow() },
+      ]);
     } else {
-      Alert.alert('Complete at least one set to finish.');
+      void finishNow();
     }
   };
 
@@ -164,7 +177,7 @@ export default function LogScreen() {
     if (menu === null) return [];
     if (menu.kind === 'log') {
       return [
-        { title: 'Finish workout', testID: 'finish-button', variant: 'finish', onPress: () => void doFinish() },
+        { title: 'Finish workout', testID: 'finish-button', variant: 'finish', onPress: doFinish },
         { title: 'Discard workout', testID: 'discard-button', onPress: confirmDiscard },
       ];
     }
@@ -254,7 +267,7 @@ export default function LogScreen() {
         })}
 
         <Button variant="secondary" title="+ Exercise" testID="add-exercise" onPress={() => setPicker({ mode: 'add' })} />
-        <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={() => void doFinish()} />
+        <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={doFinish} />
 
         {restHere ? <View style={{ height: sheetHeight }} /> : null}
       </Screen>

@@ -1,8 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
+import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import {
@@ -27,7 +28,7 @@ import {
   LOAD_FAILED,
   setMyUnits,
 } from '@/lib/workouts-api';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /** How long Start waits for the server before using the copy saved on the phone. */
@@ -171,6 +172,15 @@ export default function Today() {
     [router],
   );
 
+  const openSummary = useCallback(
+    (id: string) => {
+      if (navigating.current) return;
+      navigating.current = true;
+      router.push({ pathname: '/log/[id]/summary', params: { id } });
+    },
+    [router],
+  );
+
   async function startWorkout(w: WorkoutSummary) {
     if (startingRef.current) return;
     if (inProgress) {
@@ -253,6 +263,7 @@ export default function Today() {
               status={statuses[w.id] ?? null}
               starting={starting === w.id}
               onStart={() => void startWorkout(w)}
+              onView={openSummary}
             />
           ))
         : null}
@@ -271,37 +282,19 @@ export default function Today() {
   );
 }
 
-/** "Resume {name}" at the top of Today while a workout is in progress. */
-function ResumeBanner({ name, onPress }: { name: string; onPress: () => void }) {
-  const { text, space, radius } = useTheme();
-  return (
-    <Pressable
-      testID="resume-banner"
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.resume,
-        { borderRadius: radius.card, padding: space[4.5], gap: space[1] },
-        pressed && styles.pressed,
-      ]}
-    >
-      {/* Text on a pastel tile is always ink, never muted. */}
-      <Text style={[text('caption'), styles.ink]}>Workout in progress</Text>
-      <Text style={text('sectionHeading')}>{`Resume ${name}`}</Text>
-    </Pressable>
-  );
-}
-
 function TodayCard({
   workout,
   status,
   starting,
   onStart,
+  onView,
 }: {
   workout: WorkoutSummary;
   status: WorkoutStatus | null;
   starting: boolean;
   onStart: () => void;
+  /** Opens the finished workout's summary. */
+  onView: (logId: string) => void;
 }) {
   const { text, space, radius } = useTheme();
   const router = useRouter();
@@ -326,7 +319,9 @@ function TodayCard({
           </Text>
         ) : null}
       </View>
-      {status?.kind === 'done' ? null : (
+      {status?.kind === 'done' ? (
+        <Button title="View" testID={`view-log-${workout.id}`} onPress={() => onView(status.logId)} />
+      ) : (
         <Button
           title={status?.kind === 'in_progress' ? 'Resume' : 'Start'}
           testID={`start-${workout.id}`}
@@ -346,7 +341,5 @@ function TodayCard({
 
 const styles = StyleSheet.create({
   chip: { alignSelf: 'flex-start', backgroundColor: palette.blue },
-  resume: { backgroundColor: palette.lime },
-  pressed: { opacity: pressedOpacity },
   ink: { color: palette.ink },
 });

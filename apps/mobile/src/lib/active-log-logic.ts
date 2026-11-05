@@ -2,12 +2,18 @@
 // so they run in unit tests. Workout rules themselves (auto-finish, duration) come from @caltracker/shared.
 import {
   autoFinish,
+  completedSetCount,
   emptyLog,
+  finishLog,
+  formatLogDuration,
+  formatLogVolume,
   logDurationS,
+  logVolumeKg,
   parseClock,
   shouldAutoFinish,
   startLogFromWorkout,
   type LogStatus,
+  type Units,
   type WorkoutDoc,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
@@ -27,6 +33,14 @@ export function startOrResume(
   if (existing?.status === 'in_progress') return existing;
   const fresh = typeof from === 'string' ? emptyLog(from, makeId, nowIso) : startLogFromWorkout(from, makeId, nowIso);
   return { ...fresh, revision: 1 };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "5 Nov · 10:40 AM" in the phone's own time zone, for a coach comment. */
+export function formatCommentTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()] ?? ''} · ${formatTimeOfDay(iso)}`;
 }
 
 /** "10:40 AM" in the phone's own time zone. */
@@ -99,6 +113,71 @@ export function finishedFrom(log: WorkoutLogDoc | null): FinishedNote | null {
 /** True once a server list has the remembered log, so it can be forgotten. */
 export function finishedIsLoaded(finished: FinishedNote | null, logs: readonly { id: string }[]): boolean {
   return finished !== null && logs.some((l) => l.id === finished.logId);
+}
+
+/**
+ * The remembered Done ✓ after the server's (or the stored) copy of a log replaces the phone's: forgotten when it
+ * is the same log and no longer completed (discarded on another phone, reopened), kept otherwise.
+ */
+export function keepFinished(note: FinishedNote | null, doc: WorkoutLogDoc | null): FinishedNote | null {
+  return note && doc && doc.id === note.logId && doc.status !== 'completed' ? null : note;
+}
+
+/**
+ * The finished log remembered for its summary, after a newer copy of a log arrives: that newer copy while it is
+ * still completed (a coach correction, say), forgotten when it no longer is, unchanged for any other log.
+ */
+export function keepEnded(ended: WorkoutLogDoc | null, doc: WorkoutLogDoc | null): WorkoutLogDoc | null {
+  if (!ended || !doc || doc.id !== ended.id) return ended;
+  return doc.status === 'completed' ? doc : null;
+}
+
+export type FinishPrompt = { kind: 'none-done' } | { kind: 'unticked'; count: number } | { kind: 'ready' };
+
+const setCount = (log: WorkoutLogDoc) => log.blocks.reduce((n, b) => n + b.exercises.reduce((m, e) => m + e.sets.length, 0), 0);
+
+/**
+ * What tapping Finish does. The shared finishLog decides whether the log can be finished at all (it refuses one
+ * with no ticked set: the client may only discard or keep going); otherwise unticked sets are asked about first.
+ */
+export function finishPrompt(log: WorkoutLogDoc, nowIso: string): FinishPrompt {
+  if (finishLog(log, nowIso) === log) return { kind: 'none-done' };
+  const count = setCount(log) - completedSetCount(log);
+  return count > 0 ? { kind: 'unticked', count } : { kind: 'ready' };
+}
+
+/** "Finish with 3 sets not done? They won’t count." */
+export function finishQuestion(count: number): string {
+  return count === 1
+    ? 'Finish with 1 set not done? It won’t count.'
+    : `Finish with ${count} sets not done? They won’t count.`;
+}
+
+export type SummaryLines = { duration: string; volume: string | null; sets: string };
+
+/** The summary's lines in the client's units. Volume is left out when nothing weighted was lifted. */
+export function summaryLines(log: WorkoutLogDoc, units: Units): SummaryLines {
+  const kg = logVolumeKg(log);
+  const n = completedSetCount(log);
+  return {
+    duration: formatLogDuration(logDurationS(log)),
+    volume: kg > 0 ? formatLogVolume(kg, units) : null,
+    sets: `${n} ${n === 1 ? 'set' : 'sets'} completed`,
+  };
+}
+
+export type ReopenFrom = { kind: 'local' } | { kind: 'fetch' } | { kind: 'blocked'; name: string };
+
+/**
+ * Where "Add missed sets" starts from, given the phone's stored log: that log itself, or the server's copy when
+ * the phone has nothing that matters (the finished log has uploaded and been cleared). Another workout in
+ * progress, or another finished one still waiting to upload, blocks it: the phone holds one log at a time.
+ */
+export function reopenFrom(stored: { log: WorkoutLogDoc; lastSyncedRevision: number } | null, logId: string): ReopenFrom {
+  if (stored === null) return { kind: 'fetch' };
+  if (stored.log.id === logId) return { kind: 'local' };
+  const busy = stored.log.status === 'in_progress' || stored.log.revision > stored.lastSyncedRevision;
+  return busy ? { kind: 'blocked', name: stored.log.name } : { kind: 'fetch' };
 }
 
 /**
