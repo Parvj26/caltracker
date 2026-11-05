@@ -62,19 +62,19 @@
 .programItem { background: var(--ct-lime); }
 .singleItem { background: var(--ct-blue); }
 .itemRow { display: flex; align-items: stretch; }
-/* Finished: a ✓ that opens the log. Text on a pastel fill is always ink. */
-.doneLink {
-  flex: none;
-  display: inline-flex;
+/* Finished: a "✓ Done" line under the name that opens the log. Text on a pastel fill is always ink. */
+.doneNote {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: var(--ct-space-4);
+  gap: var(--ct-space-1);
   min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2);
   border-radius: var(--ct-radius-input);
   color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-button);
 }
-.doneLink:hover, .doneLink:focus-visible { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
+.doneNote:hover, .doneNote:focus-visible { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
 /* Missed: an amber outline on white; the word "Missed" carries the meaning, not the colour. */
 .missed { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber); }
 .missedNote {

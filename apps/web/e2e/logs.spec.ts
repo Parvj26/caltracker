@@ -5,7 +5,7 @@ import { seedLog, serviceClient, signInAsCoach } from './helpers';
 // uniquely named workouts and logs, so tests can share the demo client and run side by side.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-const created: { logs: string[]; workouts: string[]; users: string[] } = { logs: [], workouts: [], users: [] };
+const created: { logs: string[]; workouts: string[]; users: string[]; workspaces: string[] } = { logs: [], workouts: [], users: [], workspaces: [] };
 let clientId: string;
 let workspaceId: string;
 
@@ -23,8 +23,13 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (created.logs.length) await admin.from('workout_logs').delete().in('id', created.logs);
   if (created.workouts.length) await admin.from('workouts').delete().in('id', created.workouts);
+  for (const id of created.workspaces) await admin.from('workspaces').delete().eq('id', id);
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
+
+/** An ISO timestamp `minutesAgo` before now, so seeded logs are always the newest in the feed. */
+const ago = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
+const shortDay = (d: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(new Date(`${d}T00:00:00Z`));
 
 /* ---------- Plain YYYY-MM-DD maths (UTC only) ---------- */
 const MS_DAY = 86_400_000;
@@ -44,7 +49,7 @@ async function log(o: Parameters<typeof seedLog>[1]): Promise<string> {
   created.logs.push(id);
   return id;
 }
-async function newClient(firstName: string, lastName: string): Promise<string> {
+async function newClient(firstName: string, lastName: string, inWorkspace = workspaceId): Promise<string> {
   const u = await admin.auth.admin.createUser({
     email: `feed-${unique()}@example.com`,
     password: 'client-password-123',
@@ -53,34 +58,55 @@ async function newClient(firstName: string, lastName: string): Promise<string> {
   });
   if (u.error) throw u.error;
   created.users.push(u.data.user.id);
-  const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
+  const m = await admin.from('workspace_members').insert({ workspace_id: inWorkspace, user_id: u.data.user.id, role: 'client' });
   if (m.error) throw m.error;
   return u.data.user.id;
 }
 
-test('a finished workout shows in the activity feed with its sets and volume', async ({ page }) => {
+test('a finished workout shows in the activity feed with its sets and volume in the coach\'s units', async ({ page }) => {
+  // The demo coach's units are shared by every test file, so this test uses its own coach (set to pounds), its own
+  // workspace and its own client, and only ever sees its own logs.
+  const password = 'coach-password-123';
+  const email = `lb-coach-${unique()}@example.com`;
+  const coach = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { first_name: 'Pound', last_name: 'Feed' } });
+  if (coach.error) throw coach.error;
+  created.users.push(coach.data.user.id);
+  const ws = await admin.from('workspaces').insert({ name: `Feed Gym ${unique()}` }).select('id').single();
+  if (ws.error) throw ws.error;
+  created.workspaces.push(ws.data.id);
+  const owner = await admin.from('workspace_members').insert({ workspace_id: ws.data.id, user_id: coach.data.user.id, role: 'owner' });
+  if (owner.error) throw owner.error;
+  const units = await admin.from('profiles').update({ units: 'lb' }).eq('id', coach.data.user.id);
+  if (units.error) throw units.error;
+  const mine = await newClient('Lena', `Lifter${unique()}`, ws.data.id);
+
   const name = `Feed ${unique()}`;
-  const id = await log({ workspaceId, clientId, name, startedAt: '2026-11-04T17:00:00Z', finishedAt: '2026-11-04T17:53:00Z' });
-  await signInAsCoach(page);
+  const id = await log({ workspaceId: ws.data.id, clientId: mine, name, startedAt: ago(120), finishedAt: ago(67) });
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/clients$/);
   await page.getByRole('link', { name: 'Activity' }).click();
   await expect(page).toHaveURL(/\/activity$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
 
   const row = page.getByRole('row').filter({ hasText: name });
   await expect(row).toHaveCount(1);
-  await expect(row.getByRole('link', { name })).toHaveAttribute('href', `/clients/${clientId}/logs/${id}`);
-  await expect(row.getByText('Demo Client')).toBeVisible();
+  await expect(row.getByRole('link', { name })).toHaveAttribute('href', `/clients/${mine}/logs/${id}`);
+  await expect(row.getByText('Lena')).toBeVisible();
   await expect(row.getByText('3 sets')).toBeVisible();
   await expect(row.getByText('53 min')).toBeVisible();
-  await expect(row.getByText(/^[\d,]+ (kg|lb) lifted$/)).toBeVisible();
+  // 3 sets x 8 reps x 60 kg = 1,440 kg = 3,175 lb.
+  await expect(row.getByText('3,175 lb lifted')).toBeVisible();
   await expect(row.getByText('Unplanned')).toBeVisible();
 });
 
 test('the feed shows only completed logs, with the auto-finished chip', async ({ page }) => {
   const done = `Auto ${unique()}`;
   const gone = `Dropped ${unique()}`;
-  await log({ workspaceId, clientId, name: done, startedAt: '2026-11-03T10:00:00Z', finishedAt: '2026-11-03T10:30:00Z', autoFinished: true });
-  await log({ workspaceId, clientId, name: gone, status: 'discarded', sets: 0, startedAt: '2026-11-03T11:00:00Z' });
+  await log({ workspaceId, clientId, name: done, startedAt: ago(90), finishedAt: ago(60), autoFinished: true });
+  await log({ workspaceId, clientId, name: gone, status: 'discarded', sets: 0, startedAt: ago(50) });
   await signInAsCoach(page);
   await page.goto('/activity');
   await expect(page.getByRole('row').filter({ hasText: done }).getByText('Auto-finished')).toBeVisible();
@@ -92,8 +118,8 @@ test('the client filter narrows the feed', async ({ page }) => {
   const other = await newClient('Sam', last);
   const mine = `Mine ${unique()}`;
   const theirs = `Theirs ${unique()}`;
-  await log({ workspaceId, clientId, name: mine, startedAt: '2026-11-04T08:00:00Z', finishedAt: '2026-11-04T08:40:00Z' });
-  await log({ workspaceId, clientId: other, name: theirs, startedAt: '2026-11-04T09:00:00Z', finishedAt: '2026-11-04T09:40:00Z' });
+  await log({ workspaceId, clientId, name: mine, startedAt: ago(100), finishedAt: ago(70) });
+  await log({ workspaceId, clientId: other, name: theirs, startedAt: ago(100), finishedAt: ago(71) });
   await signInAsCoach(page);
   await page.goto('/activity');
   await expect(page.getByText(mine)).toBeVisible();
@@ -152,6 +178,34 @@ test('a planned workout with only a discarded or in-progress log is not done; a 
   }
 });
 
+test('a planned workout with a discarded log and then a completed one links to the completed log', async ({ page }) => {
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const d = addDays(today, -2);
+  const name = `Retry ${unique()}`;
+  const planned = await plan(name, d);
+  // The discarded attempt is the newer one by start time, so it must not win just by being the latest log.
+  const finished = await log({ workspaceId, clientId, name, plannedWorkoutId: planned, startedAt: `${d}T08:00:00Z`, finishedAt: `${d}T08:40:00Z` });
+  await log({ workspaceId, clientId, name, plannedWorkoutId: planned, status: 'discarded', sets: 0, startedAt: `${d}T18:00:00Z` });
+
+  await page.goto(calendarUrl(clientId, d));
+  const item = day(page, d).getByRole('listitem').filter({ hasText: name });
+  await expect(item.getByRole('link', { name: /Done/ })).toHaveAttribute('href', `/clients/${clientId}/logs/${finished}`);
+  await expect(item.getByText('Missed')).toHaveCount(0);
+});
+
+test('a long workout name stays readable next to its done mark', async ({ page }) => {
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const d = addDays(today, -1);
+  const name = `Upper Body A — Push ${unique()}`;
+  const planned = await plan(name, d);
+  await log({ workspaceId, clientId, name, plannedWorkoutId: planned, startedAt: `${d}T08:00:00Z`, finishedAt: `${d}T08:40:00Z` });
+  await page.goto(calendarUrl(clientId, d));
+  await expect(day(page, d).getByRole('listitem').filter({ hasText: name }).getByRole('link', { name: /Done/ })).toBeVisible();
+  await page.screenshot({ path: process.env.SHOT_CALENDAR_FIX ?? 'test-results/calendar-fix1.png', fullPage: true });
+});
+
 test.describe('in Los Angeles', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
 
@@ -167,24 +221,26 @@ test.describe('in Los Angeles', () => {
     if (!finishedAt) throw new Error('could not find 23:30 Los Angeles time');
     expect(finishedAt.slice(0, 10)).toBe(nextDay);
 
+    // Its own client, so the feed filter shows just this client's logs whatever else is in the workspace.
+    const mine = await newClient('Lola', `Late${unique()}`);
     const name = `Late ${unique()}`;
-    const planned = await plan(name, plannedDay);
+    const planned = await plan(name, plannedDay, mine);
     const nextName = `Next ${unique()}`;
-    await plan(nextName, nextDay);
-    const logId = await log({ workspaceId, clientId, name, plannedWorkoutId: planned, startedAt: new Date(Date.parse(finishedAt) - 3_000_000).toISOString(), finishedAt });
+    await plan(nextName, nextDay, mine);
+    const logId = await log({ workspaceId, clientId: mine, name, plannedWorkoutId: planned, startedAt: new Date(Date.parse(finishedAt) - 3_000_000).toISOString(), finishedAt });
 
-    await page.goto(calendarUrl(clientId, plannedDay));
+    await page.goto(calendarUrl(mine, plannedDay));
     const onPlanned = day(page, plannedDay).getByRole('listitem').filter({ hasText: name });
-    await expect(onPlanned.getByRole('link', { name: /Done/ })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+    await expect(onPlanned.getByRole('link', { name: /Done/ })).toHaveAttribute('href', `/clients/${mine}/logs/${logId}`);
     // The next day's own workout is not marked done just because the log finished on that UTC date.
-    await page.goto(calendarUrl(clientId, nextDay));
+    await page.goto(calendarUrl(mine, nextDay));
     const onNext = day(page, nextDay).getByRole('listitem').filter({ hasText: nextName });
     await expect(onNext.getByRole('link', { name: /Done/ })).toHaveCount(0);
 
     // The feed shows the finish time in the browser's zone: the planned day at 11:30 pm.
-    await page.goto('/activity');
+    await page.goto(`/activity?client=${mine}`);
     const row = page.getByRole('row').filter({ hasText: name });
-    await expect(row.locator('time')).toContainText('11:30');
+    await expect(row.locator('time')).toHaveText(`${shortDay(plannedDay)}, 11:30 pm`);
     await page.screenshot({ path: process.env.SHOT_ACTIVITY ?? 'test-results/activity.png', fullPage: true });
   });
 });

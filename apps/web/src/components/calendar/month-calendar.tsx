@@ -286,13 +286,13 @@ function DayItem({
           // Read-only calendar: the name is plain text.
           <span className={styles.itemHandle}>{item.name}</span>
         )}
-        {item.logId && logHref ? (
-          <Link href={logHref(item.logId)} className={styles.doneLink} aria-label={`Done: view the ${item.name} log`} title="Done">
-            <span aria-hidden="true">✓</span>
-          </Link>
-        ) : null}
         {renderItem(item, date, editable)}
       </div>
+      {item.logId && logHref ? (
+        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>
+          <span aria-hidden="true">✓</span> Done
+        </Link>
+      ) : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
     </li>
