@@ -4,7 +4,6 @@ import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native
 import {
   formatRest,
   formatSetTarget,
-  groupDropSets,
   setLabels,
   type IsoDate,
   type Units,
@@ -13,12 +12,19 @@ import {
   type WorkoutExerciseDoc,
 } from '@caltracker/shared';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
-import { formatDayLabel, supersetLetters } from '@/lib/workouts';
+import { blockRounds, formatDayLabel, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-type Detail = { doc: WorkoutDoc; scheduledOn: IsoDate; videoUrls: Record<string, string>; units: Units };
+type Detail = {
+  doc: WorkoutDoc;
+  scheduledOn: IsoDate;
+  videoUrls: Record<string, string>;
+  units: Units;
+  /** Rounds per block, worked out while loading: a malformed workout then shows the error, not a crash. */
+  rounds: number[];
+};
 
 /** Read-only workout: blocks, exercises and set targets in the client's own units. No logging in phase 2. */
 export default function WorkoutDetail() {
@@ -32,9 +38,10 @@ export default function WorkoutDetail() {
     setError(null);
     try {
       const [found, units] = await Promise.all([fetchWorkoutDetail(id ?? ''), fetchMyUnits()]);
-      setDetail(found ? { ...found, units } : 'missing');
+      setDetail(found ? { ...found, units, rounds: blockRounds(found.doc.blocks) } : 'missing');
     } catch {
-      // workouts-api logs the detail; the client only ever sees plain words.
+      // workouts-api logs the detail; the client only ever sees plain words. blockRounds also lands here if a
+      // drop set ever arrives with no set before it.
       setError('Something went wrong. Try again.');
     }
   }, [id]);
@@ -81,6 +88,7 @@ export default function WorkoutDetail() {
               key={block.id}
               block={block}
               letter={letters[i] ?? null}
+              rounds={detail.rounds[i] ?? 0}
               units={detail.units}
               videoUrls={detail.videoUrls}
             />
@@ -94,18 +102,19 @@ export default function WorkoutDetail() {
 function BlockCard({
   block,
   letter,
+  rounds,
   units,
   videoUrls,
 }: {
   block: WorkoutBlockDoc;
   /** The superset's letter (A for the first superset, B for the second), null for straight sets. */
   letter: string | null;
+  rounds: number;
   units: Units;
   videoUrls: Record<string, string>;
 }) {
   const { text, space } = useTheme();
   const superset = block.kind === 'superset';
-  const rounds = Math.max(0, ...block.exercises.map((e) => groupDropSets(e.sets).length));
   return (
     <Card>
       {superset ? (

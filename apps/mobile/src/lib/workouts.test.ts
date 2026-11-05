@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blockRounds,
   formatDayLabel,
   groupByDay,
   initials,
@@ -142,5 +143,24 @@ describe('supersetLetters', () => {
 
   it('is empty for a workout with no blocks', () => {
     expect(supersetLetters([])).toEqual([]);
+  });
+});
+
+describe('blockRounds', () => {
+  const s = (setType: 'normal' | 'warmup' | 'drop') => ({ setType });
+  it('counts rounds per block as its longest exercise, not counting drops', () => {
+    expect(
+      blockRounds([
+        { exercises: [{ sets: [s('warmup'), s('normal'), s('drop'), s('normal')] }] },
+        { exercises: [{ sets: [s('normal'), s('normal')] }, { sets: [s('normal'), s('drop'), s('normal')] }] },
+        { exercises: [] },
+      ]),
+    ).toEqual([3, 2, 0]);
+  });
+
+  it('throws on a leading drop, so the screen can show its error instead of crashing while drawing', () => {
+    expect(() => blockRounds([{ exercises: [{ sets: [s('drop'), s('normal')] }] }])).toThrow(
+      'A drop set must follow a normal or warm-up set.',
+    );
   });
 });

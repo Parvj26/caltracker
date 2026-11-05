@@ -1,6 +1,6 @@
 // Pure helpers for the client's calendar screens. No Supabase client here, so they run in unit tests;
 // the fetchers live in ./workouts-api.ts.
-import { addDays, isoWeekday, youtubeFormSearchUrl, type IsoDate } from '@caltracker/shared';
+import { addDays, groupDropSets, isoWeekday, youtubeFormSearchUrl, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
   id: string;
@@ -105,4 +105,15 @@ export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'supe
     n += 1;
     return letter;
   });
+}
+
+/**
+ * Rounds per block: the most non-drop sets any of its exercises has. Throws (via groupDropSets) on a drop set
+ * with nothing before it, so the detail screen calls this while loading and shows its error state, rather than
+ * hitting the throw while drawing and crashing.
+ */
+export function blockRounds(
+  blocks: ReadonlyArray<{ exercises: ReadonlyArray<{ sets: ReadonlyArray<{ setType: SetType }> }> }>,
+): number[] {
+  return blocks.map((b) => Math.max(0, ...b.exercises.map((e) => groupDropSets(e.sets).length)));
 }
