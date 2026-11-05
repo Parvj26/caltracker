@@ -601,6 +601,10 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      save_workout: {
+        Args: { p_doc: Json; p_workspace_id: string }
+        Returns: string
+      }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
     }
