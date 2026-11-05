@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 select table_privs_are('public', 'profiles', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
   'service_role has exactly select/insert/update/delete on profiles');
@@ -27,6 +27,8 @@ select table_privs_are('public', 'programs', 'service_role', array['SELECT', 'IN
   'service_role has exactly select/insert/update/delete on programs');
 select table_privs_are('public', 'program_workouts', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
   'service_role has exactly select/insert/update/delete on program_workouts');
+select table_privs_are('public', 'program_assignments', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on program_assignments');
 
 -- M2: coaches (authenticated) cannot write client_invites at all.
 select ok(not has_any_column_privilege('authenticated', 'public.client_invites', 'insert')

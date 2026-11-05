@@ -265,6 +265,66 @@ export type Database = {
         }
         Relationships: []
       }
+      program_assignments: {
+        Row: {
+          cancelled_on: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          program_id: string | null
+          program_name: string
+          start_date: string
+          updated_at: string
+          weeks: number
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_on?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          program_id?: string | null
+          program_name: string
+          start_date: string
+          updated_at?: string
+          weeks: number
+          workspace_id: string
+        }
+        Update: {
+          cancelled_on?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          program_id?: string | null
+          program_name?: string
+          start_date?: string
+          updated_at?: string
+          weeks?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_assignments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_assignments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       program_workouts: {
         Row: {
           created_at: string
@@ -562,6 +622,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "workouts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "program_assignments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workouts_source_workout_id_fkey"
             columns: ["source_workout_id"]
             isOneToOne: false
@@ -636,12 +703,31 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      assign_program: {
+        Args: {
+          p_assignment_id: string
+          p_client_id: string
+          p_program_id: string
+          p_start_date: string
+        }
+        Returns: string
+      }
       claim_invites: {
         Args: never
         Returns: {
           workspace_id: string
           workspace_name: string
         }[]
+      }
+      copy_workout: {
+        Args: {
+          p_assignment: string
+          p_client: string
+          p_date: string
+          p_new_id: string
+          p_source: string
+        }
+        Returns: string
       }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {
@@ -701,12 +787,25 @@ export type Database = {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
       }
+      schedule_workout: {
+        Args: {
+          p_client_id: string
+          p_date: string
+          p_new_id: string
+          p_workout_id: string
+        }
+        Returns: string
+      }
       set_program_weeks: {
         Args: { p_program_id: string; p_weeks: number }
         Returns: number
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
+      unassign_program: {
+        Args: { p_assignment_id: string; p_from_date: string }
+        Returns: number
+      }
     }
     Enums: {
       block_kind: "straight" | "superset"
