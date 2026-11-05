@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
 
 /** The CSV section is folded under its heading; open it first. */
 async function openCsvSection(page: Page) {
-  await page.getByText('Invite many clients from a spreadsheet (CSV)', { exact: true }).click();
+  await page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' }).getByRole('button').click();
 }
 
 test('add a client: shows under Pending invites, expires in 14 days, then resend', async ({ page }) => {

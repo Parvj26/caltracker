@@ -36,6 +36,7 @@ function HeaderList({ label, headers }: { label: string; headers: readonly strin
 }
 
 export function CsvUpload() {
+  const [open, setOpen] = useState(false);
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [statuses, setStatuses] = useState<Map<string, StatusView>>(new Map());
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -74,11 +75,21 @@ export function CsvUpload() {
 
   return (
     <section className={styles.panelSection}>
-      {/* Folded by default: the heading is the toggle, so the page leads with single invites. */}
-      <details className={styles.csvDetails}>
-      <summary className={styles.csvSummary}>
-        <h2 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h2>
-      </summary>
+      {/* Folded by default so the page leads with single invites. A button inside the heading (not <summary>)
+          keeps it a real heading for screen readers and announces expanded/collapsed. */}
+      <h2 className={styles.sectionHeading}>
+        <button
+          type="button"
+          id="csv-heading"
+          className={styles.csvToggle}
+          aria-expanded={open}
+          aria-controls="csv-body"
+          onClick={() => setOpen((o) => !o)}
+        >
+          Invite many clients from a spreadsheet (CSV)
+        </button>
+      </h2>
+      <div id="csv-body" className={styles.csvBody} hidden={!open}>
       <p id="csv-explain" className={styles.explain}>
         Bring your client list from Everfit or Excel: one row per client with first name, last name and email.
       </p>
@@ -153,7 +164,7 @@ export function CsvUpload() {
         </>
       ) : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
-      </details>
+      </div>
     </section>
   );
 }

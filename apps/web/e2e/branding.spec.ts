@@ -155,11 +155,13 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
 test('bulk CSV invite is folded under its heading, then explains itself and offers an example file', async ({ page }) => {
   await signInAsDemoCoach(page);
   // Folded by default: only the heading shows, and clicking it opens the section.
-  const toggle = page.getByText('Invite many clients from a spreadsheet (CSV)', { exact: true });
-  await expect(toggle).toBeVisible();
-  await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeHidden();
+  const toggle = page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' }).getByRole('button');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' })).toBeVisible();
+  await expect(page.locator('input[type="file"][aria-labelledby="csv-heading"]')).toBeHidden();
   await toggle.click();
-  await expect(page.getByLabel('Invite many clients from a spreadsheet (CSV)')).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('input[type="file"][aria-labelledby="csv-heading"]')).toBeVisible();
   await expect(
     page.getByText('Bring your client list from Everfit or Excel: one row per client with first name, last name and email.'),
   ).toBeVisible();
