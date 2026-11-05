@@ -143,17 +143,14 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.08em;
+  gap: 0.36em;
   font-weight: var(--ct-weight-button);
   color: var(--ct-ink);
   line-height: 1;
   white-space: nowrap;
 }
-.logoMark {
-  background: var(--ct-lime);
-  border-radius: 0.42em;
-  padding: 0.14em 0.3em 0.16em;
-}
+/* The mark is sized from the wordmark's font size, so md/lg scale together. */
+.logoMark { width: 1.45em; height: 1.45em; flex: none; display: block; border-radius: 22.5%; /* = rx 27 of 120, so outlines follow the tile */ }
 .logo-md { font-size: 19px; }
 .logo-lg { font-size: 34px; letter-spacing: var(--ct-tracking-screen-title); }
 

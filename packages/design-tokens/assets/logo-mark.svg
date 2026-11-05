@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="CalTracker">
+  <!-- CalTracker mark: a "C" drawn as an almost-closed progress ring, finishing with a dot.
+       Colours are design tokens: lime #C8F169, ink #121212, pink #FFC9E3.
+       Source of every app icon and favicon (scripts/generate-logo.ts). -->
+  <rect width="120" height="120" rx="27" fill="#C8F169"/>
+  <path d="M84 36 A34 34 0 1 0 84 84" fill="none" stroke="#121212" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="90" cy="60" r="9" fill="#FFC9E3"/>
+</svg>

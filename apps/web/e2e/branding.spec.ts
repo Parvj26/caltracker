@@ -11,7 +11,11 @@ import {
 
 test('sign-in page is branded', async ({ page }) => {
   await page.goto('/sign-in');
-  await expect(page.getByLabel('CalTracker')).toBeVisible();
+  const logo = page.getByRole('img', { name: 'CalTracker' }).first();
+  await expect(logo).toBeVisible();
+  // The mark (a "C" progress ring) sits next to the lowercase wordmark.
+  await expect(logo.locator('svg')).toHaveCount(1);
+  await expect(logo).toContainText('caltracker');
   await expect(page.getByText('Welcome back, coach!')).toBeVisible();
 
   const lime = await page.evaluate(() =>
@@ -219,4 +223,19 @@ test('exercise library: list, detail and new-exercise form use the UI kit', asyn
   }
   await page.getByRole('button', { name: 'Create exercise' }).click();
   await expect(page.locator('main').getByRole('alert')).toContainText('⚠');
+});
+
+test('the browser tab and home-screen icons are the CalTracker mark, served without signing in', async ({ request }) => {
+  const html = await (await request.get('/sign-in')).text();
+  const icon = /<link rel="icon" href="([^"]+)"/.exec(html)?.[1];
+  const apple = /<link rel="apple-touch-icon" href="([^"]+)"/.exec(html)?.[1];
+  expect(icon, 'favicon link').toBeTruthy();
+  expect(apple, 'apple-touch-icon link').toBeTruthy();
+  const svg = await request.get(icon!, { maxRedirects: 0 });
+  expect(svg.status()).toBe(200);
+  expect(svg.headers()['content-type']).toContain('image/svg+xml');
+  expect(await svg.text()).toContain('#C8F169');
+  const png = await request.get(apple!, { maxRedirects: 0 });
+  expect(png.status()).toBe(200);
+  expect(png.headers()['content-type']).toContain('image/png');
 });
