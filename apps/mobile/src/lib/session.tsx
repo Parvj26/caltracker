@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { claimWorkspace, removedFrom, type ClaimedWorkspace } from './claim';
+import { claimWorkspace, currentWorkspace, removedFrom, type ClaimedWorkspace } from './claim';
 import { supabase } from './supabase';
 
 type SessionState = {
@@ -39,17 +39,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user.id ?? null;
 
-  const runClaim = useCallback(async (id: string) => {
+  // Checks can overlap (sign-in, "Check again", returning to the app): only the latest one's answer is applied.
+  const latest = useRef(0);
+
+  /** claim: join an invited coach if there is none (sign-in, "Check again"). Otherwise only read the current link. */
+  const runCheck = useCallback(async (id: string, mode: 'claim' | 'read') => {
+    const ticket = ++latest.current;
     try {
-      const workspace = await claimWorkspace();
+      const workspace = mode === 'claim' ? await claimWorkspace() : await currentWorkspace();
       const removed = workspace ? null : await removedFrom();
+      if (ticket !== latest.current) return;
       setClaimError(null);
       setClaimed({ userId: id, workspace, removedFrom: removed });
     } catch (e) {
+      if (ticket !== latest.current) return;
       setClaimError(e instanceof Error ? e.message : 'Could not check your invite. Try again.');
+      // A failed check (often just no signal) never disconnects a client who was connected.
       setClaimed((prev) => (prev?.userId === id ? prev : { userId: id, workspace: null, removedFrom: null }));
     }
   }, []);
+  const runClaim = useCallback((id: string) => runCheck(id, 'claim'), [runCheck]);
 
   // Runs once per signed-in user (also after a deep-link sign-in).
   useEffect(() => {
@@ -61,15 +70,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (userId) await runClaim(userId);
   }, [userId, runClaim]);
 
-  // Check again whenever the app comes back to the foreground, so a client the coach removed (or invited)
-  // sees the change without signing out. Access itself is enforced by the database either way.
+  // Re-read the coach link whenever the app comes back to the foreground, so a client the coach removed sees it
+  // without signing out. Read only: it never joins a coach. Access itself is enforced by the database either way.
   useEffect(() => {
     if (!userId) return;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void runClaim(userId);
+      if (state === 'active') void runCheck(userId, 'read');
     });
     return () => sub.remove();
-  }, [userId, runClaim]);
+  }, [userId, runCheck]);
 
   const value = useMemo<SessionState>(
     () => ({

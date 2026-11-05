@@ -61,13 +61,16 @@ export async function cancelInvite(inviteId: string): Promise<SimpleOutcome> {
   if (!UUID.test(inviteId)) return { ok: false, error: 'Something went wrong. Please try again.' };
   const supabase = await createServerSupabase();
   // RLS also limits this to the coach's own workspace.
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('client_invites')
     .delete()
     .eq('id', inviteId)
     .eq('workspace_id', workspaceId)
-    .is('accepted_at', null);
+    .is('accepted_at', null)
+    .select('id');
   revalidatePath('/clients');
   if (error) return { ok: false, error: "Couldn't cancel this invite. Please try again." };
+  // Nothing deleted: they accepted a moment ago (or it was already cancelled), so the link can't be stopped here.
+  if (data.length === 0) return { ok: false, error: 'This invite was already used or cancelled. If they joined, remove them from Clients instead.' };
   return { ok: true };
 }

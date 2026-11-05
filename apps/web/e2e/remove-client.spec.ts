@@ -115,6 +115,7 @@ test('remove a client: confirm, they move to Past clients, then re-invite them',
   await row.getByRole('button', { name: `Remove ${client.name}` }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
   await expect(clients.getByRole('row').filter({ hasText: client.email })).toHaveCount(0);
+  await expect(page.locator('#clients-heading')).toBeFocused();
 
   // Past clients is folded under its heading.
   const toggle = page.getByRole('heading', { name: /Past clients \(\d+\)/ }).getByRole('button');
@@ -140,12 +141,31 @@ test('cancel an invite: confirm, it disappears, and its link stops working', asy
   await signInAsCoach(page);
   const pending = page.getByRole('table', { name: 'Pending invites' });
   const row = pending.getByRole('row').filter({ hasText: invite.email });
-  await row.getByRole('button', { name: `Cancel the invite to ${invite.email}` }).click();
+  await row.getByRole('button', { name: `Cancel invite to ${invite.email}` }).click();
   const dialog = page.getByRole('dialog', { name: 'Cancel this invite?' });
   await expect(dialog.getByText(`Cancel the invite to ${invite.email}? The link in their email will stop working.`)).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel invite' }).click();
   await expect(pending.getByRole('row').filter({ hasText: invite.email })).toHaveCount(0);
+  // Focus lands on the section heading, not lost on the page.
+  await expect(page.getByRole('heading', { name: 'Pending invites' })).toBeFocused();
 
   await page.goto(`/invite/${invite.token}`);
   await expect(page.getByText("This invite link isn't valid.")).toBeVisible();
+});
+
+test('cancelling an invite that was accepted meanwhile says so instead of pretending', async ({ page }) => {
+  const invite = await makePendingInvite();
+  await signInAsCoach(page);
+  const row = page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: invite.email });
+  await row.getByRole('button', { name: `Cancel invite to ${invite.email}` }).click();
+  // The client accepts while the coach is reading the dialog.
+  const { error } = await admin
+    .from('client_invites')
+    .update({ accepted_at: new Date().toISOString(), accepted_by: coachId })
+    .eq('email', invite.email);
+  if (error) throw error;
+  const dialog = page.getByRole('dialog', { name: 'Cancel this invite?' });
+  await dialog.getByRole('button', { name: 'Cancel invite' }).click();
+  await expect(dialog.getByText('This invite was already used or cancelled. If they joined, remove them from Clients instead.')).toBeVisible();
+  await admin.from('client_invites').delete().eq('email', invite.email);
 });

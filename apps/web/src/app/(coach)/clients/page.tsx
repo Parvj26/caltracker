@@ -101,7 +101,7 @@ export default async function ClientsPage() {
 
       <Card className={styles.listCard}>
         <section aria-labelledby="clients-heading">
-          <h2 id="clients-heading" className={styles.sectionHeading}>Clients</h2>
+          <h2 id="clients-heading" tabIndex={-1} className={styles.sectionHeading}>Clients</h2>
           <div role="table" aria-label="Clients" className={cx(styles.rows, styles.clientRows)}>
             <div role="rowgroup" className={styles.headRow}>
               <div role="row" className={styles.row}>
@@ -128,9 +128,9 @@ export default async function ClientsPage() {
                         {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}
                         {joined}
                       </span>
-                      <span role="cell" className={styles.actions}>
+                      <div role="cell" className={styles.actions}>
                         <RemoveClientButton userId={m.user_id} name={name} />
-                      </span>
+                      </div>
                     </div>
                   );
                 })
@@ -142,7 +142,7 @@ export default async function ClientsPage() {
 
       <Card className={styles.listCard}>
         <section aria-labelledby="pending-heading">
-          <h2 id="pending-heading" className={styles.sectionHeading}>Pending invites</h2>
+          <h2 id="pending-heading" tabIndex={-1} className={styles.sectionHeading}>Pending invites</h2>
           <div role="table" aria-label="Pending invites" className={cx(styles.rows, styles.inviteRows)}>
             <div role="rowgroup" className={styles.headRow}>
               <div role="row" className={styles.row}>
@@ -172,10 +172,10 @@ export default async function ClientsPage() {
                       <span role="cell" className={styles.expires}>
                         <Chip tone={expiry === 'Expired' ? 'amber' : 'grey'}>{expiry}</Chip>
                       </span>
-                      <span role="cell" className={styles.actions}>
+                      <div role="cell" className={styles.actions}>
                         <ResendButton email={i.email} firstName={i.first_name} lastName={i.last_name} />
                         <CancelInviteButton inviteId={i.id} email={i.email} />
-                      </span>
+                      </div>
                     </div>
                   );
                 })
@@ -205,7 +205,7 @@ export default async function ClientsPage() {
                     <span role="cell" className={styles.meta}>
                       {`Removed ${dateFormat.format(new Date(p.removed_at))}`}
                     </span>
-                    <span role="cell" className={styles.actions}>
+                    <div role="cell" className={styles.actions}>
                       <ResendButton
                         email={p.email}
                         firstName={p.first_name || p.email.split('@')[0] || 'Client'}
@@ -213,7 +213,7 @@ export default async function ClientsPage() {
                         label="Re-invite"
                         ariaLabel={`Re-invite ${p.full_name || p.email}`}
                       />
-                    </span>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -90,3 +90,7 @@ create trigger workspace_members_clear_past_client
 revoke execute on function public.remove_client(uuid, uuid), public.my_removal(), public.clear_past_client()
   from public, anon, authenticated;
 grant execute on function public.remove_client(uuid, uuid), public.my_removal() to authenticated;
+
+-- Cancel invite only ever deletes pending invites; an accepted one is the client's history (remove them instead).
+alter policy client_invites_delete on public.client_invites
+  using (public.is_coach_of(workspace_id) and accepted_at is null);

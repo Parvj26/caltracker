@@ -33,7 +33,7 @@ export function ResendButton({ email, firstName, lastName, label = 'Resend', ari
 
   return (
     <>
-      <Button variant="secondary" className={styles.rowButton} onClick={resend} pending={pending} aria-label={ariaLabel}>
+      <Button variant="secondary" className={styles.rowButton} onClick={resend} pending={pending} aria-label={pending ? undefined : ariaLabel}>
         {pending ? 'Sending…' : label}
       </Button>
       {message ? <span role="status"><StatusChip view={message} /></span> : null}
