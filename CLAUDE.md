@@ -6,9 +6,6 @@ Coaching platform: coaches build and assign workout programs, log in-person sess
 - **Domain:** caltracker.app
 - **Product owner** is not a developer: explain decisions in plain language, and ask before anything hard to reverse or outward-facing.
 
-## Stack
-Expo (React Native) mobile/iPad app · Next.js coach dashboard · Supabase (Postgres, Auth, Storage, Realtime, Edge Functions) · PowerSync offline sync · TypeScript everywhere · pnpm + Turborepo monorepo.
-
 ## Git and GitHub
 - `main` is protected. Never commit or push directly to `main`; all work goes through a pull request.
 - Branch names: `feature/<short-name>`, `fix/<short-name>`, `chore/<short-name>`, `docs/<short-name>`.
