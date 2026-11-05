@@ -1013,6 +1013,7 @@ export type Database = {
         }
         Returns: string
       }
+      auto_finish_stale_logs: { Args: never; Returns: number }
       claim_invites: {
         Args: never
         Returns: {
