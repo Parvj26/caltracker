@@ -144,3 +144,23 @@ export {
   logVolumeKg,
   shouldAutoFinish,
 } from './logs/summary';
+export {
+  ENDING_WITHIN_DAYS,
+  LAST_WORKOUT_LOOKBACK_DAYS,
+  MISSED_WINDOW_DAYS,
+  QUIET_DAYS,
+  endingPrograms,
+  missedClients,
+  quietClients,
+  todayRows,
+  weekProgress,
+  workoutStatus,
+} from './coach-home/home';
+export type {
+  HomeAssignment,
+  HomeClient,
+  HomeLog,
+  HomeWorkout,
+  TodayRow,
+  WorkoutStatus,
+} from './coach-home/home';
