@@ -3,6 +3,7 @@
 //   pnpm --filter mobile e2e:confirm <email>         mark the user's email as confirmed
 //   pnpm --filter mobile e2e:cleanup <email>         delete the user and their invites
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts confirmlink <email>   confirmation link from Mailpit
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts invitelink <email> <name>   invite + its caltracker://invite link
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -36,7 +37,14 @@ async function findUserId(email: string): Promise<string | undefined> {
   return data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())?.id;
 }
 
-export async function invite(email: string, name: string): Promise<void> {
+/** Creates a Demo Coaching invite and returns the app link for it (what "Open in CalTracker" opens). */
+export async function inviteLink(email: string, name: string): Promise<string> {
+  const token = randomBytes(32).toString('base64url');
+  await invite(email, name, createHash('sha256').update(token).digest('hex'));
+  return `caltracker://invite/${token}`;
+}
+
+export async function invite(email: string, name: string, tokenHash?: string): Promise<void> {
   const { data: ws, error } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
   if (error) throw error;
   const coachId = await findUserId('coach@demo.local');
@@ -48,7 +56,7 @@ export async function invite(email: string, name: string): Promise<void> {
     first_name: splitFullName(name).firstName,
     last_name: splitFullName(name).lastName,
     created_by: coachId,
-    token_hash: createHash('sha256').update(randomBytes(32)).digest('hex'),
+    token_hash: tokenHash ?? createHash('sha256').update(randomBytes(32)).digest('hex'),
   });
   if (insErr) throw insErr;
 }
@@ -87,6 +95,7 @@ export async function confirmLink(email: string): Promise<string> {
 
 async function run(action: string, email: string, name: string): Promise<string | void> {
   if (action === 'confirmlink') return confirmLink(email);
+  if (action === 'invitelink') return inviteLink(email, name);
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);

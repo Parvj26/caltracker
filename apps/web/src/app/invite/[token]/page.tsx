@@ -52,8 +52,18 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   if (valid) {
     return (
       <AuthShell title={`${preview.workspace_name} invited you to CalTracker`} note="Let's get moving!">
+        <p className={styles.lead}>Already have the app? Open it and join. You only need to choose a password.</p>
+        <div className={styles.buttons}>
+          {/* The token is safe to put here: it is already in the URL of this page. */}
+          <a className={styles.button} href={`caltracker://invite/${token}`}>
+            Open in CalTracker
+          </a>
+        </div>
         <p className={styles.lead}>
-          Download the CalTracker app and sign up with <strong>{preview.email}</strong>.
+          Don&apos;t have it yet? Install CalTracker, then tap the link in your email again.
+        </p>
+        <p className={styles.lead}>
+          You&apos;ll sign in with <strong>{preview.email}</strong>.
         </p>
         <div className={styles.buttons}>
           <StoreButton label="App Store" href={process.env.NEXT_PUBLIC_APP_STORE_URL || undefined} />

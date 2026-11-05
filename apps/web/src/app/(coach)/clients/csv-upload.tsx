@@ -36,6 +36,7 @@ function HeaderList({ label, headers }: { label: string; headers: readonly strin
 }
 
 export function CsvUpload() {
+  const [open, setOpen] = useState(false);
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [statuses, setStatuses] = useState<Map<string, StatusView>>(new Map());
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -74,23 +75,37 @@ export function CsvUpload() {
 
   return (
     <section className={styles.panelSection}>
-      <h2 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h2>
+      {/* Folded by default so the page leads with single invites. A button inside the heading (not <summary>)
+          keeps it a real heading for screen readers and announces expanded/collapsed. */}
+      <h2 className={styles.sectionHeading}>
+        <button
+          type="button"
+          id="csv-heading"
+          className={styles.csvToggle}
+          aria-expanded={open}
+          aria-controls="csv-body"
+          onClick={() => setOpen((o) => !o)}
+        >
+          Invite many clients from a spreadsheet (CSV)
+        </button>
+      </h2>
+      <div id="csv-body" className={styles.csvBody} hidden={!open}>
       <p id="csv-explain" className={styles.explain}>
         Bring your client list from Everfit or Excel: one row per client with first name, last name and email.
       </p>
+      <p id="csv-limit" className={styles.caption}>Up to {CLIENT_CSV_MAX_ROWS} clients per file.</p>
       <div className={styles.csvHelp} id="csv-help" data-csv-headers="">
         <HeaderList label="First name column, any of:" headers={FIRST_NAME_HEADERS} />
         <HeaderList label="Last name column (optional), any of:" headers={LAST_NAME_HEADERS} />
         <HeaderList label="Or one name column, split at the first space:" headers={NAME_HEADERS} />
         <HeaderList label="Email column, any of:" headers={EMAIL_HEADERS} />
-        <p className={styles.caption}>Up to {CLIENT_CSV_MAX_ROWS} clients per file.</p>
       </div>
       <div className={styles.csvActions}>
         <input
           type="file"
           accept=".csv,text/csv"
           aria-labelledby="csv-heading"
-          aria-describedby="csv-explain csv-help"
+          aria-describedby="csv-explain csv-limit csv-help"
           className={styles.fileInput}
           disabled={pending}
           onChange={(e) => void onFile(e)}
@@ -149,6 +164,7 @@ export function CsvUpload() {
         </>
       ) : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
+      </div>
     </section>
   );
 }

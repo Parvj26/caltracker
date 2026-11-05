@@ -1,10 +1,13 @@
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { AuthShell } from '@/components/auth-shell';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
 export default function SignIn() {
-  const [email, setEmail] = useState('');
+  // Pre-filled when the Join screen sends someone here ("You already have an account").
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -392,3 +392,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 verify_jwt = true
 # Resolved relative to supabase/config.toml; used by both `functions serve` and `functions deploy`.
 import_map = "./functions/deno.json"
+
+# Called signed out: the app sends the anon key (which passes verify_jwt); the invite token in the body is the proof.
+[functions.accept-invite]
+verify_jwt = true
+import_map = "./functions/deno.json"

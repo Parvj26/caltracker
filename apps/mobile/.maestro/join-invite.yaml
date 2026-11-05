@@ -1,0 +1,50 @@
+# Join from the invite link: names are pre-filled, the client only chooses a password, and there is no
+# confirmation email. Opens caltracker://invite/{token}, which is what "Open in CalTracker" on the web page does.
+appId: app.caltracker.client
+env:
+  EMAIL: e2e-join@x.com
+  PASSWORD: e2e-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/invite-link.js
+    env: { EMAIL: '${EMAIL}', NAME: 'Join Tester' }
+- launchApp:
+    clearState: true
+- openLink: ${output.link}
+# Safari or iOS may ask "Open in CalTracker?"; the prompt can appear late.
+- repeat:
+    times: 3
+    while:
+      notVisible: 'Join Demo Coaching'
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+- extendedWaitUntil:
+    visible: 'Join Demo Coaching'
+    timeout: 20000
+- assertVisible: "You'll sign in with ${EMAIL}"
+- assertVisible:
+    id: name-input
+    text: Join
+- assertVisible:
+    id: last-name-input
+    text: Tester
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- tapOn:
+    id: join-button
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to Demo Coaching'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

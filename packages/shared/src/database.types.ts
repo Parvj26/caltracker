@@ -276,6 +276,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invite_for: {
+        Args: { p_invite_id: string; p_user_id: string }
+        Returns: string
+      }
       claim_invites: {
         Args: never
         Returns: {
@@ -291,6 +295,21 @@ export type Database = {
           full_name: string
           last_name: string
           status: string
+          workspace_name: string
+        }[]
+      }
+      invite_for_join: {
+        Args: { token: string }
+        Returns: {
+          email: string
+          first_name: string
+          invite_id: string
+          last_name: string
+          status: string
+          user_confirmed: boolean
+          user_id: string
+          user_is_coach: boolean
+          workspace_id: string
           workspace_name: string
         }[]
       }

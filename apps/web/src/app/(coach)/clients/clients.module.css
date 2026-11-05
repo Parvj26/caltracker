@@ -129,6 +129,38 @@
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
 }
+.csvBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.csvBody[hidden] { display: none; }
+.csvToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* Chevron: points right when closed, down when open. */
+.csvToggle::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  margin-right: var(--ct-space-1);
+  border-right: 2px solid var(--ct-ink);
+  border-bottom: 2px solid var(--ct-ink);
+  transform: rotate(-45deg);
+  transition: transform 150ms ease;
+}
+.csvToggle[aria-expanded='true']::after { transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .csvToggle::after { transition: none; } }
+.csvToggle:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-radius: var(--ct-radius-input); }
 .headerList { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
 .headerListLabel { font-size: 14px; font-weight: var(--ct-weight-section-heading); }
 .headerList ul { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }

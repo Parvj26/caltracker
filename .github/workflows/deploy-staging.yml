@@ -1,6 +1,6 @@
 name: Deploy staging
 
-# Deploys migrations, the send-invite Edge Function and the web app to staging.
+# Deploys migrations, the Edge Functions (send-invite, accept-invite) and the web app to staging.
 # Automatic runs start only after the CI workflow succeeds on a push to main (workflow_run), so a red merge never
 # reaches staging. Manual runs must be started from main.
 # Uses repository secrets (GitHub Environments are not available on this plan). See docs/runbooks/staging.md.
