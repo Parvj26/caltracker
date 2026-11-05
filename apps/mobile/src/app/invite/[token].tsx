@@ -86,10 +86,10 @@ export default function JoinInvite() {
     );
   }
 
-  if (invite.status === 'offline') {
+  if (invite.status === 'offline' || invite.status === 'server') {
     return (
       <AuthShell title="Your invite">
-        <ErrorText>{joinMessage('offline', '')}</ErrorText>
+        <ErrorText>{joinMessage(invite.status, '')}</ErrorText>
         <Button testID="retry" title="Try again" onPress={() => void load()} />
       </AuthShell>
     );
