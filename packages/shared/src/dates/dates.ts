@@ -16,7 +16,8 @@ function fromUtcMs(ms: number): IsoDate {
 
 export const IsoDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD.')
+  // abort: zod 4 runs later checks after a failed one, and the date check below throws on a malformed string.
+  .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Use the format YYYY-MM-DD.', abort: true })
   .refine((s) => fromUtcMs(toUtcMs(s)) === s, 'That date does not exist.');
 
 export function addDays(d: IsoDate, n: number): IsoDate {

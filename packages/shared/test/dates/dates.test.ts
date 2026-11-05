@@ -67,4 +67,12 @@ describe('IsoDateSchema', () => {
     expect(IsoDateSchema.safeParse('2026-02-30').success).toBe(false);
     expect(IsoDateSchema.safeParse('2026-2-3').success).toBe(false);
   });
+
+  it('reports a badly formatted date as a format error instead of throwing', () => {
+    for (const bad of ['31/12/2026', '', 'tomorrow']) {
+      const r = IsoDateSchema.safeParse(bad);
+      expect(r.success).toBe(false);
+      expect(r.error?.issues.map((i) => i.message)).toEqual(['Use the format YYYY-MM-DD.']);
+    }
+  });
 });
