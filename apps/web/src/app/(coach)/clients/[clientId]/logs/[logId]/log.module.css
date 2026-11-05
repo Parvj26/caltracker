@@ -1,0 +1,67 @@
+/* Logged workout page. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 880px; }
+.back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
+.titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.facts { display: flex; flex-wrap: wrap; gap: var(--ct-space-1) var(--ct-space-3); margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+
+.section { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.sectionHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+
+.exercises { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.exercise { padding: var(--ct-space-3) var(--ct-space-4-5); border-radius: var(--ct-radius-card); box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-border); overflow-x: auto; }
+.exerciseHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
+.exerciseName { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: var(--ct-space-2) var(--ct-space-2); text-align: left; font-weight: inherit; }
+.table thead th { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.table tbody tr { border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.table th:first-child, .table td:first-child { width: 5.5rem; padding-left: 0; }
+/* Not done: muted text only, so the row stays readable. */
+.notDone, .notDone th, .notDone td { color: var(--ct-ink-muted); font-style: italic; }
+
+.inputs { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+.cellInput {
+  width: 6.5rem;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2-5);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+}
+.cellInput:focus-visible { outline: var(--ct-border-width-secondary-button) solid var(--ct-ink); outline-offset: 2px; }
+
+.saveBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ct-space-2) var(--ct-space-3); }
+.smallButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.smallButton:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+
+.comments { display: flex; flex-direction: column; gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+.comment { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-1); padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.commentMeta { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.commentBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

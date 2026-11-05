@@ -245,3 +245,111 @@ test.describe('in Los Angeles', () => {
   });
 });
 
+
+/* ---------- The logged workout page (phase 3a Task 11) ---------- */
+const logUrl = (client: string, id: string) => `/clients/${client}/logs/${id}`;
+
+test.describe('logged workout page', () => {
+  test('shows planned against actual, with Not done, Swapped from and Added labels', async ({ page }) => {
+    const name = `Planned ${unique()}`;
+    const planned = await plan(name, addDays(new Date().toISOString().slice(0, 10), -1));
+    const id = await log({
+      workspaceId, clientId, name, plannedWorkoutId: planned, startedAt: ago(100), finishedAt: ago(50),
+      notDone: 1, swappedFrom: 'Barbell Bench Press - Medium Grip', addedExercise: 'Barbell Incline Bench Press - Medium Grip',
+    });
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+    const squat = page.getByRole('table', { name: 'Barbell Squat' });
+    await expect(squat.getByRole('columnheader', { name: 'Planned' })).toBeVisible();
+    await expect(squat.getByRole('columnheader', { name: 'Actual' })).toBeVisible();
+    await expect(squat.getByRole('row').nth(1)).toContainText('8 reps · 60 kg');
+    await expect(squat.getByRole('row').nth(1)).toContainText('60 kg × 8');
+    await expect(squat.getByRole('row').nth(3)).toContainText('Not done');
+    await expect(page.getByText('Swapped from Barbell Bench Press - Medium Grip')).toBeVisible();
+    await expect(page.getByText('Added', { exact: true })).toBeVisible();
+    await expect(page.getByText('3 sets')).toBeVisible();
+    // Correct one set and leave a comment, so the screenshot shows the whole page.
+    await page.getByRole('button', { name: 'Correct' }).click();
+    await squat.getByLabel('Set 1 reps').fill('6');
+    await page.getByRole('button', { name: 'Save corrections' }).click();
+    await expect(page.getByText('Edited by coach')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Comment' }).fill('Great depth today');
+    await page.getByRole('button', { name: 'Post comment' }).click();
+    await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem')).toContainText('Great depth today');
+    await page.screenshot({ path: process.env.SHOT_LOG ?? 'test-results/log-page.png', fullPage: true });
+  });
+
+  test('comments can be posted, survive a reload and be deleted', async ({ page }) => {
+    const id = await log({ workspaceId, clientId, name: `Talk ${unique()}`, startedAt: ago(100), finishedAt: ago(60) });
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    await page.getByRole('button', { name: 'Post comment' }).click();
+    await expect(page.getByText('Write a comment first.')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Comment' }).fill('Great depth today');
+    await page.getByRole('button', { name: 'Post comment' }).click();
+    await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem').filter({ hasText: 'Great depth today' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem').filter({ hasText: 'Great depth today' })).toBeVisible();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Delete comment' }).click();
+    await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem').filter({ hasText: 'Great depth today' })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem').filter({ hasText: 'Great depth today' })).toHaveCount(0);
+  });
+
+  test('a correction changes the actual reps and marks the log edited', async ({ page }) => {
+    const id = await log({ workspaceId, clientId, name: `Fix ${unique()}`, startedAt: ago(100), finishedAt: ago(60) });
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    await expect(page.getByText('Edited by coach')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Correct' }).click();
+    await page.getByRole('button', { name: 'Save corrections' }).click();
+    await expect(page.getByText('Nothing to change.')).toBeVisible();
+
+    await page.getByLabel('Set 1 reps').fill('6');
+    await page.getByRole('button', { name: 'Save corrections' }).click();
+    await expect(page.getByText('Edited by coach')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Barbell Squat' }).getByRole('row').nth(1)).toContainText('60 kg × 6');
+    const rows = await admin.from('log_sets').select('actual_reps, position').eq('log_id', id).order('position');
+    expect(rows.data?.map((r) => r.actual_reps)).toEqual([6, 8, 8]);
+  });
+
+  test('an in-progress log cannot be corrected', async ({ page }) => {
+    // Its own client: only one in-progress log may exist per client.
+    const mine = await newClient('Ivy', `Live${unique()}`);
+    const id = await log({ workspaceId, clientId: mine, name: `Live ${unique()}`, status: 'in_progress', startedAt: ago(30) });
+    await signInAsCoach(page);
+    await page.goto(logUrl(mine, id));
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Correct' })).toHaveCount(0);
+  });
+
+  test('404s for a missing log, another client\'s log, another workspace\'s log; a removed client stays readable', async ({ page }) => {
+    await signInAsCoach(page);
+    const other = await newClient('Olive', `Other${unique()}`);
+    const otherLog = await log({ workspaceId, clientId: other, name: `Other ${unique()}`, startedAt: ago(100), finishedAt: ago(60) });
+    const res = await page.goto(logUrl(clientId, otherLog));
+    expect(res?.status()).toBe(404);
+    expect((await page.goto(logUrl(clientId, '00000000-0000-4000-8000-000000000000')))?.status()).toBe(404);
+
+    const ws = await admin.from('workspaces').insert({ name: `Elsewhere ${unique()}` }).select('id').single();
+    if (ws.error) throw ws.error;
+    created.workspaces.push(ws.data.id);
+    const stranger = await newClient('Sam', `Away${unique()}`, ws.data.id);
+    const foreign = await log({ workspaceId: ws.data.id, clientId: stranger, name: `Foreign ${unique()}`, startedAt: ago(100), finishedAt: ago(60) });
+    expect((await page.goto(logUrl(stranger, foreign)))?.status()).toBe(404);
+
+    // Removed client: still readable.
+    expect((await page.goto(logUrl(other, otherLog)))?.status()).toBe(200);
+    const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', other);
+    if (gone.error) throw gone.error;
+    const past = await admin.from('past_clients').insert({ workspace_id: workspaceId, user_id: other, email: `past-${unique()}@example.com`, first_name: 'Olive', last_name: 'Gone' });
+    if (past.error) throw past.error;
+    const res2 = await page.goto(logUrl(other, otherLog));
+    expect(res2?.status()).toBe(200);
+    await expect(page.getByText('Olive Gone (past client)')).toBeVisible();
+  });
+});

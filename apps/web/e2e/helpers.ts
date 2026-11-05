@@ -104,6 +104,12 @@ export type SeedLogOptions = {
   sets?: number;
   weightKg?: number;
   reps?: number;
+  /** The last `notDone` sets are unticked (no actuals, not completed). */
+  notDone?: number;
+  /** Name of the exercise the squat replaced ("Swapped from ..."). */
+  swappedFrom?: string;
+  /** Name of a second exercise the client added on top of the plan (it has no planned counterpart). */
+  addedExercise?: string;
 };
 
 /**
@@ -117,6 +123,14 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
   const finishedAt = o.finishedAt ?? (status === 'in_progress' ? null : o.startedAt);
   const exercise = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
   if (exercise.error) throw exercise.error;
+
+  const named = async (name: string) => {
+    const r = await admin.from('exercises').select('id').eq('name', name).is('workspace_id', null).limit(1).single();
+    if (r.error) throw r.error;
+    return r.data.id;
+  };
+  const swappedFromId = o.swappedFrom ? await named(o.swappedFrom) : null;
+  const addedId = o.addedExercise ? await named(o.addedExercise) : null;
 
   const log = await admin
     .from('workout_logs')
@@ -140,12 +154,14 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
   if (block.error) throw block.error;
   const ex = await admin
     .from('log_exercises')
-    .insert({ block_id: block.data.id, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0, exercise_id: exercise.data.id })
+    .insert({ block_id: block.data.id, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0, exercise_id: exercise.data.id, swapped_from_exercise_id: swappedFromId, planned_workout_exercise_id: o.plannedWorkoutId ? crypto.randomUUID() : null })
     .select('id')
     .single();
   if (ex.error) throw ex.error;
   if (sets > 0) {
-    const rows = Array.from({ length: sets }, (_, position) => ({
+    const rows = Array.from({ length: sets }, (_, position) => {
+      const done = position < sets - (o.notDone ?? 0);
+      return {
       log_exercise_id: ex.data.id,
       log_id: logId,
       workspace_id: o.workspaceId,
@@ -154,12 +170,28 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
       target_reps_min: 8,
       target_reps_max: 8,
       target_weight_kg: o.weightKg ?? 60,
-      actual_reps: o.reps ?? 8,
-      actual_weight_kg: o.weightKg ?? 60,
-      completed_at: finishedAt ?? o.startedAt,
-    }));
+      actual_reps: done ? (o.reps ?? 8) : null,
+      actual_weight_kg: done ? (o.weightKg ?? 60) : null,
+      completed_at: done ? (finishedAt ?? o.startedAt) : null,
+      };
+    });
     const inserted = await admin.from('log_sets').insert(rows);
     if (inserted.error) throw inserted.error;
+  }
+  if (addedId) {
+    const b2 = await admin.from('log_blocks').insert({ log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 1 }).select('id').single();
+    if (b2.error) throw b2.error;
+    const e2 = await admin
+      .from('log_exercises')
+      .insert({ block_id: b2.data.id, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0, exercise_id: addedId })
+      .select('id')
+      .single();
+    if (e2.error) throw e2.error;
+    const s2 = await admin.from('log_sets').insert({
+      log_exercise_id: e2.data.id, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0,
+      actual_reps: 10, actual_weight_kg: 20, completed_at: finishedAt ?? o.startedAt,
+    });
+    if (s2.error) throw s2.error;
   }
   return logId;
 }
