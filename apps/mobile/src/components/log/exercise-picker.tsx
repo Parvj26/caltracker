@@ -5,7 +5,7 @@ import { tapTarget } from '@caltracker/design-tokens';
 import { TRACKING_TYPE_LABELS, type ExercisePick } from '@caltracker/shared';
 import { ErrorText, TextButton, TextField } from '@/components/ui';
 import { searchExercises } from '@/lib/log-api';
-import { palette } from '@/theme/theme';
+import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const SEARCH_DELAY_MS = 250;
@@ -105,7 +105,7 @@ export function ExercisePicker({
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
-  column: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  column: { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   result: { minHeight: tapTarget.min, justifyContent: 'center', backgroundColor: palette.surface },
   pressed: { backgroundColor: palette.border },

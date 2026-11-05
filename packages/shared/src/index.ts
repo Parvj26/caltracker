@@ -122,6 +122,7 @@ export {
   removeLogSet,
   setExerciseNote,
   swapLogExercise,
+  toggleSet,
   uncompleteSet,
   updateActual,
 } from './logs/ops';

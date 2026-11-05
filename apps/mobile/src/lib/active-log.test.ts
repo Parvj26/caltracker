@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
 import {
+  finishedFrom,
+  finishedIsLoaded,
   foregroundCheck,
   formatTimeOfDay,
   parseActualInput,
@@ -168,5 +170,42 @@ describe('within', () => {
     expect(await within(Promise.resolve(3), 50)).toBe(3);
     expect(await within(Promise.reject(new Error('no signal')), 50)).toBeNull();
     expect(await within(new Promise(() => undefined), 10)).toBeNull();
+  });
+});
+
+describe('recently finished workout (Done ✓ survives the upload)', () => {
+  const W = '00000000-0000-4000-8000-000000000903';
+  const finishedLog = sampleLog({
+    id: 'log-9',
+    workoutId: W,
+    status: 'completed',
+    startedAt: '2026-11-05T09:00:00.000Z',
+    finishedAt: '2026-11-05T09:45:00.000Z',
+  });
+
+  it('finishedFrom keeps a finished planned log, and nothing else', () => {
+    expect(finishedFrom(finishedLog)).toEqual({ logId: 'log-9', workoutId: W, durationS: 45 * 60 });
+    expect(finishedFrom(sampleLog({ workoutId: W }))).toBeNull(); // in progress
+    expect(finishedFrom(sampleLog({ workoutId: null, status: 'completed', finishedAt: finishedLog.finishedAt }))).toBeNull();
+    expect(finishedFrom(sampleLog({ workoutId: W, status: 'discarded' }))).toBeNull();
+    expect(finishedFrom(null)).toBeNull();
+  });
+
+  it('shows Done ✓ after the store is cleared and before the server list has the log', () => {
+    const finished = finishedFrom(finishedLog);
+    expect(workoutStatuses([], null, finished)[W]).toEqual({ kind: 'done', logId: 'log-9', durationS: 45 * 60 });
+  });
+
+  it('lets an in-progress phone log of the same workout win over the remembered one', () => {
+    const again = sampleLog({ id: 'log-10', workoutId: W });
+    expect(workoutStatuses([], again, finishedFrom(finishedLog))[W]).toEqual({ kind: 'in_progress', logId: 'log-10' });
+  });
+
+  it('finishedIsLoaded once the server list contains that log', () => {
+    const finished = finishedFrom(finishedLog);
+    expect(finishedIsLoaded(finished, [])).toBe(false);
+    expect(finishedIsLoaded(finished, [{ id: 'other' }])).toBe(false);
+    expect(finishedIsLoaded(finished, [{ id: 'log-9' }])).toBe(true);
+    expect(finishedIsLoaded(null, [{ id: 'log-9' }])).toBe(false);
   });
 });

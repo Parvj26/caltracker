@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { completeSet, discardLog, finishLog } from '../../src/logs/ops';
+import { completeSet, discardLog, finishLog, toggleSet } from '../../src/logs/ops';
 import { WorkoutLogDoc } from '../../src/logs/schema';
 import { startLogFromWorkout } from '../../src/logs/start';
 import { fixtureWorkout, uuid } from './fixture';
@@ -58,5 +58,27 @@ describe('discardLog', () => {
     expect(discardLog(gone, T2)).toBe(gone);
     const done = finishLog(completeSet(log, firstSetId(log), T1), T2);
     expect(discardLog(done, T2)).toBe(done);
+  });
+});
+
+describe('toggleSet', () => {
+  it('ticks an open set and unticks a ticked one, deciding from the doc it is given', () => {
+    const log = fresh();
+    const id = firstSetId(log);
+    const on = toggleSet(log, id, T1);
+    expect(on.completed).toBe(true);
+    expect(on.log.blocks[0]!.exercises[0]!.sets[0]!.completedAt).toBe(T1);
+    expect(on.log.revision).toBe(log.revision + 1);
+    const off = toggleSet(on.log, id, T2);
+    expect(off.completed).toBe(false);
+    expect(off.log.blocks[0]!.exercises[0]!.sets[0]!.completedAt).toBeNull();
+    expect(off.log.revision).toBe(on.log.revision + 1);
+  });
+
+  it('leaves the doc alone for an unknown set', () => {
+    const log = fresh();
+    const r = toggleSet(log, uuid(), T1);
+    expect(r).toEqual({ log, completed: null });
+    expect(r.log).toBe(log);
   });
 });

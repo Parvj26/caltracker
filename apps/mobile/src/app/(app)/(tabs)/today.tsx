@@ -1,10 +1,10 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
-import { within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
+import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import {
   cacheTodayDetail,
   fetchLogsForDays,
@@ -27,7 +27,7 @@ import {
   LOAD_FAILED,
   setMyUnits,
 } from '@/lib/workouts-api';
-import { palette } from '@/theme/theme';
+import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /** How long Start waits for the server before using the copy saved on the phone. */
@@ -93,13 +93,21 @@ export default function Today() {
   const { workspace } = useSession();
   const { text, space } = useTheme();
   const router = useRouter();
-  const { log: active, banner, dismissBanner, start } = useActiveLog();
+  const { log: active, banner, dismissBanner, start, finished, forgetFinished, syncStatus } = useActiveLog();
   const [data, setData] = useState<TodayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
+  // The guard itself is a ref: state only updates on the next render, so two quick taps could both get past it.
+  const startingRef = useRef(false);
   // Loads can overlap (focus + pull to refresh): only the latest answer is shown.
   const latest = useRef(0);
+  const finishedRef = useRef(finished);
+  useEffect(() => {
+    finishedRef.current = finished;
+  }, [finished]);
+  // Set when the logging screen is opened, cleared when Today is back in view: one tap, one screen.
+  const navigating = useRef(false);
 
   const load = useCallback(async () => {
     const ticket = ++latest.current;
@@ -108,6 +116,8 @@ export default function Today() {
       if (ticket !== latest.current) return;
       setData(next);
       setError(null);
+      // The workout just finished here is now in the server's list: Done ✓ no longer needs the phone's memory.
+      if (next.kind === 'today' && finishedIsLoaded(finishedRef.current, next.logs)) forgetFinished();
     } catch {
       if (ticket !== latest.current) return;
       setError(LOAD_FAILED);
@@ -116,9 +126,19 @@ export default function Today() {
 
   useFocusEffect(
     useCallback(() => {
+      navigating.current = false;
       void load();
     }, [load]),
   );
+
+  // A finished workout has just uploaded (the phone's copy is cleared then): read Today again so its Done ✓
+  // comes from the server. Until then the provider remembers it.
+  const lastStatus = useRef(syncStatus);
+  useEffect(() => {
+    const was = lastStatus.current;
+    lastStatus.current = syncStatus;
+    if (syncStatus === 'synced' && was !== 'synced' && finished) void load();
+  }, [syncStatus, finished, load]);
 
   async function refresh() {
     setRefreshing(true);
@@ -138,14 +158,21 @@ export default function Today() {
 
   const inProgress = active?.status === 'in_progress' ? active : null;
   const statuses = useMemo(
-    () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active),
-    [data, active],
+    () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active, finished),
+    [data, active, finished],
   );
 
-  const openLog = useCallback((id: string) => router.push({ pathname: '/log/[id]', params: { id } }), [router]);
+  const openLog = useCallback(
+    (id: string) => {
+      if (navigating.current) return;
+      navigating.current = true;
+      router.push({ pathname: '/log/[id]', params: { id } });
+    },
+    [router],
+  );
 
   async function startWorkout(w: WorkoutSummary) {
-    if (starting) return;
+    if (startingRef.current) return;
     if (inProgress) {
       // Only one workout at a time: carry on with the one already going.
       if (inProgress.workoutId === w.id) {
@@ -158,6 +185,7 @@ export default function Today() {
       ]);
       return;
     }
+    startingRef.current = true;
     setStarting(w.id);
     try {
       const doc = await workoutToStart(w.id);
@@ -170,6 +198,7 @@ export default function Today() {
     } catch (e) {
       Alert.alert(e instanceof Error && e.message === START_BLOCKED ? START_BLOCKED : START_FAILED);
     } finally {
+      startingRef.current = false;
       setStarting(null);
     }
   }
@@ -318,6 +347,6 @@ function TodayCard({
 const styles = StyleSheet.create({
   chip: { alignSelf: 'flex-start', backgroundColor: palette.blue },
   resume: { backgroundColor: palette.lime },
-  pressed: { opacity: 0.75 },
+  pressed: { opacity: pressedOpacity },
   ink: { color: palette.ink },
 });

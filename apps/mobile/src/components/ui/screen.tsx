@@ -11,9 +11,8 @@ import {
   type ScrollViewInstance,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { palette, space } from '@/theme/theme';
+import { contentMaxWidth, palette, space } from '@/theme/theme';
 
-const MAX_WIDTH = 480;
 const PAD = space[6];
 /** Room left above a focused field, so its label stays visible. */
 const ABOVE_FOCUSED = space[4];
@@ -107,5 +106,5 @@ const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
   content: { flexGrow: 1, alignItems: 'center', paddingHorizontal: space[4], paddingVertical: PAD },
   centred: { justifyContent: 'center' },
-  column: { width: '100%', maxWidth: MAX_WIDTH, gap: space[6] },
+  column: { width: '100%', maxWidth: contentMaxWidth, gap: space[6] },
 });

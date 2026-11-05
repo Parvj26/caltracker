@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
-import { tapTarget } from '@caltracker/design-tokens';
+import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import {
   TARGET_FIELDS,
   distanceUnitFor,
@@ -17,7 +17,7 @@ import {
   type Units,
 } from '@caltracker/shared';
 import { parseActualInput, type ActualField } from '@/lib/active-log-logic';
-import { palette } from '@/theme/theme';
+import { actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const MAX_KG = 1000;
@@ -236,11 +236,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   ink: { color: palette.ink },
   inputs: { flexDirection: 'row' },
-  inputWrap: { width: 64 },
+  inputWrap: { width: actualInputWidth },
   input: {
     minHeight: tapTarget.min,
     backgroundColor: palette.bg,
-    borderWidth: 2,
+    borderWidth: borderWidth.card,
     borderColor: palette.border,
     textAlign: 'center',
   },
@@ -251,11 +251,11 @@ const styles = StyleSheet.create({
     height: tapTarget.logging,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: borderWidth.card,
   },
   tickOpen: { backgroundColor: palette.bg, borderColor: palette.ink },
   tickDone: { backgroundColor: palette.ink, borderColor: palette.ink },
-  tickPressed: { opacity: 0.75 },
+  tickPressed: { opacity: pressedOpacity },
   tickMarkOpen: { color: palette.inkMuted },
   tickMarkDone: { color: palette.lime },
 });

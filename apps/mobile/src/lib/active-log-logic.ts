@@ -87,17 +87,37 @@ function statusOf(l: LogTimes): WorkoutStatus | null {
   return null;
 }
 
+/** The workout just finished on this phone, remembered until Today's list from the server includes it. */
+export type FinishedNote = { logId: string; workoutId: string; durationS: number };
+
+/** A finished planned log as a note to remember; null for anything else (in progress, discarded, unplanned). */
+export function finishedFrom(log: WorkoutLogDoc | null): FinishedNote | null {
+  if (!log || log.status !== 'completed' || !log.workoutId) return null;
+  return { logId: log.id, workoutId: log.workoutId, durationS: logDurationS(log) };
+}
+
+/** True once a server list has the remembered log, so it can be forgotten. */
+export function finishedIsLoaded(finished: FinishedNote | null, logs: readonly { id: string }[]): boolean {
+  return finished !== null && logs.some((l) => l.id === finished.logId);
+}
+
 /**
  * Per planned workout id: done (with its duration) or in progress. Server logs are matched by the planned
- * workout they belong to (fetched by its scheduled date, never by the finish time). The phone's own copy wins
- * over the server's, since it may be newer than what has uploaded.
+ * workout they belong to (fetched by its scheduled date, never by the finish time). The workout just finished
+ * here keeps its Done ✓ after the phone's copy is cleared on upload and before Today's list catches up; the
+ * phone's own copy wins over both, since it may be newer than what has uploaded.
  */
-export function workoutStatuses(server: readonly LogTimes[], local: WorkoutLogDoc | null): Record<string, WorkoutStatus> {
+export function workoutStatuses(
+  server: readonly LogTimes[],
+  local: WorkoutLogDoc | null,
+  finished: FinishedNote | null = null,
+): Record<string, WorkoutStatus> {
   const out: Record<string, WorkoutStatus> = {};
   for (const l of server) {
     const s = l.workoutId ? statusOf(l) : null;
     if (s && l.workoutId) out[l.workoutId] = s;
   }
+  if (finished) out[finished.workoutId] = { kind: 'done', logId: finished.logId, durationS: finished.durationS };
   if (local?.workoutId) {
     const s = statusOf(local);
     if (s) out[local.workoutId] = s;

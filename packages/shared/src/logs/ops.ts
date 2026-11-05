@@ -287,3 +287,24 @@ export function discardLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
   if (log.status !== 'in_progress') return log;
   return { ...log, status: 'discarded', lastActivityAt: nowIso, revision: log.revision + 1 };
 }
+
+/**
+ * Ticks the set when it is open and unticks it when it is ticked, deciding from this doc (the stored one), not
+ * from what a screen last showed. `completed` is the new state, or null when the set is not in the log.
+ */
+export function toggleSet(
+  log: WorkoutLogDoc,
+  setId: string,
+  nowIso: string,
+): { log: WorkoutLogDoc; completed: boolean | null } {
+  for (const b of log.blocks) {
+    for (const e of b.exercises) {
+      const s = e.sets.find((x) => x.id === setId);
+      if (!s) continue;
+      return s.completedAt === null
+        ? { log: completeSet(log, setId, nowIso), completed: true }
+        : { log: uncompleteSet(log, setId, nowIso), completed: false };
+    }
+  }
+  return { log, completed: null };
+}

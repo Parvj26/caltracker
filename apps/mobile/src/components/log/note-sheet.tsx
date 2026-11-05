@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, TextButton, TextField } from '@/components/ui';
-import { palette } from '@/theme/theme';
+import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const NOTE_MAX = 500;
@@ -58,5 +58,5 @@ export function NoteSheet({
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
-  column: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  column: { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' },
 });

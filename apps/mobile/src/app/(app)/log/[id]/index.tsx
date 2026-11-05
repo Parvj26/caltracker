@@ -7,14 +7,12 @@ import {
   addLogDrop,
   addLogExercise,
   addLogSet,
-  completeSet,
   formatClock,
   formatLastResult,
   removeLogExercise,
   removeLogSet,
   setExerciseNote,
   swapLogExercise,
-  uncompleteSet,
   updateActual,
   type ExercisePick,
   type LogExerciseDoc,
@@ -28,7 +26,7 @@ import { RestSheet } from '@/components/log/rest-sheet';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen, TextButton } from '@/components/ui';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
-import { cancelRestEnd, restOverHaptic, scheduleReminder, scheduleRestEnd, tapHaptic } from '@/lib/log-notifications';
+import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
 import { supersetLetters } from '@/lib/workouts';
@@ -41,9 +39,6 @@ type Menu =
   | { kind: 'set'; ex: LogExerciseDoc; set: LogSetDoc; label: string };
 
 type Picker = { mode: 'add' } | { mode: 'swap'; ex: LogExerciseDoc };
-
-/** Room under the list so the rest sheet never covers the last set. */
-const REST_SHEET_SPACE = 200;
 
 const nowIso = () => new Date().toISOString();
 
@@ -62,11 +57,13 @@ export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { text, space, radius } = useTheme();
-  const { log: active, ready, syncStatus, op, finish, discard } = useActiveLog();
+  const { log: active, ready, syncStatus, op, tick, finish, discard, rest, startRest, adjustRest, skipRest, endRest } =
+    useActiveLog();
   const units = useUnits();
   const log = active && active.id === id ? active : null;
 
-  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  // Room kept under the list so the rest sheet never covers the last set.
+  const [sheetHeight, setSheetHeight] = useState(0);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [noteFor, setNoteFor] = useState<LogExerciseDoc | null>(null);
@@ -91,26 +88,14 @@ export default function LogScreen() {
     };
   }, [exerciseKey]);
 
-  const startRest = (seconds: number) => {
-    setRestEndsAt(Date.now() + seconds * 1000);
-    scheduleRestEnd(seconds);
-  };
-  const adjustRest = (delta: number) => {
-    setRestEndsAt((end) => {
-      if (end === null) return end;
-      const next = Math.max(Date.now() + 1000, end + delta * 1000);
-      scheduleRestEnd((next - Date.now()) / 1000);
-      return next;
-    });
-  };
-  const skipRest = () => {
-    cancelRestEnd();
-    setRestEndsAt(null);
-  };
-  const restDone = useCallback(() => {
-    restOverHaptic(); // the scheduled notification plays the sound
-    setRestEndsAt(null);
-  }, []);
+  const restDone = useCallback(
+    (late: boolean) => {
+      // The scheduled notification plays the sound; the buzz only when the client is here to feel it.
+      if (!late) restOverHaptic();
+      endRest();
+    },
+    [endRest],
+  );
 
   if (!ready || units === null) {
     return (
@@ -135,15 +120,13 @@ export default function LogScreen() {
 
   const handlers: BlockHandlers = {
     onTick: (_ex, set) => {
-      if (set.completedAt !== null) {
-        void op((l) => uncompleteSet(l, set.id, nowIso()));
-        return;
-      }
-      tapHaptic();
-      void op((l) => completeSet(l, set.id, nowIso()));
-      scheduleReminder(log.name, log.id);
-      const rest = set.target.restSeconds ?? 0;
-      if (rest > 0) startRest(rest);
+      // Tick or untick is decided from the stored set, so a fast double tap can't run both ways at once.
+      void tick(set.id).then((completed) => {
+        if (completed !== true) return;
+        tapHaptic();
+        const seconds = set.target.restSeconds ?? 0;
+        if (seconds > 0) startRest(log.id, seconds);
+      });
     },
     onChange: (set, patch) => void op((l) => updateActual(l, set.id, patch)),
     onSetMenu: (ex, set, label) => setMenu({ kind: 'set', ex, set, label }),
@@ -157,17 +140,13 @@ export default function LogScreen() {
       {
         text: 'Discard',
         style: 'destructive',
-        onPress: () => {
-          skipRest();
-          void discard().then(back);
-        },
+        onPress: () => void discard().then(back),
       },
     ]);
 
   const doFinish = async () => {
     // Task 9 adds the "sets not done" confirmation and the summary screen; until then Finish returns to Today.
     if (await finish()) {
-      skipRest();
       back();
     } else {
       Alert.alert('Complete at least one set to finish.');
@@ -217,6 +196,7 @@ export default function LogScreen() {
     else void op((l) => addLogExercise(l, choice, randomUUID, nowIso()));
   };
 
+  const restHere = rest?.logId === log.id ? rest : null;
   const letters = supersetLetters(log.blocks);
   let exerciseIndex = 0;
 
@@ -276,11 +256,17 @@ export default function LogScreen() {
         <Button variant="secondary" title="+ Exercise" testID="add-exercise" onPress={() => setPicker({ mode: 'add' })} />
         <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={() => void doFinish()} />
 
-        {restEndsAt !== null ? <View style={{ height: REST_SHEET_SPACE }} /> : null}
+        {restHere ? <View style={{ height: sheetHeight }} /> : null}
       </Screen>
 
-      {restEndsAt !== null ? (
-        <RestSheet endsAt={restEndsAt} onAdjust={adjustRest} onSkip={skipRest} onDone={restDone} />
+      {restHere ? (
+        <RestSheet
+          endsAt={restHere.endsAt}
+          onAdjust={adjustRest}
+          onSkip={skipRest}
+          onDone={restDone}
+          onHeight={setSheetHeight}
+        />
       ) : null}
 
       <ActionMenu title={menuTitle} items={menuItems} onClose={() => setMenu(null)} />
