@@ -48,23 +48,24 @@ export async function updateProgram(id: string, input: ProgramInput): Promise<Up
   if (readError) return { ok: false, error: "Couldn't save. Please try again." };
   if (!current) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
 
-  // Length first: set_program_weeks deletes slots past the new end and changes weeks in one transaction.
-  let removedSlots = 0;
-  if (current.weeks !== parsed.data.weeks) {
-    const { data: removed, error } = await supabase.rpc('set_program_weeks', {
-      p_program_id: id,
-      p_weeks: parsed.data.weeks,
-    });
-    if (error) return { ok: false, error: "Couldn't change the number of weeks. Please try again." };
-    removedSlots = removed;
-  }
-
+  // Name and description first: if changing the length then fails, the worst left behind is a harmless rename.
   const { error } = await supabase
     .from('programs')
     .update({ name: parsed.data.name, description: parsed.data.description })
     .eq('id', id)
     .eq('workspace_id', workspaceId);
   if (error) return { ok: false, error: "Couldn't save the name and description. Please try again." };
+
+  // set_program_weeks deletes slots past the new end and changes weeks in one transaction.
+  let removedSlots = 0;
+  if (current.weeks !== parsed.data.weeks) {
+    const { data: removed, error: weeksError } = await supabase.rpc('set_program_weeks', {
+      p_program_id: id,
+      p_weeks: parsed.data.weeks,
+    });
+    if (weeksError) return { ok: false, error: "Couldn't change the number of weeks. Please try again." };
+    removedSlots = removed;
+  }
 
   revalidatePath('/programs');
   revalidatePath(`/programs/${id}`);
@@ -151,7 +152,28 @@ export async function addProgramWorkout(input: {
     'workspace_id'
   > as Database['public']['Tables']['program_workouts']['Insert'];
   const { error } = await supabase.from('program_workouts').insert(row);
-  if (error) throw new Error(`Could not add the workout: ${error.message}`);
+  if (error) {
+    // A retry of an add whose first try was saved hits the primary key. If the row with this id is exactly the
+    // slot asked for, the add already happened: report success so the grid keeps the chip.
+    if (error.code === '23505') {
+      const { data: existing } = await supabase
+        .from('program_workouts')
+        .select('program_id, week, day, workout_id')
+        .eq('id', id)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (
+        existing &&
+        existing.program_id === programId &&
+        existing.week === week &&
+        existing.day === day &&
+        existing.workout_id === workoutId
+      ) {
+        return;
+      }
+    }
+    throw new Error(`Could not add the workout: ${error.message}`);
+  }
 }
 
 export async function moveProgramWorkout(input: { id: string; week: number; day: number; position: number }): Promise<void> {
