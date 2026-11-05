@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(20);
 
 select table_privs_are('public', 'profiles', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
   'service_role has exactly select/insert/update/delete on profiles');
@@ -29,6 +29,17 @@ select table_privs_are('public', 'program_workouts', 'service_role', array['SELE
   'service_role has exactly select/insert/update/delete on program_workouts');
 select table_privs_are('public', 'program_assignments', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
   'service_role has exactly select/insert/update/delete on program_assignments');
+
+select table_privs_are('public', 'workout_logs', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on workout_logs');
+select table_privs_are('public', 'log_blocks', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on log_blocks');
+select table_privs_are('public', 'log_exercises', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on log_exercises');
+select table_privs_are('public', 'log_sets', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on log_sets');
+select table_privs_are('public', 'workout_log_comments', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  'service_role has exactly select/insert/update/delete on workout_log_comments');
 
 -- M2: coaches (authenticated) cannot write client_invites at all.
 select ok(not has_any_column_privilege('authenticated', 'public.client_invites', 'insert')
