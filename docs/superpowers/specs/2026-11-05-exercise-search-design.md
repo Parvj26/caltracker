@@ -58,7 +58,16 @@ Results update on every keystroke, with no server round trip, and the phone sear
   4. a match that needs typo tolerance;
   5. a match only through muscles, equipment or category.
 
-  Inside a tier, favourites come first, then recently used exercises, then shorter names, then A to Z.
+  Inside a tier, the order is:
+  1. rows where every query word matches a whole name word, ahead of rows that match only by word start
+     ("lat" puts Lat Pulldown above Lateral Bound);
+  2. favourites;
+  3. recently used exercises;
+  4. shorter names;
+  5. A to Z, ignoring case and accents.
+
+  A short word ending ("spring" -> "spr") is never used as a word start: stems count as a start only at 4 or more
+  letters. A joined query ("benchpress") must begin at the start of a name word.
 - **Filters**, combined with AND between groups and OR within a group:
   - muscle chips (Chest, Back, Shoulders, Arms, Legs, Glutes, Core, Full body), mapped to the library's muscle
     names;

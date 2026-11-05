@@ -224,6 +224,49 @@ describe('chips', () => {
   });
 });
 
+describe('word boundaries', () => {
+  const idx = buildExerciseIndex([
+    row('Bench Sprint', { id: 'sprint' }),
+    row('Barbell Curl', { id: 'curl' }),
+    row('Barbell Bench Press', { id: 'bp' }),
+    row('Cre\u0301me Press', { id: 'creme' }),
+    row('Zercher Squat', { id: 'z' }),
+    row('\u00c9tirement', { id: 'e' }),
+    row('Lateral Bound', { id: 'lb' }),
+    row('Lat Pulldown - Wide Grip', { id: 'lp' }),
+  ]);
+  const ids = (q: string) => searchExercises(idx, q, NO_FILTERS, NO_BOOSTS).map((h) => h.row.id);
+
+  it('a short stem is not a prefix: spring does not match Bench Sprint', () => {
+    // "spring" is one typo away from "sprint", so it may still show up, but only as a tier 4 typo match.
+    const spring = searchExercises(idx, 'spring', NO_FILTERS, NO_BOOSTS).find((h) => h.row.id === 'sprint');
+    expect(spring === undefined || spring.tier === 4).toBe(true);
+    expect(ids('speed')).not.toContain('sprint');
+  });
+
+  it('a joined match must start at a word start', () => {
+    expect(ids('bellc')).not.toContain('curl');
+    expect(ids('ellcu')).not.toContain('curl');
+    expect(ids('benchpress')).toContain('bp');
+  });
+
+  it('decomposed accents stay inside their word', () => {
+    const h = searchExercises(idx, 'creme press', NO_FILTERS, NO_BOOSTS).find((x) => x.row.id === 'creme');
+    expect(h?.tier).toBe(1);
+    expect(h?.highlight).toEqual([[0, 6], [7, 12]]);
+    expect(h?.row.name.slice(...(h.highlight[0] as [number, number]))).toBe('Cre\u0301me');
+  });
+
+  it('sorts accented names with their base letter', () => {
+    const order = searchExercises(idx, '', NO_FILTERS, NO_BOOSTS).map((h) => h.row.id);
+    expect(order.indexOf('e')).toBeLessThan(order.indexOf('z'));
+  });
+
+  it('whole-word matches rank above word-start matches in the same tier', () => {
+    expect(ids('lat').slice(0, 2)).toEqual(['lp', 'lb']);
+  });
+});
+
 describe('performance', () => {
   it('1,000 rows and 50 queries in under 30 ms', () => {
     const words = ['barbell', 'dumbbell', 'press', 'curl', 'row', 'squat', 'incline', 'cable', 'fly', 'lunge', 'raise', 'extension', 'bridge', 'machine', 'seated', 'standing'];
