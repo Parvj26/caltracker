@@ -15,6 +15,7 @@
 
 .section { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .sectionHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.sectionActions { display: flex; align-items: center; gap: var(--ct-space-3); }
 .sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 
 .exercises { display: flex; flex-direction: column; gap: var(--ct-space-3); }

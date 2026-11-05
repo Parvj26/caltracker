@@ -89,7 +89,7 @@ export async function correctLog(input: { logId: string; sets: SetCorrection[] }
   }
 
   const supabase = await createServerSupabase();
-  const { error } = await supabase.rpc('correct_workout_log', { p_log_id: input.logId, p_sets: sets as never });
+  const { error } = await supabase.rpc('correct_workout_log', { p_log_id: input.logId, p_sets: sets as never /* the generated Json type can't take a plain object array */ });
   if (error) {
     if (error.code === '42501') return { ok: false, error: "You can't edit this workout." };
     if (error.code === '23514') {

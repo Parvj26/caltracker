@@ -10,8 +10,10 @@ import { correctLog, type SetCorrection } from './actions';
 import { PlannedVsActual, draftFor, type Drafts } from './planned-vs-actual';
 import styles from './log.module.css';
 
+const LABELS = { reps: 'Reps', weight: 'Weight', time: 'Time', distance: 'Distance' } as const;
+
 const initialDrafts = (log: WorkoutLogDoc, units: Units): Drafts =>
-  Object.fromEntries(log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
+  Object.fromEntries(log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
 
 /** A typed number, or null for blank, or NaN for text that isn't one. */
 const num = (text: string): number | null => (text.trim() === '' ? null : /^\d*\.?\d+$/.test(text.trim()) ? Number(text) : NaN);
@@ -51,7 +53,10 @@ export function CorrectForm({
         const text = draft[key];
         if (text === undefined || text.trim() === (before[id]?.[key] ?? '').trim()) continue;
         const value = key === 'time' ? parseClock(text) : num(text);
-        if (value === null) continue; // a blanked box keeps the stored value
+        if (value === null) {
+          setError(`${LABELS[key]} can't be blank.`);
+          return;
+        }
         if (Number.isNaN(value)) {
           setError('Check the numbers you typed. Time looks like 1:30.');
           return;
@@ -88,11 +93,14 @@ export function CorrectForm({
     <section className={styles.section} aria-label="Planned and actual">
       <div className={styles.sectionHead}>
         <h2 className={styles.sectionHeading}>Planned vs. actual</h2>
-        {canCorrect && !editing ? (
-          <Button variant="secondary" onClick={start}>
-            Correct
-          </Button>
-        ) : null}
+        <div className={styles.sectionActions}>
+          <SaveStatus pending={pending} dirty={false} everSaved={savedAt !== null} savedAt={savedAt} />
+          {canCorrect && !editing ? (
+            <Button variant="secondary" onClick={start}>
+              Correct
+            </Button>
+          ) : null}
+        </div>
       </div>
       <PlannedVsActual
         log={log}
@@ -100,21 +108,16 @@ export function CorrectForm({
         swappedFrom={swappedFrom}
         edit={editing ? { drafts, onChange: (id, patch) => setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } })) } : undefined}
       />
-      {editing || savedAt !== null ? (
+      {editing ? (
         <div className={styles.saveBar}>
           {error ? <ErrorText>{error}</ErrorText> : null}
           {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
-          <SaveStatus pending={pending} dirty={false} everSaved={savedAt !== null} savedAt={savedAt} />
-          {editing ? (
-            <>
-              <Button variant="secondary" onClick={() => setEditing(false)} disabled={pending}>
-                Cancel
-              </Button>
-              <Button onClick={save} pending={pending}>
-                {pending ? 'Saving…' : 'Save corrections'}
-              </Button>
-            </>
-          ) : null}
+          <Button variant="secondary" onClick={() => setEditing(false)} disabled={pending}>
+            Cancel
+          </Button>
+          <Button onClick={save} pending={pending}>
+            {pending ? 'Saving…' : 'Save corrections'}
+          </Button>
         </div>
       ) : null}
     </section>

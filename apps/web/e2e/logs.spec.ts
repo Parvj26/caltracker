@@ -271,6 +271,9 @@ test.describe('logged workout page', () => {
     await expect(page.getByText('3 sets')).toBeVisible();
     // Correct one set and leave a comment, so the screenshot shows the whole page.
     await page.getByRole('button', { name: 'Correct' }).click();
+    await expect(squat.getByRole('row').nth(1).getByRole('textbox')).toHaveCount(2);
+    await expect(squat.getByRole('row').nth(3).getByRole('textbox')).toHaveCount(0);
+    await expect(squat.getByRole('row').nth(3)).toContainText('Not done');
     await squat.getByLabel('Set 1 reps').fill('6');
     await page.getByRole('button', { name: 'Save corrections' }).click();
     await expect(page.getByText('Edited by coach')).toBeVisible();
@@ -308,6 +311,9 @@ test.describe('logged workout page', () => {
     await page.getByRole('button', { name: 'Save corrections' }).click();
     await expect(page.getByText('Nothing to change.')).toBeVisible();
 
+    await page.getByLabel('Set 1 reps').fill('');
+    await page.getByRole('button', { name: 'Save corrections' }).click();
+    await expect(page.getByText("Reps can't be blank.")).toBeVisible();
     await page.getByLabel('Set 1 reps').fill('6');
     await page.getByRole('button', { name: 'Save corrections' }).click();
     await expect(page.getByText('Edited by coach')).toBeVisible();
