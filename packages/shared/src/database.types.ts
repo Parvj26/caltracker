@@ -741,6 +741,12 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      get_my_coach: {
+        Args: never
+        Returns: {
+          coach_name: string
+        }[]
+      }
       invite_for_join: {
         Args: { token: string }
         Returns: {
