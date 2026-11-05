@@ -1,6 +1,6 @@
 // Display text for logs, in the viewer's units. Pure, shared by the phone and the dashboard.
 import type { TrackingType } from '../exercises/tracking';
-import { formatDistance, formatDuration, formatWeight } from '../units/units';
+import { KG_PER_LB, formatDistance, formatDuration, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
 import { formatSetTarget } from '../workouts/targets';
 import type { SetType } from '../workouts/schema';
@@ -68,10 +68,12 @@ export function formatLogDuration(seconds: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-/** A workout's total volume (logVolumeKg) in the viewer's units, thousands grouped: "8,420 lb lifted". */
+/**
+ * A workout's total volume (logVolumeKg) in the viewer's units, as a whole number with thousands grouped:
+ * "8,420 lb lifted". Rounded once, from the unrounded conversion. The grouping is a regex rather than
+ * toLocaleString, so the phone (Hermes) and the dashboard (Workers) always print the same text.
+ */
 export function formatLogVolume(volumeKg: number, units: Units): string {
-  const [whole = '', rest = ''] = formatWeight(volumeKg, units).split(' ');
-  const [int = '', dec] = whole.split('.');
-  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${dec === undefined ? grouped : `${grouped}.${dec}`} ${rest} lifted`;
+  const whole = Math.round(units === 'lb' ? volumeKg / KG_PER_LB : volumeKg);
+  return `${String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} ${units} lifted`;
 }

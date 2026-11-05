@@ -292,8 +292,9 @@ export function discardLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
 /**
  * "Add missed sets": puts a log finished automatically back in progress, within 24 h of its finish (canReopen).
  * The finish time and the auto-finished flag are cleared and the activity time is now, so the idle timers start
- * again; the ticked sets are kept. Refused (same object back) for anything canReopen refuses. The server keeps
- * its stored auto_finished either way.
+ * again; the ticked sets are kept. Refused (same object back) for anything canReopen refuses.
+ * The server keeps its stored auto_finished only while the log is reopened. A manual finish afterwards
+ * (finishLog, autoFinished false) ends with auto_finished = false on the server, so the log is then locked.
  */
 export function reopenLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
   if (!canReopen(log, Date.parse(nowIso))) return log;

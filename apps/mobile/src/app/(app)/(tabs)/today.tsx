@@ -331,7 +331,7 @@ function TodayCard({
       )}
       <Button
         variant="secondary"
-        title="View workout"
+        title="See the plan"
         testID={`view-workout-${workout.id}`}
         onPress={() => router.push({ pathname: '/workout/[id]', params: { id: workout.id } })}
       />

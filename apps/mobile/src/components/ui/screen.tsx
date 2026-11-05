@@ -10,7 +10,7 @@ import {
   type HostInstance,
   type ScrollViewInstance,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { contentMaxWidth, palette, space } from '@/theme/theme';
 
 const PAD = space[6];
@@ -46,6 +46,9 @@ export function Screen({
   onRefresh?: () => void;
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
+  // The bottom inset is room inside the scrolling content, not a fixed strip under it, so content scrolls under
+  // the home indicator instead of being cut off by a white band, and still clears it at the end.
+  const bottomInset = useSafeAreaInsets().bottom;
   const columnRef = useRef<HostInstance>(null);
   const focused = useRef<RefObject<HostInstance | null> | null>(null);
 
@@ -79,12 +82,16 @@ export function Screen({
 
   return (
     <RevealContext.Provider value={value}>
-      <SafeAreaView style={styles.fill} edges={inTabs ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             ref={scrollRef}
             style={styles.fill}
-            contentContainerStyle={[styles.content, centred && styles.centred]}
+            contentContainerStyle={[
+              styles.content,
+              !inTabs && { paddingBottom: PAD + bottomInset },
+              centred && styles.centred,
+            ]}
             keyboardShouldPersistTaps="handled"
             refreshControl={
               onRefresh ? (

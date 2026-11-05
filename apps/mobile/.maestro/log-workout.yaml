@@ -55,7 +55,7 @@ env:
 # 3 × 8 × 60 kg = 1,440 kg, shown in this client's pounds.
 - assertVisible:
     id: summary-volume
-- assertVisible: '3,174.7 lb lifted'
+- assertVisible: '3,175 lb lifted'
 - assertVisible: 'Coach comments'
 - tapOn:
     id: summary-done

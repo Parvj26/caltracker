@@ -81,7 +81,11 @@ export default function SummaryScreen() {
             </>
           ) : (
             <Text style={text('sectionHeading')}>
-              {log?.status === 'in_progress' ? 'This workout is still going.' : 'This workout wasn’t finished.'}
+              {log === null
+                ? 'Couldn’t find this workout.'
+                : log.status === 'in_progress'
+                  ? 'This workout is still going.'
+                  : 'This workout wasn’t finished.'}
             </Text>
           )}
           <Button title="Done" testID="summary-done" onPress={done} />

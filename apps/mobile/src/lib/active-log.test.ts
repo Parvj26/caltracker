@@ -276,7 +276,7 @@ describe('summaryLines', () => {
 
   it('gives duration, volume in the client units and the completed sets', () => {
     expect(summaryLines(done, 'kg')).toEqual({ duration: '53 min', volume: '480 kg lifted', sets: '1 set completed' });
-    expect(summaryLines(done, 'lb').volume).toBe('1,058.2 lb lifted');
+    expect(summaryLines(done, 'lb').volume).toBe('1,058 lb lifted');
   });
 
   it('leaves the volume out when nothing weighted was lifted', () => {

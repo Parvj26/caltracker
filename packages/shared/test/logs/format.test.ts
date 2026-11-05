@@ -73,15 +73,19 @@ describe('formatLogDuration', () => {
 });
 
 describe('formatLogVolume', () => {
-  it('converts to the client units and groups thousands: "8,420 lb lifted"', () => {
+  it('converts to the client units, rounds to whole units once and groups thousands', () => {
     expect(formatLogVolume(toKg(8420, 'lb'), 'lb')).toBe('8,420 lb lifted');
-    expect(formatLogVolume(1440, 'lb')).toBe('3,174.7 lb lifted');
+    expect(formatLogVolume(1440, 'lb')).toBe('3,175 lb lifted');
     expect(formatLogVolume(1440, 'kg')).toBe('1,440 kg lifted');
-    expect(formatLogVolume(1234567.5, 'kg')).toBe('1,234,567.5 kg lifted');
+    expect(formatLogVolume(1234567.5, 'kg')).toBe('1,234,568 kg lifted');
   });
 
-  it('keeps small totals as they are', () => {
+  it('keeps small totals whole', () => {
     expect(formatLogVolume(0, 'kg')).toBe('0 kg lifted');
-    expect(formatLogVolume(960.4, 'kg')).toBe('960.4 kg lifted');
+    expect(formatLogVolume(960.4, 'kg')).toBe('960 kg lifted');
+  });
+
+  it('rounds from the unrounded conversion, not per set', () => {
+    expect(formatLogVolume(toKg(135, 'lb') * 24, 'lb')).toBe('3,240 lb lifted');
   });
 });
