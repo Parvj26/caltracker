@@ -53,7 +53,6 @@ export type IndexEntry = {
   other: number[];
   muscleChips: Set<MuscleChip>;
   equipmentChip: EquipmentChip;
-  nameLower: string;
 };
 
 export type ExerciseIndex = { rows: ExerciseIndexRow[]; entries: IndexEntry[]; vocab: string[] };
@@ -134,6 +133,11 @@ function tokenizeWithRanges(name: string): Array<{ text: string; start: number; 
   let start = -1;
   let i = 0;
   for (const ch of name) {
+    if (start >= 0 && /^\p{M}+$/u.test(ch)) {
+      // A combining mark right after a letter (decomposed accent) belongs to that word.
+      i += ch.length;
+      continue;
+    }
     const n = ch.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
     const isWord = n.length > 0 && /^[\p{L}\p{N}]+$/u.test(n);
     if (isWord) {
@@ -204,7 +208,6 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
       other: [...other],
       muscleChips,
       equipmentChip,
-      nameLower: row.name.toLowerCase(),
     };
   });
   return { rows, entries, vocab };
@@ -268,7 +271,8 @@ function buildTable(vocab: string[], q: string): QueryTable {
         kind = EXACT;
         break;
       }
-      if (f.startsWith(qf)) kind = PREFIX;
+      // A stem is a weak guess ("spring" -> "spr"): use it as a prefix only when it has 4+ letters.
+      if (f.startsWith(qf) && (qf === q || qf.length >= 4)) kind = PREFIX;
     }
     if (kind === NONE && typoOk && withinEdits(q, f, typoBudget(Math.max(q.length, f.length)))) kind = TYPO;
     name[v] = kind;
@@ -296,13 +300,13 @@ function matchWord(e: IndexEntry, t: QueryTable): Match | null {
   if (bestKind === PREFIX) return { kind: PREFIX, word: bestWord };
   const q = t.q;
   if (q.length >= 5) {
-    const at = e.joined.indexOf(q);
-    if (at >= 0) {
+    // The join must start at the beginning of a name word ("bellc" must not find "Barbell Curl").
+    for (let at = e.joined.indexOf(q); at >= 0; at = e.joined.indexOf(q, at + 1)) {
       const first = e.joinedWord[at];
       const last = e.joinedWord[at + q.length - 1];
-      if (first !== undefined && last !== undefined && first !== last) {
-        return { kind: PREFIX, word: 'joined', joinedRange: [first, last] };
-      }
+      if (first === undefined || last === undefined || first === last) continue;
+      if (at > 0 && e.joinedWord[at - 1] === first) continue;
+      return { kind: PREFIX, word: 'joined', joinedRange: [first, last] };
     }
   }
   if (bestKind === TYPO) return { kind: TYPO, word: bestWord };
@@ -326,11 +330,11 @@ function buildGroups(tokens: string[]): { groups: Group[]; expanded: string } {
   return { groups, expanded: expandedParts.join(' ') };
 }
 
-/** Cheap A to Z (localeCompare is too slow to sort thousands of hits per keystroke). */
+const COLLATOR = new Intl.Collator('en', { sensitivity: 'base' });
+
+/** A to Z ignoring case and accents, so "Étirement" sorts with the Es. */
 function compareNames(a: string, b: string): number {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  return x < y ? -1 : x > y ? 1 : a < b ? -1 : a > b ? 1 : 0;
+  return COLLATOR.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
 function passesFilters(e: IndexEntry, f: SearchFilters): boolean {
@@ -381,7 +385,7 @@ export function searchExercises(
   const { groups, expanded } = buildGroups(tokens);
   const tables = new Map<string, QueryTable>();
   for (const g of groups) for (const alt of g.alts) for (const q of alt) if (!tables.has(q)) tables.set(q, buildTable(index.vocab, q));
-  const scored: Array<{ hit: SearchHit; e: IndexEntry; boost: number }> = [];
+  const scored: Array<{ hit: SearchHit; e: IndexEntry; boost: number; whole: number }> = [];
 
   for (const e of candidates) {
     let worst = EXACT;
@@ -431,15 +435,16 @@ export function searchExercises(
 
     const fav = boosts.favourites.has(e.row.id) ? 0 : 1;
     const rec = recentRank.get(e.row.id) ?? Number.MAX_SAFE_INTEGER;
-    scored.push({ hit: { row: e.row, tier, highlight: rangesFor(e, lit) }, e, boost: fav * 1e9 + Math.min(rec, 1e9 - 1) });
+    scored.push({ hit: { row: e.row, tier, highlight: rangesFor(e, lit) }, e, boost: fav * 1e9 + Math.min(rec, 1e9 - 1), whole: worst === EXACT ? 0 : 1 });
   }
 
   scored.sort(
     (a, b) =>
       a.hit.tier - b.hit.tier ||
+      a.whole - b.whole ||
       a.boost - b.boost ||
       a.e.row.name.length - b.e.row.name.length ||
-      (a.e.nameLower < b.e.nameLower ? -1 : a.e.nameLower > b.e.nameLower ? 1 : compareNames(a.e.row.name, b.e.row.name)),
+      compareNames(a.e.row.name, b.e.row.name),
   );
   return scored.map((x) => x.hit);
 }
