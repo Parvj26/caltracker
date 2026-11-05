@@ -35,7 +35,8 @@ env:
 - extendedWaitUntil:
     visible: 'Barbell Squat'
     timeout: 20000
-- assertVisible: '8 reps · 60 kg'
+# New accounts start in pounds (US launch): the coach's 60 kg target shows as 132.3 lb to this client.
+- assertVisible: '8 reps · 132.3 lb'
 # The drop row's label is read as "Drop set" (iOS shows the accessibility label, not the ↳ glyph).
 - assertVisible:
     id: drop-set

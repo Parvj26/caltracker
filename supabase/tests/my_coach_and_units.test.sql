@@ -37,23 +37,23 @@ select tests.act_as(:'kim');
 select is((select count(*)::int from public.get_my_coach()), 0, 'a removed client gets no coach');
 reset role;
 
--- Units: a client can change only their own profiles.units.
+-- Units: a client can change only their own profiles.units. New accounts start in lb, so the attempts switch to kg.
 select tests.act_as(:'sam');
-with u as (update public.profiles set units = 'lb' where id = :'sam' returning 1)
+with u as (update public.profiles set units = 'kg' where id = :'sam' returning 1)
 select is((select count(*)::int from u), 1, 'a client can change their own units');
-with u as (update public.profiles set units = 'lb' where id = :'kim' returning 1)
+with u as (update public.profiles set units = 'kg' where id = :'kim' returning 1)
 select is((select count(*)::int from u), 0, 'a client cannot change another client''s units (same workspace)');
-with u as (update public.profiles set units = 'lb' where id = :'coach' returning 1)
+with u as (update public.profiles set units = 'kg' where id = :'coach' returning 1)
 select is((select count(*)::int from u), 0, 'a client cannot change their coach''s units');
-with u as (update public.profiles set units = 'lb' where id = :'ana' returning 1)
+with u as (update public.profiles set units = 'kg' where id = :'ana' returning 1)
 select is((select count(*)::int from u), 0, 'a client cannot change units in another workspace');
 select throws_ok(format('update public.profiles set units = %L where id = %L', 'stone', :'sam'), '23514', null,
   'units must be kg or lb');
 select throws_ok(format('update public.profiles set created_at = now() where id = %L', :'sam'), '42501', null,
   'only the granted columns can be changed');
 reset role;
-select is((select units from public.profiles where id = :'sam'), 'lb', 'Sam''s change was saved');
-select is((select units from public.profiles where id = :'kim'), 'kg', 'Kim''s units were not touched');
+select is((select units from public.profiles where id = :'sam'), 'kg', 'Sam''s change was saved');
+select is((select units from public.profiles where id = :'kim'), 'lb', 'Kim''s units were not touched (new accounts start in lb)');
 
 select * from finish();
 rollback;
