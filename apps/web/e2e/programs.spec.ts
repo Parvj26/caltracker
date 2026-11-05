@@ -129,3 +129,100 @@ test('a change that fails to save is undone and the coach is told', async ({ pag
   await page.reload();
   await expect(programCell(page, 1, 1).getByRole('button', { name: workout, exact: true })).toBeVisible();
 });
+
+test('the Programs page explains what a program is', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto('/programs');
+  await expect(
+    page.getByText('A program arranges workouts into weeks. Assign it to a client and every workout lands on their calendar.'),
+  ).toBeVisible();
+});
+
+test('a change refused because the app was just updated asks the coach to reload', async ({ page }) => {
+  const workout = `Stale ${unique()}`;
+  const program = `Stale deploy ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await createProgram(page, program, 1, [{ week: 1, day: 1, workoutName: workout }]);
+
+  // What Next 16 answers when a page from before a deploy calls a server action the new deploy doesn't have.
+  const url = /\/programs\/[0-9a-f-]{36}$/;
+  await page.route(url, (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 409,
+          headers: { 'content-type': 'text/plain', 'x-nextjs-action-not-found': '1' },
+          body: 'Server Action unavailable.',
+        })
+      : route.continue(),
+  );
+  const cell = programCell(page, 1, 1);
+  await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
+  await cell.getByRole('menuitem', { name: 'Remove' }).click();
+  await expect(page.getByText('CalTracker was just updated. Reload the page to continue.')).toBeVisible();
+  await expect(page.getByText("Couldn't save that change", { exact: false })).toHaveCount(0);
+  await expect(cell.getByRole('button', { name: workout, exact: true })).toBeVisible();
+
+  await page.unroute(url);
+  await page.getByRole('button', { name: 'Reload', exact: true }).click();
+  await expect(page.getByText('CalTracker was just updated.', { exact: false })).toHaveCount(0);
+  await expect(programCell(page, 1, 1).getByRole('button', { name: workout, exact: true })).toBeVisible();
+});
+
+test.describe('a coach with an empty library', () => {
+  const email = `empty-coach-${unique()}@example.test`;
+  const password = 'empty-coach-password-123';
+  let coachId: string | undefined;
+  let workspaceId: string | undefined;
+
+  test.beforeAll(async () => {
+    const user = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { first_name: 'Empty', last_name: 'Coach' },
+    });
+    if (user.error) throw user.error;
+    coachId = user.data.user.id;
+    const ws = await admin.from('workspaces').insert({ name: `Empty Gym ${unique()}` }).select('id').single();
+    if (ws.error) throw ws.error;
+    workspaceId = ws.data.id;
+    const member = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: coachId, role: 'owner' });
+    if (member.error) throw member.error;
+  });
+
+  test.afterAll(async () => {
+    if (workspaceId) {
+      await admin.from('programs').delete().eq('workspace_id', workspaceId);
+      await admin.from('workspaces').delete().eq('id', workspaceId);
+    }
+    if (coachId) await admin.auth.admin.deleteUser(coachId);
+  });
+
+  test('sees "No workouts yet" and a link to create one, in the library and the "+" picker', async ({ page }) => {
+    await page.goto('/sign-in');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/clients$/);
+
+    await page.goto('/programs/new');
+    await page.getByLabel('Program name').fill(`First program ${unique()}`);
+    await page.getByLabel('Weeks', { exact: true }).fill('1');
+    await page.getByRole('button', { name: 'Create program' }).click();
+    await expect(page).toHaveURL(/\/programs\/[0-9a-f-]{36}$/);
+
+    const library = page.getByRole('region', { name: 'Library' });
+    await expect(library.getByText('No workouts yet. A program is built from workouts in your library.')).toBeVisible();
+    await expect(library.getByRole('link', { name: 'Create a workout' })).toHaveAttribute('href', '/workouts/new');
+
+    await page.getByRole('button', { name: 'Add a workout to week 1, day 1', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: 'Add a workout to Week 1, Day 1' });
+    await expect(picker.getByText('No workouts yet. A program is built from workouts in your library.')).toBeVisible();
+    await expect(picker.getByRole('link', { name: 'Create a workout' })).toHaveAttribute('href', '/workouts/new');
+    await picker.getByRole('link', { name: 'Create a workout' }).click();
+    await expect(page).toHaveURL(/\/workouts\/new$/);
+  });
+});

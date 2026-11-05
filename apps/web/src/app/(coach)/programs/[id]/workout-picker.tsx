@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
+import { EmptyLibrary } from '@/components/empty-library';
 import { Button } from '@/components/ui';
 import type { LibraryWorkout } from './program-grid';
 import { matchesSearch } from './search';
@@ -52,8 +52,8 @@ export function WorkoutPicker({ cellLabel, library, onPick, onClose }: Props) {
       </label>
       <ul id={resultsId} className={styles.results}>
         {library.length === 0 ? (
-          <li className={styles.caption}>
-            Your library is empty. <Link href="/workouts/new">Build a workout</Link> first.
+          <li className={styles.emptyLibrary}>
+            <EmptyLibrary className={styles.caption} />
           </li>
         ) : results.length === 0 ? (
           <li className={styles.caption}>No workouts match.</li>
