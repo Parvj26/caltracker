@@ -61,3 +61,22 @@ test('proxy refreshes an expired session and rewrites the cookies', async ({ pag
   const afterJson = Buffer.from(afterJoined.slice('base64-'.length), 'base64url').toString('utf8');
   expect(Number(afterJson.match(/"expires_at":(\d+)/)![1])).toBeGreaterThan(Date.now() / 1000);
 });
+
+test('signed-in coach can open the workouts and programs pages', async ({ page }) => {
+  if (!email || !password) {
+    console.log('SKIPPED workouts/programs check: STAGING_SMOKE_COACH_EMAIL / STAGING_SMOKE_COACH_PASSWORD are not set.');
+    test.skip();
+    return;
+  }
+
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+
+  await page.goto('/workouts');
+  await expect(page.getByRole('heading', { name: 'Workouts' })).toBeVisible();
+  await page.goto('/programs');
+  await expect(page.getByRole('heading', { name: 'Programs' })).toBeVisible();
+});

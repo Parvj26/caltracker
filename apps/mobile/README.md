@@ -15,6 +15,11 @@ pnpm db:start                        # local Supabase (repo root)
 pnpm --filter mobile env:local       # writes apps/mobile/.env.local (simulator: 127.0.0.1)
 ```
 
+## Tabs
+
+The app has two tabs in this phase. **Today** shows the workouts assigned for today plus a week calendar;
+**Workouts** lists the client's workouts, and tapping one opens a read-only detail. There is no Start button yet.
+
 ## Try it on a real phone (Expo Go)
 
 The phone cannot reach `127.0.0.1` on your Mac. Use the Mac's wifi IP (System Settings > Network),
@@ -84,5 +89,7 @@ pnpm --filter mobile e2e:cleanup <email>          # delete user and invites
 `calendar.yaml` signs in as the seed client (`client@demo.local`) and needs the built-in exercises
 (`pnpm import:exercises`, for Barbell Squat). It assigns an "E2E Program" through the seed coach and deletes every
 "E2E " workout, program and assignment at the end (`assign` and `cleanup-workouts` helper actions).
+It checks the Today and Workouts tabs and the calendar. Run just this flow with
+`pnpm --filter mobile exec maestro test .maestro/calendar.yaml`.
 
 `pnpm check` (typecheck, lint, test) needs neither Supabase nor a simulator.
