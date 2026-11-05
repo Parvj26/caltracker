@@ -144,3 +144,20 @@ export {
   logVolumeKg,
   shouldAutoFinish,
 } from './logs/summary';
+export {
+  EXERCISE_ALIASES,
+  MUSCLE_CHIP_MUSCLES,
+  buildExerciseIndex,
+  equipmentChipOf,
+  normalizeSearchText,
+  searchExercises,
+} from './exercises/search';
+export type {
+  EquipmentChip,
+  ExerciseIndex,
+  ExerciseIndexRow,
+  MuscleChip,
+  SearchBoosts,
+  SearchFilters,
+  SearchHit,
+} from './exercises/search';
