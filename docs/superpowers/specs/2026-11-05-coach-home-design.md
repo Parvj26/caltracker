@@ -92,7 +92,7 @@ Each group shows at most 5 rows. If there are more, a "Show all {n}" link expand
     use the service role.
   - Loads a window wide enough for any browser time zone: planned workouts with `scheduled_on` from UTC today − 8
     to UTC today + 8, with their logs (`id`, `status`, `started_at`, `finished_at`, `workout_id`); current clients
-    (name, `joined_at`); each client's latest completed log time; and active program assignments.
+    (name, and the join date from `workspace_members.created_at`); each client's latest completed log time; and active program assignments.
 - **Client component:**
   - Computes the browser's today and week, using the same pattern as the calendar's Missed logic
     (`apps/web/src/lib/local-today.ts`), and filters the window into tiles and lists.
