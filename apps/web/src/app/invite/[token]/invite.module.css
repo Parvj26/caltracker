@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   min-height: var(--ct-button-min-height);
-  padding: var(--ct-space-2) var(--ct-space-5);
+  padding: var(--ct-space-2) var(--ct-space-6);
   border-radius: var(--ct-radius-input);
   background: var(--ct-ink);
   color: var(--ct-bg);

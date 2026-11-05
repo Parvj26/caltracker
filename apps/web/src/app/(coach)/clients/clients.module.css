@@ -204,7 +204,7 @@
 /* ---------- Confirm dialog (Remove client, Cancel invite) ---------- */
 .dialog {
   width: min(440px, calc(100vw - 32px));
-  padding: var(--ct-space-5);
+  padding: var(--ct-space-6);
   border: var(--ct-border-width-card) solid var(--ct-border);
   border-radius: var(--ct-radius-card);
   background: var(--ct-bg);
