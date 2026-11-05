@@ -109,3 +109,16 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, prefillActuals, startLogFromWorkout } from './logs/start';
+export {
+  addLogDrop,
+  addLogExercise,
+  addLogSet,
+  completeSet,
+  removeLogExercise,
+  removeLogSet,
+  setExerciseNote,
+  swapLogExercise,
+  uncompleteSet,
+  updateActual,
+} from './logs/ops';
+export type { ActualPatch } from './logs/ops';
