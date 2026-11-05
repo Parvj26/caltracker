@@ -33,15 +33,18 @@ type Props = {
   days: Record<IsoDate, CalendarItem[]>;
   /** The viewer's own today (computed in the browser), or null before it is known. */
   today: IsoDate | null;
-  /** Extra controls shown on each item, beside its name (for example an options menu). */
-  renderItem: (item: CalendarItem, date: IsoDate) => ReactNode;
+  /**
+   * Extra controls shown on each item, beside its name (for example an options menu). `editable` is false on days
+   * before `editableFrom`, so the controls can offer less there.
+   */
+  renderItem: (item: CalendarItem, date: IsoDate, editable: boolean) => ReactNode;
   /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
   onAddToDay?: (date: IsoDate) => void;
   /**
-   * Days before this are read-only: no "+", not a drop target, and their items can't be dragged or changed
-   * (renderItem is not called for them).
+   * Days before this are read-only: no "+", not a drop target, and their items can't be dragged (renderItem is
+   * told, so it can offer fewer controls).
    */
   editableFrom?: IsoDate;
 };
@@ -51,7 +54,6 @@ type DropData = { date: IsoDate };
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const NONE: CalendarItem[] = [];
-const noControls = () => null;
 
 // Pointer first (exact for the mouse); the keyboard sensor has no pointer, so fall back to overlap.
 const collision: CollisionDetection = (args) => {
@@ -142,7 +144,8 @@ export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAd
                           inMonth={date.startsWith(`${month}-`)}
                           isToday={date === today}
                           draggable={draggable && editable}
-                          renderItem={editable ? renderItem : noControls}
+                          renderItem={renderItem}
+                          editable={editable}
                           {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
                         />
                       </td>
@@ -167,6 +170,7 @@ function DayCell({
   inMonth,
   isToday,
   draggable,
+  editable,
   renderItem,
   onAdd,
 }: {
@@ -175,6 +179,7 @@ function DayCell({
   inMonth: boolean;
   isToday: boolean;
   draggable: boolean;
+  editable: boolean;
   renderItem: Props['renderItem'];
   onAdd?: () => void;
 }) {
@@ -193,7 +198,14 @@ function DayCell({
       {items.length > 0 ? (
         <ul className={styles.items}>
           {items.map((item) => (
-            <DayItem key={item.id} item={item} date={date} draggable={draggable} renderItem={renderItem} />
+            <DayItem
+              key={item.id}
+              item={item}
+              date={date}
+              draggable={draggable}
+              editable={editable}
+              renderItem={renderItem}
+            />
           ))}
         </ul>
       ) : null}
@@ -217,11 +229,13 @@ function DayItem({
   item,
   date,
   draggable,
+  editable,
   renderItem,
 }: {
   item: CalendarItem;
   date: IsoDate;
   draggable: boolean;
+  editable: boolean;
   renderItem: Props['renderItem'];
 }) {
   const data: DragData = { item, from: date };
@@ -244,7 +258,7 @@ function DayItem({
           // Read-only calendar: the name is plain text.
           <span className={styles.itemHandle}>{item.name}</span>
         )}
-        {renderItem(item, date)}
+        {renderItem(item, date, editable)}
       </div>
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
     </li>

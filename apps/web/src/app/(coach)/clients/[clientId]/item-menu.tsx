@@ -12,6 +12,7 @@ import styles from '@/components/calendar/calendar.module.css';
 
 const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 
+/** One item's options. A past day's item gets no `editHref` or `onMove`, so its menu offers only Delete. */
 export function ItemMenu({
   item,
   editHref,
@@ -19,8 +20,8 @@ export function ItemMenu({
   onDelete,
 }: {
   item: CalendarItem;
-  editHref: string;
-  onMove: () => void;
+  editHref?: string;
+  onMove?: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -31,7 +32,7 @@ export function ItemMenu({
 
   useEffect(() => {
     if (!open) return;
-    itemsRef.current[0]?.focus();
+    itemsRef.current.find((x) => x != null)?.focus();
     const outside = (e: PointerEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -40,7 +41,7 @@ export function ItemMenu({
   }, [open]);
 
   function onMenuKey(e: KeyboardEvent<HTMLUListElement>) {
-    const els = itemsRef.current.filter((x): x is HTMLElement => x !== null);
+    const els = itemsRef.current.filter((x): x is HTMLElement => x != null);
     const at = els.indexOf(document.activeElement as HTMLElement);
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -71,29 +72,38 @@ export function ItemMenu({
       </button>
       {open ? (
         <ul id={menuId} role="menu" aria-label={`Options for ${item.name}`} className={styles.menu} onKeyDown={onMenuKey}>
-          <li role="none">
-            <Link href={editHref} role="menuitem" ref={(el) => {
-                itemsRef.current[0] = el;
-              }} className={styles.menuItem}>
-              Edit
-            </Link>
-          </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                itemsRef.current[1] = el;
-              }}
-              className={styles.menuItem}
-              onClick={() => {
-                setOpen(false);
-                onMove();
-              }}
-            >
-              Move to…
-            </button>
-          </li>
+          {editHref ? (
+            <li role="none">
+              <Link
+                href={editHref}
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[0] = el;
+                }}
+                className={styles.menuItem}
+              >
+                Edit
+              </Link>
+            </li>
+          ) : null}
+          {onMove ? (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[1] = el;
+                }}
+                className={styles.menuItem}
+                onClick={() => {
+                  setOpen(false);
+                  onMove();
+                }}
+              >
+                Move to…
+              </button>
+            </li>
+          ) : null}
           <li role="none">
             <button
               type="button"

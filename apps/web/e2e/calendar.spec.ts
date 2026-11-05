@@ -351,9 +351,8 @@ test('remove a program from the calendar from today on', async ({ page }) => {
   // The past workout stays, and the assignment records when it was stopped.
   await page.goto(calendarUrl(monthOf(pastDate)));
   await expect(day(page, pastDate).getByText(workout, { exact: true })).toHaveCount(1);
-  // Past days are read-only: no dragging, no options menu.
+  // Past days are read-only apart from Delete: the name can't be dragged.
   await expect(item(page, pastDate, workout)).toHaveCount(0);
-  await expect(day(page, pastDate).getByRole('button', { name: `Options for ${workout}` })).toHaveCount(0);
   const left = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId);
   expect(left.data).toEqual([{ scheduled_on: pastDate }]);
   const after = await admin.from('program_assignments').select('cancelled_on').eq('id', assignment.data.id).single();
@@ -593,4 +592,41 @@ test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigne
 
   const { data } = await admin.from('program_assignments').select('start_date').eq('program_name', program);
   expect(data).toEqual([{ start_date: addDays(today, -3) }]);
+});
+
+test('a past workout can be deleted, but not moved or edited', async ({ page }) => {
+  const workout = `Missed ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await page.goto(calendarUrl());
+  const pastDate = addDays(await browserToday(page), -2);
+  const seeded = await admin
+    .from('workouts')
+    .insert({ workspace_id: workspaceId, client_id: clientId, scheduled_on: pastDate, name: workout })
+    .select('id')
+    .single();
+  if (seeded.error) throw seeded.error;
+
+  await page.goto(calendarUrl(monthOf(pastDate)));
+  const cell = day(page, pastDate);
+  await expect(cell.getByText(workout, { exact: true })).toBeVisible();
+  await expect(item(page, pastDate, workout)).toHaveCount(0);
+  await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
+  const menu = cell.getByRole('menu', { name: `Options for ${workout}` });
+  await expect(menu.getByRole('menuitem')).toHaveCount(1);
+  await expect(menu.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Move to…' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
+
+  await menu.getByRole('menuitem', { name: 'Delete' }).click();
+  const confirm = page.getByRole('dialog', { name: `Delete ${workout}?` });
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(confirm).toBeHidden();
+  await expect(cell.getByText(workout, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+
+  await page.reload();
+  await expect(day(page, pastDate).getByText(workout, { exact: true })).toHaveCount(0);
+  const left = await admin.from('workouts').select('id').eq('id', seeded.data.id);
+  expect(left.data).toEqual([]);
 });

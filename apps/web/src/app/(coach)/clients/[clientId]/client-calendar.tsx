@@ -48,7 +48,7 @@ export function useLocalToday(): IsoDate {
 /**
  * One client's month: assign a program, add single library workouts ("+ Add workout" or a day's "+"), and move
  * (drag or "Move to…"), edit or delete single workouts. Single workouts go on today or later, so past days are
- * read-only. Moves and deletes show at once and are undone, with a message, if saving fails; the server re-sends the
+ * read-only except for Delete (to clear a missed workout). Moves and deletes show at once and are undone, with a message, if saving fails; the server re-sends the
  * calendar after every change. A past client's calendar is read-only: no assigning, adding, moving, editing or
  * removing.
  */
@@ -209,14 +209,19 @@ export function ClientCalendar({
           editableFrom={today}
           onDropItem={move}
           onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
-          renderItem={(item, date) => (
-            <ItemMenu
-              item={item}
-              editHref={`/clients/${client.id}/workouts/${item.id}`}
-              onMove={() => setMoving({ ...item, date })}
-              onDelete={() => setDeleting({ ...item, date })}
-            />
-          )}
+          renderItem={(item, date, editable) =>
+            editable ? (
+              <ItemMenu
+                item={item}
+                editHref={`/clients/${client.id}/workouts/${item.id}`}
+                onMove={() => setMoving({ ...item, date })}
+                onDelete={() => setDeleting({ ...item, date })}
+              />
+            ) : (
+              // A past day: no moving or editing, but a missed workout can still be cleared.
+              <ItemMenu item={item} onDelete={() => setDeleting({ ...item, date })} />
+            )
+          }
         />
       )}
 
