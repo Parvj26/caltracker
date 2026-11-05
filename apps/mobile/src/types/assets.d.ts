@@ -3,3 +3,9 @@ declare module '*.ttf' {
   const asset: number;
   export default asset;
 }
+
+// Metro resolves an image import to an asset id that <Image source> accepts.
+declare module '*.png' {
+  const asset: number;
+  export default asset;
+}

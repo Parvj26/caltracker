@@ -37,3 +37,55 @@ export {
   passwordBytes,
 } from './invites/accept';
 export type { AcceptInviteReason } from './invites/accept';
+export {
+  KG_PER_LB,
+  M_PER_MILE,
+  distanceUnitFor,
+  formatClock,
+  formatDistance,
+  formatDuration,
+  formatWeight,
+  fromKg,
+  fromMeters,
+  kgToInput,
+  parseClock,
+  toKg,
+  toMeters,
+} from './units/units';
+export type { DistanceUnit, Units } from './units/units';
+export {
+  IsoDateSchema,
+  addDays,
+  diffDays,
+  isoWeekday,
+  localToday,
+  monthGrid,
+  programDayToDate,
+  programEndDate,
+  startOfWeek,
+} from './dates/dates';
+export type { IsoDate } from './dates/dates';
+export { BLOCK_KINDS, SET_TYPES, WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } from './workouts/schema';
+export type { BlockKind, SetType } from './workouts/schema';
+export { groupDropSets, setLabels } from './workouts/drop-sets';
+export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
+export type { WorkoutTreeRow, WorkoutTreeSetRow } from './workouts/tree';
+export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget } from './workouts/targets';
+export {
+  addDrop,
+  addExerciseToSuperset,
+  addRound,
+  addSet,
+  addStraightBlock,
+  addSuperset,
+  emptyWorkout,
+  moveBlock,
+  removeBlock,
+  removeExercise,
+  removeRound,
+  removeSet,
+  replaceExercise,
+  updateSet,
+} from './workouts/doc-ops';
+export type { ExercisePick } from './workouts/doc-ops';
+export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';

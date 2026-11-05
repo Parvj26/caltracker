@@ -81,6 +81,12 @@ test('out-of-range and absurd ?page values never show an error page', async ({ p
     const response = await page.goto(`/exercises?page=${value}`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: 'Exercises' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Barbell Squat/ }).or(page.getByText('No exercises match.'))).toBeVisible();
+    // Which of these shows depends on library size: the pager (more than one page), an exercise card
+    // (a single page) or the empty message (no exercises). Any one means the list rendered, not an error.
+    const rendered = page
+      .getByRole('navigation', { name: 'Pagination' })
+      .or(page.locator('a[href^="/exercises/"]:not([href="/exercises/new"])'))
+      .or(page.getByText('No exercises match.'));
+    await expect(rendered.first()).toBeVisible();
   }
 });

@@ -1,0 +1,62 @@
+# The coach assigns a 1-week program starting today; the seed client sees it on Today, opens the read-only
+# detail, and finds it on the Workouts week view. A client with a workout never sees the first-time welcome.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- tapOn:
+    id: email-input
+- inputText: ${EMAIL}
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- runFlow: helpers/submit.yaml
+# iOS may offer to save the password; dismiss it if shown.
+- tapOn:
+    text: Not Now
+    optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to Demo Coaching'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'E2E Upper'
+    timeout: 20000
+- assertNotVisible: 'Your first workout is coming!'
+- assertNotVisible:
+    id: units-kg
+- tapOn: 'View workout'
+- extendedWaitUntil:
+    visible: 'Barbell Squat'
+    timeout: 20000
+- assertVisible: '8 reps · 60 kg'
+# The drop row's label is read as "Drop set" (iOS shows the accessibility label, not the ↳ glyph).
+- assertVisible:
+    id: drop-set
+- assertVisible: 'Drop set'
+- assertVisible: 'To failure'
+# Read only in phase 2: there is no Start button.
+- assertNotVisible: 'Start'
+- tapOn:
+    id: back
+- tapOn:
+    id: tab-workouts
+- runScript:
+    file: helpers/week-of.js
+- assertVisible: ${output.weekOf}
+- assertVisible:
+    id: today-chip
+# React Native flattens the row's views, so "inside today-row" can't be matched. The lime chip only renders
+# on today's date, and this client's only workout is E2E Upper, so these two prove today's row shows it.
+- assertVisible:
+    id: today-chip
+- assertVisible: 'E2E Upper'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

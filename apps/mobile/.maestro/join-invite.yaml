@@ -33,6 +33,10 @@ env:
 - assertVisible:
     id: last-name-input
     text: Tester
+# iOS offers "Use Strong Password?" on a hidden new-password field, and that sheet swallows typed text.
+# Show the password first: a visible field gets no sheet, and the test still types the known password.
+- tapOn:
+    id: toggle-password
 - tapOn:
     id: password-input
 - inputText: ${PASSWORD}
@@ -45,6 +49,15 @@ env:
 - extendedWaitUntil:
     visible: 'Welcome to Demo Coaching'
     timeout: 20000
+# A brand-new client has no workouts yet, so Today shows the first-time welcome.
+- extendedWaitUntil:
+    visible: 'Your first workout is coming!'
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: units-kg
+- assertVisible:
+    id: units-lb
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

@@ -5,29 +5,48 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts remove <email>   the coach removes this client (Past clients)
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts confirmlink <email>   confirmation link from Mailpit
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts invitelink <email> <name>   invite + its caltracker://invite link
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign <email>   the coach assigns "E2E Upper" to this client today
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import { splitFullName, type Database } from '@caltracker/shared';
+import { localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
 
-function serviceClient() {
+let statusEnv: string | undefined;
+/** A value from `supabase status -o env` (read once). */
+function localStatus(name: string): string | undefined {
+  statusEnv ??= execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  return statusEnv.match(new RegExp(`^${name}="?([^"\\n]+)"?$`, 'm'))?.[1];
+}
+
+function localUrl(): string {
   // Expo's process.env typing is loose (any); cast to the real shape.
-  let url = process.env.SUPABASE_URL as string | undefined;
-  let key = process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
-  if (!url || !key) {
-    const out = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    const get = (name: string) => out.match(new RegExp(`^${name}="?([^"\\n]+)"?$`, 'm'))?.[1];
-    url = get('API_URL');
-    key = get('SERVICE_ROLE_KEY');
-  }
-  if (!url || !key) throw new Error('Run local Supabase (pnpm db:start) or set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+  const url = (process.env.SUPABASE_URL as string | undefined) ?? localStatus('API_URL');
+  if (!url) throw new Error('Run local Supabase (pnpm db:start) or set SUPABASE_URL.');
   const host = new URL(url).hostname;
   if (host !== '127.0.0.1' && host !== 'localhost') {
-    throw new Error(`Refusing to run service-role helpers against non-local Supabase host: ${host}`);
+    throw new Error(`Refusing to run e2e helpers against non-local Supabase host: ${host}`);
   }
+  return url;
+}
+
+function serviceClient() {
+  const url = localUrl();
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined) ?? localStatus('SERVICE_ROLE_KEY');
+  if (!key) throw new Error('Run local Supabase (pnpm db:start) or set SUPABASE_SERVICE_ROLE_KEY.');
   return createClient<Database>(url, key, { auth: { persistSession: false } });
+}
+
+/** A client signed in as the seed coach with the anon key, so RPCs that check auth.uid() see the coach. */
+async function coachClient() {
+  const key = (process.env.SUPABASE_ANON_KEY as string | undefined) ?? localStatus('ANON_KEY');
+  if (!key) throw new Error('Run local Supabase (pnpm db:start) or set SUPABASE_ANON_KEY.');
+  const coach = createClient<Database>(localUrl(), key, { auth: { persistSession: false } });
+  const { error } = await coach.auth.signInWithPassword({ email: 'coach@demo.local', password: 'demo-password-123' });
+  if (error) throw new Error(`Seed coach sign-in failed (run pnpm db:reset): ${error.message}`);
+  return coach;
 }
 
 const admin = serviceClient();
@@ -92,6 +111,94 @@ export async function cleanup(email: string): Promise<void> {
   }
 }
 
+/**
+ * What the coach does on the dashboard: save a library workout "E2E Upper" (Barbell Squat, 8 reps @ 60 kg, then a
+ * drop to failure), put it on Day 1 of a 1-week program "E2E Program", and assign that to the client starting
+ * today in this Mac's time zone (the simulator's). Clears earlier E2E rows first, so it can be rerun.
+ */
+export async function assign(email: string): Promise<void> {
+  await cleanupWorkouts();
+  const clientId = await findUserId(email);
+  if (!clientId) throw new Error(`No user with email ${email}`);
+  const coach = await coachClient();
+  try {
+    const { data: ws, error: wsErr } = await coach.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+    if (wsErr) throw wsErr;
+    const { data: squat, error: exErr } = await coach
+      .from('exercises')
+      .select('id, name, tracking_type')
+      .eq('source', 'builtin')
+      .eq('name', 'Barbell Squat')
+      .limit(1)
+      .single();
+    if (exErr) throw new Error(`Barbell Squat not found (run pnpm import:exercises): ${exErr.message}`);
+
+    const set = { targetDurationS: null, targetDistanceM: null, note: null };
+    const doc: WorkoutDoc = {
+      id: randomUUID(),
+      name: 'E2E Upper',
+      notes: null,
+      blocks: [
+        {
+          id: randomUUID(),
+          kind: 'straight',
+          exercises: [
+            {
+              id: randomUUID(),
+              exerciseId: squat.id,
+              exerciseName: squat.name,
+              trackingType: squat.tracking_type,
+              note: null,
+              sets: [
+                { ...set, id: randomUUID(), setType: 'normal', targetRepsMin: 8, targetRepsMax: 8, targetWeightKg: 60, toFailure: false, restSeconds: 90 },
+                { ...set, id: randomUUID(), setType: 'drop', targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, toFailure: true, restSeconds: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { data: workoutId, error: saveErr } = await coach.rpc('save_workout', { p_workspace_id: ws.id, p_doc: doc });
+    if (saveErr) throw saveErr;
+
+    const programId = randomUUID();
+    const { error: progErr } = await coach.from('programs').insert({ id: programId, workspace_id: ws.id, name: 'E2E Program', weeks: 1 });
+    if (progErr) throw progErr;
+    // workspace_id is copied from the program by a trigger (and isn't insertable); the generated type still lists it.
+    type SlotInsert = Database['public']['Tables']['program_workouts']['Insert'];
+    const slot = { program_id: programId, week: 1, day: 1, position: 0, workout_id: workoutId } as Omit<
+      SlotInsert,
+      'workspace_id'
+    > as SlotInsert;
+    const { error: slotErr } = await coach.from('program_workouts').insert(slot);
+    if (slotErr) throw slotErr;
+
+    const { error: assignErr } = await coach.rpc('assign_program', {
+      p_assignment_id: randomUUID(),
+      p_program_id: programId,
+      p_client_id: clientId,
+      p_start_date: localToday(),
+    });
+    if (assignErr) throw assignErr;
+  } finally {
+    await coach.auth.signOut();
+  }
+}
+
+/** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */
+export async function cleanupWorkouts(): Promise<void> {
+  const steps = [
+    () => admin.from('workouts').delete().like('name', 'E2E %').not('client_id', 'is', null),
+    () => admin.from('program_assignments').delete().like('program_name', 'E2E %'),
+    () => admin.from('programs').delete().like('name', 'E2E %'),
+    () => admin.from('workouts').delete().like('name', 'E2E %'),
+  ];
+  for (const step of steps) {
+    const { error } = await step();
+    if (error) throw error;
+  }
+}
+
 // Finds the newest confirmation email for `email` in Mailpit (local mail catcher) and returns its verify link.
 export async function confirmLink(email: string): Promise<string> {
   const base = (process.env.MAILPIT_URL as string | undefined) ?? 'http://127.0.0.1:54324';
@@ -113,6 +220,8 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);
   else if (action === 'remove') await remove(email);
+  else if (action === 'assign') await assign(email);
+  else if (action === 'cleanup-workouts') await cleanupWorkouts();
   else throw new Error(`Unknown action ${action}`);
 }
 

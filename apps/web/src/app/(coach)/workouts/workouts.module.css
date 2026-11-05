@@ -1,0 +1,50 @@
+/* Workout library. Colours, radii and sizes only via var(--ct-*). */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
+
+.titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.titleActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin-left: auto; }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+.back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
+
+/* ---------- Search ---------- */
+.searchCard { padding: var(--ct-space-4) var(--ct-space-4-5); }
+.searchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
+.searchField { flex: 1 1 220px; }
+
+/* ---------- List ---------- */
+.listCard { padding: var(--ct-space-2) var(--ct-space-4-5); }
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  padding: var(--ct-space-2-5) var(--ct-space-2);
+  text-align: left;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+}
+.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.table td:first-child, .table th:first-child { padding-left: 0; }
+.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
+
+/* ---------- Delete dialog ---------- */
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: var(--ct-space-6);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.dialogBody { margin: 0; }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }

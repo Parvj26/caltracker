@@ -47,7 +47,14 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 14. In-app account deletion, privacy policy
 
 ### Explicitly not in Version 1
-- Coach self-sign-up and subscription billing (launch coach's workspace is created manually)
+- Coach self-sign-up and subscription billing (launch coach's workspace is created manually). **Planned before the second coach** (product owner, 2026-11-05):
+  - **Platform admin area.** A separate, locked-down area for the owner only, with an audit log of admin actions. It shows:
+    - coaches: sign-up date, client count, last active, plan and payment status
+    - health counts: sign-ups, invites sent vs accepted, errors
+    - actions: set up a coach, suspend a coach, resend an invite
+
+    It shows counts and status, never clients' workouts or body data.
+  - **Billing through Stripe Billing and its customer portal.** No billing UI of our own. The app stores each coach's plan and paid status.
 - Assistant coaches / staff accounts (data model allows them)
 - Video uploads of any kind (chat, community, exercise demos)
 - Voice notes, group chats, broadcast messages
