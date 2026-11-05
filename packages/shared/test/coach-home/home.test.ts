@@ -127,6 +127,10 @@ describe('missedClients', () => {
     const ws = [wk({ scheduledOn: '2026-11-05' }), wk({ scheduledOn: '2026-10-28' }), wk({ scheduledOn: '2026-11-04' })];
     expect(missedClients(ws, TODAY)).toEqual([]);
   });
+  it('counts a workout exactly seven days ago (inside edge)', () => {
+    const ws = [wk({ scheduledOn: '2026-10-29' }), wk({ scheduledOn: '2026-11-04' })];
+    expect(missedClients(ws, TODAY)).toEqual([{ clientId: 'c1', missed: 2 }]);
+  });
   it('does not count done workouts', () => {
     const ws = [wk({ scheduledOn: '2026-11-01', logs: [log()] }), wk({ scheduledOn: '2026-11-04' })];
     expect(missedClients(ws, TODAY)).toEqual([]);
@@ -196,6 +200,18 @@ describe('endingPrograms', () => {
     const ending = asg({ endDate: '2026-11-10' });
     const next = asg({ startDate: '2026-11-11', endDate: '2026-12-10' });
     expect(endingPrograms([ending, next], TODAY)).toEqual([]);
+  });
+  it('is not suppressed by a cancelled follow-up', () => {
+    const ending = asg({ endDate: '2026-11-10' });
+    const next = asg({ startDate: '2026-11-11', endDate: '2026-12-10', cancelledOn: '2026-11-02' });
+    expect(endingPrograms([ending, next], TODAY)).toEqual([
+      { clientId: 'c1', assignmentId: ending.id, daysLeft: 5 },
+    ]);
+  });
+  it('is not suppressed by a follow-up starting on the same day it ends', () => {
+    const ending = asg({ endDate: '2026-11-10' });
+    const next = asg({ startDate: '2026-11-10', endDate: '2026-12-10' });
+    expect(endingPrograms([ending, next], TODAY).map((e) => e.assignmentId)).toEqual([ending.id]);
   });
   it('sorts by days left', () => {
     const a = asg({ clientId: 'a', endDate: '2026-11-09' });
