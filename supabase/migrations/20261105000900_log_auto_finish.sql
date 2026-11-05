@@ -1,6 +1,6 @@
 -- Hourly job: finish workouts a client forgot to close.
 -- A log with no activity for 3 hours is completed (if at least one set was done) or discarded.
--- Both are marked auto_finished, so the phone may still upload its data for 24 h (see save_workout_log).
+-- Both are marked auto_finished, so the phone's own copy, whenever it arrives, still wins (see save_workout_log).
 -- `revision` is the phone's counter only, so this job never changes it, and last_activity_at stays as it was.
 
 create function public.auto_finish_stale_logs() returns integer

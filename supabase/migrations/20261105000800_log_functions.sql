@@ -57,17 +57,25 @@ alter table public.log_sets
 --   * revision is the phone's counter only; server actions (auto-finish, coach correction) never change it.
 --     A change applies only when doc.revision > stored revision.
 --   * The client may change a log while it is in_progress, or while it is completed/discarded with
---     auto_finished, not corrected, and within 24 h (from finished_at, or last_activity_at when discarded):
---     the phone's data wins over an automatic finish. Manually finished or corrected logs are locked.
+--     auto_finished and not corrected, however long ago: the phone's data always wins over an automatic finish,
+--     so ticked sets that reach the server late are never lost (product owner decision, 2026-11-05). Manually
+--     finished or discarded logs and corrected logs are locked. The 24 h limit applies only to the client's
+--     own "Add missed sets" reopen, which the phone checks with canReopen (packages/shared).
 --   * A refused change (stale or locked) is not an error: nothing changes and applied=false comes back with
 --     the stored revision and status, and the phone adopts the server's doc. Errors are for malformed docs
---     (23514) and authorization (42501).
---   * auto_finished follows the doc only on an in_progress -> completed/discarded change (or an insert as
---     completed/discarded); otherwise the stored value is kept, so a reopen does not erase it.
+--     (23514) and authorization (42501). A caller who is no longer a client of the log's workspace (removed by
+--     the coach) gets 42501 with hint 'not_a_client': that is final, and the phone stops retrying.
+--   * auto_finished follows the doc when the result is completed/discarded and the stored log was in progress
+--     or finished automatically (or on an insert): a manual finish over an automatic one clears it, so the log
+--     is then locked. A reopen (result in_progress) keeps the stored value.
+--   * last_activity_at is the doc's value but never later than now(), so a phone clock running ahead cannot
+--     keep a forgotten workout alive (a clock running behind only makes the hourly job finish it sooner, and
+--     the next save from the phone puts it back).
 --
 -- Rows are matched by id; positions are 0-based doc indexes; this log's rows that the doc no longer has are
 -- deleted. A row that moved to another parent within the log is deleted and re-inserted, because parent
--- columns never change (refuse_owner_change).
+-- columns never change (refuse_owner_change). The re-inserted row gets a new created_at; nothing orders or
+-- audits log rows by created_at, so that is harmless.
 create function public.save_workout_log(p_doc jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -138,14 +146,19 @@ begin
   else
     select array_agg(m.workspace_id) into v_workspaces
     from public.workspace_members m where m.user_id = v_uid and m.role = 'client';
-    if coalesce(cardinality(v_workspaces), 0) <> 1 then
+    if coalesce(cardinality(v_workspaces), 0) = 0 then
+      raise exception 'Only a current client of this coach can save workouts.'
+        using errcode = '42501', hint = 'not_a_client';
+    end if;
+    if cardinality(v_workspaces) <> 1 then
       raise exception 'You need exactly one coach to log a workout without a plan.' using errcode = '42501';
     end if;
     v_workspace_id := v_workspaces[1];
   end if;
 
   if not public.is_client_in(v_workspace_id, v_uid) then
-    raise exception 'Only a current client of this coach can save workouts.' using errcode = '42501';
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
   end if;
 
   if v_revision < 1 then
@@ -157,9 +170,7 @@ begin
     v_revision <= v_log.revision
     or not (
       v_log.status = 'in_progress'
-      or (v_log.auto_finished and v_log.corrected_at is null
-          and now() - case v_log.status when 'completed' then v_log.finished_at else v_log.last_activity_at end
-            < interval '24 hours')
+      or (v_log.auto_finished and v_log.corrected_at is null)
     )
   ) then
     return jsonb_build_object('applied', false, 'revision', v_log.revision, 'status', v_log.status);
@@ -227,7 +238,7 @@ begin
   if v_status = 'completed' then
     v_finished_at := coalesce(v_finished_at, now());
   end if;
-  if (not v_exists or v_log.status = 'in_progress') and v_status <> 'in_progress' then
+  if v_status <> 'in_progress' and (not v_exists or v_log.status = 'in_progress' or v_log.auto_finished) then
     v_auto_finished := coalesce((p_doc ->> 'autoFinished')::boolean, false);
   elsif v_exists then
     v_auto_finished := v_log.auto_finished;
@@ -241,7 +252,7 @@ begin
       name = btrim(p_doc ->> 'name'),
       status = v_status,
       finished_at = v_finished_at,
-      last_activity_at = coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()),
+      last_activity_at = least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()),
       auto_finished = v_auto_finished,
       revision = v_revision,
       notes = p_doc ->> 'notes'
@@ -251,7 +262,7 @@ begin
       last_activity_at, auto_finished, logged_by, revision, notes)
     values (v_log_id, v_workspace_id, v_uid, v_workout_id, btrim(p_doc ->> 'name'), v_status,
       coalesce((p_doc ->> 'startedAt')::timestamptz, now()), v_finished_at,
-      coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()),
+      least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()),
       v_auto_finished, v_uid, v_revision, p_doc ->> 'notes');
   end if;
 
@@ -352,6 +363,7 @@ grant execute on function public.save_workout_log(jsonb) to authenticated;
 
 -- correct_workout_log: a coach fixes typos in a finished log's actuals. p_sets is an array of
 -- { id, actualReps, actualWeightKg, actualDurationS, actualDistanceM }; a key left out keeps its value.
+-- Only sets the client ticked can be corrected (a set that was not done has no actuals to fix).
 -- It returns the number of sets updated. It never changes revision (the phone's counter); corrected_at locks
 -- the log for the client instead, so the phone's next save returns applied=false and it adopts this doc.
 create function public.correct_workout_log(p_log_id uuid, p_sets jsonb) returns integer
@@ -375,6 +387,9 @@ begin
 
   for v_set in select value from jsonb_array_elements(p_sets) loop
     v_set_id := (v_set ->> 'id')::uuid;
+    if exists (select 1 from public.log_sets s where s.id = v_set_id and s.log_id = p_log_id and s.completed_at is null) then
+      raise exception 'Only sets that were done can be corrected.' using errcode = '23514';
+    end if;
     update public.log_sets s set
       actual_reps = case when v_set ? 'actualReps' then (v_set ->> 'actualReps')::smallint else s.actual_reps end,
       actual_weight_kg = case when v_set ? 'actualWeightKg' then (v_set ->> 'actualWeightKg')::numeric
@@ -399,8 +414,12 @@ revoke execute on function public.correct_workout_log(uuid, jsonb) from public, 
 grant execute on function public.correct_workout_log(uuid, jsonb) to authenticated;
 
 -- last_results: for each exercise, the completed sets from the caller's most recent finished log in which
--- that exercise has at least one completed set ("Last time: 135 × 8"). Security invoker: RLS limits it to
--- the caller's logs in workspaces where they are still a client.
+-- that exercise has at least one completed set ("Last time: 135 × 8"), so an exercise skipped last time still
+-- shows its previous result. Security invoker: RLS limits it to the caller's logs in workspaces where they
+-- are still a client. It filters log_exercises on the caller's own client_id too, so it reads only their rows
+-- through log_exercises_client_exercise_idx instead of every client's rows for a built-in exercise.
+create index log_exercises_client_exercise_idx on public.log_exercises (client_id, exercise_id);
+
 create function public.last_results(p_exercise_ids uuid[])
 returns table (exercise_id uuid, finished_at timestamptz, set_type public.set_type, actual_reps smallint,
   actual_weight_kg numeric, actual_duration_s integer, actual_distance_m numeric, "position" smallint)
@@ -410,6 +429,7 @@ language sql stable security invoker set search_path = '' as $$
     from public.log_exercises le
     join public.workout_logs l on l.id = le.log_id
     where le.exercise_id = any (p_exercise_ids)
+      and le.client_id = (select auth.uid())
       and l.client_id = (select auth.uid())
       and l.status = 'completed'
       and exists (select 1 from public.log_sets s where s.log_exercise_id = le.id and s.completed_at is not null)
