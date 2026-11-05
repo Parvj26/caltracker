@@ -65,3 +65,20 @@ export { BLOCK_KINDS, SET_TYPES, WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget } from './workouts/targets';
+export {
+  addDrop,
+  addExerciseToSuperset,
+  addRound,
+  addSet,
+  addStraightBlock,
+  addSuperset,
+  emptyWorkout,
+  moveBlock,
+  removeBlock,
+  removeExercise,
+  removeRound,
+  removeSet,
+  replaceExercise,
+  updateSet,
+} from './workouts/doc-ops';
+export type { ExercisePick } from './workouts/doc-ops';
