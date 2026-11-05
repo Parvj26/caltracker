@@ -109,6 +109,8 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, prefillActuals, startLogFromWorkout } from './logs/start';
+export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
+export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
 export {
   addLogDrop,
   addLogExercise,
