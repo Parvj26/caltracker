@@ -11,6 +11,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   const name = `Upper A ${unique()}`;
   await signInAsCoach(page);
   await page.goto('/workouts');
+  await expect(
+    page.getByText(
+      "A workout is one session: exercises, sets, reps and rest. Build them here, then add them to programs or straight to a client's calendar.",
+    ),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'New workout' }).click();
   await expect(page).toHaveURL(/\/workouts\/new$/);
 
@@ -23,9 +28,23 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
 
   // Straight sets: 3 x 8-10 @ 60 kg, then a warm-up first and a drop to failure after set 3.
   await pickExercise(page, '+ Exercise', 'Barbell Squat');
+
+  // Each exercise's sets have column captions, and the empty boxes say what goes in them.
+  const squat = page.getByRole('region', { name: 'Barbell Squat' });
+  for (const caption of ['Type', 'Reps', 'Weight', 'Rest', 'Note']) {
+    await expect(squat.getByText(caption, { exact: true })).toBeVisible();
+  }
+  const first = setRow(page, 'Barbell Squat', 'set 1');
+  await expect(first.getByPlaceholder('reps', { exact: true })).toBeVisible();
+  await expect(first.getByLabel('Weight (kg)')).toHaveAttribute('placeholder', 'kg');
+  const toggle = first.getByRole('button', { name: '8–10', exact: true });
+  await expect(toggle).toHaveAccessibleDescription('Use a rep range, e.g. 8–10');
+  await expect(toggle).toHaveAttribute('title', 'Use a rep range, e.g. 8–10');
+
   for (const n of [1, 2, 3]) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await row.getByRole('button', { name: 'Range' }).click();
+    await row.getByRole('button', { name: '8–10', exact: true }).click();
+    await expect(row.getByRole('button', { name: 'Single', exact: true })).toHaveAccessibleDescription('Use one rep count');
     await row.getByLabel('Min reps').fill('8');
     await row.getByLabel('Max reps').fill('10');
     await row.getByLabel('Weight (kg)').fill('60');
@@ -46,16 +65,37 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   // Superset of Pushups + Pullups, 3 rounds by default.
   await page.getByRole('button', { name: '+ Superset / circuit' }).click();
   const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
+  await expect(picker.getByText('A superset needs 2 or more exercises. Search and tap each one.')).toBeVisible();
   await picker.getByLabel('Search exercises').fill('Pushups');
   await picker.getByRole('button', { name: 'Pushups', exact: true }).click();
+  // One pick is not a superset yet.
+  await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
   await picker.getByLabel('Search exercises').fill('Pullups');
   await picker.getByRole('button', { name: 'Pullups', exact: true }).click();
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
   await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Save workout' }).click();
+  // Unsaved edits are flagged next to the Save button; after saving it says so there too.
+  const saveButton = page.getByRole('button', { name: 'Save workout' });
+  await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
+  await saveButton.click();
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
-  await expect(page.getByText('Saved')).toBeVisible();
+  const savedChip = page.getByRole('status').filter({ hasText: '✓ Saved' });
+  await expect(savedChip).toBeVisible();
+  const chipBox = (await savedChip.boundingBox())!;
+  const buttonBox = (await saveButton.boundingBox())!;
+  expect(Math.abs(buttonBox.x - (chipBox.x + chipBox.width))).toBeLessThan(48);
+  expect(Math.abs(buttonBox.y + buttonBox.height / 2 - (chipBox.y + chipBox.height / 2))).toBeLessThan(24);
+  // After a few seconds it settles to a quiet line.
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 8000 });
+
+  // Saving an existing workout shows the tick again.
+  await page.getByLabel('Workout name').fill(`${name} `);
+  await page.getByLabel('Workout name').fill(name);
+  await page.getByLabel('Workout notes (optional)').fill('Keep the bar path straight.');
+  await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
+  await saveButton.click();
+  await expect(savedChip).toBeVisible();
 
   await page.reload();
   await expect(page.getByLabel('Workout name')).toHaveValue(name);

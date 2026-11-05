@@ -35,8 +35,13 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   return (
     <div className={styles.page}>
       <header className={styles.titleRow}>
-        <h1 className={styles.title}>Workouts</h1>
-        <p className={styles.caption}>Your library. Programs and client calendars use copies of these.</p>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>Workouts</h1>
+          <p className={styles.caption}>
+            A workout is one session: exercises, sets, reps and rest. Build them here, then add them to programs or
+            straight to a client&apos;s calendar.
+          </p>
+        </div>
         <div className={styles.titleActions}>
           <ButtonLink href="/workouts/new">New workout</ButtonLink>
         </div>

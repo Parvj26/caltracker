@@ -84,22 +84,35 @@
 .exerciseNote .input { width: 100%; }
 
 /* ---------- Set rows ---------- */
-.sets { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+/* Wide enough: the caption row and every set row share one grid template (set inline from set-columns.ts), so the
+   captions sit over their inputs. Narrow: the cells wrap and the captions hide; placeholders and names still say
+   what each box is. */
+.sets { display: flex; flex-direction: column; gap: var(--ct-space-1); container-type: inline-size; }
 .setRow { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-1) var(--ct-space-2); border-radius: var(--ct-radius-input); }
-.dropRow { margin-left: var(--ct-space-6); background: var(--ct-drop); }
-.setCells { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.dropRow { background: var(--ct-drop); }
+.setCells, .columnCaptions { display: grid; align-items: center; gap: var(--ct-space-2); }
+.columnCaptions {
+  padding: 0 var(--ct-space-2);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+}
+@container (max-width: 879px) {
+  .setCells { display: flex; flex-wrap: wrap; }
+  .columnCaptions { display: none; }
+  .dropRow { margin-left: var(--ct-space-6); }
+}
 .setLabel { width: 24px; text-align: center; font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
 .dropTag { width: 7rem; font-weight: var(--ct-weight-section-heading); }
 .typeSelect { width: 7rem; cursor: pointer; }
 .reps { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
 .narrow { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.rangeInput { width: 3.5rem; text-align: right; font-variant-numeric: tabular-nums; }
 .unitField { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
-.cellCaption { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.toggle { font-size: var(--ct-size-caption); }
-.toggle[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); }
+.toggle { min-width: 4.5rem; font-size: var(--ct-size-caption); }
 .check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); cursor: pointer; }
 .check input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
-.noteInput { flex: 1 1 160px; min-width: 8rem; }
+.noteInput { flex: 1 1 160px; width: 100%; min-width: 8rem; }
 .rowActions { display: flex; gap: var(--ct-space-1); }
 .rowError { padding-left: var(--ct-space-6); }
 
@@ -117,7 +130,6 @@
   background: var(--ct-bg);
   border-top: var(--ct-border-width-card) solid var(--ct-border);
 }
-.status { margin: 0 auto 0 0; color: var(--ct-ink-muted); }
 
 /* ---------- Exercise picker ---------- */
 .dialog {

@@ -20,6 +20,7 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const resultsId = useId();
+  const hintId = useId();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ExercisePick[] | null>(null);
   const [error, setError] = useState(false);
@@ -73,16 +74,21 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
           className={styles.input}
           value={query}
           aria-controls={resultsId}
+          aria-describedby={multiple ? hintId : undefined}
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
+      {multiple ? (
+        <p id={hintId} className={styles.caption}>
+          A superset needs 2 or more exercises. Search and tap each one.
+        </p>
+      ) : null}
 
       {multiple ? (
+        // Always mounted, so screen readers hear each pick as it is added.
         <div className={styles.selected} aria-live="polite">
-          {selected.length === 0 ? (
-            <p className={styles.caption}>Pick two or more, in the order they&apos;re done.</p>
-          ) : (
-            <ol className={styles.selectedList}>
+          {selected.length > 0 ? (
+            <ol className={styles.selectedList} aria-label="Picked, in the order they're done">
               {selected.map((ex) => (
                 <li key={ex.id}>
                   {ex.name}
@@ -97,7 +103,7 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
                 </li>
               ))}
             </ol>
-          )}
+          ) : null}
         </div>
       ) : null}
 
@@ -130,7 +136,7 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
         </Button>
         {multiple ? (
           <Button disabled={selected.length < 2} onClick={() => onPick(selected)}>
-            {selected.length === 1 ? 'Add 1 exercise' : `Add ${selected.length} exercises`}
+            {selected.length < 2 ? 'Pick at least 2 exercises' : `Add ${selected.length} exercises`}
           </Button>
         ) : null}
       </div>
