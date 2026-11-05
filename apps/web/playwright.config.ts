@@ -6,6 +6,9 @@ export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
+  // Two workers, as on the GitHub runner. More than that exhausts the local auth container's outgoing ports (each auth
+  // request opens a new database connection, which then sits in TIME_WAIT), and sign-ins fail with "Database error".
+  workers: 2,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
