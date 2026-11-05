@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { compareByLastName } from '@caltracker/shared';
 import { Card, Chip } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
@@ -29,11 +30,16 @@ function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   );
 }
 
-function NameCell({ name, toneKey }: { name: string; toneKey: string }) {
+/** With `href`, the name links to that page (a joined client's calendar). */
+function NameCell({ name, toneKey, href }: { name: string; toneKey: string; href?: string }) {
   return (
     <div role="cell" className={styles.nameCell}>
       <Avatar name={name} toneKey={toneKey} />
-      <span className={styles.name}>{name}</span>
+      {href ? (
+        <Link href={href} className={cx(styles.name, styles.nameLink)}>{name || 'Client'}</Link>
+      ) : (
+        <span className={styles.name}>{name}</span>
+      )}
     </div>
   );
 }
@@ -122,7 +128,7 @@ export default async function ClientsPage() {
                   const name = profileByUser.get(m.user_id)?.full_name ?? '';
                   return (
                     <div role="row" key={m.user_id} className={styles.row}>
-                      <NameCell name={name} toneKey={m.user_id} />
+                      <NameCell name={name} toneKey={m.user_id} href={`/clients/${m.user_id}`} />
                       <span role="cell" className={styles.email}>{emailByUser.get(m.user_id) ?? ''}</span>
                       <span role="cell" className={styles.meta}>
                         {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}

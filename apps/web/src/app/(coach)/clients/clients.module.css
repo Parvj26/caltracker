@@ -60,6 +60,7 @@
 
 .nameCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
 .name { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); color: var(--ct-ink); }
 .email { overflow-wrap: anywhere; }
 .meta { font-size: 14px; color: var(--ct-ink-muted); white-space: nowrap; }
 .narrowOnly { display: none; }

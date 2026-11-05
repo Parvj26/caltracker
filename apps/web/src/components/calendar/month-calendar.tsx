@@ -1,0 +1,242 @@
+'use client';
+
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useId, useState, type ReactNode } from 'react';
+import { monthGrid } from '@caltracker/shared';
+import type { IsoDate } from '@caltracker/shared';
+import { cx } from '@/components/ui/cx';
+import { formatLongDay, formatMonth, formatShortDay, shiftMonth } from './format';
+import styles from './calendar.module.css';
+
+export type CalendarItem = { id: string; name: string; programName: string | null };
+
+type Props = {
+  /** "YYYY-MM". */
+  month: string;
+  days: Record<IsoDate, CalendarItem[]>;
+  /** The viewer's own today (computed in the browser), or null before it is known. */
+  today: IsoDate | null;
+  /** Extra controls shown on each item, beside its name (for example an options menu). */
+  renderItem: (item: CalendarItem, date: IsoDate) => ReactNode;
+  /** Present: items can be dragged onto other days. */
+  onDropItem?: (itemId: string, date: IsoDate) => void;
+  /** Present: each day has a "+" button. */
+  onAddToDay?: (date: IsoDate) => void;
+};
+
+type DragData = { item: CalendarItem; from: IsoDate };
+type DropData = { date: IsoDate };
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const NONE: CalendarItem[] = [];
+
+// Pointer first (exact for the mouse); the keyboard sensor has no pointer, so fall back to overlap.
+const collision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : rectIntersection(args);
+};
+const dragName = (data: unknown) => (data as DragData | undefined)?.item.name ?? 'workout';
+const dropName = (data: unknown) => {
+  const d = data as DropData | undefined;
+  return d ? formatLongDay(d.date) : 'nowhere';
+};
+const announcements: Announcements = {
+  onDragStart: ({ active }) => `Picked up ${dragName(active.data.current)}.`,
+  onDragOver: ({ active, over }) =>
+    over ? `${dragName(active.data.current)} is over ${dropName(over.data.current)}.` : `${dragName(active.data.current)} is not over a day.`,
+  onDragEnd: ({ active, over }) =>
+    over ? `Dropped ${dragName(active.data.current)} on ${dropName(over.data.current)}.` : `${dragName(active.data.current)} was put back.`,
+  onDragCancel: ({ active }) => `Cancelled. ${dragName(active.data.current)} was put back.`,
+};
+
+/**
+ * A Monday-first month of days. Each day cell carries data-date; today has an ink ring and aria-current="date".
+ * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
+ * button and the item controls from renderItem are the non-drag path.
+ */
+export function MonthCalendar({ month, days, today, renderItem, onDropItem, onAddToDay }: Props) {
+  const pathname = usePathname();
+  const dndId = useId();
+  const [dragging, setDragging] = useState<CalendarItem | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor),
+  );
+  const weeks = monthGrid(month);
+  const draggable = Boolean(onDropItem);
+
+  function onDragStart(e: DragStartEvent) {
+    setDragging((e.active.data.current as DragData | undefined)?.item ?? null);
+  }
+  function onDragEnd(e: DragEndEvent) {
+    setDragging(null);
+    const data = e.active.data.current as DragData | undefined;
+    const target = e.over?.data.current as DropData | undefined;
+    if (!data || !target || data.from === target.date) return;
+    onDropItem?.(data.item.id, target.date);
+  }
+
+  return (
+    <div className={styles.calendar}>
+      <div className={styles.monthBar}>
+        <Link href={`${pathname}?month=${shiftMonth(month, -1)}`} className={styles.monthLink} aria-label="Previous month">
+          <span aria-hidden="true">←</span>
+        </Link>
+        <h2 className={styles.monthTitle} aria-live="polite">{formatMonth(month)}</h2>
+        <Link href={`${pathname}?month=${shiftMonth(month, 1)}`} className={styles.monthLink} aria-label="Next month">
+          <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+
+      <DndContext
+        id={dndId}
+        sensors={sensors}
+        collisionDetection={collision}
+        accessibility={{ announcements }}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setDragging(null)}
+      >
+        <div className={styles.scroll}>
+          <table className={styles.grid} aria-label={formatMonth(month)}>
+            <thead>
+              <tr>
+                {WEEKDAYS.map((d) => (
+                  <th key={d} scope="col">{d}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weeks.map((week) => (
+                <tr key={week[0]}>
+                  {week.map((date) => (
+                    <td key={date}>
+                      <DayCell
+                        date={date}
+                        items={days[date] ?? NONE}
+                        inMonth={date.startsWith(`${month}-`)}
+                        isToday={date === today}
+                        draggable={draggable}
+                        renderItem={renderItem}
+                        {...(onAddToDay ? { onAdd: () => onAddToDay(date) } : {})}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {dragging ? <span className={styles.overlayItem}>{dragging.name}</span> : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  );
+}
+
+function DayCell({
+  date,
+  items,
+  inMonth,
+  isToday,
+  draggable,
+  renderItem,
+  onAdd,
+}: {
+  date: IsoDate;
+  items: CalendarItem[];
+  inMonth: boolean;
+  isToday: boolean;
+  draggable: boolean;
+  renderItem: Props['renderItem'];
+  onAdd?: () => void;
+}) {
+  const data: DropData = { date };
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${date}`, data, disabled: !draggable });
+  return (
+    <div
+      ref={setNodeRef}
+      role="group"
+      aria-label={formatLongDay(date)}
+      aria-current={isToday ? 'date' : undefined}
+      data-date={date}
+      className={cx(styles.day, !inMonth && styles.otherMonth, isToday && styles.today, isOver && styles.dayOver)}
+    >
+      <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
+      {items.length > 0 ? (
+        <ul className={styles.items}>
+          {items.map((item) => (
+            <DayItem key={item.id} item={item} date={date} draggable={draggable} renderItem={renderItem} />
+          ))}
+        </ul>
+      ) : null}
+      {onAdd ? (
+        <button
+          type="button"
+          id={calendarAddDomId(date)}
+          className={styles.addButton}
+          aria-label={`Add a workout to ${formatShortDay(date)}`}
+          onClick={onAdd}
+        >
+          +
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function DayItem({
+  item,
+  date,
+  draggable,
+  renderItem,
+}: {
+  item: CalendarItem;
+  date: IsoDate;
+  draggable: boolean;
+  renderItem: Props['renderItem'];
+}) {
+  const data: DragData = { item, from: date };
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
+  return (
+    <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging)}>
+      <div className={styles.itemRow}>
+        <button
+          type="button"
+          id={calendarItemDomId(item.id)}
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className={cx(styles.itemHandle, draggable && styles.grab)}
+        >
+          {item.name}
+        </button>
+        {renderItem(item, date)}
+      </div>
+      {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+    </li>
+  );
+}
+
+/** DOM id of an item's name button, so focus can return to it after a move. */
+export const calendarItemDomId = (itemId: string) => `calendar-item-${itemId}`;
+/** DOM id of a day's "+" button, so focus has somewhere to go after an item is deleted. */
+export const calendarAddDomId = (date: IsoDate) => `calendar-add-${date}`;
