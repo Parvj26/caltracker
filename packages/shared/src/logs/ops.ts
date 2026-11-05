@@ -262,3 +262,28 @@ export function setExerciseNote(
 ): WorkoutLogDoc {
   return mapExercise(log, logExerciseId, (ex) => ({ ...ex, note }), nowIso);
 }
+
+const hasCompletedSet = (log: WorkoutLogDoc) =>
+  log.blocks.some((b) => b.exercises.some((e) => e.sets.some((s) => s.completedAt !== null)));
+
+/**
+ * Finishes an in-progress log by hand: completed, finishedAt = now. Refused (same object back) when it is not
+ * in progress or no set is ticked, because a completed log needs at least one completed set.
+ */
+export function finishLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
+  if (log.status !== 'in_progress' || !hasCompletedSet(log)) return log;
+  return {
+    ...log,
+    status: 'completed',
+    finishedAt: nowIso,
+    lastActivityAt: nowIso,
+    autoFinished: false,
+    revision: log.revision + 1,
+  };
+}
+
+/** Throws an in-progress log away. Refused (same object back) once it is finished or discarded. */
+export function discardLog(log: WorkoutLogDoc, nowIso: string): WorkoutLogDoc {
+  if (log.status !== 'in_progress') return log;
+  return { ...log, status: 'discarded', lastActivityAt: nowIso, revision: log.revision + 1 };
+}

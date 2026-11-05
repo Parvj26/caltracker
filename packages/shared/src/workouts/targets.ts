@@ -17,7 +17,13 @@ export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
   distance: 'distance',
 };
 
-export function formatSetTarget(set: WorkoutSetDoc, trackingType: TrackingType, units: Units): string {
+/** Only the target fields are read, so a log set's snapshot can be worded the same way. */
+export type SetTargetFields = Pick<
+  WorkoutSetDoc,
+  'toFailure' | 'targetRepsMin' | 'targetRepsMax' | 'targetWeightKg' | 'targetDurationS' | 'targetDistanceM'
+>;
+
+export function formatSetTarget(set: SetTargetFields & Partial<WorkoutSetDoc>, trackingType: TrackingType, units: Units): string {
   if (set.toFailure) return 'To failure';
   const fields = TARGET_FIELDS[trackingType];
   const parts: string[] = [];

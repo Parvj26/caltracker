@@ -24,7 +24,7 @@ export function completedSetCount(log: WorkoutLogDoc): number {
 }
 
 /** Whole seconds: finishedAt - startedAt, or lastActivityAt - startedAt while still in progress. */
-export function logDurationS(log: WorkoutLogDoc): number {
+export function logDurationS(log: Pick<WorkoutLogDoc, 'startedAt' | 'finishedAt' | 'lastActivityAt'>): number {
   const end = log.finishedAt ?? log.lastActivityAt;
   return Math.max(0, Math.floor((Date.parse(end) - Date.parse(log.startedAt)) / 1000));
 }

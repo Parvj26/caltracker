@@ -116,6 +116,8 @@ export {
   addLogExercise,
   addLogSet,
   completeSet,
+  discardLog,
+  finishLog,
   removeLogExercise,
   removeLogSet,
   setExerciseNote,
@@ -124,6 +126,8 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
+export { formatLastResult, formatLogDuration, formatLogSetTarget } from './logs/format';
+export type { ResultSet } from './logs/format';
 export {
   AUTO_FINISH_IDLE_MS,
   REMINDER_DELAY_MS,
