@@ -8,7 +8,7 @@ import { DeleteWorkout } from './delete-workout';
 import styles from '../workouts.module.css';
 
 export default async function WorkoutPage({ params }: { params: Promise<{ id: string }> }) {
-  const { units } = await requireCoach();
+  const { units, workspaceId } = await requireCoach();
   const { id } = await params;
   const supabase = await createServerSupabase();
   const loaded = await loadWorkoutDoc(supabase, id);
@@ -25,7 +25,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         </div>
       </header>
       {/* key: opening a different workout starts a fresh builder. */}
-      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} mode="library" />
+      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} workspaceId={workspaceId} mode="library" />
     </div>
   );
 }

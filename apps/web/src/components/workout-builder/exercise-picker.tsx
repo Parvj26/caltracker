@@ -7,6 +7,8 @@ import styles from '@/components/exercise-search/exercise-search.module.css';
 
 type Props = {
   title: string;
+  /** The coach's workspace (from requireCoach). */
+  workspaceId: string;
   /** Pick several (a superset needs at least two) and confirm, instead of picking one. */
   multiple: boolean;
   onPick: (exercises: ExercisePick[]) => void;
@@ -14,7 +16,7 @@ type Props = {
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
+export function ExercisePicker({ title, workspaceId, multiple, onPick, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -33,6 +35,7 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
       <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
       <SearchPanel
         mode={multiple ? 'pick-many' : 'pick-one'}
+        workspaceId={workspaceId}
         onPick={onPick}
         onCancel={() => dialogRef.current?.close()}
       />

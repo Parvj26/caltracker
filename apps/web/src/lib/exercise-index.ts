@@ -7,21 +7,30 @@ const PAGE = 1000; // PostgREST returns at most 1,000 rows per request
 
 // A backstop only: changes the app makes itself call invalidateExerciseIndex().
 export const CACHE_MS = 60 * 1000;
-let cache: { at: number; userId: string | null; value: Promise<LoadedExerciseIndex> } | null = null;
+let cache: { at: number; userId: string | null; workspaceId: string; value: Promise<LoadedExerciseIndex> } | null = null;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Forget the cached index (after a custom exercise or a workout changes). */
 export function invalidateExerciseIndex(): void {
   cache = null;
 }
 
-/** Like `fetchExerciseIndex`, but reuses a result for the same user younger than a minute so dialogs don't refetch. */
-export async function loadExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
+/**
+ * Like `fetchExerciseIndex`, but reuses a result for the same user and workspace younger than a minute so dialogs
+ * don't refetch. `workspaceId` is the coach's workspace from requireCoach.
+ */
+export async function loadExerciseIndex(supabase: SupabaseClient<Database>, workspaceId: string): Promise<LoadedExerciseIndex> {
+  // It goes into a PostgREST filter, so only ever a uuid.
+  if (!UUID.test(workspaceId)) throw new Error('Could not load exercises: bad workspace id');
   // getSession reads the stored session (no network call).
   const { data } = await supabase.auth.getSession();
   const userId = data.session?.user.id ?? null;
-  if (cache && cache.userId === userId && Date.now() - cache.at < CACHE_MS) return cache.value;
-  const value = fetchExerciseIndex(supabase);
-  const entry = { at: Date.now(), userId, value };
+  if (cache && cache.userId === userId && cache.workspaceId === workspaceId && Date.now() - cache.at < CACHE_MS) {
+    return cache.value;
+  }
+  const value = fetchExerciseIndex(supabase, workspaceId);
+  const entry = { at: Date.now(), userId, workspaceId, value };
   cache = entry;
   // A failed load must not be remembered.
   value.catch(() => {
@@ -40,13 +49,18 @@ export function rememberFavourite(id: string, on: boolean): void {
   }));
 }
 
-/** Built-in exercises plus this workspace's own (through RLS), the coach's favourites and their 20 most recent. */
-async function fetchExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
+/**
+ * Built-in exercises plus this workspace's own, the coach's favourites and their 20 most recent. The workspace
+ * filter is needed on top of RLS: exercises_select lets any member read a workspace's exercises, so a coach who is
+ * also someone's client would otherwise see that other workspace's custom exercises too.
+ */
+async function fetchExerciseIndex(supabase: SupabaseClient<Database>, workspaceId: string): Promise<LoadedExerciseIndex> {
   const index: ExerciseIndexRow[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('exercises')
       .select(EXERCISE_INDEX_COLUMNS)
+      .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
       .order('name', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);

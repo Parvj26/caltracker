@@ -7,6 +7,8 @@ import { TrackingChips } from './tracking-chips';
 import styles from './exercises.module.css';
 
 type Props = {
+  /** The coach's workspace (from requireCoach). */
+  workspaceId: string;
   initialQuery: string;
   /** "custom" starts with the Custom only chip on; "builtin" hides the coach's own exercises. */
   initialSource: '' | 'builtin' | 'custom';
@@ -14,7 +16,7 @@ type Props = {
 };
 
 /** The Exercises page body: the shared list + preview, plus the tracking-type chips the old page had. */
-export function ExerciseBrowser({ initialQuery, initialSource, initialTracking }: Props) {
+export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, initialTracking }: Props) {
   const [tracking, setTracking] = useState(initialTracking);
 
   function changeTracking(next: string) {
@@ -37,6 +39,7 @@ export function ExerciseBrowser({ initialQuery, initialSource, initialTracking }
       <div className={styles.browse}>
         <SearchPanel
           mode="browse"
+          workspaceId={workspaceId}
           initialQuery={initialQuery}
           initialFilters={{ customOnly: initialSource === 'custom' }}
           rowFilter={rowFilter}

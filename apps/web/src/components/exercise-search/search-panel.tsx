@@ -21,6 +21,8 @@ import styles from './exercise-search.module.css';
 
 type Props = {
   mode: 'pick-one' | 'pick-many' | 'browse';
+  /** The coach's workspace (from requireCoach): only its custom exercises are listed, beside the built-ins. */
+  workspaceId: string;
   onPick?: (exercises: ExercisePick[]) => void;
   /** Browse mode: open a custom exercise to edit it. */
   onOpen?: (id: string) => void;
@@ -39,7 +41,7 @@ const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: fals
 const toPick = (r: ExerciseIndexRow): ExercisePick => ({ id: r.id, name: r.name, trackingType: r.trackingType });
 
 /** Layout A: search box and filter chips on top, a results list on the left, a preview pane on the right. */
-export function SearchPanel({ mode, onPick, onOpen, onCancel, initialQuery = '', initialFilters, rowFilter }: Props) {
+export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initialQuery = '', initialFilters, rowFilter }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const listId = useId();
   const hintId = useId();
@@ -64,7 +66,7 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel, initialQuery = '',
 
   useEffect(() => {
     let stale = false;
-    loadExerciseIndex(supabase)
+    loadExerciseIndex(supabase, workspaceId)
       .then((d) => {
         if (stale) return;
         setData(d);
@@ -76,7 +78,7 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel, initialQuery = '',
     return () => {
       stale = true;
     };
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   const index = useMemo(() => (data ? buildExerciseIndex(data.index) : null), [data]);
   // Ranking uses the favourites as loaded, so starring a row does not make it jump while the coach is looking at it.

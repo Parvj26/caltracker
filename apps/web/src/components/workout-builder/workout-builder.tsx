@@ -34,6 +34,8 @@ export type BuilderMode = 'library' | { clientName: string; date: IsoDate };
 type Props = {
   initial: WorkoutDoc;
   units: Units;
+  /** The coach's workspace (from requireCoach), for the exercise picker. */
+  workspaceId: string;
   mode: BuilderMode;
   /** Called after each successful save. Without it, a new library workout moves to /workouts/[id]. */
   onSaved?: (id: string) => void;
@@ -90,7 +92,7 @@ const formatDay = (date: IsoDate) =>
     new Date(`${date}T00:00:00Z`),
   );
 
-export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }: Props) {
+export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isNew = false }: Props) {
   const router = useRouter();
   const [doc, setDoc] = useState<WorkoutDoc>(initial);
   const [savedJson, setSavedJson] = useState(() => JSON.stringify(initial));
@@ -283,6 +285,7 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       {picker ? (
         <ExercisePicker
           title={pickerTitle}
+          workspaceId={workspaceId}
           multiple={picker.kind === 'superset'}
           onPick={onPick}
           onClose={() => setPicker(null)}
