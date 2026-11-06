@@ -429,7 +429,7 @@ select tests.act_as(:'coach_b');
 select is_empty(format($$update public.workout_blocks set section_name = 'X' where id = %L returning id$$, :'ub1'),
   'a coach from another workspace cannot rename a section on a workout block (0 rows)');
 select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_sec'),
-  '42501', null, 'a coach from another workspace cannot save a sectioned workout into workspace A');
+  '42501', 'Only a coach of this workspace can save workouts.', 'a coach from another workspace cannot save a sectioned workout into workspace A');
 reset role;
 
 -- Table checks (as postgres, so only the constraints can refuse)

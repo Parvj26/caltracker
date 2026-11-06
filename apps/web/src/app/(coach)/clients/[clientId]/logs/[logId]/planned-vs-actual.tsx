@@ -81,10 +81,10 @@ export function PlannedVsActual({
               const block = log.blocks[bi]!;
               if (needsPick(block)) {
                 return [
-                  <section key={block.id} className={styles.exercise}>
+                  <div key={block.id} className={styles.exercise}>
                     <p className={styles.pickLine}>Pick one · not done</p>
                     <p className={styles.options}>{block.exercises.map((e) => e.exerciseName).join(' · ')}</p>
-                  </section>,
+                  </div>,
                 ];
               }
               return liveExercises(block).map(({ exercise: ex }) => {

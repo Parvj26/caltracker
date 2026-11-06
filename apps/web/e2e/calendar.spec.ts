@@ -682,6 +682,11 @@ test('+ Add workout: after an unclear failure, a different day gets a fresh id a
   expect(data).toEqual([{ scheduled_on: first }, { scheduled_on: second }]);
 });
 
+const seededIds: string[] = [];
+test.afterAll(async () => {
+  if (seededIds.length) await admin.from('workouts').delete().in('id', seededIds);
+});
+
 test('a sectioned workout opened from the calendar shows its section headings', async ({ page }) => {
   const name = `Sectioned ${unique()}`;
   const sections = ['Warm-Up', 'Main', 'Finisher'].map((n) => ({ id: randomUUID(), name: n }));
@@ -696,7 +701,7 @@ test('a sectioned workout opened from the calendar shows its section headings', 
       { sectionId: fin, choice: true, exercises: ['Cable Crossover', 'Barbell Squat'] },
     ],
   });
-  created.workouts.push(name);
+  seededIds.push(id);
   await page.goto(calendarUrl(monthOf(today)));
   await day(page, today).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await day(page, today).getByRole('menuitem', { name: 'Edit' }).click();

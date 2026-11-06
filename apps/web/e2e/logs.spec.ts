@@ -6,7 +6,7 @@ import { seedLog, serviceClient, signInAsCoach } from './helpers';
 // uniquely named workouts and logs, so tests can share the demo client and run side by side.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-const created: { logs: string[]; workouts: string[]; users: string[]; workspaces: string[] } = { logs: [], workouts: [], users: [], workspaces: [] };
+const created: { logs: string[]; workouts: string[]; users: string[]; workspaces: string[]; exercises: string[] } = { logs: [], workouts: [], users: [], workspaces: [], exercises: [] };
 let clientId: string;
 let workspaceId: string;
 
@@ -24,6 +24,11 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (created.logs.length) await admin.from('workout_logs').delete().in('id', created.logs);
   if (created.workouts.length) await admin.from('workouts').delete().in('id', created.workouts);
+  // After the logs: a log's exercises restrict deleting the exercise they point at.
+  if (created.exercises.length) {
+    const gone = await admin.from('exercises').delete().in('id', created.exercises).eq('workspace_id', workspaceId);
+    if (gone.error) throw gone.error;
+  }
   for (const id of created.workspaces) await admin.from('workspaces').delete().eq('id', id);
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
@@ -288,8 +293,9 @@ test.describe('logged workout page', () => {
     const u = unique();
     const slam = `Slam ${u}`;
     const walk = `Walk ${u}`;
-    const custom = await admin.from('exercises').insert([slam, walk].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const })));
+    const custom = await admin.from('exercises').insert([slam, walk].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const }))).select('id');
     if (custom.error) throw custom.error;
+    created.exercises.push(...custom.data.map((r) => r.id));
     const sections = ['Warm-Up', 'Main', 'Core', 'Finisher'].map((name) => ({ id: randomUUID(), name }));
     const [warm, main, core, fin] = sections.map((x) => x.id) as [string, string, string, string];
     const id = await log({
@@ -313,15 +319,15 @@ test.describe('logged workout page', () => {
     await page.getByRole('button', { name: 'Correct' }).click();
     await expect(page.getByRole('table', { name: slam }).getByRole('textbox')).toHaveCount(4);
     await expect(page.getByText('Pick one · not done')).toHaveCount(0);
-    await admin.from('exercises').delete().in('name', [slam, walk]).eq('workspace_id', workspaceId);
   });
 
   test('a pick-one group nobody chose from says so and lists the options', async ({ page }) => {
     const u = unique();
     const a = `Slam ${u}`;
     const b = `Walk ${u}`;
-    const custom = await admin.from('exercises').insert([a, b].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const })));
+    const custom = await admin.from('exercises').insert([a, b].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const }))).select('id');
     if (custom.error) throw custom.error;
+    created.exercises.push(...custom.data.map((r) => r.id));
     const fin = randomUUID();
     const id = await log({
       workspaceId, clientId, name: `Unpicked ${u}`, startedAt: ago(100), finishedAt: ago(50), sections: [{ id: fin, name: 'Finisher' }],
@@ -334,7 +340,6 @@ test.describe('logged workout page', () => {
     await expect(page.getByText(`${a} · ${b}`)).toBeVisible();
     await expect(page.getByRole('table', { name: a })).toHaveCount(0);
     await expect(page.getByText('Not done')).toHaveCount(0);
-    await admin.from('exercises').delete().in('name', [a, b]).eq('workspace_id', workspaceId);
   });
 
   test('comments can be posted, survive a reload and be deleted', async ({ page }) => {
