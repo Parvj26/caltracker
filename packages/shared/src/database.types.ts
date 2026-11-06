@@ -1196,6 +1196,7 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {
           p_assignment_id: string
@@ -1206,6 +1207,8 @@ export type Database = {
         Returns: string
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
+      award_catchup: { Args: never; Returns: number }
+      award_inputs: { Args: { p_log_id: string }; Returns: Json }
       claim_invites: {
         Args: never
         Returns: {

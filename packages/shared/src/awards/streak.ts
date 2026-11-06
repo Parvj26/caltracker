@@ -2,8 +2,8 @@ import { addDays, startOfWeek } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
 import { LANDMARK_JOURNEY } from './catalogue';
 
-/** The Monday of the week an instant falls in, as seen in the given time zone. */
-export function weekKey(isoTimestamp: string, timeZone: string): IsoDate {
+/** The calendar day an instant falls on, as seen in the given time zone. */
+export function localDay(isoTimestamp: string, timeZone: string): IsoDate {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
@@ -12,8 +12,12 @@ export function weekKey(isoTimestamp: string, timeZone: string): IsoDate {
     numberingSystem: 'latn',
   }).formatToParts(new Date(isoTimestamp));
   const part = (type: 'year' | 'month' | 'day') => Number(parts.find((p) => p.type === type)?.value);
-  const day = `${String(part('year')).padStart(4, '0')}-${String(part('month')).padStart(2, '0')}-${String(part('day')).padStart(2, '0')}`;
-  return startOfWeek(day);
+  return `${String(part('year')).padStart(4, '0')}-${String(part('month')).padStart(2, '0')}-${String(part('day')).padStart(2, '0')}`;
+}
+
+/** The Monday of the week an instant falls in, as seen in the given time zone. */
+export function weekKey(isoTimestamp: string, timeZone: string): IsoDate {
+  return startOfWeek(localDay(isoTimestamp, timeZone));
 }
 
 /**
