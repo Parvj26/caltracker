@@ -1,3 +1,5 @@
+import type { BlockKind } from './schema';
+
 export const MIN_CHOICE_OPTIONS = 2;
 export const MAX_CHOICE_OPTIONS = 5;
 export const SECTION_PRESETS = ['Warm-Up', 'Core', 'Main', 'Finisher', 'Cool-down'] as const;
@@ -8,6 +10,14 @@ export type SectionRun = {
 };
 
 type SectionLike = { id: string; name: string };
+
+/**
+ * How many exercises a workout shows on its cards: every exercise, but a pick-one group once, because the client
+ * does only one of its options. `exercises` is the block's number of exercises (options for a pick-one group).
+ */
+export function countExercises(blocks: ReadonlyArray<{ kind: BlockKind; exercises: number }>): number {
+  return blocks.reduce((n, b) => n + (b.kind === 'choice' ? Math.min(1, b.exercises) : b.exercises), 0);
+}
 
 /** Consecutive blocks with the same section form one run. Unknown section ids count as unsectioned. */
 export function sectionRuns(

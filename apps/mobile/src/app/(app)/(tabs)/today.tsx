@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { countExercises, formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
@@ -45,7 +45,7 @@ const summaryOf = (d: CachedDetail): WorkoutSummary => ({
   id: d.doc.id,
   name: d.doc.name,
   scheduledOn: d.scheduledOn,
-  exerciseCount: d.doc.blocks.reduce((n, b) => n + b.exercises.length, 0),
+  exerciseCount: countExercises(d.doc.blocks.map((b) => ({ kind: b.kind, exercises: b.exercises.length }))),
   programName: null,
 });
 

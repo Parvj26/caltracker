@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { countExercises } from '@caltracker/shared';
 import { Button, ButtonLink, Card, TextField } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -19,7 +20,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
   const supabase = await createServerSupabase();
   let query = supabase
     .from('workouts')
-    .select('id, name, updated_at, workout_blocks(workout_exercises(id))')
+    .select('id, name, updated_at, workout_blocks(kind, workout_exercises(id))')
     .eq('workspace_id', workspaceId)
     .is('client_id', null);
   if (q) query = query.ilike('name', `%${escapeLike(q)}%`);
@@ -29,7 +30,8 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
     id: w.id,
     name: w.name,
     updatedAt: w.updated_at,
-    exercises: w.workout_blocks.reduce((n, b) => n + b.workout_exercises.length, 0),
+    // A pick-one group counts once: the client does one of its options.
+    exercises: countExercises(w.workout_blocks.map((b) => ({ kind: b.kind, exercises: b.workout_exercises.length }))),
   }));
 
   return (

@@ -75,7 +75,7 @@ export {
   WorkoutSectionDoc,
   WorkoutSetDoc,
 } from './workouts/schema';
-export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, sectionPlace, sectionRuns } from './workouts/sections';
+export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
 export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';

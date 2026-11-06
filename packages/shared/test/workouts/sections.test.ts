@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sectionPlace, sectionRuns } from '../../src/workouts/sections';
+import { countExercises, sectionPlace, sectionRuns } from '../../src/workouts/sections';
 
 const sections = [
   { id: 'w', name: 'Warm-Up' },
@@ -50,5 +50,22 @@ describe('sectionPlace', () => {
 
   it('is null for an unsectioned block', () => {
     expect(sectionPlace([{ sectionId: null }], sections, 0)).toBeNull();
+  });
+});
+
+describe('countExercises', () => {
+  it('counts every exercise, but a pick-one group once (the client does one option)', () => {
+    expect(
+      countExercises([
+        { kind: 'straight', exercises: 1 },
+        { kind: 'superset', exercises: 3 },
+        { kind: 'choice', exercises: 4 },
+      ]),
+    ).toBe(5);
+  });
+
+  it('is 0 for no blocks, and an empty pick-one group counts nothing', () => {
+    expect(countExercises([])).toBe(0);
+    expect(countExercises([{ kind: 'choice', exercises: 0 }])).toBe(0);
   });
 });
