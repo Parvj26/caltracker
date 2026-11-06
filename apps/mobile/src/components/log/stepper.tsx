@@ -93,7 +93,8 @@ export function Stepper({
           style={[
             text('bigNumber'),
             base,
-            { fontSize, minHeight: size },
+            // The line height shrinks with the fitted size, or a long number ("102.5") sits low in the box.
+            { fontSize, lineHeight: Math.round((fontSize * base.lineHeight) / base.fontSize), minHeight: size },
             styles.value,
             { borderRadius: radius.input },
             focused && styles.valueFocused,

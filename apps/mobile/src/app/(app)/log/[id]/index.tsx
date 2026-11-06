@@ -6,8 +6,6 @@ import {
   Alert,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -42,6 +40,7 @@ import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseListSheet } from '@/components/log/exercise-list-sheet';
 import { ExercisePage, type PageHandlers } from '@/components/log/exercise-page';
 import { ExercisePicker } from '@/components/log/exercise-picker';
+import { PageScroll } from '@/components/log/keyboard-reveal';
 import type { BlockHandlers } from '@/components/log/log-block';
 import { LogTopBar } from '@/components/log/log-top-bar';
 import { NoteSheet } from '@/components/log/note-sheet';
@@ -439,16 +438,24 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
 
   return (
     <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[column, { gap: sp[3], paddingTop: sp[2], paddingBottom: sp[3] }]}>
-          <TimedTopBar
-            startedAt={log.startedAt}
-            pill={empty ? null : `${pageIndex + 1} of ${log.blocks.length}`}
-            onBack={back}
-            onPill={() => setListOpen(true)}
-            onFinish={doFinish}
-          />
-          <SyncPill status={syncStatus} />
+      {/* No KeyboardAvoidingView: each page's ScrollView makes room for the keyboard itself (PageScroll); both
+          together left a double gap and pushed the steppers under the bar. */}
+      <View style={styles.fill}>
+        <View style={[column, styles.header, { gap: sp[3], paddingTop: sp[2], paddingBottom: sp[3] }]}>
+          <View>
+            <TimedTopBar
+              startedAt={log.startedAt}
+              pill={empty ? null : `${pageIndex + 1} of ${log.blocks.length}`}
+              onBack={back}
+              onPill={() => setListOpen(true)}
+              onFinish={doFinish}
+            />
+            {/* Floats under the top bar: it comes and goes after every change, and in the flow it moved Done
+                and Skip out from under the finger. Taps pass through it. */}
+            <View pointerEvents="none" style={styles.syncPill}>
+              <SyncPill status={syncStatus} />
+            </View>
+          </View>
           {empty ? null : <ProgressStrip states={states} />}
           {restHere ? (
             <RestPanel
@@ -494,11 +501,10 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
             onMomentumScrollEnd={onMomentumScrollEnd}
             onScrollToIndexFailed={(info) => scrollTo(info.index, false)}
             renderItem={({ item, index }) => (
-              <ScrollView
+              <PageScroll
                 style={{ width }}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
-                automaticallyAdjustKeyboardInsets
                 contentContainerStyle={[styles.pageContent, { paddingBottom: sp[6] + insets.bottom }]}
               >
                 <View style={styles.pageColumn}>
@@ -524,11 +530,11 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
                     />
                   )}
                 </View>
-              </ScrollView>
+              </PageScroll>
             )}
           />
         )}
-      </KeyboardAvoidingView>
+      </View>
 
       <ExerciseListSheet
         visible={listOpen}
@@ -588,4 +594,7 @@ const styles = StyleSheet.create({
   column: { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center' },
   pageContent: { alignItems: 'center', paddingHorizontal: space[4], paddingTop: space[2] },
   pageColumn: { width: '100%', maxWidth: contentMaxWidth },
+  // Above the pages, so the floating sync pill draws over them.
+  header: { zIndex: 1 },
+  syncPill: { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1, marginTop: space[1] },
 });
