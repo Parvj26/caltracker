@@ -2,10 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc } from '@caltracker/shared';
-import type { ExercisePick } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { escapeLike } from '../exercises/filters';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
@@ -81,17 +79,18 @@ export async function countProgramUses(id: string): Promise<number> {
   return new Set(data.map((r) => r.program_id)).size;
 }
 
-/** Built-in exercises plus this workspace's own, by name. */
-export async function searchExercises(query: string): Promise<ExercisePick[]> {
-  const { workspaceId } = await requireCoach();
-  const q = typeof query === 'string' ? query.trim().slice(0, 100) : '';
+/** Set whether the signed-in coach has starred an exercise. Favourites are personal, not shared across the workspace. */
+export async function setFavourite(exerciseId: string, on: boolean): Promise<{ ok: boolean }> {
+  const { userId } = await requireCoach();
+  if (!UUID.test(exerciseId) || typeof on !== 'boolean') return { ok: false };
   const supabase = await createServerSupabase();
-  let request = supabase
-    .from('exercises')
-    .select('id, name, tracking_type')
-    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`);
-  if (q) request = request.ilike('name', `%${escapeLike(q)}%`);
-  const { data, error } = await request.order('name', { ascending: true }).limit(20);
-  if (error) throw new Error(`Could not search exercises: ${error.message}`);
-  return data.map((e) => ({ id: e.id, name: e.name, trackingType: e.tracking_type }));
+  if (on) {
+    const { error } = await supabase
+      .from('exercise_favorites')
+      .upsert({ exercise_id: exerciseId }, { onConflict: 'coach_id,exercise_id', ignoreDuplicates: true });
+    return { ok: !error };
+  }
+  // RLS already limits this to the coach's own rows; the filter says so too.
+  const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId).eq('coach_id', userId);
+  return { ok: !error };
 }

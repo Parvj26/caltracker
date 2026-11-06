@@ -33,6 +33,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
         key={loaded.doc.id}
         initial={loaded.doc}
         units={units}
+        workspaceId={workspaceId}
         mode={{ clientName: client.name, date: loaded.scheduledOn }}
       />
     </div>

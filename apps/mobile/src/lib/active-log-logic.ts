@@ -73,6 +73,11 @@ export function goneNote(coach: string | null): string {
   return `You’re no longer with ${coach ?? 'your coach'}, so this workout wasn’t saved.`;
 }
 
+/** The one-time note after a workout could not be saved because one of its exercises was deleted. */
+export function unavailableNote(name: string): string {
+  return `${name} couldn’t be saved because one of its exercises is no longer available. Ask your coach to check it.`;
+}
+
 /** The one-time note after the server's copy of a workout replaced sets ticked on the phone. */
 export function rejectedNote(name: string): string {
   return `Some sets from ${name} couldn’t be saved because the workout was already changed by your coach or on another device.`;

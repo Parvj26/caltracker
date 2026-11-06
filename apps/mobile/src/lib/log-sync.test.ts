@@ -7,6 +7,7 @@ import {
   RETRY_BACKOFF_MS,
   SYNC_DEBOUNCE_MS,
   createLogSync,
+  isExerciseUnavailable,
   isNotAClient,
   lostCompletedSets,
   resolveRefusal,
@@ -708,5 +709,69 @@ describe('createLogSync: housekeeping after its own auto-finish (M4)', () => {
     expect(onAutoFinish).toHaveBeenCalledTimes(1);
     expect(onAutoFinish).toHaveBeenCalledWith(expect.objectContaining({ id: log.id, status: 'completed', autoFinished: true }));
     expect(await store.load()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Exercise-search final fixes: a log naming an exercise that was deleted (or is no longer the workspace's) is
+// refused by save_workout_log with 42501 "Exercise <id> is not available in this workspace." That never changes on
+// a retry, so it is final like the removed-client refusal.
+
+/** What log-api throws for that refusal: the message keeps the server's words, with no hint. */
+const unavailable = () =>
+  Object.assign(
+    new Error('save_workout_log: Exercise 00000000-0000-4000-8000-0000000000e1 is not available in this workspace.'),
+    { code: '42501', hint: null },
+  );
+
+describe('isExerciseUnavailable', () => {
+  it('is true only for the unavailable-exercise refusal', () => {
+    expect(isExerciseUnavailable(unavailable())).toBe(true);
+    expect(isExerciseUnavailable(notAClient())).toBe(false);
+    // Same words but another code (say, a proxy rewording): not ours.
+    expect(isExerciseUnavailable(Object.assign(new Error(unavailable().message), { code: '23514' }))).toBe(false);
+    expect(isExerciseUnavailable(Object.assign(new Error('permission denied'), { code: '42501' }))).toBe(false);
+    expect(isExerciseUnavailable(networkError())).toBe(false);
+    expect(isExerciseUnavailable(null)).toBe(false);
+  });
+});
+
+describe('createLogSync: a log with an exercise that is no longer available', () => {
+  it('drops the log from the phone, keeps a copy, tells the screen once and never retries', async () => {
+    const storage = memoryStorage();
+    const store = createLogStore(storage, 'user-1');
+    const log = withTicked({ revision: 4 }, 2, [0]);
+    await store.save({ log, lastSyncedRevision: 2 });
+    const save = vi.fn(() => Promise.reject(unavailable()));
+    const onUnavailable = vi.fn();
+    const onGone = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onUnavailable, onGone });
+
+    expect((await sync.flushNow()).status).toBe('synced');
+    expect(await store.load()).toBeNull();
+    expect(rejectedCopy(storage.map)).toEqual(log);
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    expect(onUnavailable).toHaveBeenCalledWith(log);
+    expect(onGone).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a parked log the same way and still sends the next one', async () => {
+    const store = createLogStore(memoryStorage(), 'user-1');
+    const first = withTicked({ id: '00000000-0000-4000-8000-000000000911', revision: 5, status: 'completed', finishedAt: '2026-11-05T09:12:00.000Z' }, 2, [0, 1]);
+    await store.save({ log: first, lastSyncedRevision: 2 });
+    await store.park();
+    const second = sampleLog({ revision: 1 });
+    await store.save({ log: second, lastSyncedRevision: 0 });
+    const save = vi.fn((doc: WorkoutLogDoc) => (doc.id === first.id ? Promise.reject(unavailable()) : Promise.resolve(applied(doc))));
+    const onUnavailable = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(), store, onUnavailable });
+    expect((await sync.flushNow()).status).toBe('synced');
+    expect(await store.loadPending()).toEqual([]);
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    expect(onUnavailable).toHaveBeenCalledWith(first);
+    expect(await store.load()).toMatchObject({ log: { id: second.id }, lastSyncedRevision: 1 });
   });
 });
