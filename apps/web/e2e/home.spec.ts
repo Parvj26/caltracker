@@ -99,6 +99,15 @@ test('an in-progress log shows Training now', async ({ page }) => {
   await expect(rowFor(page, last)).toContainText('Training now');
 });
 
+test('the four tiles are the same height, linked or not', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const tiles = page.locator('[class*="tiles"] > *');
+  await expect(tiles).toHaveCount(4);
+  const heights = await tiles.evaluateAll((els) => els.map((el) => Math.round(el.firstElementChild && el.tagName === 'A' ? el.firstElementChild.getBoundingClientRect().height : el.getBoundingClientRect().height)));
+  expect(new Set(heights).size, `tile heights ${heights.join(', ')}`).toBe(1);
+});
+
 test('two undone workouts in the last 2 days list the client under Missed 2+', async ({ page }) => {
   const last = `Miss${unique()}`;
   const clientId = await newClient(last);
