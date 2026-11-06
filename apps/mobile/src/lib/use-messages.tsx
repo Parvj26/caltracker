@@ -22,7 +22,7 @@ import {
   type MessageRowLite,
 } from './messages-api';
 import { createOutbox, type Outbox, type OutboxEntry, type OutboxPhoto } from './outbox';
-import { deletePhotoFiles, persistPhoto } from './outbox-files';
+import { deletePhotoFiles, persistPhoto, photoUri } from './outbox-files';
 import { shouldMarkRead } from './read-rules';
 import { useSession } from './session';
 
@@ -251,7 +251,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
     const outbox: OutboxItem[] = entries.map((e) => ({
       clientMsgId: e.clientMsgId,
       body: e.body,
-      imagePaths: e.photos.map((p) => p.thumbUri),
+      imagePaths: e.photos.map((p) => photoUri(p.thumbUri)),
       createdAt: e.createdAt,
       state: e.state,
     }));
@@ -260,7 +260,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       conversationId,
       me,
       items: mergeOutbox(messages, outbox),
-      localPhotos: Object.fromEntries(entries.map((e) => [e.clientMsgId, e.photos.map((p) => p.thumbUri)])),
+      localPhotos: Object.fromEntries(entries.map((e) => [e.clientMsgId, e.photos.map((p) => photoUri(p.thumbUri))])),
       failedError: Object.fromEntries(entries.map((e) => [e.clientMsgId, e.error])),
       unread: unreadCount(messages, me, myReadAt),
       seenId: seenMessageId(messages, me, theirReadAt),

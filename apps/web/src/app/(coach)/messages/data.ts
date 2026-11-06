@@ -45,13 +45,13 @@ export async function loadMessages(supabase: Db, conversationId: string, before?
   return data;
 }
 
-/** The other person's last_read_at for a conversation, or null. */
-export async function loadTheirRead(supabase: Db, conversationId: string, me: string): Promise<string | null> {
+/** The other person's (the client's) last_read_at for a conversation, or null. */
+export async function loadTheirRead(supabase: Db, conversationId: string, clientId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('conversation_reads')
     .select('last_read_at')
     .eq('conversation_id', conversationId)
-    .neq('user_id', me)
+    .eq('user_id', clientId)
     .maybeSingle();
   if (error) throw new Error(`Could not load read state: ${error.message}`);
   return data?.last_read_at ?? null;
@@ -107,34 +107,87 @@ async function loadActivity(supabase: Db, workspaceId: string, me: string) {
           .eq('conversation_id', c.id)
           .order('created_at', { ascending: false })
           .limit(1),
-        (() => {
-          let q = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('conversation_id', c.id).neq('sender_id', me);
-          const read = readAt.get(c.id);
-          if (read) q = q.gt('created_at', read);
-          return q;
-        })(),
+        exactUnread(supabase, c.id, me, readAt.get(c.id) ?? null),
       ]);
       if (last.error) throw new Error(`Could not load messages: ${last.error.message}`);
-      if (count.error) throw new Error(`Could not count unread messages: ${count.error.message}`);
       const row = last.data[0];
       if (row) latest.set(c.id, { body: row.body, imagePaths: row.image_paths, senderId: row.sender_id });
-      unreadOverride.set(c.id, count.count ?? 0);
+      unreadOverride.set(c.id, count);
     }),
   );
   return { clientIds, conversations: conversations.data, latest, recentBy, readAt, unreadOverride };
 }
 
-/** Unread messages across the coach's current clients (the sidebar badge). Works with the server or browser client. */
+/** Exact unread count of one conversation (the other person's messages after my last read), counted by the database. */
+async function exactUnread(supabase: Db, conversationId: string, me: string, readAt: string | null): Promise<number> {
+  let q = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).neq('sender_id', me);
+  if (readAt) q = q.gt('created_at', readAt);
+  const { count, error } = await q;
+  if (error) throw new Error(`Could not count unread messages: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Unread messages across the coach's current clients (the sidebar badge, loaded on every dashboard page). It uses
+ * the same rule as the inbox rows (unreadCount: the other person's messages after my last read, current clients
+ * only) but a lean read: three small queries plus one of (conversation_id, sender_id, created_at) for the clients'
+ * messages newer than the oldest read mark, never the bodies. If that window is full, the conversations in it are
+ * counted exactly by the database instead, so the badge never undercounts. Works with the server or browser client.
+ */
 export async function loadUnreadTotal(supabase: Db, workspaceId: string, me: string): Promise<number> {
-  const a = await loadActivity(supabase, workspaceId, me);
-  const current = new Set(a.clientIds);
-  let total = 0;
-  for (const c of a.conversations) {
-    // Past clients' conversations stay readable but never count.
-    if (!current.has(c.client_id)) continue;
-    total += a.unreadOverride.get(c.id) ?? unreadCount(a.recentBy.get(c.id) ?? [], me, a.readAt.get(c.id) ?? null);
+  const [members, conversations, reads] = await Promise.all([
+    supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client'),
+    supabase.from('conversations').select('id, client_id').eq('workspace_id', workspaceId),
+    supabase.from('conversation_reads').select('conversation_id, last_read_at').eq('user_id', me),
+  ]);
+  if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
+  if (conversations.error) throw new Error(`Could not load conversations: ${conversations.error.message}`);
+  if (reads.error) throw new Error(`Could not load read state: ${reads.error.message}`);
+
+  const current = new Set(members.data.map((m) => m.user_id));
+  // Past clients' conversations stay readable but never count.
+  const live = conversations.data.filter((c) => current.has(c.client_id));
+  if (live.length === 0) return 0;
+  const readAt = new Map(reads.data.map((r) => [r.conversation_id, r.last_read_at]));
+
+  // Nothing older than the oldest read mark can be unread (and a conversation never read has no such bound).
+  let bound: string | null = null;
+  for (const c of live) {
+    const r = readAt.get(c.id);
+    if (!r) {
+      bound = null;
+      break;
+    }
+    if (bound === null || Date.parse(r) < Date.parse(bound)) bound = r;
   }
-  return total;
+  let q = supabase
+    .from('messages')
+    .select('conversation_id, sender_id, created_at')
+    .eq('workspace_id', workspaceId)
+    .neq('sender_id', me)
+    .order('created_at', { ascending: false })
+    .limit(RECENT_LIMIT);
+  if (bound !== null) q = q.gt('created_at', bound);
+  const recent = await q;
+  if (recent.error) throw new Error(`Could not load messages: ${recent.error.message}`);
+
+  const by = new Map<string, Stamped[]>();
+  for (const m of recent.data) {
+    const list = by.get(m.conversation_id) ?? [];
+    list.push({ senderId: m.sender_id, createdAt: m.created_at });
+    by.set(m.conversation_id, list);
+  }
+  // A full window may hide older unread messages (and conversations missing from it may have some), so then the
+  // database counts every conversation exactly. Otherwise the rows we have are the whole story.
+  const truncated = recent.data.length >= RECENT_LIMIT;
+  const counts = await Promise.all(
+    live.map((c) => {
+      const read = readAt.get(c.id) ?? null;
+      if (truncated) return exactUnread(supabase, c.id, me, read);
+      return Promise.resolve(unreadCount(by.get(c.id) ?? [], me, read));
+    }),
+  );
+  return counts.reduce((a, b) => a + b, 0);
 }
 
 /** Every current client as an inbox row (server side; names come from profiles). */
@@ -180,6 +233,6 @@ export async function loadThread(
     conversationId = data;
   }
   if (!conversationId) return { conversationId: null, rows: [], theirReadAt: null };
-  const [rows, theirReadAt] = await Promise.all([loadMessages(supabase, conversationId), loadTheirRead(supabase, conversationId, me)]);
+  const [rows, theirReadAt] = await Promise.all([loadMessages(supabase, conversationId), loadTheirRead(supabase, conversationId, client.id)]);
   return { conversationId, rows, theirReadAt };
 }
