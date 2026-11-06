@@ -5,8 +5,34 @@ export type LoadedExerciseIndex = { index: ExerciseIndexRow[]; favourites: strin
 
 const PAGE = 1000; // PostgREST returns at most 1,000 rows per request
 
+const CACHE_MS = 5 * 60 * 1000;
+let cache: { at: number; value: Promise<LoadedExerciseIndex> } | null = null;
+
+/** Like `fetchExerciseIndex`, but reuses a result younger than 5 minutes so each dialog open doesn't refetch. */
+export function loadExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
+  if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
+  const value = fetchExerciseIndex(supabase);
+  const entry = { at: Date.now(), value };
+  cache = entry;
+  // A failed load must not be remembered.
+  value.catch(() => {
+    if (cache === entry) cache = null;
+  });
+  return value;
+}
+
+/** Keep the cached favourites in step with a star the coach just set. */
+export function rememberFavourite(id: string, on: boolean): void {
+  const current = cache;
+  if (!current) return;
+  current.value = current.value.then((v) => ({
+    ...v,
+    favourites: on ? [...new Set([...v.favourites, id])] : v.favourites.filter((f) => f !== id),
+  }));
+}
+
 /** Built-in exercises plus this workspace's own (through RLS), the coach's favourites and their 20 most recent. */
-export async function loadExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
+async function fetchExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
   const index: ExerciseIndexRow[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase

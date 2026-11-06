@@ -111,6 +111,12 @@ test('open picker with a query, a filter and the preview (screenshot)', async ({
   await dialog.getByLabel('Search exercises').fill('squat');
   await dialog.getByRole('button', { name: 'Legs', exact: true }).click();
   await expect(dialog.getByRole('region', { name: 'Exercise preview' }).getByRole('img').first()).toBeVisible();
+  // Every photo on screen must have loaded (a broken or still-loading image would show in the picture).
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('dialog img')]
+      .filter((img) => img.getBoundingClientRect().top < window.innerHeight)
+      .every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0),
+  );
   await page.screenshot({
     path: '/private/tmp/claude-501/-Users-parvjain-Desktop-fitness-tracker/531e9d4c-c73a-4f3c-a3bd-f037eea52a9b/scratchpad/exercise-picker.png',
   });

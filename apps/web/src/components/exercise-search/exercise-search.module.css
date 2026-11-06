@@ -168,3 +168,7 @@
   .split[data-preview] .listPane { display: none; }
   .back { display: inline-flex; align-items: center; }
 }
+
+.placeholder { display: inline-flex; align-items: center; justify-content: center; background: var(--ct-surface); color: var(--ct-ink-muted); }
+.previewPane .placeholder { background: var(--ct-bg); }
+.detailError { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
