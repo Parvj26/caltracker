@@ -123,56 +123,59 @@ describe('duplicateProgram', () => {
 });
 
 describe('copyProgramWeek', () => {
-  const source = [
-    { id: SLOT, week: 1, day: 1, position: 0, workout_id: WORKOUT },
-    { id: '00000000-0000-4000-8000-000000000005', week: 1, day: 4, position: 0, workout_id: WORKOUT },
-  ];
-  const answer = (call: Call): Result =>
-    call.table === 'programs' ? { data: { weeks: 4 } } : call.table === 'program_workouts' ? { data: source } : { data: 6 };
+  const ids = ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'];
 
-  it('reads the saved source week of this workspace and replaces the targets in one call', async () => {
-    respond = answer;
-    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [4, 2, 3, 1] });
-    expect(result.ok).toBe(true);
-    const read = calls.find((c) => c.table === 'program_workouts');
-    expect(read?.filters).toEqual({ program_id: PROGRAM, workspace_id: WS, week: 1 });
-    const rpc = calls.find((c) => c.op === 'rpc');
-    expect(rpc?.rpc).toBe('replace_program_weeks');
-    const args = rpc?.payload as { p_weeks: number[]; p_slots: Array<{ week: number; day: number; workoutId: string }> };
-    expect(args.p_weeks).toEqual([2, 3, 4]);
-    expect(args.p_slots.map((x) => [x.week, x.day])).toEqual([
-      [2, 1],
-      [2, 4],
-      [3, 1],
-      [3, 4],
-      [4, 1],
-      [4, 4],
+  it('sends the browser\'s ids to copy_program_week in one call and returns the saved slots', async () => {
+    respond = (call) =>
+      call.op === 'rpc'
+        ? {
+            data: [
+              { id: ids[0], week: 2, day: 1, position: 0, workout_id: WORKOUT },
+              { id: ids[1], week: 3, day: 1, position: 0, workout_id: WORKOUT },
+            ],
+          }
+        : {};
+    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2, 3], ids });
+    expect(calls).toEqual([
+      { table: '', op: 'rpc', rpc: 'copy_program_week', payload: { p_program_id: PROGRAM, p_from: 1, p_to: [2, 3], p_ids: ids }, filters: {} },
     ]);
-    expect(result.ok && result.slots).toHaveLength(6);
+    expect(result).toEqual({
+      ok: true,
+      slots: [
+        { id: ids[0], week: 2, day: 1, position: 0, workoutId: WORKOUT },
+        { id: ids[1], week: 3, day: 1, position: 0, workoutId: WORKOUT },
+      ],
+    });
   });
 
-  it('refuses weeks past the end of the program', async () => {
-    respond = answer;
-    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [5] });
-    expect(result.ok).toBe(false);
-    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  it('passes on the database\'s coach-worded refusal (a week changed since the page loaded)', async () => {
+    respond = () => ({ error: { code: '23514', message: 'That week changed since the page loaded. Reload the page and try again.' } });
+    expect(await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids })).toEqual({
+      ok: false,
+      error: 'That week changed since the page loaded. Reload the page and try again.',
+    });
+  });
+
+  it('says the program is gone when the database refuses it (another workspace\'s program)', async () => {
+    respond = () => ({ error: { code: '42501', message: 'Program not found.' } });
+    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids });
+    expect(result).toEqual({ ok: false, error: "Couldn't find that program. It may have been deleted." });
   });
 
   it('refuses bad input before touching the database', async () => {
     for (const input of [
-      { programId: 'nope', fromWeek: 1, toWeeks: [2] },
-      { programId: PROGRAM, fromWeek: 0, toWeeks: [2] },
-      { programId: PROGRAM, fromWeek: 1, toWeeks: [] },
-      { programId: PROGRAM, fromWeek: 1, toWeeks: [2.5] },
+      { programId: 'nope', fromWeek: 1, toWeeks: [2], ids },
+      { programId: PROGRAM, fromWeek: 0, toWeeks: [2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2.5], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [3, 2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2, 2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [1], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids: [] },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids: ['nope'] },
     ]) {
       expect((await copyProgramWeek(input)).ok).toBe(false);
     }
     expect(calls).toEqual([]);
-  });
-
-  it('refuses a program that is not in this workspace', async () => {
-    respond = () => ({ data: null });
-    expect((await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2] })).ok).toBe(false);
-    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
   });
 });

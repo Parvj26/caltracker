@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PROGRAM_WEEKS_MAX, ProgramInput, copyName, copyWeek } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, copyName } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -247,48 +247,53 @@ export type CopyWeekOutcome =
   | { ok: true; slots: Array<{ id: string; week: number; day: number; position: number; workoutId: string }> }
   | { ok: false; error: string };
 
+/** A week holds at most 7 days of a few workouts each; this only stops absurd requests. */
+const COPY_IDS_MAX = 2000;
+
 /**
- * Copies week `fromWeek` onto `toWeeks`, replacing what those weeks held (copyWeek in packages/shared decides the
- * new slots, from the slots as saved). replace_program_weeks swaps them in one transaction. Returns the new slots of
- * the target weeks, so the grid can show their saved ids.
+ * Copies week `fromWeek` onto `toWeeks` (increasing, each once), replacing what those weeks held. The browser makes
+ * the new slot ids (`ids`, in copyWeek's order from packages/shared) so the grid already shows the ids the database
+ * keeps; copy_program_week reads the source week and writes the targets in one transaction, and refuses when the
+ * number of ids doesn't match the saved source week. Returns the saved slots of the target weeks.
  */
-export async function copyProgramWeek(input: { programId: string; fromWeek: number; toWeeks: number[] }): Promise<CopyWeekOutcome> {
-  const { workspaceId } = await requireCoach();
-  const { programId, fromWeek, toWeeks } = input;
+export async function copyProgramWeek(input: {
+  programId: string;
+  fromWeek: number;
+  toWeeks: number[];
+  ids: string[];
+}): Promise<CopyWeekOutcome> {
+  await requireCoach();
+  const { programId, fromWeek, toWeeks, ids } = input;
   if (
     !isUuid(programId) ||
     !isInt(fromWeek, 1, PROGRAM_WEEKS_MAX) ||
     !Array.isArray(toWeeks) ||
     toWeeks.length === 0 ||
-    toWeeks.length > PROGRAM_WEEKS_MAX ||
-    !toWeeks.every((w) => isInt(w, 1, PROGRAM_WEEKS_MAX))
+    !toWeeks.every((w, i) => isInt(w, 1, PROGRAM_WEEKS_MAX) && w !== fromWeek && (i === 0 || w > toWeeks[i - 1]!)) ||
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > COPY_IDS_MAX ||
+    !ids.every(isUuid)
   ) {
     return { ok: false, error: "Couldn't copy that week." };
   }
+  // RLS (security invoker) limits the function to the coach's own workspace's programs.
   const supabase = await createServerSupabase();
-  const weeks = await programWeeks(supabase, programId, workspaceId);
-  if (weeks === null) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
-  if (fromWeek > weeks || toWeeks.some((w) => w > weeks)) {
-    return { ok: false, error: 'That week is past the end of the program. Reload the page and try again.' };
-  }
-
-  const { data: rows, error: readError } = await supabase
-    .from('program_workouts')
-    .select('id, week, day, position, workout_id')
-    .eq('program_id', programId)
-    .eq('workspace_id', workspaceId)
-    .eq('week', fromWeek);
-  if (readError) return { ok: false, error: "Couldn't copy. Please try again." };
-  const source = rows.map((r) => ({ id: r.id, week: r.week, day: r.day, position: r.position, workoutId: r.workout_id }));
-  const plan = copyWeek(source, { from: fromWeek, to: toWeeks, weeks }, () => crypto.randomUUID());
-  if (plan.weeks.length === 0) return { ok: false, error: "Couldn't copy that week." };
-
-  const { error } = await supabase.rpc('replace_program_weeks', {
+  const { data, error } = await supabase.rpc('copy_program_week', {
     p_program_id: programId,
-    p_weeks: plan.weeks,
-    p_slots: plan.added,
+    p_from: fromWeek,
+    p_to: toWeeks,
+    p_ids: ids,
   });
-  if (error) return { ok: false, error: "Couldn't copy. Please try again." };
+  if (error) {
+    // 23514: a guard in copy_program_week; its message is written for the coach.
+    if (error.code === '23514') return { ok: false, error: error.message };
+    if (error.code === '42501') return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+    return { ok: false, error: "Couldn't copy. Please try again." };
+  }
   revalidatePath(`/programs/${programId}`);
-  return { ok: true, slots: plan.added };
+  return {
+    ok: true,
+    slots: data.map((r) => ({ id: r.id, week: r.week, day: r.day, position: r.position, workoutId: r.workout_id })),
+  };
 }

@@ -34,7 +34,7 @@ export function DuplicateButton({ kind, id, name, compact = false }: Props) {
           setError(outcome.error);
           return;
         }
-        router.push(kind === 'workout' ? `/workouts/${outcome.id}` : `/programs/${outcome.id}`);
+        router.push(kind === 'workout' ? `/workouts/${outcome.id}` : `/programs/${outcome.id}?copied=1`);
       } catch (e) {
         setError(failureMessage(e, "Couldn't copy. Check your connection and try again."));
       }

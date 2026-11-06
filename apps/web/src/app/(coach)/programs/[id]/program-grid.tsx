@@ -24,7 +24,7 @@ import { cx } from '@/components/ui/cx';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { addProgramWorkout, copyProgramWeek, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
 import { CopyWeekDialog } from './copy-week-dialog';
-import { DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
+import { ASSIGNED_NOTE, DUPLICATE_NOTE, DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import { LibraryPanel } from './library-panel';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
@@ -43,6 +43,7 @@ const cellId = (week: number, day: number) => `cell-${week}-${day}`;
 /** DOM ids, so focus can land somewhere sensible after a chip moves or disappears. */
 const addButtonDomId = (week: number, day: number) => `program-add-${week}-${day}`;
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
+const LOCKED_MESSAGE = 'That week is still being copied. Try again in a moment.';
 
 // Pointer first (exact for the mouse); the keyboard sensor has no pointer, so fall back to overlap.
 const collision: CollisionDetection = (args) => {
@@ -79,20 +80,25 @@ export function ProgramGrid({
   program,
   initialSlots,
   library,
+  justCopied = false,
 }: {
   program: Program;
   initialSlots: Slot[];
   library: LibraryWorkout[];
+  /** Opened right after "Duplicate" (?copied=1): say once what the copy shares with the original. */
+  justCopied?: boolean;
 }) {
   const [slots, setSlots] = useState(initialSlots);
   const [weeks, setWeeks] = useState(program.weeks);
   const [picker, setPicker] = useState<DropData | null>(null);
   const [moving, setMoving] = useState<Slot | null>(null);
   const [copying, setCopying] = useState<number | null>(null);
+  // Weeks a copy is still saving (a week may appear once per copy in flight).
+  const [locked, setLocked] = useState<number[]>([]);
   const [dragging, setDragging] = useState<DragData | null>(null);
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(justCopied ? `Copied. ${DUPLICATE_NOTE}` : null);
   const [addingWeek, setAddingWeek] = useState(false);
   // The details as last saved, so "+ Add week" doesn't save half-typed edits.
   const savedDetails = useRef({ name: program.name, description: program.description });
@@ -102,6 +108,15 @@ export function ProgramGrid({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
   );
+
+  useEffect(() => {
+    // Drop ?copied=1, so a reload doesn't say it again.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('copied')) {
+      url.searchParams.delete('copied');
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, []);
 
   useEffect(() => {
     // The reload prompt stays until the coach acts on it.
@@ -124,6 +139,7 @@ export function ProgramGrid({
   }
 
   function addSlot(workout: LibraryWorkout, week: number, day: number) {
+    if (isLocked(week)) return;
     const slot: Slot = {
       id: crypto.randomUUID(),
       week,
@@ -141,6 +157,7 @@ export function ProgramGrid({
 
   function moveSlot(slot: Slot, week: number, day: number) {
     if (slot.week === week && slot.day === day) return;
+    if (isLocked(slot.week, week)) return;
     const position = nextPosition(slots, week, day, slot.id);
     const before = { week: slot.week, day: slot.day, position: slot.position };
     optimistic(
@@ -151,6 +168,7 @@ export function ProgramGrid({
   }
 
   function removeSlot(slot: Slot) {
+    if (isLocked(slot.week)) return;
     optimistic(
       (s) => s.filter((x) => x.id !== slot.id),
       () => removeProgramWorkout(slot.id),
@@ -158,30 +176,55 @@ export function ProgramGrid({
     );
   }
 
-  /** Copy a week onto other weeks (replacing them): shown at once, saved in one call, undone if saving fails. */
+  /**
+   * Copy a week onto other weeks (replacing them): shown at once and saved in one call with the ids shown here, so
+   * the grid and the database agree. While it saves, the weeks involved are locked (no adds, moves or removals), so
+   * nothing in them can be lost when the saved slots come back. Undone, with a message, if saving fails.
+   */
   function copyWeekTo(from: number, toWeeks: number[]) {
     const plan = copyWeek(slots, { from, to: toWeeks, weeks }, () => crypto.randomUUID());
-    if (plan.weeks.length === 0) return;
+    if (plan.weeks.length === 0 || plan.added.length === 0) return;
     const addedIds = new Set(plan.added.map((s) => s.id));
     const names = new Map(plan.added.map((s) => [s.workoutId, s.workoutName]));
     const without = (s: Slot[]) => s.filter((x) => !addedIds.has(x.id));
+    const undo = () => setSlots((s) => [...without(s), ...plan.removed.filter((r) => !s.some((x) => x.id === r.id))]);
+    const lock = [from, ...plan.weeks];
     setSlots((s) => [...s.filter((x) => !plan.weeks.includes(x.week)), ...plan.added]);
+    setLocked((l) => [...l, ...lock]);
     setInFlight((n) => n + 1);
     const done = plan.weeks.length === 1 ? `week ${plan.weeks[0]}` : `weeks ${plan.weeks[0]} to ${plan.weeks[plan.weeks.length - 1]}`;
-    copyProgramWeek({ programId: program.id, fromWeek: from, toWeeks: plan.weeks })
+    copyProgramWeek({ programId: program.id, fromWeek: from, toWeeks: plan.weeks, ids: plan.added.map((s) => s.id) })
       .then((outcome) => {
-        if (!outcome.ok) throw new Error(outcome.error);
-        // The server made its own ids for the new slots; keep those, so later moves and removals find them.
+        if (!outcome.ok) {
+          undo();
+          setToast(outcome.error);
+          return;
+        }
+        // Same ids as shown; take the saved days and order in case the source week differed from this page.
         const saved = outcome.slots.map((x) => ({ ...x, workoutName: names.get(x.workoutId) ?? '' }));
-        setSlots((s) => [...without(s).filter((x) => !plan.weeks.includes(x.week)), ...saved]);
+        setSlots((s) => [...without(s), ...saved]);
         setSavedOnce(true);
-        setToast(`Copied week ${from} to ${done}.`);
+        setToast(`Copied week ${from} to ${done}. ${ASSIGNED_NOTE}`);
       })
       .catch((e: unknown) => {
-        setSlots((s) => [...without(s), ...plan.removed.filter((r) => !s.some((x) => x.id === r.id))]);
+        undo();
         setToast(failureMessage(e, "Couldn't copy the week, so nothing changed. Please try again."));
       })
-      .finally(() => setInFlight((n) => n - 1));
+      .finally(() => {
+        setInFlight((n) => n - 1);
+        setLocked((l) => {
+          const next = [...l];
+          for (const w of lock) next.splice(next.indexOf(w), 1);
+          return next;
+        });
+      });
+  }
+
+  /** True (and says so) when a week is locked by a copy that is still saving. */
+  function isLocked(...weeksTouched: number[]): boolean {
+    if (!weeksTouched.some((w) => locked.includes(w))) return false;
+    setToast(LOCKED_MESSAGE);
+    return true;
   }
 
   function onDragStart(e: DragStartEvent) {

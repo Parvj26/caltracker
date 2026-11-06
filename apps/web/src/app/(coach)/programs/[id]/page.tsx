@@ -11,9 +11,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Same cap as the workout library page.
 const LIBRARY_LIMIT = 200;
 
-export default async function ProgramPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProgramPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { workspaceId } = await requireCoach();
   const { id } = await params;
+  const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
@@ -61,7 +68,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </div>
       </header>
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.data.id} program={program.data} initialSlots={initialSlots} library={workouts} />
+      <ProgramGrid key={program.data.id} program={program.data} initialSlots={initialSlots} library={workouts} justCopied={justCopied} />
     </div>
   );
 }

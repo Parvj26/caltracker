@@ -46,10 +46,14 @@ test('add three exercises at once with 4 sets each, copy set 1 to all sets, fill
   // Set 1 of the squat: 5 reps at 100 kg, 2:00 rest. A warm-up first stays as it is.
   await setRow(page, 'Barbell Squat', 'set 1').getByLabel('Set type').selectOption('warmup');
   const first = setRow(page, 'Barbell Squat', 'set 1');
+  // Nothing to copy yet: the button waits for set 1, so typed sets are never wiped.
+  const copyAll = page.getByRole('button', { name: 'Copy set 1 of Barbell Squat to all sets' });
+  await expect(copyAll).toBeDisabled();
+  await expect(copyAll).toHaveAccessibleDescription('Type set 1 first, then copy it.');
   await first.getByLabel('Reps', { exact: true }).fill('5');
   await first.getByLabel('Weight (kg)').fill('100');
   await first.getByLabel('Rest (m:ss)').fill('2:00');
-  await page.getByRole('button', { name: 'Copy set 1 of Barbell Squat to all sets' }).click();
+  await copyAll.click();
   for (const n of [2, 3]) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
     await expect(row.getByLabel('Reps', { exact: true })).toHaveValue('5');
@@ -60,7 +64,10 @@ test('add three exercises at once with 4 sets each, copy set 1 to all sets, fill
 
   // Fill down from set 2 after changing it: only set 3 follows.
   await setRow(page, 'Barbell Squat', 'set 2').getByLabel('Weight (kg)').fill('110');
+  // Choosing the set only picks it; "Fill" fills.
   await page.getByLabel('Fill down Barbell Squat from a set').selectOption({ label: 'Set 2 to the sets below' });
+  await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('100');
+  await page.getByRole('button', { name: 'Fill down Barbell Squat', exact: true }).click();
   await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('110');
   await expect(setRow(page, 'Barbell Squat', 'set 1').getByLabel('Weight (kg)')).toHaveValue('100');
 
@@ -126,6 +133,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
   await page.goto('/programs');
   await page.getByRole('button', { name: `Duplicate ${program}`, exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: `${program} (copy)` })).toBeVisible();
+  await expect(page.getByText('Copied. Workouts are shared with the original — editing a workout changes both.')).toBeVisible();
   await expect(chip(1, 1)).toBeVisible();
   await expect(chip(1, 4)).toBeVisible();
   await expect(chip(2, 3)).toBeVisible();
@@ -133,6 +141,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
   // Copy week 1 to week 2: week 2 already has a workout, so the dialog asks before replacing it.
   await page.getByRole('button', { name: 'Copy week 1', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Copy week 1' });
+  await expect(dialog).toContainText('Clients already on this program keep their current workouts.');
   await dialog.getByLabel('Copy to').selectOption({ label: 'Week 2' });
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
   await expect(dialog.getByRole('alert')).toHaveText("Week 2 already has 1 workout. Copying replaces it with week 1's 2 workouts.");
