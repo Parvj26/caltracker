@@ -13,8 +13,10 @@ import {
   addRound,
   addSection,
   addSet,
-  addStraightBlock,
+  addStraightBlocks,
   addSuperset,
+  copyFirstSetToAll,
+  fillDown,
   moveBlock,
   moveBlockToSection,
   moveSection,
@@ -64,6 +66,8 @@ type Picker =
   | { kind: 'swap'; blockId: string; exId: string; name: string };
 
 const makeId = () => crypto.randomUUID();
+/** The most exercises "+ Exercise" adds in one go (a workout holds up to 30 blocks). */
+const STRAIGHT_PICK_MAX = 10;
 
 /**
  * A new library workout moves to /workouts/[id] after its first save, which mounts a fresh builder. This remembers
@@ -179,7 +183,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     });
   }
 
-  function onPick(exs: ExercisePick[]) {
+  function onPick(exs: ExercisePick[], sets: number) {
     const p = picker;
     setPicker(null);
     const [ex] = exs;
@@ -187,11 +191,12 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     setDoc((d) => {
       switch (p.kind) {
         case 'straight':
-          return addStraightBlock(d, ex, makeId);
+          // Several picks: each becomes its own straight block, in the order they were picked.
+          return addStraightBlocks(d, exs, makeId, sets);
         case 'superset':
-          return exs.length >= 2 ? addSuperset(d, exs, makeId) : d;
+          return exs.length >= 2 ? addSuperset(d, exs, makeId, sets) : d;
         case 'choice':
-          return exs.length >= MIN_CHOICE_OPTIONS ? addChoice(d, exs, makeId) : d;
+          return exs.length >= MIN_CHOICE_OPTIONS ? addChoice(d, exs, makeId, sets) : d;
         case 'addOption':
           return addChoiceOption(d, p.blockId, ex, makeId);
         case 'addToSuperset':
@@ -226,6 +231,8 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     onAddSet: (exId) => setDoc((d) => addSet(d, blockId, exId, makeId)),
     onAddDrop: (exId, setId) => setDoc((d) => addDrop(d, blockId, exId, setId, makeId)),
     onRemoveSet: (exId, setId) => setDoc((d) => removeSet(d, blockId, exId, setId)),
+    onCopyToAll: (exId) => setDoc((d) => copyFirstSetToAll(d, blockId, exId)),
+    onFillDown: (exId, setId) => setDoc((d) => fillDown(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
   });
 
@@ -266,7 +273,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
 
   const pickerTitle =
     picker?.kind === 'straight'
-      ? 'Add an exercise'
+      ? 'Add exercises'
       : picker?.kind === 'superset'
         ? 'Add a superset / circuit'
         : picker?.kind === 'addToSuperset'
@@ -370,9 +377,25 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         <ExercisePicker
           title={pickerTitle}
           workspaceId={workspaceId}
-          multiple={picker.kind === 'superset' || picker.kind === 'choice'}
+          multiple={picker.kind === 'straight' || picker.kind === 'superset' || picker.kind === 'choice'}
+          {...(picker.kind === 'straight'
+            ? {
+                min: 1,
+                max: STRAIGHT_PICK_MAX,
+                hint: 'Tap each exercise you want. Each one is added on its own, in the order you pick them.',
+                groupLabel: 'workout',
+                setCount: { label: 'Sets each', noun: 'sets' },
+              }
+            : {})}
+          {...(picker.kind === 'superset' ? { setCount: { label: 'Rounds', noun: 'rounds' } } : {})}
           {...(picker.kind === 'choice'
-            ? { min: MIN_CHOICE_OPTIONS, max: MAX_CHOICE_OPTIONS, hint: 'Pick 2 to 5 exercises. The client does just one of them.', groupLabel: 'pick-one group' }
+            ? {
+                min: MIN_CHOICE_OPTIONS,
+                max: MAX_CHOICE_OPTIONS,
+                hint: 'Pick 2 to 5 exercises. The client does just one of them.',
+                groupLabel: 'pick-one group',
+                setCount: { label: 'Sets each', noun: 'sets' },
+              }
             : {})}
           onPick={onPick}
           onClose={() => setPicker(null)}

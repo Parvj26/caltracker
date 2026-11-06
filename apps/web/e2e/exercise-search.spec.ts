@@ -35,7 +35,7 @@ test.afterAll(async () => {
   if (id) await admin.from('exercise_favorites').delete().eq('coach_id', id);
 });
 
-test('"db curl" finds Dumbbell Bicep Curl, the preview shows photos, and Add to workout adds it', async ({ page }) => {
+test('"db curl" finds Dumbbell Bicep Curl, the preview shows photos, and Add to workout picks it', async ({ page }) => {
   const dialog = await openPicker(page);
   await dialog.getByLabel('Search exercises').fill('db curl');
   await expect(dialog.getByRole('option').first()).toHaveAccessibleName('Dumbbell Bicep Curl');
@@ -46,11 +46,13 @@ test('"db curl" finds Dumbbell Bicep Curl, the preview shows photos, and Add to 
   await expect(preview.getByRole('img')).toHaveCount(2);
 
   await preview.getByRole('button', { name: 'Add to workout' }).click();
+  await expect(preview.getByRole('button', { name: 'Remove from workout' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add 1 exercise', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('region', { name: 'Dumbbell Bicep Curl' })).toBeVisible();
 });
 
-test('keyboard: Down moves the highlight, Enter adds', async ({ page }) => {
+test('keyboard: Down moves the highlight, Enter picks', async ({ page }) => {
   const dialog = await openPicker(page);
   const search = dialog.getByLabel('Search exercises');
   await search.fill('squat');
@@ -59,6 +61,8 @@ test('keyboard: Down moves the highlight, Enter adds', async ({ page }) => {
   await expect(second).toHaveAttribute('aria-selected', 'true');
   const name = (await second.getAttribute('aria-label'))!;
   await search.press('Enter');
+  await expect(dialog.getByRole('list', { name: "Picked, in the order they're done" })).toContainText(name);
+  await dialog.getByRole('button', { name: 'Add 1 exercise', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('region', { name })).toBeVisible();
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { MAX_CHOICE_OPTIONS, TRACKING_TYPE_LABELS, setLabels, setShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
@@ -46,6 +46,9 @@ export type BlockActions = {
   onAddDrop: (exId: string, setId: string) => void;
   onRemoveSet: (exId: string, setId: string) => void;
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
+  /** "Copy set 1 to all sets" and "Fill down from set N": see fillDown in packages/shared. */
+  onCopyToAll: (exId: string) => void;
+  onFillDown: (exId: string, setId: string) => void;
 };
 
 type Props = {
@@ -73,6 +76,9 @@ export function supersetTitle(block: WorkoutBlockDoc): string {
 
 export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, units, errors, actions }: Props) {
   const headingId = useId();
+  // Bumped after a copy, so the set rows remount and show copied rep ranges as ranges (a row picks single or range
+  // when it mounts).
+  const [copies, setCopies] = useState(0);
   const superset = block.kind === 'superset';
   const first = block.exercises[0]!;
   const choice = block.kind === 'choice';
@@ -162,6 +168,14 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         // In a superset the rest after a round sits on the round's last exercise; the others go straight on.
         const restShown = ex.sets.map((_, si) => setShowsRest(block, ei, si));
         const columns = setColumns(ex.trackingType, restShown.some(Boolean));
+        // Main sets with another main set below them: where "Fill down" can start. The first is "Copy set 1 to all".
+        const fillFrom = ex.sets.flatMap((s, si) =>
+          s.setType === 'normal' && ex.sets.slice(si + 1).some((t) => t.setType === 'normal') ? [{ id: s.id, label: labels[si]! }] : [],
+        );
+        const copied = (run: () => void) => {
+          run();
+          setCopies((n) => n + 1);
+        };
         return (
           <div key={ex.id} className={styles.exercise}>
             {multi ? (
@@ -195,7 +209,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               </div>
               {ex.sets.map((s, si) => (
                 <SetRow
-                  key={s.id}
+                  key={`${s.id}:${copies}`}
                   set={s}
                   label={labels[si]!}
                   name={`${ex.exerciseName} ${names[si]}`}
@@ -219,6 +233,35 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               >
                 + Set
               </button>
+              {fillFrom.length > 0 ? (
+                <button
+                  type="button"
+                  className={styles.smallButton}
+                  aria-label={`Copy set ${fillFrom[0]!.label} of ${ex.exerciseName} to all sets`}
+                  title="Copies reps, weight and rest to the other main sets. Warm-ups and drop sets stay as they are."
+                  onClick={() => copied(() => actions.onCopyToAll(ex.id))}
+                >
+                  Copy set {fillFrom[0]!.label} to all sets
+                </button>
+              ) : null}
+              {fillFrom.length > 1 ? (
+                <select
+                  className={`${styles.input} ${styles.moveSelect}`}
+                  aria-label={`Fill down ${ex.exerciseName} from a set`}
+                  value=""
+                  onChange={(e) => {
+                    const setId = e.target.value;
+                    if (setId) copied(() => actions.onFillDown(ex.id, setId));
+                  }}
+                >
+                  <option value="">Fill down from…</option>
+                  {fillFrom.slice(1).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      Set {f.label} to the sets below
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <label className={styles.exerciseNote}>
                 <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
                 <input
