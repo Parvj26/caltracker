@@ -54,6 +54,8 @@ type SaveState = { kind: 'idle' | 'saving' | 'saved' } | { kind: 'error' | 'fina
 
 const SAVE_DELAY_MS = 400;
 const RETRY_MS = 3000;
+/** The longest Finish waits for the award before opening the finished log. */
+const AWARD_WAIT_MS = 4000;
 const nowIso = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
@@ -468,8 +470,9 @@ export function SessionLogger({
       setFinishing(false);
       return;
     }
-    // Stickers, PRs and streaks for the client, as when they finish on the phone.
-    await awardSession(finished.id).catch(() => undefined);
+    // Stickers, PRs and streaks for the client, as when they finish on the phone. Waited for briefly, so the log
+    // page usually shows its PR chip; a slow award never holds the coach up (the catch-up job finishes it).
+    await Promise.race([awardSession(finished.id).catch(() => undefined), new Promise((r) => setTimeout(r, AWARD_WAIT_MS))]);
     router.push(`/clients/${client.id}/logs/${finished.id}`);
   }
 
