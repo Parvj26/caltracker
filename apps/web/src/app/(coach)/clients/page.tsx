@@ -1,17 +1,21 @@
 import Link from 'next/link';
-import { compareByLastName } from '@caltracker/shared';
-import { Card, Chip } from '@/components/ui';
+import { formatFullName, localToday } from '@caltracker/shared';
+import { Card } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
+import { loadHomeData } from '@/lib/coach-home';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { AddClientForm } from './add-client-form';
 import { avatarTone, initials } from './avatar';
+import { ClientDirectory } from './client-directory';
 import { CsvUpload } from './csv-upload';
 import { newestInviteFirst } from './pending-order';
 import { PastClients } from './past-clients';
 import { ResendButton } from './resend-button';
-import { CancelInviteButton, RemoveClientButton } from './row-actions';
 import styles from './clients.module.css';
+
+/** The Clients list looks this far back for each client's last workout (Home only needs 30 days). */
+const LAST_WORKOUT_LOOKBACK_DAYS = 90;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
@@ -50,13 +54,9 @@ export default async function ClientsPage() {
   const { workspaceId } = await requireCoach();
   const supabase = await createServerSupabase();
 
-  const [members, invites, past] = await Promise.all([
-    supabase
-      .from('workspace_members')
-      .select('user_id, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('role', 'client')
-      .order('created_at', { ascending: true }),
+  const [data, invites, past] = await Promise.all([
+    // Current clients with their recent workouts, programs and PRs: the same rows Home's daily check reads.
+    loadHomeData(supabase, workspaceId, localToday('UTC'), LAST_WORKOUT_LOOKBACK_DAYS),
     supabase
       .from('client_invites')
       .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at')
@@ -69,27 +69,25 @@ export default async function ClientsPage() {
       .order('removed_at', { ascending: false }),
   ]);
   if (past.error) throw new Error(`Could not load past clients: ${past.error.message}`);
-  if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (invites.error) throw new Error(`Could not load invites: ${invites.error.message}`);
-
-  // No direct foreign key links workspace_members to profiles, so load names separately.
-  const profiles = members.data.length
-    ? await supabase.from('profiles').select('id, first_name, last_name, full_name').in('id', members.data.map((m) => m.user_id))
-    : { data: [], error: null };
-  if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
-  const profileByUser = new Map((profiles.data ?? []).map((p) => [p.id, p]));
-  const nameOf = (userId: string) => {
-    const p = profileByUser.get(userId);
-    return { firstName: p?.first_name ?? '', lastName: p?.last_name ?? '' };
-  };
-  // Joined clients are sorted by last name, then first name; pending invites newest first (below).
-  const clients = [...members.data].sort((a, b) => compareByLastName(nameOf(a.user_id), nameOf(b.user_id)));
 
   // Client emails live in auth.users, which RLS hides; fall back to the accepted invite's email.
   const emailByUser = new Map(
     invites.data.filter((i) => i.accepted_by).map((i) => [i.accepted_by as string, i.email]),
   );
-  const pending = invites.data.filter((i) => i.accepted_at === null).sort(newestInviteFirst);
+  const clients = data.clients.map((c) => ({ id: c.id, name: formatFullName(c), email: emailByUser.get(c.id) ?? '' }));
+  const pending = invites.data
+    .filter((i) => i.accepted_at === null)
+    .sort(newestInviteFirst)
+    .map((i) => ({
+      id: i.id,
+      name: i.full_name,
+      email: i.email,
+      firstName: i.first_name,
+      lastName: i.last_name,
+      sent: dateFormat.format(new Date(i.sent_at)),
+      expiry: expiryLabel(i.expires_at),
+    }));
 
   return (
     <div className={styles.page}>
@@ -100,95 +98,11 @@ export default async function ClientsPage() {
         </p>
       </header>
 
+      <ClientDirectory data={data} people={clients} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
+
       <Card className={styles.addCard}>
         <AddClientForm />
         <CsvUpload />
-      </Card>
-
-      <Card className={styles.listCard}>
-        <section aria-labelledby="clients-heading">
-          <h2 id="clients-heading" tabIndex={-1} className={styles.sectionHeading}>Clients</h2>
-          <div role="table" aria-label="Clients" className={cx(styles.rows, styles.clientRows)}>
-            <div role="rowgroup" className={styles.headRow}>
-              <div role="row" className={styles.row}>
-                <span role="columnheader">Name</span>
-                <span role="columnheader">Email</span>
-                <span role="columnheader">Joined</span>
-                <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
-              </div>
-            </div>
-            <div role="rowgroup">
-              {clients.length === 0 ? (
-                <div role="row" className={styles.emptyRow}>
-                  <span role="cell">No clients yet. Add one above.</span>
-                </div>
-              ) : (
-                clients.map((m) => {
-                  const joined = m.created_at ? dateFormat.format(new Date(m.created_at)) : '';
-                  const name = profileByUser.get(m.user_id)?.full_name ?? '';
-                  return (
-                    <div role="row" key={m.user_id} className={styles.row}>
-                      <NameCell name={name} toneKey={m.user_id} href={`/clients/${m.user_id}`} />
-                      <span role="cell" className={styles.email}>{emailByUser.get(m.user_id) ?? ''}</span>
-                      <span role="cell" className={styles.meta}>
-                        {joined ? <span aria-hidden="true" className={styles.narrowOnly}>Joined </span> : null}
-                        {joined}
-                      </span>
-                      <div role="cell" className={styles.actions}>
-                        <RemoveClientButton userId={m.user_id} name={name} />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </section>
-      </Card>
-
-      <Card className={styles.listCard}>
-        <section aria-labelledby="pending-heading">
-          <h2 id="pending-heading" tabIndex={-1} className={styles.sectionHeading}>Pending invites</h2>
-          <div role="table" aria-label="Pending invites" className={cx(styles.rows, styles.inviteRows)}>
-            <div role="rowgroup" className={styles.headRow}>
-              <div role="row" className={styles.row}>
-                <span role="columnheader">Name</span>
-                <span role="columnheader">Email</span>
-                <span role="columnheader">Sent</span>
-                <span role="columnheader">Expires</span>
-                <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
-              </div>
-            </div>
-            <div role="rowgroup">
-              {pending.length === 0 ? (
-                <div role="row" className={styles.emptyRow}>
-                  <span role="cell">No pending invites.</span>
-                </div>
-              ) : (
-                pending.map((i) => {
-                  const expiry = expiryLabel(i.expires_at);
-                  return (
-                    <div role="row" key={i.id} className={styles.row}>
-                      <NameCell name={i.full_name} toneKey={i.email} />
-                      <span role="cell" className={styles.email}>{i.email}</span>
-                      <span role="cell" className={styles.meta}>
-                        <span aria-hidden="true" className={styles.narrowOnly}>Sent </span>
-                        {dateFormat.format(new Date(i.sent_at))}
-                      </span>
-                      <span role="cell" className={styles.expires}>
-                        <Chip tone={expiry === 'Expired' ? 'amber' : 'grey'}>{expiry}</Chip>
-                      </span>
-                      <div role="cell" className={styles.actions}>
-                        <ResendButton email={i.email} firstName={i.first_name} lastName={i.last_name} />
-                        <CancelInviteButton inviteId={i.id} email={i.email} />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </section>
       </Card>
 
       {past.data.length > 0 ? (

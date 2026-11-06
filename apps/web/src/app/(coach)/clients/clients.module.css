@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--ct-space-4-5);
-  max-width: 1040px;
+  max-width: 1180px;
 }
 
 .titleRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ct-space-1) var(--ct-space-3); }
@@ -45,8 +45,8 @@
 }
 .rows [role='rowgroup']:last-child > .row:last-child { border-bottom: 0; }
 /* Every row is its own grid, so tracks are fixed (rem, not auto/em) to keep the columns lined up with the header. */
-.clientRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 7rem minmax(6rem, 0.6fr); }
-.inviteRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 6.5rem 8.5rem minmax(6rem, 0.7fr); }
+.clientRows .row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) 7.5rem 5rem minmax(0, 1.2fr) 6.5rem; }
+.inviteRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 6.5rem 13rem 14.5rem; }
 
 .headRow .row {
   padding: var(--ct-space-1) 0 var(--ct-space-2);
@@ -89,24 +89,97 @@
   font-size: 14px;
 }
 
-/* Narrow cards (iPad portrait split, phones): each row stacks into a small block. */
-@container (max-width: 720px) {
+/* Narrow cards (iPad portrait, phones): each row stacks into a small block. */
+@container (max-width: 860px) {
   .headRow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .narrowOnly { display: inline; }
-  .clientRows .row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'name meta' 'email email' 'actions actions';
-  }
   .inviteRows .row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: 'name expires' 'email email' 'meta actions';
   }
-  .nameCell { grid-area: name; }
-  .email { grid-area: email; padding-left: 42px; font-size: 14px; color: var(--ct-ink-muted); }
-  .meta { grid-area: meta; }
+  :is(.inviteRows, .pastRows) .nameCell { grid-area: name; }
+  :is(.inviteRows, .pastRows) .email { grid-area: email; padding-left: 42px; font-size: 14px; color: var(--ct-ink-muted); }
+  :is(.inviteRows, .pastRows) .meta { grid-area: meta; }
   .inviteRows .meta { padding-left: 42px; }
-  .expires { grid-area: expires; }
-  .actions { grid-area: actions; }
+  .inviteRows .expires { grid-area: expires; }
+  :is(.inviteRows, .pastRows) .actions { grid-area: actions; }
+}
+
+/* ---------- Clients list: search, filters, sort, and its columns ---------- */
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
+.searchField { flex: 1 1 280px; display: flex; }
+.searchInput {
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+}
+.searchInput:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.sortField { flex: 0 1 220px; }
+.filters { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3-5);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.filterChip:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.filterChip[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-surface); box-shadow: none; }
+.filterChip:disabled { cursor: default; color: var(--ct-ink-muted); }
+.filterCount { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); opacity: 0.8; }
+.filterResult { flex: 1 1 100%; margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.filterResult:empty { display: none; }
+
+.nameStack { display: flex; flex-direction: column; min-width: 0; }
+.nameStack .nameLink { min-height: 0; padding-top: var(--ct-space-1); }
+.nameStack .email { font-size: 14px; color: var(--ct-ink-muted); }
+.clientRows .nameCell { min-height: var(--ct-tap-min); }
+.statusCell { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-1); min-width: 0; }
+.why { font-size: 13px; line-height: 1.3; color: var(--ct-ink-muted); }
+.programCell { display: flex; flex-direction: column; min-width: 0; }
+.programName { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.programEnd { font-size: 14px; color: var(--ct-ink-muted); }
+.expires { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); }
+
+/* Narrow list (iPad portrait, small windows): each client becomes a two-line card. Name and status on top, then
+   last workout, this week and program, with Remove at the end. */
+@container (max-width: 860px) {
+  .clientRows .headRow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .clientRows .narrowOnly { display: inline; }
+  .clientRows .row {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'name name status status' 'last week program actions';
+    column-gap: var(--ct-space-4);
+    padding: var(--ct-space-3) 0;
+  }
+  .clientRows .nameCell { grid-area: name; }
+  .clientRows .statusCell { grid-area: status; justify-self: end; align-items: flex-end; text-align: right; max-width: 22rem; }
+  .clientRows .meta:nth-child(3) { grid-area: last; padding-left: 42px; }
+  .clientRows .meta:nth-child(4) { grid-area: week; }
+  .clientRows .programCell { grid-area: program; }
+  .clientRows .actions { grid-area: actions; }
+}
+@container (max-width: 560px) {
+  .clientRows .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'name status' 'last week' 'program actions';
+  }
+  .clientRows .meta:nth-child(4) { text-align: right; }
+  .clientRows .programCell { padding-left: 42px; }
 }
 
 /* ---------- Add client + CSV card ---------- */
@@ -218,7 +291,7 @@
 
 /* ---------- Past clients ---------- */
 .pastRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem minmax(7rem, 0.7fr); }
-@container (max-width: 720px) {
+@container (max-width: 860px) {
   .pastRows .row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: 'name meta' 'email email' 'actions actions';
