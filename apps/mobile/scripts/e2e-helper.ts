@@ -134,7 +134,7 @@ type PlanBlock = {
   kind: 'straight' | 'superset' | 'choice';
   /** The section heading the block sits under (consecutive blocks with the same name share one section). */
   section?: string;
-  exercises: Array<{ name: string; sets: PlanSet[] }>;
+  exercises: Array<{ name: string; sets: PlanSet[]; substitutes?: Array<{ name: string; sets: PlanSet[] }> }>;
 };
 
 /**
@@ -150,7 +150,7 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
   try {
     const { data: ws, error: wsErr } = await coach.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
     if (wsErr) throw wsErr;
-    const names = [...new Set(blocks.flatMap((b) => b.exercises.map((e) => e.name)))];
+    const names = [...new Set(blocks.flatMap((b) => b.exercises.flatMap((e) => [e.name, ...(e.substitutes ?? []).map((x) => x.name)])))];
     const { data: found, error: exErr } = await coach
       .from('exercises')
       .select('id, name, tracking_type')
@@ -181,7 +181,17 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
             trackingType: ex.tracking_type,
             note: null,
             sets: e.sets.map((s) => ({ ...s, id: randomUUID() })),
-            substitutes: [],
+            substitutes: (e.substitutes ?? []).map((sub) => {
+              const subEx = byName.get(sub.name)!;
+              return {
+                id: randomUUID(),
+                exerciseId: subEx.id,
+                exerciseName: subEx.name,
+                trackingType: subEx.tracking_type,
+                note: null,
+                sets: sub.sets.map((x) => ({ ...x, id: randomUUID() })),
+              };
+            }),
           };
         }),
       })),
@@ -295,6 +305,67 @@ export async function assignTodaySections(email: string): Promise<void> {
   ]);
 }
 
+const LB = 0.45359237;
+const lb = (n: number) => Math.round(n * LB * 1000) / 1000;
+
+/**
+ * "E2E Upper/Core" today, the simple-logging mock-ups: Warm-Up [Arm Circles 1 × 0:30]; Resistance Training
+ * [superset 1: Dumbbell Bench Press 35/45/55/30 lb + Dumbbell Alternate Bicep Curl 3 sets (uneven), 1:00 round rest;
+ * superset 2: Wide-Grip Lat Pulldown 85/115 lb (substitute Machine Assisted Pull Up 2 × 10 @ 40 lb) + Triceps
+ * Pushdown 70/80 lb; Triceps Pushdown - Rope Attachment W 20 lb × 10, 40 lb × 12, drop 30 lb, drop 20 lb to
+ * failure]; Finisher [pick one: Overhead Slam 2 × 12 @ 15 lb, Farmer's Walk, Medicine Ball Scoop Throw].
+ */
+export async function assignTodayMockup(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const w = (reps: number, pounds: number, rest: number) => plan('normal', reps, lb(pounds), rest);
+  await assignWorkout(email, 'E2E Upper/Core', [
+    {
+      kind: 'straight',
+      section: 'Warm-Up',
+      exercises: [{ name: 'Arm Circles', sets: [{ ...plan('normal', null, null, 0), targetDurationS: 30 }] }],
+    },
+    {
+      kind: 'superset',
+      section: 'Resistance Training',
+      exercises: [
+        { name: 'Dumbbell Bench Press', sets: [w(12, 35, 0), w(12, 45, 0), w(10, 55, 0), w(5, 30, 0)] },
+        { name: 'Dumbbell Alternate Bicep Curl', sets: [w(12, 20, 60), w(12, 25, 60), w(12, 25, 60)] },
+      ],
+    },
+    {
+      kind: 'superset',
+      section: 'Resistance Training',
+      exercises: [
+        {
+          name: 'Wide-Grip Lat Pulldown',
+          sets: [w(12, 85, 0), w(12, 115, 0)],
+          substitutes: [{ name: 'Machine Assisted Pull Up', sets: [w(10, 40, 0), w(10, 40, 0)] }],
+        },
+        { name: 'Triceps Pushdown', sets: [w(12, 70, 60), w(12, 80, 60)] },
+      ],
+    },
+    {
+      kind: 'straight',
+      section: 'Resistance Training',
+      exercises: [
+        {
+          name: 'Triceps Pushdown - Rope Attachment',
+          sets: [plan('warmup', 10, lb(20), 60), w(12, 40, 60), plan('drop', null, lb(30), 0), plan('drop', null, lb(20), 0, true)],
+        },
+      ],
+    },
+    {
+      kind: 'choice',
+      section: 'Finisher',
+      exercises: [
+        { name: 'Overhead Slam', sets: [w(12, 15, 30), w(12, 15, 30)] },
+        { name: "Farmer's Walk", sets: [{ ...plan('normal', null, null, 60), targetDistanceM: 40 }, { ...plan('normal', null, null, 60), targetDistanceM: 40 }] },
+        { name: 'Medicine Ball Scoop Throw', sets: [w(10, 10, 30), w(10, 10, 30)] },
+      ],
+    },
+  ]);
+}
+
 /** The only account whose logs the flows may delete. */
 const DEMO_CLIENT = 'client@demo.local';
 
@@ -310,6 +381,28 @@ export async function cleanupLogs(email: string): Promise<void> {
     const { error: awardError } = await admin.from(table).delete().eq('client_id', id);
     if (awardError) throw awardError;
   }
+}
+
+/**
+ * The workout note of the client's latest finished log (the finish sheet writes "Felt: …" there), lines joined by
+ * " | ". Waits up to 15 s for the phone's upload.
+ */
+export async function logNotes(email: string): Promise<string> {
+  const id = await findUserId(email);
+  if (!id) throw new Error(`No user with email ${email}`);
+  for (let i = 0; i < 30; i += 1) {
+    const { data, error } = await admin
+      .from('workout_logs')
+      .select('notes')
+      .eq('client_id', id)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    if (data[0]) return (data[0].notes ?? '').split('\n').join(' | ');
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return '';
 }
 
 /** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */
@@ -357,6 +450,7 @@ export async function confirmLink(email: string): Promise<string> {
 async function run(action: string, email: string, name: string): Promise<string | void> {
   if (action === 'confirmlink') return confirmLink(email);
   if (action === 'invitelink') return inviteLink(email, name);
+  if (action === 'log-notes') return logNotes(email);
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);
@@ -366,6 +460,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'assign-today-sections') await assignTodaySections(email);
+  else if (action === 'assign-today-mockup') await assignTodayMockup(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   // For these two the "email" is the business name and the "name" is the bio.
   else if (action === 'coach-profile') await setCoachProfile(email, name);

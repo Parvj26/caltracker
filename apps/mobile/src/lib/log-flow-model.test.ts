@@ -310,12 +310,12 @@ describe('pages', () => {
     const block = log.blocks[3];
     expect(buildPage(log, fin.pages[1], 'lb', {})).toMatchObject({ kind: 'option', line: 'Option 2 of 3 · log a set to pick it', picked: false });
     log = pickingFirst(log, block.id, block.exercises[1].id, NOW);
-    expect(buildPage(log, fin.pages[1], 'lb', {})).toMatchObject({ line: "Option 2 of 3 · you're doing this one", picked: true });
+    expect(buildPage(log, fin.pages[1], 'lb', {})).toMatchObject({ line: "Option 2 of 3 · you’re doing this one", picked: true });
     // Picked but nothing ticked: another option can still take over.
     expect(pickingFirst(log, block.id, block.exercises[0].id, NOW).blocks[3].pickedExerciseId).toBe(block.exercises[0].id);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     expect(pickingFirst(log, block.id, block.exercises[0].id, NOW)).toBe(log);
-    expect(buildPage(log, fin.pages[0], 'lb', {})).toMatchObject({ lockedOut: "You're doing Farmers Walk. Swipe to it to log it." });
+    expect(buildPage(log, fin.pages[0], 'lb', {})).toMatchObject({ lockedOut: "You’re doing Farmers Walk. Swipe to it to log it." });
   });
 });
 
@@ -354,17 +354,17 @@ describe('finish and summary', () => {
       done: 1 + 7 + 2 + 2,
       total: 14,
       headline: '12 of 14 sets done.',
-      unticked: "2 sets of Cable Tricep Pushdown aren't ticked; they'll be saved as not done.",
+      unticked: "2 sets of Cable Tricep Pushdown aren’t ticked; they’ll be saved as not done.",
       noneDone: false,
     });
   });
 
   it('counts a pick-one group not picked yet as its first option, then only the picked option', () => {
     let log = tickAll(tickAll(tickAll(mockLog(), 0), 1), 2);
-    expect(finishModel(log)).toMatchObject({ total: 1 + 7 + 4 + 2, unticked: "2 sets aren't ticked; they'll be saved as not done." });
+    expect(finishModel(log)).toMatchObject({ total: 1 + 7 + 4 + 2, unticked: "2 sets aren’t ticked; they’ll be saved as not done." });
     const block = log.blocks[3];
     log = pickChoice(log, block.id, block.exercises[2].id, NOW);
-    expect(finishModel(log).unticked).toBe("2 sets of Overhead Throw aren't ticked; they'll be saved as not done.");
+    expect(finishModel(log).unticked).toBe("2 sets of Overhead Throw aren’t ticked; they’ll be saved as not done.");
   });
 
   it('lists the changes from the plan: swaps and the picked finisher', () => {

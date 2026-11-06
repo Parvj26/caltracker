@@ -2,9 +2,10 @@
 #   section Upper: an uneven superset, Pullups 3 × 8 (A1, no rest) + Pushups 2 × 8 (A2, 1:00 rest);
 #   section Finisher: pick one of Barbell Squat 2 × 8 @ 60 kg or Dumbbell Bicep Curl 2 × 12 @ 10 kg.
 # The preview shows the section headings, each exercise as one compact "×N" line that expands to its sets, and the
-# Equipment row. Logging: round 3 is Pullups alone and still rests (the block's round rest); the finisher is picked
-# on its cards, switched before the first set, then logged; finish, the reveal, and a summary that counts only the
-# picked option's sets.
+# Equipment row. Logging: each section opens with its start page; the superset's round 3 is Pullups alone (Pushups
+# has no third set, so it is left out); Done on the section's last page goes to the next section's start page.
+# The finisher's options are pages: logging one picks it (switchable until a set is ticked, then the others are
+# locked out); finish, the reveal, and a summary that counts only the picked option's sets and lists the pick.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -83,110 +84,133 @@ env:
 - tapOn: 'Start'
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: workout-overview
     timeout: 20000
 - assertVisible:
-    id: section-line-0
-    text: 'Upper.*'
+    id: overview-section-0
+    text: 'Upper, 1 superset · 2 exercises.*'
 - assertVisible:
-    id: done-0
-    text: 'Done · straight to A2'
+    id: overview-section-1
+    text: 'Finisher, Pick one of 2 · swipe to choose.*'
 - tapOn:
-    id: done-0
-- assertVisible:
-    id: done-0
-    text: 'Done round 1 · rest 1:00'
-- tapOn:
-    id: done-0
+    id: start-workout
 - extendedWaitUntil:
     visible:
-      id: rest-panel
+      id: section-title
+      text: 'Upper'
     timeout: 10000
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: done-0
-- tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: rest-panel
-    timeout: 10000
-- tapOn:
-    id: rest-skip
-# Round 3 is Pullups alone: it still rests the round's 1:00, then the page is done and moves on.
 - assertVisible:
-    id: done-0
-    text: 'Done round 3 · rest 1:00'
+    id: section-place
+    text: 'Section 1 of 2'
+- assertVisible:
+    id: section-count
+    text: '1 superset · 2 exercises'
+- assertVisible: 'SUPERSET'
+- takeScreenshot: sections-04-section-start
 - tapOn:
-    id: done-0
+    id: start-section
 - extendedWaitUntil:
     visible:
-      id: rest-panel
+      id: superset-heading-0
+      text: 'Superset 1 · Round 1 of 3'
     timeout: 10000
+- assertVisible:
+    id: pages-title
+    text: 'Upper'
+# Round 3 is Pullups alone: Pushups has only two sets.
+- assertVisible:
+    id: tick-0-0-2
+- assertNotVisible:
+    id: tick-0-1-2
 - tapOn:
-    id: rest-skip
+    id: mark-all
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+- assertVisible:
+    id: superset-heading-0
+    text: 'Superset 1 · Round 3 of 3'
+# The section's last page: Done goes to the next section's start page.
+- tapOn:
+    id: page-done
 
-# ---- Finisher: pick one, switch, log ----
+# ---- Finisher: pick one by logging it ----
 - extendedWaitUntil:
     visible:
-      id: choice-heading-1
+      id: section-title
+      text: 'Finisher'
     timeout: 10000
 - assertVisible:
-    id: choice-option-0
-- assertVisible:
-    id: choice-option-1
-- takeScreenshot: sections-04-pick-one-cards
+    id: section-count
+    text: 'Pick one of 2 · swipe to choose'
 - tapOn:
-    id: choice-option-0
+    id: start-section
 - extendedWaitUntil:
     visible:
-      id: picked-line-1
+      id: option-line-0
+      text: 'Option 1 of 2 · log a set to pick it'
     timeout: 10000
 - assertVisible:
-    id: exercise-name-1
+    id: exercise-name-0
     text: 'Barbell Squat'
-# Before the first set the pick can still change.
+# Typing a number picks that option.
 - tapOn:
-    id: choice-switch
+    id: actual-reps-0-0-0
+- inputText: '7'
+- tapOn:
+    id: exercise-name-0
 - extendedWaitUntil:
     visible:
-      id: choice-heading-1
-    timeout: 10000
+      id: option-line-0
+      text: 'Option 1 of 2 · you’re doing this one'
+    timeout: 5000
+- takeScreenshot: sections-05-option-picked
+# Swipe to the other option and tick a set: the pick switches (nothing was ticked yet).
 - tapOn:
-    id: choice-option-1
+    id: dot-1
 - extendedWaitUntil:
     visible:
       id: exercise-name-1
       text: 'Dumbbell Bicep Curl'
-    timeout: 10000
-- takeScreenshot: sections-05-picked
+    timeout: 5000
 - tapOn:
-    id: done-1
+    id: tick-1-1-0
 - extendedWaitUntil:
     visible:
-      id: rest-panel
-    timeout: 10000
+      id: option-line-1
+      text: 'Option 2 of 2 · you’re doing this one'
+    timeout: 5000
+# The squat can no longer be logged.
 - tapOn:
-    id: rest-skip
-# After the first set the pick is locked: no Switch.
-- assertNotVisible:
-    id: choice-switch
-- tapOn:
-    id: done-1
+    id: dot-0
 - extendedWaitUntil:
     visible:
-      id: all-done-1
-    timeout: 10000
+      id: option-locked-0
+      text: 'You’re doing Dumbbell Bicep Curl. Swipe to it to log it.'
+    timeout: 5000
 - tapOn:
-    id: finish-all-1
+    id: dot-1
+- extendedWaitUntil:
+    visible:
+      id: tick-1-1-1
+    timeout: 5000
+- tapOn:
+    id: tick-1-1-1
+- tapOn:
+    id: page-done
 
-# ---- Reveal, then the summary: 3 + 2 superset sets and the 2 curls; the squat option never counts ----
-- runFlow: helpers/reveal-through.yaml
+# ---- Finish; the summary counts 3 + 2 superset sets and the 2 curls, and lists the pick ----
+- extendedWaitUntil:
+    visible:
+      id: finish-count
+      text: '7 of 7 sets done.'
+    timeout: 10000
+- runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
     visible: '7 sets completed'
     timeout: 10000
 - assertVisible: 'E2E Sections'
+- assertVisible: 'Finisher: picked Dumbbell Bicep Curl'
 - tapOn:
     id: summary-done
 - runScript:

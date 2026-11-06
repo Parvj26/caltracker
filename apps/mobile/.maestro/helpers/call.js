@@ -13,9 +13,13 @@
 //                      Dumbbell Bicep Curl 2 x 12 @ 10 kg
 //   coach-profile      sets the demo coach's business (EMAIL) and bio (NAME)
 //   coach-profile-reset  puts the demo business name back and clears the bio (EMAIL ignored; pass '-')
+//   assign-today-mockup like assign-today, "E2E Upper/Core": the simple-logging mock-ups (sections, supersets, a
+//                      substitute, drops, a pick-one finisher)
+//   log-notes          the workout note of EMAIL's latest log, lines joined with " | " (returned as output.call)
 //   cleanup-logs       deletes every workout log of client@demo.local, and the stickers, personal bests and stats
 //                      they earned (refuses any other EMAIL)
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);
 if (!res.ok) throw new Error(ACTION + ' failed: ' + res.status + ' ' + res.body);
+output.call = res.body;

@@ -1,5 +1,6 @@
-# An unplanned workout: Workouts → Log a workout, name it "Run", add an exercise, do one of its three sets and
-# finish. The client is asked about the two sets not done, then sees the summary.
+# An unplanned workout: Workouts → Log a workout, name it "Run", add an exercise from the overview, change the
+# reps on set 1, tick it and finish. The Finish workout? sheet says the other two sets aren't ticked and will be
+# saved as not done; then the reveal and the summary.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -28,11 +29,12 @@ env:
 - inputText: 'Run'
 - tapOn:
     id: unplanned-start
+# An empty workout opens on its overview, named as typed.
 - extendedWaitUntil:
     visible:
-      id: add-exercise
+      id: overview-name
+      text: 'Run'
     timeout: 20000
-# The logging screen has no title; the summary below shows the name.
 - tapOn:
     id: add-exercise
 - tapOn:
@@ -46,26 +48,30 @@ env:
     id: exercise-result-0
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: page-done
     timeout: 10000
-# Pushups count reps only: one more than the pre-fill.
+# Pushups count reps only: one REPS column, typed straight into the box.
 - tapOn:
-    id: stepper-reps-plus-0
+    id: actual-reps-0-0-0
+- inputText: '12'
 - tapOn:
-    id: done-0
-# Added exercises have no rest set, so no rest panel; close it if one shows.
+    id: tick-0-0-0
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: actual-reps-0-0-0
+    text: '12'
 - tapOn:
-    id: rest-skip
-    optional: true
-- tapOn:
-    id: finish-workout
+    id: page-done
 - extendedWaitUntil:
-    visible: 'Finish with 2 sets not done\? They won’t count\.'
+    visible:
+      id: finish-sheet
     timeout: 10000
-- tapOn: 'Finish'
-# The sticker reveal comes first: a first workout of a fresh streak shows the week-1 landmark and "Workout #1" even
-# without a weighted set. reveal-through steps through however many cards show.
-- runFlow: helpers/reveal-through.yaml
+- assertVisible:
+    id: finish-count
+    text: '1 of 3 sets done. 2 sets of .* aren’t ticked; they’ll be saved as not done.'
+- runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
     visible: '1 set completed'
     timeout: 10000
@@ -73,9 +79,6 @@ env:
 - assertVisible: 'Coach comments'
 - tapOn:
     id: summary-done
-- extendedWaitUntil:
-    visible: 'Workouts'
-    timeout: 10000
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

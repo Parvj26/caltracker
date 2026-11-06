@@ -1,6 +1,8 @@
-# The client logs today's planned workout: Start, Done on set 1 (the rest panel opens), skip the rest, Done on the
-# other two, Finish. The summary shows the sets and the volume; Today then shows Done ✓, and its View button
-# opens the same summary again.
+# The client logs today's planned workout ("E2E Log", Barbell Squat 3 × 8 @ 60 kg, 1:30 rests): Start opens the
+# workout overview, Start workout the section's start page, Start section the exercise. The page shows the demo,
+# the coach's rest as text only (no rest timer), and a set table; ✓ on each set, Done, then the Finish workout?
+# sheet (How did it feel?, a note), the sticker reveal and the summary. Today then shows Done ✓, and View opens
+# the same summary again.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -21,14 +23,45 @@ env:
     visible: 'E2E Log'
     timeout: 20000
 - tapOn: 'Start'
+# ---- Overview, then the (unnamed) section's start page ----
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: workout-overview
     timeout: 20000
-- assertVisible: 'Set 1 of 3'
-# How to (on the photo) opens the info sheet: name, instructions, a Close button.
+- assertVisible:
+    id: overview-name
+    text: 'E2E Log'
+- assertVisible:
+    id: start-workout
+    text: 'Start workout'
 - tapOn:
-    id: how-to-0
+    id: start-workout
+- extendedWaitUntil:
+    visible:
+      id: section-title
+      text: 'E2E Log'
+    timeout: 10000
+- assertVisible:
+    id: section-count
+    text: '1 exercise'
+# The list: name, the coach's targets in one line, ×3.
+- assertVisible: 'Barbell Squat, 3 sets: 132 lb × 8, 132 lb × 8, 132 lb × 8'
+- tapOn:
+    id: start-section
+# ---- The exercise page ----
+- extendedWaitUntil:
+    visible:
+      id: exercise-name-0
+      text: 'Barbell Squat'
+    timeout: 10000
+- assertVisible:
+    id: rest-line-0-0
+    text: 'Rest 1:30'
+- assertNotVisible:
+    id: rest-panel
+# Tapping the demo opens the exercise sheet: name, instructions, Close.
+- tapOn:
+    id: demo-0-0
 - extendedWaitUntil:
     visible:
       id: exercise-sheet-name
@@ -37,51 +70,43 @@ env:
     id: exercise-sheet-name
     text: 'Barbell Squat'
 - assertVisible: 'Instructions'
-- assertVisible: '1\..*'
 - takeScreenshot: exercise-sheet
 - tapOn:
     id: exercise-sheet-close
 - assertNotVisible:
     id: exercise-sheet-name
-# Done says what happens next; set 1 starts the 1:30 rest, whose panel says what comes after it.
+# ✓ just completes the set: no rest panel, no countdown.
+- tapOn:
+    id: tick-0-0-0
 - assertVisible:
-    id: done-0
-    text: 'Done · start rest 1:30'
-- tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: rest-panel
-    timeout: 10000
-- assertVisible:
-    id: rest-next
-    text: 'Next: Barbell Squat · set 2 of 3 · 132 lb × 8'
-- tapOn:
-    id: rest-skip
-- assertNotVisible:
-    id: rest-panel
-- assertVisible: 'Set 2 of 3'
-- tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
-- assertVisible:
-    id: done-0
-    text: 'Done · last set'
-- tapOn:
-    id: done-0
-# The last set starts no rest; the page says the exercise is finished.
-- extendedWaitUntil:
-    visible:
-      id: all-done-0
-    timeout: 10000
+    id: tick-0-0-0
+    text: 'checkbox, checked'
 - assertNotVisible:
     id: rest-panel
 - tapOn:
-    id: finish-workout
-# Every set was ticked, so there is no "sets not done" question.
-# The sticker reveal comes first (sticker-reveal.yaml checks it); step through it to the summary.
-- runFlow: helpers/reveal-through.yaml
+    id: tick-0-0-1
+- tapOn:
+    id: tick-0-0-2
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+# The only section's last page: Done opens the finish sheet.
+- tapOn:
+    id: page-done
+- extendedWaitUntil:
+    visible:
+      id: finish-sheet
+    timeout: 10000
+- assertVisible:
+    id: finish-count
+    text: '3 of 3 sets done.'
+- tapOn:
+    id: feel-Good
+- tapOn:
+    id: finish-note
+- inputText: 'Felt strong'
+- tapOn: 'Finish workout?'
+- runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 10000
@@ -91,12 +116,19 @@ env:
     id: summary-volume
 - assertVisible: '3,175 lb lifted'
 - assertVisible: 'Coach comments'
+- assertNotVisible:
+    id: summary-changes
 - tapOn:
     id: summary-done
 - extendedWaitUntil:
     visible: 'Done ✓.*'
     timeout: 20000
 - assertNotVisible: 'Start'
+# The feeling and the note were saved with the workout (read back from the server here).
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
+- assertTrue: ${output.call == "Felt: Good | Felt strong"}
 # Later, from Today: View opens the summary again.
 - tapOn: 'View'
 - extendedWaitUntil:

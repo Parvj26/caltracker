@@ -424,7 +424,7 @@ export type SupersetPageModel = {
 
 export type OptionPageModel = {
   kind: 'option';
-  /** "Option 2 of 3 · you're doing this one". */
+  /** "Option 2 of 3 · you’re doing this one". */
   line: string;
   /** This option is the pick. */
   picked: boolean;
@@ -505,11 +505,11 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
     const ex = block.exercises[page.optionIndex];
     const picked = block.pickedExerciseId === ex.id;
     const other = block.exercises.find((e) => e.id === block.pickedExerciseId);
-    const lockedOut = !picked && other && isChoiceLocked(block) ? `You're doing ${other.exerciseName}. Swipe to it to log it.` : null;
+    const lockedOut = !picked && other && isChoiceLocked(block) ? `You’re doing ${other.exerciseName}. Swipe to it to log it.` : null;
     const where = `Option ${page.optionIndex + 1} of ${page.options}`;
     return {
       kind: 'option',
-      line: picked ? `${where} · you're doing this one` : lockedOut ? where : `${where} · log a set to pick it`,
+      line: picked ? `${where} · you’re doing this one` : lockedOut ? where : `${where} · log a set to pick it`,
       picked,
       lockedOut,
       exercise: exerciseModel(ex, page.optionIndex, null, last),
@@ -566,7 +566,7 @@ export type FinishModel = {
   total: number;
   /** "25 of 27 sets done." */
   headline: string;
-  /** "2 sets of Tricep Pushdown aren't ticked; they'll be saved as not done." or null when all are ticked. */
+  /** "2 sets of Tricep Pushdown aren’t ticked; they’ll be saved as not done." or null when all are ticked. */
   unticked: string | null;
   /** Nothing ticked: the workout can't be finished, only discarded. */
   noneDone: boolean;
@@ -589,9 +589,9 @@ export function finishModel(log: WorkoutLogDoc): FinishModel {
   if (open > 0) {
     const where =
       byExercise.length === 1 && unpicked === 0
-        ? `${plural(byExercise[0].n, 'set')} of ${byExercise[0].name} ${byExercise[0].n === 1 ? "isn't" : "aren't"} ticked`
-        : `${plural(open, 'set')} ${open === 1 ? "isn't" : "aren't"} ticked`;
-    unticked = `${where}; they'll be saved as not done.`;
+        ? `${plural(byExercise[0].n, 'set')} of ${byExercise[0].name} ${byExercise[0].n === 1 ? "isn’t" : "aren’t"} ticked`
+        : `${plural(open, 'set')} ${open === 1 ? "isn’t" : "aren’t"} ticked`;
+    unticked = `${where}; ${open === 1 ? 'it’ll' : 'they’ll'} be saved as not done.`;
   }
   return { done, total, headline: `${done} of ${plural(total, 'set')} done.`, unticked, noneDone: done === 0 };
 }
