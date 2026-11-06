@@ -15,7 +15,7 @@ create table public.custom_metrics (
   created_at timestamptz not null default now(),
   check (min < max)
 );
-create index custom_metrics_workspace_idx on public.custom_metrics (workspace_id);
+create unique index custom_metrics_name_idx on public.custom_metrics (workspace_id, lower(name));
 
 create table public.body_measurements (
   id uuid primary key default gen_random_uuid(), -- may be generated on the phone
@@ -34,6 +34,8 @@ create index body_measurements_entered_by_idx on public.body_measurements (enter
 
 create table public.body_measurement_values (
   measurement_id uuid not null references public.body_measurements on delete cascade,
+  -- No foreign key for custom:<uuid> keys: the metric lives in custom_metrics, which is only archived, never
+  -- deleted except with its workspace, and save_body_measurement checks it exists on every write.
   metric_key text not null check (metric_key ~ '^(weight_kg|body_fat_pct|smm_kg|lbm_kg|bmi|visceral_fat|bmr_kcal|custom:[0-9a-f-]{36})$'),
   value numeric not null,
   primary key (measurement_id, metric_key)
@@ -68,21 +70,11 @@ create policy body_measurements_select on public.body_measurements for select to
   using (public.is_coach_of(workspace_id)
     or (client_id = (select auth.uid()) and public.is_client_in(workspace_id, client_id)));
 
--- Definer, so the delete policy can look at values without going through the values' own policy (which reads
--- measurements back and would recurse).
-create function public.has_non_weight_values(mid uuid) returns boolean
-language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.body_measurement_values v where v.measurement_id = mid and v.metric_key <> 'weight_kg');
-$$;
-revoke execute on function public.has_non_weight_values(uuid) from public, anon;
-grant execute on function public.has_non_weight_values(uuid) to authenticated;
-
 -- A coach deletes any scan. A client deletes only a weight entry they made themselves.
 create policy body_measurements_delete on public.body_measurements for delete to authenticated
   using (public.is_coach_of(workspace_id)
     or (source = 'client' and client_id = (select auth.uid()) and entered_by = (select auth.uid())
-      and public.is_client_in(workspace_id, client_id)
-      and not public.has_non_weight_values(id)));
+      and public.is_client_in(workspace_id, client_id)));
 
 -- Values are visible exactly when their measurement is (the parent's RLS applies inside the subquery).
 create policy body_measurement_values_select on public.body_measurement_values for select to authenticated
@@ -95,11 +87,13 @@ create policy body_measurement_values_select on public.body_measurement_values f
 --   * the caller is a coach of the workspace (source 'coach'), or the client themself (source 'client');
 --   * client_id is a current client of the workspace;
 --   * a client may save only weight_kg, no attachment, and only edit a row they entered as source 'client'
---     (a coach scan, or a row a coach added other values to, is refused with 42501);
+--     (a coach scan is refused with 42501); a coach cannot save onto a client-entered row (42501, "Add a new
+--     scan instead."), so a client's entries stay weight-only and the client's own;
 --   * at least one value; every value is a number inside its range (built-in, or the custom metric's own);
 --     out of range, unknown key, missing custom metric or a future date give 23514;
 --   * an archived custom metric cannot get a new value, but keeps (and may re-save) one it already has;
---   * the date can't be in the future (one day of slack for time zones ahead of the database's UTC clock).
+--   * the date is from 2000-01-01 and not in the future (one day of slack past today in UTC, for time zones
+--     ahead of UTC).
 create function public.save_body_measurement(p jsonb) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -144,8 +138,8 @@ begin
     raise exception 'You cannot save measurements for this client.' using errcode = '42501';
   end if;
 
-  if v_on > current_date + 1 then
-    raise exception 'The date cannot be in the future.' using errcode = '23514';
+  if v_on > (now() at time zone 'utc')::date + 1 or v_on < date '2000-01-01' then
+    raise exception 'The date is not valid.' using errcode = '23514';
   end if;
 
   v_vals := p -> 'values';
@@ -155,12 +149,12 @@ begin
 
   if p ? 'attachment_path' then
     v_set_attach := true;
+    if not v_is_coach then
+      raise exception 'Only the coach can attach a printout.' using errcode = '42501';
+    end if;
     v_attach := case when jsonb_typeof(p -> 'attachment_path') = 'null' then null else p ->> 'attachment_path' end;
     if v_attach is not null and v_attach not like v_ws::text || '/' || v_client::text || '/%' then
       raise exception 'The printout does not belong to this client.' using errcode = '23514';
-    end if;
-    if not v_is_coach then
-      raise exception 'Only the coach can attach a printout.' using errcode = '42501';
     end if;
   end if;
 
@@ -170,9 +164,10 @@ begin
     if v_row.workspace_id <> v_ws or v_row.client_id <> v_client then
       raise exception 'You cannot save measurements for this client.' using errcode = '42501';
     end if;
-    if not v_is_coach and (v_row.source <> 'client' or v_row.entered_by is distinct from v_uid
-       or exists (select 1 from public.body_measurement_values v
-         where v.measurement_id = v_id and v.metric_key <> 'weight_kg')) then
+    if v_is_coach and v_row.source = 'client' then
+      raise exception 'Add a new scan instead.' using errcode = '42501';
+    end if;
+    if not v_is_coach and (v_row.source <> 'client' or v_row.entered_by is distinct from v_uid) then
       raise exception 'You can only change your own weight entries.' using errcode = '42501';
     end if;
   end if;
@@ -280,17 +275,5 @@ create policy scan_attachments_update on storage.objects for update to authentic
 create policy scan_attachments_delete on storage.objects for delete to authenticated
   using (bucket_id = 'scan-attachments' and public.is_coach_of(public.scan_path_workspace(name)));
 
--- Deleting a workspace removes its printouts too (the tables go by cascade).
-create function public.delete_workspace_scan_files() returns trigger
-language plpgsql security definer set search_path = '' as $$
-begin
-  perform set_config('storage.allow_delete_query', 'true', true);
-  delete from storage.objects o
-  where o.bucket_id = 'scan-attachments' and o.name like old.id::text || '/%';
-  return old;
-end;
-$$;
-revoke execute on function public.delete_workspace_scan_files() from public, anon, authenticated;
-
-create trigger workspaces_delete_scan_files before delete on public.workspaces
-  for each row execute function public.delete_workspace_scan_files();
+-- Printout files are not removed by SQL: deleting rows from storage.objects leaves the real files behind.
+-- Whatever deletes a scan or a workspace removes the files through the Storage API (see the plan).
