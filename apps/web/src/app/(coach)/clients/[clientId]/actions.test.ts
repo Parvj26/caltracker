@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type Call = { op: string; rpc?: string; payload?: unknown };
 const calls: Call[] = [];
 let rpcError: { code: string; message: string } | null = null;
+/** How many completed logs the planned workout has (what moveClientWorkout checks before moving). */
+let completedLogs = 0;
 
-function query(): unknown {
+function query(table: string): unknown {
   const call: Call = { op: 'select' };
   const builder = {
     select: () => builder,
@@ -16,7 +18,8 @@ function query(): unknown {
     not: () => builder,
     then: (ok: (r: unknown) => unknown, fail: (e: unknown) => unknown) => {
       calls.push(call);
-      return Promise.resolve({ data: [{ id: 'x' }], error: null, count: 1 }).then(ok, fail);
+      const count = table === 'workout_logs' ? completedLogs : 1;
+      return Promise.resolve({ data: [{ id: 'x' }], error: null, count }).then(ok, fail);
     },
   };
   return builder;
@@ -44,6 +47,7 @@ const NEW_ID = '00000000-0000-4000-8000-000000000005';
 beforeEach(() => {
   calls.length = 0;
   rpcError = null;
+  completedLogs = 0;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
 });
@@ -100,6 +104,15 @@ describe('moveClientWorkout', () => {
       error: 'Pick today or a later date.',
     });
     expect(await moveClientWorkout({ workoutId: WORKOUT, date: '2026-12-04', today: '2026-12-01' })).toMatchObject({ ok: false });
+    expect(rpcs()).toHaveLength(0);
+  });
+
+  it('refuses to move a workout the client has already done, and changes nothing', async () => {
+    completedLogs = 1;
+    expect(await moveClientWorkout({ workoutId: WORKOUT, date: '2026-11-09', today: '2026-11-05' })).toEqual({
+      ok: false,
+      error: "You can't move a workout that's already done: it stays on the day it was done. View its log instead.",
+    });
     expect(rpcs()).toHaveLength(0);
   });
 });

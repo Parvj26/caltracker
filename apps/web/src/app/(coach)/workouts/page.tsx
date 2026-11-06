@@ -1,11 +1,15 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { countExercises } from '@caltracker/shared';
+import { DuplicateButton } from '@/components/duplicate-button';
 import { Button, ButtonLink, Card, TextField } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
 import { LocalDate } from './local-date';
 import styles from './workouts.module.css';
+
+export const metadata: Metadata = { title: 'Workouts' };
 
 // Libraries stay small in V1; past this the list says so instead of paging.
 const LIMIT = 200;
@@ -66,6 +70,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
                 <th scope="col">Name</th>
                 <th scope="col">Exercises</th>
                 <th scope="col">Updated</th>
+                <th scope="col" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -79,6 +84,9 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
                   <td className={styles.numeric}>{w.exercises}</td>
                   <td className={styles.numeric}>
                     <LocalDate iso={w.updatedAt} />
+                  </td>
+                  <td>
+                    <DuplicateButton kind="workout" id={w.id} name={w.name} compact />
                   </td>
                 </tr>
               ))}

@@ -1299,6 +1299,21 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      copy_program_week: {
+        Args: {
+          p_from: number
+          p_ids: string[]
+          p_program_id: string
+          p_to: number[]
+        }
+        Returns: {
+          day: number
+          id: string
+          position: number
+          week: number
+          workout_id: string
+        }[]
+      }
       copy_workout: {
         Args: {
           p_assignment: string
@@ -1312,6 +1327,10 @@ export type Database = {
       correct_workout_log: {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
+      }
+      duplicate_program: {
+        Args: { p_name: string; p_new_id: string; p_program_id: string }
+        Returns: string
       }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {

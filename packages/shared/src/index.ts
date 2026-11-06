@@ -59,6 +59,7 @@ export {
   addDays,
   diffDays,
   isoWeekday,
+  localDateOf,
   localToday,
   monthGrid,
   programDayToDate,
@@ -88,11 +89,18 @@ export {
   addRound,
   addSet,
   addStraightBlock,
+  addStraightBlocks,
   addSuperset,
   addChoice,
   addChoiceOption,
   addSection,
+  copyFirstSetToAll,
+  DEFAULT_SETS,
+  MAX_SETS,
   emptyWorkout,
+  fillDown,
+  hasTargets,
+  MAX_BLOCKS,
   moveBlock,
   moveBlockToSection,
   moveSection,
@@ -107,7 +115,12 @@ export {
   updateSet,
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
+export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate';
+export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
+export type { PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
+export { programClashes } from './programs/clashes';
+export type { ProgramClash } from './programs/clashes';
 export {
   BAD_TODAY_ERROR,
   PAST_DATE_ERROR,
@@ -184,11 +197,7 @@ export {
 export {
   ENDING_WITHIN_DAYS,
   LAST_WORKOUT_LOOKBACK_DAYS,
-  MISSED_WINDOW_DAYS,
-  QUIET_DAYS,
   endingPrograms,
-  missedClients,
-  quietClients,
   todayRows,
   weekProgress,
   workoutStatus,
@@ -201,6 +210,28 @@ export type {
   TodayRow,
   WorkoutStatus,
 } from './coach-home/home';
+export {
+  ATTENTION_ORDER,
+  MISSED_LOOKBACK_DAYS,
+  MISSED_RUN_LOOKBACK_DAYS,
+  PLANNED_AHEAD_DAYS,
+  QUIET_DAYS,
+  attentionGroups,
+  checkClient,
+  checkClients,
+  compareClientChecks,
+  lastWorkoutLabel,
+} from './coach-home/daily-check';
+export type {
+  AttentionGroup,
+  AttentionKind,
+  AttentionReason,
+  CheckAssignment,
+  ClientCheck,
+  ClientSort,
+  ClientStatus,
+  DailyCheckInput,
+} from './coach-home/daily-check';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export { LANDMARK_JOURNEY, STICKERS } from './awards/catalogue';
 export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogue';
@@ -216,7 +247,7 @@ export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
 export type { NamedRecord, PersonalBestRow } from './awards/bests';
 export { shortDate, strengthExercises, strengthSeries, strengthSummary } from './awards/strength-series';
 export type { StrengthPoint } from './awards/strength-series';
-export { awardPrEvents, prsThisWeek } from './awards/week-prs';
+export { awardPrEvents, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';

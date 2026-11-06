@@ -226,3 +226,55 @@ test.describe('a coach with an empty library', () => {
     await expect(page).toHaveURL(/\/workouts\/new$/);
   });
 });
+
+test('on an iPad in portrait all seven days fit and a long workout name wraps only between words', async ({ page }) => {
+  // "Conditioning" is the word that used to break as "Condi/tionin/g" in a narrow cell.
+  // A short suffix: a single "word" wider than the whole chip would be cut with "…".
+  const workout = `Full Body Conditioning ${Math.random().toString(36).slice(2, 6)}`;
+  const program = `iPad grid ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  await createProgram(page, program, 1, [{ week: 1, day: 5, workoutName: workout }]);
+
+  const scroller = page.getByRole('table', { name: 'Program weeks' }).locator('xpath=..');
+  expect(await scroller.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  const day7 = (await page.getByRole('columnheader', { name: 'Day 7' }).boundingBox())!;
+  expect(day7.x + day7.width).toBeLessThanOrEqual(1024);
+
+  // Every line of the name starts at a word: the rendered lines, joined with spaces, give back the name.
+  const chip = programCell(page, 1, 5).getByRole('button', { name: workout, exact: true });
+  await expect(chip).toHaveAttribute('title', workout);
+  const lines = await chip.evaluate((el) => {
+    // The name's text node (the name span also holds the empty spacer the "⋯" button sits over).
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent!.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+    const text = walker.nextNode()!;
+    const range = document.createRange();
+    const tops = new Map<number, string>();
+    for (let i = 0; i < text.textContent!.length; i++) {
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const top = Math.round(range.getBoundingClientRect().top);
+      tops.set(top, (tops.get(top) ?? '') + text.textContent![i]);
+    }
+    return [...tops.values()].map((l) => l.trim());
+  });
+  expect(lines.length).toBeGreaterThan(1);
+  expect(lines.join(' ')).toBe(workout);
+  for (const line of lines) expect(workout.split(' ')).toEqual(expect.arrayContaining(line.split(' ')));
+  // The "⋯" button sits in the chip's top-right corner, not on a row of its own under the name.
+  const chipBox = (await chip.locator('xpath=..').boundingBox())!;
+  const menuBox = (await page.getByRole('button', { name: `Options for ${workout}` }).boundingBox())!;
+  expect(menuBox.y).toBeLessThanOrEqual(chipBox.y + 1);
+  expect(Math.abs(menuBox.x + menuBox.width - (chipBox.x + chipBox.width))).toBeLessThanOrEqual(1);
+
+  // A 1280 px laptop and an iPad in landscape also see all seven days without sideways scrolling.
+  for (const [width, height] of [[1280, 800], [1366, 1024]] as const) {
+    await page.setViewportSize({ width, height });
+    expect(await scroller.evaluate((el) => el.scrollWidth - el.clientWidth), `${width} px`).toBeLessThanOrEqual(0);
+    const d7 = (await page.getByRole('columnheader', { name: 'Day 7' }).boundingBox())!;
+    expect(d7.x + d7.width, `${width} px`).toBeLessThanOrEqual(width);
+  }
+});
