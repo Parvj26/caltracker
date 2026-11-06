@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,6 +33,10 @@ export function ExerciseListSheet({
 }) {
   const { text, space, radius } = useTheme();
   const pending = useRef<(() => void) | null>(null);
+  // A choice left over from a close whose dismiss never came must not run when the sheet next closes.
+  useEffect(() => {
+    if (visible) pending.current = null;
+  }, [visible]);
   const runPending = () => {
     const run = pending.current;
     pending.current = null;

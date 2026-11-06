@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, SetValues, Units } from '@caltracker/shared';
@@ -60,6 +60,10 @@ export function EditSetsSheet({
   const [menu, setMenu] = useState<Menu | null>(null);
   const [infoFor, setInfoFor] = useState<LogExerciseDoc | null>(null);
   const pending = useRef<(() => void) | null>(null);
+  // A choice left over from a close whose dismiss never came must not run when the sheet next closes.
+  useEffect(() => {
+    if (visible) pending.current = null;
+  }, [visible]);
 
   const runPending = () => {
     const run = pending.current;

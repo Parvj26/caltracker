@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,6 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   addLogDrop,
+  dropParentId,
   addLogExercise,
   addLogSet,
   formatLastResult,
@@ -25,14 +27,13 @@ import {
   removeLogSet,
   resolveSetValues,
   setExerciseNote,
-  stepSetValue,
+  stepActual,
   swapLogExercise,
   updateActual,
   type ActualPatch,
   type ExercisePick,
   type LogExerciseDoc,
   type LogSetDoc,
-  type StepField,
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
@@ -50,6 +51,7 @@ import { SupersetPage } from '@/components/log/superset-page';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { finishPrompt, finishQuestion } from '@/lib/active-log-logic';
+import { ignoreDone, ignoreTick, type LastDone } from '@/lib/done-guard';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import {
@@ -72,13 +74,19 @@ type Picker = { mode: 'add' } | { mode: 'swap'; ex: LogExerciseDoc };
 
 const nowIso = () => new Date().toISOString();
 
-/** Which stored field each stepper writes. */
-const PATCH_KEY: Record<StepField, keyof ActualPatch> = {
-  weight: 'actualWeightKg',
-  reps: 'actualReps',
-  duration: 'actualDurationS',
-  distance: 'actualDistanceM',
-};
+/** The stored field a stepper's typed value goes into. */
+function typedPatch(field: 'weight' | 'reps' | 'duration' | 'distance', value: number | null): ActualPatch {
+  switch (field) {
+    case 'weight':
+      return { actualWeightKg: value };
+    case 'reps':
+      return { actualReps: value };
+    case 'duration':
+      return { actualDurationS: value };
+    case 'distance':
+      return { actualDistanceM: value };
+  }
+}
 
 /** Seconds since `startIso`, ticking once a second. */
 function useElapsed(startIso: string): number {
@@ -157,6 +165,9 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   /** A page just added: jump to it once it is drawn. */
   const jumpTo = useRef<string | null>(null);
   const doneBusy = useRef(false);
+  /** The last set completed by Done, and by a ✓ in Edit sets: a fast second tap is the same tap. */
+  const lastDone = useRef<LastDone>(null);
+  const lastTick = useRef<LastDone>(null);
 
   const scrollTo = useCallback(
     (index: number, animated: boolean) => {
@@ -171,6 +182,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       const n = pages.current.blockIds.length;
       if (n === 0) return;
       const i = Math.min(Math.max(0, index), n - 1);
+      // A box still being typed in would show its old draft on the next page.
+      Keyboard.dismiss();
       pages.current = { ...pages.current, index: i };
       setPageIndex(i);
       scrollTo(i, animated);
@@ -321,19 +334,19 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         const cur = model?.current;
         const s = cur?.steppers.find((x) => x.field === field);
         if (!cur || !s) return;
-        const value = stepSetValue(field, s.value, dir, units);
-        if (value === s.value) return;
-        void op((l) => updateActual(l, cur.step.setId, { [PATCH_KEY[field]]: value }));
+        // Worked out inside the queued edit from the stored number, so fast presses all count.
+        void op((l) => stepActual(l, cur.step.setId, field, dir, units, s.value));
       },
       // Already in stored units (the stepper converts what was typed).
       onType: (field, value) => {
         const cur = model?.current;
         if (!cur) return;
-        void op((l) => updateActual(l, cur.step.setId, { [PATCH_KEY[field]]: value }));
+        void op((l) => updateActual(l, cur.step.setId, typedPatch(field, value)));
       },
       onDone: () => {
+        Keyboard.dismiss();
         const cur = model?.current;
-        if (!cur || doneBusy.current) return;
+        if (!cur || doneBusy.current || ignoreDone(lastDone.current, cur.step.setId, Date.now())) return;
         doneBusy.current = true;
         const { setId } = cur.step;
         const { values, after } = cur;
@@ -341,6 +354,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         void done(setId, values)
           .then((l) => {
             if (!l) return;
+            lastDone.current = { setId, at: Date.now() };
             tapHaptic();
             if (after.kind === 'rest' && after.seconds > 0) startRest(log.id, after.seconds);
             setPrefer(null);
@@ -369,9 +383,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         const ex = cur ? exAt(cur.step.exerciseIndex) : undefined;
         if (!cur || !ex) return;
         // The new drop goes after the last one of this set: its parent is the main set above the current step.
-        let main = cur.step.setIndex;
-        while (main > 0 && ex.sets[main]?.setType === 'drop') main -= 1;
-        const mainId = ex.sets[main]?.id;
+        const mainId = dropParentId(ex, cur.step.setIndex);
         if (mainId) void op((l) => addLogDrop(l, ex.id, mainId, randomUUID, nowIso()));
       },
       onPrev: () => goTo(p - 1),
@@ -384,14 +396,23 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   // ---- Edit sets ----
   const editIndex = editBlockId === null ? -1 : log.blocks.findIndex((b) => b.id === editBlockId);
   const editBlock = editIndex >= 0 ? (log.blocks[editIndex] ?? null) : null;
+  useEffect(() => {
+    // Its only exercise was removed: forget the sheet, so it can't come back for a block that is gone.
+    if (editBlockId !== null && editIndex < 0) setEditBlockId(null);
+  }, [editBlockId, editIndex]);
   const editFirstExercise = log.blocks.slice(0, Math.max(0, editIndex)).reduce((n, b) => n + b.exercises.length, 0);
   const suggestedFor = (ex: LogExerciseDoc, setId: string) => resolveSetValues(ex, setId, lastSets(ex));
 
   const removeSet = (ex: LogExerciseDoc, set: LogSetDoc) => void op((l) => removeLogSet(l, ex.id, set.id, nowIso()));
   const editHandlers: BlockHandlers = {
     onTick: (ex, set) => {
+      const now = Date.now();
+      if (ignoreTick(lastTick.current, set.id, now)) return;
+      lastTick.current = { setId: set.id, at: now };
       if (set.completedAt !== null) {
-        void tick(set.id); // untick
+        // Untick: the set may become the current step again, so Done must not take it for a repeat tap.
+        if (lastDone.current?.setId === set.id) lastDone.current = null;
+        void tick(set.id);
         return;
       }
       // Ticking here saves the pre-filled numbers like Done, without a rest.
@@ -476,6 +497,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
               <ScrollView
                 style={{ width }}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                automaticallyAdjustKeyboardInsets
                 contentContainerStyle={[styles.pageContent, { paddingBottom: sp[6] + insets.bottom }]}
               >
                 <View style={styles.pageColumn}>

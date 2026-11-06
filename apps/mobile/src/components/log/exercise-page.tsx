@@ -9,7 +9,10 @@ import { StepList } from './step-list';
 
 export type { PageHandlers, PageProps } from './page-parts';
 
-/** One straight exercise: photo, name, set heading, steppers, Done, actions, move row and Up next. */
+/**
+ * One straight exercise: photo, name, set heading, steppers, Done, actions, move row and Up next.
+ * While resting: the name, the step list, actions and the move row.
+ */
 export function ExercisePage({ model, page, resting, handlers, prevName, nextName, detail }: PageProps & { detail: ExerciseDetail | undefined }) {
   const { text, space } = useTheme();
   const ex = model.exercises[0];
@@ -20,6 +23,14 @@ export function ExercisePage({ model, page, resting, handlers, prevName, nextNam
       <View style={{ gap: space[3] }}>
         <Text testID={`exercise-name-${page}`} style={text('sectionHeading')}>{ex.name}</Text>
         <StepList steps={model.steps} page={page} showWarmupNote={model.hasWarmups} heading="THIS EXERCISE" />
+        {/* Only the photo, steppers and Done wait for the rest; editing and moving stay at hand. */}
+        <ActionRow
+          page={page}
+          onEditSets={handlers.onEditSets}
+          onNote={() => handlers.onNote(0)}
+          onSwap={() => handlers.onSwap(0)}
+        />
+        <MoveRow page={page} prevName={prevName} nextName={nextName} onPrev={handlers.onPrev} onNext={handlers.onNext} />
       </View>
     );
   }

@@ -40,6 +40,14 @@ export function SupersetPage({
           {model.exercises.map((e) => `${e.label ?? ''} ${e.name}`.trim()).join(' + ')}
         </Text>
         <StepList steps={model.steps} page={page} showWarmupNote={model.hasWarmups} heading="THIS EXERCISE" labels={labels} />
+        {/* Only the photos, steppers and Done wait for the rest; editing and moving stay at hand. */}
+        <ActionRow
+          page={page}
+          onEditSets={handlers.onEditSets}
+          onNote={() => handlers.onNote(activeIndex)}
+          onSwap={() => handlers.onSwap(activeIndex)}
+        />
+        <MoveRow page={page} prevName={prevName} nextName={nextName} onPrev={handlers.onPrev} onNext={handlers.onNext} />
       </View>
     );
   }
