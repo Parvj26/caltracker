@@ -197,11 +197,7 @@ export {
 export {
   ENDING_WITHIN_DAYS,
   LAST_WORKOUT_LOOKBACK_DAYS,
-  MISSED_WINDOW_DAYS,
-  QUIET_DAYS,
   endingPrograms,
-  missedClients,
-  quietClients,
   todayRows,
   weekProgress,
   workoutStatus,
@@ -214,6 +210,28 @@ export type {
   TodayRow,
   WorkoutStatus,
 } from './coach-home/home';
+export {
+  ATTENTION_ORDER,
+  MISSED_LOOKBACK_DAYS,
+  MISSED_RUN_LOOKBACK_DAYS,
+  PLANNED_AHEAD_DAYS,
+  QUIET_DAYS,
+  attentionGroups,
+  checkClient,
+  checkClients,
+  compareClientChecks,
+  lastWorkoutLabel,
+} from './coach-home/daily-check';
+export type {
+  AttentionGroup,
+  AttentionKind,
+  AttentionReason,
+  CheckAssignment,
+  ClientCheck,
+  ClientSort,
+  ClientStatus,
+  DailyCheckInput,
+} from './coach-home/daily-check';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export { LANDMARK_JOURNEY, STICKERS } from './awards/catalogue';
 export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogue';
@@ -229,7 +247,7 @@ export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
 export type { NamedRecord, PersonalBestRow } from './awards/bests';
 export { shortDate, strengthExercises, strengthSeries, strengthSummary } from './awards/strength-series';
 export type { StrengthPoint } from './awards/strength-series';
-export { awardPrEvents, prsThisWeek } from './awards/week-prs';
+export { awardPrEvents, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';

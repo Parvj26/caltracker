@@ -108,32 +108,49 @@ test('the four tiles are the same height, linked or not', async ({ page }) => {
   expect(new Set(heights).size, `tile heights ${heights.join(', ')}`).toBe(1);
 });
 
-test('two undone workouts in the last 2 days list the client under Missed 2+', async ({ page }) => {
+test('two undone workouts in the last 2 days list the client under Missed 2+ in a row', async ({ page }) => {
   const last = `Miss${unique()}`;
-  const clientId = await newClient(last);
+  // Joined before the missed days: workouts planned before joining never count as missed.
+  const clientId = await newClient(last, 10);
   await plan(clientId, 'Pull A', dayOffset(-1));
   await plan(clientId, 'Pull B', dayOffset(-2));
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.locator('#missed');
+  const group = page.locator('#missed-in-a-row');
   await expandGroup(group);
-  await expect(group.getByRole('heading', { name: 'Missed 2+' })).toBeVisible();
+  await expect(group.getByRole('heading', { name: /^Missed 2\+ in a row \(\d+\)$/ })).toBeVisible();
   const row = group.locator('li').filter({ hasText: last });
-  await expect(row).toContainText('Missed 2 in the last 7 days');
-  await expect(row.getByRole('link')).toHaveAttribute('href', `/clients/${clientId}`);
-  const tile = page.getByRole('link', { name: /Missed 2\+/ });
-  await expect(tile).toHaveAttribute('href', '#missed');
+  await expect(row).toContainText('Missed 2 in a row · latest yesterday');
+  await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
+  const tile = page.getByRole('link', { name: /Missed a workout/ });
+  await expect(tile).toHaveAttribute('href', /^#missed/);
   expect(Number((await tile.innerText()).match(/\d+/g)?.at(-1))).toBeGreaterThanOrEqual(1);
 });
 
-test('a client who joined 29 days ago with no logs is under No workout in 5+ days', async ({ page }) => {
-  const last = `Quiet${unique()}`;
-  await newClient(last, 29);
+test('one missed workout this week is listed with its day; a workout today is not missed yet', async ({ page }) => {
+  const last = `Once${unique()}`;
+  const clientId = await newClient(last, 10);
+  await plan(clientId, 'Legs', dayOffset(-1));
+  await plan(clientId, 'Arms', dayOffset(0));
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: 'No workout in 5+ days' });
+  const group = page.locator('#missed');
   await expandGroup(group);
-  await expect(group.locator('li').filter({ hasText: last })).toContainText(/\d+ days/);
+  await expect(group.locator('li').filter({ hasText: last })).toContainText('Missed 1 · yesterday');
+  await expect(page.locator('#missed-in-a-row li').filter({ hasText: last })).toHaveCount(0);
+});
+
+test('a client with nothing planned is under Nothing planned, with Open and Assign', async ({ page }) => {
+  const last = `Empty${unique()}`;
+  const clientId = await newClient(last, 29);
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const group = page.getByRole('region', { name: /^Nothing planned/ });
+  await expandGroup(group);
+  const row = group.locator('li').filter({ hasText: last });
+  await expect(row).toContainText('Nothing in the next 7 days');
+  await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
+  await expect(row.getByRole('link', { name: /^Assign a program to / })).toHaveAttribute('href', `/clients/${clientId}?assign=1`);
 });
 
 test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
@@ -144,9 +161,11 @@ test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
   created.assignments.push(a.data.id);
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: 'Program ending soon' });
+  const group = page.getByRole('region', { name: /^Program ending soon/ });
   await expandGroup(group);
   await expect(group.locator('li').filter({ hasText: last })).toContainText('Ends in 3 days');
+  // Ending replaces Nothing planned, so the client is listed once.
+  await expect(page.getByRole('region', { name: /^Nothing planned/ }).locator('li').filter({ hasText: last })).toHaveCount(0);
 });
 
 test('past clients are not counted', async ({ page }) => {
@@ -159,7 +178,7 @@ test('past clients are not counted', async ({ page }) => {
   await expect(page.getByText(last)).toHaveCount(0);
 });
 
-test('the coming-soon parts are visible, disabled, and the console has no hydration errors', async ({ page }) => {
+test('the coming-soon part is visible, Message is not offered yet, and the console has no hydration errors', async ({ page }) => {
   const messages: string[] = [];
   page.on('console', (m) => messages.push(m.text()));
   // A production build reports hydration mismatches as minified React errors (#418, #423, #425) on pageerror.
@@ -170,9 +189,9 @@ test('the coming-soon parts are visible, disabled, and the console has no hydrat
   await signInAsCoach(page);
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
-  for (const label of ['Message', 'Body scans 30+ days']) {
-    await expect(page.locator('[role="note"]').filter({ hasText: label }).first()).toBeVisible();
-  }
+  await expect(page.locator('[role="note"]').filter({ hasText: 'Body scans 30+ days' })).toBeVisible();
+  // Messages are not built yet, so there is no Message action at all (not even a disabled one).
+  await expect(page.getByRole('complementary', { name: 'Needs attention' }).getByText('Message')).toHaveCount(0);
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 });
 
@@ -249,7 +268,7 @@ test('Assign on an ending program opens the assign dialog, and a reload does not
   created.assignments.push(a.data.id);
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: 'Program ending soon' });
+  const group = page.getByRole('region', { name: /^Program ending soon/ });
   await expandGroup(group);
   await group.locator('li').filter({ hasText: last }).getByRole('link', { name: /^Assign/ }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}`));

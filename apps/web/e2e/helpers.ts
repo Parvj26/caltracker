@@ -3,6 +3,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
 import { expect, type Locator, type Page } from '@playwright/test';
 
+/** The web app under test (same port as playwright.config.ts: E2E_WEB_PORT, 3000 by default). */
+export const WEB_URL = `http://localhost:${process.env.E2E_WEB_PORT ?? '3000'}`;
+
+/** Local Supabase's mail catcher (Mailpit). MAILPIT_URL overrides it, e.g. on the CI port range. */
+export const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324';
+
 export const COACH_EMAIL = 'coach@demo.local';
 
 export async function signInAsCoach(page: Page) {
