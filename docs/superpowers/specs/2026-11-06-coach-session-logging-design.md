@@ -30,7 +30,8 @@ on the iPad or laptop.
   saved (debounced) through `coach_save_workout_log`, the same document and rules as the phone's
   `save_workout_log`. A failed save retries every 3 s. The website needs a connection (the phone app is the offline
   logger).
-- **Finish:** the log is saved as completed, then the website asks `award-workout` for the award (the coach path
+- **Finish:** the log is saved as completed and the finished log opens at once (`?award=1`); that page then asks
+  `award-workout` for the award, so a slow award never holds the coach up (the coach path
   already allowed for corrections; for a log with no award yet it is the full award, stickers and rolls included). If
   that call fails, the 15-minute catch-up job awards it. The client sees the stickers in their album next time they
   open the app (the phone's "Surprise!" reveal queue only holds awards the phone itself asked for).
@@ -70,7 +71,10 @@ Migration `20261106004000_coach_session_logging.sql`:
   them (its own copy is kept as a rejected copy, as for any refusal).
 - `workout_log_logger(log_id)` (the client's own log only): `{ status, heldByOther, lastActivityAt, canReclaim }`.
   `reclaim_workout_log(log_id)`: the client takes it back when the coach has had no activity for 20 minutes, or
-  at once when the holder is no longer a coach of the workspace (a removed staff coach).
+  at once when the holder is no longer a coach of the workspace (a removed staff coach). Like hand back it raises
+  the revision by 1000, so the phone's older queued copy is refused and it adopts the coach's sets.
+- Activity is the server's clock: every coach save (typing included) sets `last_activity_at = now()`, so the 20
+  minutes count from the coach's last save, whatever the coach's browser clock says.
 - The trigger that froze `logged_by` now allows it to change only while the log is in progress, to a coach of the
   workspace or back to its client (or to null when the account is deleted).
 - `coach_last_results(client_id, exercise_ids)`: `last_results` for one client, security invoker, so RLS limits it
