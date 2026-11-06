@@ -82,7 +82,7 @@ function ClientLink({ client, children }: { client: HomeClient; children?: React
   return (
     <Link href={`/clients/${client.id}`} className={styles.rowLink}>
       <Avatar name={name} toneKey={client.id} />
-      <span className={styles.rowText}>{name}</span>
+      <span className={styles.rowText} title={name}>{name}</span>
       {children}
     </Link>
   );
@@ -90,7 +90,7 @@ function ClientLink({ client, children }: { client: HomeClient; children?: React
 
 function Skeleton() {
   return (
-    <div className={styles.page} aria-busy="true" aria-label="Loading">
+    <div className={styles.page} role="status" aria-busy="true" aria-label="Loading">
       <div className={cx(styles.skeleton, styles.skeletonTitle)} />
       <div className={styles.tiles}>
         {[0, 1, 2, 3].map((n) => <div key={n} className={cx(styles.skeleton, styles.skeletonTile)} />)}
@@ -181,7 +181,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                     <li key={r.workout.id} className={styles.row}>
                       <Link href={href} className={styles.rowLink}>
                         <Avatar name={name} toneKey={r.client.id} />
-                        <span className={styles.rowText}>{name} · {r.workout.name}</span>
+                        <span className={styles.rowText} title={`${name} · ${r.workout.name}`}>{name} · {r.workout.name}</span>
                         {statusChip(r)}
                       </Link>
                       {r.status.kind === 'not_started' ? <ComingSoon label="Log session" /> : null}
