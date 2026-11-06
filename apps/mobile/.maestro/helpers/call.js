@@ -7,6 +7,10 @@
 //   cleanup-workouts   deletes every "E2E " workout, program and assignment (EMAIL is ignored; pass '-')
 //   assign-today       clears EMAIL's logs, then assigns "E2E Log" today: Barbell Squat 3 x 8 @ 60 kg, 90 s rests
 //   cleanup-logs       deletes every workout log of client@demo.local (refuses any other EMAIL)
+//   coach-message      the seed coach sends the client NAME as a chat message (client@demo.local only)
+//   assert-reply       fails unless the client has sent exactly one message whose text is NAME
+//   assert-read        fails unless the client has read every coach message
+//   cleanup-messages   deletes the demo client's conversation
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);

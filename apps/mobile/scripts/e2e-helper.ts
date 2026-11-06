@@ -9,6 +9,10 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-message client@demo.local "text"   the coach sends a chat message
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-reply client@demo.local "text"   fails unless the client sent it
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-read client@demo.local   fails unless the client has read the chat
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -222,6 +226,64 @@ export async function cleanupLogs(email: string): Promise<void> {
   if (error) throw error;
 }
 
+/** The demo client's conversation id and the seed coach's id (messages are inserted as the coach, with the service role). */
+async function demoChat(email: string): Promise<{ conversationId: string | null; clientId: string; coachId: string }> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`chat helpers only touch ${DEMO_CLIENT}`);
+  const clientId = await findUserId(DEMO_CLIENT);
+  const coachId = await findUserId('coach@demo.local');
+  if (!clientId || !coachId) throw new Error('Seed users not found (run pnpm db:reset).');
+  const { data, error } = await admin.from('conversations').select('id').eq('client_id', clientId).maybeSingle();
+  if (error) throw error;
+  return { conversationId: data?.id ?? null, clientId, coachId };
+}
+
+/** The seed coach writes to the demo client (creates the conversation if needed). */
+export async function coachMessage(email: string, body: string): Promise<void> {
+  const { conversationId, clientId, coachId } = await demoChat(email);
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  let id = conversationId;
+  if (!id) {
+    const made = await admin.from('conversations').insert({ workspace_id: ws.id, client_id: clientId }).select('id').single();
+    if (made.error) throw made.error;
+    id = made.data.id;
+  }
+  // A trigger copies workspace_id from the conversation; the generated type just requires a value.
+  const { error } = await admin.from('messages').insert({ conversation_id: id, workspace_id: ws.id, sender_id: coachId, body });
+  if (error) throw error;
+}
+
+/** Throws unless the demo client has sent a message with exactly this text. */
+export async function assertReply(email: string, body: string): Promise<void> {
+  const { conversationId, clientId } = await demoChat(email);
+  if (!conversationId) throw new Error('No conversation');
+  const { data, error } = await admin.from('messages').select('id').eq('conversation_id', conversationId).eq('sender_id', clientId).eq('body', body);
+  if (error) throw error;
+  if (data.length !== 1) throw new Error(`Expected exactly one client message "${body}", found ${data.length}`);
+}
+
+/** Throws unless the demo client has read every coach message. */
+export async function assertRead(email: string): Promise<void> {
+  const { conversationId, clientId, coachId } = await demoChat(email);
+  if (!conversationId) throw new Error('No conversation');
+  const [{ data: reads, error: e1 }, { data: last, error: e2 }] = await Promise.all([
+    admin.from('conversation_reads').select('last_read_at').eq('conversation_id', conversationId).eq('user_id', clientId).maybeSingle(),
+    admin.from('messages').select('created_at').eq('conversation_id', conversationId).eq('sender_id', coachId).order('created_at', { ascending: false }).limit(1),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  const newest = last[0]?.created_at;
+  if (!reads || (newest && Date.parse(reads.last_read_at) < Date.parse(newest))) throw new Error('The client has unread coach messages');
+}
+
+/** Deletes the demo client's conversation (messages and reads cascade). Nobody else's. */
+export async function cleanupMessages(email: string): Promise<void> {
+  const { conversationId } = await demoChat(email);
+  if (!conversationId) return;
+  const { error } = await admin.from('conversations').delete().eq('id', conversationId);
+  if (error) throw error;
+}
+
 /** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */
 export async function cleanupWorkouts(): Promise<void> {
   const steps = [
@@ -261,6 +323,10 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-workouts') await cleanupWorkouts();
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
+  else if (action === 'coach-message') await coachMessage(email, name);
+  else if (action === 'assert-reply') await assertReply(email, name);
+  else if (action === 'assert-read') await assertRead(email);
+  else if (action === 'cleanup-messages') await cleanupMessages(email);
   else throw new Error(`Unknown action ${action}`);
 }
 

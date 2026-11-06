@@ -169,3 +169,5 @@ export type { Message, OutboxItem } from './messages/types';
 export { seenMessageId, unreadCount } from './messages/state';
 export { dayLabel, messageYoutubeIds } from './messages/format';
 export { mergeOutbox } from './messages/outbox';
+export { FULL_MAX_EDGE, THUMB_MAX_EDGE, MAX_PHOTOS, fitWithin, photoPaths, thumbPathOf, isAlreadyUploaded, mergeById } from './messages/photos';
+export type { PhotoExt } from './messages/photos';

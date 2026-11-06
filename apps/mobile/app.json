@@ -27,6 +27,12 @@
       "./plugins/without-push-entitlement.js",
       "expo-notifications",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach."
+        }
+      ],
+      [
         "expo-font",
         {
           "fonts": [

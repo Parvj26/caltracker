@@ -1,0 +1,57 @@
+# Chat with the coach: the coach writes, the client opens the Coach tab (the unread badge shows, then clears),
+# sees the message, replies, and the reply appears with a time (not "Sending…"). The helper confirms the server
+# stored the reply once and that the coach's message was marked read.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-message, EMAIL: '${EMAIL}', NAME: 'Hi from your coach, ready for Monday?' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+# The Coach tab carries an unread badge here (the badge is not reachable by Maestro; the helper checks it below).
+- tapOn:
+    id: tab-coach
+- extendedWaitUntil:
+    visible: 'Hi from your coach, ready for Monday?'
+    timeout: 20000
+- assertVisible:
+    id: coach-name
+- assertVisible: 'Today'
+- tapOn:
+    id: coach-composer-input
+- inputText: 'Yes, see you Monday'
+- tapOn:
+    id: coach-send
+- extendedWaitUntil:
+    visible: 'Yes, see you Monday'
+    timeout: 10000
+- assertNotVisible:
+    id: message-sending
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assert-reply, EMAIL: '${EMAIL}', NAME: 'Yes, see you Monday' }
+# The coach's message was read when the tab opened, so the badge is gone.
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assert-read, EMAIL: '${EMAIL}' }
+# A message the coach sends while the thread is open appears live.
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-message, EMAIL: '${EMAIL}', NAME: 'Great, bring water' }
+- extendedWaitUntil:
+    visible: 'Great, bring water'
+    timeout: 20000
+- takeScreenshot: messages-phone
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }

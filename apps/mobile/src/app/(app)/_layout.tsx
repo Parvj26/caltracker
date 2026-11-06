@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useSession } from '@/lib/session';
+import { MessagesProvider } from '@/lib/use-messages';
 import { ActiveLogProvider } from '@/lib/use-active-log';
 import { palette } from '@/theme/theme';
 
@@ -14,6 +15,7 @@ export default function AppLayout() {
   const hasCoach = workspace !== null;
   return (
     <ActiveLogProvider>
+    <MessagesProvider>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Protected guard={hasCoach}>
         <Stack.Screen name="(tabs)" />
@@ -26,6 +28,7 @@ export default function AppLayout() {
         <Stack.Screen name="home" />
       </Stack.Protected>
     </Stack>
+    </MessagesProvider>
     </ActiveLogProvider>
   );
 }
