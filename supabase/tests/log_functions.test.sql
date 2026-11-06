@@ -1,5 +1,5 @@
 begin;
-select plan(122);
+select plan(138);
 
 -- Fixtures (as postgres)
 select tests.create_user('lf-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -620,6 +620,104 @@ select tests.act_as(:'a3');
 select is((select count(*)::int from public.last_results(array[:'ex_bi']::uuid[])), 0,
   'a removed client no longer gets their result');
 reset role;
+
+-- ---------------------------------------------------------------------------------------------
+-- Sections and pick-one groups (A1, unplanned logs kept in progress so last_results above is unaffected)
+select ok(not has_column_privilege('authenticated', 'public.log_blocks', 'section_id', 'insert')
+  and not has_column_privilege('authenticated', 'public.log_blocks', 'section_name', 'update')
+  and not has_column_privilege('authenticated', 'public.log_blocks', 'picked_exercise_id', 'update'),
+  'authenticated cannot write the new log_blocks columns directly (save_workout_log does)');
+
+\set c1 '6b000000-0000-4000-8000-00000000c001'
+\set c2 '6b000000-0000-4000-8000-00000000c002'
+\set csec '6b000000-0000-4000-8000-00000000c5ec'
+\set cb '6b000000-0000-4000-8000-00000000c0b0'
+\set cb2 '6b000000-0000-4000-8000-00000000c0b2'
+\set ce1 '6b000000-0000-4000-8000-00000000c0e1'
+\set ce2 '6b000000-0000-4000-8000-00000000c0e2'
+\set ce3 '6b000000-0000-4000-8000-00000000c0e3'
+\set cs1 '6b000000-0000-4000-8000-00000000c051'
+\set cs2 '6b000000-0000-4000-8000-00000000c052'
+\set cs3 '6b000000-0000-4000-8000-00000000c053'
+\set cx '6b000000-0000-4000-8000-00000000c0ff'
+\set cxe '6b000000-0000-4000-8000-00000000c0fe'
+\set cxs '6b000000-0000-4000-8000-00000000c0fd'
+
+create function tests.lg_sec_block(id uuid, section_id uuid, kind text, picked uuid, exercises jsonb) returns jsonb
+language sql as $$
+  select jsonb_build_object('id', id, 'sectionId', section_id, 'kind', kind, 'pickedExerciseId', picked,
+    'exercises', exercises);
+$$;
+-- A pick-one group of two in Upper, then a straight block with no section. done1/done2 tick each option's set.
+create function tests.lg_choice_doc(id uuid, revision int, sec uuid, sec_name text, picked uuid,
+  done1 boolean, done2 boolean, kind text default 'choice') returns jsonb
+language sql as $$
+  select jsonb_set(tests.lg_doc(id, null, 'in_progress', revision, jsonb_build_array(
+    tests.lg_sec_block('6b000000-0000-4000-8000-00000000c0b0', sec, kind, picked, jsonb_build_array(
+      tests.lg_ex('6b000000-0000-4000-8000-00000000c0e1', (select e.id from public.exercises e where e.name = 'LF Builtin'),
+        jsonb_build_array(tests.lg_set('6b000000-0000-4000-8000-00000000c051', 'normal', 8, 60, done1))),
+      tests.lg_ex('6b000000-0000-4000-8000-00000000c0e2', (select e.id from public.exercises e where e.name = 'LF Builtin Two'),
+        jsonb_build_array(tests.lg_set('6b000000-0000-4000-8000-00000000c052', 'normal', 10, 20, done2))))),
+    tests.lg_sec_block('6b000000-0000-4000-8000-00000000c0b2', null, 'straight', null, jsonb_build_array(
+      tests.lg_ex('6b000000-0000-4000-8000-00000000c0e3', (select e.id from public.exercises e where e.name = 'LF Builtin Three'),
+        jsonb_build_array(tests.lg_set('6b000000-0000-4000-8000-00000000c053', 'normal', 5, 100, false))))))),
+    '{sections}', jsonb_build_array(jsonb_build_object('id', '6b000000-0000-4000-8000-00000000c5ec', 'name', sec_name)));
+$$;
+
+select tests.act_as(:'a1');
+select is(public.save_workout_log(tests.lg_choice_doc(:'c1', 1, :'csec', '  Upper ', :'ce1', true, false)),
+  '{"applied": true, "revision": 1, "status": "in_progress"}'::jsonb, 'a log with a section and a pick saves');
+select results_eq(
+  format($$select id, position::int, kind::text, section_id, section_name, picked_exercise_id from public.log_blocks
+    where log_id = %L order by position$$, :'c1'),
+  format($$values (%L::uuid, 0, 'choice'::text, %L::uuid, 'Upper'::text, %L::uuid),
+    (%L::uuid, 1, 'straight', null::uuid, null::text, null::uuid)$$, :'cb', :'csec', :'ce1', :'cb2'),
+  'the log stores each block''s section (trimmed name) and the pick');
+select is(public.save_workout_log(tests.lg_choice_doc(:'c1', 2, :'csec', 'Upper', :'ce2', false, true)),
+  '{"applied": true, "revision": 2, "status": "in_progress"}'::jsonb, 'switching the pick saves');
+select results_eq(
+  format($$select picked_exercise_id, (select count(*)::int from public.log_sets s where s.log_id = %L
+    and s.completed_at is not null and s.id = %L) from public.log_blocks where id = %L$$, :'c1', :'cs2', :'cb'),
+  format($$values (%L::uuid, 1)$$, :'ce2'),
+  'the new pick and its done set are stored');
+
+-- A doc from before sections (no sections, sectionId or pickedExerciseId keys) still saves (discarded: A1 already
+-- has a log in progress).
+select is(public.save_workout_log(tests.lg_one(:'c2', null, 'discarded', 1, :'cx', :'cxe', :'ex_bi',
+    jsonb_build_array(tests.lg_set(:'cxs', 'normal', 8, 60, true)))),
+  '{"applied": true, "revision": 1, "status": "discarded"}'::jsonb, 'save_workout_log without the new keys still saves');
+select results_eq(
+  format($$select kind::text, section_id, section_name, picked_exercise_id from public.log_blocks where log_id = %L$$, :'c2'),
+  $$values ('straight'::text, null::uuid, null::text, null::uuid)$$,
+  'a missing key is stored as null');
+
+\set c3 '6b000000-0000-4000-8000-00000000c003'
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', :'ce1', true, false, 'superset')),
+  '23514', 'Only a pick-one group can have a pick.', 'a pick on a block that is not a pick-one group is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', :'ce3', false, false)),
+  '23514', 'The pick must be one of the group''s exercises.', 'a pick outside the group is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', :'ce1', true, true)),
+  '23514', 'Only the picked option can have done sets.', 'a done set on an option that is not picked is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', null, true, false)),
+  '23514', 'Only the picked option can have done sets.', 'a done set in a group with no pick is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', :'ce1', true, false) #- '{blocks,0,exercises,1}'),
+  '23514', 'A pick-one group needs 2 to 5 exercises.', 'a one-option pick-one group is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    jsonb_set(tests.lg_choice_doc(:'c3', 1, :'csec', 'Upper', :'ce1', true, false), '{sections}', '[]')),
+  '23514', 'Unknown section.', 'a block naming a section the log does not have is refused');
+reset role;
+select is((select count(*)::int from public.workout_logs where id = :'c3'), 0, 'no refused doc left a log behind');
+
+-- Table checks (as postgres)
+select throws_ok(format($$update public.log_blocks set picked_exercise_id = %L where id = %L$$, :'ce3', :'cb2'),
+  '23514', null, 'only a pick-one block can store a pick');
+select throws_ok(format($$update public.log_blocks set section_name = 'Lonely' where id = %L$$, :'cb2'),
+  '23514', null, 'a log block''s section name needs a section id');
 
 select * from finish();
 rollback;

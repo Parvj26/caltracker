@@ -1,5 +1,5 @@
 begin;
-select plan(51);
+select plan(70);
 
 -- Fixtures (as postgres)
 select tests.create_user('sw-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -298,6 +298,137 @@ select results_eq(
   format($$select id, 0, 60.000::numeric(7,3) from public.workout_exercises where workout_id = %L$$, :'lib_a'),
   'the library set whose id was reused is unchanged');
 select is((select count(*)::int from public.workouts where id = :'gw'), 0, 'no refused doc left a workout behind');
+
+-- ---------------------------------------------------------------------------------------------
+-- Sections and pick-one groups
+select ok(has_column_privilege('authenticated', 'public.workout_blocks', 'section_id', 'insert')
+  and has_column_privilege('authenticated', 'public.workout_blocks', 'section_name', 'insert')
+  and has_column_privilege('authenticated', 'public.workout_blocks', 'section_id', 'update')
+  and has_column_privilege('authenticated', 'public.workout_blocks', 'section_name', 'update'),
+  'authenticated may insert and update the section columns (save_workout is security invoker)');
+select ok(not has_column_privilege('anon', 'public.workout_blocks', 'section_id', 'insert')
+  and not has_column_privilege('anon', 'public.workout_blocks', 'section_name', 'update'),
+  'anon has no section column privileges');
+
+\set uw '5a000000-0000-4000-8000-000000000003'
+\set su '5a000000-0000-4000-8000-0000000005c1'
+\set sc '5a000000-0000-4000-8000-0000000005c2'
+\set ub0 '5a000000-0000-4000-8000-0000000003b0'
+\set ub1 '5a000000-0000-4000-8000-0000000003b1'
+\set ub2 '5a000000-0000-4000-8000-0000000003b2'
+\set ub3 '5a000000-0000-4000-8000-0000000003b3'
+\set ue0 '5a000000-0000-4000-8000-0000000003e0'
+\set ue1 '5a000000-0000-4000-8000-0000000003e1'
+\set ue2 '5a000000-0000-4000-8000-0000000003e2'
+\set ue3 '5a000000-0000-4000-8000-0000000003e3'
+\set ue4 '5a000000-0000-4000-8000-0000000003e4'
+\set ue5 '5a000000-0000-4000-8000-0000000003e5'
+\set us0 '5a000000-0000-4000-8000-000000000380'
+\set us1 '5a000000-0000-4000-8000-000000000381'
+\set us2 '5a000000-0000-4000-8000-000000000382'
+\set us3 '5a000000-0000-4000-8000-000000000383'
+\set us4 '5a000000-0000-4000-8000-000000000384'
+\set us5 '5a000000-0000-4000-8000-000000000385'
+\set us6 '5a000000-0000-4000-8000-000000000386'
+\set us7 '5a000000-0000-4000-8000-000000000387'
+
+-- Upper / Core: a warm-up block with no section, then Upper (a straight block and a pick-one group of two) and
+-- Core (an uneven superset: 2 sets and 1 set). The Upper name carries spaces the server trims.
+create function tests.sw_sec_block(id uuid, section_id uuid, kind text, exercises jsonb) returns jsonb
+language sql as $$
+  select jsonb_build_object('id', id, 'sectionId', section_id, 'kind', kind, 'exercises', exercises);
+$$;
+select jsonb_build_object('id', :'uw', 'name', 'Upper / Core', 'notes', null,
+  'sections', jsonb_build_array(jsonb_build_object('id', :'su', 'name', '  Upper  '),
+    jsonb_build_object('id', :'sc', 'name', 'Core')),
+  'blocks', jsonb_build_array(
+    tests.sw_sec_block(:'ub0', null, 'straight', jsonb_build_array(
+      tests.sw_ex(:'ue0', :'ex_bi', jsonb_build_array(tests.sw_set(:'us0', 'warmup', 10))))),
+    tests.sw_sec_block(:'ub1', :'su', 'straight', jsonb_build_array(
+      tests.sw_ex(:'ue1', :'ex_bi', jsonb_build_array(tests.sw_set(:'us1', 'normal', 8, 60))))),
+    tests.sw_sec_block(:'ub2', :'su', 'choice', jsonb_build_array(
+      tests.sw_ex(:'ue2', :'ex_bi', jsonb_build_array(tests.sw_set(:'us2', 'normal', 10, 20))),
+      tests.sw_ex(:'ue3', :'ex_a', jsonb_build_array(tests.sw_set(:'us3', 'normal', 10, 20),
+        tests.sw_set(:'us4', 'normal', 10, 20))))),
+    tests.sw_sec_block(:'ub3', :'sc', 'superset', jsonb_build_array(
+      tests.sw_ex(:'ue4', :'ex_bi', jsonb_build_array(tests.sw_set(:'us5', 'normal', 15),
+        tests.sw_set(:'us6', 'normal', 15))),
+      tests.sw_ex(:'ue5', :'ex_a', jsonb_build_array(tests.sw_set(:'us7', 'normal', 12))))))) as doc_sec \gset
+
+select tests.act_as(:'coach_a');
+select is(public.save_workout(:'ws_a', :'doc_sec'::jsonb), :'uw'::uuid, 'the Upper / Core doc saves');
+select results_eq(
+  format($$select id, position::int, kind::text, section_id, section_name from public.workout_blocks
+    where workout_id = %L order by position$$, :'uw'),
+  format($$values (%L::uuid, 0, 'straight', null::uuid, null::text), (%L::uuid, 1, 'straight', %L::uuid, 'Upper'),
+    (%L::uuid, 2, 'choice', %L::uuid, 'Upper'), (%L::uuid, 3, 'superset', %L::uuid, 'Core')$$,
+    :'ub0', :'ub1', :'su', :'ub2', :'su', :'ub3', :'sc'),
+  'each block stores its kind and its section''s id and trimmed name');
+select is((select count(*)::int from public.workout_exercises where block_id = :'ub2'), 2,
+  'the pick-one group keeps both options');
+select is((select count(*)::int from public.workout_sets where workout_id = :'uw'), 8,
+  'every option and the uneven superset keep their sets');
+reset role;
+
+set session_replication_role = replica;
+update public.workout_blocks set updated_at = '2000-01-01' where workout_id = :'uw';
+set session_replication_role = origin;
+
+-- Re-save with Core renamed: only Core's block is rewritten.
+select tests.act_as(:'coach_a');
+select is(public.save_workout(:'ws_a', jsonb_set(:'doc_sec'::jsonb, '{sections,1,name}', '"Abs"')), :'uw'::uuid,
+  'the doc re-saves with a renamed section');
+select results_eq(
+  format($$select id, section_name, updated_at > '2000-01-02' from public.workout_blocks
+    where workout_id = %L and section_id is not null order by position$$, :'uw'),
+  format($$values (%L::uuid, 'Upper'::text, false), (%L::uuid, 'Upper', false), (%L::uuid, 'Abs', true)$$,
+    :'ub1', :'ub2', :'ub3'),
+  'the renamed section''s block is rewritten; the unchanged ones are untouched');
+-- Taking the superset out of its section clears both columns.
+select is(public.save_workout(:'ws_a', jsonb_set(
+    jsonb_set(:'doc_sec'::jsonb, '{blocks,3,sectionId}', 'null'), '{sections}',
+    jsonb_build_array(jsonb_build_object('id', :'su', 'name', 'Upper')))), :'uw'::uuid,
+  'the doc re-saves without the Core section');
+select results_eq(
+  format($$select section_id, section_name from public.workout_blocks where id = %L$$, :'ub3'),
+  $$values (null::uuid, null::text)$$,
+  'a block moved out of its section loses both section columns');
+reset role;
+
+-- Guards
+select tests.sw_doc(:'gw', 'Guard', jsonb_build_array(tests.sw_block(:'gb', 'choice', jsonb_build_array(
+  tests.sw_ex(:'ge', :'ex_bi', jsonb_build_array(tests.sw_set(:'gs', 'normal', 8))))))) as doc_one_option \gset
+select tests.sw_doc(:'gw', 'Guard', jsonb_build_array(tests.sw_block(:'gb', 'choice', (
+  select jsonb_agg(tests.sw_ex(gen_random_uuid(), :'ex_bi', jsonb_build_array(tests.sw_set(gen_random_uuid(), 'normal', 8))))
+  from generate_series(1, 6))))) as doc_six_options \gset
+select jsonb_set(tests.sw_doc(:'gw', 'Guard', jsonb_build_array(tests.sw_sec_block(:'gb', :'sc', 'straight',
+  jsonb_build_array(tests.sw_ex(:'ge', :'ex_bi', jsonb_build_array(tests.sw_set(:'gs', 'normal', 8))))))),
+  '{sections}', jsonb_build_array(jsonb_build_object('id', :'su', 'name', 'Upper'))) as doc_unknown_section \gset
+select tests.sw_doc(:'gw', 'Guard', jsonb_build_array(tests.sw_sec_block(:'gb', :'su', 'straight',
+  jsonb_build_array(tests.sw_ex(:'ge', :'ex_bi', jsonb_build_array(tests.sw_set(:'gs', 'normal', 8)))))))
+  as doc_no_sections_key \gset
+
+select tests.act_as(:'coach_a');
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_one_option'),
+  '23514', 'A pick-one group needs 2 to 5 exercises.', 'a one-option pick-one group is refused');
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_six_options'),
+  '23514', 'A pick-one group needs 2 to 5 exercises.', 'a six-option pick-one group is refused');
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_unknown_section'),
+  '23514', 'Unknown section.', 'a block naming a section the doc does not have is refused');
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_no_sections_key'),
+  '23514', 'Unknown section.', 'a section id with no sections list is refused');
+reset role;
+select is((select count(*)::int from public.workouts where id = :'gw'), 0, 'no refused section doc left a workout behind');
+
+-- Table checks (as postgres, so only the constraints can refuse)
+select throws_ok(format($$update public.workout_blocks set section_name = 'Lonely' where id = %L$$, :'ub0'),
+  '23514', null, 'a section name without a section id is refused');
+select throws_ok(format($$update public.workout_blocks set section_id = gen_random_uuid() where id = %L$$, :'ub0'),
+  '23514', null, 'a section id without a name is refused');
+select throws_ok(format($$update public.workout_blocks set section_name = '   ' where id = %L$$, :'ub1'),
+  '23514', null, 'a blank section name is refused');
+select throws_ok(format($$update public.workout_blocks set section_name = repeat('x', 41) where id = %L$$, :'ub1'),
+  '23514', null, 'a section name over 40 characters is refused');
 
 select * from finish();
 rollback;
