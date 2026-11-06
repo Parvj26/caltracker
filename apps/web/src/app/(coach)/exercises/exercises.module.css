@@ -9,11 +9,8 @@
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
 }
-.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .newButton { margin-left: auto; }
 .sectionHeading { margin: 0 0 var(--ct-space-3); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
-.muted { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.empty { margin: 0; color: var(--ct-ink-muted); }
 
 /* ---------- Filters ---------- */
 .chipGroup { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-3); }

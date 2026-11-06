@@ -72,6 +72,7 @@ test('create a custom exercise and see it under My exercises', async ({ page }) 
     await option.click();
     await page.getByRole('region', { name: 'Exercise preview' }).getByRole('link', { name: 'Edit' }).click();
     await expect(page).toHaveURL(/\/exercises\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole('heading', { name: 'Edit exercise' })).toBeVisible();
     await page.goto('/exercises?source=builtin');
     await expect(page.getByRole('option', { name: 'Barbell Squat', exact: true })).toBeVisible();
     await expect(page.getByRole('option', { name, exact: true })).toHaveCount(0);
