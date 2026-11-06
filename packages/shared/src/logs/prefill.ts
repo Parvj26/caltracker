@@ -91,7 +91,7 @@ function resolveField(sets: readonly LogSetDoc[], index: number, f: Field, lastT
     if (set.setType === 'drop') {
       // 3. The coach's drop weight, else the step above (main set or previous drop).
       if (coach !== null) return coach;
-      if (index > 0) {
+      if (index > 0 && sets[index - 1]!.setType !== 'warmup') {
         const above = resolveField(sets, index - 1, f, lastTime);
         if (above !== null) return above;
       }

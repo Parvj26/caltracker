@@ -131,6 +131,41 @@ describe('resolveSetValues', () => {
   });
 });
 
+describe('resolveSetValues edge cases', () => {
+  it('an actual of 0 carries forward', () => {
+    const e = ex([logSet('normal', plan, { actualWeightKg: 0 }), logSet('normal', plan)]);
+    expect(resolveSetValues(e, e.sets[1]!.id, []).weightKg).toBe(0);
+  });
+
+  it('carries decimals', () => {
+    const e = ex([logSet('normal', {}, { actualWeightKg: 62.5, actualReps: 8 }), logSet('normal')]);
+    expect(resolveSetValues(e, e.sets[1]!.id, [])).toMatchObject({ weightKg: 62.5, reps: 8 });
+  });
+
+  it('a drop with no weight does not inherit from a warm-up above', () => {
+    const e = ex([logSet('warmup', {}, { actualWeightKg: 20 }), logSet('drop')]);
+    expect(resolveSetValues(e, e.sets[1]!.id, []).weightKg).toBeNull();
+  });
+
+  it('a drop with no coach weight and nothing above falls through to last time', () => {
+    const e = ex([logSet('drop')]);
+    expect(resolveSetValues(e, e.sets[0]!.id, [prev('drop', 30)]).weightKg).toBe(30);
+  });
+
+  it('reps carry while weight follows the coach', () => {
+    const e = ex([
+      logSet('normal', plan, { actualReps: 7, actualWeightKg: 60 }),
+      logSet('normal', { ...plan, weightKg: 70, repsMin: null, repsMax: null }),
+    ]);
+    expect(resolveSetValues(e, e.sets[1]!.id, [])).toMatchObject({ reps: 7, weightKg: 70 });
+  });
+
+  it('a warm-up that is not first carries from the earlier warm-up', () => {
+    const e = ex([logSet('normal', plan), logSet('warmup', {}, { actualWeightKg: 20 }), logSet('warmup')]);
+    expect(resolveSetValues(e, e.sets[2]!.id, []).weightKg).toBe(20);
+  });
+});
+
 describe('lastTimeFor', () => {
   it('matches the nth set of the same type, else the last of that type, else null', () => {
     const sets = [logSet('warmup'), logSet('normal'), logSet('normal'), logSet('normal')];
@@ -140,6 +175,13 @@ describe('lastTimeFor', () => {
     expect(lastTimeFor(sets, 3, last)?.actualWeightKg).toBe(44);
     expect(lastTimeFor(sets, 1, [])).toBeNull();
     expect(lastTimeFor([logSet('drop')], 0, last)).toBeNull();
+  });
+
+  it('uses the right drop index', () => {
+    const sets = [logSet('normal'), logSet('drop'), logSet('drop')];
+    const last = [prev('normal', 60), prev('drop', 50), prev('drop', 40)];
+    expect(lastTimeFor(sets, 1, last)?.actualWeightKg).toBe(50);
+    expect(lastTimeFor(sets, 2, last)?.actualWeightKg).toBe(40);
   });
 });
 
