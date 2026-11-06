@@ -1,3 +1,5 @@
+import { formatWeight } from '../units/units';
+import type { Units } from '../units/units';
 import type { IsoDate } from '../dates/dates';
 import type { WorkoutLogDoc } from '../logs/schema';
 import { epley1rm, liftsByExercise } from './prs';
@@ -33,7 +35,7 @@ function points(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone: st
  * first. Warm-ups and unfinished sets are left out. `timeZone` decides which calendar day a workout belongs to.
  */
 export function strengthSeries(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone = 'UTC'): StrengthPoint[] {
-  return points(logs, exerciseId, timeZone).map(({ at: _at, ...p }) => p);
+  return points(logs, exerciseId, timeZone).map((p) => ({ date: p.date, e1rmKg: p.e1rmKg, bestSet: p.bestSet }));
 }
 
 /** The exercises that have a strength series in these logs, sorted by name, for the exercise dropdown. */
@@ -47,4 +49,23 @@ export function strengthExercises(logs: readonly WorkoutLogDoc[]): Array<{ exerc
   return [...names]
     .map(([exerciseId, name]) => ({ exerciseId, name }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.exerciseId.localeCompare(b.exerciseId));
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "3 Nov" from a YYYY-MM-DD date. */
+export function shortDate(d: IsoDate): string {
+  return `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1] ?? ''}`;
+}
+
+/** A sentence for the chart's text alternative: how the estimated 1RM moved and its best. */
+export function strengthSummary(name: string, points: readonly StrengthPoint[], units: Units): string {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) return `${name}: no workouts yet.`;
+  const count = `${points.length} ${points.length === 1 ? 'workout' : 'workouts'}`;
+  if (points.length === 1) return `${name}: ${count}. Estimated 1RM ${formatWeight(first.e1rmKg, units)} on ${shortDate(first.date)}.`;
+  const change = last.e1rmKg - first.e1rmKg;
+  const trend = change === 0 ? 'no change' : `${change > 0 ? 'up' : 'down'} ${formatWeight(Math.abs(change), units)}`;
+  const best = points.reduce((a, b) => (b.e1rmKg > a.e1rmKg ? b : a));
+  return `${name}: ${count}. Estimated 1RM went from ${formatWeight(first.e1rmKg, units)} on ${shortDate(first.date)} to ${formatWeight(last.e1rmKg, units)} on ${shortDate(last.date)}, ${trend}. Best ${formatWeight(best.e1rmKg, units)} on ${shortDate(best.date)}.`;
 }

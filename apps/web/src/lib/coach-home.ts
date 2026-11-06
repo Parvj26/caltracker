@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { addDays, LAST_WORKOUT_LOOKBACK_DAYS } from '@caltracker/shared';
-import type { Database, HomeAssignment, HomeWorkout, IsoDate } from '@caltracker/shared';
+import { addDays, awardPrEvents, LAST_WORKOUT_LOOKBACK_DAYS } from '@caltracker/shared';
+import type { Database, HomeAssignment, HomeWorkout, IsoDate, PrEvent } from '@caltracker/shared';
 
 /** A current client as the server sees it: timestamps are still instants, the browser turns them into its own dates. */
 export type HomeClientRow = {
@@ -14,9 +14,17 @@ export type HomeClientRow = {
 };
 /** Planned workouts carry plain calendar dates (scheduled_on), so they need no time zone conversion. */
 export type HomeWorkoutRow = HomeWorkout;
-export type HomeData = { workouts: HomeWorkoutRow[]; clients: HomeClientRow[]; assignments: HomeAssignment[] };
+export type HomeData = {
+  workouts: HomeWorkoutRow[];
+  clients: HomeClientRow[];
+  assignments: HomeAssignment[];
+  /** Personal records from recent workouts; the browser counts the ones in its own week. */
+  prs: PrEvent[];
+};
 
 const WINDOW_DAYS = 8;
+/** Awards are read from this many days back: a week plus the most any time zone is ahead of or behind UTC. */
+const PR_WINDOW_DAYS = 9;
 const PAGE = 1000; // PostgREST's default max rows per response
 
 /** Reads every row of a query, a page at a time, so a busy coach never silently loses rows past the server cap. */
@@ -37,7 +45,9 @@ async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data
 export async function loadHomeData(supabase: SupabaseClient<Database>, workspaceId: string, utcToday: IsoDate): Promise<HomeData> {
   const since = new Date(Date.now() - (LAST_WORKOUT_LOOKBACK_DAYS + 1) * 86_400_000).toISOString();
 
-  const [members, workouts, finished, assignments] = await Promise.all([
+  const prSince = new Date(Date.now() - PR_WINDOW_DAYS * 86_400_000).toISOString();
+
+  const [members, workouts, finished, assignments, awards] = await Promise.all([
     // Current clients only: a removed client is no longer a workspace member, which is how the Clients page does it.
     supabase.from('workspace_members').select('user_id, created_at').eq('workspace_id', workspaceId).eq('role', 'client'),
     readAll(
@@ -72,6 +82,18 @@ export async function loadHomeData(supabase: SupabaseClient<Database>, workspace
       .eq('workspace_id', workspaceId)
       .is('cancelled_on', null)
       .gte('end_date', addDays(utcToday, -1)),
+    readAll(
+      (from, to) =>
+        supabase
+          .from('awards')
+          .select('log_id, client_id, result')
+          .eq('workspace_id', workspaceId)
+          .gte('created_at', prSince)
+          .order('created_at', { ascending: false })
+          .order('log_id')
+          .range(from, to),
+      'personal records',
+    ),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (assignments.error) throw new Error(`Could not load programs: ${assignments.error.message}`);
@@ -86,6 +108,7 @@ export async function loadHomeData(supabase: SupabaseClient<Database>, workspace
   for (const l of finished) if (l.finished_at && !latest.has(l.client_id)) latest.set(l.client_id, l.finished_at); // newest first
 
   return {
+    prs: awards.flatMap((a) => awardPrEvents(a.client_id, a.result)),
     clients: members.data.map((m) => ({
       id: m.user_id,
       firstName: nameOf.get(m.user_id)?.first_name ?? '',

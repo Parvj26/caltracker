@@ -170,10 +170,47 @@ test('the coming-soon parts are visible, disabled, and the console has no hydrat
   await signInAsCoach(page);
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
-  for (const label of ['New PRs this week', 'Message', 'Body scans 30+ days']) {
+  for (const label of ['Message', 'Body scans 30+ days']) {
     await expect(page.locator('[role="note"]').filter({ hasText: label }).first()).toBeVisible();
   }
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
+});
+
+test('New PRs this week counts this week\'s personal records of current clients and links to Activity', async ({ page }) => {
+  const prTile = page.getByRole('link', { name: /^New PRs this week/ });
+  const read = async () => Number((await prTile.getByText(/^\d+$/).textContent()) ?? '0');
+  await signInAsCoach(page);
+  await page.goto('/home');
+  await expect(prTile).toHaveAttribute('href', '/activity');
+  const before = await read();
+
+  const clientId = await newClient(`Prs${unique()}`);
+  const squat = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
+  if (squat.error) throw squat.error;
+  const bench = await admin.from('exercises').select('id').eq('name', 'Barbell Bench Press').is('workspace_id', null).limit(1).single();
+  if (bench.error) throw bench.error;
+  const now = new Date().toISOString();
+  const result = (logId: string, achievedAt: string) => ({
+    ladder: null, drop: null, rare: [], landmarks: [], milestone: null,
+    prs: [
+      { exerciseId: squat.data.id, kind: 'heaviest', valueKg: 100, reps: 5, logId, achievedAt },
+      { exerciseId: squat.data.id, kind: 'e1rm', valueKg: 116.7, reps: 5, logId, achievedAt },
+      { exerciseId: bench.data.id, kind: 'heaviest', valueKg: 80, reps: 5, logId, achievedAt },
+    ],
+  });
+  // Today's workout: two lifts improved (the squat's two records count once). An old one does not count.
+  const fresh = await seedLog(admin, { workspaceId, clientId, name: 'Prs now', startedAt: new Date(Date.now() - 3_600_000).toISOString(), finishedAt: now });
+  const old = await seedLog(admin, { workspaceId, clientId, name: 'Prs old', startedAt: new Date(Date.now() - 20 * MS_DAY - 3_600_000).toISOString(), finishedAt: new Date(Date.now() - 20 * MS_DAY).toISOString() });
+  created.logs.push(fresh, old);
+  for (const [logId, at] of [[fresh, now], [old, new Date(Date.now() - 20 * MS_DAY).toISOString()]] as const) {
+    const a = await admin.from('awards').insert({ log_id: logId, client_id: clientId, workspace_id: workspaceId, result: result(logId, at) });
+    if (a.error) throw a.error;
+  }
+  await page.reload();
+  // Other tests share the demo workspace, so only the rise is checked. Near Monday 00:00 the "now" PR is this week too.
+  await expect.poll(read).toBeGreaterThanOrEqual(before + 2);
+  await prTile.click();
+  await expect(page).toHaveURL(/\/activity$/);
 });
 
 test('typing part of a name in any case finds the client, and Enter opens their page', async ({ page }) => {

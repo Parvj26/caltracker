@@ -17,6 +17,17 @@ function WorkoutsIcon({ color }: { color: ColorValue }) {
   );
 }
 
+/** A tiny rising line made of three bars for Progress. */
+function ProgressIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.progressIcon}>
+      {[0.4, 0.7, 1].map((h) => (
+        <View key={h} style={[styles.progressBar, { backgroundColor: color, height: space[4.5] * h }]} />
+      ))}
+    </View>
+  );
+}
+
 /** A small paw-like drawn icon for the Zoo book: a rounded square with a dot inside. */
 function ZooIcon({ color }: { color: ColorValue }) {
   return (
@@ -26,7 +37,7 @@ function ZooIcon({ color }: { color: ColorValue }) {
   );
 }
 
-// The other tabs in the spec (Progress, Messages, Community, Me) arrive with their phases.
+// The other tabs in the spec (Messages, Community, Me) arrive with their phases.
 export default function TabsLayout() {
   return (
     <Tabs
@@ -60,6 +71,14 @@ export default function TabsLayout() {
         name="zoo"
         options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
       />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarButtonTestID: 'tab-progress',
+          tabBarIcon: ({ color }) => <ProgressIcon color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
@@ -81,6 +100,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  progressIcon: { width: space[4.5], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', gap: space[1] },
+  progressBar: { flex: 1, borderRadius: 1 },
   zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
 });

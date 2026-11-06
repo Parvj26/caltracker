@@ -177,7 +177,7 @@ export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
 export type { Rng } from './awards/rolls';
 export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
 export type { NamedRecord, PersonalBestRow } from './awards/bests';
-export { strengthExercises, strengthSeries } from './awards/strength-series';
+export { shortDate, strengthExercises, strengthSeries, strengthSummary } from './awards/strength-series';
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, prsThisWeek } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';

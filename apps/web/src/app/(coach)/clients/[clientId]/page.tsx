@@ -7,7 +7,9 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type PickerProgram } from './client-calendar';
 import { loadClient } from './client';
 import { StickersPanel } from './stickers-panel';
+import { StrengthPanel } from './strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
+import { loadClientStrength } from '@/lib/client-strength';
 import styles from '@/components/calendar/calendar.module.css';
 
 // Same cap as the workout library page.
@@ -35,7 +37,7 @@ export default async function ClientPage({
   const rangeStart = monthGrid(firstMonth)[0]![0]!;
   const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
 
-  const [workouts, assignments, library, programs, stickers] = await Promise.all([
+  const [workouts, assignments, library, programs, stickers, strength] = await Promise.all([
     supabase
       .from('workouts')
       .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
@@ -69,6 +71,7 @@ export default async function ClientPage({
       .eq('workspace_id', workspaceId)
       .order('name'),
     loadClientStickers(supabase, workspaceId, client.id),
+    loadClientStrength(supabase, workspaceId, client.id),
   ]);
   if (workouts.error) throw new Error(`Could not load the calendar: ${workouts.error.message}`);
   if (assignments.error) throw new Error(`Could not load assignments: ${assignments.error.message}`);
@@ -123,6 +126,7 @@ export default async function ClientPage({
     <div className={styles.page}>
       <Link href="/clients" className={styles.back}>← Clients</Link>
       <StickersPanel data={stickers} units={units} />
+      <StrengthPanel data={strength} units={units} />
       <ClientCalendar
         client={client}
         month={month}

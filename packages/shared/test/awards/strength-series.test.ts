@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { strengthExercises, strengthSeries } from '../../src/awards/strength-series';
+import { strengthExercises, strengthSeries, strengthSummary } from '../../src/awards/strength-series';
 import { EX_A, EX_B, mkLog } from './helpers';
 
 const at = (day: string) => ({ startedAt: `${day}T09:00:00.000Z`, finishedAt: `${day}T10:00:00.000Z` });
@@ -31,7 +31,7 @@ describe('strengthSeries', () => {
   });
 
   it('ignores exercises that are not tracked by weight and reps', () => {
-    const logs = [mkLog([{ trackingType: 'reps_only', sets: [{ w: 0, r: 20 }] }], at('2026-10-20'))];
+    const logs = [mkLog([{ trackingType: 'reps', sets: [{ w: 0, r: 20 }] }], at('2026-10-20'))];
     expect(strengthSeries(logs, EX_A)).toEqual([]);
   });
 
@@ -60,5 +60,18 @@ describe('strengthExercises', () => {
       { exerciseId: EX_B, name: 'Bench Press' },
       { exerciseId: EX_A, name: 'Squat' },
     ]);
+  });
+});
+
+describe('strengthSummary', () => {
+  const pt = (date: string, e1rmKg: number) => ({ date, e1rmKg, bestSet: { weightKg: 100, reps: 5 } });
+  it('says how the estimated max moved, in the unit shown', () => {
+    const pts = [pt('2026-10-20', 93.3), pt('2026-10-27', 126.7), pt('2026-11-03', 116.7)];
+    expect(strengthSummary('Squat', pts, 'kg')).toBe('Squat: 3 workouts. Estimated 1RM went from 93.3 kg on 20 Oct to 116.7 kg on 3 Nov, up 23.4 kg. Best 126.7 kg on 27 Oct.');
+    expect(strengthSummary('Squat', [pt('2026-11-03', 100), pt('2026-11-10', 90)], 'kg')).toContain('down 10 kg');
+  });
+  it('handles one workout and none', () => {
+    expect(strengthSummary('Squat', [pt('2026-11-03', 116.7)], 'kg')).toBe('Squat: 1 workout. Estimated 1RM 116.7 kg on 3 Nov.');
+    expect(strengthSummary('Squat', [], 'kg')).toBe('Squat: no workouts yet.');
   });
 });

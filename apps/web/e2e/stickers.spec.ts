@@ -127,3 +127,43 @@ test('a correction through the log page recomputes the client stats', async ({ p
   await page.goto(`/clients/${clientId}`);
   await expect(page.getByText('1-week streak')).toBeVisible();
 });
+
+test('the client page charts an exercise\'s estimated max over time, with a keyboard-reachable point readout', async ({ page }) => {
+  // Three squat workouts, 80 / 90 / 100 kg for 5 reps, a week apart: three points rising.
+  const u = await admin.auth.admin.createUser({ email: `stk-${unique()}@example.com`, password: 'client-password-123', email_confirm: true, user_metadata: { first_name: 'Chart', last_name: `Lifter${unique()}` } });
+  if (u.error) throw u.error;
+  const clientId = u.data.user.id;
+  created.users.push(clientId);
+  const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: clientId, role: 'client' });
+  if (m.error) throw m.error;
+  for (const [daysAgo, weightKg] of [[14, 80], [7, 90], [0, 100]] as const) {
+    const finished = new Date(Date.now() - daysAgo * 86_400_000 - 60_000).toISOString();
+    created.logs.push(await seedLog(admin, { workspaceId, clientId, name: `Chart ${unique()}`, startedAt: new Date(Date.now() - daysAgo * 86_400_000 - 3_600_000).toISOString(), finishedAt: finished, weightKg, reps: 5 }));
+  }
+
+  await signInAsCoach(page);
+  await page.goto(`/clients/${clientId}`);
+  await page.getByLabel('Exercise').selectOption({ label: 'Barbell Squat' });
+  await expect(page.getByTestId('chart-point')).toHaveCount(3);
+  // The newest workout (100 kg x 5, est. 116.7 kg) is the point read out first.
+  await expect(page.getByTestId('chart-readout')).toContainText(/116\.7 kg|257 lb/);
+  await expect(page.getByText(/Barbell Squat: 3 workouts/)).toBeVisible();
+
+  // One tab stop: focus the chart and step back with the arrow keys.
+  await page.getByTestId('line-chart').focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('chart-readout')).toContainText(/105 kg|231 lb/); // 90 x 5
+  await page.keyboard.press('Home');
+  await expect(page.getByTestId('chart-readout')).toContainText(/93\.3 kg|206 lb/);
+});
+
+test('a client with no logged lifts shows no chart', async ({ page }) => {
+  const u = await admin.auth.admin.createUser({ email: `stk-${unique()}@example.com`, password: 'client-password-123', email_confirm: true, user_metadata: { first_name: 'No', last_name: 'Lifts' } });
+  if (u.error) throw u.error;
+  created.users.push(u.data.user.id);
+  const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
+  if (m.error) throw m.error;
+  await signInAsCoach(page);
+  await page.goto(`/clients/${u.data.user.id}`);
+  await expect(page.getByText('No lifts to chart yet.')).toBeVisible();
+});
