@@ -24,6 +24,9 @@ export const restClock = {
 /** An actual-value box on a set row: wide enough for 5 characters ("135.5", "1000") after padding and border. */
 export const actualInputWidth = tapTarget.logging + space[6];
 
+/** Characters that fit the box at full size. */
+export const actualInputRoomChars = 5;
+
 /** How far a too-long value may shrink in its box before it is cut off. */
 export const actualInputMinFontScale = 0.6;
 
