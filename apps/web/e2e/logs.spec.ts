@@ -249,6 +249,36 @@ test.describe('in Los Angeles', () => {
     await expect(row.locator('time')).toHaveText(`${shortDay(plannedDay)}, 11:30 pm`);
     await page.screenshot({ path: process.env.SHOT_ACTIVITY ?? 'test-results/activity.png', fullPage: true });
   });
+
+  test('a workout the client added shows as "Added by client" on the local day it finished and opens its log', async ({ page }) => {
+    await signInAsCoach(page);
+    const today = await browserToday(page);
+    const runDay = addDays(today, -2);
+    // 23:30 in Los Angeles on runDay is already the next day in UTC: the calendar must use the local day.
+    const finishedAt = [7, 8]
+      .map((h) => `${addDays(runDay, 1)}T0${h - 1}:30:00Z`)
+      .find((iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' }).format(new Date(iso)) === `${runDay}, 23:30`);
+    if (!finishedAt) throw new Error('could not find 23:30 Los Angeles time');
+    const mine = await newClient('Ari', `Added${unique()}`);
+    const name = `Saturday run ${unique()}`;
+    const logId = await log({ workspaceId, clientId: mine, name, startedAt: new Date(Date.parse(finishedAt) - 1_800_000).toISOString(), finishedAt });
+    // A discarded one is never shown.
+    const discarded = `Gave up ${unique()}`;
+    await log({ workspaceId, clientId: mine, name: discarded, status: 'discarded', startedAt: ago(300), finishedAt: ago(280) });
+
+    await page.goto(calendarUrl(mine, runDay));
+    const added = day(page, runDay).getByRole('link', { name: `${name}, added by client: view the log` });
+    await expect(added).toBeVisible();
+    await expect(added).toContainText('Added by client');
+    await expect(day(page, addDays(runDay, 1)).getByText(name)).toHaveCount(0);
+    // It isn't a planned workout: no options menu, not draggable, never "Missed".
+    await expect(page.getByRole('button', { name: `Options for ${name}` })).toHaveCount(0);
+    await expect(day(page, runDay).getByText('Missed')).toHaveCount(0);
+    await expect(page.getByText(discarded)).toHaveCount(0);
+    await added.click();
+    await expect(page).toHaveURL(new RegExp(`/clients/${mine}/logs/${logId}$`));
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  });
 });
 
 
@@ -287,6 +317,33 @@ test.describe('logged workout page', () => {
     await page.getByRole('button', { name: 'Post comment' }).click();
     await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem')).toContainText('Great depth today');
     await page.screenshot({ path: process.env.SHOT_LOG ?? 'test-results/log-page.png', fullPage: true });
+  });
+
+  test("shows the client's workout note near the top and each exercise note on its exercise", async ({ page }) => {
+    const name = `Notes ${unique()}`;
+    const id = await log({ workspaceId, clientId, name, startedAt: ago(90), finishedAt: ago(40), addedExercise: 'Cable Crossover' });
+    const w = await admin.from('workout_logs').update({ notes: 'Slept badly, kept it light.' }).eq('id', id);
+    if (w.error) throw w.error;
+    const squat = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
+    if (squat.error) throw squat.error;
+    const e = await admin.from('log_exercises').update({ note: 'Left knee felt tight, went lighter' }).eq('log_id', id).eq('exercise_id', squat.data.id);
+    if (e.error) throw e.error;
+
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    const workoutNote = page.getByRole('figure', { name: "Client's note on this workout" });
+    await expect(workoutNote).toContainText("Client's note");
+    await expect(workoutNote).toContainText('Slept badly, kept it light.');
+    // The workout note sits in the header, above the first exercise.
+    const noteBox = await workoutNote.boundingBox();
+    const tableBox = await page.getByRole('table', { name: 'Barbell Squat' }).boundingBox();
+    expect(noteBox!.y).toBeLessThan(tableBox!.y);
+    // The exercise note sits inside the card of the exercise it belongs to; the other exercise has none.
+    // An exercise's card is the element its table sits in.
+    const squatCard = page.getByRole('table', { name: 'Barbell Squat' }).locator('xpath=..');
+    await expect(squatCard.getByRole('figure', { name: "Client's note on Barbell Squat" })).toContainText('Left knee felt tight, went lighter');
+    const cableCard = page.getByRole('table', { name: 'Cable Crossover' }).locator('xpath=..');
+    await expect(cableCard.getByRole('figure')).toHaveCount(0);
   });
 
   test('a sectioned log shows headings, the picked option, and no table for the option not picked', async ({ page }) => {

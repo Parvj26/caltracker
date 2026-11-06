@@ -26,6 +26,7 @@ export type Outcome<T extends object = object> = ({ ok: true } & T) | { ok: fals
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v);
 const GENERIC = "Couldn't save. Please try again.";
+const ALREADY_DONE = "You can't move a workout that's already done: it stays on the day it was done. View its log instead.";
 const NOT_A_CLIENT = "You can't add workouts for this client. They may no longer be your client.";
 
 const refreshCalendar = () => revalidatePath('/clients/[clientId]', 'page');
@@ -104,6 +105,7 @@ export async function scheduleWorkout(input: ScheduleWorkoutInput): Promise<Outc
 /**
  * Moves one calendar workout to today or a later day (`today` is the browser's). A refusal comes back as an outcome
  * so the calendar can show why; other failures throw. Either way the calendar has already moved it and rolls back.
+ * A workout with a completed log is refused: it was done on its day, and moving it would move the done mark too.
  */
 export async function moveClientWorkout(input: { workoutId: string; date: IsoDate; today: IsoDate }): Promise<Outcome> {
   const { workspaceId } = await requireCoach();
@@ -113,6 +115,14 @@ export async function moveClientWorkout(input: { workoutId: string; date: IsoDat
   const dateError = todayError(today.data) ?? scheduleDateError(date.data, today.data);
   if (dateError) return { ok: false, error: dateError };
   const supabase = await createServerSupabase();
+  const done = await supabase
+    .from('workout_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('workout_id', input.workoutId)
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'completed');
+  if (done.error) throw new Error(`Could not check the workout: ${done.error.message}`);
+  if ((done.count ?? 0) > 0) return { ok: false, error: ALREADY_DONE };
   const { data, error } = await supabase
     .from('workouts')
     .update({ scheduled_on: date.data })

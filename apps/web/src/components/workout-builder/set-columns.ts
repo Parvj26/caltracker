@@ -16,10 +16,10 @@ export function setColumns(trackingType: TrackingType, showRest: boolean): SetCo
     { key: 'label', caption: '', width: '24px' },
     { key: 'type', caption: 'Type', width: '7rem' },
   ];
-  if (fields.includes('reps')) cols.push({ key: 'reps', caption: 'Reps', width: '13.5rem' });
-  if (fields.includes('weight')) cols.push({ key: 'weight', caption: 'Weight', width: '6.5rem' });
+  if (fields.includes('reps')) cols.push({ key: 'reps', caption: 'Reps', width: '15rem' });
+  if (fields.includes('weight')) cols.push({ key: 'weight', caption: 'Weight', width: '8rem' });
   if (fields.includes('duration')) cols.push({ key: 'duration', caption: 'Time', width: '5rem' });
-  if (fields.includes('distance')) cols.push({ key: 'distance', caption: 'Distance', width: '6.5rem' });
+  if (fields.includes('distance')) cols.push({ key: 'distance', caption: 'Distance', width: '8rem' });
   cols.push(
     { key: 'rest', caption: showRest ? 'Rest' : '', width: '7rem' },
     { key: 'note', caption: 'Note', width: 'minmax(8rem, 1fr)' },

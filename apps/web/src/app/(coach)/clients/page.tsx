@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { formatFullName, localToday } from '@caltracker/shared';
 import { Card } from '@/components/ui';
@@ -13,6 +14,8 @@ import { newestInviteFirst } from './pending-order';
 import { PastClients } from './past-clients';
 import { ResendButton } from './resend-button';
 import styles from './clients.module.css';
+
+export const metadata: Metadata = { title: 'Clients' };
 
 /** The Clients list looks this far back for each client's last workout (Home only needs 30 days). */
 const LAST_WORKOUT_LOOKBACK_DAYS = 90;

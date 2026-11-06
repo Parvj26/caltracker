@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { DEFAULT_SETS } from '@caltracker/shared';
 import type { ExercisePick } from '@caltracker/shared';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
 import styles from '@/components/exercise-search/exercise-search.module.css';
+import { SetCountStepper } from './set-count-stepper';
 
 type Props = {
   title: string;
@@ -18,14 +20,18 @@ type Props = {
   hint?: string;
   /** With `multiple`: what the picks become, e.g. 'superset' or 'pick-one group'. */
   groupLabel?: string;
-  onPick: (exercises: ExercisePick[]) => void;
+  /** With `multiple`: shows a "Sets each: − 3 +" control (or "Rounds" for a superset) beside the Add button. */
+  setCount?: { label: string; noun: string };
+  /** `sets` is the stepper's value (3 when there is no stepper). */
+  onPick: (exercises: ExercisePick[], sets: number) => void;
   onClose: () => void;
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, onPick, onClose }: Props) {
+export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, setCount, onPick, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const [sets, setSets] = useState(DEFAULT_SETS);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -47,7 +53,8 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
         {...(max !== undefined ? { max } : {})}
         {...(hint !== undefined ? { hint } : {})}
         {...(groupLabel !== undefined ? { groupLabel } : {})}
-        onPick={onPick}
+        {...(setCount ? { footerExtra: <SetCountStepper label={setCount.label} noun={setCount.noun} value={sets} onChange={setSets} /> } : {})}
+        onPick={(exs) => onPick(exs, setCount ? sets : DEFAULT_SETS)}
         onCancel={() => dialogRef.current?.close()}
       />
     </dialog>

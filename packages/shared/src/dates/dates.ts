@@ -57,13 +57,21 @@ export function monthGrid(month: string): IsoDate[][] {
  * JavaScript engine does (Hermes, React Native's engine, ships limited locale data).
  */
 export function localToday(timeZone?: string): IsoDate {
+  return localDateOf(new Date(), timeZone);
+}
+
+/**
+ * The calendar day an instant (an ISO timestamp or a Date) falls on in the given time zone (default: the viewer's
+ * own), e.g. which day of the coach's calendar a log finished at 11:30 pm belongs to.
+ */
+export function localDateOf(instant: string | Date, timeZone?: string): IsoDate {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
     numberingSystem: 'latn',
-  }).formatToParts(new Date());
+  }).formatToParts(typeof instant === 'string' ? new Date(instant) : instant);
   const part = (type: 'year' | 'month' | 'day') => Number(parts.find((p) => p.type === type)?.value);
   const [y, m, d] = [part('year'), part('month'), part('day')];
   return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
