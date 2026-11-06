@@ -130,6 +130,8 @@ export {
 export type { ActualPatch } from './logs/ops';
 export { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from './logs/format';
 export type { ResultSet } from './logs/format';
+export { EMPTY_VALUES, lastTimeFor, resolveSetValues, valuesToPatch } from './logs/prefill';
+export type { SetValues } from './logs/prefill';
 export {
   AUTO_FINISH_IDLE_MS,
   REMINDER_DELAY_MS,
