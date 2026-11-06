@@ -23,7 +23,7 @@ export type HomeData = {
 };
 
 const WINDOW_DAYS = 8;
-/** Awards are read from this many days back: a week plus the most any time zone is ahead of or behind UTC. */
+/** Awards are read from this many days back (filtering on awards.created_at is a safe superset of the PRs achieved that week): a week plus the most any time zone is ahead of or behind UTC. */
 const PR_WINDOW_DAYS = 9;
 const PAGE = 1000; // PostgREST's default max rows per response
 

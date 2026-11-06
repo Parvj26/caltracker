@@ -67,7 +67,7 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
     <div className={styles.wrap}>
       <div
         className={styles.chart}
-        role="group"
+        role="application"
         tabIndex={0}
         aria-label={`${title}. ${points.length} ${points.length === 1 ? 'point' : 'points'}. Use the left and right arrow keys to move between them.`}
         aria-describedby={`${id}-readout`}
