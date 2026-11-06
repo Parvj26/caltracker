@@ -136,6 +136,39 @@ begin
 end;
 $$;
 
+-- A workout log for client in ws (planned from workout, or unplanned when null) with 1 straight block,
+-- 1 exercise (a new built-in) and two sets: the first completed at 8 x 60 kg, the second not done.
+-- finished_at is set for a completed log only.
+create or replace function tests.create_log(
+  ws uuid, client uuid, workout uuid default null, status text default 'completed'
+) returns uuid
+language plpgsql
+as $$
+declare
+  l uuid;
+  b uuid;
+  le uuid;
+  ex uuid := tests.create_exercise(null, 'Log exercise ' || left(gen_random_uuid()::text, 8));
+begin
+  insert into public.workout_logs (workspace_id, client_id, workout_id, name, status, started_at,
+    finished_at, last_activity_at, logged_by)
+  values (ws, client, workout, coalesce((select w.name from public.workouts w where w.id = workout), 'Logged workout'),
+    status::public.log_status, now() - interval '1 hour',
+    case when status = 'completed' then now() - interval '10 minutes' end,
+    now() - interval '10 minutes', client)
+  returning id into l;
+  insert into public.log_blocks (log_id, position, kind) values (l, 0, 'straight') returning id into b;
+  insert into public.log_exercises (block_id, position, exercise_id) values (b, 0, ex) returning id into le;
+  insert into public.log_sets (log_exercise_id, position, set_type, target_reps_min, target_reps_max,
+    target_weight_kg, rest_seconds, actual_reps, actual_weight_kg, completed_at)
+  values (le, 0, 'normal', 8, 8, 60, 90, 8, 60, now() - interval '10 minutes');
+  insert into public.log_sets (log_exercise_id, position, set_type, target_reps_min, target_reps_max,
+    target_weight_kg, rest_seconds)
+  values (le, 1, 'normal', 8, 8, 60, 90);
+  return l;
+end;
+$$;
+
 grant usage on schema tests to anon, authenticated;
 grant execute on all functions in schema tests to anon, authenticated;
 

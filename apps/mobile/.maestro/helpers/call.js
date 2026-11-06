@@ -5,6 +5,8 @@
 //   invite | confirm | cleanup | remove   per EMAIL (see scripts/e2e-helper.ts)
 //   assign             the seed coach assigns a 1-week "E2E Program" (workout "E2E Upper") to EMAIL starting today
 //   cleanup-workouts   deletes every "E2E " workout, program and assignment (EMAIL is ignored; pass '-')
+//   assign-today       clears EMAIL's logs, then assigns "E2E Log" today: Barbell Squat 3 x 8 @ 60 kg, 90 s rests
+//   cleanup-logs       deletes every workout log of client@demo.local (refuses any other EMAIL)
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);

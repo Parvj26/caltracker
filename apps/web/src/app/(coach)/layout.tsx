@@ -10,6 +10,7 @@ const NAV = [
   { href: '/workouts', label: 'Workouts', icon: 'workouts' },
   { href: '/programs', label: 'Programs', icon: 'programs' },
   { href: '/exercises', label: 'Exercises', icon: 'exercises' },
+  { href: '/activity', label: 'Activity', icon: 'activity' },
 ] as const;
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {

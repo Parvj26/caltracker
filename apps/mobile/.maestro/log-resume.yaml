@@ -1,0 +1,68 @@
+# Review Focus 1: closing the app mid-workout never loses a ticked set. Start, tick set 1, close the app,
+# open it again (same install, no clearState): Today offers Resume, and set 1 is still ticked.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- tapOn:
+    text: Allow
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 20000
+- tapOn:
+    id: tick-0-0
+- tapOn:
+    id: rest-skip
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: resume-banner
+    timeout: 20000
+- assertVisible: '.*Resume E2E Log.*'
+- tapOn:
+    id: resume-banner
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 20000
+# iOS reads a checkbox's state as its value ("checkbox, checked"), which Maestro matches as text.
+- assertVisible:
+    id: tick-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: tick-0-1
+    text: 'checkbox, unchecked'
+# Leave nothing in progress for the next flow.
+- tapOn:
+    id: log-menu
+- tapOn:
+    id: discard-button
+- tapOn: 'Discard'
+- extendedWaitUntil:
+    visible: 'Start'
+    timeout: 20000
+- assertNotVisible:
+    id: resume-banner
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

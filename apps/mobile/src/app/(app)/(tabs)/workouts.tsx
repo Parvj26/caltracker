@@ -1,30 +1,49 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
 import { addDays, localToday, startOfWeek, type IsoDate } from '@caltracker/shared';
+import { NameSheet } from '@/components/log/name-sheet';
+import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { workoutStatuses } from '@/lib/active-log-logic';
+import { fetchLogsForDays, type LogForDay } from '@/lib/log-api';
+import { useActiveLog } from '@/lib/use-active-log';
 import { formatDayMonth, groupByDay, weekdayShort, type WorkoutSummary } from '@/lib/workouts';
 import { LOAD_FAILED, fetchWorkoutsBetween } from '@/lib/workouts-api';
-import { palette } from '@/theme/theme';
+import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+
+const START_FAILED = 'Couldn’t start a workout. Try again.';
 
 export default function Workouts() {
   const { text, space, radius } = useTheme();
+  const router = useRouter();
+  const { log: active, finished, startEmpty } = useActiveLog();
   const [weekStart, setWeekStart] = useState<IsoDate>(() => startOfWeek(localToday()));
   const [today, setToday] = useState<IsoDate>(() => localToday());
-  const [items, setItems] = useState<{ weekStart: IsoDate; workouts: WorkoutSummary[] } | null>(null);
+  const [items, setItems] = useState<{ weekStart: IsoDate; workouts: WorkoutSummary[]; logs: LogForDay[] } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
   const latest = useRef(0);
 
   const load = useCallback(async (from: IsoDate) => {
     const ticket = ++latest.current;
     setToday(localToday()); // The day may have changed since the screen opened.
     try {
-      const workouts = await fetchWorkoutsBetween(from, addDays(from, 6));
+      const to = addDays(from, 6);
+      const [workouts, logs] = await Promise.all([
+        fetchWorkoutsBetween(from, to),
+        // The ✓ marks are a bonus: the week still shows when they can't be read.
+        fetchLogsForDays(from, to).catch(() => [] as LogForDay[]),
+      ]);
       if (ticket !== latest.current) return;
-      setItems({ weekStart: from, workouts });
+      setItems({ weekStart: from, workouts, logs });
       setError(null);
     } catch {
       if (ticket !== latest.current) return;
@@ -44,14 +63,52 @@ export default function Workouts() {
     setRefreshing(false);
   }
 
-  const days = groupByDay(items?.weekStart === weekStart ? items.workouts : [], weekStart);
-  const loading = items?.weekStart !== weekStart && !error;
+  const shown = items?.weekStart === weekStart ? items : null;
+  const days = groupByDay(shown?.workouts ?? [], weekStart);
+  const loading = shown === null && !error;
+  // Matched by the planned workout (its scheduled day), plus what this phone has just finished.
+  const statuses = useMemo(() => workoutStatuses(shown?.logs ?? [], active, finished), [shown, active, finished]);
+  const inProgress = active?.status === 'in_progress' ? active : null;
+
+  const openLog = (id: string) => router.push({ pathname: '/log/[id]', params: { id } });
+
+  function logUnplanned() {
+    if (inProgress) {
+      // Only one workout at a time: carry on with the one already going.
+      Alert.alert(`${inProgress.name} is still going`, 'Finish or discard it before starting another workout.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Resume ${inProgress.name}`, onPress: () => openLog(inProgress.id) },
+      ]);
+      return;
+    }
+    setNaming(true);
+  }
+
+  async function startUnplanned(name: string) {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
+    try {
+      const log = await startEmpty(name);
+      setNaming(false);
+      openLog(log.id);
+    } catch {
+      Alert.alert(START_FAILED);
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
+    }
+  }
 
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
       <Text style={text('screenTitle')} accessibilityRole="header">
         Workouts
       </Text>
+
+      {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
+
+      <Button variant="secondary" title="Log a workout" testID="log-unplanned" onPress={logUnplanned} />
 
       <View style={[styles.weekHeader, { gap: space[2] }]}>
         <WeekArrow label="Previous week" glyph="‹" onPress={() => setWeekStart((w) => addDays(w, -7))} />
@@ -97,13 +154,22 @@ export default function Workouts() {
                 {day.items.length === 0 ? (
                   <Text style={[text('body'), styles.rest]}>Rest</Text>
                 ) : (
-                  day.items.map((w) => <WorkoutRow key={w.id} workout={w} />)
+                  day.items.map((w) => (
+                    <WorkoutRow key={w.id} workout={w} done={statuses[w.id]?.kind === 'done'} />
+                  ))
                 )}
               </View>
             </View>
           );
         })}
       </Card>
+
+      <NameSheet
+        visible={naming}
+        busy={starting}
+        onStart={(name) => void startUnplanned(name)}
+        onClose={() => setNaming(false)}
+      />
     </Screen>
   );
 }
@@ -123,7 +189,7 @@ function WeekArrow({ label, glyph, onPress }: { label: string; glyph: string; on
   );
 }
 
-function WorkoutRow({ workout }: { workout: WorkoutSummary }) {
+function WorkoutRow({ workout, done }: { workout: WorkoutSummary; done: boolean }) {
   const { text, space, radius } = useTheme();
   const router = useRouter();
   return (
@@ -139,6 +205,11 @@ function WorkoutRow({ workout }: { workout: WorkoutSummary }) {
       ]}
     >
       <Text style={[text('sectionHeading'), styles.flex]}>{workout.name}</Text>
+      {done ? (
+        <Text testID={`done-mark-${workout.id}`} style={text('sectionHeading')} accessibilityLabel="Done">
+          ✓
+        </Text>
+      ) : null}
       <Text style={text('sectionHeading')} accessibilityElementsHidden importantForAccessibility="no">
         ›
       </Text>
@@ -156,7 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: palette.surface,
   },
-  pressed: { opacity: 0.75 },
+  pressed: { opacity: pressedOpacity },
   day: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap' },
   dayDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
   // Wide enough for a date chip and "Today"; at large text sizes the workouts wrap below instead of squeezing.

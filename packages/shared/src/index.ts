@@ -99,3 +99,48 @@ export {
   programStartError,
   scheduleDateError,
 } from './programs/date-rules';
+export {
+  LOG_STATUSES,
+  LogBlockDoc,
+  LogExerciseDoc,
+  LogSetDoc,
+  LogSetTarget,
+  WorkoutLogDoc,
+} from './logs/schema';
+export type { LogStatus } from './logs/schema';
+export { emptyLog, prefillActuals, startLogFromWorkout } from './logs/start';
+export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
+export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
+export {
+  addLogDrop,
+  addLogExercise,
+  addLogSet,
+  completeSet,
+  discardLog,
+  finishLog,
+  removeLogExercise,
+  reopenLog,
+  removeLogSet,
+  setExerciseNote,
+  swapLogExercise,
+  toggleSet,
+  uncompleteSet,
+  updateActual,
+} from './logs/ops';
+export type { ActualPatch } from './logs/ops';
+export { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from './logs/format';
+export type { ResultSet } from './logs/format';
+export {
+  AUTO_FINISH_IDLE_MS,
+  REMINDER_DELAY_MS,
+  REOPEN_WINDOW_MS,
+  autoFinish,
+  autoFinishTime,
+  canReopen,
+  completedSetCount,
+  isAddedExercise,
+  isPlannedLog,
+  logDurationS,
+  logVolumeKg,
+  shouldAutoFinish,
+} from './logs/summary';

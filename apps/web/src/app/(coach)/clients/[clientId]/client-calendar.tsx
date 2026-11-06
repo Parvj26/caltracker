@@ -135,7 +135,7 @@ export function ClientCalendar({
   }
 
   function schedule(workout: LibraryWorkout, date: IsoDate, newId: string) {
-    const entry: CalendarEntry = { id: newId, name: workout.name, programName: null, date };
+    const entry: CalendarEntry = { id: newId, name: workout.name, programName: null, logId: null, date };
     optimistic(
       (s) => (s.some((x) => x.id === newId) ? s : [...s, entry]),
       async () => {
@@ -146,6 +146,7 @@ export function ClientCalendar({
     );
   }
 
+  const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
   const days: Record<IsoDate, CalendarItem[]> = {};
   for (const { date, ...item } of items) (days[date] ??= []).push(item);
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
@@ -191,12 +192,13 @@ export function ClientCalendar({
       </p>
 
       {readOnly ? (
-        <MonthCalendar month={month} days={days} today={today} renderItem={() => null} />
+        <MonthCalendar month={month} days={days} today={today} logHref={logHref} renderItem={() => null} />
       ) : (
         <MonthCalendar
           month={month}
           days={days}
           today={today}
+          logHref={logHref}
           editableFrom={today}
           onDropItem={move}
           onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}

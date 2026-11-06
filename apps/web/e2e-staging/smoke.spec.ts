@@ -80,3 +80,20 @@ test('signed-in coach can open the workouts and programs pages', async ({ page }
   await page.goto('/programs');
   await expect(page.getByRole('heading', { name: 'Programs' })).toBeVisible();
 });
+
+test('signed-in coach can open the activity page', async ({ page }) => {
+  if (!email || !password) {
+    console.log('SKIPPED activity check: STAGING_SMOKE_COACH_EMAIL / STAGING_SMOKE_COACH_PASSWORD are not set.');
+    test.skip();
+    return;
+  }
+
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+
+  await page.goto('/activity');
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
+});

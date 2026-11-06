@@ -36,11 +36,14 @@ export default async function ClientPage({
   const [workouts, assignments, library, programs] = await Promise.all([
     supabase
       .from('workouts')
-      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name)')
+      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
       .gte('scheduled_on', rangeStart)
       .lte('scheduled_on', rangeEnd)
+      // Completed logs of each planned workout (a discarded or in-progress one is left out), latest first.
+      .eq('workout_logs.status', 'completed')
+      .order('finished_at', { ascending: false, referencedTable: 'workout_logs' })
       .order('scheduled_on')
       .order('created_at'),
     supabase
@@ -82,9 +85,21 @@ export default async function ClientPage({
     : { data: [], error: null };
   if (upcoming.error) throw new Error(`Could not load upcoming workouts: ${upcoming.error.message}`);
 
+  // Done is matched by the planned workout (workout_logs.workout_id), never by the log's finish date, so a workout
+  // finished at 11 pm in the client's zone stays on its planned day. Only completed logs count: a discarded or
+  // in-progress one leaves the workout open (and Missed once its day has passed). The logs come embedded with
+  // each workout, so no long id list goes into a URL.
   const entries: CalendarEntry[] = workouts.data.flatMap((w) =>
     w.scheduled_on
-      ? [{ id: w.id, name: w.name, date: w.scheduled_on, programName: w.program_assignments?.program_name ?? null }]
+      ? [
+          {
+            id: w.id,
+            name: w.name,
+            date: w.scheduled_on,
+            programName: w.program_assignments?.program_name ?? null,
+            logId: w.workout_logs[0]?.id ?? null,
+          },
+        ]
       : [],
   );
   const summaries: AssignmentSummary[] = assignments.data.map((a) => ({
