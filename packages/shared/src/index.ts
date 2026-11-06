@@ -166,17 +166,23 @@ export type {
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export {
+  COMMON_EXERCISES,
+  EQUIPMENT_CHIPS,
   EXERCISE_ALIASES,
+  EXERCISE_INDEX_COLUMNS,
   EXERCISE_OTHER_NAMES,
+  MUSCLE_CHIPS,
   MUSCLE_CHIP_MUSCLES,
   buildExerciseIndex,
   equipmentChipOf,
+  exerciseIndexRowFromDb,
   normalizeSearchText,
   searchExercises,
 } from './exercises/search';
 export type {
   EquipmentChip,
   ExerciseIndex,
+  ExerciseIndexDbRow,
   ExerciseIndexRow,
   MuscleChip,
   SearchBoosts,

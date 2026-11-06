@@ -30,6 +30,51 @@ export type EquipmentChip =
   | 'Band'
   | 'Other';
 
+/** The filter chips, in the order the pickers show them. */
+export const MUSCLE_CHIPS: readonly MuscleChip[] = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Glutes', 'Core', 'Full body'];
+export const EQUIPMENT_CHIPS: readonly EquipmentChip[] = [
+  'Barbell',
+  'Dumbbell',
+  'Cable',
+  'Machine',
+  'Kettlebell',
+  'Bodyweight',
+  'Band',
+  'Other',
+];
+
+/** The `exercises` columns an index row needs (pass to `.select()`). */
+export const EXERCISE_INDEX_COLUMNS =
+  'id, name, primary_muscles, secondary_muscles, equipment, category, tracking_type, source, image_paths' as const;
+
+/** One `exercises` row as selected with EXERCISE_INDEX_COLUMNS. */
+export type ExerciseIndexDbRow = {
+  id: string;
+  name: string;
+  primary_muscles: string[];
+  secondary_muscles: string[];
+  equipment: string | null;
+  category: string | null;
+  tracking_type: TrackingType;
+  source: string;
+  image_paths: string[];
+};
+
+/** A database row as the search index wants it: anything not custom is a built-in; only the first photo is kept. */
+export function exerciseIndexRowFromDb(e: ExerciseIndexDbRow): ExerciseIndexRow {
+  return {
+    id: e.id,
+    name: e.name,
+    primaryMuscles: e.primary_muscles,
+    secondaryMuscles: e.secondary_muscles,
+    equipment: e.equipment,
+    category: e.category,
+    trackingType: e.tracking_type,
+    source: e.source === 'custom' ? 'custom' : 'builtin',
+    imagePath: e.image_paths[0] ?? null,
+  };
+}
+
 export type SearchFilters = { muscles: MuscleChip[]; equipment: EquipmentChip[]; customOnly: boolean };
 export type SearchBoosts = { favourites: ReadonlySet<string>; recent: readonly string[] };
 export type SearchHit = {

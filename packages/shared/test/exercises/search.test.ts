@@ -2,10 +2,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  EQUIPMENT_CHIPS,
   EXERCISE_ALIASES,
+  EXERCISE_INDEX_COLUMNS,
+  MUSCLE_CHIPS,
   MUSCLE_CHIP_MUSCLES,
   buildExerciseIndex,
   equipmentChipOf,
+  exerciseIndexRowFromDb,
   normalizeSearchText,
   searchExercises,
   type ExerciseIndexRow,
@@ -254,6 +258,12 @@ describe('chips', () => {
     expect([...muscles].filter((m) => !mapped.has(m))).toEqual([]);
   });
 
+  it('lists every chip once, in the order the pickers show them', () => {
+    expect(MUSCLE_CHIPS).toEqual(['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Glutes', 'Core', 'Full body']);
+    expect(EQUIPMENT_CHIPS).toEqual(['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Kettlebell', 'Bodyweight', 'Band', 'Other']);
+    expect([...MUSCLE_CHIPS].sort()).toEqual(Object.keys(MUSCLE_CHIP_MUSCLES).sort());
+  });
+
   it('Full body matches strongman or 4+ muscles', () => {
     const idx = buildExerciseIndex([
       row('Atlas Stone', { id: 'a', category: 'strongman', primaryMuscles: ['lats'] }),
@@ -331,5 +341,41 @@ describe('performance', () => {
     }
     // A generous budget: the real cost is a few ms, but a busy machine (several test suites in parallel) can slow it.
     expect(best).toBeLessThan(100);
+  });
+});
+
+describe('exerciseIndexRowFromDb', () => {
+  const db = {
+    id: 'e1',
+    name: 'Barbell Curl',
+    primary_muscles: ['biceps'],
+    secondary_muscles: ['forearms'],
+    equipment: 'barbell',
+    category: 'strength',
+    tracking_type: 'weight_reps' as const,
+    source: 'free-exercise-db',
+    image_paths: ['a/0.jpg', 'a/1.jpg'],
+  };
+
+  it('selects exactly the columns it reads', () => {
+    expect(EXERCISE_INDEX_COLUMNS.split(', ').sort()).toEqual(Object.keys(db).sort());
+  });
+
+  it('maps a library row, keeping the first photo only', () => {
+    expect(exerciseIndexRowFromDb(db)).toEqual({
+      id: 'e1',
+      name: 'Barbell Curl',
+      primaryMuscles: ['biceps'],
+      secondaryMuscles: ['forearms'],
+      equipment: 'barbell',
+      category: 'strength',
+      trackingType: 'weight_reps',
+      source: 'builtin',
+      imagePath: 'a/0.jpg',
+    });
+  });
+
+  it('marks custom exercises and allows no photo', () => {
+    expect(exerciseIndexRowFromDb({ ...db, source: 'custom', image_paths: [] })).toMatchObject({ source: 'custom', imagePath: null });
   });
 });

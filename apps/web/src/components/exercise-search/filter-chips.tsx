@@ -1,8 +1,5 @@
-import type { EquipmentChip, MuscleChip, SearchFilters } from '@caltracker/shared';
+import { EQUIPMENT_CHIPS, MUSCLE_CHIPS, type SearchFilters } from '@caltracker/shared';
 import styles from './exercise-search.module.css';
-
-const MUSCLES: MuscleChip[] = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Glutes', 'Core', 'Full body'];
-const EQUIPMENT: EquipmentChip[] = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Kettlebell', 'Bodyweight', 'Band', 'Other'];
 
 type Props = { filters: SearchFilters; onChange: (next: SearchFilters) => void };
 
@@ -27,11 +24,11 @@ export function hasActiveFilters(f: SearchFilters): boolean {
 export function FilterChips({ filters, onChange }: Props) {
   return (
     <div className={styles.filters} role="group" aria-label="Filters">
-      {MUSCLES.map((m) => (
+      {MUSCLE_CHIPS.map((m) => (
         <Chip key={m} label={m} active={filters.muscles.includes(m)} onClick={() => onChange({ ...filters, muscles: toggle(filters.muscles, m) })} />
       ))}
       <span className={styles.filterGap} aria-hidden="true" />
-      {EQUIPMENT.map((q) => (
+      {EQUIPMENT_CHIPS.map((q) => (
         <Chip key={q} label={q} active={filters.equipment.includes(q)} onClick={() => onChange({ ...filters, equipment: toggle(filters.equipment, q) })} />
       ))}
       <span className={styles.filterGap} aria-hidden="true" />

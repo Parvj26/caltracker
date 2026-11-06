@@ -1,7 +1,7 @@
 // The phone's exercise library wired to the server. Reads go through RLS as the signed-in client: built-in
 // exercises plus their own workspace's custom ones.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ExerciseIndexRow } from '@caltracker/shared';
+import { EXERCISE_INDEX_COLUMNS, exerciseIndexRowFromDb, type ExerciseIndexRow } from '@caltracker/shared';
 import { createExerciseIndexLoader, resolveIndexUser, type LoadedExerciseIndex } from './exercise-index';
 import { supabase } from './supabase';
 
@@ -12,24 +12,12 @@ async function fetchRows(): Promise<ExerciseIndexRow[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('exercises')
-      .select('id, name, primary_muscles, secondary_muscles, equipment, category, tracking_type, source, image_paths')
+      .select(EXERCISE_INDEX_COLUMNS)
       .order('name', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Could not load exercises: ${error.message}`);
-    for (const e of data) {
-      rows.push({
-        id: e.id,
-        name: e.name,
-        primaryMuscles: e.primary_muscles,
-        secondaryMuscles: e.secondary_muscles,
-        equipment: e.equipment,
-        category: e.category,
-        trackingType: e.tracking_type,
-        source: e.source === 'custom' ? 'custom' : 'builtin',
-        imagePath: e.image_paths[0] ?? null,
-      });
-    }
+    for (const e of data) rows.push(exerciseIndexRowFromDb(e));
     if (data.length < PAGE) break;
   }
   return rows;

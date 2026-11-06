@@ -3,13 +3,13 @@ import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import {
+  EQUIPMENT_CHIPS,
+  MUSCLE_CHIPS,
   TRACKING_TYPE_LABELS,
   buildExerciseIndex,
   searchExercises,
-  type EquipmentChip,
   type ExerciseIndexRow,
   type ExercisePick,
-  type MuscleChip,
   type SearchFilters,
 } from '@caltracker/shared';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
@@ -20,8 +20,6 @@ import type { LoadedExerciseIndex } from '@/lib/exercise-index';
 import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-const MUSCLES: MuscleChip[] = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Glutes', 'Core', 'Full body'];
-const EQUIPMENT: EquipmentChip[] = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Kettlebell', 'Bodyweight', 'Band', 'Other'];
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_FAVOURITES: ReadonlySet<string> = new Set();
 const MAX_SHOWN = 50;
@@ -149,7 +147,7 @@ export function ExercisePicker({
             contentContainerStyle={{ gap: space[2], alignItems: 'center' }}
             accessibilityLabel="Filters"
           >
-            {MUSCLES.map((m) => (
+            {MUSCLE_CHIPS.map((m) => (
               <Chip
                 key={m}
                 label={m}
@@ -157,7 +155,7 @@ export function ExercisePicker({
                 onPress={() => setFilters((f) => ({ ...f, muscles: toggle(f.muscles, m) }))}
               />
             ))}
-            {EQUIPMENT.map((q) => (
+            {EQUIPMENT_CHIPS.map((q) => (
               <Chip
                 key={q}
                 label={q}
