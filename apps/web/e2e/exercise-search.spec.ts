@@ -6,6 +6,11 @@ import { serviceClient, signInAsCoach } from './helpers';
 
 const admin = serviceClient();
 
+// Every test here starts by clearing the shared demo coach's favourites, and the star tests need them to stay put
+// until they finish. Run this file's tests one after another on one worker, so one test's clean-up can't wipe a star
+// another test just set. All favourite tests live in this file for the same reason.
+test.describe.configure({ mode: 'default' });
+
 async function openPicker(page: Page, button = '+ Exercise') {
   await page.goto('/workouts/new');
   await page.getByRole('button', { name: button, exact: true }).click();
@@ -21,6 +26,11 @@ async function demoCoachId(): Promise<string | undefined> {
 
 test.beforeEach(async ({ page }) => {
   await signInAsCoach(page);
+  const id = await demoCoachId();
+  if (id) await admin.from('exercise_favorites').delete().eq('coach_id', id);
+});
+
+test.afterAll(async () => {
   const id = await demoCoachId();
   if (id) await admin.from('exercise_favorites').delete().eq('coach_id', id);
 });
@@ -68,6 +78,22 @@ test('a starred exercise is the first row of an empty search', async ({ page }) 
 
   dialog = await openPicker(page);
   await expect(dialog.getByRole('option').first()).toHaveAccessibleName('Plank');
+});
+
+test('a star set on the Exercises page shows first in the builder picker', async ({ page }) => {
+  await page.goto('/exercises');
+  await page.getByLabel('Search exercises').fill('Pullups');
+  const star = page.getByRole('button', { name: 'Favourite Pullups' });
+  await star.click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  // Wait for the save before leaving the page.
+  const coachId = await demoCoachId();
+  await expect
+    .poll(async () => (await admin.from('exercise_favorites').select('exercise_id').eq('coach_id', coachId ?? '')).data?.length ?? 0)
+    .toBe(1);
+
+  const dialog = await openPicker(page);
+  await expect(dialog.getByRole('option').first()).toHaveAccessibleName('Pullups');
 });
 
 test('muscle and equipment chips narrow a search', async ({ page }) => {

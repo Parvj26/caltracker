@@ -100,23 +100,3 @@ test('"bb squat" on the Exercises page finds Barbell Squat first', async ({ page
   await expect(preview.getByRole('link', { name: 'Edit' })).toHaveCount(0);
   await expect(preview.getByRole('link', { name: 'Details' })).toBeVisible();
 });
-
-test('a star set on the Exercises page shows first in the builder picker', async ({ page }) => {
-  const user = (await admin().auth.admin.listUsers({ perPage: 200 })).data.users.find((u) => u.email === 'coach@demo.local');
-  await admin().from('exercise_favorites').delete().eq('coach_id', user!.id);
-  try {
-    await page.goto('/exercises');
-    await page.getByLabel('Search exercises').fill('Pullups');
-    const star = page.getByRole('button', { name: 'Favourite Pullups' });
-    await star.click();
-    await expect(star).toHaveAttribute('aria-pressed', 'true');
-    // Wait for the save before leaving the page.
-    await expect.poll(async () => (await admin().from('exercise_favorites').select('exercise_id').eq('coach_id', user!.id)).data?.length).toBe(1);
-
-    await page.goto('/workouts/new');
-    await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
-    await expect(page.getByRole('dialog').getByRole('option').first()).toHaveAccessibleName('Pullups');
-  } finally {
-    await admin().from('exercise_favorites').delete().eq('coach_id', user!.id);
-  }
-});
