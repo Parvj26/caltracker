@@ -38,6 +38,7 @@ import {
   type WorkoutLogDoc,
 } from '@caltracker/shared';
 import { ChoicePage } from '@/components/log/choice-page';
+import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
 import { EditSetsSheet } from '@/components/log/edit-sets-sheet';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseListSheet } from '@/components/log/exercise-list-sheet';
@@ -55,6 +56,7 @@ import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { finishPrompt, finishQuestion } from '@/lib/active-log-logic';
 import { ignoreDone, ignoreTick, type LastDone } from '@/lib/done-guard';
+import { useCoachLogging } from '@/lib/coach-logging';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import {
@@ -118,6 +120,10 @@ export default function LogScreen() {
   const log = active && active.id === id ? active : null;
 
   const back = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
+  // Single active logger: while the coach logs this workout from the website, the client only sees a banner.
+  const coach = useCoachLogging(id);
+
+  if (coach.byCoach) return <CoachLoggingBanner finished={coach.status === 'completed'} onBack={back} />;
 
   if (!ready || units === null) {
     return (

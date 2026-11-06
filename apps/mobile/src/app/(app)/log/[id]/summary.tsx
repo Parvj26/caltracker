@@ -10,6 +10,8 @@ import { fetchAward } from '@/lib/awards';
 import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
+import { LoggedByCoachPill } from '@/components/log/coach-logging-banner';
+import { useCoachLogging } from '@/lib/coach-logging';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
 import { REOPEN_OFFLINE, useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
@@ -49,6 +51,7 @@ export default function SummaryScreen() {
   const [saving, setSaving] = useState(false);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const hasLocal = local !== null;
+  const coach = useCoachLogging(id, false);
 
   useEffect(() => {
     if (hasLocal) return;
@@ -150,6 +153,7 @@ export default function SummaryScreen() {
         <Text style={text('screenTitle')} accessibilityRole="header" testID="summary-name">
           {log.name}
         </Text>
+        {coach.byCoach ? <LoggedByCoachPill /> : null}
       </View>
 
       {/* Text on the lime pastel is always ink, never muted. */}
