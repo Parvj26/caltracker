@@ -231,9 +231,9 @@ begin
         where not (
           jsonb_typeof(o.v) = 'object'
           and (o.v -> 'substituteId' = 'null'::jsonb or (jsonb_typeof(o.v -> 'substituteId') = 'string'
-            and (o.v ->> 'substituteId') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+            and public.uuid_text_ok(o.v ->> 'substituteId')))
           and jsonb_typeof(o.v -> 'exerciseId') = 'string'
-          and (o.v ->> 'exerciseId') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          and public.uuid_text_ok(o.v ->> 'exerciseId')
           and jsonb_typeof(o.v -> 'exerciseName') = 'string'
           and o.v ->> 'trackingType' in (select t::text from unnest(enum_range(null::public.tracking_type)) t)
           and (o.v -> 'note' is null or o.v -> 'note' = 'null'::jsonb
@@ -285,7 +285,6 @@ begin
   select x.ex into v_bad from (
     select jsonb_path_query(v_blocks, '$[*].exercises[*].exerciseId') #>> '{}' as ex
     union select jsonb_path_query(v_blocks, '$[*].exercises[*].swappedFromExerciseId ? (@ != null)') #>> '{}'
-    union select jsonb_path_query(v_blocks, '$[*].exercises[*].substituteOptions[*].exerciseId') #>> '{}'
   ) x where not public.exercise_usable_in(x.ex::uuid, v_workspace_id) limit 1;
   if v_bad is not null then
     raise exception 'Exercise % is not available in this workspace.', v_bad using errcode = '42501';
@@ -358,7 +357,13 @@ begin
         swapped_from_exercise_id, note, substitute_id, substitute_options)
       values (v_ex_id, v_block_id, v_ex_pos, (v_ex ->> 'exerciseId')::uuid,
         (v_ex ->> 'plannedWorkoutExerciseId')::uuid, (v_ex ->> 'swappedFromExerciseId')::uuid, v_ex ->> 'note',
-        (v_ex ->> 'substituteId')::uuid, coalesce(v_ex -> 'substituteOptions', '[]'::jsonb))
+        (v_ex ->> 'substituteId')::uuid,
+        -- Only the exercise actually done must be usable. An option whose exercise is not (say the coach deleted
+        -- that custom exercise mid-workout) is left out rather than refusing the save, which the phone would treat
+        -- as final and drop the workout.
+        (select coalesce(jsonb_agg(o.value order by o.ordinality), '[]'::jsonb)
+           from jsonb_array_elements(coalesce(v_ex -> 'substituteOptions', '[]'::jsonb)) with ordinality o
+           where public.exercise_usable_in((o.value ->> 'exerciseId')::uuid, v_workspace_id)))
       on conflict (id) do update set position = excluded.position, exercise_id = excluded.exercise_id,
           planned_workout_exercise_id = excluded.planned_workout_exercise_id,
           swapped_from_exercise_id = excluded.swapped_from_exercise_id, note = excluded.note,

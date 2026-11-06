@@ -1,7 +1,7 @@
 -- Coach session logging (20261106004000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
-select plan(87);
+select plan(93);
 
 -- Fixtures (as postgres)
 select tests.create_user('cs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -20,6 +20,8 @@ select tests.add_client(:'ws_b', :'b1');
 insert into public.workspace_members (workspace_id, user_id, role) values (:'ws_a', :'staff_a', 'staff');
 
 select tests.create_exercise(null, 'CS Builtin') as ex \gset
+select tests.create_exercise(null, 'CS Builtin Alt') as ex_alt \gset
+select tests.create_exercise(:'ws_b', 'CS B Custom') as ex_b_custom \gset
 select tests.create_workout(:'ws_a', 'A1 Session', :'a1', '2026-11-06', :'ex') as w_a1 \gset
 select tests.create_workout(:'ws_a', 'A2 Session', :'a2', '2026-11-06', :'ex') as w_a2 \gset
 select tests.create_workout(:'ws_a', 'A1 Second', :'a1', '2026-11-07', :'ex') as w_a1b \gset
@@ -48,6 +50,19 @@ returns jsonb language sql as $$
           'actualReps', reps, 'actualWeightKg', 60, 'actualDurationS', null, 'actualDistanceM', null,
           'completedAt', case when done then to_jsonb(now() - interval '2 minutes') else 'null'::jsonb end)))))));
 $$;
+-- cs_doc with substitute options on its exercise (option exercises given), and optionally a done set on option 0.
+create function tests.cs_subs(doc jsonb, exercises uuid[], option_done boolean default false) returns jsonb
+language sql as $$
+  select jsonb_set(doc, '{blocks,0,exercises,0,substituteOptions}', (
+    select jsonb_agg(jsonb_build_object('substituteId', null, 'exerciseId', e, 'exerciseName', 'Option',
+      'trackingType', 'weight_reps', 'note', null,
+      'sets', jsonb_build_array(jsonb_build_object('setType', 'normal',
+        'target', jsonb_build_object('repsMin', 8, 'repsMax', 8, 'weightKg', 40, 'durationS', null, 'distanceM', null,
+          'toFailure', false, 'restSeconds', 90),
+        'completedAt', case when option_done and o = 1 then to_jsonb(now()) else 'null'::jsonb end)))
+      order by o)
+    from unnest(exercises) with ordinality u(e, o)));
+$$;
 -- The SQLSTATE and hint a statement fails with.
 create function tests.cs_error(sql text) returns text language plpgsql as $$
 declare
@@ -67,6 +82,8 @@ $$;
 \set l3 '6c000000-0000-4000-8000-000000000003'
 \set l4 '6c000000-0000-4000-8000-000000000004'
 \set lb '6c000000-0000-4000-8000-0000000000b1'
+\set l6 '6c000000-0000-4000-8000-000000000006'
+\set l7 '6c000000-0000-4000-8000-000000000007'
 
 -- ---------------------------------------------------------------------------------------------
 -- Function shape and privileges
@@ -95,8 +112,6 @@ select ok(not has_function_privilege('authenticated', 'private.save_workout_log_
   'the shared save body cannot be called directly');
 select ok((select prosrc from pg_proc where oid = 'public.save_workout_log(jsonb)'::regprocedure)
   like '%private.save_workout_log_as(p_doc, v_uid, v_uid)%', 'the phone''s save_workout_log uses the shared body');
-select ok((select prosrc from pg_proc where oid = 'private.save_workout_log_as(jsonb, uuid, uuid)'::regprocedure)
-  like '%substitute_options%', 'the shared body keeps the substitute checks');
 select ok(has_function_privilege('authenticated', 'public.hand_back_workout_log(uuid)', 'execute')
   and has_function_privilege('authenticated', 'public.reclaim_workout_log(uuid)', 'execute')
   and has_function_privilege('authenticated', 'public.workout_log_logger(uuid)', 'execute')
@@ -295,6 +310,32 @@ select tests.act_as(:'a1');
 select is((public.workout_log_logger(:'l4') ->> 'canReclaim')::boolean, true,
   'a removed staff coach''s session can be taken back at once');
 select lives_ok(format('select public.reclaim_workout_log(%L)', :'l4'), 'the client takes it back from a removed coach');
+
+-- ---------------------------------------------------------------------------------------------
+-- Substitute rules (20261106002100) hold for the phone and the coach alike: they share one save body.
+reset role;
+select tests.act_as(:'a2');
+select is(public.save_workout_log(tests.cs_subs(tests.cs_doc(:'l6', :'w_a2', 'completed', 1, true),
+  array[:'ex_alt'::uuid, :'ex_b_custom'::uuid]))->>'applied', 'true',
+  'the phone''s save with an option naming an exercise the workspace can''t use is applied');
+select is((select jsonb_path_query_array(substitute_options, '$[*].exerciseId') from public.log_exercises where log_id = :'l6'),
+  jsonb_build_array(:'ex_alt'::text), 'and that option is left out');
+select is(tests.cs_error(format('select public.save_workout_log(%L::jsonb)', tests.cs_subs(
+  tests.cs_doc(gen_random_uuid(), :'w_a2', 'completed', 1, true), array[:'ex_alt'::uuid], true))), '23514 -',
+  'the phone''s save is refused when an option not being done has a done set');
+select tests.act_as(:'coach_a');
+select is(public.coach_save_workout_log(:'a2', tests.cs_subs(tests.cs_doc(:'l7', :'w_a2', 'completed', 1, true),
+  array[:'ex_alt'::uuid, :'ex_b_custom'::uuid]))->>'applied', 'true',
+  'the coach''s save with an option naming an exercise the workspace can''t use is applied');
+select is((select jsonb_path_query_array(substitute_options, '$[*].exerciseId') from public.log_exercises where log_id = :'l7'),
+  jsonb_build_array(:'ex_alt'::text), 'and that option is left out of the coach''s log too');
+select is(tests.cs_error(format('select public.coach_save_workout_log(%L, %L::jsonb)', :'a2', tests.cs_subs(
+  tests.cs_doc(gen_random_uuid(), :'w_a2', 'completed', 1, true), array[:'ex_alt'::uuid], true))), '23514 -',
+  'the coach''s save is refused when an option not being done has a done set');
+select is(tests.cs_error(format('select public.coach_save_workout_log(%L, %L::jsonb)', :'a2', jsonb_set(tests.cs_subs(
+  tests.cs_doc(gen_random_uuid(), :'w_a2', 'completed', 1, true), array[:'ex_alt'::uuid]),
+  '{blocks,0,exercises,0,substituteId}', to_jsonb(gen_random_uuid())))), '23514 -',
+  'the coach''s save is refused when the substitute done is not one of the options');
 
 -- A removed client: the coach can neither log for them nor take their workout over.
 reset role;
