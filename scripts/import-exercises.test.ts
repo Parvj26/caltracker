@@ -82,6 +82,31 @@ describe('importExercises', () => {
     expect(objects).toBe(imageCount());
   });
 
+  it('upserts the CalTracker extras once as built-ins, without images, and not twice', async () => {
+    const extras = JSON.parse(
+      await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), 'caltracker-extra-exercises.json'), 'utf8'),
+    ) as { id: string; trackingType: string }[];
+    const first = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+    expect(first.extras).toBe(10);
+    const { data, error } = await admin
+      .from('exercises')
+      .select('external_id, source, workspace_id, tracking_type, image_paths')
+      .like('external_id', 'caltracker:%');
+    expect(error).toBeNull();
+    expect(data).toHaveLength(10);
+    expect(data!.every((r) => r.source === 'builtin' && r.workspace_id === null && r.image_paths.length === 0)).toBe(true);
+    const pull = data!.find((r) => r.external_id === 'caltracker:machine-assisted-pull-up');
+    expect(pull?.tracking_type).toBe(extras.find((e) => e.id === pull?.external_id)?.trackingType);
+  });
+
+  it('fails loudly on a bad extras file and writes nothing', async () => {
+    const bad = path.join(subsetDir, 'bad-extras.json');
+    await writeFile(bad, JSON.stringify([{ id: 'Barbell_Squat', name: 'X' }]));
+    await expect(importExercises(admin, { fixtureDir: subsetDir, extrasFile: bad, log: quiet })).rejects.toThrow(
+      /must start with/,
+    );
+  });
+
   it('applies tracking overrides', async () => {
     const { rows } = await state();
     expect(rows.find((r) => r.external_id === 'Plank')?.tracking_type).toBe('time');
