@@ -75,15 +75,18 @@ function statusChip(row: TodayRow) {
 
 /**
  * What a Today's clients row offers, most useful first (the row itself opens the first): log the session when
- * nobody has started, watch live (or take over) while the client trains, the log once done.
+ * nobody has started, continue the coach's own session, watch live (or take over) while the client trains, the log
+ * once done.
  */
-function rowActions(row: TodayRow): { label: string; href: string }[] {
+function rowActions(row: TodayRow, coachId: string): { label: string; href: string }[] {
   const client = row.client.id;
   const session = `/clients/${client}/log/${row.workout.id}`;
   switch (row.status.kind) {
     case 'not_started':
       return [{ label: 'Log session', href: session }];
     case 'training':
+      // The coach's own session: carry on logging it.
+      if (row.status.loggedBy === coachId) return [{ label: 'Continue session', href: session }];
       return [
         { label: 'Watch live', href: `/clients/${client}/logs/${row.status.logId}` },
         { label: 'Take over', href: session },
@@ -144,7 +147,7 @@ function Skeleton() {
   );
 }
 
-export function HomeView({ coachFirstName, data }: { coachFirstName: string; data: HomeData }) {
+export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: string; coachId: string; data: HomeData }) {
   const today = useBrowserToday();
   const greeting = useGreeting();
   const router = useRouter();
@@ -232,7 +235,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
               <ul className={styles.list}>
                 {rows.map((r) => {
                   const name = fullName(r.client);
-                  const actions = rowActions(r);
+                  const actions = rowActions(r, coachId);
                   return (
                     <li key={r.workout.id} className={cx(styles.row, styles.todayRow)}>
                       {/* The whole row opens the most useful action: log, watch live, or the finished log. */}

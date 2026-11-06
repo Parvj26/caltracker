@@ -14,17 +14,18 @@ import styles from './session.module.css';
 const REFRESH_MS = 10_000;
 
 /**
- * The client is logging this workout on their phone (single active logger). The coach sees their progress, read
- * again every few seconds, and can take over (the phone then shows "Your coach is logging this session" and stops
- * editing) or just watch.
+ * Someone else is logging this workout (single active logger): the client on their phone, or another coach. The
+ * coach sees the progress, read again every few seconds, and can take over (the phone then shows "Your coach is
+ * logging this session" and stops editing) or just watch.
  */
 export function ClientLogging({
-  client,
+  holder,
   log,
   units,
   done,
 }: {
-  client: { id: string; firstName: string };
+  /** Who logs it now: the client on their phone, or another coach of the workspace. */
+  holder: { kind: 'client' | 'other_coach'; name: string };
   log: WorkoutLogDoc;
   units: Units;
   done: number;
@@ -42,7 +43,6 @@ export function ClientLogging({
   }, [router]);
 
   const total = completedSetCount(log) + openSetCount(log);
-  const name = client.firstName || 'Your client';
 
   function takeOver() {
     setError(null);
@@ -65,14 +65,15 @@ export function ClientLogging({
       <h1 className={styles.title}>{log.name}</h1>
       <Card className={styles.liveCard}>
         <p className={styles.liveHeading} role="status">
-          {name} is logging this now on their phone
+          {holder.kind === 'client' ? `${holder.name} is logging this now on their phone` : `${holder.name} (coach) is logging this session`}
         </p>
         <p className={styles.caption}>
           {done} of {total} {total === 1 ? 'set' : 'sets'} done · last update <LocalDateTime iso={log.lastActivityAt} />
         </p>
         <p className={styles.caption}>
-          Only one of you can log it. Take over to log it here: their phone then shows &ldquo;Your coach is logging this
-          session&rdquo; and stops editing.
+          {holder.kind === 'client'
+            ? 'Only one of you can log it. Take over to log it here: their phone then shows “Your coach is logging this session” and stops editing.'
+            : `Only one person can log it. Take over to log it here instead of ${holder.name}.`}
         </p>
         <div className={styles.actions}>
           <Button onClick={takeOver} pending={pending} className={styles.big}>

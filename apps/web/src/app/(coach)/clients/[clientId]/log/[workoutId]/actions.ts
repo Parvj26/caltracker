@@ -76,6 +76,22 @@ export async function takeOverSession(logId: string): Promise<{ ok: true } | { o
   return { ok: true };
 }
 
+/** "Hand back to client": the coach stops logging; the client carries on on their phone. */
+export async function handBackSession(logId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireCoach();
+  if (!UUID.test(logId)) return { ok: false, error: GENERIC };
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('hand_back_workout_log', { p_log_id: logId });
+  if (error) {
+    if (error.code === '23514') return { ok: false, error: 'This workout is not in progress any more.' };
+    if (error.code === '42501') return { ok: false, error: error.hint === 'not_a_client' ? 'This person is no longer your client.' : 'You are not logging this workout any more.' };
+    return { ok: false, error: "Couldn't hand it back. Check your connection and try again." };
+  }
+  revalidatePath('/clients/[clientId]/log/[workoutId]', 'page');
+  revalidatePath('/home');
+  return { ok: true };
+}
+
 /**
  * After the finished session is saved: the client earns stickers, PRs and streaks exactly as when they finish on the
  * phone. award-workout lets a coach ask for a log of their workspace; for a log with no award yet that is the full

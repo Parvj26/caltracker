@@ -11,6 +11,11 @@ import { ClientLogging } from './client-logging';
 import { SessionLogger } from './session-logger';
 import styles from './session.module.css';
 
+async function coachName(supabase: Awaited<ReturnType<typeof createServerSupabase>>, id: string): Promise<string> {
+  const { data } = await supabase.from('profiles').select('first_name').eq('id', id).maybeSingle();
+  return data?.first_name || 'Another coach';
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string; workoutId: string }> }): Promise<Metadata> {
   const { clientId, workoutId } = await params;
   const [client, loaded] = await Promise.all([getClient(clientId), getWorkoutDoc(workoutId)]);
@@ -62,16 +67,16 @@ export default async function SessionPage({ params }: { params: Promise<{ client
   const exerciseIds = (log ? log.blocks : workout.doc.blocks).flatMap((b) => b.exercises.map((e) => e.exerciseId));
   const lastTimes = await loadLastTimes(supabase, client.id, exerciseIds);
 
-  if (state.kind === 'client_logging' && log) {
+  if ((state.kind === 'client_logging' || state.kind === 'other_coach_logging') && log) {
+    // Another coach's name, from their profile (coaches of one workspace can read each other's).
+    const holder =
+      state.kind === 'client_logging'
+        ? { kind: 'client' as const, name: client.firstName || 'Your client' }
+        : { kind: 'other_coach' as const, name: await coachName(supabase, state.loggedBy) };
     return (
       <div className={styles.page}>
         {back}
-        <ClientLogging
-          client={{ id: client.id, firstName: client.firstName }}
-          log={log}
-          units={units}
-          done={completedSetCount(log)}
-        />
+        <ClientLogging holder={holder} log={log} units={units} done={completedSetCount(log)} />
       </div>
     );
   }

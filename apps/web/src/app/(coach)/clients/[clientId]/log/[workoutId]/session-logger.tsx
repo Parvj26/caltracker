@@ -26,6 +26,7 @@ import {
   resolveSetValues,
   sectionRuns,
   setExerciseNote,
+  setLogNotes,
   startLogFromWorkout,
   stepName,
   toKg,
@@ -45,7 +46,7 @@ import { Button, Card, ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import type { LastTimes } from '@/lib/coach-session';
-import { awardSession, loadSession, saveSession } from './actions';
+import { awardSession, handBackSession, loadSession, saveSession } from './actions';
 import styles from './session.module.css';
 
 type Field = 'weight' | 'reps' | 'time' | 'distance';
@@ -351,6 +352,9 @@ export function SessionLogger({
   const [notice, setNotice] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [notes, setNotes] = useState(initialLog?.notes ?? '');
+  const [handingBack, setHandingBack] = useState(false);
+  // Sets already ticked when this page opened: after a take over, some were logged on the client's phone.
+  const [earlierSets] = useState(() => (initialLog ? completedSetCount(initialLog) : 0));
 
   const logRef = useRef<WorkoutLogDoc | null>(initialLog);
   const savedRevision = useRef(initialLog?.revision ?? 0);
@@ -449,7 +453,8 @@ export function SessionLogger({
   async function finish() {
     const current = logRef.current;
     if (!current) return;
-    const withNotes = notes.trim() === (current.notes ?? '') ? current : { ...current, notes: notes.trim() || null, revision: current.revision + 1 };
+    // A note typed but not yet left (no blur) still goes with the finish.
+    const withNotes = setLogNotes(current, notes, nowIso());
     const finished = finishLog(withNotes, nowIso());
     if (finished === withNotes) {
       setNotice('Tick at least one set to finish the session.');
@@ -470,11 +475,42 @@ export function SessionLogger({
 
   async function cancel() {
     const current = logRef.current;
-    if (!current || !window.confirm(`Cancel this session? Nothing is saved to ${client.firstName || 'the client'}'s history.`)) return;
+    const who = client.firstName || 'the client';
+    const warning =
+      earlierSets > 0
+        ? `Cancel this session? This throws away the whole workout, including the ${earlierSets} ${earlierSets === 1 ? 'set' : 'sets'} already logged before you opened it (after a take over, those are the ones ${who} logged on their phone). Nothing is saved to ${who}'s history.`
+        : `Cancel this session? Nothing is saved to ${who}'s history.`;
+    if (!current || !window.confirm(warning)) return;
     const discarded = discardLog(current, nowIso());
     logRef.current = discarded;
     setLog(discarded);
     if (await flush()) router.push(`/clients/${client.id}`);
+  }
+
+  /** Gives the workout back to the client's phone; they carry on from what is saved. */
+  async function handBack() {
+    const current = logRef.current;
+    if (!current) return;
+    setHandingBack(true);
+    const saved = await flush();
+    if (!saved) {
+      setHandingBack(false);
+      return;
+    }
+    try {
+      const outcome = await handBackSession(current.id);
+      if (!outcome.ok) {
+        setNotice(outcome.error);
+        setHandingBack(false);
+        return;
+      }
+    } catch (e) {
+      setNotice(failureMessage(e, "Couldn't hand it back. Check your connection and try again."));
+      setHandingBack(false);
+      return;
+    }
+    stopped.current = true;
+    router.push(`/clients/${client.id}`);
   }
 
   const status =
@@ -520,7 +556,7 @@ export function SessionLogger({
             {log.name} with {client.firstName || client.name}
           </h1>
           <p className={styles.caption}>
-            {done} of {total} {total === 1 ? 'set' : 'sets'} done · Logged by coach
+            {done} of {total} {total === 1 ? 'set' : 'sets'} done · Logged by you
           </p>
         </div>
         <p role="status" className={styles.saveStatus}>
@@ -588,14 +624,24 @@ export function SessionLogger({
         </div>
       </div>
 
-      <fieldset disabled={locked || finishing} className={cx(styles.fieldset, styles.footer)}>
+      <fieldset disabled={locked || finishing || handingBack} className={cx(styles.fieldset, styles.footer)}>
         <label className={styles.noteLabel}>
           <span>Session note (the client sees it)</span>
-          <textarea className={styles.note} rows={3} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <textarea
+            className={styles.note}
+            rows={3}
+            maxLength={2000}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={() => edit((l) => setLogNotes(l, notes, nowIso()))}
+          />
         </label>
         <div className={styles.actions}>
           <Button variant="finish" className={styles.big} onClick={() => void finish()} pending={finishing}>
             {finishing ? 'Finishing…' : 'Finish session'}
+          </Button>
+          <Button variant="secondary" className={styles.big} onClick={() => void handBack()} pending={handingBack}>
+            Hand back to {client.firstName || 'client'}
           </Button>
           <Button variant="secondary" className={styles.big} onClick={() => void cancel()}>
             Cancel session

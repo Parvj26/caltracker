@@ -70,7 +70,7 @@ export async function loadHomeData(
       (from, to) =>
         supabase
           .from('workouts')
-          .select('id, client_id, name, scheduled_on, workout_logs(id, status, started_at, finished_at, last_activity_at)')
+          .select('id, client_id, name, scheduled_on, workout_logs(id, status, started_at, finished_at, last_activity_at, logged_by)')
           .eq('workspace_id', workspaceId)
           .gte('scheduled_on', addDays(utcToday, -BACK_DAYS))
           .lte('scheduled_on', addDays(utcToday, AHEAD_DAYS))
@@ -141,7 +141,7 @@ export async function loadHomeData(
               clientId: w.client_id,
               name: w.name,
               scheduledOn: w.scheduled_on,
-              logs: w.workout_logs.map((l) => ({ id: l.id, status: l.status, startedAt: l.started_at, finishedAt: l.finished_at, lastActivityAt: l.last_activity_at })),
+              logs: w.workout_logs.map((l) => ({ id: l.id, status: l.status, startedAt: l.started_at, finishedAt: l.finished_at, lastActivityAt: l.last_activity_at, loggedBy: l.logged_by })),
             },
           ]
         : [],
