@@ -61,8 +61,10 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
     id: row.id,
     name: row.name,
     notes: row.notes,
+    sections: [], // sections are not stored yet; the save/read path adds them in a later task
     blocks: byPosition(row.workout_blocks).map((b) => ({
       id: b.id,
+      sectionId: null,
       kind: b.kind,
       exercises: byPosition(b.workout_exercises).map((e) => {
         const trackingType = e.exercises?.tracking_type ?? 'weight_reps';

@@ -157,8 +157,10 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
       id: randomUUID(),
       name,
       notes: null,
+      sections: [],
       blocks: blocks.map((b) => ({
         id: randomUUID(),
+        sectionId: null,
         kind: b.kind,
         exercises: b.exercises.map((e) => {
           const ex = byName.get(e.name)!;

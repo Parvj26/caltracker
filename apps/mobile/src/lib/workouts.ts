@@ -100,7 +100,7 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
  * Letter per block for labelling superset exercises (A1, A2…): supersets are lettered in order among
  * supersets only (first A, second B); straight blocks get null. The web builder numbers blocks and has no letters.
  */
-export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' }>): Array<string | null> {
+export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' | 'choice' }>): Array<string | null> {
   let n = 0;
   return blocks.map((b) => {
     if (b.kind !== 'superset') return null;

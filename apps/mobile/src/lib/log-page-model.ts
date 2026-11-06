@@ -71,7 +71,7 @@ export type ExerciseCardModel = {
 
 export type PageModel = {
   blockIndex: number;
-  kind: 'straight' | 'superset';
+  kind: 'straight' | 'superset' | 'choice';
   exercises: ExerciseCardModel[];
   current: null | {
     step: Step;

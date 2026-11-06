@@ -286,15 +286,17 @@ describe('immutability', () => {
   });
 });
 
-describe('superset keeps equal rounds', () => {
-  it('addSet in a superset adds a round to every exercise', () => {
+describe('supersets may be uneven', () => {
+  it('addSet in a superset adds a set to that exercise only', () => {
     const d = base();
     const sb = d.blocks[1]!;
     const out = valid(addSet(d, sb.id, sb.exercises[0]!.id, makeId));
-    for (const e of out.blocks[1]!.exercises) expect(nonDrop(e.sets)).toHaveLength(4);
+    const [a, b] = out.blocks[1]!.exercises;
+    expect(nonDrop(a!.sets)).toHaveLength(4);
+    expect(nonDrop(b!.sets)).toHaveLength(3);
   });
 
-  it('removeSet of a non-drop set removes that round everywhere, with its drops', () => {
+  it('removeSet in a superset removes that set (and its drops) from that exercise only', () => {
     let d = base();
     const sb = d.blocks[1]!;
     const [a, b] = sb.exercises;
@@ -302,10 +304,10 @@ describe('superset keeps equal rounds', () => {
     const out = valid(removeSet(d, sb.id, a!.id, a!.sets[1]!.id));
     const [oa, ob] = out.blocks[1]!.exercises;
     expect(oa!.sets.map((s) => s.id)).toEqual([a!.sets[0]!.id, a!.sets[2]!.id]);
-    expect(ob!.sets.map((s) => s.id)).toEqual([b!.sets[0]!.id, b!.sets[2]!.id]);
+    expect(ob!.sets.map((s) => s.id)).toEqual(b!.sets.map((s) => s.id));
   });
 
-  it('removeSet is a no-op with one round left; removing a drop stays local', () => {
+  it('removeSet keeps the last set of an exercise; removing a drop stays local', () => {
     let d = base();
     const sb = d.blocks[1]!;
     const a = sb.exercises[0]!;
@@ -314,8 +316,20 @@ describe('superset keeps equal rounds', () => {
     const local = valid(removeSet(d, sb.id, a.id, drop.id));
     expect(local.blocks[1]!.exercises[0]!.sets).toHaveLength(3);
     expect(local.blocks[1]!.exercises[1]!.sets).toHaveLength(3);
-    d = valid(removeRound(removeRound(local, sb.id), sb.id));
-    expect(removeSet(d, sb.id, a.id, d.blocks[1]!.exercises[0]!.sets[0]!.id)).toEqual(d);
+    let one = local;
+    for (let i = 0; i < 2; i++) one = removeSet(one, sb.id, a.id, one.blocks[1]!.exercises[0]!.sets[0]!.id);
+    expect(valid(one).blocks[1]!.exercises[0]!.sets).toHaveLength(1);
+    expect(removeSet(one, sb.id, a.id, one.blocks[1]!.exercises[0]!.sets[0]!.id)).toEqual(one);
+  });
+
+  it('removeRound still removes the last round from every exercise, even when uneven', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    d = addSet(d, sb.id, sb.exercises[0]!.id, makeId);
+    const out = valid(removeRound(d, sb.id));
+    const [a, b] = out.blocks[1]!.exercises;
+    expect(nonDrop(a!.sets)).toHaveLength(3);
+    expect(nonDrop(b!.sets)).toHaveLength(2);
   });
 });
 
@@ -339,14 +353,14 @@ describe('updateSet validity', () => {
     expect(updateSet(d, b.id, ex.id, ex.sets[0]!.id, { setType: 'drop' })).toEqual(d);
   });
 
-  it('in a superset refuses changes to the round count but allows warmup/normal', () => {
+  it('in a superset allows turning a set into a drop, because rounds may differ', () => {
     const d = base();
     const sb = d.blocks[1]!;
     const ex = sb.exercises[0]!;
-    expect(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'drop' })).toEqual(d);
-    const out = valid(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'warmup' }));
-    expect(out.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('warmup');
-    expect(valid(updateSet(out, sb.id, ex.id, ex.sets[1]!.id, { setType: 'normal' })).blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('normal');
+    const out = valid(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'drop' }));
+    expect(out.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('drop');
+    const back = valid(updateSet(out, sb.id, ex.id, ex.sets[1]!.id, { setType: 'warmup' }));
+    expect(back.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('warmup');
   });
 });
 
