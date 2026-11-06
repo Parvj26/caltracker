@@ -1059,6 +1059,16 @@ export type Database = {
           coach_name: string
         }[]
       }
+      get_my_coach_profile: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          bio: string
+          business_name: string
+          coach_name: string
+          updated_at: string
+        }[]
+      }
       invite_for_join: {
         Args: { token: string }
         Returns: {
