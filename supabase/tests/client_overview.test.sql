@@ -1,5 +1,5 @@
 begin;
-select plan(81);
+select plan(85);
 
 -- Fixtures (as postgres): workspace A with clients a1 and a2, workspace B with client b1.
 select tests.create_user('co-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -242,6 +242,16 @@ delete from public.workspace_members where workspace_id = :'ws_a' and user_id = 
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.client_documents) + (select count(*)::int from storage.objects where bucket_id = 'client-documents'),
   0, 'a removed client no longer sees shared documents or files');
+reset role;
+-- The coach may still unshare a removed client's document, but not rename it or share it again.
+select tests.act_as(:'coach_a');
+select throws_ok(format($$update public.client_documents set name = 'Renamed' where id = %L$$, :'doc_a1'),
+  '42501', null, 'the coach cannot rename a removed client''s document');
+select lives_ok(format($$update public.client_documents set shared_with_client = false where id = %L$$, :'doc_a1'),
+  'the coach can unshare a removed client''s document');
+select is((select shared_with_client from public.client_documents where id = :'doc_a1'), false, 'it is no longer shared');
+select throws_ok(format($$update public.client_documents set shared_with_client = true where id = %L$$, :'doc_a1'),
+  '42501', null, 'the coach cannot share a removed client''s document again');
 reset role;
 
 -- Coach deletes

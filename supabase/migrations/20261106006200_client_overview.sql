@@ -133,9 +133,26 @@ create policy client_documents_select on public.client_documents for select to a
     or (shared_with_client and client_id = (select auth.uid()) and public.is_client_in(workspace_id, client_id)));
 create policy client_documents_insert on public.client_documents for insert to authenticated
   with check (public.is_coach_of(workspace_id) and public.is_client_in(workspace_id, client_id));
+-- For a removed client the coach may still unshare (so a later re-invite doesn't share it again), but not share or
+-- rename: the check allows only an unshared row, and the trigger below refuses a new name.
 create policy client_documents_update on public.client_documents for update to authenticated
   using (public.is_coach_of(workspace_id))
-  with check (public.is_coach_of(workspace_id) and public.is_client_in(workspace_id, client_id));
+  with check (public.is_coach_of(workspace_id)
+    and (public.is_client_in(workspace_id, client_id) or not shared_with_client));
+
+create function public.client_documents_guard_rename() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.name is distinct from old.name and (select auth.uid()) is not null
+    and not public.is_client_in(new.workspace_id, new.client_id) then
+    raise exception 'This client was removed, so their documents can''t be renamed.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.client_documents_guard_rename() from public, anon, authenticated;
+create trigger client_documents_guard_rename before update on public.client_documents
+  for each row execute function public.client_documents_guard_rename();
 create policy client_documents_delete on public.client_documents for delete to authenticated
   using (public.is_coach_of(workspace_id));
 
