@@ -13,6 +13,8 @@ env:
     env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
@@ -20,29 +22,28 @@ env:
     visible: 'E2E Log'
     timeout: 20000
 - tapOn: 'Start'
-- tapOn:
-    text: Allow
-    optional: true
 - extendedWaitUntil:
     visible:
-      id: tick-0-0
+      id: done-0
     timeout: 20000
+# Done on each of the three sets (sets 1 and 2 start a rest, which is skipped; the last set starts none).
 - tapOn:
-    id: tick-0-0
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: tick-0-1
+    id: done-0
 - tapOn:
     id: rest-skip
 - tapOn:
-    id: tick-0-2
+    id: done-0
 - tapOn:
     id: rest-skip
 - tapOn:
-    id: log-menu
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: all-done-0
+    timeout: 10000
+# Finish from the exercise's "All sets done" card.
 - tapOn:
-    id: finish-button
+    id: finish-all-0
 # The reveal: 1,440 kg is 3,175 lb in this client's units, and about 1.x giraffes.
 - extendedWaitUntil:
     visible:
@@ -57,8 +58,8 @@ env:
 - extendedWaitUntil:
     visible: 'NEW for your zoo book'
     timeout: 10000
-- tapOn:
-    id: reveal-continue
+# Then the week-1 landmark and "Workout #1" (a first workout of a fresh streak); step through them all.
+- runFlow: helpers/reveal-through.yaml
 # Summary: the sticker row with the count.
 - extendedWaitUntil:
     visible: '3 sets completed'
