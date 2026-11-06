@@ -9,6 +9,7 @@ import { ButtonLink, Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { getClient, getLog } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { AwardKickoff } from './award-kickoff';
 import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
 import { ClientNote } from './planned-vs-actual';
@@ -20,9 +21,16 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 }
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
-export default async function LogPage({ params }: { params: Promise<{ clientId: string; logId: string }> }) {
+export default async function LogPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientId: string; logId: string }>;
+  searchParams: Promise<{ award?: string | string[] }>;
+}) {
   const { userId, units } = await requireCoach();
   const { clientId, logId } = await params;
+  const awardNow = (await searchParams).award === '1';
   const supabase = await createServerSupabase();
   const [client, loaded] = await Promise.all([getClient(clientId), getLog(logId)]);
   // RLS limits the log to this coach's workspace; it must also belong to the client in the URL.
@@ -57,6 +65,8 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
 
   return (
     <div className={styles.page}>
+      {/* Just finished here as a session: award it (only a finished log, and only once). */}
+      {awardNow && log.status === 'completed' ? <AwardKickoff logId={log.id} /> : null}
       <Link href={`/clients/${client.id}`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>

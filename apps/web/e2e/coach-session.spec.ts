@@ -82,7 +82,8 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
   await expect(page.getByRole('button', { name: 'Done: Barbell Squat Set 2 of 2' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('button', { name: 'Finish session' }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/[0-9a-f-]{36}$`), { timeout: 15_000 });
+  // The finished log opens at once; the award is asked for from there, so a slow award never holds Finish up.
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/[0-9a-f-]{36}(\\?award=1)?$`));
   await expect(page.getByText('Logged by coach', { exact: true })).toBeVisible();
 
   const log = await admin.from('workout_logs').select('id, client_id, logged_by, status').eq('workout_id', workoutId).single();

@@ -46,7 +46,7 @@ import { Button, Card, ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import type { LastTimes } from '@/lib/coach-session';
-import { awardSession, handBackSession, loadSession, saveSession } from './actions';
+import { handBackSession, loadSession, saveSession } from './actions';
 import styles from './session.module.css';
 
 type Field = 'weight' | 'reps' | 'time' | 'distance';
@@ -54,8 +54,6 @@ type SaveState = { kind: 'idle' | 'saving' | 'saved' } | { kind: 'error' | 'fina
 
 const SAVE_DELAY_MS = 400;
 const RETRY_MS = 3000;
-/** The longest Finish waits for the award before opening the finished log. */
-const AWARD_WAIT_MS = 4000;
 const nowIso = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
@@ -355,6 +353,8 @@ export function SessionLogger({
   const [finishing, setFinishing] = useState(false);
   const [notes, setNotes] = useState(initialLog?.notes ?? '');
   const [handingBack, setHandingBack] = useState(false);
+  // Set before the last save of a hand back, so nothing typed meanwhile is lost or sent after the hand back.
+  const handingBackRef = useRef(false);
   // Sets already ticked when this page opened: after a take over, some were logged on the client's phone.
   const [earlierSets] = useState(() => (initialLog ? completedSetCount(initialLog) : 0));
 
@@ -432,7 +432,7 @@ export function SessionLogger({
   const edit = useCallback(
     (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => {
       const current = logRef.current;
-      if (!current || current.status !== 'in_progress' || stopped.current) return;
+      if (!current || current.status !== 'in_progress' || stopped.current || handingBackRef.current) return;
       const next = fn(current);
       if (next === current) return;
       logRef.current = next;
@@ -470,10 +470,9 @@ export function SessionLogger({
       setFinishing(false);
       return;
     }
-    // Stickers, PRs and streaks for the client, as when they finish on the phone. Waited for briefly, so the log
-    // page usually shows its PR chip; a slow award never holds the coach up (the catch-up job finishes it).
-    await Promise.race([awardSession(finished.id).catch(() => undefined), new Promise((r) => setTimeout(r, AWARD_WAIT_MS))]);
-    router.push(`/clients/${client.id}/logs/${finished.id}`);
+    // Open the finished log at once; it asks for the client's stickers, PRs and streaks itself (?award=1), so a slow
+    // award never holds the coach up.
+    router.push(`/clients/${client.id}/logs/${finished.id}?award=1`);
   }
 
   async function cancel() {
@@ -494,22 +493,28 @@ export function SessionLogger({
   async function handBack() {
     const current = logRef.current;
     if (!current) return;
+    // Stop edits first, then send what is typed so far: the client carries on from exactly that.
+    handingBackRef.current = true;
     setHandingBack(true);
+    const undo = () => {
+      handingBackRef.current = false;
+      setHandingBack(false);
+    };
     const saved = await flush();
     if (!saved) {
-      setHandingBack(false);
+      undo();
       return;
     }
     try {
       const outcome = await handBackSession(current.id);
       if (!outcome.ok) {
         setNotice(outcome.error);
-        setHandingBack(false);
+        undo();
         return;
       }
     } catch (e) {
       setNotice(failureMessage(e, "Couldn't hand it back. Check your connection and try again."));
-      setHandingBack(false);
+      undo();
       return;
     }
     stopped.current = true;
@@ -549,7 +554,7 @@ export function SessionLogger({
   const block = log.blocks[page] ?? log.blocks[0];
   const done = completedSetCount(log);
   const total = done + openSetCount(log);
-  const locked = log.status !== 'in_progress' || save.kind === 'final';
+  const locked = log.status !== 'in_progress' || save.kind === 'final' || handingBack;
 
   return (
     <div className={styles.session}>
