@@ -1,5 +1,7 @@
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
+import type { Units } from '../units/units';
+import { displayValue } from './metrics';
 
 export const CHART_RANGES = ['3m', '1y', 'all'] as const;
 export type ChartRange = (typeof CHART_RANGES)[number];
@@ -13,16 +15,21 @@ export interface SeriesPoint {
 
 /** Points for one metric, oldest first, within the range. Fewer than 2 points gives [] (no chart). */
 export function measurementSeries(
-  rows: ReadonlyArray<{ measured_on: IsoDate; value: number }>,
+  rows: ReadonlyArray<{ measured_on: IsoDate; value: number; createdAt?: string }>,
   range: ChartRange,
   today: IsoDate,
 ): SeriesPoint[] {
   const days = RANGE_DAYS[range];
   const from = days === null ? null : addDays(today, -days);
-  const points = rows
-    .filter((r) => from === null || r.measured_on >= from)
-    .map((r) => ({ date: r.measured_on, value: r.value }))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // One value per date: the latest createdAt wins; ties (or missing createdAt) fall back to input order, last wins.
+  const byDate = new Map<IsoDate, { value: number; createdAt: string }>();
+  for (const row of rows) {
+    if (from !== null && row.measured_on < from) continue;
+    const createdAt = row.createdAt ?? '';
+    const have = byDate.get(row.measured_on);
+    if (!have || createdAt >= have.createdAt) byDate.set(row.measured_on, { value: row.value, createdAt });
+  }
+  const points = [...byDate].map(([date, v]) => ({ date, value: v.value })).sort((a, b) => (a.date < b.date ? -1 : 1));
   return points.length >= 2 ? points : [];
 }
 
@@ -35,12 +42,17 @@ export function formatShortDate(d: IsoDate, today: IsoDate): string {
   return d.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${y}`;
 }
 
-/** Change from the previous point to the latest, e.g. "−1.4 since 6 Oct". Null with fewer than 2 points. */
-export function changeSince(series: ReadonlyArray<SeriesPoint>, today: IsoDate): string | null {
+/** Change from the previous point to the latest, e.g. "−1.4 since 6 Oct". Series values are stored values (kg); they are converted the way formatMetric shows them. Null with fewer than 2 points. */
+export function changeSince(
+  series: ReadonlyArray<SeriesPoint>,
+  metricKey: string,
+  units: Units,
+  today: IsoDate,
+): string | null {
   if (series.length < 2) return null;
   const prev = series[series.length - 2]!;
   const last = series[series.length - 1]!;
-  const diff = Math.round((last.value - prev.value) * 10) / 10;
+  const diff = Math.round((displayValue(metricKey, last.value, units) - displayValue(metricKey, prev.value, units)) * 100) / 100;
   const when = formatShortDate(prev.date, today);
   if (diff === 0) return `No change since ${when}`;
   return `${diff < 0 ? '−' : '+'}${Math.abs(diff)} since ${when}`;
