@@ -272,3 +272,43 @@ export function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
     );
   });
 }
+
+/* ---------- Single active logger (coach-logging.ts) ---------- */
+
+/** What workout_log_logger says about one of the client's logs. */
+export type LoggerState = { status: LogStatus; heldByOther: boolean; canReclaim: boolean; lastActivityAt: string };
+
+const LOG_STATUS_VALUES: readonly LogStatus[] = ['in_progress', 'completed', 'discarded'];
+
+/** The function's JSON, or null when it is missing or not readable (not the client's log, signed out). */
+export function parseLoggerState(data: unknown): LoggerState | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const r = data as Record<string, unknown>;
+  if (!LOG_STATUS_VALUES.includes(r.status as LogStatus) || typeof r.heldByOther !== 'boolean') return null;
+  return {
+    status: r.status as LogStatus,
+    heldByOther: r.heldByOther,
+    canReclaim: r.canReclaim === true,
+    lastActivityAt: typeof r.lastActivityAt === 'string' ? r.lastActivityAt : '',
+  };
+}
+
+/**
+ * Whether the phone must take the server's copy of its active log now: the coach took it over (and the phone
+ * doesn't know yet), handed it back or the client reclaimed it (the phone still thinks it is held), or it was
+ * finished or discarded elsewhere while the phone still has it in progress. Pure.
+ */
+export function needsServerCopy(
+  server: LoggerState | null,
+  local: { status: LogStatus; heldByOther: boolean } | null,
+): boolean {
+  if (!server || !local || local.status !== 'in_progress') return false;
+  if (server.status !== 'in_progress') return true;
+  return server.heldByOther !== local.heldByOther;
+}
+
+/** Whole minutes since the coach's last activity, for "Your coach stopped logging 25 min ago". Never below 0. */
+export function idleMinutes(lastActivityAt: string, nowMs: number): number {
+  const t = Date.parse(lastActivityAt);
+  return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 60_000));
+}

@@ -40,7 +40,7 @@ async function myId(): Promise<string> {
 }
 
 function parseSaveResult(data: unknown): SaveLogResult {
-  const r = (data ?? {}) as { applied?: unknown; revision?: unknown; status?: unknown };
+  const r = (data ?? {}) as { applied?: unknown; revision?: unknown; status?: unknown; loggedByOther?: unknown };
   if (
     typeof r.applied !== 'boolean' ||
     typeof r.revision !== 'number' ||
@@ -48,7 +48,10 @@ function parseSaveResult(data: unknown): SaveLogResult {
   ) {
     throw new Error('save_workout_log: unexpected response');
   }
-  return { applied: r.applied, revision: r.revision, status: r.status as LogStatus };
+  const result: SaveLogResult = { applied: r.applied, revision: r.revision, status: r.status as LogStatus };
+  // The coach logs this workout now (single active logger): adopt, never push.
+  if (r.loggedByOther === true) result.loggedByOther = true;
+  return result;
 }
 
 /** Uploads the whole log. Refusals (stale or locked) come back as applied=false, not as an error. */

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc, completeSet, pickChoice } from '@caltracker/shared';
 import {
+  idleMinutes,
+  needsServerCopy,
+  parseLoggerState,
   finishPrompt,
   formatCommentTime,
   finishQuestion,
@@ -399,5 +402,34 @@ describe('final review fixes', () => {
     const waiting = sampleLog({ id: 'log-p', name: 'Upper A', status: 'completed', autoFinished: true, finishedAt: lastTick });
     expect(reopenFrom(null, 'log-p', [{ log: waiting }])).toEqual({ kind: 'blocked', name: 'Upper A' });
     expect(reopenFrom(null, 'log-x', [{ log: waiting }])).toEqual({ kind: 'fetch' });
+  });
+});
+
+describe('single active logger', () => {
+  const held = { status: 'in_progress' as const, heldByOther: true, canReclaim: false, lastActivityAt: '2026-11-06T10:00:00.000Z' };
+
+  it('parses what workout_log_logger answers, and nothing else', () => {
+    expect(parseLoggerState(held)).toEqual(held);
+    expect(parseLoggerState({ status: 'completed', heldByOther: false })).toEqual({ status: 'completed', heldByOther: false, canReclaim: false, lastActivityAt: '' });
+    expect(parseLoggerState(null)).toBeNull();
+    expect(parseLoggerState({ status: 'nope', heldByOther: true })).toBeNull();
+  });
+
+  it('takes the server copy when the coach took over, handed back, or the workout ended elsewhere', () => {
+    const mine = { status: 'in_progress' as const, heldByOther: false };
+    expect(needsServerCopy(held, mine)).toBe(true); // coach took over
+    expect(needsServerCopy({ ...held, heldByOther: false }, { ...mine, heldByOther: true })).toBe(true); // handed back
+    expect(needsServerCopy({ ...held, status: 'completed' }, { ...mine, heldByOther: true })).toBe(true); // coach finished
+    expect(needsServerCopy(held, { ...mine, heldByOther: true })).toBe(false); // already showing the banner
+    expect(needsServerCopy({ ...held, heldByOther: false }, mine)).toBe(false); // the client logs it
+    expect(needsServerCopy(held, { status: 'completed', heldByOther: false })).toBe(false); // nothing open here
+    expect(needsServerCopy(null, mine)).toBe(false); // offline: keep logging
+  });
+
+  it('counts whole idle minutes, never negative', () => {
+    const t = Date.parse('2026-11-06T10:00:00.000Z');
+    expect(idleMinutes('2026-11-06T10:00:00.000Z', t + 25 * 60_000 + 59_000)).toBe(25);
+    expect(idleMinutes('2026-11-06T10:00:00.000Z', t - 60_000)).toBe(0);
+    expect(idleMinutes('bad', t)).toBe(0);
   });
 });

@@ -12,6 +12,10 @@
 //   * Start never waits on the network for a finished workout: one still uploading moves to the store's
 //     pending list (store.park()) and the sync sends it first
 //   * a new signed-in user gets a new store and sync; the old sync is stopped and its notifications cancelled
+//   * single active logger: when the server says the coach logs the active workout (a save answered
+//     loggedByOther), the sync has adopted the coach's copy; heldByOther is then true, every edit here is refused
+//     and the reminder is cancelled until refreshFromServer finds the phone holds it again (hand back, reclaim) or
+//     the coach finished it
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
@@ -129,6 +133,13 @@ export type ActiveLog = {
   skipRest: () => void;
   /** The countdown reached zero (its notification has fired). */
   endRest: () => void;
+  /** The server says the coach logs the active workout: it is read only here (see coach-logging.ts). */
+  heldByOther: boolean;
+  /**
+   * Sends the active log once and takes the server's copy where it wins: after the coach took it over, handed it
+   * back or finished it, or after the client reclaimed it.
+   */
+  refreshFromServer: () => Promise<void>;
 };
 
 type Instance = { store: LogStore; sync: LogSync; reload: () => Promise<void> };
@@ -151,6 +162,9 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   const restRef = useRef<Rest | null>(null);
   // What the screens were last shown, so a change made by the sync can be told apart (logChange).
   const shown = useRef<WorkoutLogDoc | null>(null);
+  // The id of the active log the coach holds, per the server's last answer (single active logger).
+  const heldRef = useRef<string | null>(null);
+  const [heldId, setHeldId] = useState<string | null>(null);
   const [log, setLogState] = useState<WorkoutLogDoc | null>(null);
   const [pending, setPending] = useState<WorkoutLogDoc[]>([]);
   const [ready, setReady] = useState(false);
@@ -218,6 +232,8 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     setFinished(null);
     setFinishedLog(null);
     setRest(null);
+    heldRef.current = null;
+    setHeldId(null);
     if (!userId) return;
 
     const store = createLogStore(AsyncStorage, userId);
@@ -277,6 +293,13 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
         changedTo(doc);
         setLog(doc);
       },
+      onHeldByOther: (doc) => {
+        if (!mine()) return;
+        heldRef.current = doc.id;
+        setHeldId(doc.id);
+        // The coach logs it now: no "Still training?" reminder or rest alarm for the client.
+        clearNotifications();
+      },
     });
     const me: Instance = { store, sync, reload };
     current.current = me;
@@ -322,6 +345,14 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
 
       const run = async (): Promise<WorkoutLogDoc> => {
         let stored = await checkStale(me.store);
+        // The coach held this workout last time we asked: ask again first, so a workout the coach has finished
+        // (or handed back) is not resumed from the phone's old copy.
+        if (stored?.log.status === 'in_progress' && stored.log.id === heldRef.current) {
+          heldRef.current = null;
+          await within(me.sync.recheck(), REMOTE_CHECK_MS);
+          if (current.current === me) setHeldId(heldRef.current);
+          stored = await me.store.load();
+        }
         // A finished workout still waiting to upload: try once, then move it aside (the sync keeps sending it)
         // so the new one can start with no signal. A discard the server never saw is simply dropped.
         const freeSlot = async () => {
@@ -383,7 +414,8 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => {
       const me = current.current;
       if (!me) return;
-      const s = await applyLiveEdit(me.store, fn);
+      // Refused while the coach logs this workout (single active logger).
+      const s = await applyLiveEdit(me.store, (l) => (l.id === heldRef.current ? l : fn(l)));
       if (current.current !== me || !s) return;
       setLog(s.log);
       me.sync.push();
@@ -426,7 +458,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc, status: 'completed' | 'discarded') => {
       const me = current.current;
       if (!me) return false;
-      const s = await applyEdit(me.store, fn);
+      const s = await applyEdit(me.store, (l) => (l.id === heldRef.current ? l : fn(l)));
       if (current.current !== me || !s || s.log.status !== status) return false;
       setLog(s.log);
       ended(s.log);
@@ -503,6 +535,21 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   const start = useCallback((w: WorkoutDoc) => begin(w), [begin]);
   const startEmpty = useCallback((name: string) => begin(name), [begin]);
   const dismissBanner = useCallback(() => setBanner(null), []);
+  const refreshFromServer = useCallback(async () => {
+    const me = current.current;
+    if (!me) return;
+    // Cleared first; the sync's onHeldByOther sets it again when the coach still holds it.
+    heldRef.current = null;
+    try {
+      await me.sync.recheck();
+    } finally {
+      if (current.current === me) {
+        setHeldId(heldRef.current);
+        await me.reload();
+      }
+    }
+  }, []);
+  const heldByOther = log !== null && heldId === log.id;
   const forgetFinished = useCallback(() => setFinished(null), []);
 
   const value = useMemo<ActiveLog>(
@@ -530,6 +577,8 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       adjustRest,
       skipRest,
       endRest,
+      heldByOther,
+      refreshFromServer,
     }),
     [
       log,
@@ -555,6 +604,8 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       adjustRest,
       skipRest,
       endRest,
+      heldByOther,
+      refreshFromServer,
     ],
   );
   return <ActiveLogContext.Provider value={value}>{children}</ActiveLogContext.Provider>;

@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen } from '@/components/ui';
+import { idleMinutes } from '@/lib/active-log-logic';
+import type { CoachLogging } from '@/lib/coach-logging';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -16,10 +18,13 @@ export function LoggedByCoachPill() {
 
 /**
  * Shown instead of the logging screen while the coach logs this workout from the website (single active logger):
- * the client can't edit it, and sees it in their history when the coach finishes.
+ * the client can't edit it, and sees it in their history when the coach finishes. When the coach has stopped
+ * (20 minutes without activity, or they left the business) the client can carry on on the phone.
  */
-export function CoachLoggingBanner({ finished, onBack }: { finished: boolean; onBack: () => void }) {
+export function CoachLoggingBanner({ coach, onBack }: { coach: CoachLogging; onBack: () => void }) {
   const { text, space } = useTheme();
+  const finished = coach.status === 'completed';
+  const idle = coach.lastActivityAt ? idleMinutes(coach.lastActivityAt, Date.now()) : 0;
   return (
     <Screen>
       <Card>
@@ -31,9 +36,14 @@ export function CoachLoggingBanner({ finished, onBack }: { finished: boolean; on
           <Text style={text('body')}>
             {finished
               ? 'It is in your history, and any stickers it earned are in your album.'
-              : 'They are filling it in for you, so it can’t be changed here. It shows in your history when they finish.'}
+              : coach.canReclaim
+                ? `Your coach stopped logging ${idle} min ago. You can carry on here.`
+                : 'They are filling it in for you, so it can’t be changed here. It shows in your history when they finish.'}
           </Text>
         </View>
+        {!finished && coach.canReclaim ? (
+          <Button title="Continue on my phone" testID="coach-logging-reclaim" busy={coach.reclaiming} onPress={() => void coach.reclaim()} />
+        ) : null}
         <Button variant="secondary" title="Back to Today" testID="coach-logging-back" onPress={onBack} />
       </Card>
     </Screen>

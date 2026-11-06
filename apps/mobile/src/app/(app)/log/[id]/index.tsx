@@ -123,7 +123,7 @@ export default function LogScreen() {
   // Single active logger: while the coach logs this workout from the website, the client only sees a banner.
   const coach = useCoachLogging(id);
 
-  if (coach.byCoach) return <CoachLoggingBanner finished={coach.status === 'completed'} onBack={back} />;
+  if (coach.byCoach) return <CoachLoggingBanner coach={coach} onBack={back} />;
 
   if (!ready || units === null) {
     return (
