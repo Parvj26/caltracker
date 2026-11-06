@@ -169,6 +169,85 @@ export type Database = {
           },
         ]
       }
+      client_documents: {
+        Row: {
+          client_id: string
+          content_type: string
+          created_at: string
+          id: string
+          name: string
+          shared_with_client: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          name: string
+          shared_with_client?: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          name?: string
+          shared_with_client?: boolean
+          size_bytes?: number
+          storage_path?: string
+          uploaded_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_goals: {
+        Row: {
+          client_id: string
+          goal: string
+          target_date: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          goal: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          goal?: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_goals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -218,6 +297,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_limitations: {
+        Row: {
+          body: string
+          client_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          client_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_limitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1499,6 +1645,8 @@ export type Database = {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
       }
+      document_path_client: { Args: { name: string }; Returns: string }
+      document_path_workspace: { Args: { name: string }; Returns: string }
       duplicate_program: {
         Args: { p_name: string; p_new_id: string; p_program_id: string }
         Returns: string

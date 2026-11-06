@@ -94,8 +94,9 @@ two columns, and below 700 px in one.
 ## Data
 
 All four tables have `workspace_id`, RLS enabled and nothing granted to `anon`. Coaches write directly under RLS, with
-column-level grants so `workspace_id` and `client_id` can't change after insert. A coach writes only for a current
-client (`is_client_in`). A removed client's records stay readable for the coach, read-only.
+column-level grants so `workspace_id` and `client_id` can't change after insert. A coach adds and edits only for a current
+client (`is_client_in`). A removed client's records stay readable for the coach, who can still delete them but
+not add to or edit them.
 
 | Table | Rows | Coach of the workspace | The client | Others |
 |---|---|---|---|---|
