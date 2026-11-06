@@ -321,3 +321,22 @@ export type { BuiltInMetricKey, CustomMetricDef, MetricDef } from './body/metric
 export { CHART_RANGES, CHART_RANGE_LABELS, changeSince, formatShortDate, measurementSeries } from './body/series';
 export type { ChartRange, SeriesPoint } from './body/series';
 export { SCAN_DUE_DAYS, isScanDue } from './body/due';
+export { ageLabel, latestUpdates, trainingSummary } from './coach-home/client-overview';
+export type { ClientUpdate, ClientUpdateKind, TrackedCount, TrainingSummary } from './coach-home/client-overview';
+export {
+  DOCUMENT_MAX_BYTES,
+  DOCUMENT_NAME_MAX_LENGTH,
+  GOAL_MAX_LENGTH,
+  NOTE_MAX_LENGTH,
+  countdownLabel,
+  daysUntil,
+  documentKind,
+  formatFileSize,
+  validateDocumentName,
+  validateGoal,
+  validateLimitations,
+  validateNote,
+} from './clients/records';
+export type { TextCheck } from './clients/records';
+export { OVERVIEW_METRICS, OVERVIEW_PERIODS, OVERVIEW_PERIOD_LABELS, bodyOverview, formatMetricChange } from './body/overview';
+export type { MetricOverview, OverviewMetric, OverviewPeriod, OverviewScan } from './body/overview';
