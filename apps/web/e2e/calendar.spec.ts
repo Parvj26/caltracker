@@ -210,6 +210,9 @@ test("editing the library workout leaves the client's copy alone, and the other 
   await signInAsCoach(page);
   await createWorkout(page, workout);
   await createProgram(page, program, 1, [{ week: 1, day: 1, workoutName: workout }]);
+  // New programs have Live Sync on (live-sync.spec covers that); with it off, copies are independent of the library.
+  await page.getByRole('switch', { name: 'Live Sync' }).click();
+  await expect(page.getByRole('switch', { name: 'Live Sync' })).toHaveAttribute('aria-checked', 'false');
   const monday = await assignFromNextMonday(page, program, me);
 
   const { data: library } = await admin.from('workouts').select('id').eq('name', workout).is('client_id', null).single();

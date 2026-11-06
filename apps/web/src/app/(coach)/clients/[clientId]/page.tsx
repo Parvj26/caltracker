@@ -48,7 +48,9 @@ export default async function ClientPage({
   const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
     supabase
       .from('workouts')
-      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
+      .select(
+        'id, name, scheduled_on, assignment_id, customised_at, program_assignments(program_name, programs(live_sync)), workout_logs(id, finished_at)',
+      )
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
       .gte('scheduled_on', rangeStart)
@@ -136,6 +138,14 @@ export default async function ClientPage({
             date: w.scheduled_on,
             programName: w.program_assignments?.program_name ?? null,
             logId: w.workout_logs[0]?.id ?? null,
+            ...(w.program_assignments
+              ? {
+                  liveSync: {
+                    programLive: w.program_assignments.programs?.live_sync ?? false,
+                    customised: w.customised_at !== null,
+                  },
+                }
+              : {}),
           },
         ]
       : [],

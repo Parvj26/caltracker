@@ -5,6 +5,7 @@ import { PROGRAM_WEEKS_MAX, ProgramInput, copyName } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { loadLiveSync, type LiveSyncState } from '@/lib/live-sync';
 
 // Every action takes the workspace from the signed-in coach (requireCoach), never from the browser, and filters by
 // it on top of RLS. Slot actions throw on failure: the grid has already shown the change and rolls it back.
@@ -296,4 +297,35 @@ export async function copyProgramWeek(input: {
     ok: true,
     slots: data.map((r) => ({ id: r.id, week: r.week, day: r.day, position: r.position, workoutId: r.workout_id })),
   };
+}
+
+export type LiveSyncOutcome = ({ ok: true } & LiveSyncState) | { ok: false; error: string };
+
+/**
+ * Turns the program's Live Sync on or off. Turning it on runs the catch-up sync in the same transaction (a database
+ * trigger at commit, see the 20261106004000_live_sync migration), so the status read afterwards already includes it.
+ */
+export async function setProgramLiveSync(id: string, on: boolean): Promise<LiveSyncOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(id) || typeof on !== 'boolean') return { ok: false, error: "Couldn't find that program." };
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase
+    .from('programs')
+    .update({ live_sync: on })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('id');
+  if (error) return { ok: false, error: "Couldn't change Live Sync. Please try again." };
+  if (data.length === 0) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  const state = await loadLiveSync(supabase, workspaceId, id);
+  if (!state) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  return { ok: true, ...state };
+}
+
+/** The program's Live Sync status now (the program page asks after each saved change). Null when not found. */
+export async function getLiveSyncStatus(id: string): Promise<LiveSyncState | null> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(id)) return null;
+  const supabase = await createServerSupabase();
+  return loadLiveSync(supabase, workspaceId, id);
 }

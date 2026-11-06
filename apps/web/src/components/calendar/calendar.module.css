@@ -127,6 +127,8 @@
 }
 .clientLink:hover, .clientLink:focus-visible { background: var(--ct-surface); }
 .clientTag { font-weight: var(--ct-weight-caption); }
+/* "Live": this copy follows its program (Live Sync). */
+.liveTag { font-weight: var(--ct-weight-caption); white-space: nowrap; }
 .dragging { opacity: 0.4; }
 .overlayItem {
   display: inline-flex;

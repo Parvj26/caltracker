@@ -7,6 +7,7 @@ import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteProgram } from './delete-program';
+import { loadLiveSync } from '@/lib/live-sync';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -31,7 +32,7 @@ export default async function ProgramPage({
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
-  const [program, slots, library] = await Promise.all([
+  const [program, slots, library, live] = await Promise.all([
     getProgram(id),
     supabase
       .from('program_workouts')
@@ -48,10 +49,11 @@ export default async function ProgramPage({
       .is('client_id', null)
       .order('name')
       .limit(LIBRARY_LIMIT),
+    loadLiveSync(supabase, workspaceId, id),
   ]);
   if (slots.error) throw new Error(`Could not load the program's workouts: ${slots.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
-  if (!program) notFound();
+  if (!program || !live) notFound();
 
   const initialSlots: Slot[] = slots.data.map((s) => ({
     id: s.id,
@@ -74,7 +76,7 @@ export default async function ProgramPage({
         </div>
       </header>
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} />
     </div>
   );
 }

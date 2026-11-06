@@ -19,7 +19,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useId, useState, type ReactNode } from 'react';
-import { monthGrid } from '@caltracker/shared';
+import { isLiveWorkout, monthGrid } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { formatLongDay, formatMonth, formatShortDay, shiftMonth } from './format';
@@ -36,6 +36,8 @@ export type CalendarItem = {
   logId?: string | null;
   /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
   addedByClient?: boolean;
+  /** From a program assignment: whether that program has Live Sync on and this copy was edited for the client. */
+  liveSync?: { programLive: boolean; customised: boolean };
 };
 
 type Props = {
@@ -230,6 +232,11 @@ function DayCell({
               renderItem={renderItem}
               logHref={logHref}
               missed={item.logId === null && today !== null && date < today}
+              live={
+                item.liveSync !== undefined &&
+                today !== null &&
+                isLiveWorkout({ ...item.liveSync, done: Boolean(item.logId), date }, today)
+              }
             />
             ),
           )}
@@ -263,11 +270,14 @@ function DayItem({
   renderItem,
   logHref,
   missed,
+  live,
 }: {
   item: CalendarItem;
   logHref: Props['logHref'];
   /** Planned, its day has passed (in the viewer's zone) and no finished log. */
   missed: boolean;
+  /** Kept up to date by the program's Live Sync. */
+  live: boolean;
   date: IsoDate;
   draggable: boolean;
   editable: boolean;
@@ -312,7 +322,16 @@ function DayItem({
         </Link>
       ) : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
-      {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+      {item.programName ? (
+        <span className={styles.itemProgram}>
+          {item.programName}
+          {live ? (
+            <span className={styles.liveTag} title="Live Sync: changes to the program update this workout">
+              {' · '}Live
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </li>
   );
 }

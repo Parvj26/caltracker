@@ -141,7 +141,8 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
   // Copy week 1 to week 2: week 2 already has a workout, so the dialog asks before replacing it.
   await page.getByRole('button', { name: 'Copy week 1', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Copy week 1' });
-  await expect(dialog).toContainText('Clients already on this program keep their current workouts.');
+  // A duplicate is a new program, so Live Sync is on.
+  await expect(dialog).toContainText('Live Sync is on: clients on this program get this change from today on.');
   await dialog.getByLabel('Copy to').selectOption({ label: 'Week 2' });
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
   await expect(dialog.getByRole('alert')).toHaveText("Week 2 already has 1 workout. Copying replaces it with week 1's 2 workouts.");
