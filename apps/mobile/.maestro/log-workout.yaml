@@ -80,6 +80,8 @@ env:
 - tapOn:
     id: finish-workout
 # Every set was ticked, so there is no "sets not done" question.
+# The sticker reveal comes first (sticker-reveal.yaml checks it); step through it to the summary.
+- runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 10000

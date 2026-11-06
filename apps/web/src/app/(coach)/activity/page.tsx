@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   LOG_TREE_SELECT,
+  awardHasPrs,
   completedSetCount,
   formatLogDuration,
   formatLogVolume,
@@ -50,6 +51,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (past.error) throw new Error(`Could not load past clients: ${past.error.message}`);
 
+  // Logs that set a personal best get a PR chip.
+  const logIds = logs.data.slice(0, PAGE_SIZE).map((l) => (l as unknown as { id: string }).id);
+  const awards = logIds.length
+    ? await supabase.from('awards').select('log_id, result').in('log_id', logIds)
+    : { data: [], error: null };
+  if (awards.error) throw new Error(`Could not load awards: ${awards.error.message}`);
+  const prLogs = new Set(awards.data.filter((a) => awardHasPrs(a.result)).map((a) => a.log_id));
+
   // No direct foreign key links workspace_members to profiles, so load names separately.
   const memberIds = members.data.map((m) => m.user_id);
   const profiles = memberIds.length
@@ -72,6 +81,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       volumeKg: logVolumeKg(log),
       seconds: logDurationS(log),
       planned: isPlannedLog(log),
+      hasPr: prLogs.has(row.id),
     };
   });
   const hasNext = logs.data.length > PAGE_SIZE;
@@ -127,7 +137,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned }) => (
+              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned, hasPr }) => (
                 <tr key={row.id}>
                   <td>{clientName}</td>
                   <td>
@@ -135,6 +145,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                       <Link href={`/clients/${row.client_id}/logs/${row.id}`} className={styles.nameLink}>
                         {row.name}
                       </Link>
+                      {hasPr ? <Chip tone="lime">PR</Chip> : null}
                       {row.auto_finished ? <Chip tone="amber">Auto-finished</Chip> : null}
                       {planned ? null : <Chip>Unplanned</Chip>}
                     </div>

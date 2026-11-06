@@ -14,7 +14,7 @@ How to generate CalTracker's animal and landmark stickers with an AI image tool 
 2. **Lock the style.** Upload your favourite anchor as the **style reference** (Firefly) or say "match this exact style" (ChatGPT) for every remaining animal.
 3. **Generate the rest** using the master prompt plus each animal's subject line below. Make 2–4 options per animal and pick one.
 4. **Save** each pick as a PNG, at least 1024×1024, named `animal-name.png` (e.g. `red-panda.png`), into one folder.
-5. **Hand the folder to Claude.** `scripts/process-stickers.ts` trims and centres each sticker, adds a soft shadow, and exports app sizes (1024 PNG; 512/256/128 PNG + WebP) plus a grey locked silhouette. ChatGPT already draws the white die-cut border, so the script keeps it as is. Run: `pnpm --filter @caltracker/scripts exec tsx process-stickers.ts ~/Desktop/caltracker-stickers <outDir>`.
+5. **Hand the folder to Claude.** `scripts/process-stickers.ts` trims and centres each sticker with 4% transparent padding and exports WebP files: `<key>.webp` (512 px), `<key>-sm.webp` (256 px) and `<key>-locked.webp` (a 256 px silhouette, solid #121212 at 12% opacity), into `apps/mobile/assets/stickers/` and `apps/web/public/stickers/`. It also regenerates `apps/mobile/src/lib/sticker-assets.ts`. The source PNGs are not committed. ChatGPT already draws the white die-cut border, so the script keeps it as is. Run: `pnpm --filter @caltracker/scripts exec tsx process-stickers.ts [inDir]` (inDir defaults to the main checkout's `art/stickers`).
 
 ## ChatGPT quick-start (chosen route: your ChatGPT subscription, by hand)
 1. Start **one new chat** and keep using it for the whole set, so the style stays consistent.

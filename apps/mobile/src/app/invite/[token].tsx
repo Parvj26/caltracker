@@ -6,6 +6,7 @@ import { AuthShell } from '@/components/auth-shell';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { joinInvite, joinMessage, loadInvite, type InviteDetails, type JoinFailure } from '@/lib/join-invite';
 import { useSession } from '@/lib/session';
+import { signOutAndForget } from '@/lib/sign-out';
 import { supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -114,7 +115,7 @@ export default function JoinInvite() {
         <Text style={text('body')}>
           {`You're signed in as ${session.user.email ?? 'another account'}. Sign out to join ${invite.workspaceName} as ${invite.email}?`}
         </Text>
-        <Button testID="sign-out-to-join" title="Sign out" onPress={() => void supabase.auth.signOut()} />
+        <Button testID="sign-out-to-join" title="Sign out" onPress={() => void signOutAndForget()} />
         <TextButton testID="stay-signed-in" title="Stay signed in" onPress={() => router.replace('/')} />
       </AuthShell>
     );

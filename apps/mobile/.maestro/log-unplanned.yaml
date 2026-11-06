@@ -63,6 +63,9 @@ env:
     visible: 'Finish with 2 sets not done\? They won’t count\.'
     timeout: 10000
 - tapOn: 'Finish'
+# The sticker reveal comes first: a first workout of a fresh streak shows the week-1 landmark and "Workout #1" even
+# without a weighted set. reveal-through steps through however many cards show.
+- runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
     visible: '1 set completed'
     timeout: 10000
