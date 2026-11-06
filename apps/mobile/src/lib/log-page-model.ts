@@ -240,6 +240,7 @@ export function buildPageModel(i: {
     // A drop's dot is its main set's: walk back to the set that starts the group.
     let mainIndex = cur.setIndex;
     while (ex.sets[mainIndex].setType === 'drop' && mainIndex > 0) mainIndex -= 1;
+    // One dot per warm-up or working set; a drop has none and shows as its main set's dot (the current one).
     const dots = ex.sets.flatMap((s, si): Array<'done' | 'current' | 'todo' | 'warmup-done' | 'warmup-todo'> => {
       if (s.setType === 'drop') return [];
       if (si === mainIndex) return ['current'];
@@ -331,7 +332,7 @@ export function progressLabel(states: ReadonlyArray<Progress>): string {
 export function listRows(log: WorkoutLogDoc): Array<{ title: string; detail: string; done: boolean }> {
   const letters = supersetLetters(log.blocks);
   return log.blocks.map((b, i) => {
-    const sets = b.exercises.flatMap((e) => e.sets);
+    const sets = b.exercises.flatMap((e) => e.sets.filter((x) => x.setType === 'normal'));
     const ticked = sets.filter((s) => s.completedAt !== null).length;
     return {
       title: pageTitle(b, letters[i] ?? null),

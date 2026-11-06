@@ -58,6 +58,12 @@ describe('formatSetTarget', () => {
   it('shows To failure', () => {
     expect(formatSetTarget({ ...base, setType: 'drop', toFailure: true }, 'weight_reps', 'kg')).toBe('To failure');
   });
+  it('puts the weight before to failure', () => {
+    const drop = { ...base, setType: 'drop' as const, toFailure: true, targetWeightKg: 40 };
+    expect(formatSetTarget(drop, 'weight_reps', 'kg')).toBe('40 kg × to failure');
+    expect(formatSetTarget(drop, 'weight_reps', 'lb')).toBe('88 lb × to failure');
+    expect(formatSetTarget(drop, 'reps', 'kg')).toBe('To failure');
+  });
   it('shows a dash with no targets', () => {
     expect(formatSetTarget(base, 'weight_reps', 'kg')).toBe('—');
   });

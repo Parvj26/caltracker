@@ -36,7 +36,8 @@ describe('formatLogSetTarget', () => {
   it('reads like the planned target, in the viewer units', () => {
     expect(formatLogSetTarget(target(), 'weight_reps', 'lb')).toBe('8–10 reps · 135 lb');
     expect(formatLogSetTarget(target({ repsMin: 8, repsMax: 8 }), 'reps', 'lb')).toBe('8 reps');
-    expect(formatLogSetTarget(target({ toFailure: true }), 'weight_reps', 'kg')).toBe('To failure');
+    expect(formatLogSetTarget(target({ toFailure: true }), 'weight_reps', 'lb')).toBe('135 lb × to failure');
+    expect(formatLogSetTarget(target({ toFailure: true, weightKg: null }), 'weight_reps', 'kg')).toBe('To failure');
     expect(formatLogSetTarget(target({ repsMin: null, repsMax: null, weightKg: null }), 'weight_reps', 'kg')).toBe('—');
     expect(formatLogSetTarget(target({ durationS: 90 }), 'time', 'kg')).toBe('1:30');
   });
@@ -141,7 +142,9 @@ describe('planSummary and coachLine', () => {
   });
   it('words a to-failure plan', () => {
     const f = { repsMin: null, repsMax: null, toFailure: true };
-    expect(planSummary(ex([logSet('normal', f), logSet('normal', f), logSet('normal', f)]), 'kg')).toBe('3 × To failure');
+    const none = { ...f, weightKg: null };
+    expect(planSummary(ex([logSet('normal', none), logSet('normal', none), logSet('normal', none)]), 'kg')).toBe('3 × To failure');
+    expect(planSummary(ex([logSet('normal', f), logSet('normal', f)]), 'kg')).toBe('2 × 60 kg × to failure');
   });
   it('is null when there are no working sets', () => {
     expect(planSummary(ex([logSet('warmup'), logSet('drop')]), 'kg')).toBeNull();

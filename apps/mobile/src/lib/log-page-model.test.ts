@@ -140,7 +140,7 @@ describe('buildPageModel, straight page', () => {
     const m = build(fixture(), 0);
     expect(m.steps[0].chip).toBe('W');
     expect(m.steps[1].text).toBe('8–10 reps · 132 lb');
-    expect(m.steps[4].text).toBe('To failure');
+    expect(m.steps[4].text).toBe('88 lb × to failure');
     expect(m.steps[1].current).toBe(false);
     expect(m.steps[0].current).toBe(true);
   });
@@ -186,6 +186,19 @@ describe('buildPageModel, superset page', () => {
     expect(m.upNext).toBeNull();
   });
 
+  it('goes back to an unticked A1 when asked, and the cards agree', () => {
+    let log = fixture();
+    const a = sets(log, 1, 0);
+    const b = sets(log, 1, 1);
+    log = tick(log, a[0].id, b[0].id);
+    log = { ...log, blocks: log.blocks.map((bl, i) => (i !== 1 ? bl : { ...bl, exercises: bl.exercises.map((e, ei) => (ei !== 0 ? e : { ...e, sets: e.sets.map((s, si) => (si === 0 ? { ...s, completedAt: null } : s)) })) })) };
+    const m = buildPageModel({ log, blockIndex: 1, units: 'lb', last: {}, preferExerciseIndex: 0 });
+    expect(m.current!.step.setId).toBe(a[0].id);
+    expect(m.exercises.map((e) => e.active)).toEqual([true, false]);
+    expect(m.exercises.map((e) => e.collapsedText)).toEqual([null, 'Done · 132 lb × 8']);
+    expect(m.round!.chips[0]).toBe('current');
+  });
+
   it('prefers the exercise asked for', () => {
     const m = buildPageModel({ log: fixture(), blockIndex: 1, units: 'kg', last: {}, preferExerciseIndex: 1 });
     expect(m.current!.step.exerciseIndex).toBe(1);
@@ -206,7 +219,7 @@ describe('page list and progress', () => {
     let log = fixture();
     log = tick(log, sets(log, 0)[0].id, sets(log, 0)[1].id);
     expect(listRows(log)).toEqual([
-      { title: 'Barbell Squat', detail: '2 of 5 sets', done: false },
+      { title: 'Barbell Squat', detail: '1 of 3 sets', done: false },
       { title: 'A1 Bench press + A2 Cable row', detail: '0 of 6 sets', done: false },
       { title: 'B1 Pull-up + B2 Push-up', detail: '0 of 4 sets', done: false },
     ]);
@@ -218,6 +231,13 @@ describe('page list and progress', () => {
     expect(pageIndexAfterChange({ blockIds: ['a', 'b', 'c'], index: 2 }, ['b', 'c'])).toBe(1);
     expect(pageIndexAfterChange({ blockIds: ['a', 'b', 'c'], index: 1 }, ['a', 'b', 'c', 'd'])).toBe(1);
     expect(pageIndexAfterChange({ blockIds: ['a'], index: 0 }, [])).toBe(0);
+    // a page added before the current one, a reorder, and a swap (same block id) keep the same page
+    expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 1 }, ['x', 'a', 'b'])).toBe(2);
+    expect(pageIndexAfterChange({ blockIds: ['a', 'b', 'c'], index: 0 }, ['c', 'b', 'a'])).toBe(2);
+    expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 1 }, ['a', 'b'])).toBe(1);
+    // a stale index beyond the old pages falls back to the last page
+    expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 5 }, ['a', 'b', 'c'])).toBe(2);
+    expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 5 }, ['a'])).toBe(0);
   });
 });
 
