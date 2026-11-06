@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { clientPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { addDays, localToday, monthGrid } from '@caltracker/shared';
+import { addDays, isLoggedByCoach, localToday, monthGrid } from '@caltracker/shared';
 import { isMonth, shiftMonth } from '@/components/calendar/format';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -46,7 +46,7 @@ export default async function ClientPage({
   const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
     supabase
       .from('workouts')
-      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
+      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at, logged_by)')
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
       .gte('scheduled_on', rangeStart)
@@ -134,6 +134,7 @@ export default async function ClientPage({
             date: w.scheduled_on,
             programName: w.program_assignments?.program_name ?? null,
             logId: w.workout_logs[0]?.id ?? null,
+            loggedByCoach: w.workout_logs[0] ? isLoggedByCoach({ loggedBy: w.workout_logs[0].logged_by, clientId: client.id }) : false,
           },
         ]
       : [],

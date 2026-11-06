@@ -36,6 +36,8 @@ export type CalendarItem = {
   logId?: string | null;
   /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
   addedByClient?: boolean;
+  /** The finished log was logged by the coach in a session (the "Logged by coach" badge). */
+  loggedByCoach?: boolean;
 };
 
 type Props = {
@@ -307,8 +309,12 @@ function DayItem({
         {controls ? <div className={styles.itemControls}>{controls}</div> : null}
       </div>
       {item.logId && logHref ? (
-        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>
-          <span aria-hidden="true">✓</span> Done
+        <Link
+          href={logHref(item.logId)}
+          className={styles.doneNote}
+          aria-label={`Done${item.loggedByCoach ? ', logged by coach' : ''}: view the ${item.name} log`}
+        >
+          <span aria-hidden="true">✓</span> {item.loggedByCoach ? 'Done · Logged by coach' : 'Done'}
         </Link>
       ) : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}

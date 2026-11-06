@@ -14,16 +14,23 @@ export { LOG_TREE_SELECT, logRowToDoc };
 export async function loadLog(
   supabase: SupabaseClient<Database>,
   logId: string,
-): Promise<{ log: WorkoutLogDoc; clientId: string; plannedWorkoutId: string | null; correctedAt: string | null } | null> {
+): Promise<{
+  log: WorkoutLogDoc;
+  clientId: string;
+  plannedWorkoutId: string | null;
+  correctedAt: string | null;
+  /** Who logged it: the client on the phone, or their coach in a session; null once that account is deleted. */
+  loggedBy: string | null;
+} | null> {
   if (!UUID.test(logId)) return null;
   const { data, error } = await supabase
     .from('workout_logs')
-    .select(`client_id, corrected_at, ${LOG_TREE_SELECT}`)
+    .select(`client_id, corrected_at, logged_by, ${LOG_TREE_SELECT}`)
     .eq('id', logId)
     .maybeSingle();
   if (error) throw new Error(`Could not load workout log: ${error.message}`);
   if (!data) return null;
   // The select string is built by concatenation, so supabase-js cannot infer its shape; LogTreeRow describes it.
-  const row = data as unknown as LogTreeRow & { client_id: string; corrected_at: string | null };
-  return { log: logRowToDoc(row), clientId: row.client_id, plannedWorkoutId: row.workout_id, correctedAt: row.corrected_at };
+  const row = data as unknown as LogTreeRow & { client_id: string; corrected_at: string | null; logged_by: string | null };
+  return { log: logRowToDoc(row), clientId: row.client_id, plannedWorkoutId: row.workout_id, correctedAt: row.corrected_at, loggedBy: row.logged_by };
 }

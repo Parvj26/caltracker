@@ -173,6 +173,7 @@ export function ClientCalendar({
   }
 
   const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
+  const sessionHref = (workoutId: string) => `/clients/${client.id}/log/${workoutId}`;
   const days: Record<IsoDate, CalendarItem[]> = {};
   for (const { date, ...item } of items) (days[date] ??= []).push(item);
   for (const log of clientLogs) {
@@ -238,6 +239,8 @@ export function ClientCalendar({
             editable ? (
               <ItemMenu
                 item={item}
+                // Today's workout, not done yet: the coach can log it with the client now.
+                sessionHref={!item.logId && date === today ? sessionHref(item.id) : undefined}
                 logHref={item.logId ? logHref(item.logId) : undefined}
                 editHref={`/clients/${client.id}/workouts/${item.id}`}
                 // Done stays on its day (the server refuses moving it too).
@@ -251,6 +254,7 @@ export function ClientCalendar({
               // A past day, missed: no editing, but it can be rescheduled to today or later, or cleared.
               <ItemMenu
                 item={item}
+                sessionHref={sessionHref(item.id)}
                 onMove={() => setMoving({ ...item, date })}
                 moveLabel="Move to another day"
                 onDelete={() => setDeleting({ ...item, date })}
