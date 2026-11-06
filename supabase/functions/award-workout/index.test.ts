@@ -308,3 +308,127 @@ t('a recompute after a coach correction lowers the PR and leaves the stickers al
   assertEquals((rows[0]!.result as AwardResult).prs, []);
   assertNotEquals(rows[0]!.result, before);
 });
+
+/**
+ * The admin client with rpc calls recorded. The first `hold` award_inputs calls wait for each other, so that many
+ * callers have all read the same history before any of them writes: the race the locks must settle.
+ */
+function spiedAdmin(hold: number) {
+  const calls: Array<{ fn: string; data: unknown }> = [];
+  let held: Array<() => void> = [];
+  let loads = 0;
+  const spy = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop !== 'rpc') return Reflect.get(target, prop, receiver);
+      return async (fn: string, args: Record<string, unknown>) => {
+        const res = await target.rpc(fn, args);
+        calls.push({ fn, data: res.data });
+        if (fn === 'award_inputs' && loads < hold) {
+          loads += 1;
+          if (loads === hold) {
+            held.forEach((go) => go());
+            held = [];
+          } else {
+            await new Promise<void>((go) => held.push(go));
+          }
+        }
+        return res;
+      };
+    },
+  });
+  const statuses = () =>
+    calls.filter((c) => c.fn === 'apply_award').map((c) => (c.data as { status: string }).status).sort();
+  return { spy: spy as SupabaseClient, statuses };
+}
+
+t('the lock: two catch-up calls that both read before writing give one awarded and one existing', async () => {
+  const { ws, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  const { logId } = await makeLog(ws, client.id, exerciseId, five(60));
+  const { spy, statuses } = spiedAdmin(2);
+  const a = createHandler({ supabaseAdmin: spy, cronSecret: SECRET, rng: () => 0 });
+  const b = createHandler({ supabaseAdmin: spy, cronSecret: SECRET, rng: () => 0.999 });
+  const [ra, rb] = await Promise.all([
+    call(a, { logId }, { 'x-award-secret': SECRET }),
+    call(b, { logId }, { 'x-award-secret': SECRET }),
+  ]);
+  assertEquals([ra.status, rb.status], [200, 200]);
+  assertEquals(statuses(), ['awarded', 'existing'], 'apply_award ran twice: the second found the first award');
+  assertEquals(await ra.json(), await rb.json());
+  assertEquals((await awardRows(logId)).length, 1);
+  assert((await stickers(client.id)).every((s) => s.count === 1), 'every sticker granted once');
+});
+
+t('two workouts of one client awarded at once: one retries, and the stickers add up', async () => {
+  const { ws, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  const l1 = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 30 });
+  const l2 = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 20 });
+  const { spy, statuses } = spiedAdmin(2);
+  const handler = createHandler({ supabaseAdmin: spy, cronSecret: SECRET, rng: () => 0.5 });
+  const [r1, r2] = await Promise.all([
+    call(handler, { logId: l1.logId }, asUser(client.token)),
+    call(handler, { logId: l2.logId }, asUser(client.token)),
+  ]);
+  assertEquals([r1.status, r2.status], [200, 200]);
+  assertEquals(statuses(), ['awarded', 'awarded', 'conflict'], 'the second writer saw a stale sticker count and retried');
+  const awards = [(await r1.json()) as AwardResult, (await r2.json()) as AwardResult];
+  const expected = new Map<string, number>();
+  for (const a of awards) {
+    for (const key of [a.ladder?.key, a.drop, ...a.rare, ...a.landmarks]) {
+      if (key) expected.set(key, (expected.get(key) ?? 0) + 1);
+    }
+  }
+  const owned = await stickers(client.id);
+  assertEquals(
+    Object.fromEntries(owned.map((s) => [s.sticker_key, s.count])),
+    Object.fromEntries(expected),
+    'sticker counts are the sum of both awards',
+  );
+  assertEquals(owned.find((s) => s.sticker_key === 'rhino')?.count, 2);
+  assertEquals(awards.map((a) => a.ladder?.count).sort(), [1, 2], 'the retried award counts the first one');
+});
+
+t('a reopened and re-finished log is recomputed on the next call, and its stickers stay', async () => {
+  const { ws, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  await makeLog(ws, client.id, exerciseId, five(100, 5), { minutesAgo: 60 }).then(({ logId }) =>
+    call(handlerWith(), { logId }, asUser(client.token)),
+  );
+  const log = await makeLog(ws, client.id, exerciseId, five(100, 5), { minutesAgo: 10 });
+  const handler = handlerWith(() => 0.5);
+  const first = (await (await call(handler, { logId: log.logId }, asUser(client.token))).json()) as AwardResult;
+  assertEquals(first.prs, []);
+  const stickersBefore = await stickers(client.id);
+
+  // The client reopens the workout, adds weight to the last set and finishes again: the phone's revision goes up.
+  const { error: setError } = await admin.from('log_sets').update({ actual_weight_kg: 120 }).eq('id', log.setIds[4]!);
+  if (setError) throw setError;
+  const { error: logError } = await admin.from('workout_logs').update({ revision: 2 }).eq('id', log.logId);
+  if (logError) throw logError;
+
+  // Even a call whose rolls would all hit only recomputes.
+  const res = await call(handlerWith(() => 0), { logId: log.logId }, asUser(client.token));
+  assertEquals(res.status, 200);
+  const after = (await res.json()) as AwardResult;
+  assertEquals(after.prs.map((p) => p.kind).sort(), ['e1rm', 'heaviest']);
+  assertEquals({ ...after, prs: [] }, { ...first, prs: [] }, 'same stickers, same rolls');
+  assertEquals(await stickers(client.id), stickersBefore, 'sticker_awards unchanged');
+  assertEquals((await awardRows(log.logId))[0]!.result, after);
+  const { data: row } = await admin.from('awards').select('log_revision').eq('log_id', log.logId).single();
+  assertEquals(row, { log_revision: 2 });
+  assertEquals(await (await call(handler, { logId: log.logId }, asUser(client.token))).json(), after, 'then stable');
+});
+
+t('a client the coach removed gets 403 not_a_client and no award', async () => {
+  const { ws, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  const { logId } = await makeLog(ws, client.id, exerciseId, five(60));
+  const { error } = await admin.from('workspace_members').delete().eq('workspace_id', ws).eq('user_id', client.id);
+  if (error) throw error;
+  const res = await call(handlerWith(), { logId }, asUser(client.token));
+  assertEquals(res.status, 403);
+  assertEquals((await res.json()).hint, 'not_a_client');
+  assertEquals((await call(handlerWith(), { logId }, { 'x-award-secret': SECRET })).status, 403);
+  assertEquals(await awardRows(logId), []);
+});

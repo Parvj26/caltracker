@@ -29,6 +29,9 @@ create table public.awards (
   client_id uuid not null references auth.users on delete cascade,
   workspace_id uuid not null references public.workspaces on delete cascade,
   result jsonb not null,
+  -- The log's revision when the award was last worked out. A reopen and re-finish raises the log's revision,
+  -- and the next call then recomputes its PRs and stats (never its stickers).
+  log_revision integer not null default 0 check (log_revision >= 0),
   created_at timestamptz not null default now()
 );
 create index awards_client_idx on public.awards (client_id, created_at desc);

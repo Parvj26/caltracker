@@ -17,8 +17,11 @@ import {
 // Callers:
 //   - the phone, with the client's JWT, after its completed log is saved: { logId }
 //   - the catch-up cron job (pg_net), with the x-award-secret header: { logId }
-//   - a coach correction (web, Task 7) or a client's re-finish: { logId, recompute: true }. That rewrites the
-//     log's PRs, the client's bests and stats from the logs, and never touches stickers or rolls again.
+//   - a coach correction (web, Task 7): { logId, recompute: true }. That rewrites the log's PRs, the client's
+//     bests and stats from the logs, and never touches stickers or rolls again.
+// A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
+// plain call. A recompute of a log with no award yet is a full award (the client was always due it).
+// A client the coach has removed gets nothing: 403 with hint 'not_a_client', as save_workout_log answers.
 //
 // verify_jwt is off for this function (supabase/config.toml) because the cron job has no user JWT; a user caller's
 // token is checked here with auth.getUser instead.
@@ -36,9 +39,11 @@ export interface HandlerDeps {
 
 type Owned = { key: string; count: number; shiny: boolean };
 type Inputs = {
-  log: { id: string; client_id: string; workspace_id: string; status: string };
+  log: { id: string; client_id: string; workspace_id: string; status: string; revision: number; is_client: boolean };
   time_zone: string | null;
   award: AwardResult | null;
+  award_revision: number | null;
+  history_version: string;
   owned: Owned[];
   owned_total: number;
   logs: LogTreeRow[];
@@ -51,6 +56,9 @@ const MAX_ATTEMPTS = 3;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const fail = (error: string, status: number) => json({ error }, status);
+const NOT_A_CLIENT = 'not_a_client';
+const notAClient = () => json({ error: 'You are no longer a client of this coach.', hint: NOT_A_CLIENT }, 403);
+const serverError = () => fail('Something went wrong. Please try again.', 500);
 
 function logFailure(step: string, err: unknown) {
   console.error(`award-workout: ${step} failed`, err instanceof Error ? err.message : JSON.stringify(err));
@@ -91,7 +99,7 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
     return Boolean(data);
   }
 
-  return async (req: Request): Promise<Response> => {
+  async function handle(req: Request): Promise<Response> {
     if (req.method !== 'POST') return fail('Method not allowed', 405);
 
     const who = await caller(req);
@@ -112,7 +120,7 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
       const { data, error } = await admin.rpc('award_inputs', { p_log_id: logId });
       if (error) {
         logFailure('load', error);
-        return fail('Something went wrong. Please try again.', 500);
+        return serverError();
       }
       const inputs = data as Inputs | null;
       if (!inputs) return fail('Workout not found.', 404);
@@ -123,8 +131,12 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
           return fail('This workout belongs to someone else.', 403);
         }
       }
+      if (!inputs.log.is_client) return notAClient();
       if (inputs.log.status !== 'completed') return fail('Finish the workout first.', 409);
-      if (inputs.award && recompute !== true) return json(inputs.award);
+      // Already awarded for this version of the log: the same answer every time.
+      if (inputs.award && recompute !== true && inputs.award_revision === inputs.log.revision) {
+        return json(inputs.award);
+      }
 
       const ctx = awardContext(inputs.logs.map(logRowToDoc), logId, safeTimeZone(inputs.time_zone), now().toISOString());
       const owned = new Map(inputs.owned.map((o) => [o.key, { count: o.count, shiny: o.shiny }]));
@@ -134,6 +146,7 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
         p_log_id: logId,
         p_result: {
           mode: recompute === true ? 'recompute' : 'award',
+          history_version: inputs.history_version,
           owned_total: inputs.owned_total,
           award,
           stickers: awardedStickers(award),
@@ -159,15 +172,26 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
         // The log was reopened or deleted between the load and the write.
         if (applyError.code === '23514') return fail('Finish the workout first.', 409);
         if (applyError.code === 'P0002') return fail('Workout not found.', 404);
+        if (applyError.code === '42501') return notAClient();
         logFailure('apply', applyError);
-        return fail('Something went wrong. Please try again.', 500);
+        return serverError();
       }
       const outcome = applied as Applied;
       if (outcome.status !== 'conflict') return json(outcome.result);
-      // Another of this client's workouts was awarded meanwhile: work it out again from the new stickers.
+      // The client's logs or stickers changed meanwhile (a save, a correction, another workout's award): read
+      // them again and work the award out again.
     }
-    logFailure('apply', new Error(`sticker conflict after ${MAX_ATTEMPTS} attempts for ${logId}`));
+    logFailure('apply', new Error(`history kept changing after ${MAX_ATTEMPTS} attempts for ${logId}`));
     return fail('Something went wrong. Please try again.', 503);
+  }
+
+  return async (req: Request): Promise<Response> => {
+    try {
+      return await handle(req);
+    } catch (err) {
+      logFailure('award', err);
+      return serverError();
+    }
   };
 }
 
