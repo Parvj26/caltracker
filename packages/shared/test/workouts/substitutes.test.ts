@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addExerciseToSuperset,
+  addRound,
+  removeRound,
   addChoice,
   addStraightBlock,
   addSubstitute,
@@ -19,7 +22,7 @@ import {
 import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
 import { WORKOUT_TREE_SELECT, workoutRowToDoc } from '../../src/workouts/tree';
-import type { WorkoutTreeRow } from '../../src/workouts/tree';
+import type { WorkoutTreeRow, WorkoutTreeSubstituteRow } from '../../src/workouts/tree';
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 let counter = 5000;
@@ -245,4 +248,90 @@ describe('workoutRowToDoc with substitutes', () => {
 
 it('the tree select reads substitutes with their exercise', () => {
   expect(WORKOUT_TREE_SELECT).toContain('workout_substitutes(id, position, exercise_id, note, sets, exercises(name, tracking_type))');
+});
+
+describe('superset rounds keep substitutes in step', () => {
+  function ss() {
+    let d = emptyWorkout(makeId, 'SS');
+    d = addSuperset(d, [pick(2), pick(3)], makeId);
+    const b = d.blocks[0]!;
+    d = addSubstitute(d, b.id, b.exercises[0]!.id, pick(20), makeId);
+    d = addSubstitute(d, b.id, b.exercises[1]!.id, pick(21), makeId);
+    return WorkoutDoc.parse(d);
+  }
+  const nonDrop = (sets: Array<{ setType: string }>) => sets.filter((s) => s.setType !== 'drop').length;
+
+  it('addRound adds a set to every substitute, with the rest of the exercise it stands in for', () => {
+    const d = ss();
+    const out = addRound(d, d.blocks[0]!.id, makeId);
+    const [a, b] = out.blocks[0]!.exercises;
+    expect(a!.substitutes[0]!.sets).toHaveLength(4);
+    expect(b!.substitutes[0]!.sets).toHaveLength(4);
+    expect(a!.substitutes[0]!.sets[3]!.restSeconds).toBe(0);
+    expect(b!.substitutes[0]!.sets[3]!.restSeconds).toBe(b!.sets[3]!.restSeconds);
+    expect(valid(out)).toBe(true);
+  });
+
+  it('removeRound removes it again, but a substitute always keeps one working set', () => {
+    const d = ss();
+    const out = removeRound(d, d.blocks[0]!.id);
+    expect(out.blocks[0]!.exercises.map((e) => nonDrop(e.substitutes[0]!.sets))).toEqual([2, 2]);
+    // A substitute trimmed to one set keeps it while its exercise loses the round.
+    const b = d.blocks[0]!;
+    const sub = b.exercises[0]!.substitutes[0]!;
+    let one = removeSubstituteSet(d, b.id, b.exercises[0]!.id, sub.id, sub.sets[0]!.id);
+    one = removeSubstituteSet(one, b.id, b.exercises[0]!.id, sub.id, sub.sets[1]!.id);
+    const trimmed = removeRound(one, b.id);
+    expect(nonDrop(trimmed.blocks[0]!.exercises[0]!.sets)).toBe(2);
+    expect(nonDrop(trimmed.blocks[0]!.exercises[0]!.substitutes[0]!.sets)).toBe(1);
+    expect(valid(trimmed)).toBe(true);
+  });
+
+  it('adding an exercise to the superset moves the round rest off the old last exercise and its substitutes', () => {
+    const d = ss();
+    const out = addExerciseToSuperset(d, d.blocks[0]!.id, pick(4), makeId);
+    const old = out.blocks[0]!.exercises[1]!;
+    expect(old.sets.every((s) => s.restSeconds === 0)).toBe(true);
+    expect(old.substitutes[0]!.sets.every((s) => s.restSeconds === 0)).toBe(true);
+  });
+});
+
+describe('workoutRowToDoc skips substitute rows that would make the doc invalid', () => {
+  const goodSet = (n: number) => ({ id: ID(n), setType: 'normal', targetRepsMin: 8, targetRepsMax: 8, targetWeightKg: 20, targetDurationS: null, targetDistanceM: null, toFailure: false, restSeconds: 90, note: null });
+  const row = (kind: 'straight' | 'choice', subs: Array<Record<string, unknown>>): WorkoutTreeRow => ({
+    id: ID(1), name: 'Back', notes: null, client_id: null, scheduled_on: null,
+    workout_blocks: [{
+      id: ID(2), position: 0, kind, section_id: null, section_name: null,
+      workout_exercises: [0, 1].slice(0, kind === 'choice' ? 2 : 1).map((k) => ({
+        id: ID(3 + k), position: k, exercise_id: ID(40 + k), note: null,
+        exercises: { name: `Ex ${k}`, tracking_type: 'weight_reps' as const },
+        workout_sets: [{ id: ID(60 + k), position: 0, set_type: 'normal' as const, target_reps_min: 8, target_reps_max: 8, target_weight_kg: 50, target_duration_s: null, target_distance_m: null, to_failure: false, rest_seconds: 90, note: null }],
+        workout_substitutes: k === 0 ? (subs as unknown as WorkoutTreeSubstituteRow[]) : [],
+      })),
+    }],
+  });
+  const sub = (n: number, exerciseId: string, sets: unknown) => ({ id: ID(n), position: n, exercise_id: exerciseId, note: null, sets, exercises: { name: `Sub ${n}`, tracking_type: 'weight_reps' } });
+
+  it('keeps good ones, drops bad sets, and leaves out bad, repeated, self and extra substitutes', () => {
+    const doc = workoutRowToDoc(row('straight', [
+      sub(100, ID(80), [goodSet(200), { ...goodSet(201), id: 'not-a-uuid' }, { ...goodSet(202), targetRepsMin: -3 }]),
+      sub(101, ID(40), [goodSet(203)]), // the planned exercise itself
+      sub(102, ID(80), [goodSet(204)]), // a repeat
+      sub(103, ID(81), [{ ...goodSet(205), setType: 'drop', restSeconds: 0 }]), // starts with a drop
+      sub(104, ID(82), 'garbage'),
+      sub(105, ID(83), [goodSet(206)]),
+      sub(106, ID(84), [goodSet(207)]),
+      sub(107, ID(85), [goodSet(208)]), // a 4th good one
+    ]));
+    const subs = doc.blocks[0]!.exercises[0]!.substitutes;
+    expect(subs.map((s) => s.exerciseId)).toEqual([ID(80), ID(83), ID(84)]);
+    expect(subs[0]!.sets.map((s) => s.id)).toEqual([ID(200)]);
+    expect(WorkoutDoc.safeParse(doc).success).toBe(true);
+  });
+
+  it('gives a pick-one group no substitutes', () => {
+    const doc = workoutRowToDoc(row('choice', [sub(100, ID(80), [goodSet(200)])]));
+    expect(doc.blocks[0]!.exercises[0]!.substitutes).toEqual([]);
+    expect(WorkoutDoc.safeParse(doc).success).toBe(true);
+  });
 });

@@ -1464,6 +1464,16 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      json_number_ok: {
+        Args: {
+          hi: number
+          lo: number
+          lo_exclusive?: boolean
+          whole: boolean
+          x: Json
+        }
+        Returns: boolean
+      }
       last_results: {
         Args: { p_exercise_ids: string[] }
         Returns: {
@@ -1538,6 +1548,8 @@ export type Database = {
         Returns: number
       }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
+      valid_substitute_set: { Args: { v: Json }; Returns: boolean }
+      valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
       workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }
     Enums: {

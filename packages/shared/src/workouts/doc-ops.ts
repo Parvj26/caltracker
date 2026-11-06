@@ -53,17 +53,21 @@ function newExercise(ex: ExercisePick, rest: number, rounds: number, makeId: () 
 const lastNonDrop = (sets: readonly WorkoutSetDoc[]): WorkoutSetDoc | undefined =>
   [...sets].reverse().find((s) => s.setType !== 'drop');
 
-const withRest = (e: WorkoutExerciseDoc, rest: (s: WorkoutSetDoc, roundIndex: number) => number): WorkoutExerciseDoc => {
+function restOf(sets: readonly WorkoutSetDoc[], rest: (s: WorkoutSetDoc, roundIndex: number) => number): WorkoutSetDoc[] {
   let round = -1;
-  return {
-    ...e,
-    sets: e.sets.map((s) => {
-      if (s.setType === 'drop') return s;
-      round += 1;
-      return { ...s, restSeconds: rest(s, round) };
-    }),
-  };
-};
+  return sets.map((s) => {
+    if (s.setType === 'drop') return s;
+    round += 1;
+    return { ...s, restSeconds: rest(s, round) };
+  });
+}
+
+/** Sets the rest of each round; a substitute stands in for its exercise, so its sets follow the same rule. */
+const withRest = (e: WorkoutExerciseDoc, rest: (s: WorkoutSetDoc, roundIndex: number) => number): WorkoutExerciseDoc => ({
+  ...e,
+  sets: restOf(e.sets, rest),
+  substitutes: e.substitutes.map((sub) => ({ ...sub, sets: restOf(sub.sets, rest) })),
+});
 
 function mapBlock(doc: WorkoutDoc, blockId: string, fn: (b: WorkoutBlockDoc) => WorkoutBlockDoc): WorkoutDoc {
   return { ...doc, blocks: doc.blocks.map((b) => (b.id === blockId ? fn(b) : b)) };
@@ -302,22 +306,40 @@ export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: stri
 
 export function addRound(doc: WorkoutDoc, blockId: string, makeId: () => string): WorkoutDoc {
   return mapBlock(doc, blockId, (b) => {
-    if (b.kind !== 'superset' || b.exercises.some((e) => e.sets.length >= MAX_SETS)) return b; // choice groups have no rounds
+    // Choice groups have no rounds. Substitutes get the round too, so they keep the same number of sets.
+    const full = (sets: readonly WorkoutSetDoc[]) => sets.length >= MAX_SETS;
+    if (b.kind !== 'superset' || b.exercises.some((e) => full(e.sets) || e.substitutes.some((x) => full(x.sets)))) return b;
+    const last = b.exercises.length - 1;
+    const grow = (sets: WorkoutSetDoc[], i: number): WorkoutSetDoc[] => {
+      const from = lastNonDrop(sets);
+      return [...sets, newSet(makeId, i === last ? (from?.restSeconds ?? DEFAULT_REST) : 0, from)];
+    };
     return {
       ...b,
-      exercises: b.exercises.map((e, i) => {
-        const from = lastNonDrop(e.sets);
-        const rest = i === b.exercises.length - 1 ? (from?.restSeconds ?? DEFAULT_REST) : 0;
-        return { ...e, sets: [...e.sets, newSet(makeId, rest, from)] };
-      }),
+      exercises: b.exercises.map((e, i) => ({
+        ...e,
+        sets: grow(e.sets, i),
+        substitutes: e.substitutes.map((sub) => ({ ...sub, sets: grow(sub.sets, i) })),
+      })),
     };
   });
 }
 
+function withoutLastRound(sets: WorkoutSetDoc[]): WorkoutSetDoc[] {
+  let i = sets.length - 1;
+  while (i >= 0 && sets[i]!.setType === 'drop') i -= 1;
+  return sets.slice(0, i);
+}
+
+/** A substitute loses the round too, unless it is down to one working set (it always keeps one). */
 function dropLastRound(e: WorkoutExerciseDoc): WorkoutExerciseDoc {
-  let i = e.sets.length - 1;
-  while (i >= 0 && e.sets[i]!.setType === 'drop') i -= 1;
-  return { ...e, sets: e.sets.slice(0, i) };
+  return {
+    ...e,
+    sets: withoutLastRound(e.sets),
+    substitutes: e.substitutes.map((sub) =>
+      sub.sets.filter((s) => s.setType !== 'drop').length <= 1 ? sub : { ...sub, sets: withoutLastRound(sub.sets) },
+    ),
+  };
 }
 
 export function removeRound(doc: WorkoutDoc, blockId: string): WorkoutDoc {

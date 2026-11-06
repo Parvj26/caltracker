@@ -124,6 +124,13 @@ function checkSets(sets: readonly WorkoutSetDoc[], trackingType: TrackingType, p
   });
 }
 
+/** The set-rule messages for a substitute's sets (empty when they are fine), for loaders that skip a bad row. */
+export function substituteSetProblems(sub: Pick<WorkoutSubstituteDoc, 'sets' | 'trackingType'>): string[] {
+  const out: string[] = [];
+  checkSets(sub.sets, sub.trackingType, ['sets'], { addIssue: (i) => out.push(i.message) });
+  return out;
+}
+
 export const WorkoutDoc = z
   .object({
     id: z.uuid(),

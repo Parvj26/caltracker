@@ -225,6 +225,27 @@ begin
       if jsonb_path_exists(v_ex, '$.substituteOptions[*].sets[*] ? (@.completedAt != null)') then
         raise exception 'Only the exercise being done can have done sets.' using errcode = '23514';
       end if;
+      -- The shape of LogSubstituteOption, so the coach's page and the phone can always read the options back.
+      if jsonb_typeof(v_ex -> 'substituteOptions') = 'array' and exists (
+        select 1 from jsonb_array_elements(v_ex -> 'substituteOptions') o(v)
+        where not (
+          jsonb_typeof(o.v) = 'object'
+          and (o.v -> 'substituteId' = 'null'::jsonb or (jsonb_typeof(o.v -> 'substituteId') = 'string'
+            and (o.v ->> 'substituteId') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+          and jsonb_typeof(o.v -> 'exerciseId') = 'string'
+          and (o.v ->> 'exerciseId') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          and jsonb_typeof(o.v -> 'exerciseName') = 'string'
+          and o.v ->> 'trackingType' in (select t::text from unnest(enum_range(null::public.tracking_type)) t)
+          and (o.v -> 'note' is null or o.v -> 'note' = 'null'::jsonb
+            or (jsonb_typeof(o.v -> 'note') = 'string' and char_length(o.v ->> 'note') <= 500))
+          and jsonb_typeof(o.v -> 'sets') = 'array' and jsonb_array_length(o.v -> 'sets') between 1 and 30
+          and not exists (select 1 from jsonb_array_elements(o.v -> 'sets') s(v)
+            where jsonb_typeof(s.v) <> 'object' or coalesce(s.v ->> 'setType', '') not in ('normal', 'warmup', 'drop')
+              or jsonb_typeof(s.v -> 'target') <> 'object')
+        )
+      ) then
+        raise exception 'A substitute option is not valid.' using errcode = '23514';
+      end if;
       if v_ex -> 'sets' -> 0 ->> 'setType' = 'drop' then
         raise exception 'A drop set must follow a normal or warm-up set.' using errcode = '23514';
       end if;
@@ -264,6 +285,7 @@ begin
   select x.ex into v_bad from (
     select jsonb_path_query(v_blocks, '$[*].exercises[*].exerciseId') #>> '{}' as ex
     union select jsonb_path_query(v_blocks, '$[*].exercises[*].swappedFromExerciseId ? (@ != null)') #>> '{}'
+    union select jsonb_path_query(v_blocks, '$[*].exercises[*].substituteOptions[*].exerciseId') #>> '{}'
   ) x where not public.exercise_usable_in(x.ex::uuid, v_workspace_id) limit 1;
   if v_bad is not null then
     raise exception 'Exercise % is not available in this workspace.', v_bad using errcode = '42501';
