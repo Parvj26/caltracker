@@ -92,7 +92,7 @@ test('adding a scan with values and a PDF shows it in the history and on the cha
 
   const chart = page.getByRole('group', { name: 'Body fat chart' });
   await expect(chart).toBeVisible();
-  await expect(chart.getByRole('img')).toHaveCount(2);
+  await expect(chart.locator('circle')).toHaveCount(2);
   await expect(page.getByText('−1.5 since')).toBeVisible();
   // Only BMI has a single value: no chart for it.
   await expect(page.getByRole('group', { name: 'BMI chart' })).toHaveCount(0);
@@ -227,6 +227,12 @@ test('coach home lists an overdue client, and Add scan opens the form', async ({
   await seedScan(fresh.id, 5, { body_fat_pct: 20 });
   const old = await newClient(60);
   await seedScan(old.id, 45, { body_fat_pct: 20 });
+  // Only the client's own weight entry in the last days: it does not count as a scan, so they are still listed.
+  const selfLogged = await newClient(40);
+  await seedScan(selfLogged.id, 2, { weight_kg: 80 }, { source: 'client' });
+  const removed = await newClient(40);
+  const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', removed.id);
+  if (gone.error) throw gone.error;
   await signInAsCoach(page);
   await page.goto('/home');
   const group = page.getByRole('region', { name: 'Body scans 30+ days' });
@@ -236,9 +242,48 @@ test('coach home lists an overdue client, and Add scan opens the form', async ({
   await expect(group.locator('li').filter({ hasText: due.last })).toContainText('Never scanned');
   await expect(group.locator('li').filter({ hasText: old.last })).toContainText('Last scan');
   await expect(group.locator('li').filter({ hasText: fresh.last })).toHaveCount(0);
+  await expect(group.locator('li').filter({ hasText: selfLogged.last })).toContainText('Never scanned');
+  await expect(group.locator('li').filter({ hasText: removed.last })).toHaveCount(0);
 
   await group.locator('li').filter({ hasText: due.last }).getByRole('link', { name: /^Add a scan for/ }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${due.id}`));
   await expect(page.getByRole('dialog', { name: 'Add a scan' })).toBeVisible();
   await expect(page).not.toHaveURL(/scan=1/);
+});
+
+test('a save whose answer never arrives keeps the uploaded printout (it may have been saved)', async ({ page }) => {
+  const c = await newClient();
+  const dialog = await openForm(page, c.id);
+  await dialog.getByLabel('Body fat (%)', { exact: true }).fill('20');
+  await dialog.getByLabel(/^Printout/).setInputFiles({ name: 'inbody.pdf', mimeType: 'application/pdf', buffer: pdf() });
+  // The browser loses the connection when it sends the save (the server action call).
+  await page.route(`**/clients/${c.id}*`, (route) => (route.request().headers()['next-action'] ? route.abort() : route.continue()));
+  await dialog.getByRole('button', { name: 'Save scan' }).click();
+  await expect(dialog.getByRole('alert')).toContainText("Couldn't save the scan");
+  await expect.poll(async () => (await admin.storage.from('scan-attachments').list(`${workspaceId}/${c.id}`)).data?.length).toBe(1);
+  // Nothing removes it afterwards either.
+  await page.waitForTimeout(1000);
+  const left = await admin.storage.from('scan-attachments').list(`${workspaceId}/${c.id}`);
+  expect(left.data).toHaveLength(1);
+  created.files.push(`${workspaceId}/${c.id}/${left.data![0]!.name}`);
+});
+
+test('scans only outside the chosen range say so and Show all brings the chart back', async ({ page }) => {
+  const c = await newClient();
+  await seedScan(c.id, 400, { body_fat_pct: 24 });
+  await seedScan(c.id, 380, { body_fat_pct: 23 });
+  await seedScan(c.id, 3, { body_fat_pct: 21 });
+  await signInAsCoach(page);
+  await page.goto(`/clients/${c.id}`);
+  await expect(page.getByRole('group', { name: /^Body fat chart/ })).toHaveCount(0);
+  await expect(page.getByText('Not enough scans in this range for a chart.')).toBeVisible();
+  await page.getByRole('button', { name: 'Show all' }).click();
+  const chart = page.getByRole('group', { name: /^Body fat chart/ });
+  await expect(chart).toBeVisible();
+  // One tab stop; the arrow keys move between the three points.
+  await chart.focus();
+  const read = page.locator('[class*="chartRead"]');
+  const before = await read.innerText();
+  await chart.press('ArrowLeft');
+  await expect(read).not.toHaveText(before);
 });

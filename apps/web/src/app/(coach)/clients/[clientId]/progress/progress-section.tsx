@@ -79,24 +79,28 @@ export function ProgressSection({
   const nameOf = (key: string) => (Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey].label : (customByKey.get(key)?.name ?? 'Measure'));
   const format = (key: string, v: number) => formatMetric(key, v, units, customByKey.get(key));
 
-  const charts = keys.flatMap((key) => {
-    const rows = scans.flatMap((s) => (s.values[key] !== undefined ? [{ measured_on: s.measuredOn, value: s.values[key], createdAt: s.createdAt }] : []));
-    const series = measurementSeries(rows, range, today);
-    if (series.length === 0) return [];
-    return [
-      {
-        key,
-        title: nameOf(key),
-        change: changeSince(series, key, units, today),
-        points: series.map((p) => ({
-          date: p.date,
-          label: formatShortDate(p.date, today),
-          value: displayValue(key, p.value, units),
-          text: format(key, p.value),
-        })),
-      },
-    ];
-  });
+  const chartsFor = (r: ChartRange) =>
+    keys.flatMap((key) => {
+      const rows = scans.flatMap((s) => (s.values[key] !== undefined ? [{ measured_on: s.measuredOn, value: s.values[key], createdAt: s.createdAt }] : []));
+      const series = measurementSeries(rows, r, today);
+      if (series.length === 0) return [];
+      return [
+        {
+          key,
+          title: nameOf(key),
+          change: changeSince(series, key, units, today),
+          points: series.map((p) => ({
+            date: p.date,
+            label: formatShortDate(p.date, today),
+            value: displayValue(key, p.value, units),
+            text: format(key, p.value),
+          })),
+        },
+      ];
+    });
+  const charts = chartsFor(range);
+  // Measures that have a trend over all time but not within the chosen range: say so, and offer all time.
+  const hiddenByRange = range === 'all' ? 0 : chartsFor('all').length - charts.length;
 
   async function confirmDelete(scan: ScanRow) {
     setDeletePending(true);
@@ -137,9 +141,9 @@ export function ProgressSection({
 
       {scans.length === 0 ? (
         <p className={styles.note}>No scans yet.{readOnly ? '' : ' Add the first one from the InBody printout.'}</p>
-      ) : charts.length === 0 ? (
+      ) : charts.length === 0 && hiddenByRange === 0 ? (
         <p className={styles.note}>Add another scan to see a trend.</p>
-      ) : (
+      ) : charts.length > 0 ? (
         <ul className={styles.charts} aria-label="Charts">
           {charts.map((c) => (
             <li key={c.key} className={styles.chartCard}>
@@ -149,7 +153,14 @@ export function ProgressSection({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
+
+      {hiddenByRange > 0 ? (
+        <p className={styles.note}>
+          {charts.length === 0 ? 'Not enough scans in this range for a chart.' : `${hiddenByRange} more ${hiddenByRange === 1 ? 'measure has' : 'measures have'} older scans outside this range.`}{' '}
+          <button type="button" className={styles.linkButton} onClick={() => setRange('all')}>Show all</button>
+        </p>
+      ) : null}
 
       {scans.length > 0 ? (
         <div className={styles.tableWrap}>
@@ -242,6 +253,7 @@ export function ProgressSection({
             setToast(message);
           }}
           onManage={() => setManaging(true)}
+          onWarning={setToast}
           onClose={() => setEditing(null)}
         />
       ) : null}

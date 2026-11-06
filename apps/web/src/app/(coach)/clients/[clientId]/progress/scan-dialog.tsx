@@ -5,7 +5,7 @@ import { IsoDateSchema } from '@caltracker/shared';
 import type { IsoDate, Units } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { STALE_DEPLOY_MESSAGE, failureMessage, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { saveScan } from './actions';
 import { preparePrintout, type Printout } from './compress';
@@ -29,6 +29,7 @@ export function ScanDialog({
   presetDate,
   onSaved,
   onManage,
+  onWarning,
   onClose,
 }: {
   workspaceId: string;
@@ -41,6 +42,7 @@ export function ScanDialog({
   presetDate?: IsoDate;
   onSaved: (message: string) => void;
   onManage: () => void;
+  onWarning: (message: string) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -122,11 +124,15 @@ export function ScanDialog({
         return;
       }
       uploaded = null; // the server already took the file back
-      setFormError(outcome.error);
+      setFormError(outcome.warning ? `${outcome.error} ${outcome.warning}` : outcome.error);
+      if (outcome.warning) onWarning(outcome.warning);
     } catch (e) {
+      // The row may have been saved even though the answer never arrived, so the file stays: a leftover file is
+      // better than a scan whose printout link is broken. Only a call that certainly never ran takes it back.
+      if (!isStaleDeployError(e)) uploaded = null;
       setFormError(failureMessage(e, "Couldn't save the scan. Check your connection and try again."));
     } finally {
-      // The file of a save that did not reach the server is removed here, best effort.
+      // The file of a save that certainly never reached the server (a stale page) is removed here, best effort.
       if (uploaded) void createBrowserSupabase().storage.from('scan-attachments').remove([uploaded]);
       busy.current = false;
       setPending(false);

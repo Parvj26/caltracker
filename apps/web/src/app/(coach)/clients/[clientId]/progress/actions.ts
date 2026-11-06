@@ -9,12 +9,13 @@ import { createServerSupabase } from '@/lib/supabase/server';
 // workspace id is never taken from the browser. Printout files are removed through the Storage API, never by SQL on
 // storage.objects (that would leave the real file behind).
 
-export type Outcome<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
+export type Outcome<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string; warning?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const BUCKET = 'scan-attachments';
+const UPLOAD_LEFT_BEHIND = "The scan wasn't saved, and the uploaded printout file could not be removed.";
 const GENERIC = "Couldn't save. Please try again.";
 const refresh = () => revalidatePath('/clients/[clientId]', 'page');
 
@@ -44,6 +45,8 @@ export async function saveScan(input: SaveScanInput): Promise<Outcome<{ warning?
 
   const supabase = await createServerSupabase();
   const before = await supabase.from('body_measurements').select('attachment_path').eq('id', id).maybeSingle();
+  // Without the current printout path, a replaced or cleared file could be left behind unnoticed: stop here.
+  if (before.error) return { ok: false, error: GENERIC };
   const oldPath = before.data?.attachment_path ?? null;
 
   const p: Record<string, unknown> = { id, workspace_id: workspaceId, client_id: clientId, measured_on: measuredOn, values };
@@ -51,10 +54,14 @@ export async function saveScan(input: SaveScanInput): Promise<Outcome<{ warning?
   const { error } = await supabase.rpc('save_body_measurement', { p: p as never });
   if (error) {
     // A new file was uploaded for a save that did not happen: take it back.
-    if (typeof attachmentPath === 'string' && attachmentPath !== oldPath) await supabase.storage.from(BUCKET).remove([attachmentPath]);
+    let warning: string | undefined;
+    if (typeof attachmentPath === 'string' && attachmentPath !== oldPath) {
+      const removed = await supabase.storage.from(BUCKET).remove([attachmentPath]);
+      if (removed.error) warning = UPLOAD_LEFT_BEHIND;
+    }
     // 42501 and 23514 messages are written for people (e.g. "Add a new scan instead.").
-    if (error.code === '42501' || error.code === '23514') return { ok: false, error: error.message };
-    return { ok: false, error: GENERIC };
+    const message = error.code === '42501' || error.code === '23514' ? error.message : GENERIC;
+    return warning ? { ok: false, error: message, warning } : { ok: false, error: message };
   }
 
   let warning: string | undefined;

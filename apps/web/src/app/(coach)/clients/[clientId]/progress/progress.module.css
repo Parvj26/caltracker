@@ -25,12 +25,15 @@
 .chartTitle { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 .chartRead { margin: 0; font-variant-numeric: tabular-nums; min-height: 1.5em; }
 .chartChange { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.svg { width: 100%; height: auto; touch-action: pan-y; }
+.plot { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'y svg' '. x'; column-gap: var(--ct-space-1); }
+.yLabels { grid-area: y; display: flex; flex-direction: column; justify-content: space-between; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; }
+.xLabels { grid-area: x; display: flex; justify-content: space-between; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.svg { grid-area: svg; width: 100%; height: auto; touch-action: pan-y; border-radius: var(--ct-radius-input); }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .axis { stroke: var(--ct-border); stroke-width: 1; }
 .line { fill: none; stroke: var(--ct-ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .dot { fill: var(--ct-bg); stroke: var(--ct-ink); stroke-width: 2; cursor: pointer; }
 .dot:hover, .dot:focus-visible, .dotActive { fill: var(--ct-lime); }
-.axisText { fill: var(--ct-ink-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .note { margin: 0; color: var(--ct-ink-muted); }
 
 .tableWrap { overflow-x: auto; }
