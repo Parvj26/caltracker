@@ -249,6 +249,36 @@ test.describe('in Los Angeles', () => {
     await expect(row.locator('time')).toHaveText(`${shortDay(plannedDay)}, 11:30 pm`);
     await page.screenshot({ path: process.env.SHOT_ACTIVITY ?? 'test-results/activity.png', fullPage: true });
   });
+
+  test('a workout the client added shows as "Added by client" on the local day it finished and opens its log', async ({ page }) => {
+    await signInAsCoach(page);
+    const today = await browserToday(page);
+    const runDay = addDays(today, -2);
+    // 23:30 in Los Angeles on runDay is already the next day in UTC: the calendar must use the local day.
+    const finishedAt = [7, 8]
+      .map((h) => `${addDays(runDay, 1)}T0${h - 1}:30:00Z`)
+      .find((iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' }).format(new Date(iso)) === `${runDay}, 23:30`);
+    if (!finishedAt) throw new Error('could not find 23:30 Los Angeles time');
+    const mine = await newClient('Ari', `Added${unique()}`);
+    const name = `Saturday run ${unique()}`;
+    const logId = await log({ workspaceId, clientId: mine, name, startedAt: new Date(Date.parse(finishedAt) - 1_800_000).toISOString(), finishedAt });
+    // A discarded one is never shown.
+    const discarded = `Gave up ${unique()}`;
+    await log({ workspaceId, clientId: mine, name: discarded, status: 'discarded', startedAt: ago(300), finishedAt: ago(280) });
+
+    await page.goto(calendarUrl(mine, runDay));
+    const added = day(page, runDay).getByRole('link', { name: `${name}, added by client: view the log` });
+    await expect(added).toBeVisible();
+    await expect(added).toContainText('Added by client');
+    await expect(day(page, addDays(runDay, 1)).getByText(name)).toHaveCount(0);
+    // It isn't a planned workout: no options menu, not draggable, never "Missed".
+    await expect(page.getByRole('button', { name: `Options for ${name}` })).toHaveCount(0);
+    await expect(day(page, runDay).getByText('Missed')).toHaveCount(0);
+    await expect(page.getByText(discarded)).toHaveCount(0);
+    await added.click();
+    await expect(page).toHaveURL(new RegExp(`/clients/${mine}/logs/${logId}$`));
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  });
 });
 
 

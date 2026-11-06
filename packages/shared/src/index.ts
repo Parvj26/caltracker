@@ -59,6 +59,7 @@ export {
   addDays,
   diffDays,
   isoWeekday,
+  localDateOf,
   localToday,
   monthGrid,
   programDayToDate,

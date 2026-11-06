@@ -4,7 +4,7 @@ import { addDays, localToday, monthGrid } from '@caltracker/shared';
 import { isMonth, shiftMonth } from '@/components/calendar/format';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type PickerProgram } from './client-calendar';
+import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from './client-calendar';
 import { loadClient } from './client';
 import { StickersPanel } from './stickers-panel';
 import { StrengthPanel } from './strength-panel';
@@ -37,7 +37,7 @@ export default async function ClientPage({
   const rangeStart = monthGrid(firstMonth)[0]![0]!;
   const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
 
-  const [workouts, assignments, library, programs, stickers, strength, scheduled] = await Promise.all([
+  const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
     supabase
       .from('workouts')
       .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
@@ -81,11 +81,25 @@ export default async function ClientPage({
       .eq('client_id', client.id)
       .gte('scheduled_on', addDays(utcToday, -8))
       .order('scheduled_on'),
+    // Workouts the client added themselves: completed logs with no planned workout. They have no planned day, so
+    // they go on the day they finished in the coach's browser zone (as Activity shows the time); a day either side of
+    // the grid covers every zone. The browser picks the day.
+    supabase
+      .from('workout_logs')
+      .select('id, name, finished_at, log_blocks(log_exercises(planned_workout_exercise_id))')
+      .eq('workspace_id', workspaceId)
+      .eq('client_id', client.id)
+      .eq('status', 'completed')
+      .is('workout_id', null)
+      .gte('finished_at', `${addDays(rangeStart, -1)}T00:00:00Z`)
+      .lt('finished_at', `${addDays(rangeEnd, 2)}T00:00:00Z`)
+      .order('finished_at'),
   ]);
   if (workouts.error) throw new Error(`Could not load the calendar: ${workouts.error.message}`);
   if (assignments.error) throw new Error(`Could not load assignments: ${assignments.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
   if (programs.error) throw new Error(`Could not load programs: ${programs.error.message}`);
+  if (unplanned.error) throw new Error(`Could not load client-added workouts: ${unplanned.error.message}`);
   if (scheduled.error) throw new Error(`Could not load scheduled workouts: ${scheduled.error.message}`);
 
   // Each assignment's dates from yesterday (UTC) on, so the browser can count what "Remove from calendar" removes
@@ -118,6 +132,13 @@ export default async function ClientPage({
         ]
       : [],
   );
+  // A log whose planned workout was deleted since also has no workout_id, but its exercises still point at the plan:
+  // that one was planned, not added by the client, so it stays off the calendar with the workout the coach deleted.
+  const clientLogs: ClientLogEntry[] = unplanned.data.flatMap((l) =>
+    l.finished_at && l.log_blocks.every((b) => b.log_exercises.every((e) => e.planned_workout_exercise_id === null))
+      ? [{ id: l.id, name: l.name, finishedAt: l.finished_at }]
+      : [],
+  );
   const summaries: AssignmentSummary[] = assignments.data.map((a) => ({
     id: a.id,
     programName: a.program_name,
@@ -140,6 +161,7 @@ export default async function ClientPage({
         client={client}
         month={month}
         entries={entries}
+        clientLogs={clientLogs}
         assignments={summaries}
         library={library.data}
         programs={pickerPrograms}

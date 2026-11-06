@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { localDateOf } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
@@ -28,8 +29,14 @@ export type AssignmentSummary = {
   /** Its workouts' dates from about today on (the browser decides exactly which are upcoming). */
   dates: IsoDate[];
 };
+/** A workout the client added and finished themselves (a completed log with no planned workout). */
+export type ClientLogEntry = { id: string; name: string; finishedAt: string };
 export type PickerProgram = { id: string; name: string; weeks: number; slots: { week: number; day: number }[] };
 type LibraryWorkout = { id: string; name: string };
+
+const noSubscribe = () => () => {};
+/** The browser's time zone, or UTC on the server and during hydration (like useLocalToday). */
+const useTimeZone = () => useSyncExternalStore(noSubscribe, () => Intl.DateTimeFormat().resolvedOptions().timeZone, () => 'UTC');
 
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
@@ -47,6 +54,7 @@ export function ClientCalendar({
   client,
   month: monthParam,
   entries,
+  clientLogs,
   assignments,
   library,
   programs,
@@ -56,6 +64,8 @@ export function ClientCalendar({
   client: ClientRef;
   month: string | null;
   entries: CalendarEntry[];
+  /** Shown on the day they finished in the coach's zone, as "Added by client", linking to the log. */
+  clientLogs: readonly ClientLogEntry[];
   assignments: AssignmentSummary[];
   library: LibraryWorkout[];
   programs: PickerProgram[];
@@ -65,6 +75,7 @@ export function ClientCalendar({
   openAssign?: boolean;
 }) {
   const today = useLocalToday();
+  const timeZone = useTimeZone();
   const readOnly = client.removedAt !== null;
   const month = monthParam ?? today.slice(0, 7);
   const [items, setItems] = useState(entries);
@@ -163,6 +174,9 @@ export function ClientCalendar({
   const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
   const days: Record<IsoDate, CalendarItem[]> = {};
   for (const { date, ...item } of items) (days[date] ??= []).push(item);
+  for (const log of clientLogs) {
+    (days[localDateOf(log.finishedAt, timeZone)] ??= []).push({ id: `log-${log.id}`, name: log.name, programName: null, logId: log.id, addedByClient: true });
+  }
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
   // Empty: nothing in the month on screen and no program still running.
   const empty =

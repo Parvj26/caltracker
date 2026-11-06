@@ -34,6 +34,8 @@ export type CalendarItem = {
    * calendar doesn't track logging. Matched by the planned workout, never by the log's finish date.
    */
   logId?: string | null;
+  /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
+  addedByClient?: boolean;
 };
 
 type Props = {
@@ -214,7 +216,10 @@ function DayCell({
       <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
       {items.length > 0 ? (
         <ul className={styles.items}>
-          {items.map((item) => (
+          {items.map((item) =>
+            item.addedByClient && item.logId && logHref ? (
+              <ClientAddedItem key={item.id} name={item.name} href={logHref(item.logId)} />
+            ) : (
             <DayItem
               key={item.id}
               item={item}
@@ -225,7 +230,8 @@ function DayCell({
               logHref={logHref}
               missed={item.logId === null && today !== null && date < today}
             />
-          ))}
+            ),
+          )}
         </ul>
       ) : null}
       {onAdd ? (
@@ -298,6 +304,20 @@ function DayItem({
       ) : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+    </li>
+  );
+}
+
+/** A workout the client added on the phone: a different look, "Added by client", and the whole card opens the log. */
+function ClientAddedItem({ name, href }: { name: string; href: string }) {
+  return (
+    <li className={cx(styles.item, styles.clientItem)}>
+      <Link href={href} className={styles.clientLink} title={name} aria-label={`${name}, added by client: view the log`}>
+        <span className={styles.itemName}>{name}</span>
+        <span className={styles.clientTag}>
+          <span aria-hidden="true">✓</span> Added by client
+        </span>
+      </Link>
     </li>
   );
 }

@@ -112,6 +112,22 @@
   color: var(--ct-ink);
   overflow-wrap: break-word;
 }
+/* Added by the client on the phone: dashed ink outline on white, so it reads as "not from your plan". */
+.clientItem { background: var(--ct-bg); border: var(--ct-border-width-secondary-button) dashed var(--ct-ink); }
+.clientLink {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+}
+.clientLink:hover, .clientLink:focus-visible { background: var(--ct-surface); }
+.clientTag { font-weight: var(--ct-weight-caption); }
 .dragging { opacity: 0.4; }
 .overlayItem {
   display: inline-flex;
