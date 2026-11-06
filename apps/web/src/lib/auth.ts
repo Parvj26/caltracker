@@ -35,6 +35,6 @@ export const requireCoach = cache(async (): Promise<CoachContext> => {
     userId: auth.user.id,
     workspaceId: row.workspace_id,
     workspaceName: row.workspaces?.name ?? '',
-    units: profile.data?.units === 'lb' ? 'lb' : 'kg',
+    units: profile.data?.units === 'kg' ? 'kg' : 'lb',
   };
 });

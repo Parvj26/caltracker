@@ -12,6 +12,8 @@ pnpm --filter web exec playwright install chromium   # once
 pnpm test:e2e
 ```
 
+Before each local run, e2e global setup runs `scripts/tune-local-auth.sh`, which lets the local auth container reuse sockets and widen its port range so a full run does not run out of ports. It is skipped when `GITHUB_ACTIONS` is set and only warns if docker is not available. The setting resets when the Supabase containers restart; run the script by hand to re-apply it.
+
 Locally Playwright reuses a running `next dev`; in CI (`CI=true`) it runs `next build && next start`.
 
 ## Coach pages for programs

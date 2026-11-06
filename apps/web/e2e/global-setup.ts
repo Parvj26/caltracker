@@ -6,6 +6,14 @@ import type { Database } from '@caltracker/shared';
 // Seeds the 20-exercise fixture (idempotent), resets the demo coach to kg, and exposes service-role env to tests.
 export default async function globalSetup() {
   const root = join(__dirname, '..', '..', '..');
+  // The local auth container runs out of ports under a full run; tune it (not needed in CI). A missing docker is a warning only.
+  if (!process.env.GITHUB_ACTIONS) {
+    try {
+      execFileSync('bash', [join(root, 'scripts', 'tune-local-auth.sh')], { stdio: 'inherit' });
+    } catch (e) {
+      console.warn(`Could not tune the local auth container (is docker running?): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   const out = execFileSync('supabase', ['status', '-o', 'env'], { cwd: root, encoding: 'utf8' });
   const env: Record<string, string> = {};
   for (const line of out.split('\n')) {

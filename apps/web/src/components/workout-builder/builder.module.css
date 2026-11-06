@@ -106,8 +106,8 @@
 .dropTag { width: 7rem; font-weight: var(--ct-weight-section-heading); }
 .typeSelect { width: 7rem; cursor: pointer; }
 .reps { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
-.narrow { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
-.rangeInput { width: 3.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.narrow { width: 6rem; text-align: right; font-variant-numeric: tabular-nums; }
+.rangeInput { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
 .unitField { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
 .toggle { min-width: 4.5rem; font-size: var(--ct-size-caption); }
 .check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); cursor: pointer; }

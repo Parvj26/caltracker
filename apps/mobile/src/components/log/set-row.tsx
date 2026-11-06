@@ -17,7 +17,7 @@ import {
   type Units,
 } from '@caltracker/shared';
 import { parseActualInput, type ActualField } from '@/lib/active-log-logic';
-import { actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
+import { actualInputMinFontScale, actualInputRoomChars, actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const MAX_KG = 1000;
@@ -127,6 +127,7 @@ function ActualInput({
         style={[
           text('sectionHeading'),
           styles.input,
+          fitFont(text('sectionHeading').fontSize, draft),
           { borderRadius: radius.input, paddingHorizontal: space[2] },
           focused && styles.inputFocused,
         ]}
@@ -134,6 +135,13 @@ function ActualInput({
       <Text style={[text('caption'), styles.centre]}>{spec.unit}</Text>
     </View>
   );
+}
+
+/** Text longer than the box has room for shrinks to fit (down to a floor) instead of clipping. TextInput has no auto-fit. */
+function fitFont(fontSize: number | undefined, draft: string): { fontSize: number } | undefined {
+  if (fontSize === undefined || draft.length <= actualInputRoomChars) return undefined;
+  const scale = Math.max(actualInputMinFontScale, actualInputRoomChars / draft.length);
+  return { fontSize: Math.floor(fontSize * scale) };
 }
 
 /**
