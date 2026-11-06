@@ -393,6 +393,8 @@ export type Database = {
           note: string | null
           planned_workout_exercise_id: string | null
           position: number
+          substitute_id: string | null
+          substitute_options: Json
           swapped_from_exercise_id: string | null
           updated_at: string
           workspace_id: string
@@ -407,6 +409,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -421,6 +425,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position?: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1152,6 +1158,63 @@ export type Database = {
           },
         ]
       }
+      workout_substitutes: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          exercise_id: string
+          id: string
+          note: string | null
+          position: number
+          sets: Json
+          updated_at: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id: string
+          id?: string
+          note?: string | null
+          position: number
+          sets: Json
+          updated_at?: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          note?: string | null
+          position?: number
+          sets?: Json
+          updated_at?: string
+          workout_exercise_id?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_substitutes_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_substitutes_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workouts: {
         Row: {
           assignment_id: string | null
@@ -1383,6 +1446,16 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      json_number_ok: {
+        Args: {
+          hi: number
+          lo: number
+          lo_exclusive?: boolean
+          whole: boolean
+          x: Json
+        }
+        Returns: boolean
+      }
       last_results: {
         Args: { p_exercise_ids: string[] }
         Returns: {
@@ -1455,6 +1528,9 @@ export type Database = {
         Returns: number
       }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
+      uuid_text_ok: { Args: { t: string }; Returns: boolean }
+      valid_substitute_set: { Args: { v: Json }; Returns: boolean }
+      valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"
