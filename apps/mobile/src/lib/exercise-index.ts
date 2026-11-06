@@ -1,7 +1,8 @@
 // The exercise library the phone searches while logging. Kept in AsyncStorage so "+ Exercise" works with no signal,
-// and fetched again at most once every 24 hours. Storage and the server call are injected, so tests need neither.
+// and refreshed in the background each time the picker opens. Storage and the server call are injected, so tests
+// need neither.
 // One copy per signed-in user (custom exercises belong to a workspace), keyed `caltracker.exerciseIndex.v1.<user id>`.
-import type { ExerciseIndexRow } from '@caltracker/shared';
+import { buildExerciseIndex, type ExerciseIndex, type ExerciseIndexRow } from '@caltracker/shared';
 import type { KeyValueStorage } from './log-store';
 
 export const EXERCISE_INDEX_KEY = 'caltracker.exerciseIndex.v1';
@@ -9,9 +10,11 @@ export const EXERCISE_INDEX_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type LoadedExerciseIndex = {
   rows: ExerciseIndexRow[];
+  /** The search index built from `rows` (reused while the rows are unchanged). */
+  index: ExerciseIndex;
   /** True when the rows came from the phone's storage rather than a fresh fetch. */
   fromCache: boolean;
-  /** True when a refresh was due but failed, so the saved library is being used ("Using saved library"). */
+  /** True when the saved library is over a day old and the refresh failed ("Using saved library"). */
   refreshFailed: boolean;
 };
 
@@ -90,25 +93,43 @@ export async function forgetIndexUser(storage: KeyValueStorage): Promise<void> {
 }
 
 /**
- * Returns the saved library at once, however old. A copy older than 24 hours (or one from a clock set back) is
- * refreshed in the background: `onUpdate` gets the new rows when they land, or the saved ones with
- * `refreshFailed` when the fetch fails. With nothing saved it waits for the fetch (and rejects if that fails).
+ * Returns the saved library at once and always refreshes it in the background, so a custom exercise the coach
+ * just added (or removed) shows up the next time the picker opens. `onUpdate` hears the new rows only when they
+ * differ from the saved ones. When the refresh fails, the saved copy is kept; only a copy older than 24 hours (or
+ * from a clock set back) is reported as `refreshFailed` ("Using saved library"). With nothing saved it waits for
+ * the fetch (and rejects if that fails).
+ *
+ * The built search index is kept in memory beside the rows, so opening the picker again does not rebuild it.
  */
 export function createExerciseIndexLoader(
   storage: KeyValueStorage,
   fetchRows: () => Promise<ExerciseIndexRow[]>,
   userId: string,
   now: () => number = Date.now,
+  build: (rows: ExerciseIndexRow[]) => ExerciseIndex = buildExerciseIndex,
 ): (onUpdate?: (next: LoadedExerciseIndex) => void) => Promise<LoadedExerciseIndex> {
   const key = `${EXERCISE_INDEX_KEY}.${userId}`;
-  let inFlight: Promise<{ rows: ExerciseIndexRow[]; stillMine: boolean }> | null = null;
+  /** The saved copy (by when it was saved), its rows as JSON for comparing with a refresh, and its built index. */
+  let memo: { savedAt: number; json: string; rows: ExerciseIndexRow[]; index: ExerciseIndex } | null = null;
+  const indexed = (savedAt: number, rows: ExerciseIndexRow[]) => {
+    if (memo?.savedAt !== savedAt) memo = { savedAt, json: JSON.stringify(rows), rows, index: build(rows) };
+    return memo;
+  };
+
+  type Fetched = { rows: ExerciseIndexRow[]; index: ExerciseIndex; changed: boolean; stillMine: boolean };
+  let inFlight: Promise<Fetched> | null = null;
   const fetchAndSave = () => {
     inFlight ??= fetchRows()
-      .then(async (rows) => {
+      .then(async (rows): Promise<Fetched> => {
         // The user may have signed out, or someone else signed in, while this was loading: then save nothing.
         const stillMine = (await storage.getItem(LAST_USER_KEY).catch(() => null)) === userId;
-        if (stillMine) await storage.setItem(key, JSON.stringify({ savedAt: now(), rows })).catch(() => undefined);
-        return { rows, stillMine };
+        if (!stillMine) return { rows, index: build(rows), changed: true, stillMine };
+        const savedAt = now();
+        const json = JSON.stringify(rows);
+        const changed = memo?.json !== json;
+        memo = changed || !memo ? { savedAt, json, rows, index: build(rows) } : { ...memo, savedAt };
+        await storage.setItem(key, JSON.stringify({ savedAt, rows })).catch(() => undefined);
+        return { rows: memo.rows, index: memo.index, changed, stillMine };
       })
       .finally(() => {
         inFlight = null;
@@ -119,18 +140,20 @@ export function createExerciseIndexLoader(
   return async (onUpdate) => {
     const stored = await readStored(storage, key);
     if (!stored) {
-      return { rows: (await fetchAndSave()).rows, fromCache: false, refreshFailed: false };
+      const fetched = await fetchAndSave();
+      return { rows: fetched.rows, index: fetched.index, fromCache: false, refreshFailed: false };
     }
+    const saved = indexed(stored.savedAt, stored.rows);
     const age = now() - stored.savedAt;
-    if (age >= 0 && age < EXERCISE_INDEX_TTL_MS) {
-      return { rows: stored.rows, fromCache: true, refreshFailed: false };
-    }
+    const tooOld = !(age >= 0 && age < EXERCISE_INDEX_TTL_MS);
     fetchAndSave().then(
-      ({ rows, stillMine }) => {
-        if (stillMine) onUpdate?.({ rows, fromCache: false, refreshFailed: false });
+      ({ rows, index, changed, stillMine }) => {
+        if (stillMine && changed) onUpdate?.({ rows, index, fromCache: false, refreshFailed: false });
       },
-      () => onUpdate?.({ rows: stored.rows, fromCache: true, refreshFailed: true }),
+      () => {
+        if (tooOld) onUpdate?.({ rows: saved.rows, index: saved.index, fromCache: true, refreshFailed: true });
+      },
     );
-    return { rows: stored.rows, fromCache: true, refreshFailed: false };
+    return { rows: saved.rows, index: saved.index, fromCache: true, refreshFailed: false };
   };
 }

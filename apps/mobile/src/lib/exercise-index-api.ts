@@ -26,8 +26,8 @@ async function fetchRows(): Promise<ExerciseIndexRow[]> {
 let current: { userId: string; load: ReturnType<typeof createExerciseIndexLoader> } | null = null;
 
 /**
- * The exercise library for the signed-in user: the saved copy at once, refreshed in the background when over a day
- * old (`onUpdate` hears the result). Works offline, even when the expired session can't be read.
+ * The exercise library for the signed-in user, with its search index: the saved copy at once, refreshed in the
+ * background on every open (`onUpdate` hears new rows). Works offline, even when the expired session can't be read.
  */
 export async function loadExerciseIndexCached(onUpdate?: (next: LoadedExerciseIndex) => void): Promise<LoadedExerciseIndex> {
   const { data } = await supabase.auth.getSession(); // reads the stored session, no network call

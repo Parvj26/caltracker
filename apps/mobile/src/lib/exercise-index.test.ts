@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ExerciseIndexRow } from '@caltracker/shared';
+import { buildExerciseIndex, type ExerciseIndexRow } from '@caltracker/shared';
 import { LAST_USER_KEY, forgetIndexUser, EXERCISE_INDEX_KEY, EXERCISE_INDEX_TTL_MS, createExerciseIndexLoader as makeLoader, resolveIndexUser } from './exercise-index';
 import { memoryStorage } from './log-fixtures';
 
@@ -17,10 +17,22 @@ const row = (id: string, over: Partial<ExerciseIndexRow> = {}): ExerciseIndexRow
 });
 type Store = ReturnType<typeof memoryStorage>;
 // In the app the signed-in user is remembered before the loader runs; do the same here.
-const createExerciseIndexLoader = (s: Store, f: Parameters<typeof makeLoader>[1], u: string, n?: () => number) => {
+const createExerciseIndexLoader = (
+  s: Store,
+  f: Parameters<typeof makeLoader>[1],
+  u: string,
+  n?: () => number,
+  b?: Parameters<typeof makeLoader>[4],
+) => {
   s.map.set(LAST_USER_KEY, u);
-  return makeLoader(s, f, u, n);
+  return makeLoader(s, f, u, n, b);
 };
+/** The loaded result without its built index, for comparing. */
+const plain = (r: unknown) => {
+  const { index: _index, ...rest } = r as { index: unknown };
+  return rest;
+};
+const tick = () => new Promise((r) => setTimeout(r, 0));
 const never = () => Promise.reject(new Error('Network request failed'));
 
 describe('createExerciseIndexLoader', () => {
@@ -28,17 +40,74 @@ describe('createExerciseIndexLoader', () => {
     const storage = memoryStorage();
     const fetchRows = vi.fn().mockResolvedValue([row('a')]);
     const load = createExerciseIndexLoader(storage, fetchRows, 'u1', () => 1000);
-    expect(await load()).toEqual({ rows: [row('a')], fromCache: false, refreshFailed: false });
+    const first = await load();
+    expect(plain(first)).toEqual({ rows: [row('a')], fromCache: false, refreshFailed: false });
+    expect(first.index.rows).toEqual([row('a')]);
     expect([...storage.map.keys()].some((k) => k.startsWith(EXERCISE_INDEX_KEY))).toBe(true);
   });
 
-  it('answers from storage without fetching when it is younger than 24 hours', async () => {
+  it('answers from a young saved copy at once and still refreshes it in the background', async () => {
     const storage = memoryStorage();
     await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
-    const fetchRows = vi.fn().mockResolvedValue([row('b')]);
-    const r = await createExerciseIndexLoader(storage, fetchRows, 'u1', () => EXERCISE_INDEX_TTL_MS - 1)();
-    expect(r).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: false });
-    expect(fetchRows).not.toHaveBeenCalled();
+    const fetchRows = vi.fn().mockResolvedValue([row('a'), row('custom', { source: 'custom' })]);
+    const updates: unknown[] = [];
+    const r = await createExerciseIndexLoader(storage, fetchRows, 'u1', () => 60_000)((n) => updates.push(plain(n)));
+    expect(plain(r)).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: false });
+    await tick();
+    expect(fetchRows).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([{ rows: [row('a'), row('custom', { source: 'custom' })], fromCache: false, refreshFailed: false }]);
+  });
+
+  it('says nothing when a young copy cannot be refreshed (no "Using saved library")', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    const onUpdate = vi.fn();
+    const r = await createExerciseIndexLoader(storage, never, 'u1', () => EXERCISE_INDEX_TTL_MS - 1)(onUpdate);
+    expect(r.rows).toEqual([row('a')]);
+    await tick();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('says nothing when the refresh brings the same rows, and keeps the built index', async () => {
+    const storage = memoryStorage();
+    const build = vi.fn(buildExerciseIndex);
+    let clock = 0;
+    const load = createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => clock, build);
+    const first = await load();
+    clock = 1000;
+    const onUpdate = vi.fn();
+    const second = await load(onUpdate);
+    await tick();
+    expect(onUpdate).not.toHaveBeenCalled();
+    clock = 2000;
+    const third = await load();
+    await tick();
+    expect(second.index).toBe(first.index);
+    expect(third.index).toBe(first.index);
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds the search index once per saved copy, not on every open', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    const build = vi.fn(buildExerciseIndex);
+    const load = createExerciseIndexLoader(storage, never, 'u1', () => 1000, build);
+    const a = await load();
+    const b = await load();
+    expect(b.index).toBe(a.index);
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
+  it('rebuilds the index when a refresh brings new rows, then reuses that one', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    const build = vi.fn(buildExerciseIndex);
+    const load = createExerciseIndexLoader(storage, () => Promise.resolve([row('b')]), 'u1', () => 1000, build);
+    const updated = await new Promise<Awaited<ReturnType<typeof load>>>((done) => void load(done));
+    expect(updated.index.rows).toEqual([row('b')]);
+    const again = await load();
+    expect(again.index).toBe(updated.index);
+    expect(build).toHaveBeenCalledTimes(2); // the saved copy, then the new rows
   });
 
   it('returns an old saved library at once and refreshes it in the background', async () => {
@@ -50,10 +119,10 @@ describe('createExerciseIndexLoader', () => {
     const landed = new Promise<void>((done) => {
       const load = createExerciseIndexLoader(storage, fetchRows, 'u1', () => EXERCISE_INDEX_TTL_MS + 1);
       void load((n) => {
-        updates.push(n);
+        updates.push(plain(n));
         done();
       }).then((first) => {
-        expect(first).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: false });
+        expect(plain(first)).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: false });
         expect(updates).toEqual([]);
         release([row('b')]);
       });
@@ -71,7 +140,7 @@ describe('createExerciseIndexLoader', () => {
     const update = await new Promise((done) => {
       void createExerciseIndexLoader(storage, never, 'u1', () => EXERCISE_INDEX_TTL_MS * 3)(done);
     });
-    expect(update).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: true });
+    expect(plain(update)).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: true });
   });
 
   it('treats a clock set back (negative age) as old and refreshes', async () => {
@@ -80,7 +149,7 @@ describe('createExerciseIndexLoader', () => {
     const update = await new Promise((done) => {
       void createExerciseIndexLoader(storage, () => Promise.resolve([row('b')]), 'u1', () => 5_000)(done);
     });
-    expect(update).toEqual({ rows: [row('b')], fromCache: false, refreshFailed: false });
+    expect(plain(update)).toEqual({ rows: [row('b')], fromCache: false, refreshFailed: false });
   });
 
   it('ignores stored JSON with the wrong shape', async () => {

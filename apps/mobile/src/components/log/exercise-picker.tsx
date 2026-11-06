@@ -6,7 +6,6 @@ import {
   EQUIPMENT_CHIPS,
   MUSCLE_CHIPS,
   TRACKING_TYPE_LABELS,
-  buildExerciseIndex,
   searchExercises,
   type ExerciseIndexRow,
   type ExercisePick,
@@ -109,7 +108,7 @@ export function ExercisePicker({
     };
   }, [visible]);
 
-  const index = useMemo(() => (data ? buildExerciseIndex(data.rows) : null), [data]);
+  const index = data?.index ?? null;
   const boosts = useMemo(() => ({ favourites: NO_FAVOURITES, recent }), [recent]);
   const hits = useMemo(
     () => (index ? searchExercises(index, query, filters, boosts).slice(0, MAX_SHOWN) : []),
