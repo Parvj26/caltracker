@@ -57,10 +57,13 @@ test('keyboard: Down moves the highlight, Enter picks', async ({ page }) => {
   const search = dialog.getByLabel('Search exercises');
   await search.fill('squat');
   await search.press('ArrowDown');
+  // "+ Exercise" picks several, so aria-selected means "picked"; the highlight is the box's active option.
   const second = dialog.getByRole('option').nth(1);
-  await expect(second).toHaveAttribute('aria-selected', 'true');
+  await expect(search).toHaveAttribute('aria-activedescendant', (await second.getAttribute('id'))!);
+  await expect(second).toHaveAttribute('aria-selected', 'false');
   const name = (await second.getAttribute('aria-label'))!;
   await search.press('Enter');
+  await expect(second).toHaveAttribute('aria-selected', 'true');
   await expect(dialog.getByRole('list', { name: "Picked, in the order they're done" })).toContainText(name);
   await dialog.getByRole('button', { name: 'Add 1 exercise', exact: true }).click();
   await expect(dialog).toBeHidden();
