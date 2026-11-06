@@ -34,13 +34,17 @@ export function setRow(page: Page, exercise: string, row: string): Locator {
   return page.getByRole('group', { name: `${exercise} ${row}`, exact: true });
 }
 
-/** Opens the picker from `button` and picks one exercise by its exact name. */
+/**
+ * Opens the picker from `button` and picks one exercise by its exact name. "+ Exercise" picks several (tap each, then
+ * "Add N exercises"); the swap picker adds the one exercise straight away.
+ */
 export async function pickExercise(page: Page, buttonName: string, exercise: string) {
   await page.getByRole('button', { name: buttonName, exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Search exercises').fill(exercise);
   await dialog.getByRole('option', { name: exercise, exact: true }).click();
-  await dialog.getByRole('button', { name: 'Add to workout', exact: true }).click();
+  if (buttonName === '+ Exercise') await dialog.getByRole('button', { name: 'Add 1 exercise', exact: true }).click();
+  else await dialog.getByRole('button', { name: 'Add to workout', exact: true }).click();
   await expect(dialog).toBeHidden();
 }
 

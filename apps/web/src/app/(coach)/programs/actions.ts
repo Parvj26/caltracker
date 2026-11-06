@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PROGRAM_WEEKS_MAX, ProgramInput } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, copyName } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -210,4 +210,90 @@ export async function removeProgramWorkout(id: string): Promise<void> {
   // Removing a slot that's already gone is fine: the coach wanted it gone.
   const { error } = await supabase.from('program_workouts').delete().eq('id', id).eq('workspace_id', workspaceId);
   if (error) throw new Error(`Could not remove the workout: ${error.message}`);
+}
+
+export type DuplicateProgramOutcome = { ok: true; id: string } | { ok: false; error: string };
+
+/**
+ * Copies a program (details and every workout on its weeks) into a new program named "<name> (copy)" in the coach's
+ * workspace. duplicate_program does it in one transaction and refuses a program the caller can't see (another
+ * workspace's), so a half-made copy is never left behind.
+ */
+export async function duplicateProgram(id: string): Promise<DuplicateProgramOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(id)) return { ok: false, error: "Couldn't find that program." };
+  const supabase = await createServerSupabase();
+  const { data: program, error: readError } = await supabase
+    .from('programs')
+    .select('name')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (readError) return { ok: false, error: "Couldn't copy. Please try again." };
+  if (!program) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+
+  const newId = crypto.randomUUID();
+  const { error } = await supabase.rpc('duplicate_program', {
+    p_new_id: newId,
+    p_program_id: id,
+    p_name: copyName(program.name),
+  });
+  if (error) return { ok: false, error: "Couldn't copy. Please try again." };
+  revalidatePath('/programs');
+  return { ok: true, id: newId };
+}
+
+export type CopyWeekOutcome =
+  | { ok: true; slots: Array<{ id: string; week: number; day: number; position: number; workoutId: string }> }
+  | { ok: false; error: string };
+
+/** A week holds at most 7 days of a few workouts each; this only stops absurd requests. */
+const COPY_IDS_MAX = 2000;
+
+/**
+ * Copies week `fromWeek` onto `toWeeks` (increasing, each once), replacing what those weeks held. The browser makes
+ * the new slot ids (`ids`, in copyWeek's order from packages/shared) so the grid already shows the ids the database
+ * keeps; copy_program_week reads the source week and writes the targets in one transaction, and refuses when the
+ * number of ids doesn't match the saved source week. Returns the saved slots of the target weeks.
+ */
+export async function copyProgramWeek(input: {
+  programId: string;
+  fromWeek: number;
+  toWeeks: number[];
+  ids: string[];
+}): Promise<CopyWeekOutcome> {
+  await requireCoach();
+  const { programId, fromWeek, toWeeks, ids } = input;
+  if (
+    !isUuid(programId) ||
+    !isInt(fromWeek, 1, PROGRAM_WEEKS_MAX) ||
+    !Array.isArray(toWeeks) ||
+    toWeeks.length === 0 ||
+    !toWeeks.every((w, i) => isInt(w, 1, PROGRAM_WEEKS_MAX) && w !== fromWeek && (i === 0 || w > toWeeks[i - 1]!)) ||
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > COPY_IDS_MAX ||
+    !ids.every(isUuid)
+  ) {
+    return { ok: false, error: "Couldn't copy that week." };
+  }
+  // RLS (security invoker) limits the function to the coach's own workspace's programs.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.rpc('copy_program_week', {
+    p_program_id: programId,
+    p_from: fromWeek,
+    p_to: toWeeks,
+    p_ids: ids,
+  });
+  if (error) {
+    // 23514: a guard in copy_program_week; its message is written for the coach.
+    if (error.code === '23514') return { ok: false, error: error.message };
+    if (error.code === '42501') return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+    return { ok: false, error: "Couldn't copy. Please try again." };
+  }
+  revalidatePath(`/programs/${programId}`);
+  return {
+    ok: true,
+    slots: data.map((r) => ({ id: r.id, week: r.week, day: r.day, position: r.position, workoutId: r.workout_id })),
+  };
 }
