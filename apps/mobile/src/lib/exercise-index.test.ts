@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExerciseIndexRow } from '@caltracker/shared';
-import { EXERCISE_INDEX_KEY, EXERCISE_INDEX_TTL_MS, createExerciseIndexLoader } from './exercise-index';
+import { EXERCISE_INDEX_KEY, EXERCISE_INDEX_TTL_MS, createExerciseIndexLoader, resolveIndexUser } from './exercise-index';
 import { memoryStorage } from './log-fixtures';
 
 const row = (id: string, over: Partial<ExerciseIndexRow> = {}): ExerciseIndexRow => ({
@@ -35,22 +35,61 @@ describe('createExerciseIndexLoader', () => {
     expect(fetchRows).not.toHaveBeenCalled();
   });
 
-  it('refreshes when the stored library is older than 24 hours', async () => {
+  it('returns an old saved library at once and refreshes it in the background', async () => {
     const storage = memoryStorage();
     await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
-    const fetchRows = vi.fn().mockResolvedValue([row('b')]);
-    const r = await createExerciseIndexLoader(storage, fetchRows, 'u1', () => EXERCISE_INDEX_TTL_MS + 1)();
-    expect(r).toEqual({ rows: [row('b')], fromCache: false, refreshFailed: false });
-    // And the new copy is what is stored now.
+    let release: (r: ExerciseIndexRow[]) => void = () => undefined;
+    const fetchRows = vi.fn(() => new Promise<ExerciseIndexRow[]>((res) => (release = res)));
+    const updates: unknown[] = [];
+    const landed = new Promise<void>((done) => {
+      const load = createExerciseIndexLoader(storage, fetchRows, 'u1', () => EXERCISE_INDEX_TTL_MS + 1);
+      void load((n) => {
+        updates.push(n);
+        done();
+      }).then((first) => {
+        expect(first).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: false });
+        expect(updates).toEqual([]);
+        release([row('b')]);
+      });
+    });
+    await landed;
+    expect(updates).toEqual([{ rows: [row('b')], fromCache: false, refreshFailed: false }]);
+    // The new copy is what is stored now.
     const again = await createExerciseIndexLoader(storage, never, 'u1', () => EXERCISE_INDEX_TTL_MS + 2)();
     expect(again.rows).toEqual([row('b')]);
   });
 
-  it('returns the stored library when the fetch rejects', async () => {
+  it('keeps the saved library and reports refreshFailed when the background refresh rejects', async () => {
     const storage = memoryStorage();
     await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
-    const r = await createExerciseIndexLoader(storage, never, 'u1', () => EXERCISE_INDEX_TTL_MS * 3)();
-    expect(r).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: true });
+    const update = await new Promise((done) => {
+      void createExerciseIndexLoader(storage, never, 'u1', () => EXERCISE_INDEX_TTL_MS * 3)(done);
+    });
+    expect(update).toEqual({ rows: [row('a')], fromCache: true, refreshFailed: true });
+  });
+
+  it('treats a clock set back (negative age) as old and refreshes', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 10_000)();
+    const update = await new Promise((done) => {
+      void createExerciseIndexLoader(storage, () => Promise.resolve([row('b')]), 'u1', () => 5_000)(done);
+    });
+    expect(update).toEqual({ rows: [row('b')], fromCache: false, refreshFailed: false });
+  });
+
+  it('ignores stored JSON with the wrong shape', async () => {
+    for (const bad of [
+      { ...row('a'), source: 'other' },
+      { ...row('a'), equipment: 5 },
+      { ...row('a'), category: [] },
+      { ...row('a'), imagePath: 1 },
+      { ...row('a'), primaryMuscles: [1] },
+    ]) {
+      const storage = memoryStorage();
+      storage.map.set(`${EXERCISE_INDEX_KEY}.u1`, JSON.stringify({ savedAt: 0, rows: [bad] }));
+      const r = await createExerciseIndexLoader(storage, () => Promise.resolve([row('z')]), 'u1', () => 1)();
+      expect(r.rows).toEqual([row('z')]);
+    }
   });
 
   it('fails when there is nothing stored and the fetch rejects', async () => {
@@ -75,5 +114,38 @@ describe('createExerciseIndexLoader', () => {
     const load = createExerciseIndexLoader(memoryStorage(), fetchRows, 'u1');
     await Promise.all([load(), load()]);
     expect(fetchRows).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveIndexUser', () => {
+  const keysOf = (storage: ReturnType<typeof memoryStorage>) => () => Promise.resolve([...storage.map.keys()]);
+
+  it('uses the signed-in user and remembers them', async () => {
+    const storage = memoryStorage();
+    expect(await resolveIndexUser(storage, keysOf(storage), 'u1')).toBe('u1');
+    // Later, offline with an expired token and no readable session: the last user's saved library is used.
+    expect(await resolveIndexUser(storage, keysOf(storage), null)).toBe('u1');
+  });
+
+  it('serves the saved library offline with no session', async () => {
+    const storage = memoryStorage();
+    await resolveIndexUser(storage, keysOf(storage), 'u1');
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    const id = await resolveIndexUser(storage, keysOf(storage), null);
+    const r = await createExerciseIndexLoader(storage, never, id as string, () => 1000)();
+    expect(r.rows).toEqual([row('a')]);
+  });
+
+  it('is null when nobody has signed in on this phone', async () => {
+    const storage = memoryStorage();
+    expect(await resolveIndexUser(storage, keysOf(storage), null)).toBeNull();
+  });
+
+  it('removes the previous user’s saved library when a different user signs in', async () => {
+    const storage = memoryStorage();
+    await resolveIndexUser(storage, keysOf(storage), 'u1');
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1')();
+    await resolveIndexUser(storage, keysOf(storage), 'u2');
+    expect(storage.map.has(`${EXERCISE_INDEX_KEY}.u1`)).toBe(false);
   });
 });

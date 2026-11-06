@@ -2,7 +2,7 @@
 // exercises plus their own workspace's custom ones.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ExerciseIndexRow } from '@caltracker/shared';
-import { createExerciseIndexLoader, type LoadedExerciseIndex } from './exercise-index';
+import { createExerciseIndexLoader, resolveIndexUser, type LoadedExerciseIndex } from './exercise-index';
 import { supabase } from './supabase';
 
 const PAGE = 1000; // PostgREST returns at most 1,000 rows per request
@@ -35,15 +35,18 @@ async function fetchRows(): Promise<ExerciseIndexRow[]> {
   return rows;
 }
 
-let current: { userId: string; load: () => Promise<LoadedExerciseIndex> } | null = null;
+let current: { userId: string; load: ReturnType<typeof createExerciseIndexLoader> } | null = null;
 
-/** The exercise library for the signed-in user: from the phone when fresh or offline, else fetched and saved. */
-export async function loadExerciseIndexCached(): Promise<LoadedExerciseIndex> {
+/**
+ * The exercise library for the signed-in user: the saved copy at once, refreshed in the background when over a day
+ * old (`onUpdate` hears the result). Works offline, even when the expired session can't be read.
+ */
+export async function loadExerciseIndexCached(onUpdate?: (next: LoadedExerciseIndex) => void): Promise<LoadedExerciseIndex> {
   const { data } = await supabase.auth.getSession(); // reads the stored session, no network call
-  const userId = data.session?.user.id;
+  const userId = await resolveIndexUser(AsyncStorage, () => AsyncStorage.getAllKeys(), data.session?.user.id ?? null);
   if (!userId) throw new Error('Not signed in');
   if (current?.userId !== userId) current = { userId, load: createExerciseIndexLoader(AsyncStorage, fetchRows, userId) };
-  return current.load();
+  return current.load(onUpdate);
 }
 
 /** The client's most recently logged exercises, newest first. Empty when it can't be loaded (e.g. offline). */
