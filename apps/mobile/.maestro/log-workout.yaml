@@ -1,4 +1,4 @@
-# The client logs today's planned workout: Start, tick a set (the rest timer opens), skip the rest, tick the
+# The client logs today's planned workout: Start, Done on set 1 (the rest panel opens), skip the rest, Done on the
 # other two, Finish. The summary shows the sets and the volume; Today then shows Done ✓, and its View button
 # opens the same summary again.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
@@ -12,6 +12,8 @@ env:
     env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
@@ -19,22 +21,21 @@ env:
     visible: 'E2E Log'
     timeout: 20000
 - tapOn: 'Start'
-# The first workout asks to allow notifications (rest timer and reminder).
-- tapOn:
-    text: Allow
-    optional: true
 - extendedWaitUntil:
     visible:
-      id: tick-0-0
+      id: done-0
     timeout: 20000
-# The exercise name opens its info sheet: name, instructions, a Close button.
+- assertVisible: 'Set 1 of 3'
+# How to (on the photo) opens the info sheet: name, instructions, a Close button.
 - tapOn:
-    id: exercise-name-0
+    id: how-to-0
 - extendedWaitUntil:
     visible:
       id: exercise-sheet-name
     timeout: 10000
-- assertVisible: 'Barbell Squat'
+- assertVisible:
+    id: exercise-sheet-name
+    text: 'Barbell Squat'
 - assertVisible: 'Instructions'
 - assertVisible: '1\..*'
 - takeScreenshot: exercise-sheet
@@ -42,26 +43,42 @@ env:
     id: exercise-sheet-close
 - assertNotVisible:
     id: exercise-sheet-name
-- tapOn:
-    id: tick-0-0
+# Done says what happens next; set 1 starts the 1:30 rest, whose panel says what comes after it.
 - assertVisible:
-    id: rest-sheet
+    id: done-0
+    text: 'Done · start rest 1:30'
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- assertVisible:
+    id: rest-next
+    text: 'Next: Barbell Squat · set 2 of 3 · 132 lb × 8'
 - tapOn:
     id: rest-skip
 - assertNotVisible:
-    id: rest-sheet
+    id: rest-panel
+- assertVisible: 'Set 2 of 3'
 - tapOn:
-    id: tick-0-1
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: tick-0-2
+    id: done-0
 - tapOn:
     id: rest-skip
+- assertVisible:
+    id: done-0
+    text: 'Done · last set'
 - tapOn:
-    id: log-menu
+    id: done-0
+# The last set starts no rest; the page says the exercise is finished.
+- extendedWaitUntil:
+    visible:
+      id: all-done-0
+    timeout: 10000
+- assertNotVisible:
+    id: rest-panel
 - tapOn:
-    id: finish-button
+    id: finish-workout
 # Every set was ticked, so there is no "sets not done" question.
 - extendedWaitUntil:
     visible: '3 sets completed'

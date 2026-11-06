@@ -8,6 +8,7 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign <email>   the coach assigns "E2E Upper" to this client today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-mixed <email>   "E2E Mixed" (warm-up, superset, drops) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
@@ -126,12 +127,14 @@ const squatSet = (restSeconds: number): PlanSet => ({
   restSeconds,
 });
 
+type PlanBlock = { kind: 'straight' | 'superset'; exercises: Array<{ name: string; sets: PlanSet[] }> };
+
 /**
- * What the coach does on the dashboard: save a library workout `name` of Barbell Squat with these sets, put it on
- * Day 1 of a 1-week program "E2E Program", and assign that to the client starting today in this Mac's time zone
- * (the simulator's). Clears earlier E2E rows first, so it can be rerun.
+ * What the coach does on the dashboard: save a library workout `name` with these blocks (built-in exercises looked
+ * up by name), put it on Day 1 of a 1-week program "E2E Program", and assign that to the client starting today in
+ * this Mac's time zone (the simulator's). Clears earlier E2E rows first, so it can be rerun.
  */
-async function assignWorkout(email: string, name: string, sets: PlanSet[]): Promise<void> {
+async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): Promise<void> {
   await cleanupWorkouts();
   const clientId = await findUserId(email);
   if (!clientId) throw new Error(`No user with email ${email}`);
@@ -139,35 +142,36 @@ async function assignWorkout(email: string, name: string, sets: PlanSet[]): Prom
   try {
     const { data: ws, error: wsErr } = await coach.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
     if (wsErr) throw wsErr;
-    const { data: squat, error: exErr } = await coach
+    const names = [...new Set(blocks.flatMap((b) => b.exercises.map((e) => e.name)))];
+    const { data: found, error: exErr } = await coach
       .from('exercises')
       .select('id, name, tracking_type')
       .eq('source', 'builtin')
-      .eq('name', 'Barbell Squat')
-      .limit(1)
-      .single();
-    if (exErr) throw new Error(`Barbell Squat not found (run pnpm import:exercises): ${exErr.message}`);
+      .in('name', names);
+    if (exErr) throw exErr;
+    const byName = new Map(found.map((e) => [e.name, e]));
+    const missing = names.filter((n) => !byName.has(n));
+    if (missing.length > 0) throw new Error(`${missing.join(', ')} not found (run pnpm import:exercises)`);
 
     const doc: WorkoutDoc = {
       id: randomUUID(),
       name,
       notes: null,
-      blocks: [
-        {
-          id: randomUUID(),
-          kind: 'straight',
-          exercises: [
-            {
-              id: randomUUID(),
-              exerciseId: squat.id,
-              exerciseName: squat.name,
-              trackingType: squat.tracking_type,
-              note: null,
-              sets: sets.map((s) => ({ ...s, id: randomUUID() })),
-            },
-          ],
-        },
-      ],
+      blocks: blocks.map((b) => ({
+        id: randomUUID(),
+        kind: b.kind,
+        exercises: b.exercises.map((e) => {
+          const ex = byName.get(e.name)!;
+          return {
+            id: randomUUID(),
+            exerciseId: ex.id,
+            exerciseName: ex.name,
+            trackingType: ex.tracking_type,
+            note: null,
+            sets: e.sets.map((s) => ({ ...s, id: randomUUID() })),
+          };
+        }),
+      })),
     };
     const { data: workoutId, error: saveErr } = await coach.rpc('save_workout', { p_workspace_id: ws.id, p_doc: doc });
     if (saveErr) throw saveErr;
@@ -196,18 +200,58 @@ async function assignWorkout(email: string, name: string, sets: PlanSet[]): Prom
   }
 }
 
+/** One straight block of Barbell Squat. */
+const squat = (sets: PlanSet[]): PlanBlock[] => [{ kind: 'straight', exercises: [{ name: 'Barbell Squat', sets }] }];
+
+/** A set with reps (and optionally kg) targets. */
+const plan = (setType: PlanSet['setType'], reps: number | null, kg: number | null, restSeconds: number, toFailure = false): PlanSet => ({
+  ...NO_EXTRA,
+  setType,
+  targetRepsMin: reps,
+  targetRepsMax: reps,
+  targetWeightKg: kg,
+  toFailure,
+  restSeconds,
+});
+
 /** "E2E Upper": Barbell Squat, 8 reps @ 60 kg, then a drop to failure. */
 export function assign(email: string): Promise<void> {
-  return assignWorkout(email, 'E2E Upper', [
-    squatSet(90),
-    { ...NO_EXTRA, setType: 'drop', targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, toFailure: true, restSeconds: 0 },
-  ]);
+  return assignWorkout(email, 'E2E Upper', squat([squatSet(90), plan('drop', null, null, 0, true)]));
 }
 
 /** "E2E Log": Barbell Squat 3 × 8 @ 60 kg with 90 s rests, for the logging flows. Starts with no logs left over. */
 export async function assignToday(email: string): Promise<void> {
   await cleanupLogs(email);
-  await assignWorkout(email, 'E2E Log', [squatSet(90), squatSet(90), squatSet(90)]);
+  await assignWorkout(email, 'E2E Log', squat([squatSet(90), squatSet(90), squatSet(90)]));
+}
+
+/**
+ * "E2E Mixed" today, for log-flow: (1) Barbell Squat W 20 kg × 10 rest 60, then 2 × 8 @ 60 kg rest 90;
+ * (2) superset Pullups + Pushups, 2 rounds of 8 reps, rests A1 0 / A2 60; (3) Dumbbell Bicep Curl 2 × 12 @ 10 kg
+ * rest 60, the second followed by drops of 7.5 kg and 5 kg to failure. Starts with no logs left over.
+ */
+export async function assignTodayMixed(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const round = (rest: number) => [plan('normal', 8, null, rest), plan('normal', 8, null, rest)];
+  await assignWorkout(email, 'E2E Mixed', [
+    ...squat([plan('warmup', 10, 20, 60), squatSet(90), squatSet(90)]),
+    {
+      kind: 'superset',
+      exercises: [
+        { name: 'Pullups', sets: round(0) },
+        { name: 'Pushups', sets: round(60) },
+      ],
+    },
+    {
+      kind: 'straight',
+      exercises: [
+        {
+          name: 'Dumbbell Bicep Curl',
+          sets: [plan('normal', 12, 10, 60), plan('normal', 12, 10, 60), plan('drop', null, 7.5, 0, true), plan('drop', null, 5, 0, true)],
+        },
+      ],
+    },
+  ]);
 }
 
 /** The only account whose logs the flows may delete. */
@@ -260,6 +304,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign') await assign(email);
   else if (action === 'cleanup-workouts') await cleanupWorkouts();
   else if (action === 'assign-today') await assignToday(email);
+  else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   else throw new Error(`Unknown action ${action}`);
 }
