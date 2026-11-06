@@ -7,6 +7,9 @@ import { LIBRARY } from './fixtures/library';
 // Shared CI runners are several times slower than a developer machine; the budget still catches
 // a real regression (an order-of-magnitude slowdown) without flaking on a busy runner.
 const PERF_BUDGET_MS = process.env.CI ? 500 : 100;
+// Vitest's default 5 s limit times every pass, warm-ups included; on a busy CI runner that alone can exceed it.
+// The speed budget above is the real check, so give the whole loop room to finish.
+const PERF_TEST_TIMEOUT_MS = 30_000;
 
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_BOOSTS: SearchBoosts = { favourites: new Set(), recent: [] };
@@ -81,5 +84,5 @@ describe('performance (real library)', () => {
       best = Math.min(best, (performance.now() - t0) * 5);
     }
     expect(best).toBeLessThan(PERF_BUDGET_MS);
-  });
+  }, PERF_TEST_TIMEOUT_MS);
 });
