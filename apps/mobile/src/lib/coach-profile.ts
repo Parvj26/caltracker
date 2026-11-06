@@ -1,6 +1,7 @@
 // The client's coach card (photo, name, business, bio), kept on the phone so it shows without signal.
 // Pure logic with injected fetch/sign functions so it can be unit tested; the network side is coach-profile-api.ts.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { thumbPathOf } from '@caltracker/shared';
 
 export type CoachRecord = {
   name: string;
@@ -20,11 +21,6 @@ export type CoachProfile = {
 };
 
 const key = (userId: string) => `caltracker.coach.${userId}`;
-
-/** The thumbnail beside a full photo. The extension (webp, or jpg when the browser could not make WebP) is kept. */
-export function thumbPath(avatarPath: string): string {
-  return avatarPath.replace(/avatar\.(webp|jpg)$/, 'avatar-thumb.$1');
-}
 
 /** `?v=` changes with the profile's updated_at, so a replaced photo is never served from the image cache. */
 export function withVersion(url: string, updatedAt: string | null): string {
@@ -59,7 +55,7 @@ async function toProfile(record: CoachRecord, signUrl: (path: string) => Promise
   let avatarUrl: string | null = null;
   if (record.avatarPath) {
     try {
-      avatarUrl = withVersion(await signUrl(thumbPath(record.avatarPath)), record.updatedAt);
+      avatarUrl = withVersion(await signUrl(thumbPathOf(record.avatarPath)), record.updatedAt);
     } catch {
       avatarUrl = null; // initials show instead
     }

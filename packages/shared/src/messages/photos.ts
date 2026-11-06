@@ -20,7 +20,7 @@ export function photoPaths(workspaceId: string, conversationId: string, photoId:
   return { full: `${base}.${ext}`, thumb: `${base}-thumb.${ext}` };
 }
 
-/** The thumbnail path of a stored photo path. */
+/** The thumbnail path of a stored photo path (chat photos and coach photos): `x.webp` -> `x-thumb.webp`, same for jpg. */
 export function thumbPathOf(fullPath: string): string {
   return fullPath.replace(/\.(webp|jpg)$/, '-thumb.$1');
 }

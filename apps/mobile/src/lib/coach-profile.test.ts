@@ -9,7 +9,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-import { loadCoachProfile, thumbPath, withVersion, type CoachRecord } from './coach-profile';
+import { loadCoachProfile, withVersion, type CoachRecord } from './coach-profile';
 
 const record: CoachRecord = {
   name: 'Mia Coach',
@@ -23,16 +23,6 @@ const sign = vi.fn((path: string) => Promise.resolve(`https://x/${path}?token=t`
 beforeEach(() => {
   store.clear();
   sign.mockClear();
-});
-
-describe('thumbPath', () => {
-  it('points at the thumbnail with the same extension', () => {
-    expect(thumbPath('u1/avatar.webp')).toBe('u1/avatar-thumb.webp');
-    expect(thumbPath('u1/avatar.jpg')).toBe('u1/avatar-thumb.jpg');
-  });
-  it('leaves an unexpected path alone', () => {
-    expect(thumbPath('u1/other.png')).toBe('u1/other.png');
-  });
 });
 
 describe('withVersion', () => {

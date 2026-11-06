@@ -24,6 +24,13 @@ describe('photo paths', () => {
     expect(thumbPathOf('w/c/p.webp')).toBe('w/c/p-thumb.webp');
     expect(thumbPathOf('w/c/p.jpg')).toBe('w/c/p-thumb.jpg');
   });
+  it('finds the thumbnail of a coach photo, keeping its extension', () => {
+    expect(thumbPathOf('u1/avatar.webp')).toBe('u1/avatar-thumb.webp');
+    expect(thumbPathOf('u1/avatar.jpg')).toBe('u1/avatar-thumb.jpg');
+  });
+  it('leaves a path that is not WebP or JPEG alone', () => {
+    expect(thumbPathOf('u1/other.png')).toBe('u1/other.png');
+  });
   it('allows up to 4 photos', () => {
     expect(MAX_PHOTOS).toBe(4);
   });
