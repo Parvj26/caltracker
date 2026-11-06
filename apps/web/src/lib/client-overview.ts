@@ -33,6 +33,7 @@ export type ClientOverview = {
 };
 
 const NOTES_LIMIT = 200;
+const SCANS_LIMIT = 500;
 
 export async function loadClientOverview(
   supabase: SupabaseClient<Database>,
@@ -42,7 +43,7 @@ export async function loadClientOverview(
 ): Promise<ClientOverview> {
   const clientId = client.id;
   const since = `${addDays(utcToday, -32)}T00:00:00Z`;
-  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentLogs, profile, member, invite, past, goal, limitations, notes] =
+  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentScans, recentLogs, profile, member, invite, past, goal, limitations, notes] =
     await Promise.all([
       supabase
         .from('workouts')
@@ -77,7 +78,16 @@ export async function loadClientOverview(
         .eq('workspace_id', workspaceId)
         .eq('client_id', clientId)
         .order('measured_on', { ascending: false })
-        .limit(500),
+        // The newest 500 scans (about 40 years of monthly InBody tests): "All time" on the card covers these.
+        .limit(SCANS_LIMIT),
+      // Updates shows scans by when they were entered, so ask for the newest entries on their own.
+      supabase
+        .from('body_measurements')
+        .select('id, measured_on, created_at, source, body_measurement_values(metric_key, value)')
+        .eq('workspace_id', workspaceId)
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+        .limit(UPDATES_SHOWN),
       supabase
         .from('workout_logs')
         .select('id, name, finished_at, logged_by, workouts(scheduled_on)')
@@ -115,6 +125,7 @@ export async function loadClientOverview(
     ['stickers', stickerCount],
     ['stickers', recentStickers],
     ['body scans', scans],
+    ['recent body scans', recentScans],
     ['recent workouts', recentLogs],
     ['profile', profile],
     ['membership', member],
@@ -140,7 +151,7 @@ export async function loadClientOverview(
         ? [{ kind: 'workout', id: `log-${l.id}`, at: l.finished_at, name: l.name, plannedOn: l.workouts?.scheduled_on ?? null, byCoach: l.logged_by !== null && l.logged_by !== clientId }]
         : [],
     ),
-    ...(scans.data ?? []).slice(0, UPDATES_SHOWN).map(
+    ...(recentScans.data ?? []).map(
       (s): OverviewEvent => ({
         kind: 'scan',
         id: `scan-${s.id}`,

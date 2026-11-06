@@ -14,7 +14,10 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 
 type Query = Record<string, string | string[] | undefined>;
 
-/** Links made before the tabs (?assign=1, ?month=, ?scan=1) still land where they meant to. */
+/**
+ * Links made before the tabs still land where they meant to: ?scan=1 on Body; ?assign, ?month and the calendar's
+ * own ?view= and ?from= (the 1-, 2- and 4-week views) on Training, with all of them kept.
+ */
 function oldLinkTarget(clientId: string, query: Query): string | null {
   const keep = (keys: string[]) => {
     const p = new URLSearchParams();
@@ -26,7 +29,8 @@ function oldLinkTarget(clientId: string, query: Query): string | null {
     return s ? `?${s}` : '';
   };
   if (query.scan !== undefined) return `/clients/${clientId}/body${keep(['scan'])}`;
-  if (query.assign !== undefined || query.month !== undefined) return `/clients/${clientId}/training${keep(['assign', 'month'])}`;
+  const training = ['assign', 'month', 'view', 'from'];
+  if (training.some((k) => query[k] !== undefined)) return `/clients/${clientId}/training${keep(training)}`;
   return null;
 }
 
