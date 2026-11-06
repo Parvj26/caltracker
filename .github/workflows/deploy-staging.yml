@@ -46,7 +46,7 @@ jobs:
   require-main:
     # Fail loudly instead of silently skipping every job when a manual run starts from another branch.
     if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
-    runs-on: [self-hosted, caltracker-mac]
+    runs-on: ubuntu-latest
     steps:
       - run: |
           echo "::error::Run this workflow from main"
@@ -57,7 +57,7 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.action == 'deploy') ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    runs-on: [self-hosted, caltracker-mac]
+    runs-on: ubuntu-latest
     outputs:
       # 'true' when a newer commit is already on main: nothing was deployed and the smoke job must not run.
       skip: ${{ steps.newest.outputs.skip }}
@@ -160,7 +160,7 @@ jobs:
       needs.deploy.outputs.skip != 'true' && (
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
-    runs-on: [self-hosted, caltracker-mac]
+    runs-on: ubuntu-latest
     concurrency:
       group: deploy-staging-smoke
       cancel-in-progress: false
@@ -203,7 +203,7 @@ jobs:
 
   seed-staging:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.action != 'deploy'
-    runs-on: [self-hosted, caltracker-mac]
+    runs-on: ubuntu-latest
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
