@@ -212,18 +212,63 @@ test('Assign on an ending program opens the assign dialog, and a reload does not
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('a workout on Los Angeles\'s today shows in Today\'s clients for a coach in Los Angeles', async ({ browser }) => {
+test('a workout on the coach\'s own date shows in Today\'s clients when it is evening in Los Angeles and already tomorrow in UTC', async ({ browser }) => {
   const last = `LA${unique()}`;
   const clientId = await newClient(last);
-  const laToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
-  await plan(clientId, 'LA day', laToday);
+  // D is the real UTC date. The browser clock is pinned to D+1 03:00 UTC, which is 19:00 on D in Los Angeles.
+  const d = new Date().toISOString().slice(0, 10);
+  await plan(clientId, 'LA day', d);
   const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
   try {
     const page = await context.newPage();
     await signInAsCoach(page);
+    await page.clock.setFixedTime(new Date(Date.parse(`${d}T00:00:00Z`) + 27 * 3600e3));
     await page.goto('/home');
+    const dates = await page.evaluate(() => ({
+      la: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()),
+      utc: new Date().toISOString().slice(0, 10),
+    }));
+    expect(dates.la).toBe(d);
+    expect(dates.utc).toBe(new Date(Date.parse(`${d}T00:00:00Z`) + MS_DAY).toISOString().slice(0, 10));
     await expect(rowFor(page, last)).toContainText('Not started');
   } finally {
     await context.close();
   }
+});
+
+test('ArrowDown and ArrowUp wrap round the results, and Escape clears the box', async ({ page }) => {
+  const stem = `Wrap${unique()}`;
+  await newClient(`${stem}A`);
+  await newClient(`${stem}B`);
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const box = page.getByRole('combobox', { name: 'Find a client' });
+  await box.fill(stem);
+  const options = page.getByRole('option');
+  await expect(options).toHaveCount(2);
+  await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await box.press('ArrowDown');
+  await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await box.press('ArrowDown');
+  await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await box.press('ArrowUp');
+  await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await box.press('Escape');
+  await expect(box).toHaveValue('');
+  await expect(box).toHaveAttribute('aria-expanded', 'false');
+  await box.fill('zzzz-no-such-client');
+  await expect(page.getByRole('status').filter({ hasText: 'No clients match.' })).toBeVisible();
+});
+
+test('?assign=1 on a removed client\'s page opens no dialog', async ({ page }) => {
+  const last = `Removed${unique()}`;
+  const pastId = await newClient(last);
+  const past = await admin.from('past_clients').insert({ workspace_id: workspaceId, user_id: pastId, email: `past-${unique()}@example.com`, first_name: 'Home', last_name: last });
+  if (past.error) throw past.error;
+  const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', pastId);
+  if (gone.error) throw gone.error;
+  await signInAsCoach(page);
+  await page.goto(`/clients/${pastId}?assign=1`);
+  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
