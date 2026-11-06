@@ -1,0 +1,120 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRefreshScheduler } from './live-refresh';
+
+describe('createRefreshScheduler', () => {
+  let visible = true;
+  let refresh: ReturnType<typeof vi.fn<() => void>>;
+  const make = () => createRefreshScheduler({ refresh, isVisible: () => visible, now: () => Date.now() });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    visible = true;
+    refresh = vi.fn<() => void>();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('refreshes once, 500 ms after the last of a quick burst of changes', () => {
+    const s = make();
+    s.change();
+    vi.advanceTimersByTime(300);
+    s.change();
+    vi.advanceTimersByTime(300);
+    s.change();
+    vi.advanceTimersByTime(499);
+    expect(refresh).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('still refreshes within 2 s when changes keep coming', () => {
+    const s = make();
+    for (let i = 0; i < 10; i++) {
+      s.change();
+      vi.advanceTimersByTime(300);
+    }
+    // 3 s of changes every 300 ms: at least one refresh by the 2 s mark, never one per change.
+    expect(refresh.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(refresh.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
+  it('does nothing while the tab is hidden, then refreshes once when it becomes visible', () => {
+    const s = make();
+    visible = false;
+    s.change();
+    s.change();
+    vi.advanceTimersByTime(5000);
+    expect(refresh).not.toHaveBeenCalled();
+    visible = true;
+    s.visibility();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    s.visibility();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a change waiting when the tab hides refreshes on return, not in the background', () => {
+    const s = make();
+    s.change();
+    visible = false;
+    vi.advanceTimersByTime(1000);
+    expect(refresh).not.toHaveBeenCalled();
+    visible = true;
+    s.visibility();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('becoming visible with nothing missed does not refresh', () => {
+    const s = make();
+    visible = false;
+    s.visibility();
+    visible = true;
+    s.visibility();
+    vi.advanceTimersByTime(5000);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('the first join does not refresh, a rejoin after a drop does', () => {
+    const s = make();
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(1000);
+    expect(refresh).not.toHaveBeenCalled();
+    for (const dropped of ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']) {
+      s.status(dropped);
+      s.status('SUBSCRIBED');
+      vi.advanceTimersByTime(500);
+    }
+    expect(refresh).toHaveBeenCalledTimes(3);
+  });
+
+  it('a first join that only succeeds after an error refreshes (changes may have been missed)', () => {
+    const s = make();
+    s.status('CHANNEL_ERROR');
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(500);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rejoin while hidden waits for the tab to be visible', () => {
+    const s = make();
+    visible = false;
+    s.status('TIMED_OUT');
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(1000);
+    expect(refresh).not.toHaveBeenCalled();
+    visible = true;
+    s.visibility();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('after dispose nothing refreshes, including a pending change', () => {
+    const s = make();
+    s.change();
+    s.dispose();
+    vi.advanceTimersByTime(1000);
+    s.change();
+    s.status('CLOSED');
+    s.status('SUBSCRIBED');
+    s.visibility();
+    vi.advanceTimersByTime(1000);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
