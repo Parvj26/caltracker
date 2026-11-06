@@ -67,7 +67,8 @@ export function ExerciseThumb({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name} photo`}
-      // The name beside it opens the same sheet, so screen readers stop once, on the name.
+      // Screen readers skip the photo: something beside it offers the same sheet, so they stop once. On the
+      // logging screens the name opens it; on the workout preview the exercise row has an "Exercise info" action.
       accessibilityElementsHidden
       importantForAccessibility="no"
       hitSlop={space[1]}

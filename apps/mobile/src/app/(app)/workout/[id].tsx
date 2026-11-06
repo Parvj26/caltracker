@@ -263,30 +263,48 @@ function ExerciseSection({
           testID={`preview-thumb-${exercise.id}`}
           onPress={onInfo}
         />
-        <Pressable
-          testID={`preview-expand-${exercise.id}`}
-          onPress={() => setExpanded((v) => !v)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={`${exercise.exerciseName}, ${setsWord}: ${summary.text}`}
-          accessibilityHint={expanded ? 'Hides each set' : 'Shows each set'}
-          style={({ pressed }) => [styles.summaryRow, { gap: space[3] }, pressed && { opacity: pressedOpacity }]}
-        >
-          <View style={[styles.flex, { gap: space[1] }]}>
-            <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
-            {/* Wraps onto more lines when long: every set stays readable, nothing is cut off. */}
-            <Text testID={`preview-summary-${exercise.id}`} style={text('body')}>
-              {summary.text}
+        {summary.count > 0 ? (
+          <Pressable
+            testID={`preview-expand-${exercise.id}`}
+            onPress={() => setExpanded((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={`${exercise.exerciseName}, ${setsWord}: ${summary.spoken}`}
+            accessibilityHint={`${expanded ? 'Hides' : 'Shows'} each set. Exercise info is in the actions.`}
+            // The photo is hidden from screen readers, so the info sheet (and its demo) is offered here instead.
+            accessibilityActions={[{ name: 'info', label: 'Exercise info' }]}
+            onAccessibilityAction={(e) => {
+              if (e.nativeEvent.actionName === 'info') onInfo();
+            }}
+            style={({ pressed }) => [styles.summaryRow, { gap: space[3] }, pressed && { opacity: pressedOpacity }]}
+          >
+            <View style={[styles.flex, { gap: space[1] }]}>
+              <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
+              {/* Wraps onto more lines when long: every set stays readable, nothing is cut off. */}
+              <Text testID={`preview-summary-${exercise.id}`} style={text('body')}>
+                {summary.text}
+              </Text>
+            </View>
+            <Text testID={`preview-count-${exercise.id}`} style={text('sectionHeading')}>
+              {`×${summary.count}`}
             </Text>
-          </View>
-          <Text testID={`preview-count-${exercise.id}`} style={text('sectionHeading')}>
-            {`×${summary.count}`}
-          </Text>
-        </Pressable>
+          </Pressable>
+        ) : (
+          // No sets: nothing to show or hide, so the name opens the exercise info as on the logging screen.
+          <Pressable
+            testID={`preview-name-${exercise.id}`}
+            onPress={onInfo}
+            accessibilityRole="button"
+            accessibilityHint="Opens exercise info"
+            style={({ pressed }) => [styles.flex, pressed && { opacity: pressedOpacity }]}
+          >
+            <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
+          </Pressable>
+        )}
       </View>
       {exercise.note ? <Text style={text('body')}>{exercise.note}</Text> : null}
 
-      {expanded
+      {expanded && summary.count > 0
         ? exercise.sets.map((set, i) => {
             const drop = set.setType === 'drop';
             const rest = formatRest(set.restSeconds);
