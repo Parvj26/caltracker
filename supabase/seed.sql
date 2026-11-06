@@ -39,3 +39,11 @@ begin
     (ws, cl, 'client');
 end;
 $$;
+
+-- Local only: where the award catch-up job (pg_cron) calls award-workout, and the shared secret it sends.
+-- Not a real secret: put the same value in supabase/functions/.env as AWARD_WORKOUT_SECRET.
+-- Staging and production create their own in Vault: see docs/runbooks/staging.md.
+select vault.create_secret('http://host.docker.internal:54321/functions/v1/award-workout', 'award_workout_url',
+  'award-workout Edge Function URL for the catch-up job');
+select vault.create_secret('local-award-workout-secret', 'award_workout_secret',
+  'Shared secret the catch-up job sends to award-workout');

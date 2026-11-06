@@ -149,10 +149,20 @@ export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogu
 export { formatMultiple, isQualifying, ladderAnimal } from './awards/ladder';
 export { detectPrs, epley1rm, logBests } from './awards/prs';
 export type { PersonalRecord, PrKind } from './awards/prs';
-export { journeyStep, streakWeeks, weekKey } from './awards/streak';
+export { journeyStep, localDay, streakWeeks, weekKey } from './awards/streak';
 export { milestoneFor, newRareFinds } from './awards/rare';
 export type { ClientStats } from './awards/rare';
 export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
 export type { Rng } from './awards/rolls';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';
+export {
+  awardContext,
+  awardedStickers,
+  clientStatsAt,
+  firstLogExercises,
+  mergeRecords,
+  replayRecords,
+  safeTimeZone,
+} from './awards/history';
+export type { AwardContext } from './awards/history';
