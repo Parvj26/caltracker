@@ -43,3 +43,7 @@ export const exercisePhotoHeight = tapTarget.logging * 4;
 
 /** Width of the Delete button a swiped set row reveals. */
 export const swipeDeleteWidth = tapTarget.logging + space[6] + space[2];
+
+/** The rest panel's countdown ring: its square size and how thick the ring is drawn. */
+export const restRingSize = tapTarget.logging * 4;
+export const restRingStroke = space[2.5];
