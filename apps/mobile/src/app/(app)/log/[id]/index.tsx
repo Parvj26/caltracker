@@ -706,7 +706,13 @@ function SectionPages({
         >
           <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
         </Pressable>
-        <Text testID="pages-title" style={[text('sectionHeading'), styles.onInk, styles.headerTitle]} numberOfLines={1} accessibilityRole="header">
+        <Text
+          testID="pages-title"
+          style={[text('sectionHeading'), styles.onInk, styles.headerTitle]}
+          numberOfLines={2}
+          maxFontSizeMultiplier={1.6}
+          accessibilityRole="header"
+        >
           {section.title}
         </Text>
         <View style={styles.headerButton} />
