@@ -17,6 +17,10 @@ import {
   type SearchFilters,
 } from '../../src/exercises/search';
 
+// Shared CI runners are several times slower than a developer machine; the budget still catches
+// a real regression (an order-of-magnitude slowdown) without flaking on a busy runner.
+const PERF_BUDGET_MS = process.env.CI ? 500 : 100;
+
 function row(
   name: string,
   o: Partial<ExerciseIndexRow> & { id?: string } = {},
@@ -319,7 +323,7 @@ describe('word boundaries', () => {
 });
 
 describe('performance', () => {
-  it('1,000 rows and 50 queries in under 100 ms', () => {
+  it('1,000 rows and 50 queries in within the speed budget', () => {
     const words = ['barbell', 'dumbbell', 'press', 'curl', 'row', 'squat', 'incline', 'cable', 'fly', 'lunge', 'raise', 'extension', 'bridge', 'machine', 'seated', 'standing'];
     const rows = Array.from({ length: 1000 }, (_, i) =>
       row(`${words[i % 16]} ${words[(i * 7 + 3) % 16]} ${words[(i * 5 + 1) % 16]} ${i}`, {
@@ -340,7 +344,7 @@ describe('performance', () => {
       best = Math.min(best, performance.now() - t0);
     }
     // A generous budget: the real cost is a few ms, but a busy machine (several test suites in parallel) can slow it.
-    expect(best).toBeLessThan(100);
+    expect(best).toBeLessThan(PERF_BUDGET_MS);
   });
 });
 

@@ -4,6 +4,10 @@ import { buildExerciseIndex, searchExercises, type SearchBoosts, type SearchFilt
 import { EXERCISE_OTHER_NAMES } from '../../src/exercises/synonyms';
 import { LIBRARY } from './fixtures/library';
 
+// Shared CI runners are several times slower than a developer machine; the budget still catches
+// a real regression (an order-of-magnitude slowdown) without flaking on a busy runner.
+const PERF_BUDGET_MS = process.env.CI ? 500 : 100;
+
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_BOOSTS: SearchBoosts = { favourites: new Set(), recent: [] };
 const index = buildExerciseIndex(LIBRARY);
@@ -61,7 +65,7 @@ describe('a coach finds the lift they mean first (real library)', () => {
 });
 
 describe('performance (real library)', () => {
-  it('886 rows plus their other names, 50 queries in under 100 ms', () => {
+  it('886 rows plus their other names, 50 queries in within the speed budget', () => {
     const idx = buildExerciseIndex(LIBRARY);
     const otherNames = Object.values(EXERCISE_OTHER_NAMES).reduce((n, o) => n + o.length, 0);
     expect(idx.entries.length).toBe(LIBRARY.length + otherNames);
@@ -76,6 +80,6 @@ describe('performance (real library)', () => {
       for (const q of queries) searchExercises(idx, q, NO_FILTERS, NO_BOOSTS);
       best = Math.min(best, (performance.now() - t0) * 5);
     }
-    expect(best).toBeLessThan(100);
+    expect(best).toBeLessThan(PERF_BUDGET_MS);
   });
 });
