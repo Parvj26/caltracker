@@ -34,6 +34,14 @@
       "./plugins/without-push-entitlement.js",
       "expo-notifications",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "CalTracker uses your photos so you can share them with your coach and your community.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": false,

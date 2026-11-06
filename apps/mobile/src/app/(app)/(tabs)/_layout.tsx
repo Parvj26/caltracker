@@ -2,7 +2,9 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 import { borderWidth, radius, space, typeScale } from '@caltracker/design-tokens';
 import { fontFamilyFor } from '@/theme/fonts';
-import { palette } from '@/theme/theme';
+import { badgeLabel } from '@caltracker/shared';
+import { useCommunity } from '@/lib/use-community';
+import { palette, white } from '@/theme/theme';
 
 /** Simple drawn icons (no icon font yet): a sun-like dot for Today, a small calendar for Workouts. */
 function TodayIcon({ color }: { color: ColorValue }) {
@@ -37,12 +39,25 @@ function ZooIcon({ color }: { color: ColorValue }) {
   );
 }
 
+/** Three dots in a row (people) for Community. */
+function CommunityIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.communityIcon}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[styles.communityDot, { borderColor: color }, i === 1 && styles.communityDotMiddle]} />
+      ))}
+    </View>
+  );
+}
+
 // Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
 // tab) starts on Today, not on whichever tab the router would pick.
 export const unstable_settings = { initialRouteName: 'today' };
 
-// The other tabs in the spec (Messages, Community, Me) arrive with their phases.
+// The other tabs in the spec (Messages, Me) arrive with their phases.
 export default function TabsLayout() {
+  const { unread } = useCommunity();
+  const badge = badgeLabel(unread);
   return (
     <Tabs
       screenOptions={{
@@ -74,6 +89,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="zoo"
         options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: 'Community',
+          tabBarButtonTestID: 'tab-community',
+          tabBarIcon: ({ color }) => <CommunityIcon color={color} />,
+          tabBarBadge: badge ?? undefined,
+          tabBarBadgeStyle: { backgroundColor: palette.magenta, color: white },
+        }}
       />
       <Tabs.Screen
         name="progress"
@@ -108,4 +133,7 @@ const styles = StyleSheet.create({
   progressBar: { flex: 1, borderRadius: 1 },
   zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
+  communityIcon: { width: space[6], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 1 },
+  communityDot: { width: space[2] + 1, height: space[2] + 1, borderRadius: radius.pill, borderWidth: borderWidth.card },
+  communityDotMiddle: { width: space[2.5] + 1, height: space[2.5] + 1, marginBottom: space[1] },
 });

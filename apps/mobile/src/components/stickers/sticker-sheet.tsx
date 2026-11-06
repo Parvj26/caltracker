@@ -1,7 +1,9 @@
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
 import { Button, useReduceMotion } from '@/components/ui';
 import { formatEarned, type AlbumItem } from '@/lib/album-logic';
+import { shareHref, stickerShareCard } from '@/lib/community-share';
 import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { palette, stickerTheme } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -12,6 +14,7 @@ import { Sticker } from './sticker';
 export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClose: () => void }) {
   const { text, space, radius } = useTheme();
   const reduceMotion = useReduceMotion();
+  const router = useRouter();
   const card = useRef<HostInstance>(null);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -55,6 +58,19 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
             <Text style={[text('caption'), styles.centerText]} testID="sheet-save-note" accessibilityLiveRegion="polite">
               {note}
             </Text>
+          ) : null}
+          {stickerShareCard(item) ? (
+            <Button
+              variant="secondary"
+              title="Share to community"
+              testID="sheet-share"
+              onPress={() => {
+                const shared = stickerShareCard(item);
+                if (!shared) return;
+                close();
+                router.push(shareHref(shared));
+              }}
+            />
           ) : null}
           <Button variant="secondary" title="Save image" testID="sheet-save" busy={saving} onPress={() => void save()} />
           <Button title="Close" testID="sheet-close" onPress={close} />
