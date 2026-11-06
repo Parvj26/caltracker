@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { dayLabel, thumbPathOf } from '@caltracker/shared';
-import { CoachAvatar } from '@/components/messages/avatar';
+import { CoachAvatar } from '@/components/coach-avatar';
 import { Bubble } from '@/components/messages/bubble';
 import { Composer } from '@/components/messages/composer';
 import { useSignedUrls } from '@/components/messages/use-signed-urls';
@@ -19,7 +19,9 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 export default function CoachTab() {
   const { text } = useTheme();
+  // Null while loading, when there is no coach link, or on first launch offline: the header then says "Your coach".
   const coach = useCoachProfile();
+  const coachName = coach?.name.trim() || null;
   const chat = useMessages();
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const timeZone = useMemo(zone, []);
@@ -59,10 +61,10 @@ export default function CoachTab() {
 
   const header = (
     <View style={styles.header} accessibilityRole="header">
-      <CoachAvatar name={coach.name} photoUrl={coach.photoUrl} />
+      <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={44} />
       <View style={styles.headerText}>
-        <Text style={text('sectionHeading')} testID="coach-name" numberOfLines={1}>{coach.name ?? 'Your coach'}</Text>
-        {coach.businessName ? <Text style={text('caption')} numberOfLines={1}>{coach.businessName}</Text> : null}
+        <Text style={text('sectionHeading')} testID="coach-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
+        {coach?.businessName ? <Text style={text('caption')} numberOfLines={1}>{coach.businessName}</Text> : null}
       </View>
     </View>
   );
@@ -103,7 +105,7 @@ export default function CoachTab() {
             ListEmptyComponent={
               // An inverted list flips its empty state too, so it is flipped back.
               <View style={[styles.center, styles.flip]}>
-                <Text style={text('body')}>No messages yet. Say hello to {coach.name?.split(' ')[0] ?? 'your coach'}.</Text>
+                <Text style={text('body')}>No messages yet. Say hello to {coachName?.split(' ')[0] ?? 'your coach'}.</Text>
               </View>
             }
             ListFooterComponent={
