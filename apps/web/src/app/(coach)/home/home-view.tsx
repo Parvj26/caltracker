@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  compareByLastName,
   endingPrograms,
   formatLogDuration,
   missedClients,
@@ -68,7 +70,7 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   const headingId = `${id ?? title.replace(/\W+/g, '-')}-heading`;
   const shown = all ? items : items.slice(0, SHOWN);
   return (
-    <section id={id} aria-labelledby={headingId} className={styles.group}>
+    <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className={styles.group}>
       <h3 id={headingId} className={styles.groupHeading}>{title}</h3>
       <ul className={styles.list}>{shown.map(row)}</ul>
       {items.length > SHOWN && !all ? (
@@ -104,6 +106,14 @@ function Skeleton() {
 export function HomeView({ coachFirstName, data }: { coachFirstName: string; data: HomeData }) {
   const today = useBrowserToday();
   const greeting = useGreeting();
+  const router = useRouter();
+  // The server data is from page load: when the browser's day changes, load it again.
+  const lastToday = useRef(today);
+  useEffect(() => {
+    if (today && lastToday.current && today !== lastToday.current) router.refresh();
+    if (today) lastToday.current = today;
+  }, [today, router]);
+  const searchable = useMemo(() => [...data.clients].sort(compareByLastName), [data.clients]);
   const view = useMemo(() => {
     if (!today) return null;
     const clients: HomeClient[] = data.clients.map((c) => ({
@@ -138,7 +148,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
       <header className={styles.header}>
         <h1 className={styles.title}>{greeting}{coachFirstName ? `, ${coachFirstName}` : ''}</h1>
         <p className={styles.caption}>{dayFormat.format(new Date(`${today}T00:00:00Z`))}</p>
-        <ClientSearch clients={data.clients} />
+        <ClientSearch clients={searchable} />
       </header>
 
       <div className={styles.tiles}>
@@ -153,7 +163,8 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                 aria-label="Done this week"
                 aria-valuemin={0}
                 aria-valuenow={progress.done}
-                aria-valuemax={progress.planned}
+                aria-valuemax={Math.max(progress.planned, 1)}
+                aria-valuetext={`${progress.done} of ${progress.planned}`}
                 className={styles.track}
               >
                 <span className={styles.fill} style={{ width: `${pct}%` }} />
@@ -162,13 +173,17 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
           }
         />
         <a href="#today" className={styles.tileLink}><Tile tone="blue" label="Workouts today" value={rows.length} /></a>
-        <a href="#missed" className={styles.tileLink}><Tile tone="pink" label="Missed 2+" value={missed.length} /></a>
+        {missed.length > 0 ? (
+          <a href="#missed" className={styles.tileLink}><Tile tone="pink" label="Missed 2+" value={missed.length} /></a>
+        ) : (
+          <Tile tone="pink" label="Missed 2+" value={0} />
+        )}
         <ComingSoon label="New PRs this week" className={styles.soonTile}><span className={styles.soonValue}>—</span></ComingSoon>
       </div>
 
       <div className={styles.columns}>
         <Card className={styles.main}>
-          <section id="today" aria-labelledby="today-heading">
+          <section id="today" tabIndex={-1} aria-labelledby="today-heading">
             <h2 id="today-heading" className={styles.sectionHeading}>Today&apos;s clients</h2>
             {rows.length === 0 ? (
               <p className={styles.empty}>

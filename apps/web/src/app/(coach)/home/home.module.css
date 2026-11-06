@@ -1,4 +1,4 @@
-/* Coach home. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall (--ct-tap-min). */
+/* Coach home. Colours and radii via var(--ct-*); a few fixed px sizes (avatar, progress track, skeletons). Every control is at least 44 px tall (--ct-tap-min). */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1180px; }
 
 .header { display: flex; flex-direction: column; gap: var(--ct-space-1); }

@@ -78,7 +78,7 @@ test('a workout today is Not started, then Done once a log completes, linking to
   let row = rowFor(page, last);
   await expect(row).toContainText('Not started');
   await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.locator('[aria-disabled="true"]').filter({ hasText: 'Log session' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(row.locator('[role="note"]').filter({ hasText: 'Log session' })).toBeVisible();
 
   const start = new Date(Date.now() - 52 * 60_000).toISOString();
   const logId = await seedLog(admin, { workspaceId, clientId, name: 'Leg day', plannedWorkoutId: workoutId, startedAt: start, finishedAt: new Date().toISOString() });
@@ -153,6 +153,8 @@ test('past clients are not counted', async ({ page }) => {
 test('the coming-soon parts are visible, disabled, and the console has no hydration errors', async ({ page }) => {
   const messages: string[] = [];
   page.on('console', (m) => messages.push(m.text()));
+  // A production build reports hydration mismatches as minified React errors (#418, #423, #425) on pageerror.
+  page.on('pageerror', (e) => messages.push(e.message));
   const last = `Soon${unique()}`;
   const clientId = await newClient(last, 10);
   await plan(clientId, 'Core', dayOffset(0));
@@ -160,9 +162,9 @@ test('the coming-soon parts are visible, disabled, and the console has no hydrat
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
   for (const label of ['New PRs this week', 'Message', 'Body scans 30+ days']) {
-    await expect(page.locator('[aria-disabled="true"]').filter({ hasText: label }).first()).toBeVisible();
+    await expect(page.locator('[role="note"]').filter({ hasText: label }).first()).toBeVisible();
   }
-  expect(messages.filter((t) => t.includes('Hydration'))).toEqual([]);
+  expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 });
 
 test('typing part of a name in any case finds the client, and Enter opens their page', async ({ page }) => {

@@ -8,7 +8,7 @@ import styles from './coming-soon.module.css';
  */
 export function ComingSoon({ label, children, className }: { label: string; children?: ReactNode; className?: string | undefined }) {
   return (
-    <span aria-disabled="true" className={cx(styles.soon, className)}>
+    <span role="note" aria-label={`${label}, coming soon`} className={cx(styles.soon, className)}>
       <span>{label}</span>
       {children}
       <span className={styles.note}>coming soon</span>
