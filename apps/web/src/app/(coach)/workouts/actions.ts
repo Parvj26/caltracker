@@ -2,10 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc } from '@caltracker/shared';
-import type { ExercisePick } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { escapeLike } from '../exercises/filters';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
@@ -81,17 +79,17 @@ export async function countProgramUses(id: string): Promise<number> {
   return new Set(data.map((r) => r.program_id)).size;
 }
 
-/** Built-in exercises plus this workspace's own, by name. */
-export async function searchExercises(query: string): Promise<ExercisePick[]> {
-  const { workspaceId } = await requireCoach();
-  const q = typeof query === 'string' ? query.trim().slice(0, 100) : '';
+/** Star or unstar an exercise for the signed-in coach. Favourites are personal, not shared across the workspace. */
+export async function toggleFavourite(exerciseId: string): Promise<{ ok: true; favourite: boolean } | { ok: false }> {
+  await requireCoach();
+  if (!UUID.test(exerciseId)) return { ok: false };
   const supabase = await createServerSupabase();
-  let request = supabase
-    .from('exercises')
-    .select('id, name, tracking_type')
-    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`);
-  if (q) request = request.ilike('name', `%${escapeLike(q)}%`);
-  const { data, error } = await request.order('name', { ascending: true }).limit(20);
-  if (error) throw new Error(`Could not search exercises: ${error.message}`);
-  return data.map((e) => ({ id: e.id, name: e.name, trackingType: e.tracking_type }));
+  const existing = await supabase.from('exercise_favorites').select('exercise_id').eq('exercise_id', exerciseId).maybeSingle();
+  if (existing.error) return { ok: false };
+  if (existing.data) {
+    const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId);
+    return error ? { ok: false } : { ok: true, favourite: false };
+  }
+  const { error } = await supabase.from('exercise_favorites').insert({ exercise_id: exerciseId });
+  return error ? { ok: false } : { ok: true, favourite: true };
 }

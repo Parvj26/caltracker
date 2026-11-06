@@ -67,11 +67,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
   await expect(picker.getByText('A superset needs 2 or more exercises. Search and tap each one.')).toBeVisible();
   await picker.getByLabel('Search exercises').fill('Pushups');
-  await picker.getByRole('button', { name: 'Pushups', exact: true }).click();
+  await picker.getByRole('option', { name: 'Pushups', exact: true }).click();
   // One pick is not a superset yet.
   await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
   await picker.getByLabel('Search exercises').fill('Pullups');
-  await picker.getByRole('button', { name: 'Pullups', exact: true }).click();
+  await picker.getByRole('option', { name: 'Pullups', exact: true }).click();
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
   await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
 
