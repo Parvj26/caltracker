@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { namedPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
@@ -5,6 +7,10 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { DeleteProgram } from './delete-program';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return namedPageTitle('programs', (await params).id, 'Programs');
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Same cap as the workout library page.

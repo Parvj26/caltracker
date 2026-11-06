@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { namedPageTitle } from '@/lib/page-titles';
 import { notFound } from 'next/navigation';
 import { parseYoutubeUrl, youtubeFormSearchUrl } from '@caltracker/shared';
 import { ButtonLink, Card, Chip } from '@/components/ui';
@@ -7,6 +9,10 @@ import { ExerciseForm } from '../exercise-form';
 import { TRACKING_LABELS } from '../filters';
 import styles from '../exercises.module.css';
 import { OverrideForm } from './override-form';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return namedPageTitle('exercises', (await params).id, 'Exercises');
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

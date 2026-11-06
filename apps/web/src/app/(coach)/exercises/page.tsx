@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import { TRACKING_TYPES } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { ButtonLink } from '@/components/ui';
 import { ExerciseBrowser } from './exercise-browser';
 import styles from './exercises.module.css';
+
+export const metadata: Metadata = { title: 'Exercises' };
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';

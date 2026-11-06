@@ -1,7 +1,10 @@
+import type { Metadata } from 'next';
 import { Card } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { ExerciseForm } from '../exercise-form';
 import styles from '../exercises.module.css';
+
+export const metadata: Metadata = { title: 'New exercise · Exercises' };
 
 export default async function NewExercisePage() {
   await requireCoach();

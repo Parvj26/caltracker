@@ -22,6 +22,10 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   const fullName = `${coach.firstName} ${coach.lastName}`.trim() || coach.email;
   return (
     <div className={styles.shell}>
+      {/* First thing a keyboard user reaches: jumps past the sidebar to the page itself. */}
+      <a href="#main-content" className={styles.skipLink}>
+        Skip to content
+      </a>
       <aside className={styles.sidebar} data-coach-sidebar="">
         <div className={styles.brand}>
           <Logo className={styles.logoFull} />
@@ -43,7 +47,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           </form>
         </div>
       </aside>
-      <main className={styles.content}>{children}</main>
+      <main id="main-content" tabIndex={-1} className={styles.content}>{children}</main>
     </div>
   );
 }

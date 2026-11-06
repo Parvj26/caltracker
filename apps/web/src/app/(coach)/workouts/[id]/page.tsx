@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { namedPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
@@ -6,6 +8,10 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { loadWorkoutDoc } from '@/lib/workouts';
 import { DeleteWorkout } from './delete-workout';
 import styles from '../workouts.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return namedPageTitle('workouts', (await params).id, 'Workouts');
+}
 
 export default async function WorkoutPage({ params }: { params: Promise<{ id: string }> }) {
   const { units, workspaceId } = await requireCoach();

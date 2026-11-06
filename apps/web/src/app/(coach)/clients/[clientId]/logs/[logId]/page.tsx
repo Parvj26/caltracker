@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { logPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
@@ -12,6 +14,11 @@ import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
 import { ClientNote } from './planned-vs-actual';
 import styles from './log.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ clientId: string; logId: string }> }): Promise<Metadata> {
+  const { clientId, logId } = await params;
+  return logPageTitle(clientId, logId);
+}
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
 export default async function LogPage({ params }: { params: Promise<{ clientId: string; logId: string }> }) {

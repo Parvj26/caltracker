@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { clientPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { addDays, localToday, monthGrid } from '@caltracker/shared';
@@ -11,6 +13,10 @@ import { StrengthPanel } from './strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import styles from '@/components/calendar/calendar.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
+  return clientPageTitle((await params).clientId);
+}
 
 // Same cap as the workout library page.
 const LIBRARY_LIMIT = 200;

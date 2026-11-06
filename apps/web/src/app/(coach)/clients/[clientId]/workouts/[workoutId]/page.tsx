@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { clientWorkoutPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
@@ -6,6 +8,11 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { loadWorkoutDoc } from '@/lib/workouts';
 import { loadClient } from '../../client';
 import styles from '@/components/calendar/calendar.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ clientId: string; workoutId: string }> }): Promise<Metadata> {
+  const { clientId, workoutId } = await params;
+  return clientWorkoutPageTitle(clientId, workoutId);
+}
 
 /** One client's copy of a workout, in the builder. Saving it never changes the library workout it came from. */
 export default async function ClientWorkoutPage({ params }: { params: Promise<{ clientId: string; workoutId: string }> }) {

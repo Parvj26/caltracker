@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   LOG_TREE_SELECT,
@@ -16,6 +17,8 @@ import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { LocalDateTime } from './local-date-time';
 import styles from './activity.module.css';
+
+export const metadata: Metadata = { title: 'Activity' };
 
 const PAGE_SIZE = 25;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
