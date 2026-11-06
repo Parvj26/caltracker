@@ -6,7 +6,7 @@ Website: "Community" in the coach sidebar (feed, composer, members, Reports queu
 composer with photos, likes, comments, report/block, notifications) and "Share to community" from the zoo book sticker
 sheet and the workout summary.
 
-## Data (migration `…_community.sql`)
+## Data (migration `20261106008000_community.sql`)
 
 Every table has `workspace_id`, RLS on, nothing for `anon`.
 
