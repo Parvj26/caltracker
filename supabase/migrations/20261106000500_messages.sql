@@ -86,7 +86,7 @@ language sql stable security definer set search_path = '' as $$
     select case when p_write then public.can_post_to_conversation(c.id) else public.can_read_conversation(c.id) end
     from public.conversations c
     where c.id = public.message_image_conversation(p_name)
-      and c.workspace_id = split_part(p_name, '/', 1)::uuid
+      and c.workspace_id::text = lower(split_part(p_name, '/', 1))
   ), false);
 $$;
 
@@ -97,6 +97,11 @@ declare
   v_workspace_id uuid;
   v_prefix text;
 begin
+  -- Signed-in callers: check access first, so a non-participant cannot learn whether a conversation exists.
+  -- (The service role has no auth.uid() and is trusted.)
+  if (select auth.uid()) is not null and not public.can_post_to_conversation(new.conversation_id) then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
   select c.workspace_id into v_workspace_id from public.conversations c where c.id = new.conversation_id;
   if not found then
     raise exception 'Conversation not found' using errcode = '23503';
