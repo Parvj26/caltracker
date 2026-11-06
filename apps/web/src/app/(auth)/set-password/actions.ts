@@ -23,5 +23,5 @@ export async function setPassword(_prev: SetPasswordState, formData: FormData): 
           : 'We could not save your password. Please try again, or ask for a new link.',
     };
   }
-  redirect('/clients');
+  redirect('/home');
 }

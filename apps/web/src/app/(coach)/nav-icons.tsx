@@ -10,6 +10,11 @@ function Icon({ children }: { children: ReactNode }) {
 }
 
 export const NAV_ICONS = {
+  home: (
+    <Icon>
+      <path d="M4 11 12 4l8 7M6 9.5V19a1 1 0 0 0 1 1h3.5v-5.5h3V20H17a1 1 0 0 0 1-1V9.5" />
+    </Icon>
+  ),
   clients: (
     <Icon>
       <circle cx="9" cy="8" r="3.5" />

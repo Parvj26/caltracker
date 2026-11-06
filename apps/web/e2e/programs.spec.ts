@@ -206,7 +206,7 @@ test.describe('a coach with an empty library', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/clients$/);
+    await expect(page).toHaveURL(/\/home$/);
 
     await page.goto('/programs/new');
     await page.getByLabel('Program name').fill(`First program ${unique()}`);

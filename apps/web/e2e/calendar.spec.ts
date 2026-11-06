@@ -87,6 +87,8 @@ async function assignFromNextMonday(page: Page, program: string): Promise<string
 }
 
 test('assign a program from next Monday; a double click still copies it once', async ({ page }) => {
+  // Builds a workout and a program through the UI first: about 25-30 s on the CI runner, right at the 30 s limit.
+  test.slow();
   const workout = `Full body ${unique()}`;
   const program = `Strength 2wk ${unique()}`;
   created.workouts.push(workout);
@@ -173,6 +175,8 @@ test('a lost response, then a different date, then the same date again still cop
 });
 
 test("editing the library workout leaves the client's copy alone, and the other way round", async ({ page }) => {
+  // Builds a workout and a program through the UI first: about 25-30 s on the CI runner, right at the 30 s limit.
+  test.slow();
   const workout = `Upper ${unique()}`;
   const program = `Copy check ${unique()}`;
   created.workouts.push(workout);
@@ -311,6 +315,8 @@ test('move one item with "Move to…", drag another, then delete one', async ({ 
 });
 
 test('remove a program from the calendar from today on', async ({ page }) => {
+  // Builds a workout and a program through the UI first: about 25-30 s on the CI runner, right at the 30 s limit.
+  test.slow();
   const workout = `Legs ${unique()}`;
   const program = `Remove me ${unique()}`;
   created.workouts.push(workout);

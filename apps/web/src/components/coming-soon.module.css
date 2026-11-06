@@ -1,0 +1,19 @@
+/* A feature that has not shipped yet: muted ink and a dashed outline, never reduced opacity. */
+.soon {
+  display: inline-flex;
+  flex: none;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  align-items: center;
+  gap: var(--ct-space-1) var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2-5);
+  border: var(--ct-border-width-card) dashed var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink-muted);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  cursor: not-allowed;
+  user-select: none;
+}
+.note { font-style: italic; }

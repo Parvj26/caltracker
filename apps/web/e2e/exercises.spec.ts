@@ -7,7 +7,7 @@ async function signInAsCoach(page: Page) {
   await page.getByLabel('Email').fill('coach@demo.local');
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
 }
 
 // Service-role client: test cleanup only.

@@ -83,7 +83,7 @@ test('provisioned coach opens the invite link, sets a password, then signs in wi
     await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
     await page.getByLabel('Confirm password').fill(NEW_PASSWORD);
     await page.getByRole('button', { name: 'Set password' }).click();
-    await expect(page).toHaveURL(/\/clients$/);
+    await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByText('Fresh Gym')).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
@@ -92,7 +92,7 @@ test('provisioned coach opens the invite link, sets a password, then signs in wi
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(NEW_PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/clients$/);
+    await expect(page).toHaveURL(/\/home$/);
   } finally {
     await admin.from('workspaces').delete().eq('id', workspaceId);
     await admin.auth.admin.deleteUser(userId);
@@ -205,7 +205,7 @@ test('forgot password: same message for any email, and the emailed link lets a c
     await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
     await page.getByLabel('Confirm password').fill(NEW_PASSWORD);
     await page.getByRole('button', { name: 'Set password' }).click();
-    await expect(page).toHaveURL(/\/clients$/);
+    await expect(page).toHaveURL(/\/home$/);
   } finally {
     await admin.from('workspaces').delete().eq('id', workspaceId);
     await admin.auth.admin.deleteUser(userId);

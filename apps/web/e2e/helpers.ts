@@ -10,7 +10,9 @@ export async function signInAsCoach(page: Page) {
   await page.getByLabel('Email').fill(COACH_EMAIL);
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
+  // Most specs start from the Clients page, so go there once signed in (home.spec covers the landing page itself).
+  await page.goto('/clients');
 }
 
 /** Service-role client: test fixtures and cleanup only, never app code. */
