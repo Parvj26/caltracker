@@ -13,6 +13,9 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile "<business>" "<bio>"   set the demo coach's business name and bio
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile-reset -   put them back (Demo Coaching, no bio)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-coach-post "<text>"   the demo coach posts in the community
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-buddy-post "<text>"   a second demo client (buddy) posts
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-cleanup -   delete "E2E " posts, reports, blocks and the buddy
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -354,6 +357,58 @@ export async function confirmLink(email: string): Promise<string> {
   throw new Error(`No confirmation email found for ${email}`);
 }
 
+const BUDDY_EMAIL = 'community-buddy@demo.local';
+
+/** The demo workspace and its community. */
+async function demoCommunity(): Promise<{ workspaceId: string; communityId: string; coachId: string }> {
+  const coachId = await findUserId('coach@demo.local');
+  if (!coachId) throw new Error('Seed coach coach@demo.local not found (run pnpm db:reset).');
+  const m = await admin.from('workspace_members').select('workspace_id').eq('user_id', coachId).eq('role', 'owner').single();
+  if (m.error) throw m.error;
+  const c = await admin.from('communities').select('id').eq('workspace_id', m.data.workspace_id).eq('is_default', true).single();
+  if (c.error) throw c.error;
+  return { workspaceId: m.data.workspace_id, communityId: c.data.id, coachId };
+}
+
+/** A post written straight into the table (the service role); the coach-post notification trigger still fires. */
+async function communityPost(authorId: string, body: string): Promise<void> {
+  const { workspaceId, communityId } = await demoCommunity();
+  const { error } = await admin.from('community_posts').insert({ community_id: communityId, workspace_id: workspaceId, author_id: authorId, body });
+  if (error) throw error;
+}
+
+/** A second client in the demo workspace ("Buddy Demo"), created on first use. */
+async function buddyId(): Promise<string> {
+  const existing = await findUserId(BUDDY_EMAIL);
+  if (existing) return existing;
+  const { workspaceId } = await demoCommunity();
+  const u = await admin.auth.admin.createUser({
+    email: BUDDY_EMAIL,
+    password: randomBytes(16).toString('hex'),
+    email_confirm: true,
+    user_metadata: { first_name: 'Buddy', last_name: 'Demo' },
+  });
+  if (u.error) throw u.error;
+  const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
+  if (m.error) throw m.error;
+  return u.data.user.id;
+}
+
+/** Removes what the community flows made: "E2E " posts (and their reports), the demo client's blocks, the buddy. */
+async function communityCleanup(): Promise<void> {
+  const { workspaceId } = await demoCommunity();
+  const posts = await admin.from('community_posts').delete().eq('workspace_id', workspaceId).like('body', 'E2E %');
+  if (posts.error) throw posts.error;
+  const cards = await admin.from('community_posts').delete().eq('workspace_id', workspaceId).not('card', 'is', null);
+  if (cards.error) throw cards.error;
+  const blocks = await admin.from('community_blocks').delete().eq('workspace_id', workspaceId);
+  if (blocks.error) throw blocks.error;
+  const reports = await admin.from('community_reports').delete().eq('workspace_id', workspaceId);
+  if (reports.error) throw reports.error;
+  const buddy = await findUserId(BUDDY_EMAIL);
+  if (buddy) await admin.auth.admin.deleteUser(buddy);
+}
+
 async function run(action: string, email: string, name: string): Promise<string | void> {
   if (action === 'confirmlink') return confirmLink(email);
   if (action === 'invitelink') return inviteLink(email, name);
@@ -370,6 +425,9 @@ async function run(action: string, email: string, name: string): Promise<string 
   // For these two the "email" is the business name and the "name" is the bio.
   else if (action === 'coach-profile') await setCoachProfile(email, name);
   else if (action === 'coach-profile-reset') await setCoachProfile(DEMO_BUSINESS, '');
+  else if (action === 'community-coach-post') await communityPost((await demoCommunity()).coachId, email);
+  else if (action === 'community-buddy-post') await communityPost(await buddyId(), email);
+  else if (action === 'community-cleanup') await communityCleanup();
   else throw new Error(`Unknown action ${action}`);
 }
 

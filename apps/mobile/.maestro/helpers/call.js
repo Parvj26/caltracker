@@ -13,6 +13,9 @@
 //                      Dumbbell Bicep Curl 2 x 12 @ 10 kg
 //   coach-profile      sets the demo coach's business (EMAIL) and bio (NAME)
 //   coach-profile-reset  puts the demo business name back and clears the bio (EMAIL ignored; pass '-')
+//   community-coach-post / community-buddy-post   the demo coach / a second demo client ("Buddy Demo") posts EMAIL as
+//                      the text in the demo community
+//   community-cleanup  deletes "E2E " and card posts, reports, blocks and the buddy (EMAIL is ignored; pass '-')
 //   cleanup-logs       deletes every workout log of client@demo.local, and the stickers, personal bests and stats
 //                      they earned (refuses any other EMAIL)
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);

@@ -1,0 +1,110 @@
+# Share to community from a workout summary and from the zoo book: finish "E2E Log" (3 x 8 at 60 kg, a giraffe), tap
+# "Share to community" on the summary, post the card with a caption, then share the giraffe sticker from the zoo book.
+# Run via `pnpm --filter mobile e2e`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-cleanup, EMAIL: '-' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: all-done-0
+    timeout: 10000
+- tapOn:
+    id: finish-workout
+- extendedWaitUntil:
+    visible: 'NEW for your zoo book'
+    timeout: 15000
+- runFlow: helpers/reveal-through.yaml
+
+# The workout card, from the summary.
+- scrollUntilVisible:
+    element:
+      id: summary-share
+- tapOn:
+    id: summary-share
+- extendedWaitUntil:
+    visible: 'Share to community'
+    timeout: 10000
+- assertVisible:
+    id: community-card
+- assertVisible: 'Workout done'
+- assertVisible: '.*≈ .*Giraffe.*'
+- tapOn:
+    id: new-post-body
+- inputText: 'E2E Leg day done'
+- hideKeyboard
+- tapOn:
+    id: new-post-submit
+- extendedWaitUntil:
+    visible:
+      id: summary-done
+    timeout: 15000
+- tapOn:
+    id: summary-done
+
+# The sticker card, from the zoo book.
+- tapOn:
+    id: tab-zoo
+- scrollUntilVisible:
+    element:
+      id: sticker-giraffe
+- tapOn:
+    id: sticker-giraffe
+- tapOn:
+    id: sheet-share
+- extendedWaitUntil:
+    visible: 'Share to community'
+    timeout: 10000
+- assertVisible: 'Giraffe'
+- tapOn:
+    id: new-post-submit
+
+# Both cards are in the feed.
+- tapOn:
+    id: tab-community
+- extendedWaitUntil:
+    visible: 'E2E Leg day done'
+    timeout: 15000
+- assertVisible: 'New sticker'
+- assertVisible: 'Workout done'
+
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-cleanup, EMAIL: '-' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }
