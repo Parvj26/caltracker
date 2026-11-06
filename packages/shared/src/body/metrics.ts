@@ -1,4 +1,4 @@
-import { KG_PER_LB, fromKg, toKg } from '../units/units';
+import { KG_PER_LB, toKg } from '../units/units';
 import type { Units } from '../units/units';
 
 export const BUILT_IN_METRIC_KEYS = [
@@ -49,7 +49,7 @@ function r(value: number, decimals: number): number {
 
 /** The number an input box shows: stored kg as is, or lb to 1 decimal. Not for read-only text; use formatMetric. */
 export function toInputValue(key: string, value: number, units: Units): number {
-  return isMass(key) && units === 'lb' ? fromKg(value, 'lb') : value;
+  return isMass(key) && units === 'lb' ? r(value / KG_PER_LB, 1) : value;
 }
 
 /** Typed value in the viewer's unit to the stored value (kg, 3 decimals for mass). */
@@ -59,7 +59,7 @@ export function fromDisplay(key: string, value: number, units: Units): number {
 
 /** The stored value rounded the way it is shown: mass to 1 decimal in kg or lb, whole numbers for visceral fat and BMR. */
 export function displayValue(key: string, value: number, units: Units): number {
-  if (isMass(key)) return r(units === 'lb' ? fromKg(value, 'lb') : value, 1);
+  if (isMass(key)) return r(units === 'lb' ? r(value / KG_PER_LB, 1) : value, 1);
   if (key === 'visceral_fat' || key === 'bmr_kcal') return r(value, 0);
   if (key === 'body_fat_pct' || key === 'bmi') return r(value, 1);
   return r(value, 2);
