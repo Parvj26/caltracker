@@ -122,6 +122,7 @@ test('two undone workouts in the last 2 days list the client under Missed 2+ in 
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Missed 2 in a row · latest yesterday');
   await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
+  await expect(row.getByRole('link', { name: /^Message / })).toHaveAttribute('href', `/messages/${clientId}`);
   const tile = page.getByRole('link', { name: /Missed a workout/ });
   await expect(tile).toHaveAttribute('href', /^#missed/);
   expect(Number((await tile.innerText()).match(/\d+/g)?.at(-1))).toBeGreaterThanOrEqual(1);
@@ -190,8 +191,8 @@ test('the coming-soon part is visible, Message is not offered yet, and the conso
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
   await expect(page.locator('[role="note"]').filter({ hasText: 'Body scans 30+ days' })).toBeVisible();
-  // Messages are not built yet, so there is no Message action at all (not even a disabled one).
-  await expect(page.getByRole('complementary', { name: 'Needs attention' }).getByText('Message')).toHaveCount(0);
+  // Today's row offers a Message action that opens the client's conversation.
+  await expect(rowFor(page, last).getByRole('link', { name: /^Message / })).toHaveAttribute('href', `/messages/${clientId}`);
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 });
 

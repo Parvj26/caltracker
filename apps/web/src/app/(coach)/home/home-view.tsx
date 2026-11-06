@@ -34,13 +34,9 @@ const PROBLEMS: ReadonlySet<AttentionKind> = new Set(['missed_in_a_row', 'missed
 /** Reasons where the next step is planning: those rows get an Assign action. */
 const NEEDS_PLAN: ReadonlySet<AttentionKind> = new Set(['program_ending', 'nothing_planned']);
 
-/**
- * Messages are not on main yet. When the messages route ships, return a client's conversation URL here and every
- * Needs attention row gets a "Message" action beside Open. Until then there is no button at all (never a dead one).
- */
-function messageHref(clientId: string): string | null {
-  void clientId;
-  return null;
+/** A client's conversation, so Today's clients and Needs attention rows can offer "Message". */
+function messageHref(clientId: string): string {
+  return `/messages/${clientId}`;
 }
 
 const subscribeMinute = (onChange: () => void) => {
@@ -106,7 +102,7 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
         {assign ? (
           <Link href={`/clients/${client.id}?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
         ) : null}
-        {message ? <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link> : null}
+        <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
       </span>
     </li>
   );
@@ -221,6 +217,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                         {statusChip(r)}
                       </Link>
                       {r.status.kind === 'not_started' ? <ComingSoon label="Log session" /> : null}
+                      <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
                     </li>
                   );
                 })}
