@@ -1,7 +1,8 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
 import { sectionsFromBlocks } from '../workouts/sections';
-import type { LogStatus, LogSubstituteOption, WorkoutLogDoc } from './schema';
+import { LogSubstituteOption } from './schema';
+import type { LogStatus, WorkoutLogDoc } from './schema';
 
 /**
  * PostgREST nested select for one workout log with its blocks, exercises (and their names) and sets.
@@ -80,6 +81,27 @@ const byPosition = <T extends { position: number }>(xs: readonly T[]): T[] =>
 const num = (v: Numeric): number | null => (v === null ? null : Number(v));
 
 /**
+ * The options as stored, keeping only well-formed ones (the first of any repeat), so one bad option can't break
+ * the coach's page or make the phone drop the log. A substituteId that is no longer among them reads as null.
+ */
+function readSubstituteOptions(
+  substituteId: string | null,
+  raw: unknown,
+): { substituteId: string | null; substituteOptions: LogSubstituteOption[] } {
+  const options: LogSubstituteOption[] = [];
+  for (const o of Array.isArray(raw) ? raw : []) {
+    const parsed = LogSubstituteOption.safeParse(o);
+    if (parsed.success && !options.some((x) => x.substituteId === parsed.data.substituteId) && options.length < 4) {
+      options.push(parsed.data);
+    }
+  }
+  return {
+    substituteId: substituteId !== null && options.some((o) => o.substituteId === substituteId) ? substituteId : null,
+    substituteOptions: options,
+  };
+}
+
+/**
  * Unlike workoutRowToDoc, nothing is dropped when the exercise's tracking type has changed since: a log is
  * a record of what was done, and the log schema does not tie targets or actuals to the tracking type.
  */
@@ -110,9 +132,7 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
         plannedWorkoutExerciseId: e.planned_workout_exercise_id,
         swappedFromExerciseId: e.swapped_from_exercise_id,
         note: e.note,
-        substituteId: e.substitute_id ?? null,
-        // Stored by save_workout_log from a parsed doc; WorkoutLogDoc.parse checks it again.
-        substituteOptions: Array.isArray(e.substitute_options) ? (e.substitute_options as LogSubstituteOption[]) : [],
+        ...readSubstituteOptions(e.substitute_id ?? null, e.substitute_options),
         sets: byPosition(e.log_sets).map((s) => ({
           id: s.id,
           setType: s.set_type,

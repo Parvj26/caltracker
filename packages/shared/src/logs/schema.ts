@@ -44,6 +44,8 @@ export const LogSubstituteOption = z.object({
   exerciseId: z.uuid(),
   exerciseName: z.string(),
   trackingType: TrackingTypeSchema,
+  /** The coach's note on that option ("use the blue band"); options saved before notes have none. */
+  note: z.string().max(500).nullable().default(null),
   sets: z
     .array(z.object({ setType: z.enum(SET_TYPES), target: LogSetTarget }))
     .min(1)

@@ -19,7 +19,7 @@ import {
 import { completedSetCount, logVolumeKg, openSetCount } from '../../src/logs/summary';
 import { LOG_TREE_SELECT, logRowToDoc } from '../../src/logs/tree';
 import type { LogTreeRow } from '../../src/logs/tree';
-import { addStraightBlock, addSubstitute, addSuperset, emptyWorkout, updateSubstituteSet } from '../../src/workouts/doc-ops';
+import { addStraightBlock, addSubstitute, addSuperset, emptyWorkout, updateSubstitute, updateSubstituteSet } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
 import { uuid } from './fixture';
@@ -42,6 +42,7 @@ function workout(): WorkoutDoc {
   d = addSubstitute(d, b0.id, b0.exercises[0]!.id, BAND, uuid);
   const sub = d.blocks[0]!.exercises[0]!.substitutes[0]!;
   d = updateSubstituteSet(d, b0.id, b0.exercises[0]!.id, sub.id, sub.sets[0]!.id, { targetWeightKg: 30 });
+  d = updateSubstitute(d, b0.id, b0.exercises[0]!.id, sub.id, { note: 'Blue band' });
   const b1 = d.blocks[1]!;
   d = addSubstitute(d, b1.id, b1.exercises[0]!.id, FACE, uuid);
   return WorkoutDoc.parse(d);
@@ -63,6 +64,8 @@ describe('startLogFromWorkout with substitutes', () => {
     expect(ex.substituteOptions[0]!.substituteId).toBeNull();
     expect(ex.substituteOptions[1]!.sets[0]!.target.weightKg).toBe(30);
     expect(ex.substituteOptions[2]!.trackingType).toBe('reps');
+    expect(ex.substituteOptions[1]!.note).toBe('Blue band');
+    expect(ex.substituteOptions[0]!.note).toBeNull();
     // An exercise without substitutes has no options at all.
     expect(log.blocks[1]!.exercises[1]!.substituteOptions).toEqual([]);
   });
@@ -250,6 +253,14 @@ describe('logRowToDoc with substitutes', () => {
     const doc = WorkoutLogDoc.parse(logRowToDoc(row));
     expect(doc.blocks[0]!.exercises[0]!.substituteId).toBe(ex.substituteId);
     expect(doc.blocks[0]!.exercises[0]!.substituteOptions).toEqual(ex.substituteOptions);
+    // Bad and repeated options are left out; a substituteId that is no longer among them reads as null.
+    const opts = JSON.parse(JSON.stringify(ex.substituteOptions)) as Array<Record<string, unknown>>;
+    const messy = { ...row.log_blocks[0]!.log_exercises[0]!, substitute_options: [opts[0], { ...opts[1], trackingType: 'yoga' }, opts[0], 'junk', null] };
+    const cleaned = WorkoutLogDoc.parse(logRowToDoc({ ...row, log_blocks: [{ ...row.log_blocks[0]!, log_exercises: [messy] }] }));
+    expect(cleaned.blocks[0]!.exercises[0]!.substituteOptions).toHaveLength(1);
+    expect(cleaned.blocks[0]!.exercises[0]!.substituteId).toBeNull();
+    const notArray = logRowToDoc({ ...row, log_blocks: [{ ...row.log_blocks[0]!, log_exercises: [{ ...messy, substitute_options: { a: 1 } }] }] });
+    expect(notArray.blocks[0]!.exercises[0]!.substituteOptions).toEqual([]);
     const older = { ...row.log_blocks[0]!.log_exercises[0]! };
     delete older.substitute_id;
     delete older.substitute_options;

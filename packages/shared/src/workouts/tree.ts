@@ -1,6 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
-import { SET_TYPES } from './schema';
-import type { BlockKind, SetType, WorkoutDoc, WorkoutSetDoc } from './schema';
+import { MAX_SUBSTITUTES, SET_TYPES, WorkoutSetDoc, WorkoutSubstituteDoc, substituteSetProblems } from './schema';
+import type { BlockKind, SetType, WorkoutDoc } from './schema';
 import { sectionsFromBlocks } from './sections';
 import { TARGET_FIELDS } from './targets';
 
@@ -114,6 +114,29 @@ function jsonSets(value: unknown): WorkoutSetDoc[] {
   });
 }
 
+/**
+ * A workout's substitutes, skipping any row that would make the doc invalid (a bad set is left out; a substitute
+ * with no usable sets, a repeat, the planned exercise itself or a 4th one is left out), so one bad row never stops
+ * the coach opening the workout or the phone starting a log from it.
+ */
+function readSubstitutes(plannedExerciseId: string, rows: readonly WorkoutTreeSubstituteRow[]): WorkoutSubstituteDoc[] {
+  const used = new Set([plannedExerciseId]);
+  const out: WorkoutSubstituteDoc[] = [];
+  for (const sub of byPosition(rows)) {
+    const trackingType = sub.exercises?.tracking_type ?? 'weight_reps';
+    const sets = jsonSets(sub.sets)
+      .map((s) => fitSet(trackingType, s))
+      .filter((s) => WorkoutSetDoc.safeParse(s).success);
+    const candidate = { id: sub.id, exerciseId: sub.exercise_id, exerciseName: sub.exercises?.name ?? '', trackingType, note: sub.note, sets };
+    const parsed = WorkoutSubstituteDoc.safeParse(candidate);
+    if (!parsed.success || used.has(sub.exercise_id) || substituteSetProblems(parsed.data).length > 0) continue;
+    used.add(sub.exercise_id);
+    out.push(parsed.data);
+    if (out.length === MAX_SUBSTITUTES) break;
+  }
+  return out;
+}
+
 export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
   const blocks = byPosition(row.workout_blocks);
   return {
@@ -147,17 +170,7 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
               note: s.note,
             }),
           ),
-          substitutes: byPosition(e.workout_substitutes ?? []).map((sub) => {
-            const subType = sub.exercises?.tracking_type ?? 'weight_reps';
-            return {
-              id: sub.id,
-              exerciseId: sub.exercise_id,
-              exerciseName: sub.exercises?.name ?? '',
-              trackingType: subType,
-              note: sub.note,
-              sets: jsonSets(sub.sets).map((s) => fitSet(subType, s)),
-            };
-          }),
+          substitutes: b.kind === 'choice' ? [] : readSubstitutes(e.exercise_id, e.workout_substitutes ?? []),
         };
       }),
     })),
