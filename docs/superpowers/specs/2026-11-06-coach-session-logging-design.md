@@ -1,0 +1,90 @@
+# Coach session logging — design note (2026-11-06)
+
+Version 1 scope from the main spec (`2026-11-03-coaching-app-design.md`): "Coach session logging (iPad)" and
+"Single active logger". The coach logs a client's workout live during an in-person session, from the coach website
+on the iPad or laptop.
+
+## What the coach sees
+
+- **Entry points:** Home → Today's clients → **Log session** on a row; the client calendar's item menu →
+  **Log session** on today's workout or a missed (past, not done) one. Logging an unplanned workout is not built.
+- **Page:** `/clients/[clientId]/log/[workoutId]`. Before anything is saved it shows the workout and
+  **Start session**. Once started:
+  - left column (≥ 900 px wide): the pages list grouped by section, a ✓ on finished pages; right column: the current
+    page. Narrower screens stack them.
+  - a page is a straight exercise, a superset (rounds, exercises lettered A, B…) or a pick-one group (pick first,
+    "Change pick" until a set is done).
+  - each exercise: "Coach: 3 × 8 reps · 60 kg", "Last time: …" (the client's last results), and a table
+    **SET | LB/KG | REPS | ✓**. The boxes show the pre-filled number greyed (coach target → last time, the same
+    `resolveSetValues` rules as the phone); a tick saves those numbers. Numbers stay editable after a tick.
+    **+ Add set**, **Mark all**, a note per exercise, a session note, **Finish session**, **Cancel session**.
+  - No rest timer. Tap targets are at least 44 px (the tick and boxes slightly bigger).
+- **Saving:** every change is made with the shared log operations (`packages/shared/src/logs`) and the whole doc is
+  saved (debounced) through `coach_save_workout_log`, the same document and rules as the phone's
+  `save_workout_log`. A failed save retries every 3 s. The website needs a connection (the phone app is the offline
+  logger).
+- **Finish:** the log is saved as completed, then the website asks `award-workout` for the award (the coach path
+  already allowed for corrections; for a log with no award yet it is the full award, stickers and rolls included). If
+  that call fails, the 15-minute catch-up job awards it. The client sees the stickers in their album next time they
+  open the app (the phone's "Surprise!" reveal queue only holds awards the phone itself asked for).
+
+## Single active logger
+
+| Situation | Coach website | Client phone |
+| --- | --- | --- |
+| Nobody logging | Start session | Start as usual |
+| Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), refreshed every 10 s; **Take over**, **View only**, Refresh | Logs as usual |
+| Coach logging (started or took over) | The logging page | Opening the workout shows "Your coach is logging this session" (read only); saves from the phone are refused |
+| Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
+| Finished | Opens the finished log | — |
+
+Live progress uses a timer refresh because the Realtime work (PR #34) is not merged yet; it can replace the timer
+later.
+
+## Data and security
+
+No new tables. `workout_logs.logged_by` (already there) is who logs the workout: the client on the phone, or the
+coach. The log's `client_id` is always the client, so history, charts, PRs, streaks and stickers count it the same.
+
+Migration `20261106004000_coach_session_logging.sql`:
+
+- `private.save_workout_log_as(doc, client, logger)`: the body of `save_workout_log`, unchanged except that it takes
+  the client and the logger as arguments, requires a coach logger to coach the client's workspace, stores
+  `logged_by = logger` on insert, and refuses (`applied: false, loggedByOther: true`, not an error) a change from
+  anyone but the stored `logged_by`. It lives in a `private` schema nobody can call over the API.
+- `save_workout_log(doc)` (phone) and `coach_save_workout_log(client_id, doc)` (website) are thin wrappers.
+- `take_over_workout_log(log_id)`: a coach of the workspace, a current client, an in-progress log. Sets `logged_by`
+  to the coach and raises the revision by 1000, above anything the phone could still have queued, so a phone that
+  saves again takes the server copy instead of pushing its own (the phone re-sends whenever its revision is higher).
+- The trigger that froze `logged_by` now allows exactly one change: to a coach of the workspace while the log is in
+  progress (or to null when the account is deleted).
+- `coach_last_results(client_id, exercise_ids)`: `last_results` for one client, security invoker, so RLS limits it
+  to the coach's own workspace.
+
+pgTAP (`supabase/tests/coach_session_logging.test.sql`) proves: a coach logs only clients of their workspace; another
+workspace's coach is refused (save, start, unplanned start, take over, read, last results); a client can't log as a
+coach for themselves or another client, nor take over; the phone's saves are refused while the coach logs and the
+coach's while the client logs; take over; removed clients; the logged_by trigger; the finished session counts in the
+client's last results and award history.
+
+## Phone (minimal, isolated)
+
+Another branch (`feature/simple-logging`) is rewriting the phone's logging screens, so the phone change is small:
+
+- `apps/mobile/src/lib/coach-logging.ts`: `useCoachLogging(logId)` reads `logged_by` for the open log on open and
+  every 15 s.
+- `apps/mobile/src/components/log/coach-logging-banner.tsx`: `CoachLoggingBanner` (full-screen, read only) and
+  `LoggedByCoachPill`.
+- `app/(app)/log/[id]/index.tsx`: three lines; while the coach logs, the screen returns the banner instead of the
+  editor. When the client taps Start while the coach logs, the phone resumes the server's in-progress log (existing
+  behaviour) and so lands on the banner. `app/(app)/log/[id]/summary.tsx`: the "Logged by coach" pill.
+
+Whoever rewrites the logging screens: keep calling `useCoachLogging(id)` before the screen's early returns and render
+`CoachLoggingBanner` when `byCoach` is true.
+
+## Known limits
+
+- The client receives no push notification yet (notifications are a later phase).
+- If the client starts the same workout on a phone with no signal while the coach logs it, the phone's upload is
+  refused by the one-in-progress rule and keeps retrying until the coach finishes; the spec's "save it as a separate
+  workout and show the coach both" is not built.
