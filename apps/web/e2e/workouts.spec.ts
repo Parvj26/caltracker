@@ -196,6 +196,9 @@ test.describe('sections and pick-one groups', () => {
   let coachId: string | undefined;
   let workspaceId: string | undefined;
 
+  const tag = unique();
+  // Test-unique names: a built-in (or a future one) with the trainer's name would make the exact-name picks ambiguous.
+  const X = (base: string) => `${base} ${tag}`;
   const CUSTOM: ReadonlyArray<readonly [string, 'weight_reps' | 'reps']> = [
     ['Arm Circles', 'reps'],
     ['Hanging Leg Raise', 'reps'],
@@ -227,7 +230,7 @@ test.describe('sections and pick-one groups', () => {
     const units = await admin.from('profiles').update({ units: 'lb' }).eq('id', coachId);
     if (units.error) throw units.error;
     const seeded = await admin.from('exercises').insert(
-      CUSTOM.map(([name, tracking_type]) => ({ workspace_id: workspaceId!, source: 'custom' as const, name, tracking_type })),
+      CUSTOM.map(([name, tracking_type]) => ({ workspace_id: workspaceId!, source: 'custom' as const, name: X(name), tracking_type })),
     );
     if (seeded.error) throw seeded.error;
   });
@@ -273,56 +276,57 @@ test.describe('sections and pick-one groups', () => {
 
     // Warm-Up: Arm Circles, 1 set of 10.
     await addSection(page, 'Warm-Up');
-    await pickExercise(page, '+ Exercise', 'Arm Circles');
-    for (const n of [3, 2]) await setRow(page, 'Arm Circles', `set ${n}`).getByRole('button', { name: 'Remove set' }).click();
-    await expect(setRow(page, 'Arm Circles', 'set 2')).toHaveCount(0);
-    await fillSet(page, 'Arm Circles', 1, 10);
+    await pickExercise(page, '+ Exercise', X('Arm Circles'));
+    for (const n of [3, 2]) await setRow(page, X('Arm Circles'), `set ${n}`).getByRole('button', { name: 'Remove set' }).click();
+    await expect(setRow(page, X('Arm Circles'), 'set 2')).toHaveCount(0);
+    await fillSet(page, X('Arm Circles'), 1, 10);
 
     // Core (Activation): one superset, 3 rounds.
     await addSection(page, 'Core (Activation)');
-    await addSuperset(page, ['Hanging Leg Raise', 'Medicine Ball Sit Up & Overhead Throw']);
+    await addSuperset(page, [X('Hanging Leg Raise'), X('Medicine Ball Sit Up & Overhead Throw')]);
     await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
-    for (const n of [1, 2, 3]) await fillSet(page, 'Hanging Leg Raise', n, 10);
-    for (const [n, w] of [[1, 10], [2, 12], [3, 14]] as const) await fillSet(page, 'Medicine Ball Sit Up & Overhead Throw', n, 12, w);
+    for (const n of [1, 2, 3]) await fillSet(page, X('Hanging Leg Raise'), n, 10);
+    for (const [n, w] of [[1, 10], [2, 12], [3, 14]] as const) await fillSet(page, X('Medicine Ball Sit Up & Overhead Throw'), n, 12, w);
 
     // Resistance Training: three supersets, the second one uneven (3 + 2 sets).
     await addSection(page, 'Resistance Training');
-    await addSuperset(page, ['DB Bench', 'Alternating DB Curl']);
-    for (const [n, w, r] of [[1, 35, 12], [2, 45, 12], [3, 55, 10]] as const) await fillSet(page, 'DB Bench', n, r, w);
-    for (const n of [1, 2, 3]) await fillSet(page, 'Alternating DB Curl', n, 12, 25);
+    await addSuperset(page, [X('DB Bench'), X('Alternating DB Curl')]);
+    for (const [n, w, r] of [[1, 35, 12], [2, 45, 12], [3, 55, 10]] as const) await fillSet(page, X('DB Bench'), n, r, w);
+    for (const n of [1, 2, 3]) await fillSet(page, X('Alternating DB Curl'), n, 12, 25);
 
-    await addSuperset(page, ['Lateral Raise', 'Seated DB Press']);
-    await setRow(page, 'Seated DB Press', 'set 3').getByRole('button', { name: 'Remove set' }).click();
+    await addSuperset(page, [X('Lateral Raise'), X('Seated DB Press')]);
+    await setRow(page, X('Seated DB Press'), 'set 3').getByRole('button', { name: 'Remove set' }).click();
     await expect(page.getByText('Superset / circuit · 3 + 2 sets')).toBeVisible();
-    for (const [n, w] of [[1, 10], [2, 15], [3, 15]] as const) await fillSet(page, 'Lateral Raise', n, 12, w);
-    for (const [n, w] of [[1, 25], [2, 30]] as const) await fillSet(page, 'Seated DB Press', n, 12, w);
+    for (const [n, w] of [[1, 10], [2, 15], [3, 15]] as const) await fillSet(page, X('Lateral Raise'), n, 12, w);
+    for (const [n, w] of [[1, 25], [2, 30]] as const) await fillSet(page, X('Seated DB Press'), n, 12, w);
 
-    await addSuperset(page, ['Lat Pulldown', 'Tricep Pushdown']);
+    await addSuperset(page, [X('Lat Pulldown'), X('Tricep Pushdown')]);
     await page.getByRole('button', { name: 'Add a set to Lat Pulldown' }).click();
     await page.getByRole('button', { name: 'Add a set to Tricep Pushdown' }).click();
-    for (const [n, w, r] of [[1, 85, 12], [2, 115, 12], [3, 85, 6], [4, 85, 6]] as const) await fillSet(page, 'Lat Pulldown', n, r, w);
-    for (const [n, w, r] of [[1, 70, 12], [2, 80, 12], [3, 90, 10], [4, 70, 6]] as const) await fillSet(page, 'Tricep Pushdown', n, r, w);
+    for (const [n, w, r] of [[1, 85, 12], [2, 115, 12], [3, 85, 6], [4, 85, 6]] as const) await fillSet(page, X('Lat Pulldown'), n, r, w);
+    for (const [n, w, r] of [[1, 70, 12], [2, 80, 12], [3, 90, 10], [4, 70, 6]] as const) await fillSet(page, X('Tricep Pushdown'), n, r, w);
 
     // Finisher: pick one of Medicine Ball Slam (15 x 12 x 3) or Farmer's Walk.
     await addSection(page, 'Finisher');
     await page.getByRole('button', { name: '+ Pick one', exact: true }).click();
     const picker = page.getByRole('dialog', { name: 'Add a pick-one group' });
-    await picker.getByLabel('Search exercises').fill('Medicine Ball Slam');
-    await picker.getByRole('button', { name: 'Medicine Ball Slam', exact: true }).click();
+    await picker.getByLabel('Search exercises').fill(X('Medicine Ball Slam'));
+    await picker.getByRole('button', { name: X('Medicine Ball Slam'), exact: true }).click();
     await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
-    await picker.getByLabel('Search exercises').fill('Farmer');
-    await picker.getByRole('button', { name: "Farmer's Walk", exact: true }).click();
+    await picker.getByLabel('Search exercises').fill(X("Farmer's Walk"));
+    await picker.getByRole('button', { name: X("Farmer's Walk"), exact: true }).click();
     await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
     await expect(page.getByRole('heading', { name: 'Pick one · 2 options' })).toBeVisible();
-    for (const n of [1, 2, 3]) await fillSet(page, 'Medicine Ball Slam', n, 12, 15);
+    for (const n of [1, 2, 3]) await fillSet(page, X('Medicine Ball Slam'), n, 12, 15);
 
     await page.getByRole('button', { name: 'Save workout' }).click();
     await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('status').filter({ hasText: '✓ Saved' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel('Section name')).toHaveCount(4);
-    expect(await page.getByLabel('Section name').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual([
+    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(4);
+    const sectionBoxes = page.getByRole('textbox', { name: /^Name of section / });
+    expect(await sectionBoxes.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual([
       'Warm-Up',
       'Core (Activation)',
       'Resistance Training',
@@ -332,7 +336,7 @@ test.describe('sections and pick-one groups', () => {
     const headings = await page.getByRole('heading', { level: 2 }).allTextContents();
     const order = [
       'Warm-Up',
-      'Arm Circles',
+      X('Arm Circles'),
       'Core (Activation)',
       'Superset / circuit · 3 rounds',
       'Resistance Training',
@@ -350,22 +354,22 @@ test.describe('sections and pick-one groups', () => {
     expect(headings.at(-1)).toBe('Pick one · 2 options');
 
     // The uneven superset kept its shape, and the values survived.
-    await expect(setRow(page, 'Lateral Raise', 'set 3')).toBeVisible();
-    await expect(setRow(page, 'Seated DB Press', 'set 3')).toHaveCount(0);
-    await expect(setRow(page, 'Seated DB Press', 'set 2').getByLabel('Weight (lb)')).toHaveValue('30');
-    await expect(setRow(page, 'Tricep Pushdown', 'set 4').getByLabel('Weight (lb)')).toHaveValue('70');
-    await expect(setRow(page, 'Medicine Ball Slam', 'set 3').getByLabel('Weight (lb)')).toHaveValue('15');
+    await expect(setRow(page, X('Lateral Raise'), 'set 3')).toBeVisible();
+    await expect(setRow(page, X('Seated DB Press'), 'set 3')).toHaveCount(0);
+    await expect(setRow(page, X('Seated DB Press'), 'set 2').getByLabel('Weight (lb)')).toHaveValue('30');
+    await expect(setRow(page, X('Tricep Pushdown'), 'set 4').getByLabel('Weight (lb)')).toHaveValue('70');
+    await expect(setRow(page, X('Medicine Ball Slam'), 'set 3').getByLabel('Weight (lb)')).toHaveValue('15');
     await expect(page.getByRole('button', { name: 'Remove the last round' }).first()).toBeEnabled();
 
     // Moving the pick-one group (block 6) into Core empties Finisher, so that section goes away.
     await page.getByLabel('Move pick-one group 6 to a section').selectOption({ label: 'Core (Activation)' });
-    await expect(page.getByLabel('Section name')).toHaveCount(3);
+    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(3);
   });
 
   test('saving with an empty section says which section needs an exercise', async ({ page }) => {
     await page.getByLabel('Workout name').fill(`Empty section ${unique()}`);
     await addSection(page, 'Main');
-    await pickExercise(page, '+ Exercise', 'Arm Circles');
+    await pickExercise(page, '+ Exercise', X('Arm Circles'));
     await addSection(page, 'Core');
     const empty = page.getByRole('group', { name: 'Section Core', exact: true });
     await expect(empty.getByText('No exercises yet.')).toBeVisible();
@@ -379,13 +383,13 @@ test.describe('sections and pick-one groups', () => {
 
   test('a workout with no sections looks as it did before', async ({ page }) => {
     await page.getByLabel('Workout name').fill(`Plain ${unique()}`);
-    await pickExercise(page, '+ Exercise', 'Arm Circles');
-    await expect(page.getByLabel('Section name')).toHaveCount(0);
+    await pickExercise(page, '+ Exercise', X('Arm Circles'));
+    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /to a section/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '+ Section', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Save workout' }).click();
     await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
     await page.reload();
-    await expect(page.getByLabel('Section name')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(0);
   });
 });

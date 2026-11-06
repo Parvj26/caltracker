@@ -19,7 +19,8 @@ type Props = {
 
 /**
  * The heading row of a section. The name is an inline text box (styled as the heading); a hidden real heading carries
- * the same text so screen-reader heading navigation works. A blank draft is not saved: the last good name stays.
+ * the same text so screen-reader heading navigation works. (Tradeoff: a text box inside an <h2> gets an unreliable
+ * accessible name across browsers, so the heading and the box are separate elements that show the same text.) A blank draft is not saved: the last good name stays.
  */
 export function SectionHeader({ section, index, count, empty, errors, onRename, onMove, onRemove }: Props) {
   const [draft, setDraft] = useState(section.name);
@@ -30,7 +31,7 @@ export function SectionHeader({ section, index, count, empty, errors, onRename, 
         <h2 className={styles.visuallyHidden}>{section.name}</h2>
         <input
           type="text"
-          aria-label="Section name"
+          aria-label={`Name of section ${section.name}`}
           aria-invalid={blank || undefined}
           maxLength={40}
           className={`${styles.input} ${styles.sectionName}`}
