@@ -16,6 +16,7 @@ import {
   fromMeters,
   isBlockDone,
   kgToInput,
+  nextOpenBlock,
   planSummary,
   resolveSetValues,
   roundRestSeconds,
@@ -348,4 +349,17 @@ export function pageIndexAfterChange(prev: { blockIds: string[]; index: number }
   const kept = nextBlockIds.indexOf(prev.blockIds[prev.index] ?? '');
   if (kept >= 0) return kept;
   return Math.min(Math.max(0, prev.index), nextBlockIds.length - 1);
+}
+
+/** The page to show after Done: the same one while it has open sets, else the next open one (wrapping), else stay. */
+export function pageAfterDone(log: WorkoutLogDoc, pageIndex: number): number {
+  const block = log.blocks[pageIndex];
+  if (block && !isBlockDone(block)) return pageIndex;
+  return nextOpenBlock(log, pageIndex) ?? pageIndex;
+}
+
+/** The page shown on opening: the first with an unticked set (0 when none, or no pages). */
+export function firstOpenPage(log: WorkoutLogDoc): number {
+  const i = log.blocks.findIndex((b) => currentStep(b) !== null);
+  return i < 0 ? 0 : i;
 }

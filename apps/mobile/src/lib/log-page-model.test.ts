@@ -1,7 +1,16 @@
 import { WorkoutDoc, completeSetWith, startLogFromWorkout, updateActual, type WorkoutLogDoc } from '@caltracker/shared';
 import { describe, expect, it } from 'vitest';
 import type { LastResults } from './log-api';
-import { buildPageModel, listRows, pageIndexAfterChange, progressLabel, progressStates, restLeftLabel } from './log-page-model';
+import {
+  buildPageModel,
+  firstOpenPage,
+  listRows,
+  pageAfterDone,
+  pageIndexAfterChange, 
+  progressLabel,
+  progressStates,
+  restLeftLabel,
+} from './log-page-model';
 
 let n = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
@@ -238,6 +247,49 @@ describe('page list and progress', () => {
     // a stale index beyond the old pages falls back to the last page
     expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 5 }, ['a', 'b', 'c'])).toBe(2);
     expect(pageIndexAfterChange({ blockIds: ['a', 'b'], index: 5 }, ['a'])).toBe(0);
+  });
+});
+
+describe('doneThenAdvance', () => {
+  const allIds = (log: WorkoutLogDoc, bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((s) => s.id));
+
+  it('stays on the page while it has open sets', () => {
+    let log = fixture();
+    log = tick(log, sets(log, 0)[0].id);
+    expect(pageAfterDone(log, 0)).toBe(0);
+  });
+
+  it('moves forward to the next page with open sets', () => {
+    let log = fixture();
+    log = tick(log, ...allIds(log, 0));
+    expect(pageAfterDone(log, 0)).toBe(1);
+    // a finished page in between is skipped
+    log = tick(log, ...allIds(log, 1));
+    expect(pageAfterDone(log, 0)).toBe(2);
+  });
+
+  it('wraps round to a skipped page', () => {
+    let log = fixture();
+    log = tick(log, ...allIds(log, 2));
+    expect(pageAfterDone(log, 2)).toBe(0);
+  });
+
+  it('stays put when every set is done', () => {
+    let log = fixture();
+    log = tick(log, ...allIds(log, 0), ...allIds(log, 1), ...allIds(log, 2));
+    expect(pageAfterDone(log, 1)).toBe(1);
+  });
+});
+
+describe('firstOpenPage', () => {
+  it('is the first page with an unticked set, or 0', () => {
+    let log = fixture();
+    expect(firstOpenPage(log)).toBe(0);
+    log = tick(log, ...log.blocks[0].exercises.flatMap((e) => e.sets.map((s) => s.id)));
+    expect(firstOpenPage(log)).toBe(1);
+    log = tick(log, ...log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.map((s) => s.id))));
+    expect(firstOpenPage(log)).toBe(0);
+    expect(firstOpenPage({ ...log, blocks: [] })).toBe(0);
   });
 });
 
