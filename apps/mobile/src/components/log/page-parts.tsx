@@ -137,8 +137,9 @@ export function MoveRow({ page, prevName, nextName, onPrev, onNext }: { page: nu
       <View style={styles.flex}>
         {prevName ? (
           <Pressable testID={`prev-${page}`} onPress={onPrev} accessibilityRole="button" accessibilityLabel={`Previous exercise, ${prevName}`} style={styles.move}>
-            <Text style={[text('caption'), styles.ink]} numberOfLines={1}>
-              ‹ {prevName}
+            <Text style={[text('caption'), styles.ink]}>‹ </Text>
+            <Text style={[text('caption'), styles.ink, styles.shrink]} numberOfLines={1}>
+              {prevName}
             </Text>
           </Pressable>
         ) : null}
@@ -149,9 +150,10 @@ export function MoveRow({ page, prevName, nextName, onPrev, onNext }: { page: nu
       <View style={[styles.flex, { alignItems: 'flex-end' }]}>
         {nextName ? (
           <Pressable testID={`next-${page}`} onPress={onNext} accessibilityRole="button" accessibilityLabel={`Next exercise, ${nextName}`} style={styles.move}>
-            <Text style={[text('caption'), styles.ink]} numberOfLines={1}>
-              {nextName} ›
+            <Text style={[text('caption'), styles.ink, styles.shrink]} numberOfLines={1}>
+              {nextName}
             </Text>
+            <Text style={[text('caption'), styles.ink]}> ›</Text>
           </Pressable>
         ) : null}
       </View>
@@ -203,7 +205,9 @@ const styles = StyleSheet.create({
     borderColor: palette.ink,
     backgroundColor: palette.bg,
   },
-  move: { minHeight: tapTarget.min, justifyContent: 'center', maxWidth: '100%' },
+  // The arrow sits in its own Text beside the name, so a long name truncates without cutting the arrow off.
+  move: { minHeight: tapTarget.min, flexDirection: 'row', alignItems: 'center', maxWidth: '100%' },
+  shrink: { flexShrink: 1 },
   upNext: { backgroundColor: palette.surface },
   allDone: { backgroundColor: palette.lime },
 });
