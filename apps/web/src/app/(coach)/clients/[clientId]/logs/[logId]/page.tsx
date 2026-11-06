@@ -10,6 +10,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { loadClient } from '../../client';
 import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
+import { ClientNote } from './planned-vs-actual';
 import styles from './log.module.css';
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
@@ -82,6 +83,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
             </Chip>
           ) : null}
         </div>
+        <ClientNote text={log.notes} label="Client's note on this workout" />
       </header>
 
       <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />

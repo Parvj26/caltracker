@@ -289,6 +289,33 @@ test.describe('logged workout page', () => {
     await page.screenshot({ path: process.env.SHOT_LOG ?? 'test-results/log-page.png', fullPage: true });
   });
 
+  test("shows the client's workout note near the top and each exercise note on its exercise", async ({ page }) => {
+    const name = `Notes ${unique()}`;
+    const id = await log({ workspaceId, clientId, name, startedAt: ago(90), finishedAt: ago(40), addedExercise: 'Cable Crossover' });
+    const w = await admin.from('workout_logs').update({ notes: 'Slept badly, kept it light.' }).eq('id', id);
+    if (w.error) throw w.error;
+    const squat = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
+    if (squat.error) throw squat.error;
+    const e = await admin.from('log_exercises').update({ note: 'Left knee felt tight, went lighter' }).eq('log_id', id).eq('exercise_id', squat.data.id);
+    if (e.error) throw e.error;
+
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    const workoutNote = page.getByRole('figure', { name: "Client's note on this workout" });
+    await expect(workoutNote).toContainText("Client's note");
+    await expect(workoutNote).toContainText('Slept badly, kept it light.');
+    // The workout note sits in the header, above the first exercise.
+    const noteBox = await workoutNote.boundingBox();
+    const tableBox = await page.getByRole('table', { name: 'Barbell Squat' }).boundingBox();
+    expect(noteBox!.y).toBeLessThan(tableBox!.y);
+    // The exercise note sits inside the card of the exercise it belongs to; the other exercise has none.
+    // An exercise's card is the element its table sits in.
+    const squatCard = page.getByRole('table', { name: 'Barbell Squat' }).locator('xpath=..');
+    await expect(squatCard.getByRole('figure', { name: "Client's note on Barbell Squat" })).toContainText('Left knee felt tight, went lighter');
+    const cableCard = page.getByRole('table', { name: 'Cable Crossover' }).locator('xpath=..');
+    await expect(cableCard.getByRole('figure')).toHaveCount(0);
+  });
+
   test('a sectioned log shows headings, the picked option, and no table for the option not picked', async ({ page }) => {
     const u = unique();
     const slam = `Slam ${u}`;

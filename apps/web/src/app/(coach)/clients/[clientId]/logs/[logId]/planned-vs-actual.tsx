@@ -52,6 +52,18 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
   }
 }
 
+/** Something the client typed on the phone (a workout or an exercise note), labelled so the coach knows who wrote it. */
+export function ClientNote({ text, label = "Client's note" }: { text: string | null; label?: string }) {
+  const body = text?.trim();
+  if (!body) return null;
+  return (
+    <figure className={styles.clientNote} aria-label={label}>
+      <figcaption className={styles.clientNoteLabel}>Client&apos;s note</figcaption>
+      <blockquote className={styles.clientNoteBody}>{body}</blockquote>
+    </figure>
+  );
+}
+
 function ExerciseHeading({ level, children }: { level: 3 | 4; children: string }) {
   return level === 4 ? <h4 className={styles.exerciseName}>{children}</h4> : <h3 className={styles.exerciseName}>{children}</h3>;
 }
@@ -105,6 +117,7 @@ export function PlannedVsActual({
                       {swapped ? <Chip>Swapped from {swapped}</Chip> : null}
                       {added ? <Chip tone="blue">Added</Chip> : null}
                     </header>
+                    <ClientNote text={ex.note} label={`Client's note on ${ex.exerciseName}`} />
                     <table className={styles.table} aria-label={ex.exerciseName}>
                       <thead>
                         <tr>
