@@ -1,5 +1,5 @@
 begin;
-select plan(33);
+select plan(35);
 
 -- Fixtures (as postgres)
 select tests.create_user('coach-a@t.local', 'Coach A') as coach_a \gset
@@ -54,7 +54,8 @@ select is((select count(*)::int from public.profiles where id = :'b1'), 0, 'coac
 -- workspaces
 select tests.act_as(:'a1');
 select results_eq($$select id from public.workspaces$$, array[:'ws_a'::uuid], 'A1 sees exactly workspace A');
-update public.workspaces set name = 'Hacked' where id = :'ws_a';
+select throws_ok(format($$update public.workspaces set name = 'Hacked' where id = %L$$, :'ws_a'), '42501', null,
+  'A1 cannot rename workspace A directly');
 update public.workspaces set badge_style = 'plain' where id = :'ws_a';
 reset role;
 select is((select name from public.workspaces where id = :'ws_a'), 'Workspace A', 'A1 cannot update workspace A');
@@ -62,8 +63,10 @@ select is((select badge_style from public.workspaces where id = :'ws_a'), 'anima
 
 select tests.act_as(:'coach_a');
 select results_eq($$select id from public.workspaces$$, array[:'ws_a'::uuid], 'coach A sees exactly workspace A');
-update public.workspaces set name = 'Renamed A' where id = :'ws_a';
-update public.workspaces set name = 'Hacked' where id = :'ws_b';
+select public.update_workspace_name('Renamed A');
+-- Renaming goes through update_workspace_name (owner only); the direct column update is withdrawn.
+select throws_ok(format($$update public.workspaces set name = 'Hacked' where id = %L$$, :'ws_b'), '42501', null,
+  'coach A cannot rename workspaces directly');
 reset role;
 select is((select name from public.workspaces where id = :'ws_a'), 'Renamed A', 'coach A updates workspace A');
 select is((select name from public.workspaces where id = :'ws_b'), 'Workspace B', 'coach A cannot update workspace B');
