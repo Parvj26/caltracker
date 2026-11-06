@@ -24,6 +24,7 @@ export type { CsvError, ParsedClientCsv } from './invites/csv';
 export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
 export { FREE_EXERCISE_DB_IMAGE_PREFIX, mapFreeExercise } from './exercises/free-exercise-db';
+export { equipmentLabel, workoutEquipment } from './exercises/equipment';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
 export { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
 export { CustomExerciseInput, ExerciseOverrideInput, OptionalYoutubeUrl, YOUTUBE_URL_ERROR } from './exercises/schema';
@@ -65,12 +66,22 @@ export {
   startOfWeek,
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
-export { BLOCK_KINDS, SET_TYPES, WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } from './workouts/schema';
+export {
+  BLOCK_KINDS,
+  SET_TYPES,
+  WorkoutBlockDoc,
+  WorkoutDoc,
+  WorkoutExerciseDoc,
+  WorkoutSectionDoc,
+  WorkoutSetDoc,
+} from './workouts/schema';
+export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
+export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow } from './workouts/tree';
-export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget } from './workouts/targets';
+export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
 export {
   addDrop,
   addExerciseToSuperset,
@@ -78,13 +89,21 @@ export {
   addSet,
   addStraightBlock,
   addSuperset,
+  addChoice,
+  addChoiceOption,
+  addSection,
   emptyWorkout,
   moveBlock,
+  moveBlockToSection,
+  moveSection,
+  removeSection,
+  renameSection,
   removeBlock,
   removeExercise,
   removeRound,
   removeSet,
   replaceExercise,
+  setShowsRest,
   updateSet,
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
@@ -120,6 +139,7 @@ export {
   dropParentId,
   discardLog,
   finishLog,
+  pickChoice,
   removeLogExercise,
   reopenLog,
   removeLogSet,
@@ -158,6 +178,7 @@ export {
   isPlannedLog,
   logDurationS,
   logVolumeKg,
+  openSetCount,
   shouldAutoFinish,
 } from './logs/summary';
 export {
@@ -209,7 +230,7 @@ export {
   safeTimeZone,
 } from './awards/history';
 export type { AwardContext } from './awards/history';
-export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from './logs/flow';
+export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
 export {
   COMMON_EXERCISES,

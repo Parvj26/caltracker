@@ -6,8 +6,8 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')
 const SQUAT = id(9);
 const log = (finishedAt: string): WorkoutLogDoc => ({
   id: id(1), workoutId: null, name: 'Legs', status: 'completed', startedAt: finishedAt, finishedAt, lastActivityAt: finishedAt,
-  autoFinished: false, revision: 0, notes: null,
-  blocks: [{ id: id(2), kind: 'straight', exercises: [{
+  autoFinished: false, revision: 0, notes: null, sections: [],
+  blocks: [{ id: id(2), sectionId: null, pickedExerciseId: null, kind: 'straight', exercises: [{
     id: id(3), exerciseId: SQUAT, exerciseName: 'Squat', trackingType: 'weight_reps', plannedWorkoutExerciseId: null, swappedFromExerciseId: null, note: null,
     sets: [{ id: id(4), setType: 'normal', target: { repsMin: null, repsMax: null, weightKg: null, durationS: null, distanceM: null, toFailure: false, restSeconds: null }, actualReps: 5, actualWeightKg: 100, actualDurationS: null, actualDistanceM: null, completedAt: finishedAt }],
   }] }],

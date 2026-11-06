@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
+import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc, completeSet, pickChoice } from '@caltracker/shared';
 import {
   finishPrompt,
   formatCommentTime,
@@ -21,7 +21,7 @@ import {
   within,
   workoutStatuses,
 } from './active-log-logic';
-import { sampleLog } from './log-fixtures';
+import { sampleLog, upperCoreLog } from './log-fixtures';
 
 let n = 100;
 const makeId = () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
@@ -267,6 +267,34 @@ describe('finishPrompt', () => {
   it('asks first when some sets are not ticked, and finishes straight away when all are', () => {
     expect(finishPrompt(twoSets(true, false), NOW)).toEqual({ kind: 'unticked', count: 1 });
     expect(finishPrompt(twoSets(true, true), NOW)).toEqual({ kind: 'ready' });
+  });
+
+  it('counts an unpicked pick-one group as its first option, and only the picked option once picked', () => {
+    let log = upperCoreLog();
+    const ids = (bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((x) => x.id));
+    const tickAll = (l: WorkoutLogDoc, bi: number) =>
+      ids(bi).reduce((acc, sid) => completeSet(acc, sid, NOW), l);
+    for (const bi of [0, 1, 2, 3, 4]) log = tickAll(log, bi);
+    expect(finishPrompt(log, NOW)).toEqual({ kind: 'unticked', count: 3 });
+    const picked = pickChoice(log, log.blocks[5].id, log.blocks[5].exercises[1].id, NOW);
+    expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 3 });
+  });
+
+  it('counts the first option before the pick and the picked option after, when their set counts differ', () => {
+    let log = upperCoreLog();
+    // Option 2 (Farmer's Walk) has 2 sets; option 1 keeps its 3.
+    log = {
+      ...log,
+      blocks: log.blocks.map((b, bi) =>
+        bi === 5 ? { ...b, exercises: b.exercises.map((e, ei) => (ei === 1 ? { ...e, sets: e.sets.slice(0, 2) } : e)) } : b,
+      ),
+    };
+    const ids = (bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((x) => x.id));
+    for (const bi of [0, 1, 2, 3, 4]) log = ids(bi).reduce((acc, sid) => completeSet(acc, sid, NOW), log);
+    expect(log.blocks[5].exercises.map((e) => e.sets.length)).toEqual([3, 2]);
+    expect(finishPrompt(log, NOW)).toEqual({ kind: 'unticked', count: 3 });
+    const picked = pickChoice(log, log.blocks[5].id, log.blocks[5].exercises[1].id, NOW);
+    expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 2 });
   });
 
   it('words the question with the exact copy', () => {

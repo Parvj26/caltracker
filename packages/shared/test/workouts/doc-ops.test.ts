@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addChoice,
+  addChoiceOption,
   addDrop,
   addExerciseToSuperset,
   addRound,
+  addSection,
   addSet,
   addStraightBlock,
   addSuperset,
   emptyWorkout,
   moveBlock,
+  moveBlockToSection,
+  moveSection,
   removeBlock,
   removeExercise,
   removeRound,
+  removeSection,
   removeSet,
+  renameSection,
   replaceExercise,
+  setShowsRest,
   updateSet,
 } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
@@ -37,7 +45,7 @@ function deepFreeze<T>(o: T): T {
 }
 
 const valid = (d: unknown) => WorkoutDoc.parse(d);
-const nonDrop = (sets: { setType: string }[]) => sets.filter((s) => s.setType !== 'drop');
+const nonDrop = <S extends { setType: string }>(sets: S[]) => sets.filter((s) => s.setType !== 'drop');
 
 function base() {
   let d = emptyWorkout(makeId, 'Upper A');
@@ -286,15 +294,47 @@ describe('immutability', () => {
   });
 });
 
-describe('superset keeps equal rounds', () => {
-  it('addSet in a superset adds a round to every exercise', () => {
+describe('supersets may be uneven', () => {
+  it('addSet in a superset adds a set to that exercise only', () => {
     const d = base();
     const sb = d.blocks[1]!;
     const out = valid(addSet(d, sb.id, sb.exercises[0]!.id, makeId));
-    for (const e of out.blocks[1]!.exercises) expect(nonDrop(e.sets)).toHaveLength(4);
+    const [a, b] = out.blocks[1]!.exercises;
+    expect(nonDrop(a!.sets)).toHaveLength(4);
+    expect(nonDrop(b!.sets)).toHaveLength(3);
   });
 
-  it('removeSet of a non-drop set removes that round everywhere, with its drops', () => {
+  it('addSet on a non-last superset exercise gives a round no later exercise reaches the block round rest', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a, b] = sb.exercises;
+    d = updateSet(d, sb.id, b!.id, b!.sets[2]!.id, { restSeconds: 75 });
+    d = valid(addSet(d, sb.id, a!.id, makeId));
+    expect(nonDrop(d.blocks[1]!.exercises[0]!.sets).map((s) => s.restSeconds)).toEqual([0, 0, 0, 75]);
+    // Once B catches up, A's next set is partnered again and goes straight on.
+    d = valid(addSet(d, sb.id, b!.id, makeId));
+    d = valid(addSet(d, sb.id, b!.id, makeId));
+    d = valid(addSet(d, sb.id, a!.id, makeId));
+    expect(nonDrop(d.blocks[1]!.exercises[0]!.sets)[4]!.restSeconds).toBe(0);
+    // The last exercise still copies its own rest.
+    expect(nonDrop(d.blocks[1]!.exercises[1]!.sets).map((s) => s.restSeconds)).toEqual([90, 90, 75, 75, 75]);
+  });
+
+  it('setShowsRest: every set outside a superset, and a superset set whose round no later exercise reaches', () => {
+    let d = base();
+    const st = d.blocks[0]!;
+    expect(st.exercises[0]!.sets.every((_, i) => setShowsRest(st, 0, i))).toBe(true);
+    const sb0 = d.blocks[1]!;
+    d = addSet(d, sb0.id, sb0.exercises[0]!.id, makeId);
+    d = addDrop(d, sb0.id, sb0.exercises[0]!.id, d.blocks[1]!.exercises[0]!.sets[3]!.id, makeId);
+    const sb = d.blocks[1]!;
+    // A: [n, n, n, n, drop]; B: [n, n, n].
+    expect([0, 1, 2, 3, 4].map((i) => setShowsRest(sb, 0, i))).toEqual([false, false, false, true, true]);
+    expect([0, 1, 2].map((i) => setShowsRest(sb, 1, i))).toEqual([true, true, true]);
+    expect(setShowsRest(sb, 5, 0)).toBe(false);
+  });
+
+  it('removeSet in a superset removes that set (and its drops) from that exercise only', () => {
     let d = base();
     const sb = d.blocks[1]!;
     const [a, b] = sb.exercises;
@@ -302,10 +342,10 @@ describe('superset keeps equal rounds', () => {
     const out = valid(removeSet(d, sb.id, a!.id, a!.sets[1]!.id));
     const [oa, ob] = out.blocks[1]!.exercises;
     expect(oa!.sets.map((s) => s.id)).toEqual([a!.sets[0]!.id, a!.sets[2]!.id]);
-    expect(ob!.sets.map((s) => s.id)).toEqual([b!.sets[0]!.id, b!.sets[2]!.id]);
+    expect(ob!.sets.map((s) => s.id)).toEqual(b!.sets.map((s) => s.id));
   });
 
-  it('removeSet is a no-op with one round left; removing a drop stays local', () => {
+  it('removeSet keeps the last set of an exercise; removing a drop stays local', () => {
     let d = base();
     const sb = d.blocks[1]!;
     const a = sb.exercises[0]!;
@@ -314,8 +354,20 @@ describe('superset keeps equal rounds', () => {
     const local = valid(removeSet(d, sb.id, a.id, drop.id));
     expect(local.blocks[1]!.exercises[0]!.sets).toHaveLength(3);
     expect(local.blocks[1]!.exercises[1]!.sets).toHaveLength(3);
-    d = valid(removeRound(removeRound(local, sb.id), sb.id));
-    expect(removeSet(d, sb.id, a.id, d.blocks[1]!.exercises[0]!.sets[0]!.id)).toEqual(d);
+    let one = local;
+    for (let i = 0; i < 2; i++) one = removeSet(one, sb.id, a.id, one.blocks[1]!.exercises[0]!.sets[0]!.id);
+    expect(valid(one).blocks[1]!.exercises[0]!.sets).toHaveLength(1);
+    expect(removeSet(one, sb.id, a.id, one.blocks[1]!.exercises[0]!.sets[0]!.id)).toEqual(one);
+  });
+
+  it('removeRound still removes the last round from every exercise, even when uneven', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    d = addSet(d, sb.id, sb.exercises[0]!.id, makeId);
+    const out = valid(removeRound(d, sb.id));
+    const [a, b] = out.blocks[1]!.exercises;
+    expect(nonDrop(a!.sets)).toHaveLength(3);
+    expect(nonDrop(b!.sets)).toHaveLength(2);
   });
 });
 
@@ -339,14 +391,14 @@ describe('updateSet validity', () => {
     expect(updateSet(d, b.id, ex.id, ex.sets[0]!.id, { setType: 'drop' })).toEqual(d);
   });
 
-  it('in a superset refuses changes to the round count but allows warmup/normal', () => {
+  it('in a superset allows turning a set into a drop, because rounds may differ', () => {
     const d = base();
     const sb = d.blocks[1]!;
     const ex = sb.exercises[0]!;
-    expect(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'drop' })).toEqual(d);
-    const out = valid(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'warmup' }));
-    expect(out.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('warmup');
-    expect(valid(updateSet(out, sb.id, ex.id, ex.sets[1]!.id, { setType: 'normal' })).blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('normal');
+    const out = valid(updateSet(d, sb.id, ex.id, ex.sets[1]!.id, { setType: 'drop' }));
+    expect(out.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('drop');
+    const back = valid(updateSet(out, sb.id, ex.id, ex.sets[1]!.id, { setType: 'warmup' }));
+    expect(back.blocks[1]!.exercises[0]!.sets[1]!.setType).toBe('warmup');
   });
 });
 
@@ -378,5 +430,186 @@ describe('caps', () => {
     for (let i = 0; i < 35; i++) d = addStraightBlock(d, pick(1), makeId);
     expect(valid(d).blocks).toHaveLength(30);
     expect(addSuperset(d, [pick(1), pick(2)], makeId)).toEqual(d);
+  });
+});
+
+describe('sections and pick-one groups', () => {
+  const ids = (d: WorkoutDoc) => d.blocks.map((b) => b.id);
+  const secs = (d: WorkoutDoc) => d.sections.map((s) => s.name);
+
+  // Warm-Up [w], Resistance Training [r1, r2], Core [c], Finisher [f]
+  function sectioned() {
+    let d = emptyWorkout(makeId, 'Upper / Core');
+    for (const [name, picks] of [
+      ['Warm-Up', [10]],
+      ['Resistance Training', [11, 12]],
+      ['Core', [13]],
+      ['Finisher', [14]],
+    ] as const) {
+      d = addSection(d, name, makeId);
+      for (const n of picks) d = addStraightBlock(d, pick(n), makeId);
+    }
+    return valid(d);
+  }
+
+  it('addSection appends, trims, and refuses blank, long names and an 11th section', () => {
+    let d = emptyWorkout(makeId, 'X');
+    d = addSection(d, '  Core ', makeId);
+    expect(secs(d)).toEqual(['Core']);
+    expect(addSection(d, '  ', makeId)).toBe(d);
+    expect(addSection(d, 'x'.repeat(41), makeId)).toBe(d);
+    for (let i = 0; i < 9; i++) d = addSection(d, `S${i}`, makeId);
+    expect(d.sections).toHaveLength(10);
+    expect(addSection(d, 'More', makeId)).toBe(d);
+  });
+
+  it('adds go into the last section and the doc parses', () => {
+    let d = emptyWorkout(makeId, 'X');
+    d = addStraightBlock(d, pick(1), makeId);
+    expect(d.blocks[0]!.sectionId).toBeNull();
+    d = addSection(d, 'A', makeId);
+    d = addStraightBlock(d, pick(2), makeId);
+    d = addSection(d, 'B', makeId);
+    d = addSuperset(d, [pick(3), pick(4)], makeId);
+    d = addChoice(d, [pick(5), pick(6)], makeId);
+    expect(d.blocks.map((b) => b.sectionId)).toEqual([null, d.sections[0]!.id, d.sections[1]!.id, d.sections[1]!.id]);
+    expect(() => valid(d)).not.toThrow();
+  });
+
+  it('renameSection renames; unknown or blank is refused', () => {
+    const d = sectioned();
+    expect(renameSection(d, d.sections[2]!.id, ' Abs ').sections[2]!.name).toBe('Abs');
+    expect(renameSection(d, d.sections[2]!.id, '')).toBe(d);
+    expect(renameSection(d, ID(1), 'Abs')).toBe(d);
+  });
+
+  it('removeSection gives its blocks to the section above', () => {
+    const d = sectioned();
+    const r = removeSection(d, d.sections[2]!.id);
+    expect(secs(r)).toEqual(['Warm-Up', 'Resistance Training', 'Finisher']);
+    expect(r.blocks[3]!.sectionId).toBe(d.sections[1]!.id);
+    expect(() => valid(r)).not.toThrow();
+  });
+
+  it('removeSection on the first section leaves its blocks unsectioned at the top', () => {
+    const d = sectioned();
+    const r = removeSection(d, d.sections[0]!.id);
+    expect(r.blocks[0]!.sectionId).toBeNull();
+    expect(secs(r)).toEqual(['Resistance Training', 'Core', 'Finisher']);
+    expect(() => valid(r)).not.toThrow();
+  });
+
+  it('moveSection(+1) on Core swaps it with Finisher, blocks follow', () => {
+    const d = sectioned();
+    const core = d.sections[2]!.id;
+    const r = moveSection(d, core, 1);
+    expect(secs(r)).toEqual(['Warm-Up', 'Resistance Training', 'Finisher', 'Core']);
+    expect(r.blocks.map((b) => b.exercises[0]!.exerciseId)).toEqual([10, 11, 12, 14, 13].map(ID));
+    expect(() => valid(r)).not.toThrow();
+    expect(moveSection(d, d.sections[0]!.id, -1)).toBe(d);
+    expect(moveSection(d, d.sections[3]!.id, 1)).toBe(d);
+    const up = moveSection(d, core, -1);
+    expect(secs(up)).toEqual(['Warm-Up', 'Core', 'Resistance Training', 'Finisher']);
+    expect(up.blocks.map((b) => b.exercises[0]!.exerciseId)).toEqual([10, 13, 11, 12, 14].map(ID));
+  });
+
+  it('moveBlock cannot cross a section heading', () => {
+    const d = sectioned();
+    const [, r1, r2] = d.blocks;
+    expect(ids(moveBlock(d, r2!.id, 0))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
+    expect(ids(moveBlock(d, r1!.id, 99))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
+    expect(ids(moveBlock(d, r1!.id, 4))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
+    expect(() => valid(moveBlock(d, r1!.id, 4))).not.toThrow();
+  });
+
+  it('moveBlockToSection puts the block at the end of that section', () => {
+    const d = sectioned();
+    const r = moveBlockToSection(d, d.blocks[0]!.id, d.sections[2]!.id);
+    // Warm-Up became empty, so it goes away.
+    expect(secs(r)).toEqual(['Resistance Training', 'Core', 'Finisher']);
+    expect(r.blocks.map((b) => b.exercises[0]!.exerciseId)).toEqual([11, 12, 13, 10, 14].map(ID));
+    expect(() => valid(r)).not.toThrow();
+    const toTop = moveBlockToSection(d, d.blocks[3]!.id, null);
+    expect(toTop.blocks[0]!.id).toBe(d.blocks[3]!.id);
+    expect(toTop.blocks[0]!.sectionId).toBeNull();
+    expect(() => valid(toTop)).not.toThrow();
+    expect(moveBlockToSection(d, d.blocks[0]!.id, ID(1))).toBe(d);
+  });
+
+  it('moveBlockToSection(null) lands after an unsectioned block that already exists', () => {
+    let d = emptyWorkout(makeId, 'X');
+    d = addStraightBlock(d, pick(1), makeId);
+    d = addSection(d, 'A', makeId);
+    d = addStraightBlock(d, pick(2), makeId);
+    d = addStraightBlock(d, pick(3), makeId);
+    const r = moveBlockToSection(d, d.blocks[2]!.id, null);
+    expect(r.blocks.map((b) => b.exercises[0]!.exerciseId)).toEqual([1, 3, 2].map(ID));
+    expect(r.blocks.map((b) => b.sectionId)).toEqual([null, null, d.sections[0]!.id]);
+    expect(() => valid(r)).not.toThrow();
+  });
+
+  it('removeSection on a freshly added empty section only drops the heading', () => {
+    const d = addSection(sectioned(), 'New', makeId);
+    const r = removeSection(d, d.sections[4]!.id);
+    expect(secs(r)).toEqual(secs(sectioned()));
+    expect(ids(r)).toEqual(ids(d));
+    expect(() => valid(r)).not.toThrow();
+  });
+
+  it('removeBlock removes a section when its last block goes, and keeps it otherwise', () => {
+    const d = sectioned();
+    const r = removeBlock(d, d.blocks[0]!.id);
+    expect(secs(r)).toEqual(['Resistance Training', 'Core', 'Finisher']);
+    expect(secs(removeBlock(d, d.blocks[1]!.id))).toEqual(secs(d));
+    expect(() => valid(r)).not.toThrow();
+    // A freshly added empty section is not removed by removing someone else's block.
+    const withEmpty = addSection(d, 'New', makeId);
+    expect(secs(removeBlock(withEmpty, d.blocks[0]!.id))).toContain('New');
+  });
+
+  it('addChoice makes 2-5 options with 3 normal sets each, and refuses otherwise', () => {
+    const d = emptyWorkout(makeId, 'X');
+    const c = addChoice(d, [pick(1), pick(2), pick(3)], makeId);
+    expect(c.blocks[0]!.kind).toBe('choice');
+    expect(c.blocks[0]!.exercises.map((e) => e.sets.length)).toEqual([3, 3, 3]);
+    expect(c.blocks[0]!.exercises[0]!.sets.every((s) => s.setType === 'normal' && s.restSeconds === 90)).toBe(true);
+    expect(addChoice(d, [pick(1)], makeId)).toBe(d);
+    expect(addChoice(d, [1, 2, 3, 4, 5, 6].map((n) => pick(n)), makeId)).toBe(d);
+    expect(() => valid(c)).not.toThrow();
+  });
+
+  it('addChoiceOption adds until 5 and refuses non-choice blocks', () => {
+    let d = addChoice(emptyWorkout(makeId, 'X'), [pick(1), pick(2)], makeId);
+    const id = d.blocks[0]!.id;
+    for (const n of [3, 4, 5]) d = addChoiceOption(d, id, pick(n), makeId);
+    expect(d.blocks[0]!.exercises).toHaveLength(5);
+    expect(d.blocks[0]!.exercises[4]!.sets).toHaveLength(3);
+    expect(addChoiceOption(d, id, pick(6), makeId)).toBe(d);
+    const b = base();
+    expect(addChoiceOption(b, b.blocks[0]!.id, pick(9), makeId)).toBe(b);
+  });
+
+  it('removeExercise on a two-option choice becomes straight and keeps the other option', () => {
+    const d = addChoice(emptyWorkout(makeId, 'X'), [pick(1), pick(2)], makeId);
+    const b = d.blocks[0]!;
+    const r = removeExercise(d, b.id, b.exercises[1]!.id);
+    expect(r.blocks[0]!.kind).toBe('straight');
+    expect(r.blocks[0]!.exercises[0]).toEqual(b.exercises[0]);
+  });
+
+  it('removeExercise on a choice never moves rest to another option', () => {
+    let d = addChoice(emptyWorkout(makeId, 'X'), [pick(1), pick(2), pick(3)], makeId);
+    const b = d.blocks[0]!;
+    d = updateSet(d, b.id, b.exercises[1]!.id, b.exercises[1]!.sets[0]!.id, { restSeconds: 30 });
+    d = updateSet(d, b.id, b.exercises[2]!.id, b.exercises[2]!.sets[0]!.id, { restSeconds: 45 });
+    const r = removeExercise(d, b.id, b.exercises[2]!.id);
+    expect(r.blocks[0]!.kind).toBe('choice');
+    expect(r.blocks[0]!.exercises[1]!.sets.map((s) => s.restSeconds)).toEqual([30, 90, 90]);
+  });
+
+  it('addRound and removeRound refuse choice blocks', () => {
+    const d = addChoice(emptyWorkout(makeId, 'X'), [pick(1), pick(2)], makeId);
+    expect(addRound(d, d.blocks[0]!.id, makeId).blocks[0]!.exercises[0]!.sets).toHaveLength(3);
+    expect(removeRound(d, d.blocks[0]!.id).blocks[0]!.exercises[0]!.sets).toHaveLength(3);
   });
 });

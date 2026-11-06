@@ -1,6 +1,6 @@
 import { formatClock } from '../units/units';
 import { groupDropSets } from '../workouts/drop-sets';
-import type { LogBlockDoc, LogSetDoc, WorkoutLogDoc } from './schema';
+import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
 
 export type StepKind = 'warmup' | 'normal' | 'drop';
 
@@ -21,6 +21,29 @@ export type AfterDone =
   | { kind: 'rest'; seconds: number; round: number | null }
   | { kind: 'next'; round: number | null; pageDone: boolean }
   | { kind: 'last' };
+
+/** A pick-one group nobody has chosen from yet. */
+export const needsPick = (block: LogBlockDoc): boolean => block.kind === 'choice' && block.pickedExerciseId === null;
+
+/** The exercises being done: all of them, or for a pick-one group only the picked one (none before a pick). */
+export function liveExercises(block: LogBlockDoc): Array<{ exercise: LogExerciseDoc; exerciseIndex: number }> {
+  return block.exercises
+    .map((exercise, exerciseIndex) => ({ exercise, exerciseIndex }))
+    .filter(({ exercise }) => block.kind !== 'choice' || exercise.id === block.pickedExerciseId);
+}
+
+/** A pick-one group whose picked option already has a done set: the pick can no longer change. */
+export const isChoiceLocked = (block: LogBlockDoc): boolean =>
+  block.kind === 'choice' && liveExercises(block).some(({ exercise }) => exercise.sets.some((s) => s.completedAt !== null));
+
+/** True for a set that belongs to an option of a pick-one group that is not the picked one. */
+export function isUnpickedSet(log: WorkoutLogDoc, setId: string): boolean {
+  return log.blocks.some(
+    (b) =>
+      b.kind === 'choice' &&
+      b.exercises.some((e) => e.id !== b.pickedExerciseId && e.sets.some((s) => s.id === setId)),
+  );
+}
 
 /** Steps of one exercise as groups: [main set + its drops], with indexes into the exercise's sets. */
 function exerciseGroups(block: LogBlockDoc, exerciseIndex: number): Step[][] {
@@ -51,7 +74,7 @@ function exerciseGroups(block: LogBlockDoc, exerciseIndex: number): Step[][] {
 
 /** Straight: array order. Superset: round by round, A1 (and its drops), B1, A2, ... */
 export function blockSteps(block: LogBlockDoc): Step[] {
-  const groups = block.exercises.map((_, i) => exerciseGroups(block, i));
+  const groups = liveExercises(block).map(({ exerciseIndex }) => exerciseGroups(block, exerciseIndex));
   if (block.kind !== 'superset') return groups.flat(2);
   const rounds = Math.max(0, ...groups.map((g) => g.length));
   const steps: Step[] = [];
@@ -61,14 +84,24 @@ export function blockSteps(block: LogBlockDoc): Step[] {
   return steps;
 }
 
-/** The longest planned rest among a superset round's main sets (0 when none): what Done waits after the round. */
+/**
+ * What Done waits after a superset round: the longest planned rest among the round's main sets. Supersets may be
+ * uneven, and the builder puts the round rest only on the last exercise, so a round the last exercise doesn't reach
+ * (e.g. A has 4 sets, B has 3) would have no rest at all. When such a round has no rest of its own, it uses the
+ * block's round rest: the last exercise's rest for its last round. 0 when the round doesn't exist.
+ */
 export function roundRestSeconds(block: LogBlockDoc, round: number): number {
-  const mains = block.exercises.flatMap((_, i) => exerciseGroups(block, i)[round - 1]?.slice(0, 1) ?? []);
-  return Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+  const groups = liveExercises(block).map(({ exerciseIndex }) => exerciseGroups(block, exerciseIndex));
+  const mains = groups.flatMap((g) => g[round - 1]?.slice(0, 1) ?? []);
+  const own = Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+  const lastGroups = groups[groups.length - 1] ?? [];
+  if (own > 0 || mains.length === 0 || lastGroups[round - 1]) return own;
+  const blockRest = lastGroups[lastGroups.length - 1]?.[0];
+  return blockRest ? (setOf(block, blockRest).target.restSeconds ?? 0) : 0;
 }
 
 export function blockRoundCount(block: LogBlockDoc): number {
-  return Math.max(0, ...block.exercises.map((_, i) => exerciseGroups(block, i).length));
+  return Math.max(0, ...liveExercises(block).map(({ exerciseIndex }) => exerciseGroups(block, exerciseIndex).length));
 }
 
 const setOf = (block: LogBlockDoc, s: Step): LogSetDoc => block.exercises[s.exerciseIndex]!.sets[s.setIndex]!;
@@ -85,7 +118,7 @@ export function currentStep(block: LogBlockDoc, preferExerciseIndex?: number): S
 }
 
 export function isBlockDone(block: LogBlockDoc): boolean {
-  return block.exercises.every((ex) => ex.sets.every((s) => s.completedAt !== null));
+  return !needsPick(block) && liveExercises(block).every(({ exercise }) => exercise.sets.every((s) => s.completedAt !== null));
 }
 
 /** The next page with an unticked set, going forward and then wrapping; never fromIndex itself. */
@@ -102,7 +135,8 @@ export function nextOpenBlock(log: WorkoutLogDoc, fromIndex: number): number | n
 export function afterDone(log: WorkoutLogDoc, blockIndex: number, setId: string): AfterDone {
   const block = log.blocks[blockIndex]!;
   const openElsewhere = (b: LogBlockDoc) =>
-    b.exercises.some((ex) => ex.sets.some((s) => s.id !== setId && s.completedAt === null));
+    needsPick(b) ||
+    liveExercises(b).some(({ exercise }) => exercise.sets.some((s) => s.id !== setId && s.completedAt === null));
   if (!log.blocks.some(openElsewhere)) return { kind: 'last' };
 
   const steps = blockSteps(block);

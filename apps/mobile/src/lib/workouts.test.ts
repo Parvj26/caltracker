@@ -6,6 +6,7 @@ import {
   groupByDay,
   initials,
   isFirstTimeClient,
+  orList,
   resolveVideoUrls,
   supersetLetters,
   toWorkoutSummary,
@@ -71,9 +72,21 @@ describe('toWorkoutSummary', () => {
         name: 'Upper A',
         scheduled_on: '2026-11-09',
         program_assignments: { program_name: 'Strength 101' },
-        workout_blocks: [{ workout_exercises: [{ count: 2 }] }, { workout_exercises: [{ count: 1 }] }],
+        workout_blocks: [{ kind: 'superset', workout_exercises: [{ count: 2 }] }, { kind: 'straight', workout_exercises: [{ count: 1 }] }],
       }),
     ).toEqual({ id: 'w1', name: 'Upper A', scheduledOn: '2026-11-09', exerciseCount: 3, programName: 'Strength 101' });
+  });
+
+  it('counts a pick-one group once: the client does one of its options', () => {
+    expect(
+      toWorkoutSummary({
+        id: 'w3',
+        name: 'Upper / Core',
+        scheduled_on: '2026-11-09',
+        program_assignments: null,
+        workout_blocks: [{ kind: 'straight', workout_exercises: [{ count: 1 }] }, { kind: 'choice', workout_exercises: [{ count: 3 }] }],
+      }).exerciseCount,
+    ).toBe(2);
   });
 
   it('handles a one-off workout with no program and no blocks', () => {
@@ -173,5 +186,20 @@ describe('blockRounds', () => {
     expect(() => blockRounds([{ exercises: [{ sets: [s('drop'), s('normal')] }] }])).toThrow(
       'A drop set must follow a normal or warm-up set.',
     );
+  });
+});
+
+describe('orList', () => {
+  it('joins two names with "or"', () => {
+    expect(orList(['Medicine Ball Slam', "Farmer's Walk"])).toBe("Medicine Ball Slam or Farmer's Walk");
+  });
+
+  it('joins three or more with commas and a last "or"', () => {
+    expect(orList(['A', 'B', 'C'])).toBe('A, B or C');
+  });
+
+  it('gives one name alone, and nothing for none', () => {
+    expect(orList(['A'])).toBe('A');
+    expect(orList([])).toBe('');
   });
 });

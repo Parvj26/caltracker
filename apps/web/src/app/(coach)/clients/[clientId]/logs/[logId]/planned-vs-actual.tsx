@@ -9,6 +9,9 @@ import {
   fromMeters,
   isAddedExercise,
   kgToInput,
+  liveExercises,
+  needsPick,
+  sectionRuns,
   type LogSetDoc,
   type TrackingType,
   type Units,
@@ -49,6 +52,10 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
   }
 }
 
+function ExerciseHeading({ level, children }: { level: 3 | 4; children: string }) {
+  return level === 4 ? <h4 className={styles.exerciseName}>{children}</h4> : <h3 className={styles.exerciseName}>{children}</h3>;
+}
+
 type Edit = { drafts: Drafts; onChange: (setId: string, patch: SetDraft) => void };
 
 /**
@@ -69,71 +76,89 @@ export function PlannedVsActual({
 }) {
   const distUnit = distanceUnitFor(units);
   return (
-    <div className={styles.exercises}>
-      {log.blocks.flatMap((block) =>
-        block.exercises.map((ex) => {
-          const swapped = ex.swappedFromExerciseId ? (swappedFrom[ex.swappedFromExerciseId] ?? 'another exercise') : null;
-          // Only a log that followed a plan (even one deleted since) has added exercises; an unplanned one is all
-          // the client's own.
-          const added = isAddedExercise(log, ex);
-          return (
-            <section key={ex.id} className={styles.exercise}>
-              <header className={styles.exerciseHead}>
-                <h3 className={styles.exerciseName}>{ex.exerciseName}</h3>
-                {swapped ? <Chip>Swapped from {swapped}</Chip> : null}
-                {added ? <Chip tone="blue">Added</Chip> : null}
-              </header>
-              <table className={styles.table} aria-label={ex.exerciseName}>
-                <thead>
-                  <tr>
-                    <th scope="col">Set</th>
-                    <th scope="col">Planned</th>
-                    <th scope="col">Actual</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ex.sets.map((set, i) => {
-                    const done = set.completedAt !== null;
-                    const draft = edit?.drafts[set.id];
-                    const field = (key: keyof SetDraft, label: string, mode: 'numeric' | 'decimal' | 'text') => (
-                      <input
-                        className={styles.cellInput}
-                        aria-label={`Set ${i + 1} ${label}`}
-                        inputMode={mode}
-                        value={draft?.[key] ?? ''}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => edit?.onChange(set.id, { [key]: e.target.value })}
-                      />
-                    );
-                    return (
-                      <tr key={set.id} className={done ? undefined : styles.notDone}>
-                        <th scope="row">
-                          {i + 1}
-                          {set.setType === 'warmup' ? ' · warm-up' : set.setType === 'drop' ? ' · drop' : ''}
-                        </th>
-                        <td>{formatLogSetTarget(set.target, ex.trackingType, units)}</td>
-                        <td>
-                          {edit && draft ? (
-                            <span className={styles.inputs}>
-                              {ex.trackingType === 'weight_reps' ? field('weight', `weight (${units})`, 'decimal') : null}
-                              {ex.trackingType === 'weight_reps' || ex.trackingType === 'reps' ? field('reps', 'reps', 'numeric') : null}
-                              {ex.trackingType === 'time' ? field('time', 'time (m:ss)', 'text') : null}
-                              {ex.trackingType === 'distance' ? field('distance', `distance (${distUnit})`, 'decimal') : null}
-                            </span>
-                          ) : done ? (
-                            actualText(set, ex.trackingType, units)
-                          ) : (
-                            'Not done'
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </section>
-          );
-        }),
-      )}
+    <div className={styles.runs}>
+      {sectionRuns(log.blocks, log.sections).map((run) => (
+        <div key={run.blockIndexes[0]} className={styles.run}>
+          {/* Inside the "Planned vs. actual" <h2>: a section is an <h3> and its exercises <h4>; without one, <h3>. */}
+          {run.section ? <h3 className={styles.runHeading}>{run.section.name}</h3> : null}
+          <div className={styles.exercises}>
+            {run.blockIndexes.flatMap((bi) => {
+              const block = log.blocks[bi]!;
+              if (needsPick(block)) {
+                return [
+                  <div key={block.id} className={styles.exercise}>
+                    <p className={styles.pickLine}>Pick one · not done</p>
+                    <p className={styles.options}>{block.exercises.map((e) => e.exerciseName).join(' · ')}</p>
+                  </div>,
+                ];
+              }
+              return liveExercises(block).map(({ exercise: ex }) => {
+                const swapped = ex.swappedFromExerciseId ? (swappedFrom[ex.swappedFromExerciseId] ?? 'another exercise') : null;
+                // Only a log that followed a plan (even one deleted since) has added exercises; an unplanned one is
+                // all the client's own.
+                const added = isAddedExercise(log, ex);
+                return (
+                  <section key={ex.id} className={styles.exercise}>
+                    <header className={styles.exerciseHead}>
+                      <ExerciseHeading level={run.section ? 4 : 3}>{ex.exerciseName}</ExerciseHeading>
+                      {block.kind === 'choice' ? <Chip>Picked: {ex.exerciseName}</Chip> : null}
+                      {swapped ? <Chip>Swapped from {swapped}</Chip> : null}
+                      {added ? <Chip tone="blue">Added</Chip> : null}
+                    </header>
+                    <table className={styles.table} aria-label={ex.exerciseName}>
+                      <thead>
+                        <tr>
+                          <th scope="col">Set</th>
+                          <th scope="col">Planned</th>
+                          <th scope="col">Actual</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ex.sets.map((set, i) => {
+                          const done = set.completedAt !== null;
+                          const draft = edit?.drafts[set.id];
+                          const field = (key: keyof SetDraft, label: string, mode: 'numeric' | 'decimal' | 'text') => (
+                            <input
+                              className={styles.cellInput}
+                              aria-label={`Set ${i + 1} ${label}`}
+                              inputMode={mode}
+                              value={draft?.[key] ?? ''}
+                              onChange={(e: ChangeEvent<HTMLInputElement>) => edit?.onChange(set.id, { [key]: e.target.value })}
+                            />
+                          );
+                          return (
+                            <tr key={set.id} className={done ? undefined : styles.notDone}>
+                              <th scope="row">
+                                {i + 1}
+                                {set.setType === 'warmup' ? ' · warm-up' : set.setType === 'drop' ? ' · drop' : ''}
+                              </th>
+                              <td>{formatLogSetTarget(set.target, ex.trackingType, units)}</td>
+                              <td>
+                                {edit && draft ? (
+                                  <span className={styles.inputs}>
+                                    {ex.trackingType === 'weight_reps' ? field('weight', `weight (${units})`, 'decimal') : null}
+                                    {ex.trackingType === 'weight_reps' || ex.trackingType === 'reps' ? field('reps', 'reps', 'numeric') : null}
+                                    {ex.trackingType === 'time' ? field('time', 'time (m:ss)', 'text') : null}
+                                    {ex.trackingType === 'distance' ? field('distance', `distance (${distUnit})`, 'decimal') : null}
+                                  </span>
+                                ) : done ? (
+                                  actualText(set, ex.trackingType, units)
+                                ) : (
+                                  'Not done'
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </section>
+                );
+              });
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

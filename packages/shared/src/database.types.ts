@@ -339,7 +339,10 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["block_kind"]
           log_id: string
+          picked_exercise_id: string | null
           position: number
+          section_id: string | null
+          section_name: string | null
           updated_at: string
           workspace_id: string
         }
@@ -349,7 +352,10 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           log_id: string
+          picked_exercise_id?: string | null
           position: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -359,7 +365,10 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           log_id?: string
+          picked_exercise_id?: string | null
           position?: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -868,6 +877,8 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["block_kind"]
           position: number
+          section_id: string | null
+          section_name: string | null
           updated_at: string
           workout_id: string
           workspace_id: string
@@ -878,6 +889,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           position: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workout_id: string
           workspace_id: string
@@ -888,6 +901,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           position?: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workout_id?: string
           workspace_id?: string
@@ -1423,7 +1438,7 @@ export type Database = {
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
     }
     Enums: {
-      block_kind: "straight" | "superset"
+      block_kind: "straight" | "superset" | "choice"
       log_status: "in_progress" | "completed" | "discarded"
       member_role: "owner" | "staff" | "client"
       set_type: "normal" | "warmup" | "drop"
@@ -1558,7 +1573,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      block_kind: ["straight", "superset"],
+      block_kind: ["straight", "superset", "choice"],
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],
       set_type: ["normal", "warmup", "drop"],

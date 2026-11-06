@@ -32,6 +32,8 @@ const row: WorkoutTreeRow = {
       id: id(30),
       position: 1,
       kind: 'superset',
+      section_id: null,
+      section_name: null,
       workout_exercises: [
         {
           id: id(32),
@@ -61,6 +63,8 @@ const row: WorkoutTreeRow = {
       id: id(10),
       position: 0,
       kind: 'straight',
+      section_id: null,
+      section_name: null,
       workout_exercises: [
         {
           id: id(11),
@@ -176,5 +180,36 @@ describe('workoutRowToDoc', () => {
     for (const part of ['workout_blocks(', 'workout_exercises(', 'exercises(name, tracking_type)', 'workout_sets(', 'position']) {
       expect(WORKOUT_TREE_SELECT).toContain(part);
     }
+  });
+});
+
+describe('workoutRowToDoc sections', () => {
+  const S1 = id(500);
+  const S2 = id(501);
+  it('rebuilds sections in order of first appearance and keeps each block section', () => {
+    const [b1, b0] = [row.workout_blocks[0]!, row.workout_blocks[1]!];
+    const doc = workoutRowToDoc({
+      ...row,
+      workout_blocks: [
+        { ...b1, section_id: S1, section_name: 'Main' },
+        { ...b0, id: id(31 + 100), position: 0, section_id: S2, section_name: 'Core' },
+        { ...b0, id: id(31 + 101), position: 2, section_id: S1, section_name: 'Main' },
+      ].map((b) => b),
+    });
+    expect(doc.sections).toEqual([
+      { id: S2, name: 'Core' },
+      { id: S1, name: 'Main' },
+    ]);
+    expect(doc.blocks.map((b) => b.sectionId)).toEqual([S2, S1, S1]);
+  });
+
+  it('gives no sections when the section columns are null', () => {
+    const doc = workoutRowToDoc(row);
+    expect(doc.sections).toEqual([]);
+    expect(doc.blocks.every((b) => b.sectionId === null)).toBe(true);
+  });
+
+  it('selects the section columns', () => {
+    expect(WORKOUT_TREE_SELECT).toContain('section_id, section_name');
   });
 });

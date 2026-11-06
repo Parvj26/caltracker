@@ -1,5 +1,5 @@
 begin;
-select plan(84);
+select plan(88);
 
 -- Fixtures (as postgres)
 select tests.create_user('as-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -18,6 +18,20 @@ select tests.create_workout(:'ws_a', 'Lower A') as lo \gset
 select tests.create_workout(:'ws_a', 'Full A') as ful \gset
 select tests.create_workout(:'ws_b', 'B Lib') as lib_b \gset
 select tests.create_workout(:'ws_a', 'A1 Day', :'a1', '2026-11-10') as inst_a1 \gset
+-- Upper A sits in a section, so its copies must carry the section.
+select gen_random_uuid() as up_sec \gset
+update public.workout_blocks set section_id = :'up_sec', section_name = 'Upper' where workout_id = :'up';
+-- Pick A: a pick-one group of two options in a Core section, for schedule_workout.
+select tests.create_workout(:'ws_a', 'Pick A') as pick \gset
+select gen_random_uuid() as pick_sec \gset
+update public.workout_blocks set kind = 'choice', section_id = :'pick_sec', section_name = 'Core'
+  where workout_id = :'pick';
+insert into public.workout_exercises (block_id, position, exercise_id)
+select b.id, 1, tests.create_exercise(null, 'Pick A option two') from public.workout_blocks b where b.workout_id = :'pick'
+returning id as pick_opt2 \gset
+insert into public.workout_sets (workout_exercise_id, position, set_type, target_reps_min, target_reps_max)
+values (:'pick_opt2', 0, 'normal', 12, 12);
+select gen_random_uuid() as sw_pick \gset
 
 select gen_random_uuid() as prog \gset
 select gen_random_uuid() as prog_b \gset
@@ -142,6 +156,11 @@ select is((select count(*)::int
   where w.assignment_id = :'asg1'), 8,
   'every copied set has the same positions and targets as its template');
 select is((select count(*)::int from public.workouts where assignment_id = :'asg2'), 4, 'A2 also gets 4 instances');
+select results_eq(
+  format($$select b.kind::text, b.section_id, b.section_name from public.workout_blocks b
+    join public.workouts w on w.id = b.workout_id where w.assignment_id = %L and w.name = 'Upper A'$$, :'asg1'),
+  format($$values ('straight'::text, %L::uuid, 'Upper'::text), ('straight', %L::uuid, 'Upper')$$, :'up_sec', :'up_sec'),
+  'assign_program copies each block''s section id and name');
 
 -- Idempotency (Review Focus 4)
 select tests.act_as(:'coach_a');
@@ -213,6 +232,17 @@ select is((select count(*)::int from public.workouts where id = :'sw1') * 100
     + (select count(*)::int from public.workout_sets where workout_id = :'sw1'), 102,
   'schedule_workout twice made 1 workout with its 2 sets');
 select is((select count(*)::int from public.workouts where id = :'sw_x'), 0, 'refused schedule calls created nothing');
+select tests.act_as(:'coach_a');
+select is(public.schedule_workout(:'sw_pick', :'pick', :'a1', '2026-11-13'), :'sw_pick'::uuid,
+  'schedule_workout copies a workout with a pick-one group');
+reset role;
+select results_eq(
+  format($$select kind::text, section_id, section_name from public.workout_blocks where workout_id = %L$$, :'sw_pick'),
+  format($$values ('choice'::text, %L::uuid, 'Core'::text)$$, :'pick_sec'),
+  'the copy keeps the pick-one kind and the section id and name');
+select is((select count(*)::int from public.workout_exercises where workout_id = :'sw_pick') * 100
+    + (select count(*)::int from public.workout_sets where workout_id = :'sw_pick'), 203,
+  'the copy keeps both options and their 3 sets');
 
 -- Template edited or deleted after assignment (Review Focus 1)
 update public.workout_sets set target_weight_kg = 100 where workout_id = :'up' and position = 0;

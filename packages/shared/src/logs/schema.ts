@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
-import { BLOCK_KINDS, SET_TYPES } from '../workouts/schema';
+import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from '../workouts/sections';
+import { BLOCK_KINDS, SET_TYPES, WorkoutSectionDoc } from '../workouts/schema';
 
 export const LOG_STATUSES = ['in_progress', 'completed', 'discarded'] as const;
 export type LogStatus = (typeof LOG_STATUSES)[number];
@@ -48,6 +49,9 @@ export type LogExerciseDoc = z.infer<typeof LogExerciseDoc>;
 
 export const LogBlockDoc = z.object({
   id: z.uuid(),
+  sectionId: z.uuid().nullable().default(null),
+  /** For a pick-one group: the log exercise the client chose; null until they choose. */
+  pickedExerciseId: z.uuid().nullable().default(null),
   kind: z.enum(BLOCK_KINDS),
   exercises: z.array(LogExerciseDoc).min(1).max(10),
 });
@@ -69,11 +73,30 @@ export const WorkoutLogDoc = z
     autoFinished: z.boolean(),
     revision: z.number().int().min(0),
     notes: z.string().max(2000).nullable(),
+    sections: z.array(WorkoutSectionDoc).max(10).default([]),
     blocks: z.array(LogBlockDoc).max(30),
   })
   .superRefine((doc, ctx) => {
     let completedSets = 0;
+    const sectionIds = new Set(doc.sections.map((s) => s.id));
     doc.blocks.forEach((block, bi) => {
+      if (block.sectionId !== null && !sectionIds.has(block.sectionId)) {
+        ctx.addIssue({ code: 'custom', message: 'Unknown section.', path: ['blocks', bi, 'sectionId'] });
+      }
+      if (block.kind === 'choice' && (block.exercises.length < MIN_CHOICE_OPTIONS || block.exercises.length > MAX_CHOICE_OPTIONS)) {
+        ctx.addIssue({ code: 'custom', message: 'A pick-one group needs 2 to 5 exercises.', path: ['blocks', bi, 'exercises'] });
+      }
+      if (block.pickedExerciseId !== null) {
+        if (block.kind !== 'choice') {
+          ctx.addIssue({ code: 'custom', message: 'Only a pick-one group can have a pick.', path: ['blocks', bi, 'pickedExerciseId'] });
+        } else if (!block.exercises.some((e) => e.id === block.pickedExerciseId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: "The pick must be one of the group's exercises.",
+            path: ['blocks', bi, 'pickedExerciseId'],
+          });
+        }
+      }
       if (block.kind === 'superset' && block.exercises.length < 2) {
         ctx.addIssue({
           code: 'custom',
@@ -84,6 +107,13 @@ export const WorkoutLogDoc = z
       block.exercises.forEach((ex, ei) => {
         ex.sets.forEach((s, si) => {
           if (s.completedAt !== null) completedSets += 1;
+          if (s.completedAt !== null && block.kind === 'choice' && ex.id !== block.pickedExerciseId) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Only the picked option can have done sets.',
+              path: ['blocks', bi, 'exercises', ei, 'sets', si, 'completedAt'],
+            });
+          }
           if (si === 0 && s.setType === 'drop') {
             ctx.addIssue({
               code: 'custom',

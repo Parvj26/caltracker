@@ -1,12 +1,16 @@
+import { liveExercises, needsPick } from './flow';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
 
 export const AUTO_FINISH_IDLE_MS = 3 * 60 * 60 * 1000;
 export const REMINDER_DELAY_MS = 20 * 60 * 1000;
 export const REOPEN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** Sets of the exercises being done: a pick-one group's unpicked options never count (see liveExercises). */
 function allSets(log: WorkoutLogDoc): { set: LogSetDoc; weightReps: boolean }[] {
   return log.blocks.flatMap((b) =>
-    b.exercises.flatMap((e) => e.sets.map((set) => ({ set, weightReps: e.trackingType === 'weight_reps' }))),
+    liveExercises(b).flatMap(({ exercise: e }) =>
+      e.sets.map((set) => ({ set, weightReps: e.trackingType === 'weight_reps' })),
+    ),
   );
 }
 
@@ -21,6 +25,22 @@ export function logVolumeKg(log: WorkoutLogDoc): number {
 
 export function completedSetCount(log: WorkoutLogDoc): number {
   return allSets(log).filter(({ set }) => set.completedAt !== null).length;
+}
+
+/**
+ * Counting rule: sets still to do: not-done sets of the exercises being done, plus for each pick-one group not yet picked from
+ * its first option's normal sets (the best guess of what it will turn into).
+ */
+export function openSetCount(log: WorkoutLogDoc): number {
+  let n = 0;
+  for (const b of log.blocks) {
+    if (needsPick(b)) {
+      n += b.exercises[0]?.sets.filter((s) => s.setType === 'normal').length ?? 0;
+    } else {
+      for (const { exercise } of liveExercises(b)) n += exercise.sets.filter((s) => s.completedAt === null).length;
+    }
+  }
+  return n;
 }
 
 /** Whole seconds: finishedAt - startedAt, or lastActivityAt - startedAt while still in progress. */

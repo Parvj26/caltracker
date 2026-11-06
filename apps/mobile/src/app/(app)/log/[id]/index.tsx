@@ -21,6 +21,8 @@ import {
   addLogExercise,
   addLogSet,
   formatLastResult,
+  liveExercises,
+  pickChoice,
   removeLogExercise,
   removeLogSet,
   resolveSetValues,
@@ -35,6 +37,7 @@ import {
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import { ChoicePage } from '@/components/log/choice-page';
 import { EditSetsSheet } from '@/components/log/edit-sets-sheet';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseListSheet } from '@/components/log/exercise-list-sheet';
@@ -44,6 +47,7 @@ import { PageScroll } from '@/components/log/keyboard-reveal';
 import type { BlockHandlers } from '@/components/log/log-block';
 import { LogTopBar } from '@/components/log/log-top-bar';
 import { NoteSheet } from '@/components/log/note-sheet';
+import { MoveRow, UpNext } from '@/components/log/page-parts';
 import { ProgressStrip } from '@/components/log/progress-strip';
 import { RestPanel } from '@/components/log/rest-panel';
 import { SupersetPage } from '@/components/log/superset-page';
@@ -56,10 +60,11 @@ import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import {
   buildPageModel,
   firstOpenPage,
-  listRows,
+  listSections,
   pageAfterDone,
   pageIndexAfterChange,
-  progressStates,
+  pickFirstOnly,
+  progressGroups,
   type PageModel,
 } from '@/lib/log-page-model';
 import { useActiveLog } from '@/lib/use-active-log';
@@ -250,8 +255,14 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       ),
     [log, units, last, prefer],
   );
-  const rows = useMemo(() => listRows(log), [log]);
-  const states = useMemo(() => progressStates(log, pageIndex), [log, pageIndex]);
+  // The list sheet draws the sections with their headings; the move row's names read the rows by page.
+  const sections = useMemo(() => listSections(log), [log]);
+  const rows = useMemo(() => {
+    const byPage: Array<{ title: string } | undefined> = [];
+    for (const row of sections.flatMap((s) => s.rows)) byPage[row.pageIndex] = row;
+    return byPage;
+  }, [sections]);
+  const groups = useMemo(() => progressGroups(log, pageIndex), [log, pageIndex]);
   const letters = useMemo(() => supersetLetters(log.blocks), [log.blocks]);
   const data = useMemo(() => models.map((model, i) => ({ key: log.blocks[i]?.id ?? String(i), model })), [models, log.blocks]);
 
@@ -390,12 +401,35 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       onNext: () => goTo(p + 1),
       onFocusExercise: (k) => block && setPrefer({ blockId: block.id, exerciseIndex: k }),
       onFinish: doFinish,
+      // Back to the option cards; the shared rule refuses once the picked option has a done set.
+      onSwitch: () => {
+        if (block) void op((l) => pickChoice(l, block.id, null, nowIso()));
+      },
     };
+  };
+
+  /**
+   * A card on a pick-one page: saved and synced like every other edit (op → applyEdit → sync). Only the first
+   * tap picks (decided from the stored doc); changing the pick goes through Switch.
+   */
+  const pickOption = (p: number, logExerciseId: string) => {
+    const block = log.blocks[p];
+    if (!block) return;
+    tapHaptic();
+    void op((l) => pickFirstOnly(l, block.id, logExerciseId, nowIso()));
   };
 
   // ---- Edit sets ----
   const editIndex = editBlockId === null ? -1 : log.blocks.findIndex((b) => b.id === editBlockId);
-  const editBlock = editIndex >= 0 ? (log.blocks[editIndex] ?? null) : null;
+  const editBlockAll = editIndex >= 0 ? (log.blocks[editIndex] ?? null) : null;
+  // Edit sets on a pick-one page shows the picked option only (the options left behind are not part of the workout).
+  const editBlock = useMemo(
+    () =>
+      editBlockAll?.kind === 'choice'
+        ? { ...editBlockAll, exercises: liveExercises(editBlockAll).map(({ exercise }) => exercise) }
+        : editBlockAll,
+    [editBlockAll],
+  );
   useEffect(() => {
     // Its only exercise was removed: forget the sheet, so it can't come back for a block that is gone.
     if (editBlockId !== null && editIndex < 0) setEditBlockId(null);
@@ -457,7 +491,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
               <SyncPill status={syncStatus} />
             </View>
           </View>
-          {empty ? null : <ProgressStrip states={states} />}
+          {empty ? null : <ProgressStrip groups={groups} />}
           {restHere ? (
             <RestPanel
               endsAt={restHere.endsAt}
@@ -509,7 +543,24 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
                 contentContainerStyle={[styles.pageContent, { paddingBottom: sp[6] + insets.bottom }]}
               >
                 <View style={styles.pageColumn}>
-                  {item.model.kind === 'superset' ? (
+                  {item.model.choice && !item.model.choice.picked ? (
+                    <View style={{ gap: sp[3] }}>
+                      <ChoicePage
+                        model={item.model.choice}
+                        page={index}
+                        details={details}
+                        onPick={(logExerciseId) => pickOption(index, logExerciseId)}
+                      />
+                      <MoveRow
+                        page={index}
+                        prevName={rows[index - 1]?.title ?? null}
+                        nextName={rows[index + 1]?.title ?? null}
+                        onPrev={() => goTo(index - 1)}
+                        onNext={() => goTo(index + 1)}
+                      />
+                      <UpNext page={index} text={item.model.upNext} />
+                    </View>
+                  ) : item.model.kind === 'superset' ? (
                     <SupersetPage
                       model={item.model}
                       page={index}
@@ -539,7 +590,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
 
       <ExerciseListSheet
         visible={listOpen}
-        rows={rows}
+        sections={sections}
         current={pageIndex}
         onPick={(i) => goTo(i)}
         onAdd={() => setPicker({ mode: 'add' })}

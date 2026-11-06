@@ -1,12 +1,30 @@
-import { WorkoutDoc, completeSetWith, startLogFromWorkout, updateActual, type WorkoutLogDoc } from '@caltracker/shared';
+import {
+  WorkoutDoc,
+  addChoice,
+  addSection,
+  addStraightBlock,
+  addSuperset,
+  completeSetWith,
+  emptyWorkout,
+  pickChoice,
+  removeLogExercise,
+  startLogFromWorkout,
+  updateActual,
+  type ExercisePick,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 import { describe, expect, it } from 'vitest';
 import type { LastResults } from './log-api';
+import { sampleLog, upperCoreLog } from './log-fixtures';
 import {
   buildPageModel,
   firstOpenPage,
-  listRows,
+  listSections,
+  progressGroups,
+  sectionLine,
   pageAfterDone,
-  pageIndexAfterChange, 
+  pageIndexAfterChange,
+  pickFirstOnly,
   progressLabel,
   progressStates,
   restLeftLabel,
@@ -234,16 +252,165 @@ describe('page list and progress', () => {
     expect(progressLabel(states)).toBe('Exercise 2 of 3. 1 done.');
   });
 
-  it('listRows', () => {
+  it('listSections without sections is one heading-less section (the regression)', () => {
     let log = fixture();
     log = tick(log, sets(log, 0)[0].id, sets(log, 0)[1].id);
-    expect(listRows(log)).toEqual([
-      { title: 'Barbell Squat', detail: '1 of 3 sets', done: false },
-      { title: 'A1 Bench press + A2 Cable row', detail: '0 of 6 sets', done: false },
-      { title: 'B1 Pull-up + B2 Push-up', detail: '0 of 4 sets', done: false },
+    expect(listSections(log)).toEqual([
+      {
+        heading: null,
+        rows: [
+          { pageIndex: 0, title: 'Barbell Squat', detail: '1 of 3 sets', done: false },
+          { pageIndex: 1, title: 'A1 Bench press + A2 Cable row', detail: '0 of 6 sets', done: false },
+          { pageIndex: 2, title: 'B1 Pull-up + B2 Push-up', detail: '0 of 4 sets', done: false },
+        ],
+      },
+    ]);
+    expect(progressGroups(log, 1)).toEqual([['todo', 'current', 'todo']]);
+  });
+});
+
+describe('sections and pick-one pages', () => {
+  const FINISHER = 5;
+  const allIds = (log: WorkoutLogDoc, bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((s) => s.id));
+  const tickPages = (log: WorkoutLogDoc, pages: number[]) => tick(log, ...pages.flatMap((p) => allIds(log, p)));
+  const pickOpt = (log: WorkoutLogDoc, ei: number) =>
+    pickChoice(log, log.blocks[FINISHER].id, log.blocks[FINISHER].exercises[ei].id, NOW);
+
+  it('names the section place on each page, and null without sections', () => {
+    const log = upperCoreLog();
+    expect(build(log, 1).section).toEqual({ name: 'Core (Activation)', at: 1, of: 1 });
+    expect(build(log, 3).section).toEqual({ name: 'Resistance Training', at: 2, of: 3 });
+    expect(sectionLine({ name: 'Core (Activation)', at: 1, of: 2 })).toBe('Core (Activation) · 1 of 2');
+    expect(build(fixture(), 0).section).toBeNull();
+    expect(build(sampleLog(), 0).section).toBeNull();
+  });
+
+  it('counts places across straight, superset and pick-one pages of one section', () => {
+    const pick = (name: string): ExercisePick => ({ id: uuid(), name, trackingType: 'weight_reps' });
+    let d = emptyWorkout(uuid, 'Mixed');
+    d = addSection(d, 'Main', uuid);
+    d = addStraightBlock(d, pick('Squat'), uuid);
+    d = addSuperset(d, [pick('Pull-up'), pick('Push-up')], uuid);
+    d = addChoice(d, [pick('Slam'), pick('Carry')], uuid);
+    const log = startLogFromWorkout(WorkoutDoc.parse(d), uuid, NOW);
+    expect(log.blocks.map((b) => b.kind)).toEqual(['straight', 'superset', 'choice']);
+    expect([0, 1, 2].map((p) => build(log, p).section)).toEqual([
+      { name: 'Main', at: 1, of: 3 },
+      { name: 'Main', at: 2, of: 3 },
+      { name: 'Main', at: 3, of: 3 },
     ]);
   });
 
+  it('pickFirstOnly picks only while nothing is picked, so a second quick tap cannot flip the pick', () => {
+    const log = upperCoreLog();
+    const block = log.blocks[FINISHER];
+    const [slam, walk] = block.exercises;
+    const picked = pickFirstOnly(log, block.id, slam.id, NOW);
+    expect(picked.blocks[FINISHER].pickedExerciseId).toBe(slam.id);
+    expect(pickFirstOnly(picked, block.id, walk.id, NOW)).toBe(picked);
+    expect(pickFirstOnly(log, 'no-such-block', slam.id, NOW)).toBe(log);
+  });
+
+  it('progressGroups: one group per section run, with the current page marked', () => {
+    const log = tickPages(upperCoreLog(), [0]);
+    const groups = progressGroups(log, 3);
+    expect(groups.map((g) => g.length)).toEqual([1, 1, 3, 1]);
+    expect(groups).toEqual([['done'], ['todo'], ['todo', 'current', 'todo'], ['todo']]);
+    expect(progressGroups(fixture(), 0)).toHaveLength(1);
+  });
+
+  it('listSections: four headings with rows carrying their page index', () => {
+    const log = upperCoreLog();
+    const sections = listSections(log);
+    expect(sections.map((s) => s.heading)).toEqual(['Warm-Up', 'Core (Activation)', 'Resistance Training', 'Finisher']);
+    expect(sections[2].rows.map((r) => r.pageIndex)).toEqual([2, 3, 4]);
+    expect(sections[3].rows).toEqual([
+      { pageIndex: 5, title: "Pick one: Medicine Ball Slam or Farmer's Walk", detail: 'Not picked yet', done: false },
+    ]);
+  });
+
+  it('hides a section heading that has no pages left', () => {
+    let log = upperCoreLog();
+    log = removeLogExercise(log, log.blocks[1].exercises[0].id, NOW);
+    expect(listSections(log).map((s) => s.heading)).toEqual(['Warm-Up', 'Resistance Training', 'Finisher']);
+    expect(progressGroups(log, 0)).toHaveLength(3);
+  });
+
+  it('an unpicked pick-one page is a choice model with two options', () => {
+    const m = build(upperCoreLog(), FINISHER);
+    expect(m.kind).toBe('choice');
+    expect(m.current).toBeNull();
+    expect(m.steps).toEqual([]);
+    expect(m.allDone).toBe(false);
+    expect(m.choice!.heading).toBe('Finisher · pick one');
+    expect(m.choice!.options.map((o) => o.name)).toEqual(['Medicine Ball Slam', "Farmer's Walk"]);
+    expect(m.choice!.options[0].plan).toBe('3 sets');
+    expect(m.choice!.picked).toBe(false);
+    expect(m.choice!.canSwitch).toBe(true);
+    expect(m.choice!.pickedLine).toBeNull();
+    expect(m.upNext).toBeNull();
+  });
+
+  it('heading is just "Pick one" when the group has no section', () => {
+    let log = upperCoreLog();
+    log = { ...log, blocks: log.blocks.map((b, i) => (i === FINISHER ? { ...b, sectionId: null } : b)) };
+    expect(build(log, FINISHER).choice!.heading).toBe('Pick one');
+    expect(build(log, FINISHER).section).toBeNull();
+  });
+
+  it('a picked pick-one page describes only the picked option, like a straight page', () => {
+    const log = pickOpt(upperCoreLog(), 0);
+    const m = build(log, FINISHER);
+    expect(m.kind).toBe('choice');
+    expect(m.exercises.map((e) => e.name)).toEqual(['Medicine Ball Slam']);
+    expect(m.exercises[0].exerciseIndex).toBe(0);
+    expect(m.steps).toHaveLength(3);
+    expect(m.current!.setName).toBe('Set 1 of 3');
+    expect(m.choice!.picked).toBe(true);
+    expect(m.choice!.pickedLine).toBe('Picked from 2 options');
+    expect(m.choice!.canSwitch).toBe(true);
+    // the other option can be picked instead
+    expect(build(pickOpt(log, 1), FINISHER).exercises.map((e) => e.name)).toEqual(["Farmer's Walk"]);
+    expect(listSections(log)[3].rows[0]).toMatchObject({ title: 'Medicine Ball Slam', detail: '0 of 3 sets' });
+  });
+
+  it('shows the warm-up note only for the picked option\'s warm-ups', () => {
+    const base = upperCoreLog();
+    const fin = base.blocks[FINISHER];
+    // Only the option not picked first (Farmer's Walk) has a warm-up.
+    const walk = fin.exercises[1];
+    const withWarmup: WorkoutLogDoc = {
+      ...base,
+      blocks: base.blocks.map((b, i) =>
+        i !== FINISHER
+          ? b
+          : { ...b, exercises: [b.exercises[0], { ...walk, sets: walk.sets.map((s, si) => (si === 0 ? { ...s, setType: 'warmup' as const } : s)) }] },
+      ),
+    };
+    expect(build(pickOpt(withWarmup, 0), FINISHER).hasWarmups).toBe(false);
+    expect(build(pickOpt(withWarmup, 1), FINISHER).hasWarmups).toBe(true);
+  });
+
+  it('cannot switch after a done set', () => {
+    let log = pickOpt(upperCoreLog(), 0);
+    log = tick(log, log.blocks[FINISHER].exercises[0].sets[0].id);
+    const m = build(log, FINISHER);
+    expect(m.choice!.canSwitch).toBe(false);
+    expect(listSections(log)[3].rows[0].detail).toBe('1 of 3 sets');
+  });
+
+  it('up next before an unpicked pick-one page', () => {
+    expect(build(upperCoreLog(), 4).upNext).toBe("Pick one · Medicine Ball Slam or Farmer's Walk");
+  });
+
+  it('an unpicked group is open: the first open page and progress treat it as to-do', () => {
+    const log = tickPages(upperCoreLog(), [0, 1, 2, 3, 4]);
+    expect(firstOpenPage(log)).toBe(FINISHER);
+    expect(progressGroups(log, 0)[3]).toEqual(['todo']);
+  });
+});
+
+describe('page list helpers', () => {
   it('pageIndexAfterChange', () => {
     expect(pageIndexAfterChange({ blockIds: ['a', 'b', 'c'], index: 1 }, ['a', 'c'])).toBe(1);
     expect(pageIndexAfterChange({ blockIds: ['a', 'b', 'c'], index: 2 }, ['a', 'b'])).toBe(1);

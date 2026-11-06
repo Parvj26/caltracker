@@ -4,6 +4,7 @@ import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { DoneButton } from './done-button';
+import { SectionLine } from './exercise-header';
 import { ExerciseThumb } from './exercise-thumb';
 import { ActionRow, AllDoneCard, MoveRow, PillButton, SetHeading, StepperRow, UpNext, type PageProps } from './page-parts';
 import { StepList } from './step-list';
@@ -36,6 +37,7 @@ export function SupersetPage({
   if (resting) {
     return (
       <View style={{ gap: space[3] }}>
+        <SectionLine section={model.section} page={page} />
         <Text testID={`exercise-name-${page}`} style={text('sectionHeading')}>
           {model.exercises.map((e) => `${e.label ?? ''} ${e.name}`.trim()).join(' + ')}
         </Text>
@@ -54,6 +56,7 @@ export function SupersetPage({
 
   return (
     <View style={{ gap: space[3] }}>
+      <SectionLine section={model.section} page={page} />
       {header}
       {model.exercises.map((ex, k) => {
         const open = ex.active && current !== null && !model.allDone;

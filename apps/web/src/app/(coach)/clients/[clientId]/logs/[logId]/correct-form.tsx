@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { parseClock, type Units, type WorkoutLogDoc } from '@caltracker/shared';
+import { liveExercises, parseClock, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
 import { Button, ErrorText } from '@/components/ui';
@@ -13,7 +13,7 @@ import styles from './log.module.css';
 const LABELS = { reps: 'Reps', weight: 'Weight', time: 'Time', distance: 'Distance' } as const;
 
 const initialDrafts = (log: WorkoutLogDoc, units: Units): Drafts =>
-  Object.fromEntries(log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
+  Object.fromEntries(log.blocks.flatMap((b) => liveExercises(b).flatMap(({ exercise: e }) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
 
 /** A typed number, or null for blank, or NaN for text that isn't one. */
 const num = (text: string): number | null => (text.trim() === '' ? null : /^\d*\.?\d+$/.test(text.trim()) ? Number(text) : NaN);

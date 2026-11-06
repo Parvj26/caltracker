@@ -1,5 +1,5 @@
 begin;
-select plan(55);
+select plan(56);
 
 -- Fixtures (as postgres)
 select tests.create_user('ac-coach@t.local', 'Coach') as coach \gset
@@ -72,6 +72,8 @@ select is(jsonb_array_length(public.award_inputs(:'l1') -> 'logs'), 2, 'inputs h
 select is(jsonb_array_length(public.award_inputs(:'l1') -> 'logs' -> 0 -> 'log_blocks' -> 0 -> 'log_exercises' -> 0
   -> 'log_sets'), 1, 'only completed sets are sent');
 select is(public.award_inputs(:'l1') ->> 'time_zone', 'UTC', 'inputs carry the time zone');
+select ok((public.award_inputs(:'l1') -> 'logs' -> 0 -> 'log_blocks' -> 0) ?& array['picked_exercise_id', 'section_id', 'section_name'],
+  'inputs carry each block''s pick and section');
 select is(public.award_inputs(:'l1') ->> 'history_version', public.award_history_version(:'c1', :'ws'),
   'inputs carry the history fingerprint');
 select is(public.award_inputs(:'l_gone') -> 'log' ->> 'is_client', 'false', 'inputs say a removed client is not a client');

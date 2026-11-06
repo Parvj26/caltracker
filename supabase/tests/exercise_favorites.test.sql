@@ -1,5 +1,5 @@
 begin;
-select plan(33);
+select plan(35);
 
 select tests.create_user('ef-coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('ef-coach-b@t.local', 'Coach B') as coach_b \gset
@@ -65,6 +65,17 @@ insert into public.workout_logs (workspace_id, client_id, name, status, started_
 insert into public.log_blocks (log_id, position) values (:'l4', 0) returning id as lb4 \gset
 insert into public.log_exercises (block_id, position, exercise_id) values
   (:'lb1', 0, :'ex_old'), (:'lb2', 0, :'ex_new'), (:'lb2', 1, :'ex_new'), (:'lb3', 0, :'ex_mid'), (:'lb4', 0, :'ex_a2');
+-- Client A3 did a pick-one group: picked ex_pick, never did ex_unpicked.
+select tests.create_user('ef-a3@t.local', 'Client A3') as a3 \gset
+select tests.add_client(:'ws_a', :'a3');
+select tests.create_exercise(null, 'EF Picked') as ex_pick \gset
+select tests.create_exercise(null, 'EF Unpicked') as ex_unpicked \gset
+insert into public.workout_logs (workspace_id, client_id, name, status, started_at, finished_at)
+  values (:'ws_a', :'a3', 'L5', 'completed', now(), now()) returning id as l5 \gset
+insert into public.log_blocks (log_id, position, kind) values (:'l5', 0, 'choice') returning id as lb5 \gset
+insert into public.log_exercises (block_id, position, exercise_id) values (:'lb5', 0, :'ex_pick') returning id as le_pick \gset
+insert into public.log_exercises (block_id, position, exercise_id) values (:'lb5', 1, :'ex_unpicked');
+update public.log_blocks set picked_exercise_id = :'le_pick' where id = :'lb5';
 
 -- Coach A: star, list, unstar
 select tests.act_as(:'coach_a');
@@ -134,6 +145,12 @@ select is((select count(*)::int from public.recent_exercises_for_coach()), 0, 'a
 select tests.act_as(:'a2');
 select results_eq($$select exercise_id from public.recent_exercises_for_client()$$,
   format($$values (%L::uuid)$$, :'ex_a2'), 'client A2 recents contain only A2''s own log');
+
+select tests.act_as(:'a3');
+select results_eq($$select exercise_id from public.recent_exercises_for_client()$$,
+  format($$values (%L::uuid)$$, :'ex_pick'), 'client recents hold the picked option of a pick-one group');
+select is((select count(*)::int from public.recent_exercises_for_client() where exercise_id = :'ex_unpicked'), 0,
+  'client recents leave out a pick-one option that was not picked');
 
 -- Anonymous
 select tests.act_as_anon();

@@ -11,12 +11,19 @@ type Props = {
   workspaceId: string;
   /** Pick several (a superset needs at least two) and confirm, instead of picking one. */
   multiple: boolean;
+  /** With `multiple`: how many must be picked (default 2) and the most that can be (default 10). */
+  min?: number;
+  max?: number;
+  /** With `multiple`: the line under the search box. */
+  hint?: string;
+  /** With `multiple`: what the picks become, e.g. 'superset' or 'pick-one group'. */
+  groupLabel?: string;
   onPick: (exercises: ExercisePick[]) => void;
   onClose: () => void;
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, workspaceId, multiple, onPick, onClose }: Props) {
+export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, onPick, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -36,6 +43,10 @@ export function ExercisePicker({ title, workspaceId, multiple, onPick, onClose }
       <SearchPanel
         mode={multiple ? 'pick-many' : 'pick-one'}
         workspaceId={workspaceId}
+        {...(min !== undefined ? { min } : {})}
+        {...(max !== undefined ? { max } : {})}
+        {...(hint !== undefined ? { hint } : {})}
+        {...(groupLabel !== undefined ? { groupLabel } : {})}
         onPick={onPick}
         onCancel={() => dialogRef.current?.close()}
       />

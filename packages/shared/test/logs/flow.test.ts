@@ -259,6 +259,58 @@ describe('nextOpenBlock', () => {
   });
 });
 
+describe('uneven supersets rest after a round no later exercise reaches', () => {
+  // As the builder makes them: only the last exercise carries the round rest.
+  const builderRests = (log: WorkoutLogDoc, restA: number[], restB: number[]) => {
+    let out = log;
+    ids(out, 1, 0).forEach((id, i) => (out = withRest(out, id, restA[i] ?? 0)));
+    ids(out, 1, 1).forEach((id, i) => (out = withRest(out, id, restB[i] ?? 0)));
+    return out;
+  };
+
+  it('A is longer than B: A alone in its extra round rests with the block round rest', () => {
+    let log = fresh();
+    log = removeLogSet(log, log.blocks[1]!.exercises[1]!.id, ids(log, 1, 1)[2]!, NOW);
+    log = builderRests(log, [0, 0, 0], [60, 75]);
+    const a = ids(log, 1, 0);
+    expect(roundRestSeconds(log.blocks[1]!, 3)).toBe(75);
+    // Before the next block (block 0 still open).
+    const rest = tick(log, ...a.slice(0, 2), ...ids(log, 1, 1));
+    expect(afterDone(rest, 1, a[2]!)).toEqual({ kind: 'rest', seconds: 75, round: 3 });
+    expect(doneLabel(afterDone(rest, 1, a[2]!), 'A')).toBe('Done round 3 · rest 1:15');
+    // Rounds B still reaches keep their own rest.
+    expect(roundRestSeconds(log.blocks[1]!, 1)).toBe(60);
+    // A round the coach set to 0 on purpose (B is in it) stays 0.
+    const zero = builderRests(log, [0, 0, 0], [0, 75]);
+    expect(roundRestSeconds(zero.blocks[1]!, 1)).toBe(0);
+    // A rest the coach typed on A's extra round wins.
+    expect(roundRestSeconds(withRest(log, a[2]!, 30).blocks[1]!, 3)).toBe(30);
+  });
+
+  it('in a block of three, a round the last exercise misses rests after its last exercise there', () => {
+    const log = fresh();
+    const ss = log.blocks[1]!;
+    const b = ss.exercises[1]!;
+    // C: a copy of B with two rounds; only C carries the round rest.
+    const c = { ...b, id: uuid(), sets: b.sets.slice(0, 2).map((s) => ({ ...s, id: uuid(), target: { ...s.target, restSeconds: 80 } })) };
+    const zero = (e: typeof b) => ({ ...e, sets: e.sets.map((s) => ({ ...s, target: { ...s.target, restSeconds: 0 } })) });
+    const three: WorkoutLogDoc = { ...log, blocks: [log.blocks[0]!, { ...ss, exercises: [zero(ss.exercises[0]!), zero(b), c] }] };
+    const [a3, b3] = [ids(three, 1, 0)[2]!, ids(three, 1, 1)[2]!];
+    expect(afterDone(three, 1, a3)).toEqual({ kind: 'superset-next', exerciseIndex: 1 });
+    expect(afterDone(tick(three, a3), 1, b3)).toEqual({ kind: 'rest', seconds: 80, round: 3 });
+  });
+
+  it('B is longer than A: B alone in its extra round rests with its own rest', () => {
+    let log = fresh();
+    log = removeLogSet(log, log.blocks[1]!.exercises[0]!.id, ids(log, 1, 0)[2]!, NOW);
+    log = builderRests(log, [0, 0], [90, 90, 45]);
+    const b = ids(log, 1, 1);
+    expect(roundRestSeconds(log.blocks[1]!, 3)).toBe(45);
+    expect(afterDone(log, 1, b[2]!)).toEqual({ kind: 'rest', seconds: 45, round: 3 });
+    expect(afterDone(log, 1, ids(log, 1, 0)[1]!)).toEqual({ kind: 'superset-next', exerciseIndex: 1 });
+  });
+});
+
 describe('roundRestSeconds', () => {
   it('is the longest main-set rest in the round, 0 when none', () => {
     const log = fresh();

@@ -1,5 +1,14 @@
 // Test helpers for the log store and sync tests: an in-memory storage and a small valid log.
-import type { WorkoutLogDoc } from '@caltracker/shared';
+import {
+  WorkoutDoc,
+  addChoice,
+  addSection,
+  addStraightBlock,
+  emptyWorkout,
+  startLogFromWorkout,
+  type ExercisePick,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 import type { KeyValueStorage } from './log-store';
 
 export function memoryStorage(): KeyValueStorage & { map: Map<string, string> } {
@@ -32,9 +41,12 @@ export function sampleLog(over: Partial<WorkoutLogDoc> = {}): WorkoutLogDoc {
     autoFinished: false,
     revision: 1,
     notes: null,
+    sections: [],
     blocks: [
       {
         id: id(2),
+        sectionId: null,
+        pickedExerciseId: null,
         kind: 'straight',
         exercises: [
           {
@@ -63,4 +75,26 @@ export function sampleLog(over: Partial<WorkoutLogDoc> = {}): WorkoutLogDoc {
     ],
     ...over,
   };
+}
+
+/**
+ * Upper / Core, started: Warm-Up [Jumping jacks], Core (Activation) [Plank], Resistance Training [Squat, Bench press,
+ * Row], Finisher [pick one: Medicine Ball Slam / Farmer's Walk]. Pages 0 to 5; the pick-one group is page 5, unpicked.
+ */
+export function upperCoreLog(): WorkoutLogDoc {
+  let n = 100;
+  const makeId = () => id(++n);
+  const pick = (name: string): ExercisePick => ({ id: makeId(), name, trackingType: 'weight_reps' });
+  let d = emptyWorkout(makeId, 'Upper / Core');
+  d = addSection(d, 'Warm-Up', makeId);
+  d = addStraightBlock(d, pick('Jumping jacks'), makeId);
+  d = addSection(d, 'Core (Activation)', makeId);
+  d = addStraightBlock(d, pick('Plank'), makeId);
+  d = addSection(d, 'Resistance Training', makeId);
+  d = addStraightBlock(d, pick('Squat'), makeId);
+  d = addStraightBlock(d, pick('Bench press'), makeId);
+  d = addStraightBlock(d, pick('Row'), makeId);
+  d = addSection(d, 'Finisher', makeId);
+  d = addChoice(d, [pick('Medicine Ball Slam'), pick("Farmer's Walk")], makeId);
+  return startLogFromWorkout(WorkoutDoc.parse(d), makeId, '2026-11-06T10:00:00.000Z');
 }

@@ -23,8 +23,11 @@ export function mkLog(
     autoFinished: false,
     revision: 0,
     notes: null,
+    sections: [],
     blocks: exercises.map((e) => ({
       id: uuid(),
+      sectionId: null,
+      pickedExerciseId: null,
       kind: 'straight' as const,
       exercises: [
         {

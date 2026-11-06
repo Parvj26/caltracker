@@ -29,8 +29,23 @@ const exercise = (sets: unknown[], trackingType: TrackingType = 'weight_reps') =
   sets,
 });
 
-const block = (kind: 'straight' | 'superset', exercises: unknown[]) => ({ id: uuid(), kind, exercises });
-const doc = (blocks: unknown[]) => ({ id: uuid(), name: 'Upper A', notes: null, blocks });
+const block = (kind: 'straight' | 'superset' | 'choice', exercises: unknown[]) => ({ id: uuid(), kind, exercises });
+const doc = (blocks: unknown[]) => ({
+  id: uuid(),
+  name: 'Upper A',
+  notes: null,
+  blocks,
+});
+const sec = (name: string) => ({ id: uuid(), name });
+const inSec = (b: object, s: { id: string } | null) => ({
+  ...b,
+  sectionId: s ? s.id : null,
+});
+const docS = (sections: unknown[], blocks: unknown[]) => ({
+  ...doc(blocks),
+  sections,
+});
+const one = () => block('straight', [exercise([set()])]);
 
 function messages(input: unknown) {
   const r = WorkoutDoc.safeParse(input);
@@ -49,14 +64,20 @@ describe('WorkoutDoc', () => {
   });
 
   it('trims the name', () => {
-    const r = WorkoutDoc.parse({ ...doc([block('straight', [exercise([set()])])]), name: '  Upper A  ' });
+    const r = WorkoutDoc.parse({
+      ...doc([block('straight', [exercise([set()])])]),
+      name: '  Upper A  ',
+    });
     expect(r.name).toBe('Upper A');
   });
 
   it('asks for a name when it is blank', () => {
-    expect(messages({ ...doc([block('straight', [exercise([set()])])]), name: '   ' })).toEqual([
-      { message: 'Enter a name.', path: ['name'] },
-    ]);
+    expect(
+      messages({
+        ...doc([block('straight', [exercise([set()])])]),
+        name: '   ',
+      }),
+    ).toEqual([{ message: 'Enter a name.', path: ['name'] }]);
   });
 
   it('requires at least one block', () => {
@@ -85,15 +106,16 @@ describe('WorkoutDoc', () => {
     });
   });
 
-  it('rejects superset exercises with different round counts, ignoring drops', () => {
-    const a = exercise([set(), set(), set('drop')]);
+  it('allows a superset whose exercises have different round counts', () => {
+    const a = exercise([set(), set(), set()]);
     const b = exercise([set(), set()]);
     expect(messages(doc([block('superset', [a, b])]))).toEqual([]);
-    const d = exercise([set()]);
-    expect(messages(doc([block('superset', [a, d])]))).toContainEqual({
-      message: 'Every exercise in a superset needs the same number of rounds.',
-      path: ['blocks', 0, 'exercises'],
-    });
+  });
+
+  it('still needs two exercises in a superset when rounds differ', () => {
+    expect(messages(doc([block('superset', [exercise([set(), set()])])])).map((x) => x.message)).toEqual([
+      'A superset needs at least two exercises.',
+    ]);
   });
 
   it('rejects min reps above max reps', () => {
@@ -105,7 +127,12 @@ describe('WorkoutDoc', () => {
   });
 
   it('rejects targets that do not apply to the tracking type', () => {
-    const timeSet = set('normal', { targetRepsMin: null, targetRepsMax: null, targetWeightKg: 20, targetDurationS: 30 });
+    const timeSet = set('normal', {
+      targetRepsMin: null,
+      targetRepsMax: null,
+      targetWeightKg: 20,
+      targetDurationS: 30,
+    });
     const m = messages(doc([block('straight', [exercise([timeSet], 'time')])]));
     expect(m).toContainEqual({
       message: "Weight doesn't apply to time.",
@@ -115,7 +142,10 @@ describe('WorkoutDoc', () => {
     expect(messages(doc([block('straight', [exercise([repsSet], 'reps')])])).map((x) => x.message)).toContain(
       "Weight doesn't apply to reps only.",
     );
-    const distSet = set('normal', { targetWeightKg: null, targetDistanceM: 100 });
+    const distSet = set('normal', {
+      targetWeightKg: null,
+      targetDistanceM: 100,
+    });
     expect(messages(doc([block('straight', [exercise([distSet], 'weight_reps')])])).map((x) => x.message)).toContain(
       "Distance doesn't apply to weight and reps.",
     );
@@ -123,7 +153,10 @@ describe('WorkoutDoc', () => {
     expect(messages(doc([block('straight', [exercise([durSet], 'weight_reps')])])).map((x) => x.message)).toContain(
       "Duration doesn't apply to weight and reps.",
     );
-    const repSet = set('normal', { targetWeightKg: null, targetDistanceM: 100 });
+    const repSet = set('normal', {
+      targetWeightKg: null,
+      targetDistanceM: 100,
+    });
     expect(messages(doc([block('straight', [exercise([repSet], 'distance')])])).map((x) => x.message)).toContain(
       "Reps doesn't apply to distance.",
     );
@@ -156,5 +189,101 @@ describe('WorkoutDoc', () => {
     expect(bad({ targetWeightKg: 1001 })).toBe(false);
     expect(bad({ restSeconds: 3601 })).toBe(false);
     expect(bad({ note: 'x'.repeat(501) })).toBe(false);
+  });
+});
+
+describe('WorkoutDoc sections and pick-one groups', () => {
+  it('defaults sections to [] and sectionId to null', () => {
+    const r = WorkoutDoc.parse(doc([one(), one()]));
+    expect(r.sections).toEqual([]);
+    expect(r.blocks.map((b) => b.sectionId)).toEqual([null, null]);
+  });
+
+  it('parses an Upper / Core style doc', () => {
+    const [w, c, m, k] = [sec('Warm-Up'), sec('Core'), sec('Resistance Training'), sec('Cool-down')];
+    const d = docS(
+      [w, c, m, k],
+      [inSec(one(), w), inSec(one(), c), inSec(one(), m), inSec(one(), m), inSec(one(), m), inSec(one(), k)],
+    );
+    expect(messages(d)).toEqual([]);
+    expect(WorkoutDoc.parse(d).blocks[2]!.sectionId).toBe(m.id);
+  });
+
+  it('accepts a pick-one group of 2 to 5 exercises, with different set counts', () => {
+    const e = (n: number) => exercise(Array.from({ length: n }, () => set()));
+    expect(messages(doc([block('choice', [e(3), e(2)])]))).toEqual([]);
+    expect(messages(doc([block('choice', [e(1), e(1), e(1), e(1), e(1)])]))).toEqual([]);
+  });
+
+  it('rejects a pick-one group of 1 or 6', () => {
+    const e = () => exercise([set()]);
+    for (const n of [1, 6]) {
+      expect(messages(doc([block('choice', Array.from({ length: n }, e))]))).toContainEqual({
+        message: 'A pick-one group needs 2 to 5 exercises.',
+        path: ['blocks', 0, 'exercises'],
+      });
+    }
+  });
+
+  it('rejects an unknown section', () => {
+    const d = docS([sec('Core')], [{ ...one(), sectionId: uuid() }]);
+    expect(messages(d)).toContainEqual({
+      message: 'Unknown section.',
+      path: ['blocks', 0, 'sectionId'],
+    });
+  });
+
+  it('keeps each section together and in order', () => {
+    const [a, b] = [sec('A'), sec('B')];
+    const together = "Keep each section's exercises together.";
+    const unsectionedAfter = docS([a], [inSec(one(), a), one()]);
+    expect(messages(unsectionedAfter).map((m) => m.message)).toContain(together);
+    const split = docS([a, b], [inSec(one(), a), inSec(one(), b), inSec(one(), a)]);
+    expect(messages(split).map((m) => m.message)).toContain(together);
+    const outOfOrder = docS([a, b], [inSec(one(), b), inSec(one(), a)]);
+    expect(messages(outOfOrder).map((m) => m.message)).toContain(together);
+    expect(messages(docS([a], [one(), inSec(one(), a)]))).toEqual([]);
+  });
+
+  it('rejects a section with no exercise', () => {
+    const [a, core] = [sec('A'), sec('Core')];
+    expect(messages(docS([a, core], [inSec(one(), a)]))).toContainEqual({
+      message: 'Add an exercise to Core or remove the section.',
+      path: ['sections', 1],
+    });
+  });
+
+  it('checks section names', () => {
+    const base = (name: string) => {
+      const s = sec(name);
+      return docS([s], [inSec(one(), s)]);
+    };
+    expect(messages(base('   '))).toContainEqual({
+      message: 'Name the section.',
+      path: ['sections', 0, 'name'],
+    });
+    expect(messages(base('x'.repeat(41)))).toContainEqual({
+      message: 'Keep section names to 40 characters.',
+      path: ['sections', 0, 'name'],
+    });
+    expect(messages(base('x'.repeat(40)))).toEqual([]);
+  });
+
+  it('allows at most 10 sections', () => {
+    const secs = Array.from({ length: 11 }, (_, i) => sec(`S${i}`));
+    const d = docS(
+      secs,
+      secs.map((s) => inSec(one(), s)),
+    );
+    expect(messages(d).map((m) => m.message)).toContain('Use at most 10 sections.');
+  });
+
+  it('rejects two sections with the same id', () => {
+    const a = sec('A');
+    const d = docS([a, { ...a, name: 'B' }], [inSec(one(), a)]);
+    expect(messages(d)).toContainEqual({
+      message: 'Each section needs its own id.',
+      path: ['sections', 1],
+    });
   });
 });

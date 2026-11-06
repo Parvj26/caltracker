@@ -1,3 +1,5 @@
+import { addChoice, addSection, addStraightBlock, emptyWorkout } from '../../src/workouts/doc-ops';
+import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
 import type { SetType } from '../../src/workouts/schema';
 
@@ -33,4 +35,22 @@ export function fixtureWorkout(): WorkoutDoc {
   const straight = { id: uuid(), kind: 'straight', exercises: [exercise([set('warmup'), set(), set(), set(), drop])] };
   const ss = { id: uuid(), kind: 'superset', exercises: [exercise([set(), set(), set()]), exercise([set(), set(), set()])] };
   return WorkoutDoc.parse({ id: uuid(), name: 'Upper A', notes: null, blocks: [straight, ss] });
+}
+
+const pickEx = (): ExercisePick => ({ id: uuid(), name: 'Exercise', trackingType: 'weight_reps' });
+
+/** Warm-Up [1], Resistance Training [straight, pick-one of 2, straight], Core [1], Finisher [1]: 6 blocks. */
+export function fixtureSectionedWorkout(): WorkoutDoc {
+  let d = emptyWorkout(uuid, 'Upper / Core');
+  d = addSection(d, 'Warm-Up', uuid);
+  d = addStraightBlock(d, pickEx(), uuid);
+  d = addSection(d, 'Resistance Training', uuid);
+  d = addStraightBlock(d, pickEx(), uuid);
+  d = addChoice(d, [pickEx(), pickEx()], uuid);
+  d = addStraightBlock(d, pickEx(), uuid);
+  d = addSection(d, 'Core', uuid);
+  d = addStraightBlock(d, pickEx(), uuid);
+  d = addSection(d, 'Finisher', uuid);
+  d = addStraightBlock(d, pickEx(), uuid);
+  return WorkoutDoc.parse(d);
 }

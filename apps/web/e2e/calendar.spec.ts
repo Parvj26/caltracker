@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Client calendar and assignment (phase 2 Task 16). Every test builds its own workouts and programs with unique
 // names, so tests can share the demo client and still run side by side.
@@ -681,4 +681,34 @@ test('+ Add workout: after an unclear failure, a different day gets a fresh id a
 
   const { data } = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId).order('scheduled_on');
   expect(data).toEqual([{ scheduled_on: first }, { scheduled_on: second }]);
+});
+
+const seededIds: string[] = [];
+test.afterAll(async () => {
+  if (seededIds.length) await admin.from('workouts').delete().in('id', seededIds);
+});
+
+test('a sectioned workout opened from the calendar shows its section headings', async ({ page }) => {
+  const name = `Sectioned ${unique()}`;
+  const sections = ['Warm-Up', 'Main', 'Finisher'].map((n) => ({ id: randomUUID(), name: n }));
+  const [warm, main, fin] = sections.map((x) => x.id) as [string, string, string];
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const id = await seedSectionedWorkout(admin, {
+    workspaceId, clientId, name, scheduledOn: today, sections,
+    blocks: [
+      { sectionId: warm, exercises: ['Barbell Deadlift'] },
+      { sectionId: main, exercises: ['Barbell Squat'] },
+      { sectionId: fin, choice: true, exercises: ['Cable Crossover', 'Barbell Squat'] },
+    ],
+  });
+  seededIds.push(id);
+  await page.goto(calendarUrl(monthOf(today)));
+  await day(page, today).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
+  await day(page, today).getByRole('menuitem', { name: 'Edit' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
+  // In the builder each section heading is its name box.
+  const boxes = page.getByRole('textbox', { name: 'Section name', exact: true });
+  await expect(boxes).toHaveCount(3);
+  expect(await boxes.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['Warm-Up', 'Main', 'Finisher']);
 });

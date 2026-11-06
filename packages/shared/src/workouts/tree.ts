@@ -1,5 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType, WorkoutDoc } from './schema';
+import { sectionsFromBlocks } from './sections';
 import { TARGET_FIELDS } from './targets';
 
 /**
@@ -8,7 +9,7 @@ import { TARGET_FIELDS } from './targets';
  */
 export const WORKOUT_TREE_SELECT =
   'id, name, notes, client_id, scheduled_on, ' +
-  'workout_blocks(id, position, kind, ' +
+  'workout_blocks(id, position, kind, section_id, section_name, ' +
   'workout_exercises(id, position, exercise_id, note, exercises(name, tracking_type), ' +
   'workout_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
   'target_distance_m, to_failure, rest_seconds, note)))';
@@ -40,6 +41,8 @@ export type WorkoutTreeRow = {
     id: string;
     position: number;
     kind: BlockKind;
+    section_id: string | null;
+    section_name: string | null;
     workout_exercises: Array<{
       id: string;
       position: number;
@@ -57,12 +60,15 @@ const byPosition = <T extends { position: number }>(xs: readonly T[]): T[] =>
 const num = (v: Numeric): number | null => (v === null ? null : Number(v));
 
 export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
+  const blocks = byPosition(row.workout_blocks);
   return {
     id: row.id,
     name: row.name,
     notes: row.notes,
-    blocks: byPosition(row.workout_blocks).map((b) => ({
+    sections: sectionsFromBlocks(blocks),
+    blocks: blocks.map((b) => ({
       id: b.id,
+      sectionId: b.section_id,
       kind: b.kind,
       exercises: byPosition(b.workout_exercises).map((e) => {
         const trackingType = e.exercises?.tracking_type ?? 'weight_reps';

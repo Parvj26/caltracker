@@ -1,5 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } from './schema';
+import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from './sections';
 import { TARGET_FIELDS } from './targets';
 
 export type ExercisePick = { id: string; name: string; trackingType: TrackingType };
@@ -9,6 +10,10 @@ const DEFAULT_REST = 90;
 const MAX_SETS = 20;
 const MAX_EXERCISES = 10;
 const MAX_BLOCKS = 30;
+const MAX_SECTIONS = 10;
+const MAX_SECTION_NAME = 40;
+
+const lastSectionId = (doc: WorkoutDoc): string | null => doc.sections[doc.sections.length - 1]?.id ?? null;
 
 type Patch = Partial<Omit<WorkoutSetDoc, 'id'>>;
 
@@ -67,13 +72,14 @@ function mapExercise(
 }
 
 export function emptyWorkout(makeId: () => string, name = ''): WorkoutDoc {
-  return { id: makeId(), name, notes: null, blocks: [] };
+  return { id: makeId(), name, notes: null, sections: [], blocks: [] };
 }
 
 export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string): WorkoutDoc {
   if (doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
+    sectionId: lastSectionId(doc),
     kind: 'straight',
     exercises: [newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)],
   };
@@ -85,6 +91,7 @@ export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => 
   if (exs.length > MAX_EXERCISES || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
+    sectionId: lastSectionId(doc),
     kind: 'superset',
     exercises: exs.map((ex, i) =>
       newExercise(ex, i === exs.length - 1 ? DEFAULT_REST : 0, DEFAULT_ROUNDS, makeId),
@@ -110,18 +117,111 @@ export function addExerciseToSuperset(doc: WorkoutDoc, blockId: string, ex: Exer
   });
 }
 
+/** Removing a section's last block removes the section too, because a section is never empty. */
 export function removeBlock(doc: WorkoutDoc, blockId: string): WorkoutDoc {
-  return { ...doc, blocks: doc.blocks.filter((b) => b.id !== blockId) };
+  const block = doc.blocks.find((b) => b.id === blockId);
+  if (!block) return doc;
+  const blocks = doc.blocks.filter((b) => b.id !== blockId);
+  const sid = block.sectionId;
+  const sections =
+    sid !== null && !blocks.some((b) => b.sectionId === sid) ? doc.sections.filter((s) => s.id !== sid) : doc.sections;
+  return { ...doc, sections, blocks };
 }
 
+/** Stable regroup: unsectioned blocks first, then each section's blocks in section order. */
+function regroup(sections: WorkoutDoc['sections'], blocks: WorkoutBlockDoc[]): WorkoutBlockDoc[] {
+  const rank = (b: WorkoutBlockDoc) => sections.findIndex((s) => s.id === b.sectionId);
+  return blocks
+    .map((b, i) => ({ b, i, r: rank(b) }))
+    .sort((x, y) => x.r - y.r || x.i - y.i)
+    .map((x) => x.b);
+}
+
+/** A block only moves inside its own section's run, so sections stay contiguous. */
 export function moveBlock(doc: WorkoutDoc, blockId: string, toIndex: number): WorkoutDoc {
   const from = doc.blocks.findIndex((b) => b.id === blockId);
   if (from < 0) return doc;
-  const to = Math.max(0, Math.min(doc.blocks.length - 1, toIndex));
+  const sid = doc.blocks[from]!.sectionId;
+  const own = doc.blocks.flatMap((b, i) => (b.sectionId === sid ? [i] : []));
+  const to = Math.max(own[0]!, Math.min(own[own.length - 1]!, toIndex));
   const blocks = [...doc.blocks];
   const [moved] = blocks.splice(from, 1);
   blocks.splice(to, 0, moved!);
   return { ...doc, blocks };
+}
+
+const cleanName = (name: string): string | null => {
+  const n = name.trim();
+  return n.length >= 1 && n.length <= MAX_SECTION_NAME ? n : null;
+};
+
+export function addSection(doc: WorkoutDoc, name: string, makeId: () => string): WorkoutDoc {
+  const n = cleanName(name);
+  if (n === null || doc.sections.length >= MAX_SECTIONS) return doc;
+  return { ...doc, sections: [...doc.sections, { id: makeId(), name: n }] };
+}
+
+export function renameSection(doc: WorkoutDoc, sectionId: string, name: string): WorkoutDoc {
+  const n = cleanName(name);
+  if (n === null || !doc.sections.some((s) => s.id === sectionId)) return doc;
+  return { ...doc, sections: doc.sections.map((s) => (s.id === sectionId ? { ...s, name: n } : s)) };
+}
+
+/** Its blocks join the section above, or become unsectioned when it was the first. */
+export function removeSection(doc: WorkoutDoc, sectionId: string): WorkoutDoc {
+  const i = doc.sections.findIndex((s) => s.id === sectionId);
+  if (i < 0) return doc;
+  const above = doc.sections[i - 1]?.id ?? null;
+  return {
+    ...doc,
+    sections: doc.sections.filter((s) => s.id !== sectionId),
+    blocks: doc.blocks.map((b) => (b.sectionId === sectionId ? { ...b, sectionId: above } : b)),
+  };
+}
+
+/** Swaps with the neighbouring section; both runs of blocks move with it. */
+export function moveSection(doc: WorkoutDoc, sectionId: string, delta: -1 | 1): WorkoutDoc {
+  const i = doc.sections.findIndex((s) => s.id === sectionId);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= doc.sections.length) return doc;
+  const sections = [...doc.sections];
+  [sections[i], sections[j]] = [sections[j]!, sections[i]!];
+  return { ...doc, sections, blocks: regroup(sections, doc.blocks) };
+}
+
+/** Puts the block at the end of that section's run (null: the unsectioned run at the top). */
+export function moveBlockToSection(doc: WorkoutDoc, blockId: string, sectionId: string | null): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  if (!block || (sectionId !== null && !doc.sections.some((s) => s.id === sectionId))) return doc;
+  const others = doc.blocks.filter((b) => b.id !== blockId);
+  const blocks = regroup(doc.sections, [...others, { ...block, sectionId }]);
+  // Removing the block may leave its old section empty; sections are never empty.
+  const old = block.sectionId;
+  const sections =
+    old !== null && old !== sectionId && !blocks.some((b) => b.sectionId === old)
+      ? doc.sections.filter((s) => s.id !== old)
+      : doc.sections;
+  return { ...doc, sections, blocks };
+}
+
+export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string): WorkoutDoc {
+  if (exs.length < MIN_CHOICE_OPTIONS || exs.length > MAX_CHOICE_OPTIONS || doc.blocks.length >= MAX_BLOCKS) return doc;
+  const block: WorkoutBlockDoc = {
+    id: makeId(),
+    sectionId: lastSectionId(doc),
+    kind: 'choice',
+    exercises: exs.map((ex) => newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)),
+  };
+  return { ...doc, blocks: [...doc.blocks, block] };
+}
+
+export function addChoiceOption(doc: WorkoutDoc, blockId: string, ex: ExercisePick, makeId: () => string): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  if (!block || block.kind !== 'choice' || block.exercises.length >= MAX_CHOICE_OPTIONS) return doc;
+  return mapBlock(doc, blockId, (b) => ({
+    ...b,
+    exercises: [...b.exercises, newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)],
+  }));
 }
 
 export function removeExercise(doc: WorkoutDoc, blockId: string, workoutExerciseId: string): WorkoutDoc {
@@ -132,7 +232,7 @@ export function removeExercise(doc: WorkoutDoc, blockId: string, workoutExercise
   if (block.exercises.length === 1) return removeBlock(doc, blockId);
   const removed = block.exercises[index]!;
   let exercises = block.exercises.filter((e) => e.id !== workoutExerciseId);
-  if (index === block.exercises.length - 1) {
+  if (block.kind === 'superset' && index === block.exercises.length - 1) {
     // The removed exercise carried the per-round rest; hand it to the new last exercise.
     const rests = removed.sets.filter((s) => s.setType !== 'drop').map((s) => s.restSeconds);
     const last = exercises[exercises.length - 1]!;
@@ -142,19 +242,50 @@ export function removeExercise(doc: WorkoutDoc, blockId: string, workoutExercise
   return mapBlock(doc, blockId, (b) => ({ ...b, kind, exercises }));
 }
 
-/** In a superset a set is a round, so adding one adds a round to every exercise. */
+const roundCount = (e: WorkoutExerciseDoc) => e.sets.filter((s) => s.setType !== 'drop').length;
+
+/** True when a later exercise of the block also has a set in this 1-based round. */
+const roundHasLaterExercise = (b: WorkoutBlockDoc, exerciseIndex: number, round: number) =>
+  b.exercises.slice(exerciseIndex + 1).some((e) => roundCount(e) >= round);
+
+/**
+ * Whether a set's rest box means anything (the builder shows it only then). Outside a superset, always. In a
+ * superset the round rest sits on the last exercise of the round, so a set rests only when no later exercise has a
+ * set in its round: every set of the last exercise, plus the extra rounds of a longer one (supersets may be uneven).
+ */
+export function setShowsRest(block: WorkoutBlockDoc, exerciseIndex: number, setIndex: number): boolean {
+  const ex = block.exercises[exerciseIndex];
+  if (!ex || !ex.sets[setIndex]) return false;
+  if (block.kind !== 'superset') return true;
+  const round = Math.max(1, roundCount({ ...ex, sets: ex.sets.slice(0, setIndex + 1) }));
+  return !roundHasLaterExercise(block, exerciseIndex, round);
+}
+
+/**
+ * Adds a set to one exercise. Supersets may be uneven, so this never touches the other exercises (use addRound for
+ * all). On a superset exercise that isn't last, the new set goes straight on (rest 0) when a later exercise has a set
+ * in its round, and otherwise takes the block's round rest (the last exercise's last rest), so the client still rests.
+ */
 export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, makeId: () => string): WorkoutDoc {
-  if (doc.blocks.find((b) => b.id === blockId)?.kind === 'superset') return addRound(doc, blockId, makeId);
-  return mapExercise(doc, blockId, workoutExerciseId, (e) => {
-    if (e.sets.length >= MAX_SETS) return e;
+  return mapBlock(doc, blockId, (b) => {
+    const i = b.exercises.findIndex((e) => e.id === workoutExerciseId);
+    const e = b.exercises[i];
+    if (!e || e.sets.length >= MAX_SETS) return b;
     const from = lastNonDrop(e.sets);
-    return { ...e, sets: [...e.sets, newSet(makeId, from?.restSeconds ?? DEFAULT_REST, from)] };
+    let rest = from?.restSeconds ?? DEFAULT_REST;
+    if (b.kind === 'superset' && i < b.exercises.length - 1) {
+      rest = roundHasLaterExercise(b, i, roundCount(e) + 1)
+        ? 0
+        : (lastNonDrop(b.exercises[b.exercises.length - 1]!.sets)?.restSeconds ?? DEFAULT_REST);
+    }
+    const added = { ...e, sets: [...e.sets, newSet(makeId, rest, from)] };
+    return { ...b, exercises: b.exercises.map((x, xi) => (xi === i ? added : x)) };
   });
 }
 
 export function addRound(doc: WorkoutDoc, blockId: string, makeId: () => string): WorkoutDoc {
   return mapBlock(doc, blockId, (b) => {
-    if (b.kind !== 'superset' || b.exercises.some((e) => e.sets.length >= MAX_SETS)) return b;
+    if (b.kind !== 'superset' || b.exercises.some((e) => e.sets.length >= MAX_SETS)) return b; // choice groups have no rounds
     return {
       ...b,
       exercises: b.exercises.map((e, i) => {
@@ -197,32 +328,8 @@ export function addDrop(
   });
 }
 
-function removeNthRound(e: WorkoutExerciseDoc, n: number): WorkoutExerciseDoc {
-  let seen = -1;
-  const sets: WorkoutSetDoc[] = [];
-  let skipping = false;
-  for (const s of e.sets) {
-    if (s.setType !== 'drop') {
-      seen += 1;
-      skipping = seen === n;
-    }
-    if (!skipping) sets.push(s);
-  }
-  return { ...e, sets };
-}
-
-/** In a superset, removing a non-drop set removes that round from every exercise. */
+/** Removes one set (and the drops that follow it) from one exercise; never touches the other exercises of a superset. */
 export function removeSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, setId: string): WorkoutDoc {
-  const block = doc.blocks.find((b) => b.id === blockId);
-  if (block?.kind === 'superset') {
-    const ex = block.exercises.find((e) => e.id === workoutExerciseId);
-    const target = ex?.sets.find((s) => s.id === setId);
-    if (ex && target && target.setType !== 'drop') {
-      if (ex.sets.filter((s) => s.setType !== 'drop').length <= 1) return doc;
-      const n = ex.sets.filter((s) => s.setType !== 'drop').findIndex((s) => s.id === setId);
-      return mapBlock(doc, blockId, (b) => ({ ...b, exercises: b.exercises.map((e) => removeNthRound(e, n)) }));
-    }
-  }
   return mapExercise(doc, blockId, workoutExerciseId, (e) => {
     const i = e.sets.findIndex((s) => s.id === setId);
     if (i < 0) return e;
@@ -250,10 +357,6 @@ export function updateSet(
     return next.setType === 'drop' ? { ...next, restSeconds: 0 } : { ...next, toFailure: false };
   });
   if (sets[0]?.setType === 'drop') return doc;
-  if (block.kind === 'superset') {
-    const count = (xs: readonly WorkoutSetDoc[]) => xs.filter((s) => s.setType !== 'drop').length;
-    if (count(sets) !== count(ex.sets)) return doc;
-  }
   return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets }));
 }
 

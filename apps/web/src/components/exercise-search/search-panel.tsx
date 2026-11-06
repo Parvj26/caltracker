@@ -24,6 +24,13 @@ type Props = {
   /** The coach's workspace (from requireCoach): only its custom exercises are listed, beside the built-ins. */
   workspaceId: string;
   onPick?: (exercises: ExercisePick[]) => void;
+  /** Pick-many mode: how many must be picked (default 2) and the most that can be (default 10). */
+  min?: number;
+  max?: number;
+  /** Pick-many mode: the line under the search box (default: the superset hint). */
+  hint?: string;
+  /** Pick-many mode: what the picks become, in the preview's Add to … button (default 'superset'). */
+  groupLabel?: string;
   /** Browse mode: open a custom exercise to edit it. */
   onOpen?: (id: string) => void;
   /** Shows a Cancel button in the footer. */
@@ -41,7 +48,20 @@ const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: fals
 const toPick = (r: ExerciseIndexRow): ExercisePick => ({ id: r.id, name: r.name, trackingType: r.trackingType });
 
 /** Layout A: search box and filter chips on top, a results list on the left, a preview pane on the right. */
-export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initialQuery = '', initialFilters, rowFilter }: Props) {
+export function SearchPanel({
+  mode,
+  workspaceId,
+  onPick,
+  min = 2,
+  max = 10,
+  hint = 'A superset needs 2 or more exercises. Search and tap each one.',
+  groupLabel = 'superset',
+  onOpen,
+  onCancel,
+  initialQuery = '',
+  initialFilters,
+  rowFilter,
+}: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const listId = useId();
   const hintId = useId();
@@ -127,7 +147,9 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
   const imageUrl = (path: string) => exerciseImageUrl(supabase, path);
 
   function toggleSelected(row: ExerciseIndexRow) {
-    setSelected((cur) => (cur.some((s) => s.id === row.id) ? cur.filter((s) => s.id !== row.id) : [...cur, toPick(row)]));
+    setSelected((cur) =>
+      cur.some((s) => s.id === row.id) ? cur.filter((s) => s.id !== row.id) : cur.length >= max ? cur : [...cur, toPick(row)],
+    );
   }
 
   function activate(id: string) {
@@ -198,7 +220,7 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
     : mode === 'pick-one'
       ? { label: 'Add to workout', onClick: () => primary(active) }
       : many
-        ? { label: selectedIds.has(active.id) ? 'Remove from superset' : 'Add to superset', onClick: () => primary(active) }
+        ? { label: selectedIds.has(active.id) ? `Remove from ${groupLabel}` : `Add to ${groupLabel}`, onClick: () => primary(active) }
         : active.source === 'custom'
           ? onOpen
             ? { label: 'Edit', onClick: () => primary(active) }
@@ -234,7 +256,8 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
       </label>
       {many ? (
         <p id={hintId} className={styles.caption}>
-          A superset needs 2 or more exercises. Search and tap each one.
+          {hint}
+          {selected.length >= max ? ` You can pick at most ${max}.` : ''}
         </p>
       ) : null}
       <FilterChips filters={filters} onChange={changeFilters} />
@@ -316,8 +339,8 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
         <div className={styles.footer}>
           {onCancel ? <Button variant="secondary" onClick={onCancel}>Cancel</Button> : null}
           {many ? (
-            <Button disabled={selected.length < 2} onClick={() => onPick?.(selected)}>
-              {selected.length < 2 ? 'Pick at least 2 exercises' : `Add ${selected.length} exercises`}
+            <Button disabled={selected.length < min} onClick={() => onPick?.(selected)}>
+              {selected.length < min ? `Pick at least ${min} exercises` : `Add ${selected.length} exercises`}
             </Button>
           ) : null}
         </div>

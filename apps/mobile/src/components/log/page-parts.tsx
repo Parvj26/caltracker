@@ -20,6 +20,8 @@ export type PageHandlers = {
   onNext: () => void;
   onFocusExercise: (exerciseIndex: number) => void;
   onFinish: () => void;
+  /** Picked pick-one page: back to the option cards (clears the pick). */
+  onSwitch: () => void;
 };
 
 export type PageProps = {
@@ -38,6 +40,9 @@ export type PageProps = {
  *   edit-sets-{p}  note-{p}  swap-{p}  prev-{p}  next-{p}  up-next-{p}  add-drop-{p}
  *   all-done-{p} with next-exercise-{p} or finish-all-{p}
  * (photo-{p}, how-to-{p}, exercise-name-{p}, step-row-{p}-{exerciseIndex}-{setIndex}, superset-ex-{p}-{k} live in their own files.)
+ * Sections and pick-one: section-line-{p}, picked-line-{p}, choice-switch (exercise-header.tsx);
+ *   choice-heading-{p}, choice-option-{index}, choice-thumb-{index} (choice-page.tsx);
+ *   exercise-list-heading-{n} (exercise-list-sheet.tsx); progress-segment-{p}-{state} (progress-strip.tsx).
  */
 type Current = NonNullable<PageModel['current']>;
 

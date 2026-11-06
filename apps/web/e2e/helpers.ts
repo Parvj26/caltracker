@@ -44,6 +44,23 @@ export async function pickExercise(page: Page, buttonName: string, exercise: str
   await expect(dialog).toBeHidden();
 }
 
+const SECTION_PRESETS = ['Warm-Up', 'Core', 'Main', 'Finisher', 'Cool-down'];
+
+/** Adds a section at the end of the builder: a preset by its name, anything else through "Custom…". */
+export async function addSection(page: Page, name: string) {
+  await page.getByRole('button', { name: '+ Section', exact: true }).click();
+  const menu = page.getByRole('group', { name: 'Add a section', exact: true });
+  if (SECTION_PRESETS.includes(name)) {
+    await menu.getByRole('button', { name, exact: true }).click();
+  } else {
+    await menu.getByRole('button', { name: 'Custom…', exact: true }).click();
+    await menu.getByLabel('Custom section name').fill(name);
+    await menu.getByRole('button', { name: 'Add section', exact: true }).click();
+  }
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole('group', { name: `Section ${name}`, exact: true })).toBeVisible();
+}
+
 /** Builds and saves a 1-block workout through the UI: Barbell Squat, 3 sets of 8 at 60 (coach's units, kg by default). */
 export async function createWorkout(page: Page, name: string): Promise<void> {
   await page.goto('/workouts/new');
@@ -113,7 +130,17 @@ export type SeedLogOptions = {
   swappedFrom?: string;
   /** Name of a second exercise the client added on top of the plan (it has no planned counterpart). */
   addedExercise?: string;
+  /** Sections the blocks can point at. */
+  sections?: { id: string; name: string }[];
+  /**
+   * Replaces the default single squat block. Each exercise gets `sets` sets (default 2); the exercises being done
+   * (all of a straight block, only the picked one of a pick-one group) have them ticked. `picked` is the name of
+   * the picked option, or null/omitted for a pick-one group nobody has chosen from.
+   */
+  blocks?: SeedLogBlock[];
 };
+
+export type SeedLogBlock = { sectionId?: string; choice?: boolean; picked?: string | null; exercises: string[]; sets?: number };
 
 /**
  * Inserts a finished (or in-progress, or discarded) workout log with one Barbell Squat exercise, straight into the
@@ -128,7 +155,7 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
   if (exercise.error) throw exercise.error;
 
   const named = async (name: string) => {
-    const r = await admin.from('exercises').select('id').eq('name', name).is('workspace_id', null).limit(1).single();
+    const r = await admin.from('exercises').select('id').eq('name', name).or(`workspace_id.is.null,workspace_id.eq.${o.workspaceId}`).limit(1).single();
     if (r.error) throw r.error;
     return r.data.id;
   };
@@ -152,6 +179,39 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
     .single();
   if (log.error) throw log.error;
   const logId = log.data.id;
+
+  if (o.blocks) {
+    const names = new Map(o.sections?.map((x) => [x.id, x.name]));
+    for (const [position, b] of o.blocks.entries()) {
+      const blockId = crypto.randomUUID();
+      const exIds = b.exercises.map(() => crypto.randomUUID());
+      const pickedId = b.choice && b.picked ? exIds[b.exercises.indexOf(b.picked)] : undefined;
+      const bi = await admin.from('log_blocks').insert({
+        id: blockId, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position,
+        kind: b.choice ? 'choice' : 'straight',
+        section_id: b.sectionId ?? null, section_name: b.sectionId ? (names.get(b.sectionId) ?? null) : null,
+        picked_exercise_id: pickedId ?? null,
+      });
+      if (bi.error) throw bi.error;
+      for (const [k, name] of b.exercises.entries()) {
+        const exercise_id = await named(name);
+        const le = await admin.from('log_exercises').insert({
+          id: exIds[k]!, block_id: blockId, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: k, exercise_id,
+          planned_workout_exercise_id: o.plannedWorkoutId ? crypto.randomUUID() : null,
+        });
+        if (le.error) throw le.error;
+        const live = !b.choice || exIds[k] === pickedId;
+        const rows = Array.from({ length: b.sets ?? 2 }, (_, p) => ({
+          log_exercise_id: exIds[k]!, log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: p,
+          target_reps_min: 8, target_reps_max: 8, target_weight_kg: 20,
+          actual_reps: live ? 8 : null, actual_weight_kg: live ? 20 : null, completed_at: live ? (finishedAt ?? o.startedAt) : null,
+        }));
+        const ss = await admin.from('log_sets').insert(rows);
+        if (ss.error) throw ss.error;
+      }
+    }
+    return logId;
+  }
 
   const block = await admin.from('log_blocks').insert({ log_id: logId, workspace_id: o.workspaceId, client_id: o.clientId, position: 0 }).select('id').single();
   if (block.error) throw block.error;
@@ -197,4 +257,40 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
     if (s2.error) throw s2.error;
   }
   return logId;
+}
+
+/**
+ * Inserts a client's scheduled workout with sections: one block per entry, each exercise with 2 sets of 8 at 20 kg.
+ * Delete it with `admin.from('workouts').delete().eq('id', id)`.
+ */
+export async function seedSectionedWorkout(
+  admin: SupabaseClient<Database>,
+  o: { workspaceId: string; clientId: string; name: string; scheduledOn: string; sections: { id: string; name: string }[]; blocks: SeedLogBlock[] },
+): Promise<string> {
+  const w = await admin.from('workouts').insert({ workspace_id: o.workspaceId, client_id: o.clientId, scheduled_on: o.scheduledOn, name: o.name }).select('id').single();
+  if (w.error) throw w.error;
+  const names = new Map(o.sections.map((x) => [x.id, x.name]));
+  for (const [position, b] of o.blocks.entries()) {
+    const blk = await admin.from('workout_blocks').insert({
+      workout_id: w.data.id, workspace_id: o.workspaceId, client_id: o.clientId, position, kind: b.choice ? 'choice' : 'straight',
+      section_id: b.sectionId ?? null, section_name: b.sectionId ? (names.get(b.sectionId) ?? null) : null,
+    }).select('id').single();
+    if (blk.error) throw blk.error;
+    for (const [k, name] of b.exercises.entries()) {
+      const ex = await admin.from('exercises').select('id').eq('name', name).or(`workspace_id.is.null,workspace_id.eq.${o.workspaceId}`).limit(1).single();
+      if (ex.error) throw ex.error;
+      const we = await admin.from('workout_exercises').insert({
+        block_id: blk.data.id, workout_id: w.data.id, workspace_id: o.workspaceId, client_id: o.clientId, position: k, exercise_id: ex.data.id,
+      }).select('id').single();
+      if (we.error) throw we.error;
+      const sets = await admin.from('workout_sets').insert(
+        [0, 1].map((p) => ({
+          workout_exercise_id: we.data.id, workout_id: w.data.id, workspace_id: o.workspaceId, client_id: o.clientId, position: p,
+          target_reps_min: 8, target_reps_max: 8, target_weight_kg: 20,
+        })),
+      );
+      if (sets.error) throw sets.error;
+    }
+  }
+  return w.data.id;
 }

@@ -1,3 +1,4 @@
+import { liveExercises } from '../logs/flow';
 import type { WorkoutLogDoc } from '../logs/schema';
 
 export type PrKind = 'heaviest' | 'reps_at_weight' | 'e1rm';
@@ -18,11 +19,14 @@ export function epley1rm(weightKg: number, reps: number): number {
 
 export type Lift = { weightKg: number; reps: number; at: string };
 
-/** Counted lifts per exercise: weight-and-reps sets that are finished, not warm-ups, with a weight and reps. */
+/**
+ * Counted lifts per exercise: weight-and-reps sets that are finished, not warm-ups, with a weight and reps.
+ * Only the exercises being done count: a pick-one group's unpicked options are left out.
+ */
 export function liftsByExercise(log: WorkoutLogDoc): Map<string, Lift[]> {
   const out = new Map<string, Lift[]>();
   for (const b of log.blocks) {
-    for (const e of b.exercises) {
+    for (const { exercise: e } of liveExercises(b)) {
       if (e.trackingType !== 'weight_reps') continue;
       for (const s of e.sets) {
         if (s.setType === 'warmup' || s.completedAt === null) continue;
