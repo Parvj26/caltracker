@@ -53,7 +53,7 @@
 .navItemCurrent,
 .navItemCurrent:hover { background: var(--ct-ink); color: var(--ct-bg); }
 
-.signOut { margin-top: auto; }
+.bottom { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 
 .content {
   min-width: 0;
@@ -67,7 +67,7 @@
   .brand { padding: 0; align-items: center; }
   .logoFull, .workspace { display: none; }
   .logoMark { display: inline-flex; font-size: 22px; }
-  .nav { width: 100%; }
+  .nav, .bottom { width: 100%; }
   .navItem { justify-content: center; width: 44px; padding: 0; margin: 0 auto; }
   .navLabel {
     position: absolute;

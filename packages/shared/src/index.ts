@@ -189,3 +189,11 @@ export type {
   SearchFilters,
   SearchHit,
 } from './exercises/search';
+export {
+  BIO_MAX_LENGTH,
+  BUSINESS_NAME_MAX_LENGTH,
+  Bio,
+  BusinessName,
+  ProfileInput,
+  characterCount,
+} from './profile/schema';
