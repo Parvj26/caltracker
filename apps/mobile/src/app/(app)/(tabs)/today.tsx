@@ -17,7 +17,7 @@ import {
   type LogForDay,
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
-import { supabase } from '@/lib/supabase';
+import { signOutAndForget } from '@/lib/sign-out';
 import { useActiveLog } from '@/lib/use-active-log';
 import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
@@ -287,7 +287,7 @@ export default function Today() {
         </Card>
       ) : null}
 
-      <TextButton testID="sign-out" title="Sign out" onPress={() => void supabase.auth.signOut()} />
+      <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />
     </Screen>
   );
 }

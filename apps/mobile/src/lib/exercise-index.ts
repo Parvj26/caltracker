@@ -46,7 +46,7 @@ async function readStored(storage: KeyValueStorage, key: string): Promise<{ save
   }
 }
 
-const LAST_USER_KEY = 'caltracker.exerciseIndexUser.v1';
+export const LAST_USER_KEY = 'caltracker.exerciseIndexUser.v1';
 
 /**
  * Whose library to use: the signed-in user's, or (when the session can't be read, e.g. offline with an expired
@@ -78,6 +78,17 @@ export async function resolveIndexUser(
   return sessionUserId;
 }
 
+/** Explicit sign-out: forget who was signed in and remove their saved library. Not for token-refresh failures. */
+export async function forgetIndexUser(storage: KeyValueStorage): Promise<void> {
+  try {
+    const last = await storage.getItem(LAST_USER_KEY);
+    await storage.removeItem(LAST_USER_KEY);
+    if (last) await storage.removeItem(`${EXERCISE_INDEX_KEY}.${last}`);
+  } catch {
+    // Nothing more to do; the next sign-in prunes anyway.
+  }
+}
+
 /**
  * Returns the saved library at once, however old. A copy older than 24 hours (or one from a clock set back) is
  * refreshed in the background: `onUpdate` gets the new rows when they land, or the saved ones with
@@ -90,12 +101,14 @@ export function createExerciseIndexLoader(
   now: () => number = Date.now,
 ): (onUpdate?: (next: LoadedExerciseIndex) => void) => Promise<LoadedExerciseIndex> {
   const key = `${EXERCISE_INDEX_KEY}.${userId}`;
-  let inFlight: Promise<ExerciseIndexRow[]> | null = null;
+  let inFlight: Promise<{ rows: ExerciseIndexRow[]; stillMine: boolean }> | null = null;
   const fetchAndSave = () => {
     inFlight ??= fetchRows()
       .then(async (rows) => {
-        await storage.setItem(key, JSON.stringify({ savedAt: now(), rows })).catch(() => undefined);
-        return rows;
+        // The user may have signed out, or someone else signed in, while this was loading: then save nothing.
+        const stillMine = (await storage.getItem(LAST_USER_KEY).catch(() => null)) === userId;
+        if (stillMine) await storage.setItem(key, JSON.stringify({ savedAt: now(), rows })).catch(() => undefined);
+        return { rows, stillMine };
       })
       .finally(() => {
         inFlight = null;
@@ -106,14 +119,16 @@ export function createExerciseIndexLoader(
   return async (onUpdate) => {
     const stored = await readStored(storage, key);
     if (!stored) {
-      return { rows: await fetchAndSave(), fromCache: false, refreshFailed: false };
+      return { rows: (await fetchAndSave()).rows, fromCache: false, refreshFailed: false };
     }
     const age = now() - stored.savedAt;
     if (age >= 0 && age < EXERCISE_INDEX_TTL_MS) {
       return { rows: stored.rows, fromCache: true, refreshFailed: false };
     }
     fetchAndSave().then(
-      (rows) => onUpdate?.({ rows, fromCache: false, refreshFailed: false }),
+      ({ rows, stillMine }) => {
+        if (stillMine) onUpdate?.({ rows, fromCache: false, refreshFailed: false });
+      },
       () => onUpdate?.({ rows: stored.rows, fromCache: true, refreshFailed: true }),
     );
     return { rows: stored.rows, fromCache: true, refreshFailed: false };
