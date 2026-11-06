@@ -129,3 +129,21 @@
 .who { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; }
 .why { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .rowActions { flex: none; display: flex; gap: var(--ct-space-2); margin-left: auto; }
+
+/* Today's clients: each row carries its own actions (≥ 44 px), wrapping under the name on a narrow screen. */
+.todayRow { flex-wrap: wrap; padding: var(--ct-space-1) 0; }
+.primaryAction {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.primaryAction:hover { text-decoration: underline; }

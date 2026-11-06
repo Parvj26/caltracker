@@ -73,6 +73,26 @@ function statusChip(row: TodayRow) {
   return <Chip tone="grey">Not started</Chip>;
 }
 
+/**
+ * What a Today's clients row offers, most useful first (the row itself opens the first): log the session when
+ * nobody has started, watch live (or take over) while the client trains, the log once done.
+ */
+function rowActions(row: TodayRow): { label: string; href: string }[] {
+  const client = row.client.id;
+  const session = `/clients/${client}/log/${row.workout.id}`;
+  switch (row.status.kind) {
+    case 'not_started':
+      return [{ label: 'Log session', href: session }];
+    case 'training':
+      return [
+        { label: 'Watch live', href: `/clients/${client}/logs/${row.status.logId}` },
+        { label: 'Take over', href: session },
+      ];
+    case 'done':
+      return [{ label: 'View log', href: `/clients/${client}/logs/${row.status.logId}` }];
+  }
+}
+
 function Group<T>({ id, title, items, row }: { id?: string; title: string; items: T[]; row: (item: T) => React.ReactNode }) {
   const [all, setAll] = useState(false);
   const headingId = `${id ?? title.replace(/\W+/g, '-')}-heading`;
@@ -211,16 +231,28 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
             ) : (
               <ul className={styles.list}>
                 {rows.map((r) => {
-                  const href = r.status.kind === 'done' ? `/clients/${r.client.id}/logs/${r.status.logId}` : `/clients/${r.client.id}`;
                   const name = fullName(r.client);
+                  const actions = rowActions(r);
                   return (
-                    <li key={r.workout.id} className={styles.row}>
-                      <Link href={href} className={styles.rowLink}>
+                    <li key={r.workout.id} className={cx(styles.row, styles.todayRow)}>
+                      {/* The whole row opens the most useful action: log, watch live, or the finished log. */}
+                      <Link href={actions[0]!.href} className={styles.rowLink} aria-label={`${name} · ${r.workout.name}: ${actions[0]!.label}`}>
                         <Avatar name={name} toneKey={r.client.id} />
                         <span className={styles.rowText} title={`${name} · ${r.workout.name}`}>{name} · {r.workout.name}</span>
                         {statusChip(r)}
                       </Link>
-                      {r.status.kind === 'not_started' ? <ComingSoon label="Log session" /> : null}
+                      <span className={styles.rowActions}>
+                        {actions.map((a, i) => (
+                          <Link
+                            key={a.label}
+                            href={a.href}
+                            className={i === 0 ? styles.primaryAction : styles.assign}
+                            aria-label={`${a.label}: ${name}, ${r.workout.name}`}
+                          >
+                            {a.label}
+                          </Link>
+                        ))}
+                      </span>
                     </li>
                   );
                 })}
