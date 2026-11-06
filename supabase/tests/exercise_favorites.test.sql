@@ -1,12 +1,14 @@
 begin;
-select plan(28);
+select plan(33);
 
 select tests.create_user('ef-coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('ef-coach-b@t.local', 'Coach B') as coach_b \gset
 select tests.create_user('ef-a1@t.local', 'Client A1') as a1 \gset
 select tests.create_workspace('EF Workspace A', :'coach_a') as ws_a \gset
 select tests.create_workspace('EF Workspace B', :'coach_b') as ws_b \gset
+select tests.create_user('ef-a2@t.local', 'Client A2') as a2 \gset
 select tests.add_client(:'ws_a', :'a1');
+select tests.add_client(:'ws_a', :'a2');
 
 select tests.create_exercise(null, 'EF Built-in') as ex_builtin \gset
 select tests.create_exercise(:'ws_a', 'EF Custom A') as ex_custom \gset
@@ -14,6 +16,7 @@ select tests.create_exercise(:'ws_a', 'EF Old') as ex_old \gset
 select tests.create_exercise(:'ws_a', 'EF Mid') as ex_mid \gset
 select tests.create_exercise(:'ws_a', 'EF New') as ex_new \gset
 select tests.create_exercise(:'ws_b', 'EF Other WS') as ex_b \gset
+select tests.create_exercise(null, 'EF A2 Only') as ex_a2 \gset
 
 -- Structure and privileges
 select has_table('public', 'exercise_favorites', 'exercise_favorites exists');
@@ -56,8 +59,12 @@ insert into public.workout_logs (workspace_id, client_id, name, status, started_
 insert into public.log_blocks (log_id, position) values (:'l1', 0) returning id as lb1 \gset
 insert into public.log_blocks (log_id, position) values (:'l2', 0) returning id as lb2 \gset
 insert into public.log_blocks (log_id, position) values (:'l3', 0) returning id as lb3 \gset
+-- Client A2 (same workspace) has a completed log of a different exercise.
+insert into public.workout_logs (workspace_id, client_id, name, status, started_at, finished_at)
+  values (:'ws_a', :'a2', 'L4', 'completed', now(), now()) returning id as l4 \gset
+insert into public.log_blocks (log_id, position) values (:'l4', 0) returning id as lb4 \gset
 insert into public.log_exercises (block_id, position, exercise_id) values
-  (:'lb1', 0, :'ex_old'), (:'lb2', 0, :'ex_new'), (:'lb2', 1, :'ex_old'), (:'lb3', 0, :'ex_mid');
+  (:'lb1', 0, :'ex_old'), (:'lb2', 0, :'ex_new'), (:'lb2', 1, :'ex_new'), (:'lb3', 0, :'ex_mid'), (:'lb4', 0, :'ex_a2');
 
 -- Coach A: star, list, unstar
 select tests.act_as(:'coach_a');
@@ -89,6 +96,8 @@ select results_eq($$select exercise_id from public.recent_exercises_for_coach(2)
 select is((select count(*)::int from public.recent_exercises_for_coach() where exercise_id = :'ex_b'), 0,
   'coach recents never include another workspace''s workouts');
 select is((select count(*)::int from public.recent_exercises_for_client()), 0, 'a coach has no client recents');
+select is((select count(*)::int from public.recent_exercises_for_coach(-5)), 0, 'a negative limit returns nothing');
+select is((select count(*)::int from public.recent_exercises_for_coach(null)), 3, 'a null limit uses the default');
 
 -- Coach B sees nothing of A's favourites and cannot delete them
 select tests.act_as(:'coach_b');
@@ -101,6 +110,13 @@ select tests.act_as(:'coach_b');
 select results_eq($$select exercise_id from public.recent_exercises_for_coach()$$,
   format($$values (%L::uuid)$$, :'ex_b'), 'coach B recents contain only coach B''s own items');
 
+-- A coach of one workspace who is only a client of another cannot star that other workspace's custom exercise
+reset role;
+select tests.add_client(:'ws_a', :'coach_b');
+select tests.act_as(:'coach_b');
+select throws_ok(format($$insert into public.exercise_favorites (exercise_id) values (%L)$$, :'ex_custom'),
+  '42501', null, 'cannot star a custom exercise of a workspace the caller does not coach');
+
 -- Client
 select tests.act_as(:'a1');
 select throws_ok(format($$insert into public.exercise_favorites (exercise_id) values (%L)$$, :'ex_builtin'),
@@ -109,9 +125,15 @@ select is((select count(*)::int from public.exercise_favorites), 0, 'a client se
 select results_eq($$select exercise_id from public.recent_exercises_for_client()$$,
   format($$values (%L::uuid), (%L::uuid)$$, :'ex_new', :'ex_old'),
   'client recents are completed logs only, newest first');
+select is((select count(*)::int from public.recent_exercises_for_client() where exercise_id = :'ex_a2'), 0,
+  'client recents never include another client''s logs');
 select results_eq($$select exercise_id from public.recent_exercises_for_client(1)$$,
   format($$values (%L::uuid)$$, :'ex_new'), 'client recents honour p_limit');
 select is((select count(*)::int from public.recent_exercises_for_coach()), 0, 'a client has no coach recents');
+
+select tests.act_as(:'a2');
+select results_eq($$select exercise_id from public.recent_exercises_for_client()$$,
+  format($$values (%L::uuid)$$, :'ex_a2'), 'client A2 recents contain only A2''s own log');
 
 -- Anonymous
 select tests.act_as_anon();

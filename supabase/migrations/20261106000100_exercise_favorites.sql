@@ -11,6 +11,9 @@ create table public.exercise_favorites (
 
 create index exercise_favorites_exercise_id_idx on public.exercise_favorites (exercise_id);
 
+-- Serves recent_exercises_for_coach.
+create index workouts_created_by_idx on public.workouts (created_by, created_at desc);
+
 -- True when the caller is an owner or staff member of any workspace.
 create function public.is_coach_anywhere() returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -30,11 +33,14 @@ alter table public.exercise_favorites enable row level security;
 
 create policy exercise_favorites_select on public.exercise_favorites for select to authenticated
   using (coach_id = (select auth.uid()) and public.is_coach_anywhere());
--- Only exercises the coach can see: built-ins or custom exercises of a workspace they belong to.
+-- Only built-ins, or custom exercises of a workspace the caller coaches.
 create policy exercise_favorites_insert on public.exercise_favorites for insert to authenticated
   with check (
     coach_id = (select auth.uid()) and public.is_coach_anywhere()
-    and exists (select 1 from public.exercises e where e.id = exercise_id)
+    and exists (
+      select 1 from public.exercises e
+      where e.id = exercise_id and (e.source = 'builtin' or public.is_coach_of(e.workspace_id))
+    )
   );
 create policy exercise_favorites_delete on public.exercise_favorites for delete to authenticated
   using (coach_id = (select auth.uid()) and public.is_coach_anywhere());
@@ -50,7 +56,7 @@ language sql stable security definer set search_path = '' as $$
     and public.is_coach_of(w.workspace_id)
   group by we.exercise_id
   order by last_used desc, we.exercise_id
-  limit greatest(coalesce(p_limit, 20), 0);
+  limit least(greatest(coalesce(p_limit, 20), 0), 100);
 $$;
 
 -- Distinct exercises in the caller's own completed logs.
@@ -64,7 +70,7 @@ language sql stable security definer set search_path = '' as $$
     and l.status = 'completed'
   group by le.exercise_id
   order by last_used desc, le.exercise_id
-  limit greatest(coalesce(p_limit, 20), 0);
+  limit least(greatest(coalesce(p_limit, 20), 0), 100);
 $$;
 
 revoke execute on function public.recent_exercises_for_coach(int), public.recent_exercises_for_client(int)
