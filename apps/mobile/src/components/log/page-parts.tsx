@@ -32,6 +32,13 @@ export type PageProps = {
   nextName: string | null;
 };
 
+/*
+ * testIDs for Maestro (p = page index, k = exercise index on a superset page):
+ *   done-{p}  stepper-{weight|reps|duration|distance}-{minus|value|plus}-{p}  step-name-{p}  body-tile-{p}
+ *   edit-sets-{p}  note-{p}  swap-{p}  prev-{p}  next-{p}  up-next-{p}  add-drop-{p}
+ *   all-done-{p} with next-exercise-{p} or finish-all-{p}
+ * (photo-{p}, how-to-{p}, exercise-name-{p}, step-row-{p}-{exerciseIndex}-{setIndex}, superset-ex-{p}-{k} live in their own files.)
+ */
 type Current = NonNullable<PageModel['current']>;
 
 const DOT = { done: palette.ink, current: palette.magenta, todo: palette.border, 'warmup-done': palette.inkMuted, 'warmup-todo': palette.surface } as const;
@@ -84,6 +91,7 @@ export function StepperRow({ current, page, handlers }: { current: Current; page
           page={page}
           onStep={(d) => handlers.onStep(s.field, d)}
           onType={(v) => handlers.onType(s.field, v)}
+          setName={current.setName}
         />
       ))}
     </View>

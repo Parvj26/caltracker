@@ -3,8 +3,17 @@ import { Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions 
 import { borderWidth } from '@caltracker/design-tokens';
 import type { StepField } from '@caltracker/shared';
 import type { StepperModel } from '@/lib/log-page-model';
+import { fitStepperFont } from '@/lib/stepper-fit';
 import { typedToStored } from '@/lib/stepper-input';
-import { palette, pressedOpacity, stepperButtonSize, stepperValue } from '@/theme/theme';
+import {
+  palette,
+  pressedOpacity,
+  stepperButtonSize,
+  stepperButtonSizeCompact,
+  stepperCompactBelow,
+  stepperValue,
+  stepperValueCompact,
+} from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
@@ -13,9 +22,6 @@ const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
   duration: 'numbers-and-punctuation',
   distance: 'decimal-pad',
 };
-
-/** Characters that fit the number box at full size. */
-const ROOM_CHARS = 4;
 
 const NAME: Record<StepField, string> = { weight: 'Weight', reps: 'Reps', duration: 'Time', distance: 'Distance' };
 
@@ -28,15 +34,24 @@ export function Stepper({
   page,
   onStep,
   onType,
+  setName,
 }: {
   model: StepperModel;
   page: number;
   onStep: (direction: -1 | 1) => void;
   onType: (value: number | null) => void;
+  /** "Set 2": put in the number box's spoken label. */
+  setName?: string;
 }) {
   const { text, space, radius } = useTheme();
   const [draft, setDraft] = useState(model.display);
   const [focused, setFocused] = useState(false);
+  const [rowWidth, setRowWidth] = useState(0);
+  const [boxWidth, setBoxWidth] = useState(0);
+  const compact = rowWidth > 0 && rowWidth < stepperCompactBelow;
+  const size = compact ? stepperButtonSizeCompact : stepperButtonSize;
+  const base = compact ? stepperValueCompact : stepperValue;
+  const fontSize = fitStepperFont(boxWidth, Math.max(draft.length, 1), base.fontSize);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useEffect(() => {
     if (!focused) setDraft(model.display);
@@ -51,8 +66,8 @@ export function Stepper({
 
   return (
     <View style={[styles.wrap, { gap: space[1] }]}>
-      <View style={[styles.row, { gap: space[2] }]}>
-        <StepButton testID={`${id}-minus-${page}`} mark="−" label={model.lessLabel} onPress={() => step(-1)} />
+      <View style={[styles.row, { gap: compact ? space[1] : space[2] }]} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
+        <StepButton size={size} testID={`${id}-minus-${page}`} mark="−" label={model.lessLabel} onPress={() => step(-1)} />
         <TextInput
           ref={input}
           testID={`${id}-value-${page}`}
@@ -62,7 +77,8 @@ export function Stepper({
           selectTextOnFocus
           placeholder="–"
           placeholderTextColor={palette.inkMuted}
-          accessibilityLabel={`${NAME[model.field]}${model.field === 'reps' ? '' : ` in ${model.unit}`}`}
+          accessibilityLabel={`${setName ? `${setName} ` : ''}${NAME[model.field].toLowerCase()}${model.field === 'reps' ? '' : ` in ${model.unit}`}`}
+          onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}
           numberOfLines={1}
           onFocus={() => setFocused(true)}
           onBlur={() => {
@@ -76,28 +92,21 @@ export function Stepper({
           }}
           style={[
             text('bigNumber'),
-            stepperValue,
-            fitValue(draft),
+            base,
+            { fontSize, minHeight: size },
             styles.value,
             { borderRadius: radius.input },
             focused && styles.valueFocused,
           ]}
         />
-        <StepButton testID={`${id}-plus-${page}`} mark="+" label={model.moreLabel} onPress={() => step(1)} />
+        <StepButton size={size} testID={`${id}-plus-${page}`} mark="+" label={model.moreLabel} onPress={() => step(1)} />
       </View>
       <Text style={[text('caption'), styles.unit]}>{model.unit}</Text>
     </View>
   );
 }
 
-/** TextInput has no auto-fit: a long number shrinks (down to half size) so it stays inside the box. */
-function fitValue(draft: string): { fontSize: number; lineHeight: number } | undefined {
-  if (draft.length <= ROOM_CHARS) return undefined;
-  const scale = Math.max(0.5, ROOM_CHARS / draft.length);
-  return { fontSize: Math.floor(stepperValue.fontSize * scale), lineHeight: stepperValue.lineHeight };
-}
-
-function StepButton({ testID, mark, label, onPress }: { testID: string; mark: string; label: string; onPress: () => void }) {
+function StepButton({ testID, mark, label, size, onPress }: { testID: string; mark: string; label: string; size: number; onPress: () => void }) {
   const { text, radius } = useTheme();
   return (
     <Pressable
@@ -105,7 +114,7 @@ function StepButton({ testID, mark, label, onPress }: { testID: string; mark: st
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.button, { borderRadius: radius.button }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.button, { width: size, height: size },  { borderRadius: radius.button }, pressed && styles.pressed]}
     >
       <Text style={[text('screenTitle'), styles.mark]}>{mark}</Text>
     </Pressable>

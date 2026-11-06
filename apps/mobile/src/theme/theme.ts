@@ -60,3 +60,9 @@ export const doneButtonHeight = tapTarget.logging;
 
 /** The start/end photo area on the logging page. */
 export const logPhotoHeight = exercisePhotoHeight;
+
+/** Side-by-side steppers (weight + reps) are tighter: 44 pt buttons and a smaller number, as in the mockup. */
+export const stepperButtonSizeCompact = tapTarget.min;
+export const stepperValueCompact = { fontSize: 34, lineHeight: 40 };
+/** A stepper row narrower than this (pt) uses the compact sizes. */
+export const stepperCompactBelow = 240;

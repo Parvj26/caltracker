@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
+import { tapTarget } from '@caltracker/design-tokens';
 import { useTheme } from '@/theme/use-theme';
 import { DoneButton } from './done-button';
 import { ExercisePhoto } from './exercise-photo';
@@ -31,6 +32,7 @@ export function ExercisePage({ model, page, resting, handlers, prevName, nextNam
         accessibilityRole="button"
         accessibilityHint="Opens exercise info"
         accessibilityLabel={ex.name}
+        style={styles.nameButton}
       >
         <Text style={text('screenTitle')}>{ex.name}</Text>
       </Pressable>
@@ -81,3 +83,7 @@ export function ExercisePage({ model, page, resting, handlers, prevName, nextNam
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  nameButton: { minHeight: tapTarget.min, justifyContent: 'center' },
+});

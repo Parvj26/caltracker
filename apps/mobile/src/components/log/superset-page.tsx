@@ -65,9 +65,11 @@ export function SupersetPage({
                 pressed && { opacity: pressedOpacity },
               ]}
             >
-              <View style={[styles.letter, { borderRadius: radius.pill }]}>
-                <Text style={text('sectionHeading')}>{ex.label}</Text>
-              </View>
+              {ex.label ? (
+                <View style={[styles.letter, { borderRadius: radius.pill }]}>
+                  <Text style={text('sectionHeading')}>{ex.label}</Text>
+                </View>
+              ) : null}
               <Text style={[text('body'), styles.flex, styles.ink]} numberOfLines={1}>{ex.name}</Text>
               {ex.collapsedText ? <Text style={[text('caption'), styles.ink]}>{ex.collapsedText}</Text> : null}
             </Pressable>
@@ -80,9 +82,11 @@ export function SupersetPage({
             style={[styles.card, styles.open, { borderRadius: radius.card, padding: space[3], gap: space[3] }]}
           >
             <View style={[styles.head, { gap: space[2] }]}>
-              <View style={[styles.letter, { borderRadius: radius.pill }]}>
-                <Text style={text('sectionHeading')}>{ex.label}</Text>
-              </View>
+              {ex.label ? (
+                <View style={[styles.letter, { borderRadius: radius.pill }]}>
+                  <Text style={text('sectionHeading')}>{ex.label}</Text>
+                </View>
+              ) : null}
               <ExerciseThumb
                 name={ex.name}
                 detail={details[ex.exerciseId]}

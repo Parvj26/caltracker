@@ -1,6 +1,6 @@
 import { tapTarget, typeScale } from '@caltracker/design-tokens';
 import { expect, it } from 'vitest';
-import { doneButtonHeight, exercisePhotoHeight, logPhotoHeight, stepperButtonSize, stepperValue } from './theme';
+import { stepperButtonSizeCompact, stepperValueCompact, doneButtonHeight, exercisePhotoHeight, logPhotoHeight, stepperButtonSize, stepperValue } from './theme';
 
 it('makes the stepper number bigger than the big number style', () => {
   expect(stepperValue.fontSize).toBeGreaterThan(typeScale.bigNumber.size.phone);
@@ -14,4 +14,9 @@ it('keeps every logging pressable at least the minimum tap size', () => {
 
 it('uses the exercise photo height for the logging photo', () => {
   expect(logPhotoHeight).toBe(exercisePhotoHeight);
+});
+
+it('keeps the compact stepper buttons at the minimum tap size', () => {
+  expect(stepperButtonSizeCompact).toBeGreaterThanOrEqual(tapTarget.min);
+  expect(stepperValueCompact.fontSize).toBeLessThan(stepperValue.fontSize);
 });
