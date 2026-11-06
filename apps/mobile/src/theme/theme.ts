@@ -34,3 +34,9 @@ export const actualInputMinFontScale = 0.6;
 export const pressedOpacity = 0.75;
 
 export { radius, space };
+
+/** The square exercise photo beside an exercise name. */
+export const exerciseThumbSize = 40;
+
+/** Height of each photo in the exercise info sheet (full width, cropped to fill). */
+export const exercisePhotoHeight = tapTarget.logging * 4;

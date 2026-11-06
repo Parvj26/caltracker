@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { setLabels, type ActualPatch, type LogBlockDoc, type LogExerciseDoc, type LogSetDoc, type Units } from '@caltracker/shared';
 import { Card, TextButton } from '@/components/ui';
+import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { useTheme } from '@/theme/use-theme';
 import { ExerciseHeader } from './exercise-header';
 import { SetRow } from './set-row';
@@ -10,6 +11,7 @@ export type BlockHandlers = {
   onChange: (set: LogSetDoc, patch: ActualPatch) => void;
   onSetMenu: (ex: LogExerciseDoc, set: LogSetDoc, label: string) => void;
   onExerciseMenu: (ex: LogExerciseDoc) => void;
+  onExerciseInfo: (ex: LogExerciseDoc) => void;
   onAddSet: (ex: LogExerciseDoc) => void;
 };
 
@@ -20,6 +22,7 @@ export function LogBlock({
   firstExerciseIndex,
   units,
   lastTime,
+  details,
   handlers,
 }: {
   block: LogBlockDoc;
@@ -29,6 +32,8 @@ export function LogBlock({
   firstExerciseIndex: number;
   units: Units;
   lastTime: (ex: LogExerciseDoc) => string | null;
+  /** Loaded exercise details by exercise id. */
+  details: Record<string, ExerciseDetail>;
   handlers: BlockHandlers;
 }) {
   const { text, space } = useTheme();
@@ -52,7 +57,11 @@ export function LogBlock({
               lastTime={lastTime(ex)}
               swapped={ex.swappedFromExerciseId !== null}
               menuTestID={`exercise-menu-${ei}`}
+              detail={details[ex.exerciseId]}
+              thumbTestID={`exercise-thumb-${ei}`}
+              nameTestID={`exercise-name-${ei}`}
               onMenu={() => handlers.onExerciseMenu(ex)}
+              onInfo={() => handlers.onExerciseInfo(ex)}
             />
             {ex.sets.map((set, si) => (
               <SetRow
