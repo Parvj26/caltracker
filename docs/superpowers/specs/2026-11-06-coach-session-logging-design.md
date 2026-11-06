@@ -41,15 +41,14 @@ on the iPad or laptop.
 | Situation | Coach website | Client phone |
 | --- | --- | --- |
 | Nobody logging | Start session | Start as usual |
-| Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), refreshed every 10 s; **Take over**, **View only**, Refresh | Logs as usual |
+| Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), live over Realtime; **Take over**, **View only**, Refresh | Logs as usual |
 | Coach logging (started or took over) | The logging page | Opening the workout shows "Your coach is logging this session" (read only); saves from the phone are refused and the phone takes the coach's copy |
 | Coach handed back | Back to the calendar | Logs as usual from the server copy |
 | Coach stopped (20 min without activity) or is no longer a coach | — | "Your coach stopped logging N min ago" · **Continue on my phone** |
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
 | Finished | Opens the finished log | — |
 
-Live progress uses a timer refresh because the Realtime work (PR #34) is not merged yet; it can replace the timer
-later.
+Live progress uses Realtime (PR #34): the page re-renders whenever the log row changes.
 
 ## Data and security
 
@@ -90,10 +89,10 @@ client's last results and award history.
 
 How the phone learns the coach holds its workout: instantly from a save's answer (`loggedByOther`: log-sync adopts
 the server copy, never pushes, and use-active-log sets `heldByOther`, refuses edits and cancels the reminder), and
-by asking `workout_log_logger` when the workout opens, when the app returns to the foreground and at most once a
-minute while it is open. When the server and phone disagree (taken over, handed back, finished elsewhere) the phone
-takes the server's copy, and Start first asks again before resuming a held workout. TODO: subscribe to the log row
-over Realtime once PR #34 is on main.
+over Realtime (the log row is published; RLS lets a client hear only their own rows), and by asking
+`workout_log_logger` when the workout opens, when the app returns to the foreground and once a minute while Realtime
+is not connected. When the server and phone disagree (taken over, handed back, finished elsewhere) the phone
+takes the server's copy, and Start first asks again before resuming a held workout.
 
 Another branch (`feature/simple-logging`) is rewriting the phone's logging screens, so the phone change is small:
 
