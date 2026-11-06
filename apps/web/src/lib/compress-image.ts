@@ -1,31 +1,9 @@
 // Photos are compressed in the browser before upload: at most 1600 px on the long edge, plus a small thumbnail, both
-// WebP, or JPEG where the browser can't write WebP. (The same recipe as the phone app. A shared copy with the coach-profile image helper can replace this one
-// once that helper is on main.)
+// WebP, or JPEG where the browser can't write WebP. (The same recipe as the phone app; the size and path rules live in @caltracker/shared.)
 
-export const FULL_MAX_EDGE = 1600;
-export const THUMB_MAX_EDGE = 320;
-export const MAX_PHOTOS = 4;
+import { FULL_MAX_EDGE, THUMB_MAX_EDGE, fitWithin, type PhotoExt } from '@caltracker/shared';
 
-/** The size that fits `width` x `height` inside a `max` px long edge, never enlarging. */
-export function fitWithin(width: number, height: number, max: number): { width: number; height: number } {
-  const longEdge = Math.max(width, height);
-  if (longEdge <= max) return { width, height };
-  const scale = max / longEdge;
-  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
-}
 
-export type PhotoExt = 'webp' | 'jpg';
-
-/** Storage paths for one photo: `{workspace}/{conversation}/{id}.{ext}` and its `-thumb.{ext}`. */
-export function photoPaths(workspaceId: string, conversationId: string, photoId: string, ext: PhotoExt = 'webp'): { full: string; thumb: string } {
-  const base = `${workspaceId}/${conversationId}/${photoId}`;
-  return { full: `${base}.${ext}`, thumb: `${base}-thumb.${ext}` };
-}
-
-/** The thumbnail path of a stored photo path. */
-export function thumbPathOf(fullPath: string): string {
-  return fullPath.replace(/\.(webp|jpg)$/, '-thumb.$1');
-}
 
 export class PhotoError extends Error {}
 

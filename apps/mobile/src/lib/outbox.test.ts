@@ -171,4 +171,41 @@ describe('outbox', () => {
     await box.load();
     expect(box.items()).toEqual([]);
   });
+
+  it('keeps an offline photo message "Sending…" and sends it when the signal is back', async () => {
+    const photo = { id: 'p1', fullUri: 'file:///docs/p1.webp', thumbUri: 'file:///docs/p1-thumb.webp', ext: 'webp' as const };
+    let online = false;
+    const send = vi.fn((e: OutboxEntry) => {
+      // The photo upload is the first thing a send does, so a dropped connection surfaces from there.
+      if (!online) return Promise.reject(new OutboxSendError('network', 'Network request failed'));
+      expect(e.photos).toEqual([photo]);
+      return Promise.resolve();
+    });
+    const box = createOutbox({ storage: memoryStorage(), userId: 'u1', send });
+    await box.enqueue(entry('a', { photos: [photo] }));
+    await box.flush();
+    expect(box.items().map((i) => i.state)).toEqual(['sending']);
+    online = true;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(box.items()).toEqual([]);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes a failed message, and only a failed one', async () => {
+    const removed: string[] = [];
+    const send = vi.fn((e: OutboxEntry) =>
+      e.clientMsgId === 'a' ? Promise.reject(new OutboxSendError('refused', "You can't message your coach any more.")) : Promise.reject(new OutboxSendError('network', 'x')),
+    );
+    const box = createOutbox({ storage: memoryStorage(), userId: 'u1', send, onRemoved: (e) => removed.push(e.clientMsgId) });
+    await box.enqueue(entry('a'));
+    await box.flush();
+    await box.enqueue(entry('b', { createdAt: '2026-11-05T09:01:00.000Z' }));
+    await box.flush();
+    await box.remove('b');
+    expect(box.items().map((i) => i.clientMsgId)).toEqual(['a', 'b']);
+    await box.remove('a');
+    expect(box.items().map((i) => i.clientMsgId)).toEqual(['b']);
+    expect(removed).toEqual(['a']);
+    box.stop();
+  });
 });

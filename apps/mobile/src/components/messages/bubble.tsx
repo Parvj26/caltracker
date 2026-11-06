@@ -14,11 +14,12 @@ export type BubbleProps = {
   /** Why a failed message failed, if known. */
   error?: string | undefined;
   onRetry: (clientMsgId: string) => void;
+  onDelete: (clientMsgId: string) => void;
   onOpenPhoto: (uri: string) => void;
 };
 
 /** One message: photos, text, YouTube cards, then the time (or Sending… / Didn't send · Retry) and "Seen". */
-export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onOpenPhoto }: BubbleProps) {
+export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDelete, onOpenPhoto }: BubbleProps) {
   const { text } = useTheme();
   const pending = 'state' in item ? item : null;
   // A message still on its way shows its local files; a sent one shows the thumbnail and opens the full photo.
@@ -70,6 +71,10 @@ export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onOpe
               <Text style={text('caption')} testID="message-failed">Didn’t send ·</Text>
               <Pressable accessibilityRole="button" testID="message-retry" onPress={() => onRetry(item.clientMsgId)} hitSlop={space[2]}>
                 <Text style={[text('caption'), styles.retry]}>Retry</Text>
+              </Pressable>
+              <Text style={text('caption')}>·</Text>
+              <Pressable accessibilityRole="button" testID="message-delete" onPress={() => onDelete(item.clientMsgId)} hitSlop={space[2]}>
+                <Text style={[text('caption'), styles.retry]}>Delete</Text>
               </Pressable>
             </>
           )

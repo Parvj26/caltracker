@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
-import { MAX_PHOTOS } from '@/lib/compress-image';
+import { MAX_PHOTOS } from '@caltracker/shared';
 import styles from './messages.module.css';
 
 export type Draft = { body: string; files: File[] };
