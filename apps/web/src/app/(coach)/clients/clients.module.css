@@ -139,10 +139,9 @@
 }
 .filterChip:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .filterChip[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-surface); box-shadow: none; }
-.filterChip:disabled { cursor: default; color: var(--ct-ink-muted); }
+.filterChip[aria-disabled='true'] { cursor: default; color: var(--ct-ink-muted); }
 .filterCount { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); opacity: 0.8; }
 .filterResult { flex: 1 1 100%; margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.filterResult:empty { display: none; }
 
 .nameStack { display: flex; flex-direction: column; min-width: 0; }
 .nameStack .nameLink { min-height: 0; padding-top: var(--ct-space-1); }

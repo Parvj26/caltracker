@@ -208,7 +208,7 @@ test('Home groups every client under its reason, with counts, a reason line and 
   // The Missed tile counts both missed groups and jumps to the first one.
   const tile = page.getByRole('link', { name: /Missed a workout/ });
   await expect(tile).toHaveAttribute('href', '#missed-in-a-row');
-  await expect(tile).toContainText('2');
+  await expect(tile.getByText(/^\d+$/)).toHaveText('2');
 
   // No Message action until messages exist.
   await expect(attention.getByRole('link', { name: /^Message/ })).toHaveCount(0);
@@ -217,7 +217,11 @@ test('Home groups every client under its reason, with counts, a reason line and 
   await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
 });
 
-test('the Clients list shows status, last workout, this week and program for each client', async ({ page }) => {
+test('the Clients list shows status, last workout, this week and program for each client, with no hydration errors', async ({ page }) => {
+  const messages: string[] = [];
+  page.on('console', (m) => messages.push(m.text()));
+  // A production build reports hydration mismatches as minified React errors (#418, #423, #425) on pageerror.
+  page.on('pageerror', (e) => messages.push(e.message));
   const coach = await newCoach();
   await seedFive(coach);
   await invite(coach);
@@ -238,6 +242,11 @@ test('the Clients list shows status, last workout, this week and program for eac
   await expect(rowOf('Nell Nothing').getByRole('cell').nth(2)).toContainText('None yet');
   await expect(rowOf('Nell Nothing').getByRole('cell').nth(4)).toContainText('No program');
   await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: 'Ivy Invited' })).toContainText('Invited');
+  // The week count reads as words to a screen reader.
+  await expect(steady.getByRole('cell').nth(3).getByText(/^\d+ of \d+ done this week$/)).toBeAttached();
+  await page.reload();
+  await expect(rowOf('Sami Steady').getByRole('cell').nth(1)).toHaveText(/^On track/);
+  expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 });
 
 test('Clients search filters as you type, status chips filter, and sort reorders', async ({ page }) => {
@@ -249,6 +258,9 @@ test('Clients search filters as you type, status chips filter, and sort reorders
   const table = page.getByRole('table', { name: 'Clients' });
   const names = () => table.locator('[data-client-id] a').allTextContents();
   const filters = page.getByRole('group', { name: 'Filter by status' });
+
+  // The result line is always there (a live region), and says so when nothing is filtered.
+  await expect(page.getByRole('status').filter({ hasText: 'Showing all 7' })).toBeVisible();
 
   // Default sort is by last name.
   await expect.poll(names).toEqual(['Enid Ending', 'Nell Nothing', 'Olive Once', 'Quinn Quiet', 'Rowan Run', 'Sami Steady']);
@@ -274,6 +286,7 @@ test('Clients search filters as you type, status chips filter, and sort reorders
   await expect(table).toHaveCount(0);
   await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: 'Ivy Invited' })).toBeVisible();
   await filters.getByRole('button', { name: /^All/ }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Showing all 7' })).toBeVisible();
 
   // Sort by last workout (most recent first, never-trained last) and by program end (soonest first, none last).
   await page.getByLabel('Sort by').selectOption('last_workout');

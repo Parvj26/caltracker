@@ -126,8 +126,11 @@ export function ClientDirectory({
                 type="button"
                 aria-pressed={filter === f}
                 className={styles.filterChip}
-                onClick={() => setFilter(f)}
-                disabled={!known}
+                // aria-disabled, not disabled: the chip stays focusable and announced while the statuses load.
+                aria-disabled={!known || undefined}
+                onClick={() => {
+                  if (known) setFilter(f);
+                }}
               >
                 {label}{' '}
                 {known ? <span className={styles.filterCount}>{counts[f]}</span> : null}
@@ -135,8 +138,9 @@ export function ClientDirectory({
             );
           })}
         </div>
+        {/* Always rendered (never display: none), so screen readers announce each change. */}
         <p role="status" className={styles.filterResult}>
-          {filtering ? `Showing ${shownTotal} of ${counts.all}` : ''}
+          {filtering ? `Showing ${shownTotal} of ${counts.all}` : `Showing all ${counts.all}`}
         </p>
       </div>
 
@@ -184,7 +188,10 @@ export function ClientDirectory({
                         <span role="cell" className={styles.meta}>
                           <span aria-hidden="true" className={styles.narrowOnly}>This week: </span>
                           {c ? (
-                            <span aria-label={`${c.week.done} of ${c.week.planned} done this week`}>{c.week.done} / {c.week.planned}</span>
+                            <>
+                              <span aria-hidden="true">{c.week.done} / {c.week.planned}</span>
+                              <span className={styles.visuallyHidden}>{`${c.week.done} of ${c.week.planned} done this week`}</span>
+                            </>
                           ) : null}
                         </span>
                         <span role="cell" className={styles.programCell}>
