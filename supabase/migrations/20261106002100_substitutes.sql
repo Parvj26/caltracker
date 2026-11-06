@@ -13,6 +13,82 @@
 -- so the phone can still switch before the first done set) are two new columns on log_exercises. Like
 -- picked_exercise_id they have no foreign key: an offline save never fails on them.
 
+-- The set rules of WorkoutSetDoc / WorkoutDoc (packages/shared/src/workouts/schema.ts) for a substitute's jsonb sets,
+-- so a row written any way (save_workout, copy_workout, a direct insert) is one the apps can read. The rules that
+-- depend on the exercise's tracking type are not checked here (it can change later); the loaders drop those targets.
+-- A UUID as zod's z.uuid() accepts it (RFC 9562: version 1-8 and variant 8/9/a/b, or the nil and max UUIDs), so the
+-- database and packages/shared agree on what is valid.
+create function public.uuid_text_ok(t text) returns boolean
+language sql immutable set search_path = '' as $$
+  select t ~* '^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$';
+$$;
+
+-- plpgsql, so each test runs only after the ones before it passed (a SQL AND may evaluate a cast first).
+create function public.json_number_ok(x jsonb, lo numeric, hi numeric, whole boolean, lo_exclusive boolean default false)
+returns boolean
+language plpgsql immutable set search_path = '' as $$
+declare
+  n numeric;
+begin
+  if x is null or x = 'null'::jsonb then return true; end if;
+  if jsonb_typeof(x) <> 'number' then return false; end if;
+  n := (x #>> '{}')::numeric;
+  return (not whole or n = trunc(n)) and (case when lo_exclusive then n > lo else n >= lo end) and n <= hi;
+end;
+$$;
+
+create function public.valid_substitute_set(v jsonb) returns boolean
+language plpgsql immutable set search_path = '' as $$
+begin
+  if jsonb_typeof(v) is distinct from 'object' then return false; end if;
+  if jsonb_typeof(v -> 'id') is distinct from 'string'
+     or not public.uuid_text_ok(v ->> 'id') then
+    return false;
+  end if;
+  if coalesce(v ->> 'setType', '') not in ('normal', 'warmup', 'drop') then return false; end if;
+  if not (public.json_number_ok(v -> 'targetRepsMin', 1, 1000, true)
+      and public.json_number_ok(v -> 'targetRepsMax', 1, 1000, true)
+      and public.json_number_ok(v -> 'targetWeightKg', 0, 1000, false)
+      and public.json_number_ok(v -> 'targetDurationS', 1, 86400, true)
+      and public.json_number_ok(v -> 'targetDistanceM', 0, 1000000, false, true)) then
+    return false;
+  end if;
+  if jsonb_typeof(v -> 'toFailure') is distinct from 'boolean' then return false; end if;
+  if jsonb_typeof(v -> 'restSeconds') is distinct from 'number'
+     or not public.json_number_ok(v -> 'restSeconds', 0, 3600, true) then
+    return false;
+  end if;
+  if not (v -> 'note' is null or v -> 'note' = 'null'::jsonb
+      or (jsonb_typeof(v -> 'note') = 'string' and char_length(v ->> 'note') <= 500)) then
+    return false;
+  end if;
+  if jsonb_typeof(v -> 'targetRepsMin') = 'number' and jsonb_typeof(v -> 'targetRepsMax') = 'number'
+     and (v ->> 'targetRepsMin')::numeric > (v ->> 'targetRepsMax')::numeric then
+    return false;
+  end if;
+  if (v -> 'toFailure')::boolean and v ->> 'setType' <> 'drop' then return false; end if;
+  -- A drop has no rest timer (as for workout_sets).
+  if v ->> 'setType' = 'drop' and (v ->> 'restSeconds')::numeric <> 0 then return false; end if;
+  return true;
+end;
+$$;
+
+create function public.valid_substitute_sets(p_sets jsonb) returns boolean
+language plpgsql immutable set search_path = '' as $$
+begin
+  if jsonb_typeof(p_sets) is distinct from 'array' or jsonb_array_length(p_sets) not between 1 and 20 then
+    return false;
+  end if;
+  if p_sets -> 0 ->> 'setType' = 'drop' then return false; end if;
+  return not exists (select 1 from jsonb_array_elements(p_sets) s where not public.valid_substitute_set(s.value));
+end;
+$$;
+
+revoke execute on function public.uuid_text_ok(text), public.json_number_ok(jsonb, numeric, numeric, boolean, boolean),
+  public.valid_substitute_set(jsonb), public.valid_substitute_sets(jsonb) from public, anon;
+grant execute on function public.uuid_text_ok(text), public.json_number_ok(jsonb, numeric, numeric, boolean, boolean),
+  public.valid_substitute_set(jsonb), public.valid_substitute_sets(jsonb) to authenticated, service_role;
+
 create table public.workout_substitutes (
   id uuid primary key default gen_random_uuid(),
   workout_exercise_id uuid not null references public.workout_exercises on delete cascade,
@@ -23,10 +99,11 @@ create table public.workout_substitutes (
   -- As for workout_exercises: an exercise a workout still uses cannot be deleted.
   exercise_id uuid not null references public.exercises on delete restrict,
   note text check (char_length(note) <= 500),
-  sets jsonb not null check (jsonb_typeof(sets) = 'array' and jsonb_array_length(sets) between 1 and 20),
+  sets jsonb not null check (public.valid_substitute_sets(sets)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (workout_exercise_id, position) deferrable initially deferred
+  unique (workout_exercise_id, position) deferrable initially deferred,
+  unique (workout_exercise_id, exercise_id) deferrable initially deferred
 );
 
 create index workout_substitutes_workout_id_idx on public.workout_substitutes (workout_id);
@@ -69,6 +146,44 @@ create trigger workout_substitutes_inherit_owner before insert on public.workout
   for each row execute function public.inherit_workout_owner();
 create trigger workout_substitutes_touch_updated_at before update on public.workout_substitutes
   for each row execute function public.touch_updated_at();
+
+-- A substitute is never on a pick-one option and never the planned exercise itself, however it is written. Checked
+-- at commit (constraint triggers, deferred), because save_workout changes the exercise and block rows before it
+-- prunes the substitutes the doc no longer has. Fires on the substitute, and on the exercise / block it hangs from.
+create function public.check_substitute_rules() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (
+    select 1 from public.workout_substitutes ws
+    join public.workout_exercises we on we.id = ws.workout_exercise_id
+    join public.workout_blocks b on b.id = we.block_id
+    where b.kind = 'choice' and case tg_table_name
+      when 'workout_substitutes' then ws.id = new.id
+      when 'workout_exercises' then we.id = new.id
+      else b.id = new.id end
+  ) then
+    raise exception 'A pick-one group''s exercises can''t have substitutes.' using errcode = '23514';
+  end if;
+  if exists (
+    select 1 from public.workout_substitutes ws
+    join public.workout_exercises we on we.id = ws.workout_exercise_id
+    where ws.exercise_id = we.exercise_id and case tg_table_name
+      when 'workout_substitutes' then ws.id = new.id
+      else we.id = new.id end
+  ) then
+    raise exception 'A substitute must be a different exercise.' using errcode = '23514';
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.check_substitute_rules() from public, anon, authenticated;
+
+create constraint trigger workout_substitutes_rules after insert or update on public.workout_substitutes
+  deferrable initially deferred for each row execute function public.check_substitute_rules();
+create constraint trigger workout_exercises_substitute_rules after update of exercise_id on public.workout_exercises
+  deferrable initially deferred for each row execute function public.check_substitute_rules();
+create constraint trigger workout_blocks_substitute_rules after update of kind on public.workout_blocks
+  deferrable initially deferred for each row execute function public.check_substitute_rules();
 
 -- Privileges as for workout_exercises: owner and parent columns are not insertable or updatable.
 revoke all on table public.workout_substitutes from anon, authenticated, service_role;
@@ -187,6 +302,7 @@ begin
     union all select jsonb_path_query(p_doc, '$.blocks[*].exercises[*].id') #>> '{}'
     union all select jsonb_path_query(p_doc, '$.blocks[*].exercises[*].sets[*].id') #>> '{}'
     union all select jsonb_path_query(p_doc, '$.blocks[*].exercises[*].substitutes[*].id') #>> '{}'
+    union all select jsonb_path_query(p_doc, '$.blocks[*].exercises[*].substitutes[*].sets[*].id') #>> '{}'
   ) ids
   group by ids.id having count(*) > 1
   limit 1;
@@ -535,6 +651,27 @@ begin
       if jsonb_path_exists(v_ex, '$.substituteOptions[*].sets[*] ? (@.completedAt != null)') then
         raise exception 'Only the exercise being done can have done sets.' using errcode = '23514';
       end if;
+      -- The shape of LogSubstituteOption, so the coach's page and the phone can always read the options back.
+      if jsonb_typeof(v_ex -> 'substituteOptions') = 'array' and exists (
+        select 1 from jsonb_array_elements(v_ex -> 'substituteOptions') o(v)
+        where not (
+          jsonb_typeof(o.v) = 'object'
+          and (o.v -> 'substituteId' = 'null'::jsonb or (jsonb_typeof(o.v -> 'substituteId') = 'string'
+            and public.uuid_text_ok(o.v ->> 'substituteId')))
+          and jsonb_typeof(o.v -> 'exerciseId') = 'string'
+          and public.uuid_text_ok(o.v ->> 'exerciseId')
+          and jsonb_typeof(o.v -> 'exerciseName') = 'string'
+          and o.v ->> 'trackingType' in (select t::text from unnest(enum_range(null::public.tracking_type)) t)
+          and (o.v -> 'note' is null or o.v -> 'note' = 'null'::jsonb
+            or (jsonb_typeof(o.v -> 'note') = 'string' and char_length(o.v ->> 'note') <= 500))
+          and jsonb_typeof(o.v -> 'sets') = 'array' and jsonb_array_length(o.v -> 'sets') between 1 and 30
+          and not exists (select 1 from jsonb_array_elements(o.v -> 'sets') s(v)
+            where jsonb_typeof(s.v) <> 'object' or coalesce(s.v ->> 'setType', '') not in ('normal', 'warmup', 'drop')
+              or jsonb_typeof(s.v -> 'target') <> 'object')
+        )
+      ) then
+        raise exception 'A substitute option is not valid.' using errcode = '23514';
+      end if;
       if v_ex -> 'sets' -> 0 ->> 'setType' = 'drop' then
         raise exception 'A drop set must follow a normal or warm-up set.' using errcode = '23514';
       end if;
@@ -644,7 +781,13 @@ begin
         swapped_from_exercise_id, note, substitute_id, substitute_options)
       values (v_ex_id, v_block_id, v_ex_pos, (v_ex ->> 'exerciseId')::uuid,
         (v_ex ->> 'plannedWorkoutExerciseId')::uuid, (v_ex ->> 'swappedFromExerciseId')::uuid, v_ex ->> 'note',
-        (v_ex ->> 'substituteId')::uuid, coalesce(v_ex -> 'substituteOptions', '[]'::jsonb))
+        (v_ex ->> 'substituteId')::uuid,
+        -- Only the exercise actually done must be usable. An option whose exercise is not (say the coach deleted
+        -- that custom exercise mid-workout) is left out rather than refusing the save, which the phone would treat
+        -- as final and drop the workout.
+        (select coalesce(jsonb_agg(o.value order by o.ordinality), '[]'::jsonb)
+           from jsonb_array_elements(coalesce(v_ex -> 'substituteOptions', '[]'::jsonb)) with ordinality o
+           where public.exercise_usable_in((o.value ->> 'exerciseId')::uuid, v_workspace_id)))
       on conflict (id) do update set position = excluded.position, exercise_id = excluded.exercise_id,
           planned_workout_exercise_id = excluded.planned_workout_exercise_id,
           swapped_from_exercise_id = excluded.swapped_from_exercise_id, note = excluded.note,

@@ -1,5 +1,5 @@
 begin;
-select plan(37);
+select plan(58);
 
 -- Fixtures (as postgres)
 select tests.create_user('su-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -97,6 +97,15 @@ select public.save_workout(:'ws_a', jsonb_set(:'doc', '{blocks,0,exercises,0,sub
 select is((select count(*)::int from public.workout_substitutes where workout_id = :'w1'), 1,
   'a substitute the doc no longer has is deleted');
 select public.save_workout(:'ws_a', :'doc');
+-- Swapping the exercise for one of its own substitutes: save_workout prunes that substitute, so the deferred
+-- rules pass once checked.
+select public.save_workout(:'ws_a', jsonb_set(jsonb_set(:'doc', '{blocks,0,exercises,0,exerciseId}', to_jsonb(:'ex_assist'::text)),
+  '{blocks,0,exercises,0,substitutes}', jsonb_build_array((:'doc'::jsonb) #> '{blocks,0,exercises,0,substitutes,1}')));
+select lives_ok('set constraints all immediate', 'replacing an exercise with its own substitute passes the substitute rules');
+set constraints all deferred;
+select results_eq(format($$select exercise_id from public.workout_substitutes where workout_exercise_id = %L$$, :'e1'),
+  format($$values (%L::uuid)$$, :'ex_band'), 'and the substitute that became the exercise is gone');
+select public.save_workout(:'ws_a', :'doc');
 -- An older doc (no "substitutes" key) still saves, and has none.
 select is(public.save_workout(:'ws_a', tests.su_doc(gen_random_uuid(), 'straight', jsonb_build_array(
   (tests.su_ex(gen_random_uuid(), :'ex_row', jsonb_build_array(tests.su_set(gen_random_uuid(), 'normal')))) - 'substitutes'
@@ -127,6 +136,58 @@ select matches(tests.su_save_error(:'ws_a', tests.su_doc(gen_random_uuid(), 'str
   '^42501', 'a substitute cannot be another workspace''s custom exercise');
 select matches(tests.su_save_error(:'ws_a', jsonb_set(:'doc', '{blocks,0,exercises,0,substitutes,0,id}',
   to_jsonb(:'e1'::text))), '^23514: Row .* appears twice', 'substitute ids are checked for duplicates too');
+
+-- Direct writes are held to the same rules as save_workout (constraint triggers are checked here at once).
+set constraints all immediate;
+reset role;
+create function tests.su_sets(over jsonb) returns jsonb
+language sql as $$ select jsonb_build_array(tests.su_set(gen_random_uuid(), 'normal') || over); $$;
+grant execute on all functions in schema tests to authenticated;
+select tests.act_as(:'coach_a');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"id": "not-a-uuid"}')), '23514', null,
+  'a substitute set needs a uuid id');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}')), '23514', null,
+  'and an RFC one (version 1-8, variant 8-b), as zod checks');
+select ok(not has_function_privilege('anon', 'public.valid_substitute_sets(jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.uuid_text_ok(text)', 'execute')
+  and has_function_privilege('authenticated', 'public.valid_substitute_sets(jsonb)', 'execute'),
+  'anon cannot call the substitute validators');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"targetRepsMin": 12, "targetRepsMax": 8}')), '23514', null,
+  'minimum reps can''t be more than maximum reps');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"targetWeightKg": 5000}')), '23514', null,
+  'targets stay in range');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"toFailure": true}')), '23514', null,
+  'only drop sets can be to failure');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', jsonb_build_array(tests.su_set(gen_random_uuid(), 'drop', 8, 20, 0))),
+  '23514', null, 'a substitute''s first set is not a drop');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_lat', tests.su_sets('{}')), '23514',
+  'A substitute must be a different exercise.', 'a direct insert cannot make the planned exercise its own substitute');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_assist', tests.su_sets('{}')), '23505', null,
+  'nor add the same substitute twice');
+select throws_ok(format($$update public.workout_substitutes set exercise_id = %L where id = %L$$, :'ex_b', :'sub1'),
+  '42501', null, 'the coach cannot point a substitute at another workspace''s custom exercise');
+select throws_ok(format($$update public.workout_blocks set kind = 'choice' where workout_id = %L$$, :'w1'), '23514',
+  'A pick-one group''s exercises can''t have substitutes.', 'a block with substitutes cannot become a pick-one group');
+\set c1 '5b000000-0000-4000-8000-0000000000c1'
+\set ce1 '5b000000-0000-4000-8000-0000000000c2'
+select public.save_workout(:'ws_a', tests.su_doc(:'c1', 'choice', jsonb_build_array(
+  tests.su_ex(:'ce1', :'ex_row', jsonb_build_array(tests.su_set(gen_random_uuid(), 'normal'))),
+  tests.su_ex(gen_random_uuid(), :'ex_lat', jsonb_build_array(tests.su_set(gen_random_uuid(), 'normal'))))));
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 0, %L, %L)$$, :'ce1', :'ex_band', tests.su_sets('{}')), '23514',
+  'A pick-one group''s exercises can''t have substitutes.', 'a direct insert cannot put a substitute on a pick-one option');
+set constraints all deferred;
+select matches(tests.su_save_error(:'ws_a', jsonb_set(:'doc', '{blocks,0,exercises,0,substitutes,1,sets,0,id}',
+  (:'doc'::jsonb) #> '{blocks,0,exercises,0,substitutes,0,sets,0,id}')), '^23514: Row .* appears twice',
+  'substitute set ids are checked for duplicates too');
 
 -- ------------------------------------------------------------------------------------- cross-workspace RLS
 select tests.act_as(:'coach_b');
@@ -230,6 +291,17 @@ select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
 select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
   tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,sets,0,completedAt}', to_jsonb(now()))))),
   '^23514: Only the exercise being done can have done sets', 'an option not being done cannot have done sets');
+select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
+  tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,trackingType}', '"yoga"')))),
+  '^23514: A substitute option is not valid', 'a malformed substitute option is refused');
+-- An option whose exercise the workspace can't use (another workspace's, or deleted since) is left out, not refused:
+-- refusing would make every save of the phone's workout fail for good.
+select gen_random_uuid() as log_strip \gset
+select is(public.save_workout_log(tests.su_log(:'log_strip', :'inst',
+  tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,exerciseId}', to_jsonb(:'ex_b'::text))), 'in_progress')) ->> 'applied',
+  'true', 'a log with an option naming an exercise the workspace can''t use still saves');
+select is((select jsonb_path_query_array(substitute_options, '$[*].exerciseId') from public.log_exercises where log_id = :'log_strip'),
+  jsonb_build_array(:'ex_lat'::text), 'and that option is left out');
 select gen_random_uuid() as log_old \gset
 select is(public.save_workout_log(tests.su_log(:'log_old', null,
   tests.su_log_ex(:'ex_row', null, null, '[]') - 'substituteId' - 'substituteOptions')) ->> 'applied', 'true',
@@ -248,6 +320,19 @@ select ok(jsonb_path_exists(public.award_inputs(:'log1'),
     '$.logs[*] ? (@.id == $l).log_blocks[*].log_exercises[*] ? (@.exercise_id == $x)',
     jsonb_build_object('l', :'log1', 'x', :'ex_lat')),
   'award inputs count the substitute done, not the planned exercise');
+
+-- A removed client no longer sees the substitutes of their copy.
+select tests.act_as(:'coach_a');
+select public.remove_client(:'ws_a', :'a1');
+select tests.act_as(:'a1');
+select is((select count(*)::int from public.workout_substitutes where workout_id = :'inst'), 0,
+  'a removed client sees none of their old workout''s substitutes');
+
+-- Deleting a workspace takes its substitutes with it (their exercises restrict deletes, so order matters).
+reset role;
+select lives_ok(format($$delete from public.workspaces where id = %L$$, :'ws_a'), 'a workspace with substitutes can be deleted');
+select is((select count(*)::int from public.workout_substitutes where workout_id in (:'w1', :'inst')), 0,
+  'and its substitutes are gone');
 
 select * from finish();
 rollback;

@@ -77,6 +77,7 @@ export {
   WorkoutSetDoc,
   WorkoutSubstituteDoc,
   MAX_SUBSTITUTES,
+  substituteSetProblems,
 } from './workouts/schema';
 export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
 export type { SectionRun } from './workouts/sections';

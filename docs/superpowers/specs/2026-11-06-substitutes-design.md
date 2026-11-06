@@ -32,6 +32,7 @@ Builder ops (`workouts/doc-ops.ts`, all return the same doc when they refuse):
 LogExerciseDoc.substituteId: string | null               // default null = the planned exercise
 LogExerciseDoc.substituteOptions: LogSubstituteOption[]  // default []; the planned exercise first, then substitutes
 LogSubstituteOption = { substituteId: string | null, exerciseId, exerciseName, trackingType,
+                        note: string | null,  // the coach's note on that option (default null)
                         sets: Array<{ setType, target: LogSetTarget }> }  // planned-set snapshot
 ```
 
@@ -52,7 +53,10 @@ Ops and helpers (`logs/substitutes.ts`, exported from `@caltracker/shared`):
 | `otherSubstituteOptions(ex)` | The options not being done ("or: Machine Assisted Pull Up"). |
 | `substitutedFrom(ex)` | `{ exerciseId, exerciseName }` of the planned exercise when a substitute is chosen, else null. |
 
-`startLogFromWorkout` fills `substituteOptions` from the plan. `swapLogExercise` (the client's own free swap)
+`startLogFromWorkout` fills `substituteOptions` from the plan (with each option's coach note).
+`workoutRowToDoc` and `logRowToDoc` skip substitute rows / options that would not parse, so one bad row never
+stops a workout opening or makes the phone drop a log. In a superset, `addRound` / `removeRound` add and remove the
+round on substitutes too (a substitute always keeps one working set), and round rests move with the exercise. `swapLogExercise` (the client's own free swap)
 clears `substituteId` and `substituteOptions`: the slot is then off-plan.
 
 ### How the phone should use it
@@ -67,10 +71,14 @@ clears `substituteId` and `substituteOptions`: the slot is then off-plan.
 
 - Plans: new table `workout_substitutes` (one row per substitute: `workout_exercise_id`, `position`,
   `exercise_id`, `note`, `sets jsonb` = the `WorkoutSetDoc[]`), owner columns inherited like the other workout
-  tables, same RLS (coach of the workspace writes; the client reads their own scheduled copy). `save_workout`
+  tables, same RLS (coach of the workspace writes; the client reads their own scheduled copy). A check
+  (`valid_substitute_sets`) holds the jsonb sets to the WorkoutSetDoc rules, and deferred constraint triggers keep
+  substitutes off pick-one options and different from the planned exercise, however a row is written. `save_workout`
   writes them, `copy_workout` copies them, `WORKOUT_TREE_SELECT` reads them.
 - Logs: `log_exercises.substitute_id` and `log_exercises.substitute_options jsonb`. `save_workout_log` stores
-  them and refuses a `substituteId` that is not one of the options. The exercise row and its sets are the option
+  them and refuses a `substituteId` that is not one of the options or a malformed option. An option naming an
+  exercise the workspace can't use (e.g. a custom exercise deleted mid-workout) is left out, not refused. Options are not compared with the current plan: the coach may edit the plan
+  while the client is mid-workout, and a save must not fail forever because of that. The exercise row and its sets are the option
   actually done, so `award_inputs` and `recent_exercises_for_client` already use it.
 
 ## Coach website
