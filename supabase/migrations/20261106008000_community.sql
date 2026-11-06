@@ -14,6 +14,9 @@ create table public.communities (
   name text not null default 'Community' check (char_length(name) between 1 and 80),
   is_default boolean not null default true,
   created_at timestamptz not null default now(),
+  -- Bumped by the database whenever a post, comment or like is deleted. Feeds listen for this row's UPDATE (filtered
+  -- by id, checked by RLS) instead of DELETE events, which Realtime can neither filter nor check.
+  activity_at timestamptz not null default now(),
   unique (id, workspace_id)
 );
 create unique index communities_one_default_idx on public.communities (workspace_id) where is_default;
@@ -42,7 +45,8 @@ create table public.community_posts (
   -- Posts show the author's name and photo, read from profiles (embedded through this key).
   author_id uuid not null references public.profiles on delete cascade,
   body text not null default '' check (char_length(body) <= 2000),
-  -- A sticker / workout / PR card the author chose to share (checked by create_community_post).
+  -- A sticker / workout / PR card the author chose to share. Built by create_community_post from the database's own
+  -- records (zoo book, workout log, stored award), never from what the app sent.
   card jsonb check (
     card is null
     or (jsonb_typeof(card) = 'object' and card ->> 'kind' in ('sticker', 'workout', 'pr') and octet_length(card::text) <= 4000)
@@ -197,27 +201,30 @@ language sql stable security definer set search_path = '' as $$
   );
 $$;
 
--- Only clients can be blocked (the coach is the moderator), and only within the caller's own workspace.
+-- Clients block other clients of their own workspace. The coach is never blocked, and never blocks (they moderate).
 create function public.can_block_in_community(p_workspace_id uuid, p_user_id uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.is_member_of(p_workspace_id)
+    and not public.is_coach_of(p_workspace_id)
     and exists (
       select 1 from public.workspace_members m
       where m.workspace_id = p_workspace_id and m.user_id = p_user_id and m.role = 'client'
     );
 $$;
 
--- Upload paths: {workspace}/{caller}/{post}/{file}, in a workspace whose community the caller can post in.
+-- Upload paths: {workspace}/{caller}/{post}/{file}.webp|jpg|jpeg, in a workspace whose community the caller can post in.
+-- (The file's real type and pixel size are checked on the device; checking them on the server is a follow-up.)
 create function public.can_upload_community_image(p_name text) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select coalesce(
-    p_name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]+$'
-    and split_part(p_name, '/', 2) = (select auth.uid())::text
-    and exists (
+  select case
+    when p_name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]+\.(webp|jpg|jpeg)$'
+      and split_part(p_name, '/', 2) = (select auth.uid())::text
+    then exists (
       select 1 from public.communities c
-      where c.workspace_id::text = split_part(p_name, '/', 1) and public.can_view_community(c.id)
-    ),
-    false);
+      where c.workspace_id = split_part(p_name, '/', 1)::uuid and public.can_view_community(c.id)
+    )
+    else false
+  end;
 $$;
 
 -- Reading a photo: it must belong to a post the caller can see. Not a definer: the lookup runs under the caller's
@@ -405,45 +412,103 @@ $$;
 create trigger community_reports_notify after insert on public.community_reports
   for each row execute function public.community_notify_report();
 
+-- Deletes become a filterable UPDATE of the community's activity_at (see communities.activity_at).
+create function public.community_touch_activity() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.communities c set activity_at = clock_timestamp() where c.id = old.community_id;
+  return old;
+end;
+$$;
+create trigger community_posts_touch_activity after delete on public.community_posts
+  for each row execute function public.community_touch_activity();
+create trigger community_comments_touch_activity after delete on public.community_comments
+  for each row execute function public.community_touch_activity();
+create trigger community_likes_touch_activity after delete on public.community_likes
+  for each row execute function public.community_touch_activity();
+
 -- ---------------------------------------------------------------------------------------------------------------
 -- Functions the apps call
 -- ---------------------------------------------------------------------------------------------------------------
 
--- A shared card must be the author's own: a sticker in their zoo book, or a completed workout of theirs.
--- 42501 otherwise; 22023 for a malformed card.
-create function public.check_community_card(p_workspace_id uuid, p_author_id uuid, p_card jsonb) returns void
+-- Builds the card to store from the database's own records. The app only says what to share:
+--   {"kind":"sticker","stickerKey":k}  a sticker in the author's zoo book (shiny and count from sticker_awards)
+--   {"kind":"workout","logId":id}      the author's finished workout: its name and finish time, exercise and set
+--                                       counts, and the animal from the stored award (volume is not shown: that sum
+--                                       lives only in packages/shared)
+--   {"kind":"pr","logId":id}           the PRs the award function stored for that workout (names from exercises)
+-- Any other key, or another kind, is refused (22023); someone else's sticker or workout is refused (42501).
+create function public.build_community_card(p_workspace_id uuid, p_author_id uuid, p_card jsonb) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
-  v_kind text := p_card ->> 'kind';
-  v_log text := p_card ->> 'logId';
+  v_kind text;
+  v_log public.workout_logs%rowtype;
+  v_award jsonb;
+  v_sticker public.sticker_awards%rowtype;
+  v_prs jsonb;
 begin
-  if jsonb_typeof(p_card) <> 'object' then
+  if jsonb_typeof(p_card) is distinct from 'object' then
     raise exception 'Card must be an object' using errcode = '22023';
   end if;
+  v_kind := p_card ->> 'kind';
   if v_kind = 'sticker' then
-    if jsonb_typeof(p_card -> 'stickerKey') <> 'string' then
-      raise exception 'Card needs a sticker' using errcode = '22023';
+    if exists (select 1 from jsonb_object_keys(p_card) k where k not in ('kind', 'stickerKey'))
+      or jsonb_typeof(p_card -> 'stickerKey') is distinct from 'string' then
+      raise exception 'A sticker card names only the sticker' using errcode = '22023';
     end if;
-    if not exists (
-      select 1 from public.sticker_awards a
-      where a.client_id = p_author_id and a.workspace_id = p_workspace_id and a.sticker_key = p_card ->> 'stickerKey'
-        and (a.shiny or coalesce(p_card ->> 'shiny', 'false') = 'false')
-    ) then
+    select * into v_sticker from public.sticker_awards a
+    where a.client_id = p_author_id and a.workspace_id = p_workspace_id and a.sticker_key = p_card ->> 'stickerKey';
+    if not found then
       raise exception 'You can only share stickers you have' using errcode = '42501';
     end if;
-  elsif v_kind in ('workout', 'pr') then
-    if v_log is null or v_log !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
-      raise exception 'Card needs a workout' using errcode = '22023';
-    end if;
-    if not exists (
-      select 1 from public.workout_logs l
-      where l.id = v_log::uuid and l.client_id = p_author_id and l.workspace_id = p_workspace_id and l.status = 'completed'
-    ) then
-      raise exception 'You can only share your own workouts' using errcode = '42501';
-    end if;
-  else
+    return jsonb_build_object('kind', 'sticker', 'stickerKey', v_sticker.sticker_key, 'shiny', v_sticker.shiny,
+      'count', v_sticker.count);
+  end if;
+
+  if v_kind not in ('workout', 'pr') or v_kind is null then
     raise exception 'Unknown card' using errcode = '22023';
   end if;
+  if exists (select 1 from jsonb_object_keys(p_card) k where k not in ('kind', 'logId'))
+    or coalesce(p_card ->> 'logId', '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'A workout card names only the workout' using errcode = '22023';
+  end if;
+  select * into v_log from public.workout_logs l
+  where l.id = (p_card ->> 'logId')::uuid and l.client_id = p_author_id and l.workspace_id = p_workspace_id
+    and l.status = 'completed';
+  if not found then
+    raise exception 'You can only share your own finished workouts' using errcode = '42501';
+  end if;
+  select a.result into v_award from public.awards a where a.log_id = v_log.id and a.client_id = p_author_id;
+
+  if v_kind = 'workout' then
+    return jsonb_build_object(
+      'kind', 'workout',
+      'logId', v_log.id,
+      'workoutName', left(v_log.name, 120),
+      'finishedAt', v_log.finished_at,
+      'exerciseCount', (select count(*) from public.log_exercises e join public.log_blocks b on b.id = e.block_id
+        where b.log_id = v_log.id),
+      'setCount', (select count(*) from public.log_sets st join public.log_exercises e on e.id = st.log_exercise_id
+        join public.log_blocks b on b.id = e.block_id where b.log_id = v_log.id and st.completed_at is not null),
+      'stickerKey', v_award #>> '{ladder,key}',
+      'multiple', v_award #> '{ladder,multiple}',
+      'shiny', coalesce((v_award #>> '{ladder,shiny}')::boolean, false));
+  end if;
+
+  select jsonb_agg(jsonb_build_object(
+      'exerciseName', coalesce(left(x.name, 120), 'Exercise'),
+      'prKind', pr ->> 'kind',
+      'valueKg', pr -> 'valueKg',
+      'reps', pr -> 'reps') order by ord)
+    into v_prs
+  from jsonb_array_elements(coalesce(v_award -> 'prs', '[]'::jsonb)) with ordinality as t(pr, ord)
+  left join public.exercises x on x.id::text = pr ->> 'exerciseId'
+  where ord <= 5;
+  if v_prs is null then
+    raise exception 'This workout set no personal bests' using errcode = '22023';
+  end if;
+  return jsonb_build_object('kind', 'pr', 'logId', v_log.id, 'workoutName', left(v_log.name, 120),
+    'finishedAt', v_log.finished_at, 'prs', v_prs);
 end;
 $$;
 
@@ -462,6 +527,7 @@ declare
   v_img record;
   v_path text;
   v_thumb text;
+  v_card jsonb;
 begin
   if v_me is null or p_id is null or not public.can_view_community(p_community_id) then
     raise exception 'Not allowed' using errcode = '42501';
@@ -483,19 +549,19 @@ begin
     raise exception 'At most 4 photos per post' using errcode = '23514';
   end if;
   if p_card is not null then
-    perform public.check_community_card(v_ws, v_me, p_card);
+    v_card := public.build_community_card(v_ws, v_me, p_card);
   end if;
 
   insert into public.community_posts (id, community_id, workspace_id, author_id, body, card, image_count)
-  values (p_id, p_community_id, v_ws, v_me, btrim(coalesce(p_body, '')), p_card, jsonb_array_length(v_images));
+  values (p_id, p_community_id, v_ws, v_me, btrim(coalesce(p_body, '')), v_card, jsonb_array_length(v_images));
 
   v_prefix := v_ws::text || '/' || v_me::text || '/' || p_id::text || '/';
   for v_img in select value, ordinality from jsonb_array_elements(v_images) with ordinality loop
     v_path := v_img.value ->> 'path';
     v_thumb := v_img.value ->> 'thumbPath';
     if v_path is null or v_thumb is null
-      or v_path !~ ('^' || v_prefix || '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(webp|jpg)$')
-      or v_thumb <> regexp_replace(v_path, '\.(webp|jpg)$', '-thumb.\1') then
+      or v_path !~ ('^' || v_prefix || '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(webp|jpg|jpeg)$')
+      or v_thumb <> regexp_replace(v_path, '\.(webp|jpg|jpeg)$', '-thumb.\1') then
       raise exception 'Photos must be in your own folder for this post' using errcode = '23514';
     end if;
     insert into public.community_post_images (post_id, workspace_id, position, path, thumb_path, width, height)
@@ -655,7 +721,7 @@ revoke execute on function
   public.community_comment_before_insert(), public.community_like_before_insert(),
   public.community_notify_post(), public.community_notify_comment(), public.community_notify_like(),
   public.community_unnotify_like(), public.community_notify_report(),
-  public.check_community_card(uuid, uuid, jsonb),
+  public.build_community_card(uuid, uuid, jsonb), public.community_touch_activity(),
   public.create_community_post(uuid, uuid, text, jsonb, jsonb), public.set_community_post_pinned(uuid, boolean),
   public.remove_community_member(uuid, uuid), public.restore_community_member(uuid, uuid),
   public.report_community_content(text, uuid, uuid, text), public.resolve_community_report(uuid, text),
@@ -774,12 +840,13 @@ create policy community_images_select on storage.objects for select to authentic
 create policy community_images_delete on storage.objects for delete to authenticated
   using (bucket_id = 'community-images'
     and (split_part(name, '/', 2) = (select auth.uid())::text
-      or (split_part(name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        and public.is_coach_of(split_part(name, '/', 1)::uuid))));
+      or case when split_part(name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        then public.is_coach_of(split_part(name, '/', 1)::uuid) else false end));
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Realtime: idempotent, and a no-op where the publication does not exist. Realtime checks each INSERT/UPDATE against
--- the subscriber's SELECT policies; DELETE events carry only the (uuid) key.
+-- the subscriber's SELECT policies. The apps never listen to DELETE events (they can't be filtered or checked):
+-- deletes bump communities.activity_at instead.
 -- ---------------------------------------------------------------------------------------------------------------
 
 do $$
@@ -787,7 +854,7 @@ declare
   t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['community_posts', 'community_comments', 'community_likes', 'community_notifications',
+    foreach t in array array['communities', 'community_posts', 'community_comments', 'community_likes', 'community_notifications',
       'community_reports'] loop
       if not exists (
         select 1 from pg_publication_tables

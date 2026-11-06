@@ -207,6 +207,7 @@ export type Database = {
       }
       communities: {
         Row: {
+          activity_at: string
           created_at: string
           id: string
           is_default: boolean
@@ -214,6 +215,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          activity_at?: string
           created_at?: string
           id?: string
           is_default?: boolean
@@ -221,6 +223,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          activity_at?: string
           created_at?: string
           id?: string
           is_default?: boolean
@@ -1835,6 +1838,10 @@ export type Database = {
         Returns: string
       }
       award_inputs: { Args: { p_log_id: string }; Returns: Json }
+      build_community_card: {
+        Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
+        Returns: Json
+      }
       can_block_in_community: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean
@@ -1842,10 +1849,6 @@ export type Database = {
       can_read_community_image: { Args: { p_name: string }; Returns: boolean }
       can_upload_community_image: { Args: { p_name: string }; Returns: boolean }
       can_view_community: { Args: { p_community_id: string }; Returns: boolean }
-      check_community_card: {
-        Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
-        Returns: undefined
-      }
       claim_invites: {
         Args: never
         Returns: {

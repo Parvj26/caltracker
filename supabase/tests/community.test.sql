@@ -1,5 +1,5 @@
 begin;
-select plan(130);
+select plan(154);
 
 -- Community (docs/superpowers/specs/2026-11-06-community-design.md): workspace isolation, removed members, client vs
 -- coach powers, blocks, reports, notifications, cards, photos and Realtime.
@@ -21,7 +21,17 @@ select id as comm_b from public.communities where workspace_id = :'ws_b' \gset
 select tests.create_log(:'ws_a', :'a1') as log_a1 \gset
 select tests.create_log(:'ws_a', :'a2') as log_a2 \gset
 select tests.create_log(:'ws_a', :'a1', null, 'in_progress') as log_a1_open \gset
+select tests.create_log(:'ws_a', :'a1') as log_a1_plain \gset
 insert into public.sticker_awards (client_id, workspace_id, sticker_key) values (:'a1', :'ws_a', 'cat');
+select le.exercise_id as ex_a1, e.name as ex_a1_name
+from public.log_exercises le join public.log_blocks b on b.id = le.block_id join public.exercises e on e.id = le.exercise_id
+where b.log_id = :'log_a1' \gset
+-- What the award function stored for A1's workout (written with the service role): a cat at 2.5x and one PR.
+insert into public.awards (log_id, client_id, workspace_id, result, log_revision) values (:'log_a1', :'a1', :'ws_a',
+  jsonb_build_object('ladder', jsonb_build_object('key', 'cat', 'multiple', 2.5, 'isNew', true, 'count', 1, 'shiny', false),
+    'drop', null, 'rare', '[]'::jsonb, 'landmarks', '[]'::jsonb, 'milestone', null,
+    'prs', jsonb_build_array(jsonb_build_object('exerciseId', :'ex_a1', 'kind', 'heaviest', 'valueKg', 60, 'reps', null,
+      'logId', :'log_a1', 'achievedAt', now()))), 1);
 
 select gen_random_uuid() as p1 \gset
 select gen_random_uuid() as p2 \gset
@@ -90,22 +100,46 @@ select throws_ok(format($$select public.create_community_post(%L, %L, 'x', null,
     'thumbPath', format('%s/%s/%s/%s-thumb.webp', :'ws_a', :'a1', :'p3', :'img1'), 'width', 3000, 'height', 10))),
   '23514', null, 'a photo larger than 1600 px is refused');
 
--- Cards
-select lives_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"sticker","stickerKey":"cat","shiny":false}')$$,
+-- Cards: the app sends only what to share; the database builds what is shown from its own records.
+select lives_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"sticker","stickerKey":"cat"}')$$,
   :'p3', :'comm_a'), 'a client shares a sticker they own');
+select is((select card from public.community_posts where id = :'p3'),
+  '{"kind":"sticker","stickerKey":"cat","shiny":false,"count":1}'::jsonb, 'the sticker card comes from the zoo book');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"sticker","stickerKey":"okapi"}')$$,
   gen_random_uuid(), :'comm_a'), '42501', null, 'a sticker they do not own is refused');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"sticker","stickerKey":"cat","shiny":true}')$$,
-  gen_random_uuid(), :'comm_a'), '42501', null, 'a shiny they do not own is refused');
+  gen_random_uuid(), :'comm_a'), '22023', null, 'a card that claims shiny is refused (unknown key)');
+select ok(public.create_community_post(gen_random_uuid(), :'comm_a', '', jsonb_build_object('kind', 'workout', 'logId', :'log_a1')) is not null,
+  'a client shares their finished workout');
+select results_eq(format($$select card - 'finishedAt' from public.community_posts where card ->> 'kind' = 'workout' and card ->> 'logId' = %L$$, :'log_a1'),
+  format($$values (jsonb_build_object('kind', 'workout', 'logId', %L::text, 'workoutName', 'Logged workout', 'exerciseCount', 1,
+    'setCount', 1, 'stickerKey', 'cat', 'multiple', 2.5, 'shiny', false))$$, :'log_a1'),
+  'the workout card is built from the log and its award');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'workout', 'logId', :'log_a1', 'volumeKg', 999999)), '22023', null, 'a forged volume is refused');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'workout', 'logId', :'log_a1', 'stickerKey', 'okapi', 'shiny', true)), '22023', null,
+  'a workout card carrying a sticker is refused');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'workout', 'logId', :'log_a1', 'workoutName', 'Marathon')), '22023', null, 'a forged workout name is refused');
 select lives_ok(format($$select public.create_community_post(%L, %L, 'PR!', %L::jsonb)$$, :'p4', :'comm_a',
-  jsonb_build_object('kind', 'pr', 'logId', :'log_a1', 'workoutName', 'Legs', 'prs', '[]'::jsonb)),
-  'a client shares a PR card from their own finished workout');
+  jsonb_build_object('kind', 'pr', 'logId', :'log_a1')), 'a client shares the PRs of their own finished workout');
+select results_eq(format($$select card -> 'prs' from public.community_posts where id = %L$$, :'p4'),
+  format($$values (jsonb_build_array(jsonb_build_object('exerciseName', %L::text, 'prKind', 'heaviest', 'valueKg', 60, 'reps', null)))$$, :'ex_a1_name'),
+  'the PRs come from the stored award');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'pr', 'logId', :'log_a1', 'prs', jsonb_build_array(jsonb_build_object('exerciseName', 'Squat', 'prKind', 'heaviest', 'valueKg', 500, 'reps', null)))),
+  '22023', null, 'forged PRs are refused');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'pr', 'logId', :'log_a1_plain')), '22023', null, 'a PR card needs a workout that set PRs');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
   jsonb_build_object('kind', 'workout', 'logId', :'log_a2')), '42501', null, 'another client''s workout is refused');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
   jsonb_build_object('kind', 'workout', 'logId', :'log_a1_open')), '42501', null, 'an unfinished workout is refused');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"inbody"}')$$, gen_random_uuid(), :'comm_a'),
   '22023', null, 'an unknown card is refused');
+select throws_ok(format($$insert into public.community_post_images (post_id, workspace_id, position, path, thumb_path, width, height)
+  values (%L, %L, 3, 'x', 'y', 1, 1)$$, :'p2', :'ws_a'), '42501', null, 'photos cannot be added to a post directly');
 reset role;
 
 select tests.act_as(:'a2');
@@ -162,7 +196,7 @@ reset role;
 -- Comments, likes, and what a client may not do
 -- ---------------------------------------------------------------------------------------------------------------
 select tests.act_as(:'a2');
-select is((select count(*)::int from public.community_posts where workspace_id = :'ws_a'), 5,
+select is((select count(*)::int from public.community_posts where workspace_id = :'ws_a'), 6,
   'A2 sees every post in the community');
 select lives_ok(format($$insert into public.community_comments (post_id, body) values (%L, '  Nice one  ')$$, :'p1'),
   'A2 comments on A1''s post');
@@ -241,6 +275,11 @@ select lives_ok(format($$insert into public.community_comments (post_id, body) v
   'A1 comments on the coach''s post');
 reset role;
 
+select tests.act_as(:'coach_a');
+select throws_ok(format($$insert into public.community_blocks (workspace_id, blocked_id) values (%L, %L)$$, :'ws_a', :'a1'),
+  '42501', null, 'the coach cannot block (they moderate instead)');
+reset role;
+
 select tests.act_as(:'a2');
 select throws_ok(format($$insert into public.community_blocks (workspace_id, blocked_id) values (%L, %L)$$, :'ws_a', :'coach_a'),
   '42501', null, 'the coach cannot be blocked');
@@ -257,18 +296,18 @@ select throws_ok(format($$insert into public.community_comments (post_id, body) 
 reset role;
 
 select tests.act_as(:'a3');
-select is((select count(*)::int from public.community_posts where author_id = :'a1'), 3, 'A3 still sees A1''s posts');
+select is((select count(*)::int from public.community_posts where author_id = :'a1'), 4, 'A3 still sees A1''s posts');
 select is((select count(*)::int from public.community_blocks), 0, 'A3 cannot see A2''s blocks');
 reset role;
 
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.community_blocks), 0, 'A1 cannot tell they were blocked');
-select is((select count(*)::int from public.community_posts where author_id = :'a1'), 3, 'A1 still sees their own posts');
+select is((select count(*)::int from public.community_posts where author_id = :'a1'), 4, 'A1 still sees their own posts');
 reset role;
 
 select tests.act_as(:'a2');
 delete from public.community_blocks where blocked_id = :'a1';
-select is((select count(*)::int from public.community_posts where author_id = :'a1'), 3, 'after unblocking, A2 sees A1 again');
+select is((select count(*)::int from public.community_posts where author_id = :'a1'), 4, 'after unblocking, A2 sees A1 again');
 reset role;
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -322,9 +361,21 @@ select lives_ok(format($$insert into storage.objects (bucket_id, name, owner_id)
   format('%s/%s/%s/%s.webp', :'ws_a', :'a1', :'p2', :'img1'), :'a1'), 'A1 uploads into their own folder');
 select throws_ok(format($$insert into storage.objects (bucket_id, name) values ('community-images', %L)$$,
   format('%s/%s/%s/%s.webp', :'ws_a', :'a2', :'p2', :'img1')), '42501', null, 'A1 cannot upload into A2''s folder');
+select throws_ok(format($$insert into storage.objects (bucket_id, name) values ('community-images', %L)$$,
+  format('%s/%s/%s/%s.png', :'ws_a', :'a1', :'p2', :'img2')), '42501', null, 'only WebP and JPEG files can be uploaded');
+select lives_ok(format($$insert into storage.objects (bucket_id, name, owner_id) values ('community-images', %L, %L)$$,
+  format('%s/%s/%s/%s.jpeg', :'ws_a', :'a1', :'p2', gen_random_uuid()), :'a1'), '.jpeg is accepted');
 reset role;
 select tests.act_as(:'a2');
-select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 1, 'A2 can open a photo of a post they see');
+select is((select count(*)::int from storage.objects where bucket_id = 'community-images' and name like '%.webp'), 1,
+  'A2 can open a photo of a post they see');
+insert into public.community_blocks (workspace_id, blocked_id) values (:'ws_a', :'a1');
+select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 0,
+  'after blocking A1, A2 cannot open A1''s photos');
+delete from public.community_blocks where blocked_id = :'a1';
+reset role;
+select tests.act_as(:'coach_b');
+select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 0, 'coach B cannot open A''s photos');
 reset role;
 select tests.act_as(:'b1');
 select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 0, 'B1 cannot open A''s photos');
@@ -351,6 +402,11 @@ select throws_ok(format($$select public.create_community_post(%L, %L, 'still her
 select throws_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p_coach'), '42501', null,
   'A3 cannot like');
 select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 0, 'A3 cannot open photos');
+select throws_ok(format($$insert into public.community_comments (post_id, body) values (%L, 'hi')$$, :'p_coach'), '42501', null,
+  'A3 cannot comment');
+select throws_ok(format($$select public.report_community_content('spam', %L)$$, :'p_coach'), '42501', null, 'A3 cannot report');
+select throws_ok(format($$insert into storage.objects (bucket_id, name) values ('community-images', %L)$$,
+  format('%s/%s/%s/%s.webp', :'ws_a', :'a3', gen_random_uuid(), gen_random_uuid())), '42501', null, 'A3 cannot upload photos');
 reset role;
 
 select tests.act_as(:'a2');
@@ -382,8 +438,33 @@ reset role;
 -- Realtime
 -- ---------------------------------------------------------------------------------------------------------------
 select is((select count(*)::int from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'
-  and tablename in ('community_posts', 'community_comments', 'community_likes', 'community_notifications', 'community_reports')),
-  5, 'posts, comments, likes, notifications and reports are published to Realtime');
+  and tablename in ('communities', 'community_posts', 'community_comments', 'community_likes', 'community_notifications', 'community_reports')),
+  6, 'the community, posts, comments, likes, notifications and reports are published to Realtime');
+
+-- Deletes are announced as an UPDATE of the community's activity_at (filterable by id and checked by RLS), so feeds
+-- never have to listen to unfilterable DELETE events.
+update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
+select tests.act_as(:'a3');
+select lives_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p_coach'), 'A3 likes the coach''s post');
+reset role;
+update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
+select tests.act_as(:'a3');
+delete from public.community_likes where post_id = :'p_coach';
+reset role;
+select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'an unlike bumps activity_at');
+update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
+select tests.act_as(:'coach_a');
+delete from public.community_comments where post_id = :'p_coach';
+reset role;
+select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted comment bumps activity_at');
+update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
+select tests.act_as(:'coach_a');
+delete from public.community_posts where id = :'p3';
+reset role;
+select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted post bumps activity_at');
+select ok(not has_column_privilege('authenticated', 'public.communities', 'activity_at', 'update'),
+  'only the database sets activity_at');
+select lives_ok(format($$delete from public.workspaces where id = %L$$, :'ws_b'), 'deleting a workspace removes its community cleanly');
 select is((select relreplident::text from pg_class where oid = 'public.community_likes'::regclass), 'd',
   'likes keep the default replica identity (a DELETE carries only the uuid key)');
 
