@@ -32,10 +32,24 @@ env:
 - assertNotVisible:
     id: units-kg
 - tapOn: 'See the plan'
+# The exercise row is one button whose label is the name, the set count and the set summary.
 - extendedWaitUntil:
-    visible: 'Barbell Squat'
+    visible: 'Barbell Squat.*'
     timeout: 20000
+# What to bring: the squat's barbell, as a chip under the title.
+- extendedWaitUntil:
+    visible:
+      id: preview-equipment
+    timeout: 20000
+- assertVisible: 'Barbell'
+# Collapsed, the sets read as one line (weight first, drops marked ↓ and not counted): one set.
 # New accounts start in pounds (US launch): the coach's 60 kg target shows as 132 lb to this client.
+- assertVisible: 'Barbell Squat, 1 set: 132 lb × 8, ↓ To failure'
+- assertNotVisible:
+    id: drop-set
+# Tapping the exercise shows each set.
+- tapOn:
+    id: 'preview-expand-.*'
 - assertVisible: '8 reps · 132 lb'
 # The drop row's label is read as "Drop set" (iOS shows the accessibility label, not the ↳ glyph).
 - assertVisible:

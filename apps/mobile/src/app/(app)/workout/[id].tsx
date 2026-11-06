@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   formatRest,
   formatSetTarget,
+  formatSetsSummary,
   sectionRuns,
   setLabels,
+  workoutEquipment,
   type IsoDate,
   type Units,
   type WorkoutBlockDoc,
@@ -21,7 +23,7 @@ import { openDemo } from '@/lib/open-demo';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { blockRounds, formatDayLabel, orList, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
-import { palette } from '@/theme/theme';
+import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 type Detail = {
@@ -33,7 +35,11 @@ type Detail = {
   rounds: number[];
 };
 
-/** Read-only workout: blocks, exercises and set targets in the client's own units. No logging in phase 2. */
+/**
+ * Read-only workout: what to bring, then blocks and exercises in the client's own units. Each exercise shows one
+ * summary line of its sets and a set count (×N: warm-up and working sets; a drop continues the set before it, so
+ * it is not counted); tapping the exercise shows each set with its rest and notes.
+ */
 export default function WorkoutDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -62,6 +68,8 @@ export default function WorkoutDetail() {
     [detail],
   );
   const details = useExerciseDetails(exerciseIds);
+  // Every exercise counts, pick-one options included: the client may choose any of them. Fills in as details load.
+  const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
   const [infoFor, setInfoFor] = useState<WorkoutExerciseDoc | null>(null);
 
   const letters = detail && detail !== 'missing' ? supersetLetters(detail.doc.blocks) : [];
@@ -96,6 +104,7 @@ export default function WorkoutDetail() {
             </Text>
             <Text style={text('body')}>{formatDayLabel(detail.scheduledOn)}</Text>
           </View>
+          {equipment.length > 0 ? <EquipmentRow names={equipment} /> : null}
           {detail.doc.notes ? <Text style={text('body')}>{detail.doc.notes}</Text> : null}
           {/* Blocks under their section headings; a workout without sections is one run with no heading. */}
           {sectionRuns(detail.doc.blocks, detail.doc.sections).map((run, r) => (
@@ -131,6 +140,33 @@ export default function WorkoutDetail() {
         onClose={() => setInfoFor(null)}
       />
     </Screen>
+  );
+}
+
+/** What to bring: one chip per piece of equipment, scrolling sideways when they don't fit. */
+function EquipmentRow({ names }: { names: string[] }) {
+  const { text, space, radius } = useTheme();
+  return (
+    <View style={{ gap: space[2] }}>
+      <Text style={text('sectionHeading')} accessibilityRole="header">
+        Equipment
+      </Text>
+      <ScrollView
+        testID="preview-equipment"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: space[2] }}
+      >
+        {names.map((name) => (
+          <View
+            key={name}
+            style={[styles.chip, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}
+          >
+            <Text style={[text('body'), styles.inkText]}>{name}</Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -208,7 +244,10 @@ function ExerciseSection({
   onInfo: () => void;
 }) {
   const { text, space, radius } = useTheme();
+  const [expanded, setExpanded] = useState(false);
   const labels = setLabels(exercise.sets);
+  const summary = formatSetsSummary(exercise.sets, exercise.trackingType, units);
+  const setsWord = `${summary.count} ${summary.count === 1 ? 'set' : 'sets'}`;
   return (
     <View style={{ gap: space[2] }}>
       <View style={[styles.exerciseHeader, { gap: space[2] }]}>
@@ -217,46 +256,68 @@ function ExerciseSection({
             <Text style={text('sectionHeading')}>{label}</Text>
           </View>
         ) : null}
+        {/* The photo opens the exercise info (and its demo); the rest of the row shows or hides each set. */}
         <ExerciseThumb
           name={exercise.exerciseName}
           detail={detail}
           testID={`preview-thumb-${exercise.id}`}
           onPress={onInfo}
         />
-        <Pressable onPress={onInfo} accessibilityRole="button" accessibilityHint="Opens exercise info" style={styles.flex}>
-          <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
+        <Pressable
+          testID={`preview-expand-${exercise.id}`}
+          onPress={() => setExpanded((v) => !v)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={`${exercise.exerciseName}, ${setsWord}: ${summary.text}`}
+          accessibilityHint={expanded ? 'Hides each set' : 'Shows each set'}
+          style={({ pressed }) => [styles.summaryRow, { gap: space[3] }, pressed && { opacity: pressedOpacity }]}
+        >
+          <View style={[styles.flex, { gap: space[1] }]}>
+            <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
+            {/* Wraps onto more lines when long: every set stays readable, nothing is cut off. */}
+            <Text testID={`preview-summary-${exercise.id}`} style={text('body')}>
+              {summary.text}
+            </Text>
+          </View>
+          <Text testID={`preview-count-${exercise.id}`} style={text('sectionHeading')}>
+            {`×${summary.count}`}
+          </Text>
         </Pressable>
       </View>
       {exercise.note ? <Text style={text('body')}>{exercise.note}</Text> : null}
 
-      {exercise.sets.map((set, i) => {
-        const drop = set.setType === 'drop';
-        const rest = formatRest(set.restSeconds);
-        return (
-          <View
-            key={set.id}
-            testID={drop ? 'drop-set' : undefined}
-            style={[
-              styles.setRow,
-              { gap: space[3], paddingVertical: space[2], paddingHorizontal: space[3], borderRadius: radius.input },
-              drop && [styles.dropRow, { marginLeft: space[6] }],
-            ]}
-          >
-            <Text
-              style={[text('sectionHeading'), styles.setLabel, drop && styles.inkText]}
-              accessibilityLabel={drop ? 'Drop set' : labels[i] === 'W' ? 'Warm-up' : `Set ${labels[i]}`}
-            >
-              {labels[i]}
-            </Text>
-            <View style={[styles.flex, { gap: space[1] }]}>
-              {/* Text on the drop pastel is always ink, never muted. */}
-              <Text style={[text('body'), drop && styles.inkText]}>{formatSetTarget(set, exercise.trackingType, units)}</Text>
-              {rest ? <Text style={[text('caption'), drop && styles.inkText]}>{rest}</Text> : null}
-              {set.note ? <Text style={[text('caption'), drop && styles.inkText]}>{set.note}</Text> : null}
-            </View>
-          </View>
-        );
-      })}
+      {expanded
+        ? exercise.sets.map((set, i) => {
+            const drop = set.setType === 'drop';
+            const rest = formatRest(set.restSeconds);
+            return (
+              <View
+                key={set.id}
+                testID={drop ? 'drop-set' : undefined}
+                style={[
+                  styles.setRow,
+                  { gap: space[3], paddingVertical: space[2], paddingHorizontal: space[3], borderRadius: radius.input },
+                  drop && [styles.dropRow, { marginLeft: space[6] }],
+                ]}
+              >
+                <Text
+                  style={[text('sectionHeading'), styles.setLabel, drop && styles.inkText]}
+                  accessibilityLabel={drop ? 'Drop set' : labels[i] === 'W' ? 'Warm-up' : `Set ${labels[i]}`}
+                >
+                  {labels[i]}
+                </Text>
+                <View style={[styles.flex, { gap: space[1] }]}>
+                  {/* Text on the drop pastel is always ink, never muted. */}
+                  <Text style={[text('body'), drop && styles.inkText]}>
+                    {formatSetTarget(set, exercise.trackingType, units)}
+                  </Text>
+                  {rest ? <Text style={[text('caption'), drop && styles.inkText]}>{rest}</Text> : null}
+                  {set.note ? <Text style={[text('caption'), drop && styles.inkText]}>{set.note}</Text> : null}
+                </View>
+              </View>
+            );
+          })
+        : null}
 
       {openableDemoUrl(videoUrl) ? (
         <Button
@@ -271,8 +332,11 @@ function ExerciseSection({
 
 const styles = StyleSheet.create({
   backRow: { alignItems: 'flex-start' },
-  exerciseHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  // No wrapping: the summary takes the room beside the photo and grows downwards when long.
+  exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start' },
   letterChip: { backgroundColor: palette.lime },
+  chip: { backgroundColor: palette.surface },
+  summaryRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   setRow: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: palette.surface },
   // Drop rows sit indented on the drop pastel (text stays ink, never muted, on a pastel).
   dropRow: { backgroundColor: palette.drop },
