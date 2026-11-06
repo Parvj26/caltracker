@@ -314,7 +314,7 @@ test.describe('logged workout page', () => {
     await expect(page.getByRole('table', { name: slam })).toBeVisible();
     await expect(page.getByRole('table', { name: walk })).toHaveCount(0);
     await expect(page.getByText(walk)).toHaveCount(0);
-    await expect(page.getByText('Not done')).toHaveCount(0);
+    await expect(page.getByText('Not done', { exact: true })).toHaveCount(0);
     // Correcting only offers boxes for the picked option.
     await page.getByRole('button', { name: 'Correct' }).click();
     await expect(page.getByRole('table', { name: slam }).getByRole('textbox')).toHaveCount(4);
@@ -339,7 +339,7 @@ test.describe('logged workout page', () => {
     await expect(page.getByText('Pick one · not done')).toBeVisible();
     await expect(page.getByText(`${a} · ${b}`)).toBeVisible();
     await expect(page.getByRole('table', { name: a })).toHaveCount(0);
-    await expect(page.getByText('Not done')).toHaveCount(0);
+    await expect(page.getByText('Not done', { exact: true })).toHaveCount(0);
   });
 
   test('comments can be posted, survive a reload and be deleted', async ({ page }) => {
