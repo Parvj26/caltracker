@@ -8,6 +8,7 @@
 // Usage: pnpm --filter @caltracker/scripts exec tsx process-stickers.ts [inDir] [mobileOutDir] [webOutDir]
 // Defaults write to apps/mobile/assets/stickers and apps/web/public/stickers in this repo, and also
 // regenerate apps/mobile/src/lib/sticker-assets.ts.
+import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,7 +24,11 @@ export const LOCKED_ALPHA = 0.12;
 const WEBP_QUALITY = 80;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const DEFAULT_IN_DIR = '/Users/parvjain/Desktop/fitness-tracker/art/stickers';
+/** The source art is not committed; it lives in the main checkout's art/stickers, found from any worktree. */
+function defaultInDir(): string {
+  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+  return path.join(path.dirname(common), 'art/stickers');
+}
 export const DEFAULT_MOBILE_DIR = path.join(repoRoot, 'apps/mobile/assets/stickers');
 export const DEFAULT_WEB_DIR = path.join(repoRoot, 'apps/web/public/stickers');
 export const ASSET_MAP_FILE = path.join(repoRoot, 'apps/mobile/src/lib/sticker-assets.ts');
@@ -52,9 +57,9 @@ export async function processSticker(file: string, outDirs: string[]): Promise<s
 
   // Two steps: sharp runs `extractChannel` after `linear` in one pipeline, which would scale the wrong channel.
   const fullAlpha = await sharp(large).resize(LOCKED_SIZE, LOCKED_SIZE).extractChannel('alpha').png().toBuffer();
-  const alpha = await sharp(fullAlpha).linear(LOCKED_ALPHA, 0.5).raw().toBuffer();
+  const alpha = await sharp(fullAlpha).linear(LOCKED_ALPHA, 0.5).toColourspace('b-w').png().toBuffer();
   const lockedWebp = await sharp({ create: { width: LOCKED_SIZE, height: LOCKED_SIZE, channels: 3, background: LOCKED_COLOUR } })
-    .joinChannel(alpha, { raw: { width: LOCKED_SIZE, height: LOCKED_SIZE, channels: 1 } })
+    .joinChannel(alpha)
     .webp({ lossless: true, exact: true })
     .toBuffer();
 
@@ -107,7 +112,7 @@ export async function processStickers(inDir: string, outDirs: string[]): Promise
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const [inDir = DEFAULT_IN_DIR, mobileDir = DEFAULT_MOBILE_DIR, webDir = DEFAULT_WEB_DIR] = process.argv.slice(2);
+  const [inDir = defaultInDir(), mobileDir = DEFAULT_MOBILE_DIR, webDir = DEFAULT_WEB_DIR] = process.argv.slice(2);
   const keys = await processStickers(inDir, [mobileDir, webDir]);
   await writeFile(ASSET_MAP_FILE, assetMapSource(keys));
   console.log(`wrote ${ASSET_MAP_FILE}`);

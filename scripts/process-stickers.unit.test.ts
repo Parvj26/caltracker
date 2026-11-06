@@ -41,6 +41,16 @@ async function pixels(file: string) {
   return { data, width: info.width, height: info.height };
 }
 
+/** Share of pixels where "has any alpha" agrees between two same-size images. */
+async function outlineMatch(a: string, b: string): Promise<number> {
+  const [pa, pb] = await Promise.all([pixels(a), pixels(b)]);
+  expect([pa.width, pa.height]).toEqual([pb.width, pb.height]);
+  let same = 0;
+  const total = pa.width * pa.height;
+  for (let i = 0; i < total; i++) if (((pa.data[i * 4 + 3] ?? 0) > 0) === ((pb.data[i * 4 + 3] ?? 0) > 0)) same++;
+  return same / total;
+}
+
 describe('processSticker', () => {
   it('writes the large, small and locked images into every output folder', async () => {
     const out1 = path.join(dir, 'out1');
@@ -102,6 +112,12 @@ describe('processSticker', () => {
     expect(maxAlpha).toBe(Math.round(LOCKED_ALPHA * 255));
   });
 
+  it('draws the locked silhouette from the sticker\'s own outline', async () => {
+    const out = path.join(dir, 'out');
+    await processSticker(await fixture('fox'), [out]);
+    expect(await outlineMatch(path.join(out, 'fox-sm.webp'), path.join(out, 'fox-locked.webp'))).toBeGreaterThanOrEqual(0.98);
+  });
+
   it('rejects an image without a transparent background', async () => {
     const file = path.join(dir, 'flat.png');
     await writeFile(file, await sharp({ create: { width: 10, height: 10, channels: 3, background: '#fff' } }).png().toBuffer());
@@ -135,6 +151,13 @@ describe('committed sticker assets', () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it.each(['hippo', 'colosseum', 'koala'])('draws the committed %s silhouette from its own outline', async (key) => {
+    for (const d of dirs) {
+      const match = await outlineMatch(path.join(root, d, `${key}-sm.webp`), path.join(root, d, `${key}-locked.webp`));
+      expect(match).toBeGreaterThanOrEqual(0.98);
+    }
   });
 
   it('has a generated asset map that mentions every STICKERS key', async () => {
