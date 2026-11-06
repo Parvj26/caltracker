@@ -173,3 +173,7 @@ export {
   ProfileInput,
   characterCount,
 } from './profile/schema';
+export type { Message, OutboxItem } from './messages/types';
+export { seenMessageId, unreadCount } from './messages/state';
+export { dayLabel, messageYoutubeIds } from './messages/format';
+export { mergeOutbox } from './messages/outbox';
