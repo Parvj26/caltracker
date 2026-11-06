@@ -98,12 +98,12 @@ export default async function ClientsPage() {
         </p>
       </header>
 
-      <ClientDirectory data={data} people={clients} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
-
       <Card className={styles.addCard}>
         <AddClientForm />
         <CsvUpload />
       </Card>
+
+      <ClientDirectory data={data} people={clients} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
 
       {past.data.length > 0 ? (
         <Card className={styles.listCard}>

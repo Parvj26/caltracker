@@ -54,8 +54,7 @@ bests never change the status. The reasons are shown in small text under the chi
   on; until then there is no Message action at all (the old disabled "Message, coming soon" note is gone).
 - **No snooze or dismiss.** Doing it properly needs a new table (the coach uses a laptop and an iPad, so browser
   storage would disagree between them). Left for later.
-- **Clients list order on the page:** the list (and pending invites) now come before the Add client card, because a
-  coach opens this page far more often to look than to add.
+- **Add client stays above the list** (an earlier decision, so the invite form is above the fold on a laptop); the search, filters and list follow it.
 - **Last workout lookback:** the Clients list reads finished workouts from the last 90 days (Home: 30). With none in
   that time it says "None yet" for a client who joined within it, otherwise "Over 90 days ago".
 - **Search and filter are not saved in the URL.** Simple to add later if the coach wants to bookmark a view.
