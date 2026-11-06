@@ -1,3 +1,4 @@
+import { demoUrl } from './demo-link';
 import { describe, expect, it } from 'vitest';
 import {
   blockRounds,
@@ -93,24 +94,34 @@ describe('resolveVideoUrls', () => {
     const urls = resolveVideoUrls(
       ex,
       [
-        { id: 'e1', youtube_url: 'https://youtu.be/own1' },
-        { id: 'e2', youtube_url: 'https://youtu.be/own2' },
+        { id: 'e1', youtube_url: 'https://youtu.be/ownvideo001' },
+        { id: 'e2', youtube_url: 'https://youtu.be/ownvideo002' },
         { id: 'e3', youtube_url: null },
       ],
-      [{ exercise_id: 'e1', youtube_url: 'https://youtu.be/coach1' }],
+      [{ exercise_id: 'e1', youtube_url: 'https://youtu.be/coachvid001' }],
     );
-    expect(urls.e1).toBe('https://youtu.be/coach1');
-    expect(urls.e2).toBe('https://youtu.be/own2');
+    expect(urls.e1).toBe(demoUrl('https://youtu.be/coachvid001'));
+    expect(urls.e2).toBe(demoUrl('https://youtu.be/ownvideo002'));
     expect(urls.e3).toMatch(/^https:\/\/www\.youtube\.com\/results\?search_query=.*Plank/);
   });
 
   it('ignores an override without a link', () => {
     const urls = resolveVideoUrls(
       [ex[0]],
-      [{ id: 'e1', youtube_url: 'https://youtu.be/own1' }],
+      [{ id: 'e1', youtube_url: 'https://youtu.be/ownvideo001' }],
       [{ exercise_id: 'e1', youtube_url: null }],
     );
-    expect(urls.e1).toBe('https://youtu.be/own1');
+    expect(urls.e1).toBe(demoUrl('https://youtu.be/ownvideo001'));
+  });
+
+  it('skips a stored link that is not a YouTube video, falling back to the next one', () => {
+    const urls = resolveVideoUrls(
+      [ex[0]],
+      [{ id: 'e1', youtube_url: 'https://youtu.be/ownvideo001' }],
+      [{ exercise_id: 'e1', youtube_url: 'javascript:alert(1)' }],
+    );
+    expect(urls.e1).toBe(demoUrl('https://youtu.be/ownvideo001'));
+    expect(resolveVideoUrls([ex[0]], [{ id: 'e1', youtube_url: 'https://evil.example/x' }], [])['e1']).toMatch(/results\?search_query/);
   });
 });
 

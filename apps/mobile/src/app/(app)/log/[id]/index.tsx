@@ -20,11 +20,14 @@ import {
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { ExercisePicker } from '@/components/log/exercise-picker';
+import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { LogBlock, type BlockHandlers } from '@/components/log/log-block';
+import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { NoteSheet } from '@/components/log/note-sheet';
 import { RestSheet } from '@/components/log/rest-sheet';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen, TextButton } from '@/components/ui';
+import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import { finishPrompt, finishQuestion } from '@/lib/active-log-logic';
 import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
@@ -68,6 +71,7 @@ export default function LogScreen() {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [noteFor, setNoteFor] = useState<LogExerciseDoc | null>(null);
+  const [infoFor, setInfoFor] = useState<LogExerciseDoc | null>(null);
   const [last, setLast] = useState<LastResults>({});
   const elapsed = useElapsed(log?.startedAt);
 
@@ -78,6 +82,7 @@ export default function LogScreen() {
     () => [...new Set(log?.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId)) ?? [])].sort().join(','),
     [log],
   );
+  const details = useExerciseDetails(useMemo(() => (exerciseKey ? exerciseKey.split(',') : []), [exerciseKey]));
   useEffect(() => {
     if (!exerciseKey) return;
     let alive = true;
@@ -119,6 +124,9 @@ export default function LogScreen() {
     );
   }
 
+  const removeSet = (ex: LogExerciseDoc, set: LogSetDoc) =>
+    void op((l) => removeLogSet(l, ex.id, set.id, nowIso()));
+
   const handlers: BlockHandlers = {
     onTick: (_ex, set) => {
       // Tick or untick is decided from the stored set, so a fast double tap can't run both ways at once.
@@ -132,6 +140,11 @@ export default function LogScreen() {
     onChange: (set, patch) => void op((l) => updateActual(l, set.id, patch)),
     onSetMenu: (ex, set, label) => setMenu({ kind: 'set', ex, set, label }),
     onExerciseMenu: (ex) => setMenu({ kind: 'exercise', ex }),
+    onExerciseInfo: (ex) => setInfoFor(ex),
+    // The swipe's Delete button runs exactly what the set menu's "Remove set" runs.
+    onRemoveSet: (ex, set) => removeSet(ex, set),
+    // Asked of the shared rule itself: it returns the same doc when it refuses.
+    canRemoveSet: (ex, set) => removeLogSet(log, ex.id, set.id, nowIso()) !== log,
     onAddSet: (ex) => void op((l) => addLogSet(l, ex.id, randomUUID, nowIso())),
   };
 
@@ -198,7 +211,7 @@ export default function LogScreen() {
         onPress: () => void op((l) => addLogDrop(l, ex.id, set.id, randomUUID, nowIso())),
       });
     }
-    items.push({ title: 'Remove set', testID: 'menu-remove-set', onPress: () => void op((l) => removeLogSet(l, ex.id, set.id, nowIso())) });
+    items.push({ title: 'Remove set', testID: 'menu-remove-set', onPress: () => removeSet(ex, set) });
     return items;
   })();
 
@@ -215,7 +228,7 @@ export default function LogScreen() {
 
   return (
     <View style={styles.fill}>
-      <Screen>
+      <Screen onScrollBegin={closeOpenSwipeRow}>
         <View style={[styles.headerRow, { gap: space[2] }]}>
           <TextButton testID="back" title="Today" onPress={back} />
           <SyncPill status={syncStatus} />
@@ -261,6 +274,7 @@ export default function LogScreen() {
               firstExerciseIndex={first}
               units={units}
               lastTime={(ex) => formatLastResult(last[ex.exerciseId]?.sets ?? [], ex.trackingType, units)}
+              details={details}
               handlers={handlers}
             />
           );
@@ -288,6 +302,11 @@ export default function LogScreen() {
         visible={picker !== null}
         onPick={pick}
         onClose={() => setPicker(null)}
+      />
+      <ExerciseInfoSheet
+        name={infoFor?.exerciseName ?? null}
+        detail={infoFor ? details[infoFor.exerciseId] : undefined}
+        onClose={() => setInfoFor(null)}
       />
       <NoteSheet
         exerciseName={noteFor?.exerciseName ?? null}

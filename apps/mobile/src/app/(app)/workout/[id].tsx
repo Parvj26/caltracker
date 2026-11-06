@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   formatRest,
   formatSetTarget,
@@ -11,7 +11,13 @@ import {
   type WorkoutDoc,
   type WorkoutExerciseDoc,
 } from '@caltracker/shared';
+import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
+import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import type { ExerciseDetail } from '@/lib/exercise-detail';
+import { openableDemoUrl } from '@/lib/demo-link';
+import { openDemo } from '@/lib/open-demo';
+import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { blockRounds, formatDayLabel, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
@@ -49,6 +55,13 @@ export default function WorkoutDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const exerciseIds = useMemo(
+    () => (detail && detail !== 'missing' ? detail.doc.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId)) : []),
+    [detail],
+  );
+  const details = useExerciseDetails(exerciseIds);
+  const [infoFor, setInfoFor] = useState<WorkoutExerciseDoc | null>(null);
 
   const letters = detail && detail !== 'missing' ? supersetLetters(detail.doc.blocks) : [];
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
@@ -91,10 +104,18 @@ export default function WorkoutDetail() {
               rounds={detail.rounds[i] ?? 0}
               units={detail.units}
               videoUrls={detail.videoUrls}
+              details={details}
+              onInfo={setInfoFor}
             />
           ))}
         </>
       ) : null}
+
+      <ExerciseInfoSheet
+        name={infoFor?.exerciseName ?? null}
+        detail={infoFor ? details[infoFor.exerciseId] : undefined}
+        onClose={() => setInfoFor(null)}
+      />
     </Screen>
   );
 }
@@ -105,6 +126,8 @@ function BlockCard({
   rounds,
   units,
   videoUrls,
+  details,
+  onInfo,
 }: {
   block: WorkoutBlockDoc;
   /** The superset's letter (A for the first superset, B for the second), null for straight sets. */
@@ -112,6 +135,8 @@ function BlockCard({
   rounds: number;
   units: Units;
   videoUrls: Record<string, string>;
+  details: Record<string, ExerciseDetail>;
+  onInfo: (ex: WorkoutExerciseDoc) => void;
 }) {
   const { text, space } = useTheme();
   const superset = block.kind === 'superset';
@@ -129,6 +154,8 @@ function BlockCard({
             label={superset && letter ? `${letter}${i + 1}` : null}
             units={units}
             videoUrl={videoUrls[ex.exerciseId]}
+            detail={details[ex.exerciseId]}
+            onInfo={() => onInfo(ex)}
           />
         </View>
       ))}
@@ -141,11 +168,15 @@ function ExerciseSection({
   label,
   units,
   videoUrl,
+  detail,
+  onInfo,
 }: {
   exercise: WorkoutExerciseDoc;
   label: string | null;
   units: Units;
   videoUrl: string | undefined;
+  detail: ExerciseDetail | undefined;
+  onInfo: () => void;
 }) {
   const { text, space, radius } = useTheme();
   const labels = setLabels(exercise.sets);
@@ -157,9 +188,15 @@ function ExerciseSection({
             <Text style={text('sectionHeading')}>{label}</Text>
           </View>
         ) : null}
-        <Text style={[text('sectionHeading'), styles.flex]} accessibilityRole="header">
-          {exercise.exerciseName}
-        </Text>
+        <ExerciseThumb
+          name={exercise.exerciseName}
+          detail={detail}
+          testID={`preview-thumb-${exercise.id}`}
+          onPress={onInfo}
+        />
+        <Pressable onPress={onInfo} accessibilityRole="button" accessibilityHint="Opens exercise info" style={styles.flex}>
+          <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
+        </Pressable>
       </View>
       {exercise.note ? <Text style={text('body')}>{exercise.note}</Text> : null}
 
@@ -192,11 +229,11 @@ function ExerciseSection({
         );
       })}
 
-      {videoUrl ? (
+      {openableDemoUrl(videoUrl) ? (
         <Button
           variant="secondary"
           title="Watch form on YouTube"
-          onPress={() => void Linking.openURL(videoUrl).catch(() => undefined)}
+          onPress={() => openDemo(videoUrl)}
         />
       ) : null}
     </View>

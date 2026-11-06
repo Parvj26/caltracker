@@ -27,6 +27,21 @@ env:
     visible:
       id: tick-0-0
     timeout: 20000
+# The exercise name opens its info sheet: name, instructions, a Close button.
+- tapOn:
+    id: exercise-name-0
+- extendedWaitUntil:
+    visible:
+      id: exercise-sheet-name
+    timeout: 10000
+- assertVisible: 'Barbell Squat'
+- assertVisible: 'Instructions'
+- assertVisible: '1\..*'
+- takeScreenshot: exercise-sheet
+- tapOn:
+    id: exercise-sheet-close
+- assertNotVisible:
+    id: exercise-sheet-name
 - tapOn:
     id: tick-0-0
 - assertVisible:
