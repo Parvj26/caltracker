@@ -281,3 +281,7 @@
   .back { display: inline-flex; }
   .item { max-width: 92%; }
 }
+
+/* ---------- Error screen (error.tsx) ---------- */
+.errorPanel { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-3); margin: auto; max-width: 28rem; padding: var(--ct-space-6) var(--ct-space-4); }
+.errorText { margin: 0; color: var(--ct-ink-muted); font-size: var(--ct-size-body); }

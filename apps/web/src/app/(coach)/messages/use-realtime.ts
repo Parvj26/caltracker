@@ -32,6 +32,37 @@ export function useOnWake(onWake: () => void): void {
 
 export type ChangeSpec = { table: 'messages' | 'conversation_reads'; filter: string };
 
+/** The few Supabase client methods the subscription needs (so a test can stand in for the real client). */
+type RealtimeClient = Pick<SupabaseClient<Database>, 'channel' | 'removeChannel'>;
+
+/**
+ * Joins a Realtime channel for the given tables/filters and returns the function that leaves it. Every call uses its
+ * own unique topic: the browser client is shared, and a channel that is still leaving (a quick remount, React
+ * StrictMode in development) would otherwise be handed back by name, the new subscribe would do nothing, and the
+ * pending removal would then kill the live updates for good.
+ */
+export function subscribeChanges(
+  supabase: RealtimeClient,
+  channelName: string,
+  specs: ChangeSpec[],
+  handlers: { onChange: (table: ChangeSpec['table'], row: Record<string, unknown>) => void; onReady?: (() => void) | undefined },
+): () => void {
+  let channel = supabase.channel(`${channelName}:${crypto.randomUUID()}`);
+  for (const spec of specs) {
+    channel = channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: spec.table, filter: spec.filter },
+      (payload) => handlers.onChange(spec.table, payload.new as Record<string, unknown>),
+    );
+  }
+  channel.subscribe((status) => {
+    if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) handlers.onReady?.();
+  });
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 /**
  * Subscribes to Postgres changes (RLS applies) on the given tables/filters. `onChange` gets each changed row.
  * `onReady` runs each time the channel (re)joins, so a caller can refetch what it missed while disconnected.
@@ -47,21 +78,12 @@ export function useChanges(
     ref.current = handlers;
   });
   const key = JSON.stringify(specs);
-  useEffect(() => {
-    const parsed = JSON.parse(key) as ChangeSpec[];
-    let channel = supabase.channel(channelName);
-    for (const spec of parsed) {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: spec.table, filter: spec.filter },
-        (payload) => ref.current.onChange(spec.table, payload.new as Record<string, unknown>),
-      );
-    }
-    channel.subscribe((status) => {
-      if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) ref.current.onReady?.();
-    });
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [supabase, channelName, key]);
+  useEffect(
+    () =>
+      subscribeChanges(supabase, channelName, JSON.parse(key) as ChangeSpec[], {
+        onChange: (table, row) => ref.current.onChange(table, row),
+        onReady: () => ref.current.onReady?.(),
+      }),
+    [supabase, channelName, key],
+  );
 }
