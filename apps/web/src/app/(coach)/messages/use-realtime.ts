@@ -32,14 +32,20 @@ export function useOnWake(onWake: () => void): void {
 
 export type ChangeSpec = { table: 'messages' | 'conversation_reads'; filter: string };
 
-/** The few Supabase client methods the subscription needs (so a test can stand in for the real client). */
-type RealtimeClient = Pick<SupabaseClient<Database>, 'channel' | 'removeChannel'>;
+/** The few Supabase client parts the subscription needs (so a test can stand in for the real client). */
+type RealtimeClient = Pick<SupabaseClient<Database>, 'channel' | 'removeChannel'> & {
+  realtime: Pick<SupabaseClient<Database>['realtime'], 'setAuth'>;
+};
 
 /**
  * Joins a Realtime channel for the given tables/filters and returns the function that leaves it. Every call uses its
  * own unique topic: the browser client is shared, and a channel that is still leaving (a quick remount, React
  * StrictMode in development) would otherwise be handed back by name, the new subscribe would do nothing, and the
  * pending removal would then kill the live updates for good.
+ *
+ * The coach's token is loaded into Realtime (`realtime.setAuth()`) before the join. Otherwise the first join can go
+ * out with only the anon key, Realtime then checks every change as anon, RLS hides every message, and nothing
+ * arrives even though the channel says it is subscribed. (Same as LiveRefresh.)
  */
 export function subscribeChanges(
   supabase: RealtimeClient,
@@ -55,10 +61,17 @@ export function subscribeChanges(
       (payload) => handlers.onChange(spec.table, payload.new as Record<string, unknown>),
     );
   }
-  channel.subscribe((status) => {
-    if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) handlers.onReady?.();
-  });
+  let active = true;
+  void (async () => {
+    // No argument: takes the session's token now and keeps refreshing it afterwards.
+    await supabase.realtime.setAuth().catch(() => undefined);
+    if (!active) return;
+    channel.subscribe((status) => {
+      if (active && status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) handlers.onReady?.();
+    });
+  })();
   return () => {
+    active = false;
     void supabase.removeChannel(channel);
   };
 }

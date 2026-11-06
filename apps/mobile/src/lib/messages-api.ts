@@ -192,10 +192,19 @@ export function subscribeChanges(
       (payload) => handlers.onChange(spec.table, payload.new as Record<string, unknown>),
     );
   }
-  channel.subscribe((status) => {
-    if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) handlers.onReady?.();
-  });
+  let active = true;
+  void (async () => {
+    // Load the client's token into Realtime before joining. Otherwise the first join can go out with only the anon
+    // key, Realtime checks every change as anon, RLS hides every message, and nothing arrives even though the channel
+    // says it is subscribed. No argument: takes the session's token now and keeps refreshing it afterwards.
+    await supabase.realtime.setAuth().catch(() => undefined);
+    if (!active) return;
+    channel.subscribe((status) => {
+      if (active && status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) handlers.onReady?.();
+    });
+  })();
   return () => {
+    active = false;
     void supabase.removeChannel(channel);
   };
 }
