@@ -28,14 +28,30 @@ export function awardPrEvents(clientId: string, result: unknown): PrEvent[] {
  * so the number is lifts improved, not records broken.
  */
 export function prsThisWeek(events: readonly PrEvent[], currentClientIds: ReadonlySet<string>, today: IsoDate, timeZone: string): number {
+  let total = 0;
+  for (const count of prsThisWeekByClient(events, currentClientIds, today, timeZone).values()) total += count;
+  return total;
+}
+
+/** The same count as `prsThisWeek`, per client (clients with none are left out). */
+export function prsThisWeekByClient(
+  events: readonly PrEvent[],
+  currentClientIds: ReadonlySet<string>,
+  today: IsoDate,
+  timeZone: string,
+): Map<string, number> {
   const start = startOfWeek(today);
   const end = addDays(start, 6);
   const seen = new Set<string>();
+  const counts = new Map<string, number>();
   for (const e of events) {
     if (!currentClientIds.has(e.clientId)) continue;
     const day = localDay(e.achievedAt, timeZone);
     if (day < start || day > end) continue;
-    seen.add(`${e.clientId}|${e.logId}|${e.exerciseId}`);
+    const key = `${e.clientId}|${e.logId}|${e.exerciseId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    counts.set(e.clientId, (counts.get(e.clientId) ?? 0) + 1);
   }
-  return seen.size;
+  return counts;
 }

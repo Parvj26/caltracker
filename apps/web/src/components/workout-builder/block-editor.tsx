@@ -1,11 +1,12 @@
 'use client';
 
-import { useId } from 'react';
-import { MAX_CHOICE_OPTIONS, TRACKING_TYPE_LABELS, setLabels, setShowsRest } from '@caltracker/shared';
+import { useId, useState } from 'react';
+import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, TRACKING_TYPE_LABELS, hasTargets, setLabels, setShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { gridTemplate, setColumns } from './set-columns';
 import { SetRow, type SetPatch } from './set-row';
+import { SubstituteEditor, type SubstituteActions } from './substitute-editor';
 import styles from './builder.module.css';
 
 /** Row names for screen readers and tests: "set 1", "warm-up set", "drop after set 3", "drop 2 after set 3". */
@@ -46,6 +47,11 @@ export type BlockActions = {
   onAddDrop: (exId: string, setId: string) => void;
   onRemoveSet: (exId: string, setId: string) => void;
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
+  onAddSubstitute: (exId: string) => void;
+  substitute: (exId: string, substituteId: string) => SubstituteActions;
+  /** "Copy set 1 to all sets" and "Fill down from set N": see fillDown in packages/shared. */
+  onCopyToAll: (exId: string) => void;
+  onFillDown: (exId: string, setId: string) => void;
 };
 
 type Props = {
@@ -73,6 +79,9 @@ export function supersetTitle(block: WorkoutBlockDoc): string {
 
 export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, units, errors, actions }: Props) {
   const headingId = useId();
+  // Per exercise, bumped after a copy, so that exercise's set rows remount and show copied rep ranges as ranges (a
+  // row picks single or range when it mounts).
+  const [copies, setCopies] = useState<Readonly<Record<string, number>>>({});
   const superset = block.kind === 'superset';
   const first = block.exercises[0]!;
   const choice = block.kind === 'choice';
@@ -162,6 +171,17 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         // In a superset the rest after a round sits on the round's last exercise; the others go straight on.
         const restShown = ex.sets.map((_, si) => setShowsRest(block, ei, si));
         const columns = setColumns(ex.trackingType, restShown.some(Boolean));
+        // Main sets with another main set below them: where "Fill down" can start. The first is "Copy set 1 to all".
+        const fillFrom = ex.sets.flatMap((s, si) =>
+          s.setType === 'normal' && ex.sets.slice(si + 1).some((t) => t.setType === 'normal')
+            ? [{ id: s.id, label: labels[si]!, ready: hasTargets(s) }]
+            : [],
+        );
+        const copied = (run: () => void) => {
+          run();
+          setCopies((c) => ({ ...c, [ex.id]: (c[ex.id] ?? 0) + 1 }));
+        };
+        const copyHintId = `${headingId}-${ex.id}-copy-hint`;
         return (
           <div key={ex.id} className={styles.exercise}>
             {multi ? (
@@ -195,7 +215,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               </div>
               {ex.sets.map((s, si) => (
                 <SetRow
-                  key={s.id}
+                  key={`${s.id}:${copies[ex.id] ?? 0}`}
                   set={s}
                   label={labels[si]!}
                   name={`${ex.exerciseName} ${names[si]}`}
@@ -219,6 +239,45 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               >
                 + Set
               </button>
+              {/* Pick-one options are already alternatives to each other, so they get no substitutes. */}
+              {!choice ? (
+                <button
+                  type="button"
+                  className={styles.smallButton}
+                  aria-label={`Add a substitute for ${ex.exerciseName}`}
+                  disabled={ex.substitutes.length >= MAX_SUBSTITUTES}
+                  title={ex.substitutes.length >= MAX_SUBSTITUTES ? `At most ${MAX_SUBSTITUTES} substitutes` : undefined}
+                  onClick={() => actions.onAddSubstitute(ex.id)}
+                >
+                  + Substitute
+                </button>
+              ) : null}
+              {fillFrom.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.smallButton}
+                    aria-label={`Copy set ${fillFrom[0]!.label} of ${ex.exerciseName} to all sets`}
+                    aria-describedby={copyHintId}
+                    disabled={!fillFrom[0]!.ready}
+                    onClick={() => copied(() => actions.onCopyToAll(ex.id))}
+                  >
+                    Copy set {fillFrom[0]!.label} to all sets
+                  </button>
+                  <span id={copyHintId} className={fillFrom[0]!.ready ? styles.visuallyHidden : styles.caption}>
+                    {fillFrom[0]!.ready
+                      ? 'Copies reps, weight and rest to the other main sets. Warm-ups and drop sets stay as they are.'
+                      : `Type set ${fillFrom[0]!.label} first, then copy it.`}
+                  </span>
+                </>
+              ) : null}
+              {fillFrom.length > 1 ? (
+                <FillDown
+                  exerciseName={ex.exerciseName}
+                  options={fillFrom.slice(1)}
+                  onFill={(setId) => copied(() => actions.onFillDown(ex.id, setId))}
+                />
+              ) : null}
               <label className={styles.exerciseNote}>
                 <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
                 <input
@@ -231,6 +290,17 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
                 />
               </label>
             </div>
+            {ex.substitutes.map((sub) => (
+              <SubstituteEditor
+                key={sub.id}
+                block={block}
+                exerciseIndex={ei}
+                substitute={sub}
+                units={units}
+                errors={errors}
+                actions={actions.substitute(ex.id, sub.id)}
+              />
+            ))}
           </div>
         );
       })}
@@ -277,5 +347,50 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** "Fill down from [set 2] [Fill]": choosing a set only picks it (arrow keys never fill); the button fills. */
+function FillDown({
+  exerciseName,
+  options,
+  onFill,
+}: {
+  exerciseName: string;
+  options: ReadonlyArray<{ id: string; label: string; ready: boolean }>;
+  onFill: (setId: string) => void;
+}) {
+  const [choice, setChoice] = useState('');
+  const picked = options.find((o) => o.id === choice);
+  return (
+    <>
+      <select
+        className={`${styles.input} ${styles.moveSelect}`}
+        aria-label={`Fill down ${exerciseName} from a set`}
+        value={picked ? picked.id : ''}
+        onChange={(e) => setChoice(e.target.value)}
+      >
+        <option value="">Fill down from…</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            Set {o.label} to the sets below
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Fill down ${exerciseName}`}
+        disabled={!picked || !picked.ready}
+        title={picked && !picked.ready ? `Type set ${picked.label} first.` : undefined}
+        onClick={() => {
+          if (!picked) return;
+          onFill(picked.id);
+          setChoice('');
+        }}
+      >
+        Fill
+      </button>
+    </>
   );
 }

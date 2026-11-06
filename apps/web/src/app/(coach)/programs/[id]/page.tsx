@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteProgram } from './delete-program';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
@@ -17,9 +18,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Same cap as the workout library page.
 const LIBRARY_LIMIT = 200;
 
-export default async function ProgramPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProgramPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { workspaceId } = await requireCoach();
   const { id } = await params;
+  const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
@@ -61,11 +69,12 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{program.name}</h1>
         <div className={styles.titleActions}>
+          <DuplicateButton kind="program" id={program.id} name={program.name} />
           <DeleteProgram id={program.id} name={program.name} />
         </div>
       </header>
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} />
     </div>
   );
 }

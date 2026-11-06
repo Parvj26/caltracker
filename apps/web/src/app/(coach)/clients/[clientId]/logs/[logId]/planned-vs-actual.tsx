@@ -12,6 +12,7 @@ import {
   liveExercises,
   needsPick,
   sectionRuns,
+  substitutedFrom,
   type LogSetDoc,
   type TrackingType,
   type Units,
@@ -105,7 +106,10 @@ export function PlannedVsActual({
                 ];
               }
               return liveExercises(block).map(({ exercise: ex }) => {
-                const swapped = ex.swappedFromExerciseId ? (swappedFrom[ex.swappedFromExerciseId] ?? 'another exercise') : null;
+                // A coach-added substitute also points swappedFromExerciseId at the planned exercise; say it as a substitute.
+                const substitute = substitutedFrom(ex);
+                const swapped =
+                  !substitute && ex.swappedFromExerciseId ? (swappedFrom[ex.swappedFromExerciseId] ?? 'another exercise') : null;
                 // Only a log that followed a plan (even one deleted since) has added exercises; an unplanned one is
                 // all the client's own.
                 const added = isAddedExercise(log, ex);
@@ -114,6 +118,11 @@ export function PlannedVsActual({
                     <header className={styles.exerciseHead}>
                       <ExerciseHeading level={run.section ? 4 : 3}>{ex.exerciseName}</ExerciseHeading>
                       {block.kind === 'choice' ? <Chip>Picked: {ex.exerciseName}</Chip> : null}
+                      {substitute ? (
+                        <Chip>
+                          Did the substitute: {ex.exerciseName} (planned {substitute.exerciseName})
+                        </Chip>
+                      ) : null}
                       {swapped ? <Chip>Swapped from {swapped}</Chip> : null}
                       {added ? <Chip tone="blue">Added</Chip> : null}
                     </header>

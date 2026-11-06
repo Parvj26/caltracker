@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   buildExerciseIndex,
@@ -35,6 +35,8 @@ type Props = {
   onOpen?: (id: string) => void;
   /** Shows a Cancel button in the footer. */
   onCancel?: () => void;
+  /** Pick-many mode: an extra control in the footer, before the buttons (the builder's set count). */
+  footerExtra?: ReactNode;
   /** Starting search text and chips (the Exercises page fills these from its address). */
   initialQuery?: string;
   initialFilters?: Partial<SearchFilters>;
@@ -58,6 +60,7 @@ export function SearchPanel({
   groupLabel = 'superset',
   onOpen,
   onCancel,
+  footerExtra,
   initialQuery = '',
   initialFilters,
   rowFilter,
@@ -337,10 +340,13 @@ export function SearchPanel({
 
       {onCancel || many ? (
         <div className={styles.footer}>
+          {many ? footerExtra : null}
           {onCancel ? <Button variant="secondary" onClick={onCancel}>Cancel</Button> : null}
           {many ? (
             <Button disabled={selected.length < min} onClick={() => onPick?.(selected)}>
-              {selected.length < min ? `Pick at least ${min} exercises` : `Add ${selected.length} exercises`}
+              {selected.length < min
+                ? `Pick at least ${min} ${min === 1 ? 'exercise' : 'exercises'}`
+                : `Add ${selected.length} ${selected.length === 1 ? 'exercise' : 'exercises'}`}
             </Button>
           ) : null}
         </div>
