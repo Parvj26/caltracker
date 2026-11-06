@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { loadExtras } from './caltracker-extras';
 import {
   FREE_EXERCISE_DB_IMAGE_PREFIX,
   TRACKING_TYPES,
@@ -26,11 +27,14 @@ export interface ImportOptions {
   fixtureDir?: string;
   /** Override of the raw.githubusercontent.com base (tests). */
   rawBase?: string;
+  /** Override of the CalTracker extras JSON file (tests). */
+  extrasFile?: string;
   log?: (line: string) => void;
 }
 
 export interface ImportSummary {
   exercises: number;
+  extras: number;
   imagesUploaded: number;
   imagesSkipped: number;
   imagesFailed: number;
@@ -112,9 +116,18 @@ export async function importExercises(admin: Admin, opts: ImportOptions = {}): P
     log(`Upserted exercises ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
   }
 
+  // 2b. CalTracker's own extras: validated first, upserted the same way, no images.
+  const extras = await loadExtras(list.map((e) => e.id), opts.extrasFile);
+  const extraRows = extras.map((e) => mapFreeExercise(e, { [e.id]: e.trackingType }));
+  if (extraRows.length > 0) {
+    const { error } = await admin.from('exercises').upsert(extraRows, { onConflict: 'external_id' });
+    if (error) throw new Error(`Upsert of CalTracker extras failed: ${error.message}`);
+  }
+  log(`Upserted ${extraRows.length} CalTracker extra exercises`);
+
   // 3. Upload images, skipping those already in the bucket.
   const sources = list.flatMap((e) => e.images);
-  const summary: ImportSummary = { exercises: rows.length, imagesUploaded: 0, imagesSkipped: 0, imagesFailed: 0 };
+  const summary: ImportSummary = { exercises: rows.length, extras: extraRows.length, imagesUploaded: 0, imagesSkipped: 0, imagesFailed: 0 };
   let done = 0;
   await runPool(sources, IMAGE_CONCURRENCY, async (image) => {
     const objectPath = `${FREE_EXERCISE_DB_IMAGE_PREFIX}${image}`;
@@ -149,7 +162,7 @@ export async function importExercises(admin: Admin, opts: ImportOptions = {}): P
   });
 
   log(
-    `Done: ${summary.exercises} exercises; images uploaded ${summary.imagesUploaded}, ` +
+    `Done: ${summary.exercises} exercises + ${summary.extras} CalTracker extras; images uploaded ${summary.imagesUploaded}, ` +
       `skipped ${summary.imagesSkipped}, failed ${summary.imagesFailed}`,
   );
   return summary;
