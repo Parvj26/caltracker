@@ -74,12 +74,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (userId) await runClaim(userId);
   }, [userId, runClaim]);
 
-  // Re-read the coach link whenever the app comes back to the foreground, so a client the coach removed sees it
-  // without signing out. Read only: it never joins a coach. Access itself is enforced by the database either way.
+  // Re-read the coach link (and the phone's time zone) whenever the app comes back to the foreground, so a client
+  // the coach removed sees it without signing out. Read only: it never joins a coach. Access itself is enforced by the database either way.
   useEffect(() => {
     if (!userId) return;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void runCheck(userId, 'read');
+      if (state === 'active') {
+        void runCheck(userId, 'read');
+        // The phone may have travelled to another time zone while it was in the background.
+        void syncTimeZone(userId);
+      }
     });
     return () => sub.remove();
   }, [userId, runCheck]);
