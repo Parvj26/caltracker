@@ -94,6 +94,12 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+/** "A or B", "A, B or C": the options of a pick-one group, as the phone writes them. */
+export function orList(names: ReadonlyArray<string>): string {
+  if (names.length < 2) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+}
+
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /**

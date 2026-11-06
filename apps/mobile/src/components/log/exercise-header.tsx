@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
+import { sectionLine, type ChoiceModel, type SectionPlace } from '@/lib/log-page-model';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ExerciseThumb } from './exercise-thumb';
@@ -78,4 +79,46 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   menu: { minWidth: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
   pressed: { backgroundColor: palette.surface },
+  ink: { color: palette.ink },
+  underline: { textDecorationLine: 'underline' },
+  switch: { minWidth: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
 });
+
+/** "Core (Activation) · 1 of 2" above a page's name; nothing for a page with no section. testID section-line-{p}. */
+export function SectionLine({ section, page }: { section: SectionPlace | null; page: number }) {
+  const { text } = useTheme();
+  if (!section) return null;
+  return (
+    <Text testID={`section-line-${page}`} style={text('caption')}>
+      {sectionLine(section)}
+    </Text>
+  );
+}
+
+/**
+ * "Picked from 2 options · Switch" under the name of a picked pick-one page. Switch (testID choice-switch) goes
+ * back to the cards; it is gone once the pick is locked (the picked option has a done set). testID picked-line-{p}.
+ */
+export function PickedLine({ choice, page, onSwitch }: { choice: ChoiceModel | null; page: number; onSwitch: () => void }) {
+  const { text, space } = useTheme();
+  if (!choice?.pickedLine) return null;
+  return (
+    <View style={[styles.row, { gap: space[1] }]}>
+      <Text testID={`picked-line-${page}`} style={text('caption')}>
+        {choice.canSwitch ? `${choice.pickedLine} ·` : choice.pickedLine}
+      </Text>
+      {choice.canSwitch ? (
+        <Pressable
+          testID="choice-switch"
+          onPress={onSwitch}
+          accessibilityRole="button"
+          accessibilityLabel="Switch exercise"
+          accessibilityHint="Shows the options again"
+          style={({ pressed }) => [styles.switch, { paddingHorizontal: space[1] }, pressed && { opacity: pressedOpacity }]}
+        >
+          <Text style={[text('body'), styles.ink, styles.underline]}>Switch</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}

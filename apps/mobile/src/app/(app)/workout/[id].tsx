@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   formatRest,
   formatSetTarget,
+  sectionRuns,
   setLabels,
   type IsoDate,
   type Units,
@@ -18,7 +19,7 @@ import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { openableDemoUrl } from '@/lib/demo-link';
 import { openDemo } from '@/lib/open-demo';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
-import { blockRounds, formatDayLabel, supersetLetters } from '@/lib/workouts';
+import { blockRounds, formatDayLabel, orList, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -96,17 +97,30 @@ export default function WorkoutDetail() {
             <Text style={text('body')}>{formatDayLabel(detail.scheduledOn)}</Text>
           </View>
           {detail.doc.notes ? <Text style={text('body')}>{detail.doc.notes}</Text> : null}
-          {detail.doc.blocks.map((block, i) => (
-            <BlockCard
-              key={block.id}
-              block={block}
-              letter={letters[i] ?? null}
-              rounds={detail.rounds[i] ?? 0}
-              units={detail.units}
-              videoUrls={detail.videoUrls}
-              details={details}
-              onInfo={setInfoFor}
-            />
+          {/* Blocks under their section headings; a workout without sections is one run with no heading. */}
+          {sectionRuns(detail.doc.blocks, detail.doc.sections).map((run, r) => (
+            <Fragment key={run.section?.id ?? `none-${r}`}>
+              {run.section ? (
+                <Text testID={`preview-section-${r}`} style={text('sectionHeading')} accessibilityRole="header">
+                  {run.section.name}
+                </Text>
+              ) : null}
+              {run.blockIndexes.map((i) => {
+                const block = detail.doc.blocks[i];
+                return block ? (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    letter={letters[i] ?? null}
+                    rounds={detail.rounds[i] ?? 0}
+                    units={detail.units}
+                    videoUrls={detail.videoUrls}
+                    details={details}
+                    onInfo={setInfoFor}
+                  />
+                ) : null;
+              })}
+            </Fragment>
           ))}
         </>
       ) : null}
@@ -140,6 +154,7 @@ function BlockCard({
 }) {
   const { text, space } = useTheme();
   const superset = block.kind === 'superset';
+  const choice = block.kind === 'choice';
   return (
     <Card>
       {superset ? (
@@ -147,8 +162,22 @@ function BlockCard({
           {`Superset / circuit · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}`}
         </Text>
       ) : null}
+      {choice ? (
+        <View style={{ gap: space[1] }}>
+          <Text testID={`preview-pick-one-${block.id}`} style={text('sectionHeading')} accessibilityRole="header">
+            Pick one
+          </Text>
+          <Text style={text('body')}>{orList(block.exercises.map((e) => e.exerciseName))}</Text>
+        </View>
+      ) : null}
       {block.exercises.map((ex, i) => (
         <View key={ex.id} style={{ gap: space[2] }}>
+          {/* Between the options of a pick-one group. */}
+          {choice && i > 0 ? (
+            <Text style={[text('caption'), styles.centre]} accessibilityElementsHidden importantForAccessibility="no">
+              or
+            </Text>
+          ) : null}
           <ExerciseSection
             exercise={ex}
             label={superset && letter ? `${letter}${i + 1}` : null}
@@ -250,4 +279,5 @@ const styles = StyleSheet.create({
   setLabel: { minWidth: 24 },
   inkText: { color: palette.ink },
   flex: { flex: 1 },
+  centre: { textAlign: 'center' },
 });

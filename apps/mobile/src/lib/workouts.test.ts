@@ -6,6 +6,7 @@ import {
   groupByDay,
   initials,
   isFirstTimeClient,
+  orList,
   resolveVideoUrls,
   supersetLetters,
   toWorkoutSummary,
@@ -173,5 +174,20 @@ describe('blockRounds', () => {
     expect(() => blockRounds([{ exercises: [{ sets: [s('drop'), s('normal')] }] }])).toThrow(
       'A drop set must follow a normal or warm-up set.',
     );
+  });
+});
+
+describe('orList', () => {
+  it('joins two names with "or"', () => {
+    expect(orList(['Medicine Ball Slam', "Farmer's Walk"])).toBe("Medicine Ball Slam or Farmer's Walk");
+  });
+
+  it('joins three or more with commas and a last "or"', () => {
+    expect(orList(['A', 'B', 'C'])).toBe('A, B or C');
+  });
+
+  it('gives one name alone, and nothing for none', () => {
+    expect(orList(['A'])).toBe('A');
+    expect(orList([])).toBe('');
   });
 });

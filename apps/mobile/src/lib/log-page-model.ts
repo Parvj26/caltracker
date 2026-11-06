@@ -38,7 +38,7 @@ import {
   type WorkoutLogDoc,
 } from '@caltracker/shared';
 import type { LastResults } from './log-api';
-import { supersetLetters } from './workouts';
+import { orList, supersetLetters } from './workouts';
 
 export type StepperModel = {
   field: StepField;
@@ -196,8 +196,7 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** "A or B" (two options) or "A, B or C": the option names of a pick-one group. */
 function optionNames(block: LogBlockDoc): string {
-  const names = block.exercises.map((e) => e.exerciseName);
-  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+  return orList(block.exercises.map((e) => e.exerciseName));
 }
 
 /** "Core (Activation) · 1 of 2". */

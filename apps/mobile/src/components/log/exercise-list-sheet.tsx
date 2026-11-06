@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,16 +6,18 @@ import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-export type ExerciseListRow = { title: string; detail: string; done: boolean };
+export type ExerciseListRow = { pageIndex: number; title: string; detail: string; done: boolean };
+export type ExerciseListSection = { heading: string | null; rows: ExerciseListRow[] };
 
 /**
  * The exercise list (opened from the "2 of 5" pill): one row per page, a ✓ on finished ones; tapping a row jumps
- * there. At the bottom: + Add exercise and Discard workout. Every choice closes the sheet first and runs once it has
+ * there. Rows sit under their section's heading (testID exercise-list-heading-{n}, n counting headings shown);
+ * rows with no section have none, so a workout without sections looks as before. Row testIDs are page indexes. At the bottom: + Add exercise and Discard workout. Every choice closes the sheet first and runs once it has
  * gone, because iOS cannot show the picker or an alert while this sheet is still closing.
  */
 export function ExerciseListSheet({
   visible,
-  rows,
+  sections,
   current,
   onPick,
   onAdd,
@@ -23,7 +25,7 @@ export function ExerciseListSheet({
   onClose,
 }: {
   visible: boolean;
-  rows: ExerciseListRow[];
+  sections: ExerciseListSection[];
   /** The page on screen, marked in the list. */
   current: number;
   onPick: (index: number) => void;
@@ -65,33 +67,49 @@ export function ExerciseListSheet({
               </Text>
               <TextButton testID="exercise-list-close" title="Close" onPress={onClose} />
             </View>
-            {rows.map((row, i) => (
-              <Pressable
-                key={i}
-                testID={`exercise-row-${i}`}
-                onPress={() => choose(() => onPick(i))}
-                accessibilityRole="button"
-                accessibilityState={{ selected: i === current }}
-                accessibilityLabel={`${row.title}, ${row.detail}${row.done ? ', done' : ''}${i === current ? ', on screen' : ''}`}
-                style={({ pressed }) => [
-                  styles.row,
-                  {
-                    borderRadius: radius.card,
-                    padding: space[3],
-                    gap: space[3],
-                    borderColor: i === current ? palette.ink : palette.border,
-                  },
-                  row.done && styles.doneRow,
-                  pressed && { opacity: pressedOpacity },
-                ]}
-              >
-                <View style={[styles.flex, { gap: space[1] }]}>
-                  <Text style={[text('body'), styles.ink]}>{row.title}</Text>
-                  <Text style={[text('caption'), styles.ink]}>{row.detail}</Text>
-                </View>
-                {row.done ? <Text style={[text('sectionHeading'), styles.ink]}>✓</Text> : null}
-              </Pressable>
-            ))}
+            {sections.map((section, si) => {
+              const headingNo = sections.slice(0, si).filter((x) => x.heading !== null).length;
+              return (
+                <Fragment key={si}>
+                  {section.heading !== null ? (
+                    <Text
+                      testID={`exercise-list-heading-${headingNo}`}
+                      style={[text('sectionHeading'), si > 0 && { marginTop: space[2] }]}
+                      accessibilityRole="header"
+                    >
+                      {section.heading}
+                    </Text>
+                  ) : null}
+                  {section.rows.map((row) => (
+                    <Pressable
+                      key={row.pageIndex}
+                      testID={`exercise-row-${row.pageIndex}`}
+                      onPress={() => choose(() => onPick(row.pageIndex))}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: row.pageIndex === current }}
+                      accessibilityLabel={`${row.title}, ${row.detail}${row.done ? ', done' : ''}${row.pageIndex === current ? ', on screen' : ''}`}
+                      style={({ pressed }) => [
+                        styles.row,
+                        {
+                          borderRadius: radius.card,
+                          padding: space[3],
+                          gap: space[3],
+                          borderColor: row.pageIndex === current ? palette.ink : palette.border,
+                        },
+                        row.done && styles.doneRow,
+                        pressed && { opacity: pressedOpacity },
+                      ]}
+                    >
+                      <View style={[styles.flex, { gap: space[1] }]}>
+                        <Text style={[text('body'), styles.ink]}>{row.title}</Text>
+                        <Text style={[text('caption'), styles.ink]}>{row.detail}</Text>
+                      </View>
+                      {row.done ? <Text style={[text('sectionHeading'), styles.ink]}>✓</Text> : null}
+                    </Pressable>
+                  ))}
+                </Fragment>
+              );
+            })}
             <Button
               variant="secondary"
               title="+ Add exercise"
