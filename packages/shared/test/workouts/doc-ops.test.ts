@@ -487,6 +487,7 @@ describe('sections and pick-one groups', () => {
     const [, r1, r2] = d.blocks;
     expect(ids(moveBlock(d, r2!.id, 0))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
     expect(ids(moveBlock(d, r1!.id, 99))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
+    expect(ids(moveBlock(d, r1!.id, 4))).toEqual([d.blocks[0]!.id, r2!.id, r1!.id, d.blocks[3]!.id, d.blocks[4]!.id]);
     expect(() => valid(moveBlock(d, r1!.id, 4))).not.toThrow();
   });
 
@@ -502,6 +503,26 @@ describe('sections and pick-one groups', () => {
     expect(toTop.blocks[0]!.sectionId).toBeNull();
     expect(() => valid(toTop)).not.toThrow();
     expect(moveBlockToSection(d, d.blocks[0]!.id, ID(1))).toBe(d);
+  });
+
+  it('moveBlockToSection(null) lands after an unsectioned block that already exists', () => {
+    let d = emptyWorkout(makeId, 'X');
+    d = addStraightBlock(d, pick(1), makeId);
+    d = addSection(d, 'A', makeId);
+    d = addStraightBlock(d, pick(2), makeId);
+    d = addStraightBlock(d, pick(3), makeId);
+    const r = moveBlockToSection(d, d.blocks[2]!.id, null);
+    expect(r.blocks.map((b) => b.exercises[0]!.exerciseId)).toEqual([1, 3, 2].map(ID));
+    expect(r.blocks.map((b) => b.sectionId)).toEqual([null, null, d.sections[0]!.id]);
+    expect(() => valid(r)).not.toThrow();
+  });
+
+  it('removeSection on a freshly added empty section only drops the heading', () => {
+    const d = addSection(sectioned(), 'New', makeId);
+    const r = removeSection(d, d.sections[4]!.id);
+    expect(secs(r)).toEqual(secs(sectioned()));
+    expect(ids(r)).toEqual(ids(d));
+    expect(() => valid(r)).not.toThrow();
   });
 
   it('removeBlock removes a section when its last block goes, and keeps it otherwise', () => {

@@ -137,6 +137,7 @@ export {
   dropParentId,
   discardLog,
   finishLog,
+  pickChoice,
   removeLogExercise,
   reopenLog,
   removeLogSet,
@@ -175,6 +176,7 @@ export {
   isPlannedLog,
   logDurationS,
   logVolumeKg,
+  openSetCount,
   shouldAutoFinish,
 } from './logs/summary';
 export {
@@ -198,5 +200,5 @@ export type {
   WorkoutStatus,
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
-export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from './logs/flow';
+export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';

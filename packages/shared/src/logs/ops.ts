@@ -3,6 +3,7 @@ import { TARGET_FIELDS } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
 import type { SetValues } from './prefill';
 import { stepSetValue, type StepField } from './steppers';
+import { isChoiceLocked, isUnpickedSet } from './flow';
 import { canReopen } from './summary';
 import type { Units } from '../units/units';
 
@@ -72,6 +73,7 @@ function mapSet(
 }
 
 export function completeSet(log: WorkoutLogDoc, setId: string, nowIso: string): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   const r = mapSet(log, setId, (s) => ({ ...s, completedAt: nowIso }));
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
 }
@@ -83,6 +85,7 @@ export function completeSetWith(
   values: SetValues,
   nowIso: string,
 ): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   let skip = false;
   const r = mapSet(log, setId, (s) => {
     if (s.completedAt !== null) {
@@ -108,6 +111,7 @@ export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string)
 
 /** Typing into a field is not "activity" for the idle timers, so only the revision moves. */
 export function updateActual(log: WorkoutLogDoc, setId: string, patch: ActualPatch): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   const r = mapSet(log, setId, (s) => ({ ...s, ...patch }));
   return r.found ? { ...r.log, revision: log.revision + 1 } : log;
 }
@@ -132,6 +136,7 @@ export function stepActual(
   units: Units,
   shown: number | null,
 ): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   const key = ACTUAL_KEY[field];
   const set = log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets)).find((s) => s.id === setId);
   if (!set) return log;
@@ -310,6 +315,8 @@ export function removeLogExercise(log: WorkoutLogDoc, logExerciseId: string, now
   if (!log.blocks.some((b) => b.exercises.some((e) => e.id === logExerciseId))) return log;
   const blocks: LogBlockDoc[] = [];
   for (const b of log.blocks) {
+    // Taking one option out of a pick-one group takes the whole group out.
+    if (b.kind === 'choice' && b.exercises.some((e) => e.id === logExerciseId)) continue;
     const exercises = b.exercises.filter((e) => e.id !== logExerciseId);
     if (exercises.length === 0) continue;
     blocks.push(
@@ -319,6 +326,24 @@ export function removeLogExercise(log: WorkoutLogDoc, logExerciseId: string, now
     );
   }
   return touch(log, blocks, nowIso);
+}
+
+/**
+ * Sets (or with null, clears) the pick of a pick-one group; `logExerciseId` is the option's log exercise id.
+ * Refused (same object back) for a block that is not a pick-one group, an id that is not one of its options, or
+ * once the picked option has a done set and the id would change the pick.
+ */
+export function pickChoice(log: WorkoutLogDoc, blockId: string, logExerciseId: string | null, nowIso: string): WorkoutLogDoc {
+  const block = log.blocks.find((b) => b.id === blockId);
+  if (!block || block.kind !== 'choice') return log;
+  if (logExerciseId !== null && !block.exercises.some((e) => e.id === logExerciseId)) return log;
+  if (block.pickedExerciseId === logExerciseId) return log;
+  if (isChoiceLocked(block)) return log;
+  return touch(
+    log,
+    log.blocks.map((b) => (b.id === blockId ? { ...b, pickedExerciseId: logExerciseId } : b)),
+    nowIso,
+  );
 }
 
 export function setExerciseNote(
@@ -387,6 +412,7 @@ export function toggleSet(
     for (const e of b.exercises) {
       const s = e.sets.find((x) => x.id === setId);
       if (!s) continue;
+      if (s.completedAt === null && isUnpickedSet(log, setId)) return { log, completed: null };
       return s.completedAt === null
         ? { log: completeSet(log, setId, nowIso), completed: true }
         : { log: uncompleteSet(log, setId, nowIso), completed: false };
