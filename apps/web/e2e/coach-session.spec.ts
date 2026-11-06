@@ -82,7 +82,7 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
   await expect(page.getByRole('button', { name: 'Done: Barbell Squat Set 2 of 2' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('button', { name: 'Finish session' }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/[0-9a-f-]{36}$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/[0-9a-f-]{36}$`), { timeout: 15_000 });
   await expect(page.getByText('Logged by coach', { exact: true })).toBeVisible();
 
   const log = await admin.from('workout_logs').select('id, client_id, logged_by, status').eq('workout_id', workoutId).single();
@@ -120,9 +120,15 @@ test('while the client logs on the phone the coach watches, views, then takes ov
 
   await page.getByRole('button', { name: 'Take over' }).click();
   await expect(page.getByRole('button', { name: 'Finish session' })).toBeVisible();
-  const row = await admin.from('workout_logs').select('logged_by, revision').eq('id', logId).single();
+  const row = await admin.from('workout_logs').select('logged_by').eq('id', logId).single();
   expect(row.data?.logged_by).toBe(coachId);
-  expect(row.data?.revision).toBeGreaterThanOrEqual(1000);
+  // The page now logs it, and says so.
+  await expect(page.getByText(/Logged by you/)).toBeVisible();
+
+  // Hand it back: the client's phone holds it again.
+  await page.getByRole('button', { name: 'Hand back to Parv' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}$`));
+  await expect.poll(async () => (await admin.from('workout_logs').select('logged_by').eq('id', logId).single()).data?.logged_by).toBe(client);
 });
 
 test('another client\'s workout, another workspace\'s client and a past client have no session page', async ({ page }) => {

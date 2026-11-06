@@ -655,10 +655,11 @@ test('a missed past workout can be deleted or moved to another day, but not edit
   await expect(item(page, pastDate, workout)).toHaveCount(0);
   await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
   const menu = cell.getByRole('menu', { name: `Options for ${workout}` });
-  await expect(menu.getByRole('menuitem')).toHaveText(['Move to another day', 'Delete']);
+  // A missed workout can still be logged with the client (coach session logging).
+  await expect(menu.getByRole('menuitem')).toHaveText(['Log session', 'Move to another day', 'Delete']);
   await expect(menu.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: 'View log' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Move to another day' })).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'Log session' })).toBeFocused();
 
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   const confirm = page.getByRole('dialog', { name: `Delete ${workout}?` });

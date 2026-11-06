@@ -110,6 +110,19 @@ test('an in-progress log shows Training now', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Take over' })).toBeVisible();
 });
 
+test('the coach\'s own session in progress offers Continue session', async ({ page }) => {
+  const last = `Mine${unique()}`;
+  const clientId = await newClient(last);
+  const workoutId = await plan(clientId, 'Pull', dayOffset(0));
+  const coach = (await admin.auth.admin.listUsers({ perPage: 1000 })).data.users.find((u) => u.email === COACH_EMAIL)!;
+  created.logs.push(await seedLog(admin, { workspaceId, clientId, name: 'Pull', plannedWorkoutId: workoutId, status: 'in_progress', startedAt: new Date().toISOString(), loggedBy: coach.id }));
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const row = rowFor(page, last);
+  await expect(row.getByRole('link', { name: /^Continue session: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
+  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveCount(0);
+});
+
 test('the four tiles are the same height, linked or not', async ({ page }) => {
   await signInAsCoach(page);
   await page.goto('/home');
