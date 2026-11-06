@@ -88,11 +88,16 @@ export {
   addRound,
   addSet,
   addStraightBlock,
+  addStraightBlocks,
   addSuperset,
   addChoice,
   addChoiceOption,
   addSection,
+  copyFirstSetToAll,
+  DEFAULT_SETS,
+  MAX_SETS,
   emptyWorkout,
+  fillDown,
   moveBlock,
   moveBlockToSection,
   moveSection,
@@ -107,6 +112,9 @@ export {
   updateSet,
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
+export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate';
+export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
+export type { PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
 export {
   BAD_TODAY_ERROR,

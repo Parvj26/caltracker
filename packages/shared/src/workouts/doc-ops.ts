@@ -5,13 +5,18 @@ import { TARGET_FIELDS } from './targets';
 
 export type ExercisePick = { id: string; name: string; trackingType: TrackingType };
 
-const DEFAULT_ROUNDS = 3;
+/** Sets (or superset rounds) a new exercise starts with, and the most one exercise may have. */
+export const DEFAULT_SETS = 3;
+const DEFAULT_ROUNDS = DEFAULT_SETS;
 const DEFAULT_REST = 90;
-const MAX_SETS = 20;
+export const MAX_SETS = 20;
 const MAX_EXERCISES = 10;
 const MAX_BLOCKS = 30;
 const MAX_SECTIONS = 10;
 const MAX_SECTION_NAME = 40;
+
+/** A set count from the builder (1 to 20 sets; anything else is clamped or rounded). */
+const clampSets = (n: number): number => (Number.isFinite(n) ? Math.min(MAX_SETS, Math.max(1, Math.round(n))) : DEFAULT_ROUNDS);
 
 const lastSectionId = (doc: WorkoutDoc): string | null => doc.sections[doc.sections.length - 1]?.id ?? null;
 
@@ -75,18 +80,28 @@ export function emptyWorkout(makeId: () => string, name = ''): WorkoutDoc {
   return { id: makeId(), name, notes: null, sections: [], blocks: [] };
 }
 
-export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string): WorkoutDoc {
+export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string, sets = DEFAULT_ROUNDS): WorkoutDoc {
   if (doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
     sectionId: lastSectionId(doc),
     kind: 'straight',
-    exercises: [newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)],
+    exercises: [newExercise(ex, DEFAULT_REST, clampSets(sets), makeId)],
   };
   return { ...doc, blocks: [...doc.blocks, block] };
 }
 
-export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string): WorkoutDoc {
+/** Each pick becomes its own straight block, in pick order, until the 30-block cap. */
+export function addStraightBlocks(
+  doc: WorkoutDoc,
+  exs: readonly ExercisePick[],
+  makeId: () => string,
+  sets = DEFAULT_ROUNDS,
+): WorkoutDoc {
+  return exs.reduce((d, ex) => addStraightBlock(d, ex, makeId, sets), doc);
+}
+
+export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, rounds = DEFAULT_ROUNDS): WorkoutDoc {
   if (exs.length < 2) throw new Error('A superset needs at least two exercises.');
   if (exs.length > MAX_EXERCISES || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
@@ -94,7 +109,7 @@ export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => 
     sectionId: lastSectionId(doc),
     kind: 'superset',
     exercises: exs.map((ex, i) =>
-      newExercise(ex, i === exs.length - 1 ? DEFAULT_REST : 0, DEFAULT_ROUNDS, makeId),
+      newExercise(ex, i === exs.length - 1 ? DEFAULT_REST : 0, clampSets(rounds), makeId),
     ),
   };
   return { ...doc, blocks: [...doc.blocks, block] };
@@ -204,13 +219,13 @@ export function moveBlockToSection(doc: WorkoutDoc, blockId: string, sectionId: 
   return { ...doc, sections, blocks };
 }
 
-export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string): WorkoutDoc {
+export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, sets = DEFAULT_ROUNDS): WorkoutDoc {
   if (exs.length < MIN_CHOICE_OPTIONS || exs.length > MAX_CHOICE_OPTIONS || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
     sectionId: lastSectionId(doc),
     kind: 'choice',
-    exercises: exs.map((ex) => newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)),
+    exercises: exs.map((ex) => newExercise(ex, DEFAULT_REST, clampSets(sets), makeId)),
   };
   return { ...doc, blocks: [...doc.blocks, block] };
 }
@@ -381,4 +396,41 @@ export function replaceExercise(
       targetDistanceM: allowed.includes('distance') ? s.targetDistanceM : null,
     })),
   }));
+}
+
+/**
+ * "Fill down": copies one normal set's targets (reps, weight, time, distance) to every normal set below it in the
+ * same exercise. Warm-ups and drop sets are left alone, as are notes and set types, and other exercises (a superset's
+ * partners, a pick-one group's other options) are never touched. Rest is copied only where both sets show a rest
+ * box: in a superset an exercise that goes straight on to the next keeps its 0, and an extra round keeps its rest.
+ * Returns the same doc when there is nothing to copy from (unknown ids, a warm-up or a drop).
+ */
+export function fillDown(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, fromSetId: string): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  const ei = block ? block.exercises.findIndex((e) => e.id === workoutExerciseId) : -1;
+  const ex = block?.exercises[ei];
+  const from = ex ? ex.sets.findIndex((s) => s.id === fromSetId) : -1;
+  const source = ex?.sets[from];
+  if (!block || !ex || !source || source.setType !== 'normal') return doc;
+  const sourceRests = setShowsRest(block, ei, from);
+  const sets = ex.sets.map((s, si) => {
+    if (si <= from || s.setType !== 'normal') return s;
+    return {
+      ...s,
+      targetRepsMin: source.targetRepsMin,
+      targetRepsMax: source.targetRepsMax,
+      targetWeightKg: source.targetWeightKg,
+      targetDurationS: source.targetDurationS,
+      targetDistanceM: source.targetDistanceM,
+      restSeconds: sourceRests && setShowsRest(block, ei, si) ? source.restSeconds : s.restSeconds,
+    };
+  });
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets }));
+}
+
+/** "Copy set 1 to all sets": fill down from the exercise's first normal set. */
+export function copyFirstSetToAll(doc: WorkoutDoc, blockId: string, workoutExerciseId: string): WorkoutDoc {
+  const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === workoutExerciseId);
+  const first = ex?.sets.find((s) => s.setType === 'normal');
+  return first ? fillDown(doc, blockId, workoutExerciseId, first.id) : doc;
 }
