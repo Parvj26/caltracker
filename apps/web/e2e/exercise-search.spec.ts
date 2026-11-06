@@ -14,10 +14,14 @@ async function openPicker(page: Page, button = '+ Exercise') {
   return dialog;
 }
 
+async function demoCoachId(): Promise<string | undefined> {
+  const coach = await admin.auth.admin.listUsers({ perPage: 200 });
+  return coach.data.users.find((u) => u.email === 'coach@demo.local')?.id;
+}
+
 test.beforeEach(async ({ page }) => {
   await signInAsCoach(page);
-  const coach = await admin.auth.admin.listUsers({ perPage: 200 });
-  const id = coach.data.users.find((u) => u.email === 'coach@demo.local')?.id;
+  const id = await demoCoachId();
   if (id) await admin.from('exercise_favorites').delete().eq('coach_id', id);
 });
 
@@ -54,6 +58,12 @@ test('a starred exercise is the first row of an empty search', async ({ page }) 
   await dialog.getByLabel('Search exercises').fill('Plank');
   await dialog.getByRole('button', { name: 'Favourite Plank' }).click();
   await expect(dialog.getByRole('button', { name: 'Favourite Plank' })).toHaveAttribute('aria-pressed', 'true');
+  // The star shows at once, before the save reaches the server. Reloading the page now could cancel that save, so
+  // wait until the favourite is really stored.
+  const coachId = await demoCoachId();
+  await expect
+    .poll(async () => (await admin.from('exercise_favorites').select('exercise_id').eq('coach_id', coachId ?? '')).data?.length ?? 0)
+    .toBe(1);
   await dialog.getByRole('button', { name: 'Cancel' }).click();
 
   dialog = await openPicker(page);
