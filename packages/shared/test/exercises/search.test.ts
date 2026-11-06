@@ -17,9 +17,8 @@ import {
   type SearchFilters,
 } from '../../src/exercises/search';
 
-// Shared CI runners are several times slower than a developer machine; the budget still catches
-// a real regression (an order-of-magnitude slowdown) without flaking on a busy runner.
-const PERF_BUDGET_MS = process.env.CI ? 500 : 100;
+// This guards against an accidental O(n²) slowdown (many seconds), not runner speed, so CI gets a roomy budget.
+const PERF_BUDGET_MS = process.env.CI ? 1500 : 100;
 // Vitest's default 5 s limit times every pass, warm-ups included; on a busy CI runner that alone can exceed it.
 // The speed budget above is the real check, so give the whole loop room to finish.
 const PERF_TEST_TIMEOUT_MS = 30_000;
