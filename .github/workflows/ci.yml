@@ -5,9 +5,28 @@ on:
   push:
     branches: [main]
 
+# A newer push to the same branch or PR cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every job runs on the self-hosted Mac runner (`caltracker-mac`), a developer Mac shared with local Supabase stacks
+# (lane A "fitness-tracker" on 543xx, lane B "fitness-tracker-b" on 544xx). Jobs that start Supabase first run
+# scripts/ci-isolate-supabase.sh, which moves this checkout to project "fitness-tracker-ci" on 545xx (web app on 3300),
+# and always stop that stack at the end, so CI never touches the developers' stacks.
+# To go back to GitHub-hosted runners, change every `runs-on` back to `ubuntu-latest` (the isolation steps are harmless
+# there, and `playwright install` can take `--with-deps` again).
+env:
+  CI_SUPABASE_PROJECT_ID: fitness-tracker-ci
+  # Must match the ports scripts/ci-isolate-supabase.sh writes into supabase/config.toml.
+  MAILPIT_URL: http://127.0.0.1:54524
+  CI_SMTP_PORT: '54525'
+  E2E_WEB_PORT: '3300'
+  CI_SITE_URL: http://localhost:3300
+
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, caltracker-mac]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -19,12 +38,17 @@ jobs:
       - run: pnpm check
 
   db:
-    runs-on: ubuntu-latest
+    needs: check
+    runs-on: [self-hosted, caltracker-mac]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with:
           version: 2.67.1
+      - name: Use the CI project id and ports (never the developers' stacks)
+        run: bash scripts/ci-isolate-supabase.sh
+      - name: Remove a CI stack left over from a cancelled run
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID" || true
       # Start the full stack once: a bare `supabase db start` here makes a later
       # `supabase start` report "already running" and leave Auth/API stopped.
       - run: supabase start -x studio,imgproxy,vector,logflare,supavisor
@@ -53,10 +77,14 @@ jobs:
           eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
           : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
           SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
-            PUBLIC_SITE_URL=http://localhost:3000 pnpm test:integration
+            PUBLIC_SITE_URL=$CI_SITE_URL pnpm test:integration
+      - name: Stop the CI Supabase stack
+        if: always()
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
 
   e2e:
-    runs-on: ubuntu-latest
+    needs: check
+    runs-on: [self-hosted, caltracker-mac]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
@@ -67,6 +95,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Use the CI project id and ports (never the developers' stacks)
+        run: bash scripts/ci-isolate-supabase.sh
+      - name: Remove a CI stack left over from a cancelled run
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID" || true
       - name: Start Supabase and seed demo users
         run: |
           supabase start -x studio,imgproxy,vector,logflare,supavisor
@@ -74,16 +106,17 @@ jobs:
           bash scripts/reload-auth-templates.sh
       - name: Write Edge Function env (invite emails go to the local mail catcher)
         run: |
-          cat > supabase/functions/.env <<'EOF'
-          PUBLIC_SITE_URL=http://localhost:3000
+          cat > supabase/functions/.env <<EOF
+          PUBLIC_SITE_URL=$CI_SITE_URL
           INVITE_FROM_EMAIL=CalTracker <invites@caltracker.app>
           SMTP_HOST=host.docker.internal
-          SMTP_PORT=54325
+          SMTP_PORT=$CI_SMTP_PORT
           EOF
       - name: Write web env
         run: bash apps/web/scripts/write-local-env.sh
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      # --with-deps installs system packages with apt, which only exists on Linux runners.
+      - run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
         working-directory: apps/web
       - run: pnpm --filter web build
       - name: End-to-end tests
@@ -96,3 +129,6 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+      - name: Stop the CI Supabase stack
+        if: always()
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
