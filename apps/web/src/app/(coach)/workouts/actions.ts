@@ -81,7 +81,7 @@ export async function countProgramUses(id: string): Promise<number> {
 
 /** Set whether the signed-in coach has starred an exercise. Favourites are personal, not shared across the workspace. */
 export async function setFavourite(exerciseId: string, on: boolean): Promise<{ ok: boolean }> {
-  await requireCoach();
+  const { userId } = await requireCoach();
   if (!UUID.test(exerciseId) || typeof on !== 'boolean') return { ok: false };
   const supabase = await createServerSupabase();
   if (on) {
@@ -90,6 +90,7 @@ export async function setFavourite(exerciseId: string, on: boolean): Promise<{ o
       .upsert({ exercise_id: exerciseId }, { onConflict: 'coach_id,exercise_id', ignoreDuplicates: true });
     return { ok: !error };
   }
-  const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId);
+  // RLS already limits this to the coach's own rows; the filter says so too.
+  const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId).eq('coach_id', userId);
   return { ok: !error };
 }
