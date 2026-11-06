@@ -187,15 +187,15 @@ test('New PRs this week counts this week\'s personal records of current clients 
   const clientId = await newClient(`Prs${unique()}`);
   const squat = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
   if (squat.error) throw squat.error;
-  const bench = await admin.from('exercises').select('id').eq('name', 'Barbell Bench Press').is('workspace_id', null).limit(1).single();
-  if (bench.error) throw bench.error;
+  const deadlift = await admin.from('exercises').select('id').eq('name', 'Barbell Deadlift').is('workspace_id', null).limit(1).single();
+  if (deadlift.error) throw deadlift.error;
   const now = new Date().toISOString();
   const result = (logId: string, achievedAt: string) => ({
     ladder: null, drop: null, rare: [], landmarks: [], milestone: null,
     prs: [
       { exerciseId: squat.data.id, kind: 'heaviest', valueKg: 100, reps: 5, logId, achievedAt },
       { exerciseId: squat.data.id, kind: 'e1rm', valueKg: 116.7, reps: 5, logId, achievedAt },
-      { exerciseId: bench.data.id, kind: 'heaviest', valueKg: 80, reps: 5, logId, achievedAt },
+      { exerciseId: deadlift.data.id, kind: 'heaviest', valueKg: 80, reps: 5, logId, achievedAt },
     ],
   });
   // Today's workout: two lifts improved (the squat's two records count once). An old one does not count.

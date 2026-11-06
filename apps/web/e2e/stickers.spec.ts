@@ -53,7 +53,7 @@ async function seedClient(lastName: string) {
     admin.from('awards').insert({ log_id: logId, client_id: clientId, workspace_id: workspaceId, result: { ladder: null, drop: null, rare: [], landmarks: [], milestone: null, prs: [pr] } }),
     admin.from('client_stats').insert({ client_id: clientId, workspace_id: workspaceId, workouts: 12, streak: 3, streak_week: weekKey(new Date().toISOString(), 'UTC'), best_streak: 3, journey_week: 3, pr_count: 1 }),
     admin.from('sticker_awards').insert([
-      { client_id: clientId, workspace_id: workspaceId, sticker_key: 'axolotl', first_log_id: logId, last_earned_at: ago(60) },
+      { client_id: clientId, workspace_id: workspaceId, sticker_key: 'axolotl', first_log_id: logId, shiny: false, last_earned_at: ago(60) },
       { client_id: clientId, workspace_id: workspaceId, sticker_key: 'bison', first_log_id: logId, shiny: true, last_earned_at: ago(90) },
     ]),
     admin.from('personal_records').insert([
@@ -147,7 +147,7 @@ test('the client page charts an exercise\'s estimated max over time, with a keyb
 
   await signInAsCoach(page);
   await page.goto(`/clients/${clientId}`);
-  await page.getByLabel('Exercise').selectOption({ label: 'Barbell Squat' });
+  await page.getByLabel('Exercise', { exact: true }).selectOption({ label: 'Barbell Squat' });
   await expect(page.getByTestId('chart-point')).toHaveCount(3);
   // The newest workout (100 kg x 5, est. 116.7 kg) is the point read out first.
   await expect(page.getByTestId('chart-readout')).toContainText(/116\.7 kg|257 lb/);
