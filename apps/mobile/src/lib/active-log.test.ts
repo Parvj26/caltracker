@@ -9,6 +9,7 @@ import {
   keepEnded,
   keepFinished,
   goneNote,
+  unavailableNote,
   logChange,
   rejectedNote,
   reopenFrom,
@@ -326,6 +327,12 @@ describe('final review fixes', () => {
     expect(goneNote(null)).toBe('You’re no longer with your coach, so this workout wasn’t saved.');
     expect(rejectedNote('Upper A')).toBe(
       'Some sets from Upper A couldn’t be saved because the workout was already changed by your coach or on another device.',
+    );
+  });
+
+  it('words the unavailable-exercise note', () => {
+    expect(unavailableNote('Upper A')).toBe(
+      'Upper A couldn’t be saved because one of its exercises is no longer available. Ask your coach to check it.',
     );
   });
 
