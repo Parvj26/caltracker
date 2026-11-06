@@ -1,0 +1,12 @@
+/* Colours, sizes and weights only via var(--ct-*). */
+.wrap { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
+.chart { border-radius: var(--ct-radius-card); }
+.chart:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis { stroke: var(--ct-border); stroke-width: 2; }
+.tick { fill: var(--ct-ink-muted); font-size: 12px; font-family: var(--ct-font-sans), system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.line { fill: none; stroke: var(--ct-ink); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.point { fill: var(--ct-bg); stroke: var(--ct-ink); stroke-width: 2.5; }
+.pointActive { fill: var(--ct-lime); stroke: var(--ct-ink); stroke-width: 3; }
+.readout { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; }
+.summary { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }

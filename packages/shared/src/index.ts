@@ -181,6 +181,34 @@ export type {
   WorkoutStatus,
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
+export { LANDMARK_JOURNEY, STICKERS } from './awards/catalogue';
+export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogue';
+export { formatMultiple, isQualifying, ladderAnimal } from './awards/ladder';
+export { detectPrs, epley1rm, logBests } from './awards/prs';
+export type { PersonalRecord, PrKind } from './awards/prs';
+export { journeyStep, liveStreak, localDay, streakWeek, streakWeeks, weekKey } from './awards/streak';
+export { milestoneFor, newRareFinds } from './awards/rare';
+export type { ClientStats } from './awards/rare';
+export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
+export type { Rng } from './awards/rolls';
+export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
+export type { NamedRecord, PersonalBestRow } from './awards/bests';
+export { shortDate, strengthExercises, strengthSeries, strengthSummary } from './awards/strength-series';
+export type { StrengthPoint } from './awards/strength-series';
+export { awardPrEvents, prsThisWeek } from './awards/week-prs';
+export type { PrEvent } from './awards/week-prs';
+export { computeAward, revealCards } from './awards/award';
+export type { AwardInput, AwardResult, RevealCard } from './awards/award';
+export {
+  awardContext,
+  awardedStickers,
+  clientStatsAt,
+  firstLogExercises,
+  mergeRecords,
+  replayRecords,
+  safeTimeZone,
+} from './awards/history';
+export type { AwardContext } from './awards/history';
 export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
 export {

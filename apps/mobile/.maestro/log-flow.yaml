@@ -164,13 +164,14 @@ env:
       text: 'Drop 1 of 3'
     timeout: 10000
 
-# ---- Finish with sets left: asked, then the summary ----
+# ---- Finish with sets left: asked, then the sticker reveal and the summary ----
 - tapOn:
     id: finish-workout
 - extendedWaitUntil:
     visible: 'Finish with .* sets not done\? They won’t count\.'
     timeout: 10000
 - tapOn: 'Finish'
+- runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
     visible: '.* sets completed'
     timeout: 10000

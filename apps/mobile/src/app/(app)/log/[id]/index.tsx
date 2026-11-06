@@ -279,8 +279,9 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     ]);
 
   const finishNow = async () => {
-    // The summary replaces this screen, so Done (or back) on it returns to where the workout was started.
-    if (await finish()) router.replace({ pathname: '/log/[id]/summary', params: { id: log.id } });
+    // Finish, then the sticker reveal, then the summary. Each replaces this screen, so Done (or back) on the
+    // summary returns to where the workout was started.
+    if (await finish()) router.replace({ pathname: '/log/[id]/reveal', params: { id: log.id } });
   };
 
   const doFinish = () => {
