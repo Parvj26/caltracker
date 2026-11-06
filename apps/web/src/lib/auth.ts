@@ -51,7 +51,6 @@ export const requireCoach = cache(async (): Promise<CoachContext> => {
     lastName: profile.data?.last_name ?? '',
     workspaceId: row.workspace_id,
     workspaceName: row.workspaces?.name ?? '',
-    firstName: profile.data?.first_name ?? '',
     units: profile.data?.units === 'kg' ? 'kg' : 'lb',
     bio: profile.data?.bio ?? '',
     avatarPath: profile.data?.avatar_path ?? null,
