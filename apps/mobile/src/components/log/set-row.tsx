@@ -19,6 +19,7 @@ import {
 import { parseActualInput, type ActualField } from '@/lib/active-log-logic';
 import { actualInputMinFontScale, actualInputRoomChars, actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { SwipeToDelete } from './swipe-to-delete';
 
 const MAX_KG = 1000;
 const MAX_M = 1_000_000;
@@ -157,6 +158,7 @@ export function SetRow({
   onTick,
   onChange,
   onMenu,
+  onDelete,
 }: {
   set: LogSetDoc;
   /** "W", "1", "2" or "↳". */
@@ -168,6 +170,8 @@ export function SetRow({
   onTick: () => void;
   onChange: (patch: ActualPatch) => void;
   onMenu: () => void;
+  /** The swipe's Delete button: the same removal as "Remove set" in the menu. */
+  onDelete: () => void;
 }) {
   const { text, space, radius } = useTheme();
   const drop = set.setType === 'drop';
@@ -177,6 +181,7 @@ export function SetRow({
   const target = formatLogSetTarget(set.target, trackingType, units);
 
   return (
+    <SwipeToDelete testID={`set-delete-${index}`} label={`Delete ${setName.toLowerCase()}`} onDelete={onDelete}>
     <View
       testID={`set-${index}`}
       style={[
@@ -186,15 +191,27 @@ export function SetRow({
         done && styles.doneRow,
       ]}
     >
-      <Pressable
-        testID={`set-menu-${index}`}
-        onPress={onMenu}
-        accessibilityRole="button"
-        accessibilityLabel={`${setName} options`}
-        style={({ pressed }) => [styles.label, { borderRadius: radius.input }, pressed && styles.pressed]}
-      >
-        <Text style={text('sectionHeading')}>{label}</Text>
-      </Pressable>
+      <View>
+        <Pressable
+          testID={`set-menu-${index}`}
+          onPress={onMenu}
+          accessibilityRole="button"
+          accessibilityLabel={`${setName} options`}
+          style={({ pressed }) => [styles.label, { borderRadius: radius.input }, pressed && styles.pressed]}
+        >
+          <Text style={text('sectionHeading')}>{label}</Text>
+        </Pressable>
+        {/* Under the number so the value boxes keep their width on a phone. */}
+        <Pressable
+          testID={`set-more-${index}`}
+          onPress={onMenu}
+          accessibilityRole="button"
+          accessibilityLabel={`More for ${setName.toLowerCase()}`}
+          style={({ pressed }) => [styles.label, { borderRadius: radius.input }, pressed && styles.pressed]}
+        >
+          <Text style={text('sectionHeading')}>⋯</Text>
+        </Pressable>
+      </View>
 
       <View style={[styles.flex, { gap: space[2] }]}>
         {/* Text on the drop and lime pastels is always ink, never muted. */}
@@ -232,6 +249,7 @@ export function SetRow({
         <Text style={[text('screenTitle'), done ? styles.tickMarkDone : styles.tickMarkOpen]}>✓</Text>
       </Pressable>
     </View>
+    </SwipeToDelete>
   );
 }
 

@@ -1,0 +1,58 @@
+# Deleting a set while logging, two ways: the set's ⋯ button then Remove set, and swiping the row left then Delete.
+# "E2E Log" starts with 3 sets of Barbell Squat.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- tapOn:
+    text: Allow
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: set-0-2
+    timeout: 20000
+# ⋯ button, then Remove set: three sets become two.
+- tapOn:
+    id: set-more-0-1
+- tapOn:
+    id: menu-remove-set
+- assertNotVisible:
+    id: set-0-2
+- assertVisible:
+    id: set-0-1
+# Swipe the second row left, tap its Delete: one set left.
+# Start on the row's caption line, clear of the value boxes and the tick button.
+- swipe:
+    start: 62%,51%
+    end: 15%,51%
+- assertVisible:
+    id: set-delete-0-1
+- waitForAnimationToEnd
+- takeScreenshot: swipe-delete
+- tapOn:
+    id: set-delete-0-1
+- assertNotVisible:
+    id: set-0-1
+- assertVisible:
+    id: set-0-0
+# Tidy up.
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

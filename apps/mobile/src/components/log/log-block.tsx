@@ -12,6 +12,7 @@ export type BlockHandlers = {
   onSetMenu: (ex: LogExerciseDoc, set: LogSetDoc, label: string) => void;
   onExerciseMenu: (ex: LogExerciseDoc) => void;
   onExerciseInfo: (ex: LogExerciseDoc) => void;
+  onRemoveSet: (ex: LogExerciseDoc, set: LogSetDoc) => void;
   onAddSet: (ex: LogExerciseDoc) => void;
 };
 
@@ -74,6 +75,7 @@ export function LogBlock({
                 onTick={() => handlers.onTick(ex, set)}
                 onChange={(patch) => handlers.onChange(set, patch)}
                 onMenu={() => handlers.onSetMenu(ex, set, labels[si] ?? '')}
+                onDelete={() => handlers.onRemoveSet(ex, set)}
               />
             ))}
             <TextButton testID={`add-set-${ei}`} title="+ Set" onPress={() => handlers.onAddSet(ex)} />

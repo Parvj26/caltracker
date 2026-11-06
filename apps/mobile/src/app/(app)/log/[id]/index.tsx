@@ -140,6 +140,8 @@ export default function LogScreen() {
     onSetMenu: (ex, set, label) => setMenu({ kind: 'set', ex, set, label }),
     onExerciseMenu: (ex) => setMenu({ kind: 'exercise', ex }),
     onExerciseInfo: (ex) => setInfoFor(ex),
+    // The swipe's Delete button runs exactly what the set menu's "Remove set" runs.
+    onRemoveSet: (ex, set) => removeSet(ex, set),
     onAddSet: (ex) => void op((l) => addLogSet(l, ex.id, randomUUID, nowIso())),
   };
 
