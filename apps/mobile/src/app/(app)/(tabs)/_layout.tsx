@@ -17,7 +17,18 @@ function WorkoutsIcon({ color }: { color: ColorValue }) {
   );
 }
 
-// The other tabs in the spec (Progress, Messages, Community, Me) arrive with their phases.
+/** A small rising line: three bars of growing height. */
+function ProgressIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.barsIcon}>
+      {[0.4, 0.7, 1].map((h) => (
+        <View key={h} style={[styles.bar, { height: space[4.5] * h, backgroundColor: color }]} />
+      ))}
+    </View>
+  );
+}
+
+// The other tabs in the spec (Messages, Community, Me) arrive with their phases.
 export default function TabsLayout() {
   return (
     <Tabs
@@ -47,6 +58,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <WorkoutsIcon color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarButtonTestID: 'tab-progress',
+          tabBarIcon: ({ color }) => <ProgressIcon color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
@@ -60,5 +79,7 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.card,
     overflow: 'hidden',
   },
+  barsIcon: { width: space[4.5], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  bar: { flex: 1, borderRadius: 1 },
   calendarBar: { height: space[1] },
 });

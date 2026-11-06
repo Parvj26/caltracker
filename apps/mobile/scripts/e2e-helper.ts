@@ -9,12 +9,14 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import { localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
+import { addDays, localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
 
 let statusEnv: string | undefined;
 /** A value from `supabase status -o env` (read once). */
@@ -222,6 +224,39 @@ export async function cleanupLogs(email: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Deletes every body scan of the seed demo client (values cascade). Nobody else's. */
+export async function cleanupScans(email: string): Promise<void> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-scans only clears ${DEMO_CLIENT}`);
+  const id = await findUserId(DEMO_CLIENT);
+  if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
+  const { error } = await admin.from('body_measurements').delete().eq('client_id', id);
+  if (error) throw error;
+}
+
+/** Two coach-entered scans for the demo client (34 and 3 days ago): weight 82 kg then 80 kg, body fat 20% then 19%. Starts clean. */
+export async function seedScans(email: string): Promise<void> {
+  await cleanupScans(email);
+  const clientId = await findUserId(email);
+  if (!clientId) throw new Error(`User ${email} not found`);
+  // The flow types pounds, so make that explicit rather than rely on the default.
+  const { error: unitsErr } = await admin.from('profiles').update({ units: 'lb' }).eq('id', clientId);
+  if (unitsErr) throw unitsErr;
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  const coach = await coachClient();
+  try {
+    for (const [daysAgo, kg, fat] of [[34, 82, 20], [3, 80, 19]] as const) {
+      const measuredOn = addDays(localToday(), -daysAgo);
+      const { error } = await coach.rpc('save_body_measurement', {
+        p: { workspace_id: ws.id, client_id: clientId, measured_on: measuredOn, values: { weight_kg: kg, body_fat_pct: fat } },
+      });
+      if (error) throw error;
+    }
+  } finally {
+    await coach.auth.signOut();
+  }
+}
+
 /** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */
 export async function cleanupWorkouts(): Promise<void> {
   const steps = [
@@ -261,6 +296,8 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-workouts') await cleanupWorkouts();
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
+  else if (action === 'seed-scans') await seedScans(email);
+  else if (action === 'cleanup-scans') await cleanupScans(email);
   else throw new Error(`Unknown action ${action}`);
 }
 

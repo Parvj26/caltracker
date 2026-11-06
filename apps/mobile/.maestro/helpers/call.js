@@ -7,6 +7,7 @@
 //   cleanup-workouts   deletes every "E2E " workout, program and assignment (EMAIL is ignored; pass '-')
 //   assign-today       clears EMAIL's logs, then assigns "E2E Log" today: Barbell Squat 3 x 8 @ 60 kg, 90 s rests
 //   cleanup-logs       deletes every workout log of client@demo.local (refuses any other EMAIL)
+//   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);
