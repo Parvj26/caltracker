@@ -15,20 +15,20 @@ async function looksLikePdf(file: Blob): Promise<boolean> {
 /**
  * Gets a chosen file ready to upload: an image is shrunk on this device (long edge at most 1600 px) and saved as
  * WebP, or as JPEG at quality 0.85 when the browser cannot encode WebP; a PDF is kept as it is. Throws an Error with
- * the message to show when the file is not an image or a real PDF, or is over 5 MB.
+ * the message to show (`error`) when the file is not an image or a real PDF, or is over 5 MB. Documents use it too.
  */
-export async function preparePrintout(file: File): Promise<Printout> {
+export async function preparePrintout(file: File, error: string = PRINTOUT_ERROR): Promise<Printout> {
   if (file.type === 'application/pdf') {
-    if (file.size > MAX_PRINTOUT_BYTES || !(await looksLikePdf(file))) throw new Error(PRINTOUT_ERROR);
+    if (file.size > MAX_PRINTOUT_BYTES || !(await looksLikePdf(file))) throw new Error(error);
     return { blob: file, ext: 'pdf', contentType: 'application/pdf' };
   }
-  if (!file.type.startsWith('image/')) throw new Error(PRINTOUT_ERROR);
+  if (!file.type.startsWith('image/')) throw new Error(error);
 
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    throw new Error(PRINTOUT_ERROR);
+    throw new Error(error);
   }
   try {
     const scale = Math.min(1, LONG_EDGE / Math.max(bitmap.width, bitmap.height));
@@ -42,7 +42,7 @@ export async function preparePrintout(file: File): Promise<Printout> {
       webp?.type === 'image/webp'
         ? ({ blob: webp, ext: 'webp', contentType: 'image/webp' } as const)
         : await toBlob(canvas, 'image/jpeg', 0.85).then((b) => (b ? ({ blob: b, ext: 'jpg', contentType: 'image/jpeg' } as const) : null));
-    if (!out || out.blob.size > MAX_PRINTOUT_BYTES) throw new Error(PRINTOUT_ERROR);
+    if (!out || out.blob.size > MAX_PRINTOUT_BYTES) throw new Error(error);
     return out;
   } finally {
     bitmap.close();
