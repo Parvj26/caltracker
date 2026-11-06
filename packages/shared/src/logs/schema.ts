@@ -35,6 +35,31 @@ export const LogSetDoc = z.object({
 });
 export type LogSetDoc = z.infer<typeof LogSetDoc>;
 
+/**
+ * One way of doing a planned exercise that has coach-added substitutes: the planned exercise itself
+ * (substituteId null) or one substitute (its WorkoutSubstituteDoc id), with a snapshot of its planned sets.
+ */
+export const LogSubstituteOption = z.object({
+  substituteId: z.uuid().nullable(),
+  exerciseId: z.uuid(),
+  exerciseName: z.string(),
+  trackingType: TrackingTypeSchema,
+  /** The coach's note on that option ("use the blue band"); options saved before notes have none. */
+  note: z.string().max(500).nullable().default(null),
+  sets: z
+    .array(z.object({ setType: z.enum(SET_TYPES), target: LogSetTarget }))
+    .min(1)
+    .max(30),
+});
+export type LogSubstituteOption = z.infer<typeof LogSubstituteOption>;
+
+/**
+ * The exercise's own fields (exerciseId, name, tracking type, sets) are always what the client is doing. When the
+ * plan gave this exercise substitutes, `substituteOptions` lists every way to do it (the planned exercise first)
+ * and `substituteId` says which one the fields are: null for the planned exercise. Choosing another option
+ * (chooseSubstitute) swaps the fields, so everything that counts sets, volume or PRs only ever sees the exercise
+ * actually done, and options not chosen have no logged sets at all.
+ */
 export const LogExerciseDoc = z.object({
   id: z.uuid(),
   exerciseId: z.uuid(),
@@ -44,6 +69,9 @@ export const LogExerciseDoc = z.object({
   swappedFromExerciseId: z.uuid().nullable(),
   note: z.string().max(500).nullable(),
   sets: z.array(LogSetDoc).min(1).max(30),
+  /** Logs saved before substitutes have neither. */
+  substituteId: z.uuid().nullable().default(null),
+  substituteOptions: z.array(LogSubstituteOption).max(4).default([]),
 });
 export type LogExerciseDoc = z.infer<typeof LogExerciseDoc>;
 
@@ -105,6 +133,21 @@ export const WorkoutLogDoc = z
         });
       }
       block.exercises.forEach((ex, ei) => {
+        const keys = ex.substituteOptions.map((o) => o.substituteId);
+        if (new Set(keys).size !== keys.length) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Each substitute option appears once.',
+            path: ['blocks', bi, 'exercises', ei, 'substituteOptions'],
+          });
+        }
+        if (ex.substituteId !== null && !keys.includes(ex.substituteId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'The substitute must be one of the options.',
+            path: ['blocks', bi, 'exercises', ei, 'substituteId'],
+          });
+        }
         ex.sets.forEach((s, si) => {
           if (s.completedAt !== null) completedSets += 1;
           if (s.completedAt !== null && block.kind === 'choice' && ex.id !== block.pickedExerciseId) {

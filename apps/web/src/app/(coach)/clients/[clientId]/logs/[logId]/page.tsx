@@ -13,6 +13,8 @@ import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
 import { ClientNote } from './planned-vs-actual';
 import styles from './log.module.css';
+import { LiveRefresh } from '@/components/live-refresh';
+import { renderTime } from '@/lib/live-refresh';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string; logId: string }> }): Promise<Metadata> {
   const { clientId, logId } = await params;
@@ -94,6 +96,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
 
       <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />
       <Comments logId={log.id} comments={commentViews} />
+      <LiveRefresh on={[{ table: 'workout_logs', filter: `id=eq.${log.id}` }, { table: 'awards', filter: `log_id=eq.${log.id}` }]} renderedAt={renderTime()} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ export function duplicateWorkoutDoc(doc: WorkoutDoc, makeId: () => string): Work
         ...e,
         id: makeId(),
         sets: e.sets.map((s) => ({ ...s, id: makeId() })),
+        substitutes: e.substitutes.map((sub) => ({ ...sub, id: makeId(), sets: sub.sets.map((s) => ({ ...s, id: makeId() })) })),
       })),
     })),
   };

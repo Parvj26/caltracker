@@ -150,3 +150,16 @@
 .customSection { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
 .moveSelect { min-height: var(--ct-tap-min); cursor: pointer; }
 .blockHelp { margin: 0; }
+
+/* ---------- Substitutes ---------- */
+.substitute {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2);
+  margin-left: var(--ct-space-4);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-left: var(--ct-border-width-card) solid var(--ct-border);
+}
+.substituteName { font-weight: var(--ct-weight-section-heading); }
+.substituteBody { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.substituteBody[hidden] { display: none; }

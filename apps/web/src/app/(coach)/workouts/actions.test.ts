@@ -83,6 +83,7 @@ describe('duplicateWorkout', () => {
             sets: [
               { id: id(4), setType: 'normal', targetRepsMin: 5, targetRepsMax: 5, targetWeightKg: 100, targetDurationS: null, targetDistanceM: null, toFailure: false, restSeconds: 120, note: null },
             ],
+            substitutes: [],
           },
         ],
       },
