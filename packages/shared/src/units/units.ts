@@ -19,21 +19,21 @@ export function toKg(value: number, unit: Units): number {
   return round(unit === 'lb' ? value * KG_PER_LB : value, 3);
 }
 
-/** Converts stored kilograms to the display unit, rounded to 1 decimal. */
+/** Converts stored kilograms to the display unit: whole pounds, or kilograms to 1 decimal. */
 export function fromKg(kg: number, unit: Units): number {
-  return round(unit === 'lb' ? kg / KG_PER_LB : kg, 1);
+  return unit === 'lb' ? round(kg / KG_PER_LB, 0) : round(kg, 1);
 }
 
 /**
  * The number an editable weight box shows. kg: the stored value to 3 decimals, so 61.25 typed stays 61.25.
- * lb: fromKg to 1 decimal, so 135 lb (stored 61.235 kg) reads back as 135.
+ * lb: fromKg to a whole pound, so 135 lb (stored 61.235 kg) reads back as 135.
  */
 export function kgToInput(kg: number, unit: Units): number {
   return unit === 'kg' ? round(kg, 3) : fromKg(kg, unit);
 }
 
 export function formatWeight(kg: number, unit: Units): string {
-  return `${trim(fromKg(kg, unit), 1)} ${unit}`;
+  return `${trim(fromKg(kg, unit), unit === 'lb' ? 0 : 1)} ${unit}`;
 }
 
 export function distanceUnitFor(units: Units): DistanceUnit {

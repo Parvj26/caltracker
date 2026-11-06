@@ -89,14 +89,35 @@ describe('clock durations', () => {
   });
 });
 
+describe('pounds are whole numbers', () => {
+  it('rounds converted pounds to the nearest whole pound', () => {
+    expect(fromKg(60, 'lb')).toBe(132);
+    expect(fromKg(61.235, 'lb')).toBe(135);
+    expect(fromKg(0, 'lb')).toBe(0);
+    expect(fromKg(22.68, 'lb')).toBe(50);
+  });
+  it('rounds half a pound up', () => {
+    expect(fromKg(toKg(132.5, 'lb'), 'lb')).toBe(133);
+    expect(fromKg(toKg(132.4, 'lb'), 'lb')).toBe(132);
+  });
+  it('formats pounds without decimals', () => {
+    expect(formatWeight(60, 'lb')).toBe('132 lb');
+    expect(formatWeight(0, 'lb')).toBe('0 lb');
+  });
+  it('still saves a typed half pound exactly', () => {
+    expect(toKg(132.5, 'lb')).toBe(60.101);
+  });
+});
+
 describe('kgToInput', () => {
   it('shows a kg coach the kilograms they typed, to 3 decimals', () => {
     expect(kgToInput(61.25, 'kg')).toBe(61.25);
     expect(kgToInput(60, 'kg')).toBe(60);
     expect(kgToInput(61.2345, 'kg')).toBe(61.235);
   });
-  it('shows a lb coach pounds to 1 decimal, so 135 lb stays 135', () => {
+  it('shows a lb coach whole pounds, so 135 lb stays 135', () => {
     expect(kgToInput(61.235, 'lb')).toBe(135);
-    expect(kgToInput(toKg(135.5, 'lb'), 'lb')).toBe(135.5);
+    expect(kgToInput(60, 'lb')).toBe(132);
+    expect(kgToInput(0, 'lb')).toBe(0);
   });
 });
