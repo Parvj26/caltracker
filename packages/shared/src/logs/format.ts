@@ -118,9 +118,10 @@ function sharedTarget(ex: PlanOf, units: Units): string | null {
   return same ? text : null;
 }
 
-/** "3 × 10 reps · 50 lb" when the working sets share one target, else "3 sets" ("1 set"). */
-export function planSummary(ex: PlanOf, units: Units): string {
+/** "3 × 10 reps · 50 lb" when the working sets share one target, else "3 sets" ("1 set"); null with no working sets. */
+export function planSummary(ex: PlanOf, units: Units): string | null {
   const count = ex.sets.filter((s) => s.setType === 'normal').length;
+  if (count === 0) return null;
   const shared = sharedTarget(ex, units);
   if (shared !== null) return `${count} × ${shared}`;
   return `${count} ${count === 1 ? 'set' : 'sets'}`;
@@ -130,7 +131,8 @@ export function planSummary(ex: PlanOf, units: Units): string {
 export function coachLine(ex: PlanOf, setIndex: number, units: Units): string | null {
   const set = ex.sets[setIndex];
   if (!set) return null;
-  if (set.setType === 'normal' && sharedTarget(ex, units) !== null) return `Coach: ${planSummary(ex, units)}`;
+  const plan = set.setType === 'normal' && sharedTarget(ex, units) !== null ? planSummary(ex, units) : null;
+  if (plan !== null) return `Coach: ${plan}`;
   const own = formatLogSetTarget(set.target, ex.trackingType, units);
   return own === '—' ? null : `Coach: ${own}`;
 }

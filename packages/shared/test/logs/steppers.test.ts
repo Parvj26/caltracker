@@ -31,4 +31,13 @@ describe('stepSetValue', () => {
     expect(fromMeters(stepSetValue('distance', m, -1, 'lb') as number, 'mi')).toBe(1.4);
     expect(stepSetValue('distance', null, 1, 'kg')).toBe(toMeters(0.1, 'km'));
   });
+
+  it('refuses to pass the highest reps, duration and distance the log accepts', () => {
+    expect(stepSetValue('reps', 1000, 1, 'kg')).toBe(1000);
+    expect(stepSetValue('reps', 999, 1, 'kg')).toBe(1000);
+    expect(stepSetValue('duration', 86400, 1, 'kg')).toBe(86400);
+    expect(stepSetValue('duration', 86390, 1, 'kg')).toBe(86390);
+    expect(stepSetValue('distance', 1_000_000, 1, 'kg')).toBe(1_000_000);
+    expect(stepSetValue('distance', 1_000_000, 1, 'lb')).toBe(1_000_000);
+  });
 });

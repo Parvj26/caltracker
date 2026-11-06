@@ -61,6 +61,12 @@ export function blockSteps(block: LogBlockDoc): Step[] {
   return steps;
 }
 
+/** The longest planned rest among a superset round's main sets (0 when none): what Done waits after the round. */
+export function roundRestSeconds(block: LogBlockDoc, round: number): number {
+  const mains = block.exercises.flatMap((_, i) => exerciseGroups(block, i)[round - 1]?.slice(0, 1) ?? []);
+  return Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+}
+
 export function blockRoundCount(block: LogBlockDoc): number {
   return Math.max(0, ...block.exercises.map((_, i) => exerciseGroups(block, i).length));
 }
@@ -120,10 +126,14 @@ export function afterDone(log: WorkoutLogDoc, blockIndex: number, setId: string)
   }
 
   // A drop chain rests with its main set; a superset round uses the longest rest in the round.
-  const mains = superset
-    ? block.exercises.flatMap((_, i) => exerciseGroups(block, i)[step.round - 1]?.slice(0, 1) ?? [])
-    : steps.filter((s) => s.exerciseIndex === step.exerciseIndex && s.round === step.round && s.kind !== 'drop');
-  const seconds = Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+  const seconds = superset
+    ? roundRestSeconds(block, step.round)
+    : Math.max(
+        0,
+        ...steps
+          .filter((s) => s.exerciseIndex === step.exerciseIndex && s.round === step.round && s.kind !== 'drop')
+          .map((m) => setOf(block, m).target.restSeconds ?? 0),
+      );
   const round = superset ? step.round : null;
   if (seconds > 0) return { kind: 'rest', seconds, round };
   return { kind: 'next', round, pageDone: !openElsewhere(block) };

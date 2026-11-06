@@ -139,6 +139,13 @@ describe('planSummary and coachLine', () => {
     expect(planSummary(pyramid, 'kg')).toBe('2 sets');
     expect(planSummary(ex([logSet('normal', { repsMin: null, repsMax: null, weightKg: null })]), 'kg')).toBe('1 set');
   });
+  it('words a to-failure plan', () => {
+    const f = { repsMin: null, repsMax: null, toFailure: true };
+    expect(planSummary(ex([logSet('normal', f), logSet('normal', f), logSet('normal', f)]), 'kg')).toBe('3 × To failure');
+  });
+  it('is null when there are no working sets', () => {
+    expect(planSummary(ex([logSet('warmup'), logSet('drop')]), 'kg')).toBeNull();
+  });
   it('shows the plan on working sets and the own target otherwise', () => {
     const uniform = ex([logSet('warmup', { weightKg: 20 }), logSet('normal'), logSet('normal')]);
     expect(coachLine(uniform, 1, 'kg')).toBe('Coach: 2 × 8–10 reps · 60 kg');

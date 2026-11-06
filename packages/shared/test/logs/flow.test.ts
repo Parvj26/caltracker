@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock } from '../../src/logs/flow';
+import { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from '../../src/logs/flow';
 import { removeLogSet } from '../../src/logs/ops';
 import { startLogFromWorkout } from '../../src/logs/start';
 import type { WorkoutLogDoc } from '../../src/logs/schema';
@@ -256,5 +256,17 @@ describe('nextOpenBlock', () => {
   it('is null when everything is done', () => {
     const log = tickBlock(tickBlock(fresh(), 0), 1);
     expect(nextOpenBlock(log, 0)).toBeNull();
+  });
+});
+
+describe('roundRestSeconds', () => {
+  it('is the longest main-set rest in the round, 0 when none', () => {
+    const log = fresh();
+    const [a, b] = [ids(log, 1, 0), ids(log, 1, 1)];
+    expect(roundRestSeconds(log.blocks[1]!, 1)).toBe(90);
+    const only = withRest(withRest(log, a[0]!, 0), b[0]!, 120);
+    expect(roundRestSeconds(only.blocks[1]!, 1)).toBe(120);
+    expect(roundRestSeconds(withRest(withRest(log, a[0]!, 0), b[0]!, 0).blocks[1]!, 1)).toBe(0);
+    expect(roundRestSeconds(log.blocks[1]!, 9)).toBe(0);
   });
 });
