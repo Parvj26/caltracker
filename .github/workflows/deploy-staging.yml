@@ -128,7 +128,7 @@ jobs:
 
       - name: Apply database migrations
         if: steps.newest.outputs.skip != 'true'
-        run: supabase db push
+        run: supabase db push --include-all
 
       - name: Set Edge Function secrets
         if: steps.newest.outputs.skip != 'true'
