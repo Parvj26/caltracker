@@ -147,7 +147,8 @@ test('the client page charts an exercise\'s estimated max over time, with a keyb
 
   await signInAsCoach(page);
   await page.goto(`/clients/${clientId}`);
-  await page.getByLabel('Exercise', { exact: true }).selectOption({ label: 'Barbell Squat' });
+  // The wrapping <label> also contains the options' text, so match the select by role and a name that starts with "Exercise".
+  await page.getByRole('combobox', { name: /^Exercise/ }).selectOption({ label: 'Barbell Squat' });
   await expect(page.getByTestId('chart-point')).toHaveCount(3);
   // The newest workout (100 kg x 5, est. 116.7 kg) is the point read out first.
   await expect(page.getByTestId('chart-readout')).toContainText(/116\.7 kg|257 lb/);
