@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { completedSetCount, openSetCount, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { Button, Card, ErrorText } from '@/components/ui';
@@ -10,12 +10,10 @@ import { PlannedVsActual } from '../../logs/[logId]/planned-vs-actual';
 import { takeOverSession } from './actions';
 import styles from './session.module.css';
 
-/** How often the page reads the client's progress again while they log on the phone. */
-const REFRESH_MS = 10_000;
-
 /**
  * Someone else is logging this workout (single active logger): the client on their phone, or another coach. The
- * coach sees the progress, read again every few seconds, and can take over (the phone then shows "Your coach is
+ * coach sees the progress live (the page's LiveRefresh re-renders it whenever the log changes, and moves on to the
+ * finished log when they finish) and can take over (the phone then shows "Your coach is
  * logging this session" and stops editing) or just watch.
  */
 export function ClientLogging({
@@ -34,13 +32,6 @@ export function ClientLogging({
   const [viewing, setViewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  // Live progress without a host-specific push channel: the server page is read again on a timer. When the client
-  // finishes, the page moves on to the finished log by itself.
-  useEffect(() => {
-    const timer = setInterval(() => router.refresh(), REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [router]);
 
   const total = completedSetCount(log) + openSetCount(log);
 

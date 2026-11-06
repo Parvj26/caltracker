@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { completedSetCount } from '@caltracker/shared';
+import { LiveRefresh } from '@/components/live-refresh';
 import { requireCoach } from '@/lib/auth';
+import { renderTime } from '@/lib/live-refresh';
 import { loadLastTimes, loadSessionState } from '@/lib/coach-session';
 import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
 import { pageTitle } from '@/lib/page-titles';
@@ -76,6 +78,8 @@ export default async function SessionPage({ params }: { params: Promise<{ client
     return (
       <div className={styles.page}>
         {back}
+        {/* Live progress: the page re-renders when the log row changes (each save of the phone updates it). */}
+        <LiveRefresh on={[{ table: 'workout_logs', filter: `id=eq.${log.id}` }]} renderedAt={renderTime()} />
         <ClientLogging holder={holder} log={log} units={units} done={completedSetCount(log)} />
       </div>
     );
