@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { LANDMARK_JOURNEY, STICKERS } from '@caltracker/shared';
-import { albumModel, parseAlbumCache, workoutShareLine, type AlbumAward, type AlbumStats } from './album-logic';
+import { albumCacheKey, albumCachePrefix, albumModel, parseAlbumCache, workoutShareLine, type AlbumAward, type AlbumStats } from './album-logic';
 
 const stats = (over: Partial<AlbumStats> = {}): AlbumStats => ({
   workouts: 0,
   streak: 0,
+  streakWeek: null,
   bestStreak: 0,
   journeyWeek: 0,
   prCount: 0,
@@ -88,9 +89,33 @@ describe('albumModel', () => {
   });
 });
 
+describe('albumModel streak as of this week', () => {
+  it('keeps a streak whose last week is this week or last week', () => {
+    expect(albumModel([], stats({ streak: 3, streakWeek: '2026-11-02' }), 'kg', '2026-11-02').journey.streak).toBe(3);
+    expect(albumModel([], stats({ streak: 3, streakWeek: '2026-10-26' }), 'kg', '2026-11-02').journey.streak).toBe(3);
+  });
+  it('shows 0 once a whole week went by without a workout', () => {
+    const m = albumModel([], stats({ streak: 3, streakWeek: '2026-10-19' }), 'kg', '2026-11-02');
+    expect(m.journey.streak).toBe(0);
+    expect(m.journey.title).toBe('🔥 0-week streak');
+    expect(m.journey.dots.every((d) => !d.reached)).toBe(true);
+  });
+});
+
+describe('albumCacheKey', () => {
+  it('keeps one copy per coach, all under the user prefix', () => {
+    expect(albumCacheKey('u1', 'wsA')).not.toBe(albumCacheKey('u1', 'wsB'));
+    expect(albumCacheKey('u1', 'wsA').startsWith(`${albumCachePrefix('u1')}.`)).toBe(true);
+  });
+});
+
 describe('parseAlbumCache', () => {
+  it('reads an old copy without a streak week as having none', () => {
+    const old = { awards: [], stats: { workouts: 1, streak: 2, bestStreak: 2, journeyWeek: 2, prCount: 0, lifetimeVolumeKg: 0 } };
+    expect(parseAlbumCache(JSON.stringify(old))?.stats?.streakWeek).toBeNull();
+  });
   it('round-trips and rejects junk', () => {
-    const data = { awards: [award('cat')], stats: stats({ streak: 1 }) };
+    const data = { awards: [award('cat')], stats: stats({ streak: 1, streakWeek: '2026-11-02' }) };
     expect(parseAlbumCache(JSON.stringify(data))).toEqual(data);
     expect(parseAlbumCache('nope')).toBeNull();
     expect(parseAlbumCache(null)).toBeNull();

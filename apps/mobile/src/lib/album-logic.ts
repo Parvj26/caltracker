@@ -5,6 +5,7 @@ import {
   STICKERS,
   formatLogVolume,
   formatMultiple,
+  liveStreak,
   type RareRequirement,
   type StickerDef,
   type Units,
@@ -13,7 +14,10 @@ import {
 export type AlbumAward = { key: string; count: number; shiny: boolean; firstEarnedAt: string };
 export type AlbumStats = {
   workouts: number;
+  /** The streak as of the client's last awarded workout; see streakWeek. */
   streak: number;
+  /** The Monday of the streak's last week (client_stats.streak_week), or null. */
+  streakWeek: string | null;
   bestStreak: number;
   journeyWeek: number;
   prCount: number;
@@ -65,7 +69,16 @@ export function requirementText(req: RareRequirement, units: Units): string {
   }
 }
 
-export function albumModel(awards: readonly AlbumAward[], stats: AlbumStats | null, units: Units = 'kg'): AlbumModel {
+/**
+ * `currentWeek` is this week's Monday on the phone: the stored streak is shown as it stands now (0 once a whole week
+ * went by without a workout). Without it the stored streak is shown as is.
+ */
+export function albumModel(
+  awards: readonly AlbumAward[],
+  stats: AlbumStats | null,
+  units: Units = 'kg',
+  currentWeek?: string,
+): AlbumModel {
   const owned = new Map(awards.filter((a) => byKey.has(a.key)).map((a) => [a.key, a]));
   const item = (def: StickerDef): AlbumItem => {
     const a = owned.get(def.key);
@@ -89,7 +102,7 @@ export function albumModel(awards: readonly AlbumAward[], stats: AlbumStats | nu
     .sort((a, b) => (a.weightKg ?? 0) - (b.weightKg ?? 0))
     .map(item);
   const rare = ofKind('rare').map(item);
-  const streak = stats?.streak ?? 0;
+  const streak = !stats ? 0 : currentWeek ? liveStreak(stats.streak, stats.streakWeek, currentWeek) : stats.streak;
   const next = LANDMARK_JOURNEY.find((s) => s.week > streak) ?? null;
 
   return {
@@ -112,7 +125,10 @@ export function albumModel(awards: readonly AlbumAward[], stats: AlbumStats | nu
 
 // ---- the copy kept on the phone ------------------------------------------------------------------------
 
-export const albumCacheKey = (userId: string) => `caltracker.album.${userId}`;
+/** Every saved copy of this user's book starts with this. */
+export const albumCachePrefix = (userId: string) => `caltracker.album.${userId}`;
+/** One saved copy per user and coach: a client who joins a new coach starts a fresh book there. */
+export const albumCacheKey = (userId: string, workspaceId: string) => `${albumCachePrefix(userId)}.${workspaceId}`;
 
 const isAward = (v: unknown): v is AlbumAward => {
   if (typeof v !== 'object' || v === null) return false;
@@ -133,7 +149,9 @@ export function parseAlbumCache(raw: string | null): AlbumData | null {
     if (!Array.isArray(v.awards) || !v.awards.every(isAward)) return null;
     const s = v.stats;
     const stats =
-      typeof s === 'object' && s !== null && typeof (s as AlbumStats).streak === 'number' ? (s as AlbumStats) : null;
+      typeof s === 'object' && s !== null && typeof (s as AlbumStats).streak === 'number'
+        ? { ...(s as AlbumStats), streakWeek: typeof (s as AlbumStats).streakWeek === 'string' ? (s as AlbumStats).streakWeek : null }
+        : null;
     return { awards: v.awards, stats };
   } catch {
     return null;

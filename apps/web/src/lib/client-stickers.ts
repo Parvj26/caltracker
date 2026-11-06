@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { personalBestRows, STICKERS } from '@caltracker/shared';
+import { liveStreak, personalBestRows, safeTimeZone, STICKERS, weekKey } from '@caltracker/shared';
 import type { Database, PersonalBestRow } from '@caltracker/shared';
 
 export const RECENT_STICKERS = 6;
@@ -14,10 +14,20 @@ export type ClientStickers = {
   bests: PersonalBestRow[];
 };
 
-/** A client's streak, zoo book and personal bests, read through the coach's own session (RLS limits it to the workspace). */
-export async function loadClientStickers(supabase: SupabaseClient<Database>, workspaceId: string, clientId: string): Promise<ClientStickers> {
-  const [stats, owned, recent, records] = await Promise.all([
-    supabase.from('client_stats').select('streak, best_streak').eq('workspace_id', workspaceId).eq('client_id', clientId).maybeSingle(),
+/**
+ * A client's streak, zoo book and personal bests in this workspace, read through the coach's own session (RLS limits
+ * it to the workspace). The stored streak is as of the client's last workout; it is shown as it stands this week in
+ * the client's time zone (0 once a whole week passed without a workout).
+ */
+export async function loadClientStickers(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  clientId: string,
+  now: Date = new Date(),
+): Promise<ClientStickers> {
+  const [stats, profile, owned, recent, records] = await Promise.all([
+    supabase.from('client_stats').select('streak, streak_week, best_streak').eq('workspace_id', workspaceId).eq('client_id', clientId).maybeSingle(),
+    supabase.from('profiles').select('time_zone').eq('id', clientId).maybeSingle(),
     supabase.from('sticker_awards').select('sticker_key', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('client_id', clientId),
     supabase
       .from('sticker_awards')
@@ -41,7 +51,10 @@ export async function loadClientStickers(supabase: SupabaseClient<Database>, wor
 
   const names = new Map(STICKERS.map((s) => [s.key, s.name]));
   return {
-    streak: stats.data?.streak ?? 0,
+    // A profile the coach cannot read (or a bad zone) falls back to UTC, as on the strength chart.
+    streak: stats.data
+      ? liveStreak(stats.data.streak, stats.data.streak_week, weekKey(now.toISOString(), safeTimeZone(profile.data?.time_zone)))
+      : 0,
     bestStreak: stats.data?.best_streak ?? 0,
     collected: owned.count ?? 0,
     total: STICKERS.length,

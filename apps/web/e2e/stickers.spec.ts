@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { weekKey } from '@caltracker/shared';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 
 // The coach's side of stickers: a client's streak, zoo book and personal bests, and the PR chip (Task 7 of the
@@ -27,7 +28,10 @@ test.afterAll(async () => {
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
-/** A new client with a finished squat log, a PR award for it, a 3-week streak, two stickers and a squat best. */
+/**
+ * A new client with a finished squat log, a PR award for it, a 3-week streak (still running: its last week is this
+ * one, in the client's default UTC zone), two stickers and a squat best.
+ */
 async function seedClient(lastName: string) {
   const u = await admin.auth.admin.createUser({
     email: `stk-${unique()}@example.com`,
@@ -47,7 +51,7 @@ async function seedClient(lastName: string) {
   const pr = { exerciseId: squatId, kind: 'heaviest', valueKg: 100, reps: 5, logId, achievedAt: ago(60) };
   const steps = [
     admin.from('awards').insert({ log_id: logId, client_id: clientId, workspace_id: workspaceId, result: { ladder: null, drop: null, rare: [], landmarks: [], milestone: null, prs: [pr] } }),
-    admin.from('client_stats').insert({ client_id: clientId, workspace_id: workspaceId, workouts: 12, streak: 3, best_streak: 3, journey_week: 3, pr_count: 1 }),
+    admin.from('client_stats').insert({ client_id: clientId, workspace_id: workspaceId, workouts: 12, streak: 3, streak_week: weekKey(new Date().toISOString(), 'UTC'), best_streak: 3, journey_week: 3, pr_count: 1 }),
     admin.from('sticker_awards').insert([
       { client_id: clientId, workspace_id: workspaceId, sticker_key: 'axolotl', first_log_id: logId, last_earned_at: ago(60) },
       { client_id: clientId, workspace_id: workspaceId, sticker_key: 'bison', first_log_id: logId, shiny: true, last_earned_at: ago(90) },
