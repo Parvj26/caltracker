@@ -1,6 +1,7 @@
 import type { ExercisePick } from '../workouts/doc-ops';
 import { TARGET_FIELDS } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
+import type { SetValues } from './prefill';
 import { canReopen } from './summary';
 
 const DEFAULT_SETS = 3;
@@ -73,6 +74,31 @@ export function completeSet(log: WorkoutLogDoc, setId: string, nowIso: string): 
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
 }
 
+/** Fills only the actuals that are null from `values`, then completes the set. Same object back if the set is unknown or already completed. Bumps revision and lastActivityAt like completeSet. */
+export function completeSetWith(
+  log: WorkoutLogDoc,
+  setId: string,
+  values: SetValues,
+  nowIso: string,
+): WorkoutLogDoc {
+  let skip = false;
+  const r = mapSet(log, setId, (s) => {
+    if (s.completedAt !== null) {
+      skip = true;
+      return s;
+    }
+    return {
+      ...s,
+      actualReps: s.actualReps ?? values.reps,
+      actualWeightKg: s.actualWeightKg ?? values.weightKg,
+      actualDurationS: s.actualDurationS ?? values.durationS,
+      actualDistanceM: s.actualDistanceM ?? values.distanceM,
+      completedAt: nowIso,
+    };
+  });
+  return r.found && !skip ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
+}
+
 export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string): WorkoutLogDoc {
   const r = mapSet(log, setId, (s) => ({ ...s, completedAt: null }));
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
@@ -100,10 +126,10 @@ export function addLogSet(
         id: makeId(),
         setType: 'normal',
         target: last ? { ...last.target } : emptyTarget(null),
-        actualReps: last?.actualReps ?? null,
-        actualWeightKg: last?.actualWeightKg ?? null,
-        actualDurationS: last?.actualDurationS ?? null,
-        actualDistanceM: last?.actualDistanceM ?? null,
+        actualReps: null,
+        actualWeightKg: null,
+        actualDurationS: null,
+        actualDistanceM: null,
         completedAt: null,
       };
       return { ...ex, sets: [...ex.sets, fresh] };

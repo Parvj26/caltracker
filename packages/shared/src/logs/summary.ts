@@ -10,11 +10,11 @@ function allSets(log: WorkoutLogDoc): { set: LogSetDoc; weightReps: boolean }[] 
   );
 }
 
-/** Sum of weight x reps over completed sets of weight_reps exercises (warm-ups and drops included), to 1 decimal. */
+/** Sum of weight x reps over completed sets of weight_reps exercises (warm-ups left out, drops counted), to 1 decimal. */
 export function logVolumeKg(log: WorkoutLogDoc): number {
   let total = 0;
   for (const { set, weightReps } of allSets(log)) {
-    if (weightReps && set.completedAt !== null) total += (set.actualWeightKg ?? 0) * (set.actualReps ?? 0);
+    if (weightReps && set.setType !== 'warmup' && set.completedAt !== null) total += (set.actualWeightKg ?? 0) * (set.actualReps ?? 0);
   }
   return Math.round(total * 10) / 10;
 }

@@ -1,17 +1,6 @@
 import type { WorkoutDoc, WorkoutSetDoc } from '../workouts/schema';
 import type { LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
 
-export function prefillActuals(
-  target: Pick<LogSetTarget, 'repsMin' | 'repsMax' | 'weightKg' | 'durationS' | 'distanceM'>,
-): Pick<LogSetDoc, 'actualReps' | 'actualWeightKg' | 'actualDurationS' | 'actualDistanceM'> {
-  return {
-    actualReps: target.repsMax ?? target.repsMin,
-    actualWeightKg: target.weightKg,
-    actualDurationS: target.durationS,
-    actualDistanceM: target.distanceM,
-  };
-}
-
 function logSetFromPlan(s: WorkoutSetDoc, makeId: () => string): LogSetDoc {
   const target: LogSetTarget = {
     repsMin: s.targetRepsMin,
@@ -22,7 +11,7 @@ function logSetFromPlan(s: WorkoutSetDoc, makeId: () => string): LogSetDoc {
     toFailure: s.toFailure,
     restSeconds: s.restSeconds,
   };
-  return { id: makeId(), setType: s.setType, target, ...prefillActuals(target), completedAt: null };
+  return { id: makeId(), setType: s.setType, target, actualReps: null, actualWeightKg: null, actualDurationS: null, actualDistanceM: null, completedAt: null };
 }
 
 export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, nowIso: string): WorkoutLogDoc {

@@ -4,6 +4,7 @@ import {
   addLogExercise,
   addLogSet,
   completeSet,
+  completeSetWith,
   removeLogExercise,
   removeLogSet,
   setExerciseNote,
@@ -61,7 +62,7 @@ describe('log ops', () => {
     expect(out.lastActivityAt).toBe(log.lastActivityAt);
   });
 
-  it('addLogSet appends a normal set copying the last non-drop target and actuals', () => {
+  it('addLogSet copies the target, not the actuals', () => {
     const log = fresh();
     const out = addLogSet(log, straight(log).id, makeId, T1);
     const sets = straight(out).sets;
@@ -71,11 +72,41 @@ describe('log ops', () => {
     expect(added).toMatchObject({
       setType: 'normal',
       target: lastNormal.target,
-      actualReps: lastNormal.actualReps,
-      actualWeightKg: lastNormal.actualWeightKg,
+      actualReps: null,
+      actualWeightKg: null,
+      actualDurationS: null,
+      actualDistanceM: null,
       completedAt: null,
     });
     expect(added.id).not.toBe(lastNormal.id);
+  });
+
+  it('completeSetWith fills empty actuals and completes', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const out = completeSetWith(log, id, { reps: 10, weightKg: 60, durationS: null, distanceM: null }, T1);
+    const s = straight(out).sets[1]!;
+    expect([s.actualReps, s.actualWeightKg, s.completedAt]).toEqual([10, 60, T1]);
+    expect(out.revision).toBe(log.revision + 1);
+    expect(out.lastActivityAt).toBe(T1);
+  });
+
+  it('completeSetWith keeps a typed value', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const typed = updateActual(log, id, { actualWeightKg: 55 });
+    const out = completeSetWith(typed, id, { reps: 10, weightKg: 60, durationS: null, distanceM: null }, T1);
+    const s = straight(out).sets[1]!;
+    expect([s.actualReps, s.actualWeightKg]).toEqual([10, 55]);
+  });
+
+  it('completeSetWith refuses an already completed set and an unknown set', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const done = completeSet(log, id, T1);
+    const v = { reps: 1, weightKg: 1, durationS: null, distanceM: null };
+    expect(completeSetWith(done, id, v, T2)).toBe(done);
+    expect(completeSetWith(log, uuid(), v, T1)).toBe(log);
   });
 
   it('addLogDrop twice after set 2 orders [n1, n2, d, d, n3]', () => {
