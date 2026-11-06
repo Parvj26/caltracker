@@ -1,0 +1,47 @@
+/* Coach profile page. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 640px; }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: var(--ct-space-1) 0 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.card { display: flex; flex-direction: column; gap: var(--ct-space-4); }
+.sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+
+.form { display: flex; flex-direction: column; gap: var(--ct-space-4); }
+.nameRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-4); }
+.counter { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; }
+.counterOver { color: var(--ct-ink); font-weight: var(--ct-weight-button); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); }
+.success { margin: 0; font-weight: var(--ct-weight-section-heading); }
+
+.photoRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-4); }
+.photoActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.fileInput:focus-visible + .chooseLabel { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.smallButton {
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .nameRow { grid-template-columns: minmax(0, 1fr); }
+}

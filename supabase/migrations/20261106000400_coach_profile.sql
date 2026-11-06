@@ -44,7 +44,8 @@ $$;
 revoke execute on function public.update_workspace_name(text) from public, anon, authenticated;
 grant execute on function public.update_workspace_name(text) to authenticated;
 
--- Private avatars bucket. Paths are {user_id}/avatar.webp and {user_id}/avatar-thumb.webp.
+-- Private avatars bucket. Paths are {user_id}/avatar.webp and {user_id}/avatar-thumb.webp (.jpg instead when the
+-- browser cannot make WebP). No type restriction on the bucket, so both work; the policies only look at the folder.
 -- A user writes only their own folder; reads cover their own folder and people in their workspace.
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', false)
