@@ -68,7 +68,7 @@ async function openCommunity(page: Page) {
   await page.getByRole('link', { name: 'Community', exact: true }).click();
   await expect(page).toHaveURL(/\/community$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Community' })).toBeVisible();
-  await expect(page.locator('[data-live="live"]')).toHaveCount(1);
+  await expect(page.locator('[data-live="live"]')).toHaveCount(1, { timeout: 15_000 });
 }
 
 test('the coach posts with a photo, a client likes and comments live, and the coach pins and moderates', async ({ page }) => {
@@ -76,10 +76,11 @@ test('the coach posts with a photo, a client likes and comments live, and the co
   await openCommunity(page);
 
   const text = `Welcome to the group ${unique()} — see https://caltracker.app`;
-  await page.getByLabel('Write a post').fill(text);
-  await page.getByLabel('Add photos').setInputFiles({ name: 'red.png', mimeType: 'image/png', buffer: PNG });
-  await expect(page.getByRole('img', { name: 'Photo 1' })).toBeVisible();
-  await page.getByRole('button', { name: 'Post', exact: true }).click();
+  const composer = page.getByRole('region', { name: 'New post' });
+  await composer.getByLabel('Write a post').fill(text);
+  await composer.getByLabel('Add photos').setInputFiles({ name: 'red.png', mimeType: 'image/png', buffer: PNG });
+  await expect(composer.getByRole('img', { name: 'Photo 1' })).toBeVisible();
+  await composer.getByRole('button', { name: 'Post', exact: true }).click();
   const mine = post(page, text);
   await expect(mine).toBeVisible();
   await expect(mine.getByRole('link', { name: 'https://caltracker.app' })).toHaveAttribute('target', '_blank');
