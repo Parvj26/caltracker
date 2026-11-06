@@ -1161,7 +1161,6 @@ export type Database = {
           coach_name: string
         }[]
       }
-      has_non_weight_values: { Args: { mid: string }; Returns: boolean }
       invite_for_join: {
         Args: { token: string }
         Returns: {
