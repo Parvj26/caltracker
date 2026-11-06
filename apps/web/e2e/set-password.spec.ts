@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
+import { MAILPIT_URL, WEB_URL } from './helpers';
 
 // Local Supabase's mail catcher (Mailpit) HTTP API.
-const MAILPIT = 'http://127.0.0.1:54324/api/v1';
+const MAILPIT = `${MAILPIT_URL}/api/v1`;
 const NEW_PASSWORD = 'brand-new-password-1';
 
 // Service role is used in test code only, to clean up the coach afterwards.
@@ -28,7 +29,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
   const out = execFileSync('pnpm', ['--filter', '@caltracker/scripts', 'exec', 'tsx', '--input-type=module', '-e', code, email], {
     cwd: join(__dirname, '..', '..', '..'),
     encoding: 'utf8',
-    env: { ...process.env, PUBLIC_SITE_URL: 'http://localhost:3000' },
+    env: { ...process.env, PUBLIC_SITE_URL: WEB_URL },
   });
   const line = out.split('\n').find((l) => l.startsWith('RESULT:'));
   if (!line) throw new Error(`provisionCoach gave no result:\n${out}`);
@@ -123,9 +124,9 @@ test.describe('/auth/confirm with real tokens', () => {
     // Still valid for a second visitor.
     const other = await browser.newContext();
     const otherPage = await other.newPage();
-    await otherPage.goto(`http://localhost:3000/auth/confirm?token_hash=${token}&type=magiclink&next=/clients`);
+    await otherPage.goto(`${WEB_URL}/auth/confirm?token_hash=${token}&type=magiclink&next=/clients`);
     await otherPage.getByRole('button', { name: 'Continue' }).click();
-    await expect(otherPage).toHaveURL(/localhost:3000\/clients$/);
+    await expect(otherPage).toHaveURL(new RegExp(`${WEB_URL}/clients$`));
     await other.close();
   });
 
@@ -136,7 +137,7 @@ test.describe('/auth/confirm with real tokens', () => {
       const token = await freshToken('magiclink');
       await page.goto(`/auth/confirm?token_hash=${token}&type=magiclink&next=${next}`);
       await page.getByRole('button', { name: 'Continue' }).click();
-      await expect(page).toHaveURL(/^http:\/\/localhost:3000\/clients$/);
+      await expect(page).toHaveURL(new RegExp(`^${WEB_URL}/clients$`));
     });
   }
 
@@ -151,7 +152,7 @@ test.describe('/auth/confirm with real tokens', () => {
       await next.evaluate((el, value) => ((el as HTMLInputElement).value = value), evil);
       await expect(next).toHaveValue(evil);
       await page.getByRole('button', { name: 'Continue' }).click();
-      await expect(page).toHaveURL(/^http:\/\/localhost:3000\/clients$/);
+      await expect(page).toHaveURL(new RegExp(`^${WEB_URL}/clients$`));
     });
   }
 
@@ -159,7 +160,7 @@ test.describe('/auth/confirm with real tokens', () => {
     const token = await freshToken('recovery');
     await page.goto(`/auth/confirm?token_hash=${token}&type=recovery&next=/set-password`);
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page).toHaveURL(/^http:\/\/localhost:3000\/set-password$/);
+    await expect(page).toHaveURL(new RegExp(`^${WEB_URL}/set-password$`));
   });
 
   test('a reused confirm link shows the friendly message', async ({ page, browser }) => {
@@ -169,7 +170,7 @@ test.describe('/auth/confirm with real tokens', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page).toHaveURL(/\/clients$/);
 
-    const second = await browser.newContext({ baseURL: 'http://localhost:3000' });
+    const second = await browser.newContext({ baseURL: WEB_URL });
     const secondPage = await second.newPage();
     await secondPage.goto(url);
     await secondPage.getByRole('button', { name: 'Continue' }).click();
