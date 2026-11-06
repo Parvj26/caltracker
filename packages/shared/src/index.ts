@@ -203,3 +203,11 @@ export type {
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
+export {
+  BIO_MAX_LENGTH,
+  BUSINESS_NAME_MAX_LENGTH,
+  Bio,
+  BusinessName,
+  ProfileInput,
+  characterCount,
+} from './profile/schema';
