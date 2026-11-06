@@ -9,6 +9,7 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-workouts -   delete every "E2E " workout, program, assignment
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-mixed <email>   "E2E Mixed" (warm-up, superset, drops) today
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-sections <email> "E2E Sections" (sections, uneven superset, pick-one) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile "<business>" "<bio>"   set the demo coach's business name and bio
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile-reset -   put them back (Demo Coaching, no bio)
@@ -129,7 +130,12 @@ const squatSet = (restSeconds: number): PlanSet => ({
   restSeconds,
 });
 
-type PlanBlock = { kind: 'straight' | 'superset'; exercises: Array<{ name: string; sets: PlanSet[] }> };
+type PlanBlock = {
+  kind: 'straight' | 'superset' | 'choice';
+  /** The section heading the block sits under (consecutive blocks with the same name share one section). */
+  section?: string;
+  exercises: Array<{ name: string; sets: PlanSet[] }>;
+};
 
 /**
  * What the coach does on the dashboard: save a library workout `name` with these blocks (built-in exercises looked
@@ -155,14 +161,16 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
     const missing = names.filter((n) => !byName.has(n));
     if (missing.length > 0) throw new Error(`${missing.join(', ')} not found (run pnpm import:exercises)`);
 
+    const sectionIds = new Map<string, string>();
+    for (const b of blocks) if (b.section && !sectionIds.has(b.section)) sectionIds.set(b.section, randomUUID());
     const doc: WorkoutDoc = {
       id: randomUUID(),
       name,
       notes: null,
-      sections: [],
+      sections: [...sectionIds].map(([sectionName, id]) => ({ id, name: sectionName })),
       blocks: blocks.map((b) => ({
         id: randomUUID(),
-        sectionId: null,
+        sectionId: b.section ? (sectionIds.get(b.section) ?? null) : null,
         kind: b.kind,
         exercises: b.exercises.map((e) => {
           const ex = byName.get(e.name)!;
@@ -258,6 +266,34 @@ export async function assignTodayMixed(email: string): Promise<void> {
   ]);
 }
 
+/**
+ * "E2E Sections" today, for log-sections: section "Upper" holds an uneven superset, Pullups 3 × 8 (no rest) +
+ * Pushups 2 × 8 (1:00 rest), so round 3 is Pullups alone and rests the block's 1:00; section "Finisher" is a
+ * pick-one group of Barbell Squat 2 × 8 @ 60 kg or Dumbbell Bicep Curl 2 × 12 @ 10 kg. Starts with no logs left over.
+ */
+export async function assignTodaySections(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const reps = (n: number, rest: number) => Array.from({ length: n }, () => plan('normal', 8, null, rest));
+  await assignWorkout(email, 'E2E Sections', [
+    {
+      kind: 'superset',
+      section: 'Upper',
+      exercises: [
+        { name: 'Pullups', sets: reps(3, 0) },
+        { name: 'Pushups', sets: reps(2, 60) },
+      ],
+    },
+    {
+      kind: 'choice',
+      section: 'Finisher',
+      exercises: [
+        { name: 'Barbell Squat', sets: [squatSet(60), squatSet(60)] },
+        { name: 'Dumbbell Bicep Curl', sets: [plan('normal', 12, 10, 60), plan('normal', 12, 10, 60)] },
+      ],
+    },
+  ]);
+}
+
 /** The only account whose logs the flows may delete. */
 const DEMO_CLIENT = 'client@demo.local';
 
@@ -328,6 +364,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-workouts') await cleanupWorkouts();
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
+  else if (action === 'assign-today-sections') await assignTodaySections(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   // For these two the "email" is the business name and the "name" is the bio.
   else if (action === 'coach-profile') await setCoachProfile(email, name);
