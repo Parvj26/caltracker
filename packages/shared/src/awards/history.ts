@@ -4,7 +4,8 @@ import type { AwardInput, AwardResult } from './award';
 import { detectPrs, logBests } from './prs';
 import type { PersonalRecord } from './prs';
 import type { ClientStats } from './rare';
-import { localDay, streakWeeks, weekKey } from './streak';
+import { localDay, streakWeek, streakWeeks, weekKey } from './streak';
+import type { IsoDate } from '../dates/dates';
 
 // Everything the award works out from a client's whole log history. The award-workout Edge Function loads the
 // client's completed logs and hands them here, so a retry, a catch-up out of order or a coach correction all
@@ -109,6 +110,8 @@ export type AwardContext = Omit<AwardInput, 'owned' | 'rng'> & {
   records: PersonalRecord[];
   /** The stats over every completed log, as of now: what client_stats should hold. */
   current: ClientStats;
+  /** The Monday of the last week that counted for `current.streak` (null with no streak): client_stats.streak_week. */
+  currentStreakWeek: IsoDate | null;
 };
 
 /**
@@ -138,6 +141,10 @@ export function awardContext(
     statsAfter: clientStatsAt(ordered.slice(0, i + 1), timeZone, log.finishedAt, prsBefore + own.length),
     records: all.records,
     current: clientStatsAt(ordered, timeZone, nowIso, countPrs(all.prs)),
+    currentStreakWeek: streakWeek(
+      ordered.map((l) => weekKey(l.finishedAt as string, timeZone)),
+      weekKey(nowIso, timeZone),
+    ),
   };
 }
 

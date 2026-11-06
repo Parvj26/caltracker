@@ -133,9 +133,14 @@ describe('awardContext', () => {
     // The stored records and stats cover every log, up to now.
     expect(c.records.find((r) => r.kind === 'heaviest')).toMatchObject({ valueKg: 120, logId: l2.id });
     expect(c.current).toMatchObject({ workouts: 3, streak: 2, prCount: 2 });
+    expect(c.currentStreakWeek).toBe('2026-11-02');
     const award = computeAward({ ...c, owned: new Map(), rng: () => 0.5 });
     expect(award.prs.map((p) => p.kind).sort()).toEqual(['e1rm', 'heaviest']);
     expect(award.landmarks).toEqual(['christ-the-redeemer']);
+  });
+  it('the streak week is the last week that counted, as of now', () => {
+    expect(awardContext([l1, l2, l3], l2.id, 'UTC', '2026-11-10T00:00:00Z').currentStreakWeek).toBe('2026-11-02');
+    expect(awardContext([l1, l2, l3], l2.id, 'UTC', '2026-11-17T00:00:00Z').currentStreakWeek).toBeNull();
   });
   it('the first log is a baseline and the first milestone', () => {
     const c = awardContext([l1], l1.id, 'UTC', '2026-11-05T00:00:00Z');

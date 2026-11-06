@@ -43,6 +43,28 @@ export function streakWeeks(
   return { current, best };
 }
 
+/**
+ * The Monday of the last week that counts for the current streak: the current week if it has a workout, else last
+ * week if that had one, else null (no streak running). Stored with the streak so a reader can tell, later, whether
+ * the streak is still alive (see liveStreak).
+ */
+export function streakWeek(completedWeekKeys: readonly IsoDate[], currentWeek: IsoDate): IsoDate | null {
+  const weeks = new Set(completedWeekKeys);
+  if (weeks.has(currentWeek)) return currentWeek;
+  const last = addDays(currentWeek, -7);
+  return weeks.has(last) ? last : null;
+}
+
+/**
+ * The stored streak as it stands in `currentWeek` (the viewer's Monday, in the client's time zone). A stored streak
+ * is only written when a workout is awarded, so it never decays by itself: it is still alive while its last week is
+ * this week or last week (this week is not over yet), and 0 once a whole week has ended without a workout.
+ */
+export function liveStreak(streak: number, lastWeek: IsoDate | null, currentWeek: IsoDate): number {
+  if (streak <= 0 || !lastWeek) return 0;
+  return lastWeek >= addDays(currentWeek, -7) ? streak : 0;
+}
+
 /** Landmarks reached at exactly this streak, and the next one ahead. */
 export function journeyStep(streak: number): {
   reached: string[];

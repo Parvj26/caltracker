@@ -5,7 +5,7 @@ import { formatMultiple, isQualifying, ladderAnimal } from '../../src/awards/lad
 import { detectPrs, epley1rm } from '../../src/awards/prs';
 import type { PersonalRecord } from '../../src/awards/prs';
 import { milestoneFor, newRareFinds } from '../../src/awards/rare';
-import { journeyStep, streakWeeks, weekKey } from '../../src/awards/streak';
+import { journeyStep, liveStreak, streakWeek, streakWeeks, weekKey } from '../../src/awards/streak';
 import { EX_A, EX_B, mkLog, stats } from './helpers';
 
 describe('STICKERS', () => {
@@ -135,6 +135,46 @@ describe('streakWeeks', () => {
     expect(streakWeeks(['2026-10-19', '2026-10-26'], '2026-11-02')).toEqual({ current: 2, best: 2 });
     expect(streakWeeks(['2026-10-19', '2026-10-26'], '2026-11-09')).toEqual({ current: 0, best: 2 });
     expect(streakWeeks([], '2026-11-02')).toEqual({ current: 0, best: 0 });
+  });
+});
+
+describe('streakWeek', () => {
+  it('is the current week when it has a workout', () => {
+    expect(streakWeek(['2026-10-26', '2026-11-02'], '2026-11-02')).toBe('2026-11-02');
+  });
+  it('is last week when this week has none yet', () => {
+    expect(streakWeek(['2026-10-19', '2026-10-26'], '2026-11-02')).toBe('2026-10-26');
+  });
+  it('is null when the streak is already broken or there is none', () => {
+    expect(streakWeek(['2026-10-19'], '2026-11-02')).toBeNull();
+    expect(streakWeek([], '2026-11-02')).toBeNull();
+  });
+  it('ignores weeks after the current one', () => {
+    expect(streakWeek(['2026-11-09'], '2026-11-02')).toBeNull();
+  });
+});
+
+describe('liveStreak', () => {
+  it('keeps the stored streak while its last week is this week', () => {
+    expect(liveStreak(3, '2026-11-02', '2026-11-02')).toBe(3);
+  });
+  it('keeps it while this week has no workout yet (the week is not over)', () => {
+    expect(liveStreak(3, '2026-10-26', '2026-11-02')).toBe(3);
+  });
+  it('drops to 0 once a whole week ended without a workout', () => {
+    expect(liveStreak(3, '2026-10-19', '2026-11-02')).toBe(0);
+    expect(liveStreak(12, '2026-01-05', '2026-11-02')).toBe(0);
+  });
+  it('is 0 with no last week or no streak', () => {
+    expect(liveStreak(3, null, '2026-11-02')).toBe(0);
+    expect(liveStreak(0, '2026-11-02', '2026-11-02')).toBe(0);
+  });
+  it('trusts a last week ahead of the viewer (their zone is a day behind the client)', () => {
+    expect(liveStreak(2, '2026-11-09', '2026-11-02')).toBe(2);
+  });
+  it('works across a year boundary', () => {
+    expect(liveStreak(5, '2026-12-28', '2027-01-04')).toBe(5);
+    expect(liveStreak(5, '2026-12-21', '2027-01-04')).toBe(0);
   });
 });
 

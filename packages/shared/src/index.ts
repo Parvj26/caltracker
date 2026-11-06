@@ -170,7 +170,7 @@ export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogu
 export { formatMultiple, isQualifying, ladderAnimal } from './awards/ladder';
 export { detectPrs, epley1rm, logBests } from './awards/prs';
 export type { PersonalRecord, PrKind } from './awards/prs';
-export { journeyStep, localDay, streakWeeks, weekKey } from './awards/streak';
+export { journeyStep, liveStreak, localDay, streakWeek, streakWeeks, weekKey } from './awards/streak';
 export { milestoneFor, newRareFinds } from './awards/rare';
 export type { ClientStats } from './awards/rare';
 export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
