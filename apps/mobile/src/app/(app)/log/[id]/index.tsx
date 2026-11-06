@@ -222,7 +222,18 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
 
   // ---- Data: exercise details (photos, equipment) and last time ----
   const exerciseIds = useMemo(
-    () => [...new Set(log.blocks.flatMap((b) => b.exercises.flatMap((e) => [e.exerciseId, ...(e.swappedFromExerciseId ? [e.swappedFromExerciseId] : [])])))],
+    () => [
+      ...new Set(
+        log.blocks.flatMap((b) =>
+          b.exercises.flatMap((e) => [
+            e.exerciseId,
+            ...(e.swappedFromExerciseId ? [e.swappedFromExerciseId] : []),
+            // The coach's substitutes too, so their photos and last time are ready when the client switches.
+            ...e.substituteOptions.map((o) => o.exerciseId),
+          ]),
+        ),
+      ),
+    ],
     [log.blocks],
   );
   const exerciseKey = [...exerciseIds].sort().join(',');

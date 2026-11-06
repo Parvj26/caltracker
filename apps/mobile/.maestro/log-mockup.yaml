@@ -133,7 +133,7 @@ env:
     timeout: 5000
 - assertVisible:
     id: exercise-name-1-0
-    text: 'A1 · Machine Assisted Pull Up'
+    text: 'B1 · Machine Assisted Pull Up'
 - assertVisible:
     id: substitute-switch-1-0
 - tapOn:
