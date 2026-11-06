@@ -16,9 +16,10 @@ export function epley1rm(weightKg: number, reps: number): number {
   return Math.round(weightKg * (1 + reps / 30) * 10) / 10;
 }
 
-type Lift = { weightKg: number; reps: number; at: string };
+export type Lift = { weightKg: number; reps: number; at: string };
 
-function liftsByExercise(log: WorkoutLogDoc): Map<string, Lift[]> {
+/** Counted lifts per exercise: weight-and-reps sets that are finished, not warm-ups, with a weight and reps. */
+export function liftsByExercise(log: WorkoutLogDoc): Map<string, Lift[]> {
   const out = new Map<string, Lift[]>();
   for (const b of log.blocks) {
     for (const e of b.exercises) {
