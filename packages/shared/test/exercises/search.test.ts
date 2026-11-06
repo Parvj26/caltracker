@@ -188,6 +188,29 @@ describe('plain names rank first', () => {
   });
 });
 
+describe('plain names with other leading equipment', () => {
+  const idx = buildExerciseIndex([
+    row('Smith Machine Squat Jump', { equipment: 'machine' }),
+    row('Smith Machine Squat', { equipment: 'machine' }),
+    row('Squat Jerk', { equipment: 'barbell' }),
+    row('Ez-Bar Curl', { equipment: 'e-z curl bar' }),
+    row('Curl Up', { equipment: 'body only' }),
+    row('Bodyweight', { equipment: 'body only' }),
+  ]);
+  const first = (q: string) => searchExercises(idx, q, NO_FILTERS, NO_BOOSTS)[0];
+  it('"squat" ranks "Smith Machine Squat" as an exact plain name, ahead of Squat Jerk', () => {
+    expect(first('squat')?.row.name).toBe('Smith Machine Squat');
+    expect(first('squat')?.tier).toBe(1);
+  });
+  it('"curl" ranks "Ez-Bar Curl" as an exact plain name, ahead of Curl Up', () => {
+    expect(first('curl')?.row.name).toBe('Ez-Bar Curl');
+    expect(first('curl')?.tier).toBe(1);
+  });
+  it('a name that is only an equipment word still matches itself', () => {
+    expect(first('bodyweight')?.row.name).toBe('Bodyweight');
+  });
+});
+
 describe('highlight', () => {
   it('covers the matched name words', () => {
     const h = hits('incline dumbbell').find((x) => x.row.name === 'Dumbbell Incline Bench Press');

@@ -54,7 +54,7 @@ export function ResultList({
                 onClick={() => onActivate(row.id)}
               >
                 {selectedIds ? <span className={styles.box} aria-hidden="true">{picked ? '✓' : ''}</span> : null}
-                <Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={48} height={48} className={styles.thumb} />
+                <Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={48} height={48} className={styles.thumb ?? ''} />
                 <span className={styles.rowText} aria-hidden="true">
                   <span className={styles.rowName}><Highlighted name={row.name} ranges={highlight} /></span>
                   <span className={styles.tags}>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import styles from './exercise-search.module.css';
 
-type Props = { src: string | null; alt: string; width: number; height: number; className: string | undefined };
+type Props = { src: string | null; alt: string; width: number; height: number; className: string };
 
 /** A lazy-loaded photo that shows a dumbbell placeholder when there is no image or it fails to load. */
 export function Photo({ src, alt, width, height, className }: Props) {
