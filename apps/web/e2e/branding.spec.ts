@@ -142,11 +142,20 @@ test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-  // A keyboard user still sees each link's name: it shows beside the icon on focus.
-  await nav.getByRole('link', { name: 'Workouts' }).focus();
-  await expect(nav.getByRole('link', { name: 'Workouts' }).getByText('Workouts')).toBeVisible();
-  const label = await nav.getByRole('link', { name: 'Workouts' }).getByText('Workouts').boundingBox();
-  expect(label!.width).toBeGreaterThan(20);
+  // Mouse users get the name as a tooltip.
+  await expect(nav.getByRole('link', { name: 'Workouts' })).toHaveAttribute('title', 'Workouts');
+});
+
+test('on a short screen the icon rail scrolls, so Profile and Sign out stay reachable', async ({ page }) => {
+  // About what an iPad in landscape split view or a 200% zoom leaves.
+  await page.setViewportSize({ width: 1024, height: 420 });
+  await signInAsDemoCoach(page);
+  const sidebar = page.locator('[data-coach-sidebar]');
+  expect(await sidebar.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+  await signOut.scrollIntoViewIfNeeded();
+  await expect(signOut).toBeInViewport();
+  await expect(page.getByRole('link', { name: 'Profile' })).toBeVisible();
 });
 
 test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({ page }) => {

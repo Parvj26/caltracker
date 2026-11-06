@@ -15,6 +15,7 @@ export function NavLink({ href, label, icon, leading }: { href: string; label: s
     <Link
       href={href}
       aria-label={label}
+      title={label}
       aria-current={current ? 'page' : undefined}
       className={cx(styles.navItem, current && styles.navItemCurrent)}
     >
