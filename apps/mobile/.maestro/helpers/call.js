@@ -9,6 +9,10 @@
 //   coach-profile      sets the demo coach's business (EMAIL) and bio (NAME)
 //   coach-profile-reset  puts the demo business name back and clears the bio (EMAIL ignored; pass '-')
 //   cleanup-logs       deletes every workout log of client@demo.local (refuses any other EMAIL)
+//   coach-message      the seed coach sends the client NAME as a chat message (client@demo.local only)
+//   assert-reply       fails unless the client has sent exactly one message whose text is NAME
+//   assert-read        fails unless the client has read every coach message
+//   cleanup-messages   deletes the demo client's conversation
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);
