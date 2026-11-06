@@ -1,8 +1,10 @@
 import { EXERCISE_ALIASES, EXERCISE_NAME_SYNONYMS } from './aliases';
+import { COMMON_EXERCISES } from './popular';
 import { EXERCISE_OTHER_NAMES } from './synonyms';
 import type { TrackingType } from './tracking';
 
 export { EXERCISE_ALIASES } from './aliases';
+export { COMMON_EXERCISES } from './popular';
 export { EXERCISE_OTHER_NAMES } from './synonyms';
 
 export type ExerciseIndexRow = {
@@ -62,6 +64,8 @@ export type IndexEntry = {
   other: number[];
   muscleChips: Set<MuscleChip>;
   equipmentChip: EquipmentChip;
+  /** Position in COMMON_EXERCISES (built-ins only); lower is more common, unlisted rows share the last place. */
+  popularity: number;
 };
 
 /** `entries` holds one entry per row (the real name) plus one per "also known as" name of a built-in. */
@@ -80,6 +84,9 @@ export const MUSCLE_CHIP_MUSCLES: Readonly<Record<MuscleChip, readonly string[]>
   // Decided by category or muscle count, not by muscle name.
   'Full body': [],
 };
+
+const POPULARITY = new Map<string, number>(COMMON_EXERCISES.map((name, i) => [name, i]));
+const UNLISTED = COMMON_EXERCISES.length;
 
 const MUSCLE_TO_CHIP = new Map<string, MuscleChip>();
 for (const [chip, muscles] of Object.entries(MUSCLE_CHIP_MUSCLES) as Array<[MuscleChip, readonly string[]]>) {
@@ -230,6 +237,7 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
       other: [...other],
       muscleChips,
       equipmentChip,
+      popularity: row.source === 'builtin' ? (POPULARITY.get(row.name) ?? UNLISTED) : UNLISTED,
     };
   };
   const entries: IndexEntry[] = [];
@@ -479,9 +487,12 @@ export function searchExercises(
       // The whole name typed beats a name that matches only without its equipment word
       // ("bench press": the other name "Bench Press" beats "Machine Bench Press").
       a.full - b.full ||
+      // The coach's favourites, then their recent exercises.
+      a.boost - b.boost ||
+      // Then the exercises most coaches mean ("bench": Barbell Bench Press before Bench Dips).
+      a.e.popularity - b.e.popularity ||
       // A real name beats an other name that matches just as well.
       a.viaAlias - b.viaAlias ||
-      a.boost - b.boost ||
       a.e.row.name.length - b.e.row.name.length ||
       compareNames(a.e.row.name, b.e.row.name),
   );

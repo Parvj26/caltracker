@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   buildExerciseIndex,
@@ -10,33 +8,7 @@ import {
   type SearchFilters,
 } from '../../src/exercises/search';
 import { EXERCISE_OTHER_NAMES } from '../../src/exercises/synonyms';
-import { inferTrackingType } from '../../src/exercises/tracking';
-
-/**
- * Names-only copy of the real built-in library (free-exercise-db 876 + 10 CalTracker extras) as imported into the
- * local database: `name|equipment|primary muscles|category`, one per line.
- */
-const LIBRARY: ExerciseIndexRow[] = readFileSync(
-  fileURLToPath(new URL('./fixtures/library-names.txt', import.meta.url)),
-  'utf8',
-)
-  .split('\n')
-  .filter((l) => l.trim() !== '')
-  .map((line, i) => {
-    const [name = '', equipment = '', muscles = '', category = ''] = line.split('|');
-    const primaryMuscles = muscles ? muscles.split(',') : [];
-    return {
-      id: `lib-${i}`,
-      name,
-      primaryMuscles,
-      secondaryMuscles: [],
-      equipment: equipment || null,
-      category: category || null,
-      trackingType: inferTrackingType({ category, equipment: equipment || null }),
-      source: 'builtin',
-      imagePath: null,
-    };
-  });
+import { LIBRARY } from './fixtures/library';
 
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_BOOSTS: SearchBoosts = { favourites: new Set(), recent: [] };
