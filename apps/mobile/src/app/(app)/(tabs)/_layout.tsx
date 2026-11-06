@@ -37,6 +37,10 @@ function ZooIcon({ color }: { color: ColorValue }) {
   );
 }
 
+// Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
+// tab) starts on Today, not on whichever tab the router would pick.
+export const unstable_settings = { initialRouteName: 'today' };
+
 // The other tabs in the spec (Messages, Community, Me) arrive with their phases.
 export default function TabsLayout() {
   return (
