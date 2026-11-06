@@ -1,7 +1,9 @@
 import { EXERCISE_ALIASES, EXERCISE_NAME_SYNONYMS } from './aliases';
+import { EXERCISE_OTHER_NAMES } from './synonyms';
 import type { TrackingType } from './tracking';
 
 export { EXERCISE_ALIASES } from './aliases';
+export { EXERCISE_OTHER_NAMES } from './synonyms';
 
 export type ExerciseIndexRow = {
   id: string;
@@ -32,8 +34,10 @@ export type SearchHit = {
   row: ExerciseIndexRow;
   /** 0 = empty-query listing. */
   tier: 1 | 2 | 3 | 4 | 5 | 0;
-  /** Ranges in row.name. */
+  /** Ranges in row.name. Empty when the match was through an other name. */
   highlight: Array<[start: number, end: number]>;
+  /** The "also known as" name that matched, when it ranked better than the real name. */
+  alias?: string;
 };
 
 /** `forms` are ids into the index vocabulary. */
@@ -42,6 +46,9 @@ type NameWord = { start: number; end: number; forms: number[] };
 /** Precomputed search data for one row. Opaque to callers. */
 export type IndexEntry = {
   row: ExerciseIndexRow;
+  /** Null for the real name; otherwise the "also known as" name this entry searches as (built-ins only). */
+  alias: string | null;
+  /** Words of the real name, or of `alias`. */
   words: NameWord[];
   /** Normalised name, words joined by single spaces. */
   nameNorm: string;
@@ -57,6 +64,7 @@ export type IndexEntry = {
   equipmentChip: EquipmentChip;
 };
 
+/** `entries` holds one entry per row (the real name) plus one per "also known as" name of a built-in. */
 export type ExerciseIndex = { rows: ExerciseIndexRow[]; entries: IndexEntry[]; vocab: string[] };
 
 /** Muscle names in the library (free-exercise-db) grouped under the filter chips. */
@@ -177,8 +185,9 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
     }
     return id;
   };
-  const entries = rows.map((row): IndexEntry => {
-    const words: NameWord[] = tokenizeWithRanges(row.name).map((t) => {
+  const entryFor = (row: ExerciseIndexRow, alias: string | null): IndexEntry => {
+    const name = alias ?? row.name;
+    const words: NameWord[] = tokenizeWithRanges(name).map((t) => {
       const forms = formsOf(t.text);
       const synonym = EXERCISE_NAME_SYNONYMS[t.text];
       if (synonym) forms.push(...formsOf(synonym));
@@ -186,7 +195,7 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
     });
     let joined = '';
     const joinedWord: number[] = [];
-    const nameWords = tokenizeWithRanges(row.name);
+    const nameWords = tokenizeWithRanges(name);
     nameWords.forEach((t, wi) => {
       joined += t.text;
       for (let k = 0; k < t.text.length; k++) joinedWord.push(wi);
@@ -212,6 +221,7 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
 
     return {
       row,
+      alias,
       words,
       nameNorm: nameWords.map((t) => t.text).join(' '),
       plainNorm: withoutLeadingEquipment(nameWords.map((t) => t.text).join(' ')),
@@ -221,7 +231,14 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
       muscleChips,
       equipmentChip,
     };
-  });
+  };
+  const entries: IndexEntry[] = [];
+  for (const row of rows) {
+    entries.push(entryFor(row, null));
+    // Other names belong to the library exercise: a custom exercise that shares its name does not get them.
+    const others = row.source === 'builtin' && Object.hasOwn(EXERCISE_OTHER_NAMES, row.name) ? EXERCISE_OTHER_NAMES[row.name] : undefined;
+    if (others) for (const alias of others) entries.push(entryFor(row, alias));
+  }
   return { rows, entries, vocab };
 }
 
@@ -389,6 +406,7 @@ export function searchExercises(
 
   if (normQuery === '') {
     return candidates
+      .filter((e) => e.alias === null)
       .map((e): SearchHit => ({ row: e.row, tier: 0, highlight: [] }))
       .sort((a, b) => boostCompare(a.row, b.row) || compareNames(a.row.name, b.row.name));
   }
@@ -397,7 +415,7 @@ export function searchExercises(
   const { groups, expanded } = buildGroups(tokens);
   const tables = new Map<string, QueryTable>();
   for (const g of groups) for (const alt of g.alts) for (const q of alt) if (!tables.has(q)) tables.set(q, buildTable(index.vocab, q));
-  const scored: Array<{ hit: SearchHit; e: IndexEntry; boost: number; whole: number }> = [];
+  const scored: Array<{ hit: SearchHit; e: IndexEntry; boost: number; whole: number; full: number; viaAlias: number }> = [];
 
   for (const e of candidates) {
     let worst = EXACT;
@@ -450,16 +468,30 @@ export function searchExercises(
 
     const fav = boosts.favourites.has(e.row.id) ? 0 : 1;
     const rec = recentRank.get(e.row.id) ?? Number.MAX_SAFE_INTEGER;
-    scored.push({ hit: { row: e.row, tier, highlight: rangesFor(e, lit) }, e, boost: fav * 1e9 + Math.min(rec, 1e9 - 1), whole: worst === EXACT ? 0 : 1 });
+    const hit: SearchHit = e.alias === null ? { row: e.row, tier, highlight: rangesFor(e, lit) } : { row: e.row, tier, highlight: [], alias: e.alias };
+    scored.push({ hit, e, boost: fav * 1e9 + Math.min(rec, 1e9 - 1), whole: worst === EXACT ? 0 : 1, full: e.nameNorm === normQuery || e.nameNorm === expanded ? 0 : 1, viaAlias: e.alias === null ? 0 : 1 });
   }
 
   scored.sort(
     (a, b) =>
       a.hit.tier - b.hit.tier ||
       a.whole - b.whole ||
+      // The whole name typed beats a name that matches only without its equipment word
+      // ("bench press": the other name "Bench Press" beats "Machine Bench Press").
+      a.full - b.full ||
+      // A real name beats an other name that matches just as well.
+      a.viaAlias - b.viaAlias ||
       a.boost - b.boost ||
       a.e.row.name.length - b.e.row.name.length ||
       compareNames(a.e.row.name, b.e.row.name),
   );
-  return scored.map((x) => x.hit);
+  // A row can match through its real name and its other names: keep only its best placed hit.
+  const seen = new Set<ExerciseIndexRow>();
+  const out: SearchHit[] = [];
+  for (const x of scored) {
+    if (seen.has(x.e.row)) continue;
+    seen.add(x.e.row);
+    out.push(x.hit);
+  }
+  return out;
 }

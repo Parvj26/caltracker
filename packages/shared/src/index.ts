@@ -167,6 +167,7 @@ export type {
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export {
   EXERCISE_ALIASES,
+  EXERCISE_OTHER_NAMES,
   MUSCLE_CHIP_MUSCLES,
   buildExerciseIndex,
   equipmentChipOf,
