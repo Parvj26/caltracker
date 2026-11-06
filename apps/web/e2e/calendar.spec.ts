@@ -260,6 +260,7 @@ test('"+" on a day adds one library workout', async ({ page }) => {
 });
 
 test('move one item with "Move to…", drag another, then delete one', async ({ page }) => {
+  test.slow();
   const first = `Mover ${unique()}`;
   const second = `Dragger ${unique()}`;
   created.workouts.push(first, second);

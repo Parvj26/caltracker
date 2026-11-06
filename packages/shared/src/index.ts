@@ -165,3 +165,11 @@ export type {
   WorkoutStatus,
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
+export {
+  BIO_MAX_LENGTH,
+  BUSINESS_NAME_MAX_LENGTH,
+  Bio,
+  BusinessName,
+  ProfileInput,
+  characterCount,
+} from './profile/schema';
