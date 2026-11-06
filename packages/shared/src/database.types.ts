@@ -166,6 +166,7 @@ export type Database = {
           lifetime_volume_kg: number
           pr_count: number
           streak: number
+          streak_week: string | null
           updated_at: string
           workouts: number
           workspace_id: string
@@ -177,6 +178,7 @@ export type Database = {
           lifetime_volume_kg?: number
           pr_count?: number
           streak?: number
+          streak_week?: string | null
           updated_at?: string
           workouts?: number
           workspace_id: string
@@ -188,6 +190,7 @@ export type Database = {
           lifetime_volume_kg?: number
           pr_count?: number
           streak?: number
+          streak_week?: string | null
           updated_at?: string
           workouts?: number
           workspace_id?: string
@@ -1237,7 +1240,10 @@ export type Database = {
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
       award_catchup: { Args: never; Returns: number }
-      award_history_version: { Args: { p_client_id: string }; Returns: string }
+      award_history_version: {
+        Args: { p_client_id: string; p_workspace_id: string }
+        Returns: string
+      }
       award_inputs: { Args: { p_log_id: string }; Returns: Json }
       claim_invites: {
         Args: never

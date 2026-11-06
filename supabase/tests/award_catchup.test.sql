@@ -1,5 +1,5 @@
 begin;
-select plan(51);
+select plan(55);
 
 -- Fixtures (as postgres)
 select tests.create_user('ac-coach@t.local', 'Coach') as coach \gset
@@ -72,9 +72,18 @@ select is(jsonb_array_length(public.award_inputs(:'l1') -> 'logs'), 2, 'inputs h
 select is(jsonb_array_length(public.award_inputs(:'l1') -> 'logs' -> 0 -> 'log_blocks' -> 0 -> 'log_exercises' -> 0
   -> 'log_sets'), 1, 'only completed sets are sent');
 select is(public.award_inputs(:'l1') ->> 'time_zone', 'UTC', 'inputs carry the time zone');
-select is(public.award_inputs(:'l1') ->> 'history_version', public.award_history_version(:'c1'),
+select is(public.award_inputs(:'l1') ->> 'history_version', public.award_history_version(:'c1', :'ws'),
   'inputs carry the history fingerprint');
 select is(public.award_inputs(:'l_gone') -> 'log' ->> 'is_client', 'false', 'inputs say a removed client is not a client');
+
+-- The fingerprint covers completed logs only: a log still in progress changing never makes an award retry.
+select public.award_history_version(:'c2', :'ws') as fp_c2 \gset
+update public.workout_logs set revision = revision + 1, last_activity_at = now() where id = :'l_open';
+select is(public.award_history_version(:'c2', :'ws'), :'fp_c2', 'saving a log in progress keeps the fingerprint');
+update public.workout_logs set status = 'completed', finished_at = now() where id = :'l_open';
+select isnt(public.award_history_version(:'c2', :'ws'), :'fp_c2', 'finishing it changes the fingerprint');
+update public.workout_logs set status = 'in_progress', finished_at = null where id = :'l_open';
+select is(public.award_history_version(:'c2', :'ws'), :'fp_c2', 'reopening it changes it back');
 
 -- apply_award
 select format($j${
@@ -86,8 +95,9 @@ select format($j${
     {"exercise_id": "%1$s", "kind": "reps_at_weight", "value_kg": 60, "reps": 8, "log_id": "%2$s", "achieved_at": "2026-11-05T10:00:00Z"},
     {"exercise_id": "%1$s", "kind": "reps_at_weight", "value_kg": 50, "reps": 9, "log_id": "%2$s", "achieved_at": "2026-11-05T10:00:00Z"}
   ],
-  "stats": {"workouts": 1, "streak": 1, "best_streak": 1, "journey_week": 1, "pr_count": 0, "lifetime_volume_kg": 480}
-}$j$, :'ex', :'l1', public.award_history_version(:'c1')) as award1 \gset
+  "stats": {"workouts": 1, "streak": 1, "streak_week": "2026-11-02", "best_streak": 1, "journey_week": 1, "pr_count": 0,
+    "lifetime_volume_kg": 480}
+}$j$, :'ex', :'l1', public.award_history_version(:'c1', :'ws')) as award1 \gset
 
 select is(public.apply_award(:'l1', :'award1'::jsonb) ->> 'status', 'awarded', 'the first award is written');
 select results_eq(format($q$select client_id, workspace_id from public.awards where log_id = %L$q$, :'l1'),
@@ -96,6 +106,8 @@ select results_eq(format($q$select sticker_key, count, first_log_id from public.
   format($q$values ('chichen-itza', 1, %1$L::uuid), ('goat', 1, %1$L::uuid)$q$, :'l1'), 'each sticker is granted once');
 select is((select count(*)::int from public.personal_records where client_id = :'c1'), 3, 'the bests are stored');
 select is((select workouts from public.client_stats where client_id = :'c1'), 1, 'the stats are stored');
+select is((select streak_week from public.client_stats where client_id = :'c1'), '2026-11-02'::date,
+  'with the Monday of the streak''s last week');
 
 select is(public.apply_award(:'l1', jsonb_set(:'award1'::jsonb, '{award,ladder,key}', '"hippo"')),
   jsonb_build_object('status', 'existing', 'result', :'award1'::jsonb -> 'award'),
@@ -113,7 +125,7 @@ select is(public.apply_award(:'l1', format($j${
   "stickers": [{"key": "hippo", "shiny": true}],
   "records": [{"exercise_id": "%1$s", "kind": "heaviest", "value_kg": 55, "reps": 8, "log_id": "%2$s", "achieved_at": "2026-11-05T10:00:00Z"}],
   "stats": {"workouts": 1, "streak": 1, "best_streak": 1, "journey_week": 1, "pr_count": 1, "lifetime_volume_kg": 440}
-}$j$, :'ex', :'l1', public.award_history_version(:'c1'))::jsonb) -> 'result',
+}$j$, :'ex', :'l1', public.award_history_version(:'c1', :'ws'))::jsonb) -> 'result',
   jsonb_set(:'award1'::jsonb -> 'award', '{prs}', '[{"kind": "e1rm"}]'),
   'a recompute returns the first award with the new PRs');
 select results_eq(format($q$select sticker_key, count, shiny from public.sticker_awards where client_id = %L order by 1$q$, :'c1'),
@@ -127,7 +139,7 @@ select throws_ok(format($q$select public.apply_award(%L, %L::jsonb)$q$, :'l_gone
   'You are no longer a client of this coach.', 'a removed client gets no award');
 
 -- A history that changed between award_inputs and apply_award is refused, in both modes.
-select jsonb_set(jsonb_set(:'award1'::jsonb, '{history_version}', to_jsonb(public.award_history_version(:'c3'))),
+select jsonb_set(jsonb_set(:'award1'::jsonb, '{history_version}', to_jsonb(public.award_history_version(:'c3', :'ws'))),
   '{records}', '[]') as award3 \gset
 update public.workout_logs set corrected_at = now() where id = :'l3';
 select is(public.apply_award(:'l3', :'award3'::jsonb) ->> 'status', 'conflict',
@@ -137,7 +149,7 @@ select is(public.apply_award(:'l3', jsonb_set(:'award3'::jsonb, '{mode}', '"reco
   'so is a recompute from a changed history');
 
 -- A recompute of a log with no award yet is a full award.
-select jsonb_set(jsonb_set(:'award1'::jsonb, '{history_version}', to_jsonb(public.award_history_version(:'c5'))),
+select jsonb_set(jsonb_set(:'award1'::jsonb, '{history_version}', to_jsonb(public.award_history_version(:'c5', :'ws'))),
   '{records}', '[]') as award5 \gset
 select is(public.apply_award(:'l5', jsonb_set(:'award5'::jsonb, '{mode}', '"recompute"')) ->> 'status', 'awarded',
   'a recompute of a log with no award yet awards it');
@@ -146,7 +158,7 @@ select is((select sum(count)::int from public.sticker_awards where client_id = :
 -- A reopened and re-finished log (new revision) is recomputed by a plain award call: PRs only, no stickers.
 update public.workout_logs set revision = revision + 1 where id = :'l5';
 select is(public.apply_award(:'l5', jsonb_set(jsonb_set(:'award5'::jsonb, '{history_version}',
-    to_jsonb(public.award_history_version(:'c5'))), '{award,prs}', '[{"kind": "heaviest"}]')),
+    to_jsonb(public.award_history_version(:'c5', :'ws'))), '{award,prs}', '[{"kind": "heaviest"}]')),
   jsonb_build_object('status', 'recomputed', 'result',
     jsonb_set(:'award5'::jsonb -> 'award', '{prs}', '[{"kind": "heaviest"}]')),
   'a re-finished log is recomputed');

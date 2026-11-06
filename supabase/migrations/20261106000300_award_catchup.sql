@@ -5,24 +5,28 @@
 -- A pg_cron job every 15 minutes calls the function for completed logs that have no award yet (a phone that never
 -- called it, or the hourly auto-finish job), through pg_net, with a secret kept in Vault.
 
--- A fingerprint of the client's logs. It changes when any log is saved again (revision), finished, reopened,
--- discarded or corrected. apply_award compares it with the one award_inputs gave, so an award is never written from
--- a history that changed underneath it.
-create function public.award_history_version(p_client_id uuid) returns text
+-- A fingerprint of the client's completed logs in one workspace (the only logs an award is worked out from). It
+-- changes when one is saved again (revision) or corrected, and when a log is finished, or a finished one reopened or
+-- discarded (it joins or leaves the set). apply_award compares it with the one award_inputs gave, so an award is
+-- never written from a history that changed underneath it. Logs still in progress do not change it, so a client
+-- training on the phone never makes an award retry.
+create function public.award_history_version(p_client_id uuid, p_workspace_id uuid) returns text
 language sql stable security definer set search_path = '' as $$
   select md5(coalesce(string_agg(
     l.id::text || '|' || l.revision || '|' || l.status::text || '|' || coalesce(l.finished_at::text, '') || '|'
       || coalesce(l.corrected_at::text, ''),
     ',' order by l.id), ''))
-  from public.workout_logs l where l.client_id = p_client_id;
+  from public.workout_logs l
+  where l.client_id = p_client_id and l.workspace_id = p_workspace_id and l.status = 'completed';
 $$;
 
-revoke execute on function public.award_history_version(uuid) from public, anon, authenticated, service_role;
+revoke execute on function public.award_history_version(uuid, uuid) from public, anon, authenticated, service_role;
 
 -- Everything the award needs about one log's client, as one JSON document (one round trip, no row limit):
 -- the log's owner, status and revision, whether the owner is still a client of that workspace, the client's time
 -- zone, the award already granted (if any) and the log revision it was worked out for, the stickers owned, the
 -- history fingerprint, and every completed log of the client in LogTreeRow shape (completed sets only: nothing else counts).
+-- Stickers, fingerprint and logs are the log's workspace's only: a client starts fresh with each coach.
 create function public.award_inputs(p_log_id uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
@@ -33,10 +37,11 @@ language sql stable security definer set search_path = '' as $$
     'time_zone', (select p.time_zone from public.profiles p where p.id = t.client_id),
     'award', (select a.result from public.awards a where a.log_id = t.id),
     'award_revision', (select a.log_revision from public.awards a where a.log_id = t.id),
-    'history_version', public.award_history_version(t.client_id),
+    'history_version', public.award_history_version(t.client_id, t.workspace_id),
     'owned', coalesce((select jsonb_agg(jsonb_build_object('key', s.sticker_key, 'count', s.count, 'shiny', s.shiny))
-      from public.sticker_awards s where s.client_id = t.client_id), '[]'::jsonb),
-    'owned_total', (select coalesce(sum(s.count), 0) from public.sticker_awards s where s.client_id = t.client_id),
+      from public.sticker_awards s where s.client_id = t.client_id and s.workspace_id = t.workspace_id), '[]'::jsonb),
+    'owned_total', (select coalesce(sum(s.count), 0) from public.sticker_awards s
+      where s.client_id = t.client_id and s.workspace_id = t.workspace_id),
     'logs', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', l.id, 'workout_id', l.workout_id, 'name', l.name, 'status', l.status, 'started_at', l.started_at,
@@ -64,7 +69,8 @@ language sql stable security definer set search_path = '' as $$
             ), '[]'::jsonb)) order by b.position)
           from public.log_blocks b where b.log_id = l.id
         ), '[]'::jsonb)) order by l.finished_at, l.id)
-      from public.workout_logs l where l.client_id = t.client_id and l.status = 'completed'
+      from public.workout_logs l
+      where l.client_id = t.client_id and l.workspace_id = t.workspace_id and l.status = 'completed'
     ), '[]'::jsonb))
   from public.workout_logs t where t.id = p_log_id;
 $$;
@@ -78,8 +84,9 @@ grant execute on function public.award_inputs(uuid) to service_role;
 --   owned_total      the sum of sticker counts the award was worked out from
 --   award            the AwardResult returned to the phone
 --   stickers         [{ key, shiny }] to add one of each
---   records          every personal best of the client: [{ exercise_id, kind, value_kg, reps, log_id, achieved_at }]
---   stats            { workouts, streak, best_streak, journey_week, pr_count, lifetime_volume_kg }
+--   records          every personal best of the client in this workspace:
+--                    [{ exercise_id, kind, value_kg, reps, log_id, achieved_at }]
+--   stats            { workouts, streak, streak_week, best_streak, journey_week, pr_count, lifetime_volume_kg }
 -- It returns { status, result }:
 --   'existing'   the log already had an award for its current revision: nothing written, the first result
 --                returned (a retry or a race)
@@ -92,7 +99,8 @@ grant execute on function public.award_inputs(uuid) to service_role;
 -- A 'recompute' of a log with no award yet (a coach corrected it before the phone or the catch-up called) is a full
 -- award, rolls included: the client was always going to get it, and the catch-up would grant it anyway.
 -- A log whose client is no longer a client of its workspace gets nothing (42501, hint 'not_a_client').
--- The award row, the bests and the stats always take the client and workspace from the log row.
+-- The award row, the bests and the stats always take the client and workspace from the log row, and only that
+-- workspace's stickers, bests and stats are read or written: rows from another workspace are never touched.
 create function public.apply_award(p_log_id uuid, p_result jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -141,12 +149,13 @@ begin
   end if;
 
   -- The bests and stats below are rebuilt from the logs: refuse if they changed since they were read.
-  if public.award_history_version(v_log.client_id) is distinct from p_result ->> 'history_version' then
+  if public.award_history_version(v_log.client_id, v_log.workspace_id) is distinct from p_result ->> 'history_version' then
     return jsonb_build_object('status', 'conflict');
   end if;
 
   if v_existing is null then
-    if (select coalesce(sum(s.count), 0) from public.sticker_awards s where s.client_id = v_log.client_id)
+    if (select coalesce(sum(s.count), 0) from public.sticker_awards s
+        where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id)
         is distinct from (p_result ->> 'owned_total')::bigint then
       return jsonb_build_object('status', 'conflict');
     end if;
@@ -154,11 +163,10 @@ begin
     insert into public.sticker_awards as cur (client_id, workspace_id, sticker_key, shiny, first_log_id)
     select v_log.client_id, v_log.workspace_id, s.key, coalesce(s.shiny, false), v_log.id
     from jsonb_to_recordset(p_result -> 'stickers') as s(key text, shiny boolean)
-    on conflict (client_id, sticker_key) do update
+    on conflict (client_id, workspace_id, sticker_key) do update
       set count = cur.count + 1,
           shiny = cur.shiny or excluded.shiny,
-          last_earned_at = now(),
-          workspace_id = excluded.workspace_id;
+          last_earned_at = now();
 
     v_result := p_result -> 'award';
     insert into public.awards (log_id, client_id, workspace_id, result, log_revision)
@@ -173,7 +181,7 @@ begin
 
   -- The bests: drop the ones no longer held, then upsert the rest through the two partial unique indexes.
   delete from public.personal_records p
-  where p.client_id = v_log.client_id
+  where p.client_id = v_log.client_id and p.workspace_id = v_log.workspace_id
     and not exists (
       select 1 from jsonb_to_recordset(p_result -> 'records') as r(exercise_id uuid, kind text, value_kg numeric)
       where r.exercise_id = p.exercise_id and r.kind = p.kind
@@ -185,11 +193,11 @@ begin
   from jsonb_to_recordset(p_result -> 'records')
     as r(exercise_id uuid, kind text, value_kg numeric, reps integer, log_id uuid, achieved_at timestamptz)
   where r.kind <> 'reps_at_weight'
-  on conflict (client_id, exercise_id, kind) where kind <> 'reps_at_weight' do update
+  on conflict (client_id, workspace_id, exercise_id, kind) where kind <> 'reps_at_weight' do update
     set value_kg = excluded.value_kg, reps = excluded.reps, log_id = excluded.log_id,
-        achieved_at = excluded.achieved_at, workspace_id = excluded.workspace_id
-    where (cur.value_kg, cur.reps, cur.log_id, cur.achieved_at, cur.workspace_id)
-      is distinct from (excluded.value_kg, excluded.reps, excluded.log_id, excluded.achieved_at, excluded.workspace_id);
+        achieved_at = excluded.achieved_at
+    where (cur.value_kg, cur.reps, cur.log_id, cur.achieved_at)
+      is distinct from (excluded.value_kg, excluded.reps, excluded.log_id, excluded.achieved_at);
 
   insert into public.personal_records as cur
     (client_id, workspace_id, exercise_id, kind, value_kg, reps, log_id, achieved_at)
@@ -197,19 +205,18 @@ begin
   from jsonb_to_recordset(p_result -> 'records')
     as r(exercise_id uuid, kind text, value_kg numeric, reps integer, log_id uuid, achieved_at timestamptz)
   where r.kind = 'reps_at_weight'
-  on conflict (client_id, exercise_id, value_kg) where kind = 'reps_at_weight' do update
-    set reps = excluded.reps, log_id = excluded.log_id, achieved_at = excluded.achieved_at,
-        workspace_id = excluded.workspace_id
-    where (cur.reps, cur.log_id, cur.achieved_at, cur.workspace_id)
-      is distinct from (excluded.reps, excluded.log_id, excluded.achieved_at, excluded.workspace_id);
+  on conflict (client_id, workspace_id, exercise_id, value_kg) where kind = 'reps_at_weight' do update
+    set reps = excluded.reps, log_id = excluded.log_id, achieved_at = excluded.achieved_at
+    where (cur.reps, cur.log_id, cur.achieved_at)
+      is distinct from (excluded.reps, excluded.log_id, excluded.achieved_at);
 
-  insert into public.client_stats as cur (client_id, workspace_id, workouts, streak, best_streak, journey_week,
-    pr_count, lifetime_volume_kg, updated_at)
+  insert into public.client_stats as cur (client_id, workspace_id, workouts, streak, streak_week, best_streak,
+    journey_week, pr_count, lifetime_volume_kg, updated_at)
   values (v_log.client_id, v_log.workspace_id, (v_stats ->> 'workouts')::integer, (v_stats ->> 'streak')::integer,
-    (v_stats ->> 'best_streak')::integer, (v_stats ->> 'journey_week')::integer, (v_stats ->> 'pr_count')::integer,
-    (v_stats ->> 'lifetime_volume_kg')::numeric, now())
-  on conflict (client_id) do update
-    set workspace_id = excluded.workspace_id, workouts = excluded.workouts, streak = excluded.streak,
+    (v_stats ->> 'streak_week')::date, (v_stats ->> 'best_streak')::integer, (v_stats ->> 'journey_week')::integer,
+    (v_stats ->> 'pr_count')::integer, (v_stats ->> 'lifetime_volume_kg')::numeric, now())
+  on conflict (client_id, workspace_id) do update
+    set workouts = excluded.workouts, streak = excluded.streak, streak_week = excluded.streak_week,
         best_streak = excluded.best_streak, journey_week = excluded.journey_week, pr_count = excluded.pr_count,
         lifetime_volume_kg = excluded.lifetime_volume_kg, updated_at = now();
 

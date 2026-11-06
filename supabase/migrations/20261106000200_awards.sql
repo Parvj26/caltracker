@@ -1,6 +1,9 @@
 -- Stickers, personal records and streak stats (see docs/superpowers/specs/2026-11-05-stickers-prs-streaks-design.md).
 -- Clients and coaches only read these tables. Every write comes from the award Edge Function with the service role.
 -- All rows cascade from the client's account (auth.users) and from the workspace.
+-- Every award row belongs to one workspace and is worked out from that workspace's logs only. A client who leaves a
+-- coach and joins another starts fresh there: the new coach never sees what was earned with the old one, and the old
+-- coach's rows stay as they were (keyed by workspace, never moved).
 
 -- The client's own time zone decides which calendar day and week a workout counts for.
 alter table public.profiles
@@ -18,9 +21,9 @@ create table public.sticker_awards (
   first_earned_at timestamptz not null default now(),
   last_earned_at timestamptz not null default now(),
   first_log_id uuid references public.workout_logs on delete set null,
-  primary key (client_id, sticker_key)
+  primary key (client_id, workspace_id, sticker_key)
 );
-create index sticker_awards_workspace_idx on public.sticker_awards (workspace_id);
+create index sticker_awards_workspace_idx on public.sticker_awards (workspace_id, client_id);
 create index sticker_awards_first_log_idx on public.sticker_awards (first_log_id);
 
 -- What a finished workout earned: written once per log, so a retry returns the same result.
@@ -51,24 +54,30 @@ create table public.personal_records (
   achieved_at timestamptz not null,
   check (kind <> 'reps_at_weight' or reps is not null)
 );
-create unique index personal_records_best_idx on public.personal_records (client_id, exercise_id, kind)
+create unique index personal_records_best_idx on public.personal_records (client_id, workspace_id, exercise_id, kind)
   where kind <> 'reps_at_weight';
-create unique index personal_records_reps_idx on public.personal_records (client_id, exercise_id, value_kg)
+create unique index personal_records_reps_idx on public.personal_records
+  (client_id, workspace_id, exercise_id, value_kg)
   where kind = 'reps_at_weight';
 create index personal_records_workspace_idx on public.personal_records (workspace_id);
 create index personal_records_exercise_idx on public.personal_records (exercise_id);
 create index personal_records_log_idx on public.personal_records (log_id);
 
 create table public.client_stats (
-  client_id uuid primary key references auth.users on delete cascade,
+  client_id uuid not null references auth.users on delete cascade,
   workspace_id uuid not null references public.workspaces on delete cascade,
   workouts integer not null default 0 check (workouts >= 0),
   streak integer not null default 0 check (streak >= 0),
+  -- The Monday (client's time zone) of the last week that counted for streak; null with no streak. The streak is
+  -- only written when a workout is awarded, so readers pass both to the shared liveStreak, which drops it to 0 once
+  -- a whole week has ended without a workout.
+  streak_week date,
   best_streak integer not null default 0 check (best_streak >= 0),
   journey_week integer not null default 0 check (journey_week >= 0),
   pr_count integer not null default 0 check (pr_count >= 0),
   lifetime_volume_kg numeric(14,3) not null default 0 check (lifetime_volume_kg >= 0),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (client_id, workspace_id)
 );
 create index client_stats_workspace_idx on public.client_stats (workspace_id);
 

@@ -22,6 +22,8 @@ import {
 // A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
 // plain call. A recompute of a log with no award yet is a full award (the client was always due it).
 // A client the coach has removed gets nothing: 403 with hint 'not_a_client', as save_workout_log answers.
+// Everything is per workspace: award_inputs hands over only the log's workspace's logs and stickers, so a client
+// who joins a new coach starts fresh there.
 //
 // verify_jwt is off for this function (supabase/config.toml) because the cron job has no user JWT; a user caller's
 // token is checked here with auth.getUser instead.
@@ -161,6 +163,7 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
           stats: {
             workouts: ctx.current.workouts,
             streak: ctx.current.streak,
+            streak_week: ctx.currentStreakWeek,
             best_streak: ctx.current.bestStreak,
             journey_week: ctx.current.streak,
             pr_count: ctx.current.prCount,

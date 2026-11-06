@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AwardResult, Rng } from '@caltracker/shared';
+import { weekKey, type AwardResult, type Rng } from '@caltracker/shared';
 import { createHandler } from './index.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL') ?? 'http://127.0.0.1:54321';
@@ -225,8 +225,10 @@ t('the same log twice gives one award and an identical response', async () => {
   assertEquals(rows[0]!.workspace_id, ws);
   const owned = await stickers(client.id);
   assertEquals(owned.map((s) => [s.sticker_key, s.count]), [['chichen-itza', 1], ['rhino', 1]]);
-  const { data: stats } = await admin.from('client_stats').select('workouts, streak, journey_week').eq('client_id', client.id).single();
-  assertEquals(stats, { workouts: 1, streak: 1, journey_week: 1 });
+  const { data: stats } = await admin.from('client_stats').select('workouts, streak, journey_week, streak_week').eq('client_id', client.id).single();
+  const { data: log } = await admin.from('workout_logs').select('finished_at').eq('id', logId).single();
+  // The streak's last week is the Monday of the workout's week (the profile's zone is UTC by default).
+  assertEquals(stats, { workouts: 1, streak: 1, journey_week: 1, streak_week: weekKey(log!.finished_at as string, 'UTC') });
 });
 
 t('the catch-up secret can award; two concurrent calls give one award row and the same response', async () => {
