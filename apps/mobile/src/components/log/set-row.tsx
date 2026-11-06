@@ -17,7 +17,7 @@ import {
   type Units,
 } from '@caltracker/shared';
 import { parseActualInput, type ActualField } from '@/lib/active-log-logic';
-import { actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
+import { actualInputMinFontScale, actualInputWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const MAX_KG = 1000;
@@ -109,6 +109,9 @@ function ActualInput({
         keyboardType={spec.keyboard}
         returnKeyType="done"
         selectTextOnFocus
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={actualInputMinFontScale}
         accessibilityLabel={`${setName} ${spec.field === 'reps' ? 'reps' : spec.field}${spec.field === 'reps' ? '' : ` in ${spec.unit}`}`}
         placeholder="–"
         placeholderTextColor={palette.inkMuted}
