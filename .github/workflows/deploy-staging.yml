@@ -151,7 +151,16 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm --filter web cf:deploy
+        # The Mac runner's network occasionally corrupts a large upload (Cloudflare closes the connection with a TLS
+        # bad_record_mac, which Node reports as EPIPE). Each attempt re-sends the whole version, so a fresh try
+        # usually goes through; only real failures fail all five.
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if pnpm --filter web cf:deploy; then exit 0; fi
+            echo "::warning::Cloudflare upload attempt $attempt failed; retrying in $((attempt * 10)) s"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
   smoke:
     needs: deploy
