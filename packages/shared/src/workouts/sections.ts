@@ -44,3 +44,14 @@ export function sectionPlace(
     of: run.blockIndexes.length,
   };
 }
+
+/** Rebuild a doc's sections from block rows: one entry per distinct id, in order of first appearance. */
+export function sectionsFromBlocks(
+  blocks: ReadonlyArray<{ section_id: string | null; section_name: string | null }>,
+): Array<{ id: string; name: string }> {
+  const seen = new Map<string, string>();
+  for (const b of blocks) {
+    if (b.section_id !== null && !seen.has(b.section_id)) seen.set(b.section_id, b.section_name ?? '');
+  }
+  return [...seen].map(([id, name]) => ({ id, name }));
+}

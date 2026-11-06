@@ -32,9 +32,12 @@ export function sampleLog(over: Partial<WorkoutLogDoc> = {}): WorkoutLogDoc {
     autoFinished: false,
     revision: 1,
     notes: null,
+    sections: [],
     blocks: [
       {
         id: id(2),
+        sectionId: null,
+        pickedExerciseId: null,
         kind: 'straight',
         exercises: [
           {

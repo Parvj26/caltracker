@@ -278,6 +278,8 @@ export function addLogExercise(
   if (log.blocks.length >= MAX_BLOCKS) return log;
   const block: LogBlockDoc = {
     id: makeId(),
+    sectionId: null,
+    pickedExerciseId: null,
     kind: 'straight',
     exercises: [
       {

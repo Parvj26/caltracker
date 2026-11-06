@@ -26,8 +26,11 @@ export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, n
     autoFinished: false,
     revision: 0,
     notes: null,
+    sections: workout.sections.map((s) => ({ ...s })),
     blocks: workout.blocks.map((b) => ({
       id: makeId(),
+      sectionId: b.sectionId,
+      pickedExerciseId: null,
       kind: b.kind,
       exercises: b.exercises.map((e) => ({
         id: makeId(),
@@ -55,6 +58,7 @@ export function emptyLog(name: string, makeId: () => string, nowIso: string): Wo
     autoFinished: false,
     revision: 0,
     notes: null,
+    sections: [],
     blocks: [],
   };
 }

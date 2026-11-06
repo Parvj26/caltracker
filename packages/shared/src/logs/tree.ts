@@ -1,5 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
+import { sectionsFromBlocks } from '../workouts/sections';
 import type { LogStatus, WorkoutLogDoc } from './schema';
 
 /**
@@ -9,7 +10,7 @@ import type { LogStatus, WorkoutLogDoc } from './schema';
  */
 export const LOG_TREE_SELECT =
   'id, workout_id, name, status, started_at, finished_at, last_activity_at, auto_finished, revision, notes, ' +
-  'log_blocks(id, position, kind, ' +
+  'log_blocks(id, position, kind, section_id, section_name, picked_exercise_id, ' +
   'log_exercises(id, position, exercise_id, planned_workout_exercise_id, swapped_from_exercise_id, note, ' +
   'exercises!log_exercises_exercise_id_fkey(name, tracking_type), ' +
   'log_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
@@ -52,6 +53,9 @@ export type LogTreeRow = {
     id: string;
     position: number;
     kind: BlockKind;
+    section_id: string | null;
+    section_name: string | null;
+    picked_exercise_id: string | null;
     log_exercises: Array<{
       id: string;
       position: number;
@@ -75,6 +79,7 @@ const num = (v: Numeric): number | null => (v === null ? null : Number(v));
  * a record of what was done, and the log schema does not tie targets or actuals to the tracking type.
  */
 export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
+  const blocks = byPosition(row.log_blocks);
   return {
     id: row.id,
     workoutId: row.workout_id,
@@ -86,8 +91,11 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
     autoFinished: row.auto_finished,
     revision: row.revision,
     notes: row.notes,
-    blocks: byPosition(row.log_blocks).map((b) => ({
+    sections: sectionsFromBlocks(blocks),
+    blocks: blocks.map((b) => ({
       id: b.id,
+      sectionId: b.section_id,
+      pickedExerciseId: b.picked_exercise_id,
       kind: b.kind,
       exercises: byPosition(b.log_exercises).map((e) => ({
         id: e.id,
