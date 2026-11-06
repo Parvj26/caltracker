@@ -20,11 +20,12 @@ env:
     env: { NAME: 'E2E Log' }
 - assertVisible:
     id: set-0-0-2
-# Swipe the second row left from its set number, then Delete: three sets become two.
+# Swipe the second row left (from its middle), then Delete: three sets become two.
 - swipe:
     from:
-      id: tag-0-0-1
+      id: set-0-0-1
     direction: LEFT
+    duration: 800
 - extendedWaitUntil:
     visible:
       id: set-delete-0-0-1

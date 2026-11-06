@@ -128,7 +128,7 @@ env:
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
-- assertTrue: ${output.call == "Felt: Good | Felt strong"}
+- assertTrue: '${output.call == "Felt: Good | Felt strong"}'
 # Later, from Today: View opens the summary again.
 - tapOn: 'View'
 - extendedWaitUntil:

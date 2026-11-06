@@ -24,6 +24,8 @@ env:
 # ---- ✓ with the keyboard up: the typed weight is what is saved ----
 - tapOn:
     id: actual-weight-0-0-0
+# Let the keypad finish coming up (the page scrolls the box above it) before typing.
+- waitForAnimationToEnd
 - inputText: '50'
 - tapOn:
     id: tick-0-0-0
