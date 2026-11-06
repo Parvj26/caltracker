@@ -84,3 +84,19 @@ export function isInRange(key: string, value: number, customDef?: { min: number;
 
 /** Largest error, in kg, from showing a stored kg value to 1 decimal in lb (plus up to 0.0005 from storing kg to 3 decimals). */
 export const MAX_LB_DISPLAY_DRIFT_KG = 0.05 * KG_PER_LB;
+
+/**
+ * A body weight typed by a person ("80,5" or " 176.4 ") in their units, as stored kg; or the plain message to show.
+ * Used by the client's own weigh-in on the phone.
+ */
+export function parseWeightInput(text: string, units: Units): { ok: true; kg: number } | { ok: false; error: string } {
+  const t = text.trim().replace(',', '.');
+  if (t === '') return { ok: false, error: 'Enter your weight.' };
+  if (!/^\d+(\.\d+)?$/.test(t)) return { ok: false, error: 'Enter your weight as a number.' };
+  const kg = fromDisplay('weight_kg', Number(t), units);
+  if (!isInRange('weight_kg', kg)) {
+    const { min, max } = METRICS.weight_kg;
+    return { ok: false, error: `Enter a weight between ${toInputValue('weight_kg', min, units)} and ${toInputValue('weight_kg', max, units)} ${units}.` };
+  }
+  return { ok: true, kg };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LB_DISPLAY_DRIFT_KG, METRICS, formatMetric, fromDisplay, isInRange, toInputValue } from '../../src/body/metrics';
+import { MAX_LB_DISPLAY_DRIFT_KG, METRICS, formatMetric, fromDisplay, isInRange, parseWeightInput, toInputValue } from '../../src/body/metrics';
 import { changeSince, measurementSeries } from '../../src/body/series';
 import { isScanDue } from '../../src/body/due';
 
@@ -139,5 +139,19 @@ describe('measurementSeries extras', () => {
   it('includes exactly 365 days back for 1y', () => {
     expect(measurementSeries([{ measured_on: '2025-11-05', value: 1 }, { measured_on: '2026-11-05', value: 2 }], '1y', '2026-11-05')).toHaveLength(2);
     expect(measurementSeries([{ measured_on: '2025-11-04', value: 1 }, { measured_on: '2026-11-05', value: 2 }], '1y', '2026-11-05')).toEqual([]);
+  });
+});
+
+describe('parseWeightInput', () => {
+  it('turns a typed weight into kg', () => {
+    expect(parseWeightInput('176.4', 'lb')).toEqual({ ok: true, kg: 80.014 });
+    expect(parseWeightInput(' 80,5 ', 'kg')).toEqual({ ok: true, kg: 80.5 });
+  });
+  it('refuses empty, non-numbers and out-of-range with a plain message', () => {
+    expect(parseWeightInput('', 'kg')).toEqual({ ok: false, error: 'Enter your weight.' });
+    expect(parseWeightInput('abc', 'kg')).toEqual({ ok: false, error: 'Enter your weight as a number.' });
+    const low = parseWeightInput('5', 'kg');
+    expect(low).toEqual({ ok: false, error: 'Enter a weight between 20 and 400 kg.' });
+    expect(parseWeightInput('30', 'lb')).toEqual({ ok: false, error: 'Enter a weight between 44.1 and 881.8 lb.' });
   });
 });

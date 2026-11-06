@@ -8,9 +8,6 @@ import {
   displayValue,
   formatMetric,
   formatShortDate,
-  fromDisplay,
-  isInRange,
-  toInputValue,
   measurementSeries,
 } from '@caltracker/shared';
 import { addDays } from '@caltracker/shared';
@@ -154,18 +151,6 @@ export function parseCachedProgress(raw: string | null): ProgressRows | null {
   return v as unknown as ProgressRows;
 }
 
-/** A typed weight (in the viewer's unit, comma or dot) to the stored kg, or a plain message. */
-export function parseWeightInput(text: string, units: Units): { ok: true; kg: number } | { ok: false; error: string } {
-  const t = text.trim().replace(',', '.');
-  if (t === '') return { ok: false, error: 'Enter your weight.' };
-  if (!/^\d+(\.\d+)?$/.test(t)) return { ok: false, error: 'Enter your weight as a number.' };
-  const kg = fromDisplay('weight_kg', Number(t), units);
-  if (!isInRange('weight_kg', kg)) {
-    const { min, max } = METRICS.weight_kg;
-    return { ok: false, error: `Enter a weight between ${toInputValue('weight_kg', min, units)} and ${toInputValue('weight_kg', max, units)} ${units}.` };
-  }
-  return { ok: true, kg };
-}
 
 /** Steps the weight entry's date by whole days. Never later than today (no future dates) and never before 2000-01-01, the earliest the database takes. */
 export function stepWeightDate(date: IsoDate, days: number, today: IsoDate): IsoDate {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildProgress, stepWeightDate, parseWeightInput, parseCachedProgress, serializeProgress, type ProgressRows, type ScanRow } from './progress';
+import { buildProgress, stepWeightDate, parseCachedProgress, serializeProgress, type ProgressRows, type ScanRow } from './progress';
 
 const scan = (id: string, measuredOn: string, weightKg: number, extra: Partial<ScanRow> = {}): ScanRow => ({
   id,
@@ -82,20 +82,6 @@ describe('cached progress', () => {
     expect(parseCachedProgress(null)).toBeNull();
     expect(parseCachedProgress('not json')).toBeNull();
     expect(parseCachedProgress('{"scans":[{"id":1}],"customs":[]}')).toBeNull();
-  });
-});
-
-describe('parseWeightInput', () => {
-  it('turns a typed weight into kg', () => {
-    expect(parseWeightInput('176.4', 'lb')).toEqual({ ok: true, kg: 80.014 });
-    expect(parseWeightInput(' 80,5 ', 'kg')).toEqual({ ok: true, kg: 80.5 });
-  });
-  it('refuses empty, non-numbers and out-of-range with a plain message', () => {
-    expect(parseWeightInput('', 'kg')).toEqual({ ok: false, error: 'Enter your weight.' });
-    expect(parseWeightInput('abc', 'kg')).toEqual({ ok: false, error: 'Enter your weight as a number.' });
-    const low = parseWeightInput('5', 'kg');
-    expect(low).toEqual({ ok: false, error: 'Enter a weight between 20 and 400 kg.' });
-    expect(parseWeightInput('30', 'lb')).toEqual({ ok: false, error: 'Enter a weight between 44.1 and 881.8 lb.' });
   });
 });
 

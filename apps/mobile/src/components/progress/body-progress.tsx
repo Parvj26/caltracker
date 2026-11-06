@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
-import { CHART_RANGES, CHART_RANGE_LABELS, formatShortDate, localToday, toInputValue, type ChartRange, type IsoDate } from '@caltracker/shared';
+import { CHART_RANGES, CHART_RANGE_LABELS, formatShortDate, localToday, parseWeightInput, toInputValue, type ChartRange, type IsoDate } from '@caltracker/shared';
 import { LineChart } from '@/components/progress/line-chart';
 import { Button, Card, ErrorText, TextButton, TextField } from '@/components/ui';
 import {
@@ -14,7 +14,7 @@ import {
   saveMyWeight,
   PROGRESS_LOAD_FAILED,
 } from '@/lib/body-api';
-import { buildProgress, parseWeightInput, stepWeightDate, type HistoryItem, type ProgressRows } from '@/lib/progress';
+import { buildProgress, stepWeightDate, type HistoryItem, type ProgressRows } from '@/lib/progress';
 import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
