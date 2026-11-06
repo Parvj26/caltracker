@@ -50,7 +50,7 @@ untouched workout for today is updated.
 
 ## How it works (database)
 
-Migration `supabase/migrations/20261106004000_live_sync.sql`.
+Migration `supabase/migrations/20261106007000_live_sync.sql`.
 
 ### New columns
 
