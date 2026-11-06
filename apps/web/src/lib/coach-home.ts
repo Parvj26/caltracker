@@ -86,9 +86,9 @@ export async function loadHomeData(
     ),
     supabase
       .from('program_assignments')
+      // Cancelled ones too: a program cancelled from a future date still runs until then (the shared rules work that out).
       .select('id, client_id, program_name, start_date, end_date, cancelled_on')
       .eq('workspace_id', workspaceId)
-      .is('cancelled_on', null)
       .gte('end_date', addDays(utcToday, -1)),
     readAll(
       (from, to) =>

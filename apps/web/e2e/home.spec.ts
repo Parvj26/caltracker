@@ -110,7 +110,8 @@ test('the four tiles are the same height, linked or not', async ({ page }) => {
 
 test('two undone workouts in the last 2 days list the client under Missed 2+ in a row', async ({ page }) => {
   const last = `Miss${unique()}`;
-  const clientId = await newClient(last);
+  // Joined before the missed days: workouts planned before joining never count as missed.
+  const clientId = await newClient(last, 10);
   await plan(clientId, 'Pull A', dayOffset(-1));
   await plan(clientId, 'Pull B', dayOffset(-2));
   await signInAsCoach(page);

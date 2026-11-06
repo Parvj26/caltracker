@@ -73,17 +73,21 @@ export type ClientCheck = {
   program: { name: string; startDate: IsoDate; endDate: IsoDate } | null;
 };
 
-function missedReason(workouts: HomeWorkout[], today: IsoDate): AttentionReason | null {
+function missedReason(workouts: HomeWorkout[], today: IsoDate, joinedOn: IsoDate): AttentionReason | null {
+  const from = addDays(today, -MISSED_RUN_LOOKBACK_DAYS);
+  const isDone = (w: HomeWorkout) => workoutStatus(w).kind === 'done';
+  // Nothing before the client joined counts: a re-added client had no access to those days.
   const past = workouts
-    .filter((w) => w.scheduledOn < today && w.scheduledOn >= addDays(today, -MISSED_RUN_LOOKBACK_DAYS))
-    .sort((a, b) => (a.scheduledOn < b.scheduledOn ? 1 : a.scheduledOn > b.scheduledOn ? -1 : 0)); // newest first
+    .filter((w) => w.scheduledOn < today && w.scheduledOn >= from && w.scheduledOn >= joinedOn)
+    // Newest day first; within a day, done workouts first, so a day with any workout done breaks the run.
+    .sort((a, b) => (a.scheduledOn < b.scheduledOn ? 1 : a.scheduledOn > b.scheduledOn ? -1 : Number(isDone(b)) - Number(isDone(a))));
   const windowStart = addDays(today, -MISSED_LOOKBACK_DAYS);
-  const missed = past.filter((w) => w.scheduledOn >= windowStart && workoutStatus(w).kind !== 'done');
+  const missed = past.filter((w) => w.scheduledOn >= windowStart && !isDone(w));
   const latest = missed[0];
   if (!latest) return null;
   let run = 0;
   for (const w of past) {
-    if (workoutStatus(w).kind === 'done') break;
+    if (isDone(w)) break;
     run += 1;
   }
   // The run starts at the latest past workout: if that one was done there is no run.
@@ -98,8 +102,21 @@ function hasSomethingPlanned(workouts: HomeWorkout[], today: IsoDate): boolean {
   );
 }
 
+/**
+ * Programs as they really run: one cancelled from a date ends the day before it (removing a program "from today on"
+ * keeps its past days). One cancelled on or before its start is gone.
+ */
+function effectiveAssignments(assignments: CheckAssignment[]): CheckAssignment[] {
+  return assignments.flatMap((a) => {
+    if (a.cancelledOn === null) return [a];
+    const lastDay = addDays(a.cancelledOn, -1);
+    const endDate = lastDay < a.endDate ? lastDay : a.endDate;
+    return endDate < a.startDate ? [] : [{ ...a, endDate, cancelledOn: null }];
+  });
+}
+
 function currentProgram(assignments: CheckAssignment[], today: IsoDate): ClientCheck['program'] {
-  const live = assignments.filter((a) => a.cancelledOn === null && a.endDate >= today);
+  const live = assignments.filter((a) => a.endDate >= today);
   const running = live.filter((a) => a.startDate <= today).sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
   const next = live.filter((a) => a.startDate > today).sort((a, b) => (a.startDate < b.startDate ? -1 : 1))[0];
   const pick = running ?? next;
@@ -127,10 +144,10 @@ function statusOf(reasons: AttentionReason[]): ClientStatus {
 export function checkClient(client: HomeClient, input: DailyCheckInput, bests?: ReadonlyMap<string, number>): ClientCheck {
   const { today } = input;
   const workouts = input.workouts.filter((w) => w.clientId === client.id);
-  const assignments = input.assignments.filter((a) => a.clientId === client.id);
+  const assignments = effectiveAssignments(input.assignments.filter((a) => a.clientId === client.id));
   const reasons: AttentionReason[] = [];
 
-  const missed = missedReason(workouts, today);
+  const missed = missedReason(workouts, today, client.joinedOn);
   if (missed) reasons.push(missed);
   const ending = endingPrograms(assignments, today)[0];
   if (ending) {
@@ -156,10 +173,10 @@ export function checkClient(client: HomeClient, input: DailyCheckInput, bests?: 
   };
 }
 
-/** Checks every client, in the order given. */
+/** Checks every client, sorted by last name (ties keep the input order), so every list built from it is stable. */
 export function checkClients(input: DailyCheckInput): ClientCheck[] {
   const bests = prsThisWeekByClient(input.prs, new Set(input.clients.map((c) => c.id)), input.today, input.timeZone);
-  return input.clients.map((c) => checkClient(c, input, bests));
+  return [...input.clients].sort(compareByLastName).map((c) => checkClient(c, input, bests));
 }
 
 export type AttentionGroup = { kind: AttentionKind; items: Array<{ clientId: string; reason: AttentionReason }> };

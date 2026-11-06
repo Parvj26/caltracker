@@ -33,6 +33,10 @@ means the workout has a completed log; a discarded log or one still in progress 
 | New personal bests this week | Lifts improved Monday to Sunday of this week (each lift counted once per workout, the same count as the "New PRs this week" tile) | "2 lifts improved" | Open |
 
 - A workout planned for **today** is never missed while today is still going. It becomes missed after midnight.
+- Workouts planned **before the client joined** never count as missed (a re-added client had no access then).
+- A day with **any workout done** breaks a run of misses, even if another workout that day was missed.
+- A program **cancelled from a future date** runs until the day before; one cancelled on or before its start is ignored.
+- Clients are checked in last-name order, so groups and lists always come out in the same order.
 - **Program ending replaces Nothing planned** for the same client, so they are listed once, with Assign.
 - A client can be in more than one group (e.g. missed 2 in a row and their program ends this week).
 - Within a group: longest run / most misses first, soonest end first, longest quiet first, most bests first.

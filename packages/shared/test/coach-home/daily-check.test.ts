@@ -89,6 +89,17 @@ describe('missed workouts', () => {
   });
 });
 
+describe('missed workouts before the client joined', () => {
+  it('ignores workouts planned before the join date (a re-added client had no access then)', () => {
+    const c = only({ clients: [client({ joinedOn: '2026-11-03', lastFinishedOn: null })], workouts: [wk('2026-11-01'), wk('2026-11-02'), wk('2026-11-03'), tomorrow()] });
+    expect(c.reasons).toEqual([{ kind: 'missed', count: 1, lastMissedOn: '2026-11-03' }]);
+  });
+
+  it('does not count a run that only exists before joining', () => {
+    expect(kinds(only({ clients: [client({ joinedOn: '2026-11-04', lastFinishedOn: null })], workouts: [wk('2026-11-02'), wk('2026-11-03'), tomorrow()] }))).toEqual([]);
+  });
+});
+
 describe('missed 2+ in a row', () => {
   it('flags the last two planned workouts both missed', () => {
     const c = only({ workouts: [wk('2026-11-01', { logs: done() }), wk('2026-11-02'), wk('2026-11-04'), tomorrow()] });
@@ -120,6 +131,15 @@ describe('missed 2+ in a row', () => {
     expect(c.reasons).toEqual([{ kind: 'missed_in_a_row', count: 2, lastMissedOn: '2026-11-04' }]);
   });
 
+  it('lets a done workout on the same day break the run, whatever order they come in', () => {
+    // Two missed and one done on the 4th: the day was not skipped, so there is no run.
+    const missedFirst = [wk('2026-11-04'), wk('2026-11-04'), wk('2026-11-04', { logs: done() }), tomorrow()];
+    const doneFirst = [wk('2026-11-04', { logs: done() }), wk('2026-11-04'), wk('2026-11-04'), tomorrow()];
+    for (const workouts of [missedFirst, doneFirst]) {
+      expect(only({ workouts }).reasons).toEqual([{ kind: 'missed', count: 2, lastMissedOn: '2026-11-04' }]);
+    }
+  });
+
   it('counts two missed workouts on the same day as two in a row', () => {
     expect(kinds(only({ workouts: [wk('2026-11-04'), wk('2026-11-04'), tomorrow()] }))).toEqual(['missed_in_a_row']);
   });
@@ -143,6 +163,24 @@ describe('program ending', () => {
     expect(kinds(only({ assignments: [asg({ endDate: '2026-11-08', cancelledOn: '2026-11-01' })], workouts: [tomorrow()] }))).toEqual([]);
     const next = asg({ startDate: '2026-11-09', endDate: '2026-12-06' });
     expect(kinds(only({ assignments: [asg({ endDate: '2026-11-08' }), next], workouts: [tomorrow()] }))).toEqual([]);
+  });
+
+  it('treats a program cancelled from a future date as ending the day before', () => {
+    const a = asg({ endDate: '2026-11-29', cancelledOn: '2026-11-09' });
+    expect(only({ assignments: [a], workouts: [tomorrow()] }).reasons).toEqual([{ kind: 'program_ending', assignmentId: a.id, endDate: '2026-11-08', daysLeft: 3 }]);
+    expect(only({ assignments: [a] }).program).toEqual({ name: 'Strength 8', startDate: '2026-10-01', endDate: '2026-11-08' });
+  });
+
+  it('drops a program cancelled from today or earlier, or before it started', () => {
+    expect(only({ assignments: [asg({ cancelledOn: TODAY })], workouts: [tomorrow()] }).program).toBeNull();
+    expect(kinds(only({ assignments: [asg({ endDate: '2026-11-08', cancelledOn: TODAY })], workouts: [tomorrow()] }))).toEqual([]);
+    expect(only({ assignments: [asg({ startDate: '2026-11-10', endDate: '2026-12-07', cancelledOn: '2026-11-10' })] }).program).toBeNull();
+  });
+
+  it('a cancelled program no longer hides the one before it from "ending"', () => {
+    const before = asg({ endDate: '2026-11-08' });
+    const next = asg({ startDate: '2026-11-09', endDate: '2026-12-06', cancelledOn: '2026-11-09' });
+    expect(kinds(only({ assignments: [before, next], workouts: [tomorrow()] }))).toEqual(['program_ending']);
   });
 
   it('replaces "nothing planned" when both are true, so the client is listed once with Assign', () => {
@@ -243,6 +281,12 @@ describe('status, week and program for the clients list', () => {
   it('only checks the clients it is given, and keeps other clients\' workouts out', () => {
     const checks = checkClients(input({ clients: [client(), client({ id: 'c2' })], workouts: [wk('2026-11-03', { clientId: 'c2' }), tomorrow()] }));
     expect(checks.map((c) => [c.clientId, kinds(c)])).toEqual([['c1', []], ['c2', ['missed', 'nothing_planned']]]);
+  });
+
+  it('returns clients sorted by last name, so groups and lists have a stable order', () => {
+    const checks = checkClients(input({ clients: [client({ id: 'z', lastName: 'Zed' }), client({ id: 'a', lastName: 'Abbot' }), client({ id: 'm', lastName: 'Moss' })], workouts: [] }));
+    expect(checks.map((c) => c.clientId)).toEqual(['a', 'm', 'z']);
+    expect(attentionGroups(checks)[0]!.items.map((i) => i.clientId)).toEqual(['a', 'm', 'z']);
   });
 
   it('checkClient gives the same answer for one client', () => {
