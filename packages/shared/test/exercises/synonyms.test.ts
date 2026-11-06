@@ -13,7 +13,7 @@ import { EXERCISE_OTHER_NAMES } from '../../src/exercises/synonyms';
 import { inferTrackingType } from '../../src/exercises/tracking';
 
 /**
- * Names-only copy of the real built-in library (free-exercise-db, 876 exercises) as imported into the
+ * Names-only copy of the real built-in library (free-exercise-db 876 + 10 CalTracker extras) as imported into the
  * local database: `name|equipment|primary muscles|category`, one per line.
  */
 const LIBRARY: ExerciseIndexRow[] = readFileSync(
@@ -246,7 +246,7 @@ describe('common gym names find the library exercise first (real library)', () =
   it('has at least 100 cases and every expected name is in the library', () => {
     expect(CASES.length).toBeGreaterThanOrEqual(100);
     const names = new Set(LIBRARY.map((r) => r.name));
-    expect(LIBRARY.length).toBe(876);
+    expect(LIBRARY.length).toBe(886);
     expect(CASES.map(([, e]) => e).filter((e) => !names.has(e))).toEqual([]);
   });
 
@@ -254,8 +254,8 @@ describe('common gym names find the library exercise first (real library)', () =
     expect(top(query)).toBe(expected);
   });
 
-  // Enabled once the library extras land (see LIBRARY_EXTRAS).
-  it.skip.each(LIBRARY_EXTRAS)('%s finds itself', (name) => {
+  // The 10 CalTracker extras (scripts/caltracker-extra-exercises.json) find themselves.
+  it.each(LIBRARY_EXTRAS)('%s finds itself', (name) => {
     expect(top(name)).toBe(name);
   });
 });
