@@ -1,5 +1,5 @@
 begin;
-select plan(67);
+select plan(80);
 
 select tests.create_user('ms-coach@t.local', 'Ms Coach') as coach \gset
 select tests.create_workspace('MS Coaching', :'coach') as ws \gset
@@ -21,6 +21,10 @@ select ok(not has_any_column_privilege('authenticated', 'public.messages', 'upda
 select ok(not has_column_privilege('authenticated', 'public.messages', 'sender_id', 'insert'), 'sender_id has no insert privilege');
 select ok(not has_table_privilege('authenticated', 'public.conversation_reads', 'insert,update,delete'), 'reads are written only by mark_conversation_read');
 select ok(not has_table_privilege('authenticated', 'public.conversations', 'insert,update,delete'), 'conversations are created only by get_or_create_conversation');
+
+select ok(not has_column_privilege('authenticated', 'public.messages', 'workspace_id', 'insert'), 'workspace_id has no insert privilege');
+select ok(not has_column_privilege('authenticated', 'public.messages', 'created_at', 'insert'), 'created_at has no insert privilege');
+select ok(not has_column_privilege('authenticated', 'public.messages', 'id', 'insert'), 'id has no insert privilege');
 
 -- get_or_create_conversation.
 select tests.act_as(:'coach');
@@ -71,6 +75,18 @@ select throws_ok(format($$insert into public.messages (conversation_id, image_pa
   '23514', null, 'an image path outside the conversation''s folder is rejected');
 reset role;
 
+-- Outsiders cannot send into Sam's conversation.
+select tests.act_as(:'coach2');
+select throws_ok(format($$insert into public.messages (conversation_id, body) values (%L, 'intruder')$$, :'conv'), '42501', null, 'another coach cannot send into the conversation');
+select throws_ok(format('select public.mark_conversation_read(%L)', :'conv'), '42501', null, 'another coach cannot mark the conversation read');
+reset role;
+select tests.act_as(:'lee');
+select throws_ok(format($$insert into public.messages (conversation_id, body) values (%L, 'intruder')$$, :'conv'), '42501', null, 'another workspace''s client cannot send into the conversation');
+reset role;
+select tests.act_as_anon();
+select throws_ok(format($$insert into public.messages (conversation_id, body) values (%L, 'intruder')$$, :'conv'), '42501', null, 'anon cannot send');
+reset role;
+
 select tests.act_as(:'coach');
 select lives_ok(format($$insert into public.messages (conversation_id, body) values (%L, 'Hi Sam')$$, :'conv'), 'the coach replies');
 reset role;
@@ -97,6 +113,8 @@ select is((select count(*)::int from public.conversations), 0, 'another coach se
 reset role;
 select tests.act_as_anon();
 select throws_ok('select count(*) from public.messages', '42501', null, 'anon cannot read messages');
+select throws_ok('select count(*) from public.conversations', '42501', null, 'anon cannot read conversations');
+select throws_ok('select count(*) from public.conversation_reads', '42501', null, 'anon cannot read conversation reads');
 reset role;
 
 -- Reads.
@@ -112,6 +130,9 @@ reset role;
 select tests.act_as(:'kim');
 select is((select count(*)::int from public.conversation_reads), 0, 'another client cannot see Sam''s read');
 reset role;
+select tests.act_as(:'coach2');
+select is((select count(*)::int from public.conversation_reads), 0, 'another coach cannot see Sam''s read');
+reset role;
 
 -- Storage.
 select tests.act_as(:'sam');
@@ -120,6 +141,8 @@ select lives_ok(format($$insert into storage.objects (bucket_id, name) values ('
 select throws_ok(format($$insert into storage.objects (bucket_id, name) values ('message-images', %L)$$, :'ws' || '/' || :'kconv' || '/a.webp'),
   '42501', null, 'Sam cannot upload into Kim''s conversation folder');
 select throws_ok($$insert into storage.objects (bucket_id, name) values ('message-images', 'junk/a.webp')$$, '42501', null, 'a malformed path is refused');
+select throws_ok(format($$insert into storage.objects (bucket_id, name) values ('message-images', %L)$$, :'ws2' || '/' || :'conv' || '/m.webp'),
+  '42501', null, 'a path with a mismatched workspace folder is refused');
 reset role;
 select tests.act_as(:'coach');
 select lives_ok(format($$insert into storage.objects (bucket_id, name) values ('message-images', %L)$$, :'ws' || '/' || :'conv' || '/b.webp'),
@@ -157,6 +180,8 @@ select throws_ok(format('select public.get_or_create_conversation(%L)', :'sam'),
 reset role;
 select tests.act_as(:'sam');
 select is((select count(*)::int from public.messages), 0, 'the removed client reads nothing');
+select is((select count(*)::int from public.conversations), 0, 'the removed client sees no conversations');
+select is((select count(*)::int from storage.objects where bucket_id = 'message-images'), 0, 'the removed client reads no photos');
 select throws_ok(format($$insert into public.messages (conversation_id, body) values (%L, 'still here?')$$, :'conv'), '42501', null, 'the removed client cannot send');
 select throws_ok(format('select public.mark_conversation_read(%L)', :'conv'), '42501', null, 'the removed client cannot mark read');
 reset role;
