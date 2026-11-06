@@ -84,6 +84,11 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
       : first.exerciseName;
   const shortTitle = superset ? `superset ${index + 1}` : choice ? `pick-one group ${index + 1}` : first.exerciseName;
   const minRounds = Math.min(...block.exercises.map(rounds));
+  // Under a section's (hidden) <h2>, a block's title is an <h3> and its exercises <h4>, so heading navigation shows
+  // which blocks belong to which section. Blocks outside any section keep <h2> / <h3>.
+  const inSection = block.sectionId !== null && sections.some((sec) => sec.id === block.sectionId);
+  const TitleTag = inSection ? 'h3' : 'h2';
+  const ExerciseTag = inSection ? 'h4' : 'h3';
   const targets = [
     ...(block.sectionId !== null ? [{ id: 'none', name: 'No section' }] : []),
     ...sections.filter((sec) => sec.id !== block.sectionId),
@@ -93,7 +98,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
     <section aria-labelledby={headingId} className={styles.block}>
       <header className={styles.blockHeader}>
         <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
-        <h2 id={headingId} className={styles.blockTitle}>{title}</h2>
+        <TitleTag id={headingId} className={styles.blockTitle}>{title}</TitleTag>
         {!multi ? <span className={styles.caption}>{TRACKING_TYPE_LABELS[first.trackingType]}</span> : null}
         <div className={styles.blockTools}>
           {!multi ? (
@@ -161,7 +166,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
           <div key={ex.id} className={styles.exercise}>
             {multi ? (
               <div className={styles.exerciseHeader}>
-                <h3 className={styles.exerciseName}>{ex.exerciseName}</h3>
+                <ExerciseTag className={styles.exerciseName}>{ex.exerciseName}</ExerciseTag>
                 <span className={styles.caption}>{TRACKING_TYPE_LABELS[ex.trackingType]}</span>
                 <div className={styles.blockTools}>
                   <button type="button" className={styles.smallButton} onClick={() => actions.onSwap(ex.id)}>

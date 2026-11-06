@@ -708,7 +708,7 @@ test('a sectioned workout opened from the calendar shows its section headings', 
   await day(page, today).getByRole('menuitem', { name: 'Edit' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
   // In the builder each section heading is its name box.
-  const boxes = page.getByRole('textbox', { name: /^Name of section / });
+  const boxes = page.getByRole('textbox', { name: 'Section name', exact: true });
   await expect(boxes).toHaveCount(3);
   expect(await boxes.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['Warm-Up', 'Main', 'Finisher']);
 });

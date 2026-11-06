@@ -309,7 +309,9 @@ test.describe('logged workout page', () => {
     });
     await signInAsCoach(page);
     await page.goto(logUrl(clientId, id));
-    for (const name of ['Warm-Up', 'Main', 'Core', 'Finisher']) await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+    for (const name of ['Warm-Up', 'Main', 'Core', 'Finisher']) await expect(page.getByRole('heading', { level: 3, name, exact: true })).toBeVisible();
+    // Exercises sit one level below their section.
+    await expect(page.getByRole('heading', { level: 4, name: slam, exact: true })).toBeVisible();
     await expect(page.getByText(`Picked: ${slam}`)).toBeVisible();
     await expect(page.getByRole('table', { name: slam })).toBeVisible();
     await expect(page.getByRole('table', { name: walk })).toHaveCount(0);
@@ -335,7 +337,9 @@ test.describe('logged workout page', () => {
     });
     await signInAsCoach(page);
     await page.goto(logUrl(clientId, id));
-    await expect(page.getByRole('heading', { level: 2, name: 'Finisher' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'Finisher' })).toBeVisible();
+    // The unsectioned exercise is an <h3> straight under "Planned vs. actual".
+    await expect(page.getByRole('heading', { level: 3, name: 'Barbell Squat', exact: true })).toBeVisible();
     await expect(page.getByText('Pick one · not done')).toBeVisible();
     await expect(page.getByText(`${a} · ${b}`)).toBeVisible();
     await expect(page.getByRole('table', { name: a })).toHaveCount(0);

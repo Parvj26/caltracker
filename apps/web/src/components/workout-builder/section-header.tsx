@@ -31,7 +31,9 @@ export function SectionHeader({ section, index, count, empty, errors, onRename, 
         <h2 className={styles.visuallyHidden}>{section.name}</h2>
         <input
           type="text"
-          aria-label={`Name of section ${section.name}`}
+          // A fixed name: one built from the section's name would change on every keystroke. The group around it says
+          // which section this is.
+          aria-label="Section name"
           aria-invalid={blank || undefined}
           maxLength={40}
           className={`${styles.input} ${styles.sectionName}`}

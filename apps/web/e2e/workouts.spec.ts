@@ -324,34 +324,36 @@ test.describe('sections and pick-one groups', () => {
     await expect(page.getByRole('status').filter({ hasText: '✓ Saved' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(4);
-    const sectionBoxes = page.getByRole('textbox', { name: /^Name of section / });
+    await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(4);
+    const sectionBoxes = page.getByRole('textbox', { name: 'Section name', exact: true });
     expect(await sectionBoxes.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual([
       'Warm-Up',
       'Core (Activation)',
       'Resistance Training',
       'Finisher',
     ]);
-    // Headings come in order, and the pick-one group sits under Finisher.
-    const headings = await page.getByRole('heading', { level: 2 }).allTextContents();
+    // Headings come in order: sections are <h2> and their blocks <h3>, so the pick-one group sits under Finisher.
+    const headings = (
+      await page.getByRole('heading').evaluateAll((els) => els.map((e) => `${e.tagName} ${e.textContent ?? ''}`))
+    ).filter((h) => h.startsWith('H2 ') || h.startsWith('H3 '));
     const order = [
-      'Warm-Up',
-      X('Arm Circles'),
-      'Core (Activation)',
-      'Superset / circuit · 3 rounds',
-      'Resistance Training',
-      'Superset / circuit · 3 rounds',
-      'Superset / circuit · 3 + 2 sets',
-      'Superset / circuit · 4 rounds',
-      'Finisher',
-      'Pick one · 2 options',
+      'H2 Warm-Up',
+      `H3 ${X('Arm Circles')}`,
+      'H2 Core (Activation)',
+      'H3 Superset / circuit · 3 rounds',
+      'H2 Resistance Training',
+      'H3 Superset / circuit · 3 rounds',
+      'H3 Superset / circuit · 3 + 2 sets',
+      'H3 Superset / circuit · 4 rounds',
+      'H2 Finisher',
+      'H3 Pick one · 2 options',
     ];
     let at = -1;
     for (const h of order) {
       at = headings.indexOf(h, at + 1);
       expect(at, `heading "${h}" in order`).toBeGreaterThan(-1);
     }
-    expect(headings.at(-1)).toBe('Pick one · 2 options');
+    expect(headings.at(-1)).toBe('H3 Pick one · 2 options');
 
     // The uneven superset kept its shape, and the values survived.
     await expect(setRow(page, X('Lateral Raise'), 'set 3')).toBeVisible();
@@ -363,7 +365,7 @@ test.describe('sections and pick-one groups', () => {
 
     // Moving the pick-one group (block 6) into Core empties Finisher, so that section goes away.
     await page.getByLabel('Move pick-one group 6 to a section').selectOption({ label: 'Core (Activation)' });
-    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(3);
+    await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(3);
   });
 
   test('saving with an empty section says which section needs an exercise', async ({ page }) => {
@@ -384,12 +386,12 @@ test.describe('sections and pick-one groups', () => {
   test('a workout with no sections looks as it did before', async ({ page }) => {
     await page.getByLabel('Workout name').fill(`Plain ${unique()}`);
     await pickExercise(page, '+ Exercise', X('Arm Circles'));
-    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /to a section/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '+ Section', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Save workout' }).click();
     await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
     await page.reload();
-    await expect(page.getByRole('textbox', { name: /^Name of section / })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(0);
   });
 });

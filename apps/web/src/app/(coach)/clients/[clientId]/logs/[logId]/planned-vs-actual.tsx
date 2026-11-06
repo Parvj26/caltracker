@@ -52,6 +52,10 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
   }
 }
 
+function ExerciseHeading({ level, children }: { level: 3 | 4; children: string }) {
+  return level === 4 ? <h4 className={styles.exerciseName}>{children}</h4> : <h3 className={styles.exerciseName}>{children}</h3>;
+}
+
 type Edit = { drafts: Drafts; onChange: (setId: string, patch: SetDraft) => void };
 
 /**
@@ -75,7 +79,8 @@ export function PlannedVsActual({
     <div className={styles.runs}>
       {sectionRuns(log.blocks, log.sections).map((run) => (
         <div key={run.blockIndexes[0]} className={styles.run}>
-          {run.section ? <h2 className={styles.runHeading}>{run.section.name}</h2> : null}
+          {/* Inside the "Planned vs. actual" <h2>: a section is an <h3> and its exercises <h4>; without one, <h3>. */}
+          {run.section ? <h3 className={styles.runHeading}>{run.section.name}</h3> : null}
           <div className={styles.exercises}>
             {run.blockIndexes.flatMap((bi) => {
               const block = log.blocks[bi]!;
@@ -95,7 +100,7 @@ export function PlannedVsActual({
                 return (
                   <section key={ex.id} className={styles.exercise}>
                     <header className={styles.exerciseHead}>
-                      <h3 className={styles.exerciseName}>{ex.exerciseName}</h3>
+                      <ExerciseHeading level={run.section ? 4 : 3}>{ex.exerciseName}</ExerciseHeading>
                       {block.kind === 'choice' ? <Chip>Picked: {ex.exerciseName}</Chip> : null}
                       {swapped ? <Chip>Swapped from {swapped}</Chip> : null}
                       {added ? <Chip tone="blue">Added</Chip> : null}
