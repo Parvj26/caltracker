@@ -1,7 +1,10 @@
 import { Logo } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { NAV_ICONS } from './nav-icons';
+import { loadUnreadTotal } from './messages/data';
+import { MessagesNavLink } from './messages-nav-link';
 import { NavLink } from './nav-link';
+import { createServerSupabase } from '@/lib/supabase/server';
 import styles from './coach.module.css';
 
 // Programs arrives with the program builder (phase 2 Task 15); until then it 404s.
@@ -16,6 +19,10 @@ const NAV = [
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
   const coach = await requireCoach();
+  // A failed count must not take the whole dashboard down; the sidebar badge refetches by itself in the browser.
+  const unread = await createServerSupabase()
+    .then((supabase) => loadUnreadTotal(supabase, coach.userId))
+    .catch(() => 0);
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar} data-coach-sidebar="">
@@ -28,6 +35,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           {NAV.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
+          <MessagesNavLink userId={coach.userId} workspaceId={coach.workspaceId} initial={unread} />
         </nav>
         <form action="/auth/sign-out" method="post" className={styles.signOut}>
           <button type="submit" aria-label="Sign out" className={styles.navItem}>
