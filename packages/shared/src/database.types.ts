@@ -1313,6 +1313,10 @@ export type Database = {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
       }
+      duplicate_program: {
+        Args: { p_name: string; p_new_id: string; p_program_id: string }
+        Returns: string
+      }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {
         Args: { token: string }
@@ -1410,6 +1414,10 @@ export type Database = {
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
+      }
+      replace_program_weeks: {
+        Args: { p_program_id: string; p_slots: Json; p_weeks: number[] }
+        Returns: number
       }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
