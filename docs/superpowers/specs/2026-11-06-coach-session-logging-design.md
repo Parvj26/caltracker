@@ -7,20 +7,24 @@ on the iPad or laptop.
 ## What the coach sees
 
 - **Home → Today's clients:** every row has its actions, and the whole row opens the first one: not started →
-  **Log session**; training now → **Watch live** (the workout in progress; it updates live once PR #34 merges) and
+  **Log session**; my own session in progress → **Continue session**; training now → **Watch live** (the workout in progress; it updates live once PR #34 merges) and
   **Take over** (the session page, which offers it); done → **View log**. All at least 44 px.
 - **Entry points:** Home → Today's clients → **Log session** on a row; the client calendar's item menu →
   **Log session** on today's workout or a missed (past, not done) one. Logging an unplanned workout is not built.
 - **Page:** `/clients/[clientId]/log/[workoutId]`. Before anything is saved it shows the workout and
   **Start session**. Once started:
-  - left column (≥ 900 px wide): the pages list grouped by section, a ✓ on finished pages; right column: the current
+  - left column (from 760 px wide, so iPad portrait too): the pages list grouped by section, a ✓ on finished pages; right column: the current
     page. Narrower screens stack them.
   - a page is a straight exercise, a superset (rounds, exercises lettered A, B…) or a pick-one group (pick first,
     "Change pick" until a set is done).
   - each exercise: "Coach: 3 × 8 reps · 60 kg", "Last time: …" (the client's last results), and a table
     **SET | LB/KG | REPS | ✓**. The boxes show the pre-filled number greyed (coach target → last time, the same
     `resolveSetValues` rules as the phone); a tick saves those numbers. Numbers stay editable after a tick.
-    **+ Add set**, **Mark all**, a note per exercise, a session note, **Finish session**, **Cancel session**.
+    **+ Add set**, **Mark all**, a note per exercise, a session note (saved when the box is left),
+    **Finish session**, **Hand back to {client}**, **Cancel session** (after a take over it warns that the sets
+    already logged, including the client's own from the phone, are thrown away).
+  - The page says who logs it: "Logged by you"; "Parv is logging this now on their phone"; "Alex (coach) is
+    logging this session" (another coach of the workspace, who can be taken over the same way).
   - No rest timer. Tap targets are at least 44 px (the tick and boxes slightly bigger).
 - **Saving:** every change is made with the shared log operations (`packages/shared/src/logs`) and the whole doc is
   saved (debounced) through `coach_save_workout_log`, the same document and rules as the phone's
@@ -37,7 +41,9 @@ on the iPad or laptop.
 | --- | --- | --- |
 | Nobody logging | Start session | Start as usual |
 | Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), refreshed every 10 s; **Take over**, **View only**, Refresh | Logs as usual |
-| Coach logging (started or took over) | The logging page | Opening the workout shows "Your coach is logging this session" (read only); saves from the phone are refused |
+| Coach logging (started or took over) | The logging page | Opening the workout shows "Your coach is logging this session" (read only); saves from the phone are refused and the phone takes the coach's copy |
+| Coach handed back | Back to the calendar | Logs as usual from the server copy |
+| Coach stopped (20 min without activity) or is no longer a coach | — | "Your coach stopped logging N min ago" · **Continue on my phone** |
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
 | Finished | Opens the finished log | — |
 
@@ -56,11 +62,17 @@ Migration `20261106004000_coach_session_logging.sql`:
   `logged_by = logger` on insert, and refuses (`applied: false, loggedByOther: true`, not an error) a change from
   anyone but the stored `logged_by`. It lives in a `private` schema nobody can call over the API.
 - `save_workout_log(doc)` (phone) and `coach_save_workout_log(client_id, doc)` (website) are thin wrappers.
-- `take_over_workout_log(log_id)`: a coach of the workspace, a current client, an in-progress log. Sets `logged_by`
-  to the coach and raises the revision by 1000, above anything the phone could still have queued, so a phone that
-  saves again takes the server copy instead of pushing its own (the phone re-sends whenever its revision is higher).
-- The trigger that froze `logged_by` now allows exactly one change: to a coach of the workspace while the log is in
-  progress (or to null when the account is deleted).
+- `take_over_workout_log(log_id)`: a coach of the workspace, a current client, an in-progress log (held by the
+  client or another coach). Sets `logged_by` to the coach; the revision stays. The phone's next save is answered
+  `loggedByOther` and it adopts the server copy without pushing, whatever its revision.
+- `hand_back_workout_log(log_id)`: only the coach holding it. `logged_by` goes back to the client and the revision
+  jumps by 1000, so a phone that was offline with older edits queued adopts the coach's sets instead of overwriting
+  them (its own copy is kept as a rejected copy, as for any refusal).
+- `workout_log_logger(log_id)` (the client's own log only): `{ status, heldByOther, lastActivityAt, canReclaim }`.
+  `reclaim_workout_log(log_id)`: the client takes it back when the coach has had no activity for 20 minutes, or
+  at once when the holder is no longer a coach of the workspace (a removed staff coach).
+- The trigger that froze `logged_by` now allows it to change only while the log is in progress, to a coach of the
+  workspace or back to its client (or to null when the account is deleted).
 - `coach_last_results(client_id, exercise_ids)`: `last_results` for one client, security invoker, so RLS limits it
   to the coach's own workspace.
 
@@ -72,10 +84,18 @@ client's last results and award history.
 
 ## Phone (minimal, isolated)
 
+How the phone learns the coach holds its workout: instantly from a save's answer (`loggedByOther`: log-sync adopts
+the server copy, never pushes, and use-active-log sets `heldByOther`, refuses edits and cancels the reminder), and
+by asking `workout_log_logger` when the workout opens, when the app returns to the foreground and at most once a
+minute while it is open. When the server and phone disagree (taken over, handed back, finished elsewhere) the phone
+takes the server's copy, and Start first asks again before resuming a held workout. TODO: subscribe to the log row
+over Realtime once PR #34 is on main.
+
 Another branch (`feature/simple-logging`) is rewriting the phone's logging screens, so the phone change is small:
 
-- `apps/mobile/src/lib/coach-logging.ts`: `useCoachLogging(logId)` reads `logged_by` for the open log on open and
-  every 15 s.
+- `apps/mobile/src/lib/coach-logging.ts`: `useCoachLogging(logId)` (the checks above, plus `reclaim`).
+- `apps/mobile/src/lib/log-sync.ts`, `log-api.ts`, `use-active-log.tsx`, `active-log-logic.ts`: `loggedByOther`,
+  `heldByOther`, `refreshFromServer`, and the pure decisions (`needsServerCopy`, `parseLoggerState`).
 - `apps/mobile/src/components/log/coach-logging-banner.tsx`: `CoachLoggingBanner` (full-screen, read only) and
   `LoggedByCoachPill`.
 - `app/(app)/log/[id]/index.tsx`: three lines; while the coach logs, the screen returns the banner instead of the
