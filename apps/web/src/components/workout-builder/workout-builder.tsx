@@ -30,6 +30,13 @@ import {
   replaceExercise,
   sectionRuns,
   updateSet,
+  addSubstitute,
+  addSubstituteDrop,
+  addSubstituteSet,
+  removeSubstitute,
+  removeSubstituteSet,
+  updateSubstitute,
+  updateSubstituteSet,
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
@@ -64,7 +71,8 @@ type Picker =
   | { kind: 'choice' }
   | { kind: 'addOption'; blockId: string }
   | { kind: 'addToSuperset'; blockId: string }
-  | { kind: 'swap'; blockId: string; exId: string; name: string };
+  | { kind: 'swap'; blockId: string; exId: string; name: string }
+  | { kind: 'substitute'; blockId: string; exId: string; name: string };
 
 const makeId = () => crypto.randomUUID();
 /** The most exercises "+ Exercise" adds in one go (a workout holds up to 30 blocks). */
@@ -103,6 +111,15 @@ function issuesByKey(doc: WorkoutDoc, issues: readonly SaveIssue[]): Map<string,
       continue;
     }
     const ex = typeof ei === 'number' ? block.exercises[ei] : undefined;
+    if (ex && path[4] === 'substitutes') {
+      // ['blocks', bi, 'exercises', ei, 'substitutes', subIndex, 'sets', setIndex, ...]
+      const sub = typeof path[5] === 'number' ? ex.substitutes[path[5]] : undefined;
+      const subSet = sub && typeof path[7] === 'number' ? sub.sets[path[7]] : undefined;
+      if (subSet) add(`set:${subSet.id}`, message);
+      else if (sub) add(`substitute:${sub.id}`, message);
+      else add(`exercise:${ex.id}`, message);
+      continue;
+    }
     const set = ex && typeof si === 'number' ? ex.sets[si] : undefined;
     if (set) add(`set:${set.id}`, message);
     else if (ex) add(`exercise:${ex.id}`, message);
@@ -204,6 +221,8 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
           return addExerciseToSuperset(d, p.blockId, ex, makeId);
         case 'swap':
           return replaceExercise(d, p.blockId, p.exId, ex);
+        case 'substitute':
+          return addSubstitute(d, p.blockId, p.exId, ex, makeId);
       }
     });
   }
@@ -235,6 +254,18 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     onCopyToAll: (exId) => setDoc((d) => copyFirstSetToAll(d, blockId, exId)),
     onFillDown: (exId, setId) => setDoc((d) => fillDown(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
+    onAddSubstitute: (exId) => {
+      const name = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === exId)?.exerciseName ?? '';
+      setPicker({ kind: 'substitute', blockId, exId, name });
+    },
+    substitute: (exId, subId) => ({
+      onRemove: () => setDoc((d) => removeSubstitute(d, blockId, exId, subId)),
+      onNote: (note) => setDoc((d) => updateSubstitute(d, blockId, exId, subId, { note })),
+      onAddSet: () => setDoc((d) => addSubstituteSet(d, blockId, exId, subId, makeId)),
+      onAddDrop: (setId) => setDoc((d) => addSubstituteDrop(d, blockId, exId, subId, setId, makeId)),
+      onRemoveSet: (setId) => setDoc((d) => removeSubstituteSet(d, blockId, exId, subId, setId)),
+      onUpdateSet: (setId, patch) => setDoc((d) => updateSubstituteSet(d, blockId, exId, subId, setId, patch)),
+    }),
   });
 
   // Headings and blocks in order. A section with no exercises yet still shows its heading, where it belongs.
@@ -286,6 +317,8 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
           ? 'Add an exercise to the superset'
           : picker?.kind === 'swap'
             ? `Swap ${picker.name}`
+            : picker?.kind === 'substitute'
+              ? `Add a substitute for ${picker.name}`
             : picker?.kind === 'choice'
               ? 'Add a pick-one group'
               : picker?.kind === 'addOption'

@@ -75,13 +75,15 @@ export {
   WorkoutExerciseDoc,
   WorkoutSectionDoc,
   WorkoutSetDoc,
+  WorkoutSubstituteDoc,
+  MAX_SUBSTITUTES,
 } from './workouts/schema';
 export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
 export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
-export type { WorkoutTreeRow, WorkoutTreeSetRow } from './workouts/tree';
+export type { WorkoutTreeRow, WorkoutTreeSetRow, WorkoutTreeSubstituteRow } from './workouts/tree';
 export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
 export {
   addDrop,
@@ -113,8 +115,16 @@ export {
   replaceExercise,
   setShowsRest,
   updateSet,
+  addSubstitute,
+  addSubstituteDrop,
+  addSubstituteSet,
+  removeSubstitute,
+  removeSubstituteSet,
+  substituteSetShowsRest,
+  updateSubstitute,
+  updateSubstituteSet,
 } from './workouts/doc-ops';
-export type { ExercisePick } from './workouts/doc-ops';
+export type { ExercisePick, SubstitutePatch } from './workouts/doc-ops';
 export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate';
 export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
 export type { PlanSlot } from './programs/grid';
@@ -137,6 +147,7 @@ export {
   LogExerciseDoc,
   LogSetDoc,
   LogSetTarget,
+  LogSubstituteOption,
   WorkoutLogDoc,
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
@@ -297,3 +308,12 @@ export {
   ProfileInput,
   characterCount,
 } from './profile/schema';
+export {
+  chooseSubstitute,
+  clearSubstitute,
+  isSubstituteLocked,
+  liveExercise,
+  otherSubstituteOptions,
+  substituteChoices,
+  substitutedFrom,
+} from './logs/substitutes';

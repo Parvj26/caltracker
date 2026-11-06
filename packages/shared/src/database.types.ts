@@ -393,6 +393,8 @@ export type Database = {
           note: string | null
           planned_workout_exercise_id: string | null
           position: number
+          substitute_id: string | null
+          substitute_options: Json
           swapped_from_exercise_id: string | null
           updated_at: string
           workspace_id: string
@@ -407,6 +409,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -421,6 +425,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position?: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1145,6 +1151,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workout_sets_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_substitutes: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          exercise_id: string
+          id: string
+          note: string | null
+          position: number
+          sets: Json
+          updated_at: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id: string
+          id?: string
+          note?: string | null
+          position: number
+          sets: Json
+          updated_at?: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          note?: string | null
+          position?: number
+          sets?: Json
+          updated_at?: string
+          workout_exercise_id?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_substitutes_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_substitutes_workout_exercise_id_fkey"
             columns: ["workout_exercise_id"]
             isOneToOne: false
             referencedRelation: "workout_exercises"

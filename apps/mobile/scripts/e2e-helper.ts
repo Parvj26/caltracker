@@ -181,6 +181,7 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
             trackingType: ex.tracking_type,
             note: null,
             sets: e.sets.map((s) => ({ ...s, id: randomUUID() })),
+            substitutes: [],
           };
         }),
       })),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addSection, addStraightBlock, addSuperset, emptyWorkout } from '../../src/workouts/doc-ops';
+import { addSection, addStraightBlock, addSubstitute, addSuperset, emptyWorkout } from '../../src/workouts/doc-ops';
 import { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from '../../src/workouts/duplicate';
 import { WorkoutDoc } from '../../src/workouts/schema';
 
@@ -54,6 +54,18 @@ describe('duplicateWorkoutDoc', () => {
     const copy = duplicateWorkoutDoc(doc(), makeId);
     expect(copy.blocks[0]!.sectionId).toBeNull();
     expect(copy.blocks[1]!.sectionId).toBe(copy.sections[0]!.id);
+    expect(WorkoutDoc.parse(copy)).toBeTruthy();
+  });
+
+  it('copies substitutes with new ids for them and their sets', () => {
+    const d0 = doc();
+    const d = WorkoutDoc.parse(addSubstitute(d0, d0.blocks[0]!.id, d0.blocks[0]!.exercises[0]!.id, pick(9), makeId));
+    const copy = duplicateWorkoutDoc(d, makeId);
+    const before = d.blocks[0]!.exercises[0]!.substitutes[0]!;
+    const after = copy.blocks[0]!.exercises[0]!.substitutes[0]!;
+    expect(after.exerciseId).toBe(ID(9));
+    expect(after.id).not.toBe(before.id);
+    expect(after.sets.some((s) => before.sets.some((b) => b.id === s.id))).toBe(false);
     expect(WorkoutDoc.parse(copy)).toBeTruthy();
   });
 });

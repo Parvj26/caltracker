@@ -1,5 +1,6 @@
 import type { TrackingType } from '../exercises/tracking';
-import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } from './schema';
+import { MAX_SUBSTITUTES } from './schema';
+import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc, WorkoutSubstituteDoc } from './schema';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from './sections';
 import { TARGET_FIELDS } from './targets';
 
@@ -45,6 +46,7 @@ function newExercise(ex: ExercisePick, rest: number, rounds: number, makeId: () 
     trackingType: ex.trackingType,
     note: null,
     sets: Array.from({ length: rounds }, () => newSet(makeId, rest)),
+    substitutes: [],
   };
 }
 
@@ -387,15 +389,181 @@ export function replaceExercise(
     exerciseId: ex.id,
     exerciseName: ex.name,
     trackingType: ex.trackingType,
-    sets: e.sets.map((s) => ({
-      ...s,
-      targetRepsMin: allowed.includes('reps') ? s.targetRepsMin : null,
-      targetRepsMax: allowed.includes('reps') ? s.targetRepsMax : null,
-      targetWeightKg: allowed.includes('weight') ? s.targetWeightKg : null,
-      targetDurationS: allowed.includes('duration') ? s.targetDurationS : null,
-      targetDistanceM: allowed.includes('distance') ? s.targetDistanceM : null,
-    })),
+    sets: e.sets.map((s) => fitSet(s, allowed)),
+    // A substitute that is now the exercise itself would be an alternative to itself.
+    substitutes: e.substitutes.filter((sub) => sub.exerciseId !== ex.id),
   }));
+}
+
+const fitSet = (s: WorkoutSetDoc, allowed: (typeof TARGET_FIELDS)[TrackingType]): WorkoutSetDoc => ({
+  ...s,
+  targetRepsMin: allowed.includes('reps') ? s.targetRepsMin : null,
+  targetRepsMax: allowed.includes('reps') ? s.targetRepsMax : null,
+  targetWeightKg: allowed.includes('weight') ? s.targetWeightKg : null,
+  targetDurationS: allowed.includes('duration') ? s.targetDurationS : null,
+  targetDistanceM: allowed.includes('distance') ? s.targetDistanceM : null,
+});
+
+// Substitutes: a coach-added alternative to one planned exercise, with its own sets. Not for pick-one groups,
+// whose options are already alternatives. Every op below returns the same doc when it refuses.
+
+export type SubstitutePatch = { note?: string | null };
+
+function mapSubstitute(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  fn: (s: WorkoutSubstituteDoc) => WorkoutSubstituteDoc,
+): WorkoutDoc {
+  const sub = doc.blocks
+    .find((b) => b.id === blockId)
+    ?.exercises.find((e) => e.id === workoutExerciseId)
+    ?.substitutes.find((x) => x.id === substituteId);
+  if (!sub) return doc;
+  const next = fn(sub);
+  if (next === sub) return doc;
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({
+    ...e,
+    substitutes: e.substitutes.map((x) => (x.id === substituteId ? next : x)),
+  }));
+}
+
+/**
+ * Adds `ex` as a substitute for one exercise. Its sets start as a copy of the exercise's sets (new ids), minus the
+ * targets the substitute's tracking type doesn't use. Refused inside a pick-one group, past 3 substitutes, or when
+ * `ex` is the exercise itself or already one of its substitutes.
+ */
+export function addSubstitute(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  ex: ExercisePick,
+  makeId: () => string,
+): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  const e = block?.exercises.find((x) => x.id === workoutExerciseId);
+  if (!block || !e || block.kind === 'choice') return doc;
+  if (e.substitutes.length >= MAX_SUBSTITUTES) return doc;
+  if (e.exerciseId === ex.id || e.substitutes.some((x) => x.exerciseId === ex.id)) return doc;
+  const allowed = TARGET_FIELDS[ex.trackingType];
+  const sub: WorkoutSubstituteDoc = {
+    id: makeId(),
+    exerciseId: ex.id,
+    exerciseName: ex.name,
+    trackingType: ex.trackingType,
+    note: null,
+    sets: e.sets.map((s) => ({ ...fitSet(s, allowed), id: makeId() })),
+  };
+  return mapExercise(doc, blockId, workoutExerciseId, (x) => ({ ...x, substitutes: [...x.substitutes, sub] }));
+}
+
+export function removeSubstitute(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, substituteId: string): WorkoutDoc {
+  const e = doc.blocks.find((b) => b.id === blockId)?.exercises.find((x) => x.id === workoutExerciseId);
+  if (!e || !e.substitutes.some((x) => x.id === substituteId)) return doc;
+  return mapExercise(doc, blockId, workoutExerciseId, (x) => ({
+    ...x,
+    substitutes: x.substitutes.filter((sub) => sub.id !== substituteId),
+  }));
+}
+
+/** Changes a substitute's coach note (null clears it). */
+export function updateSubstitute(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  patch: SubstitutePatch,
+): WorkoutDoc {
+  return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) =>
+    patch.note === undefined || patch.note === s.note ? s : { ...s, note: patch.note },
+  );
+}
+
+/** Adds a set to a substitute, copying the targets and rest of its last working set. */
+export function addSubstituteSet(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  makeId: () => string,
+): WorkoutDoc {
+  return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
+    if (s.sets.length >= MAX_SETS) return s;
+    const from = lastNonDrop(s.sets);
+    return { ...s, sets: [...s.sets, newSet(makeId, from?.restSeconds ?? DEFAULT_REST, from)] };
+  });
+}
+
+/** Adds a drop after a substitute's set (and its existing drops), like addDrop. */
+export function addSubstituteDrop(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  parentSetId: string,
+  makeId: () => string,
+): WorkoutDoc {
+  return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
+    const p = s.sets.findIndex((x) => x.id === parentSetId);
+    if (p < 0 || s.sets[p]!.setType === 'drop' || s.sets.length >= MAX_SETS) return s;
+    let at = p + 1;
+    while (at < s.sets.length && s.sets[at]!.setType === 'drop') at += 1;
+    const drop: WorkoutSetDoc = { ...newSet(makeId, 0), setType: 'drop' };
+    return { ...s, sets: [...s.sets.slice(0, at), drop, ...s.sets.slice(at)] };
+  });
+}
+
+/** Removes one set of a substitute and the drops that follow it; a substitute keeps at least one working set. */
+export function removeSubstituteSet(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  setId: string,
+): WorkoutDoc {
+  return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
+    const i = s.sets.findIndex((x) => x.id === setId);
+    if (i < 0) return s;
+    if (s.sets[i]!.setType === 'drop') return { ...s, sets: s.sets.filter((x) => x.id !== setId) };
+    if (s.sets.filter((x) => x.setType !== 'drop').length <= 1) return s;
+    let end = i + 1;
+    while (end < s.sets.length && s.sets[end]!.setType === 'drop') end += 1;
+    return { ...s, sets: [...s.sets.slice(0, i), ...s.sets.slice(end)] };
+  });
+}
+
+/** Same rules as updateSet: a drop has no rest, only drops can be "to failure", the first set is never a drop. */
+export function updateSubstituteSet(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  substituteId: string,
+  setId: string,
+  patch: Patch,
+): WorkoutDoc {
+  return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
+    if (!s.sets.some((x) => x.id === setId)) return s;
+    const sets = s.sets.map((x) => {
+      if (x.id !== setId) return x;
+      const next = { ...x, ...patch };
+      return next.setType === 'drop' ? { ...next, restSeconds: 0 } : { ...next, toFailure: false };
+    });
+    return sets[0]?.setType === 'drop' ? s : { ...s, sets };
+  });
+}
+
+/** Whether a substitute's set shows a rest box: as for the exercise it stands in for (see setShowsRest). */
+export function substituteSetShowsRest(
+  block: WorkoutBlockDoc,
+  exerciseIndex: number,
+  substitute: Pick<WorkoutSubstituteDoc, 'sets'>,
+  setIndex: number,
+): boolean {
+  const ex = block.exercises[exerciseIndex];
+  if (!ex) return false;
+  const stand = { ...block, exercises: block.exercises.map((e, i) => (i === exerciseIndex ? { ...e, sets: substitute.sets } : e)) };
+  return setShowsRest(stand, exerciseIndex, setIndex);
 }
 
 /** True when a set has any target typed in (reps, weight, time or distance): something worth copying. */

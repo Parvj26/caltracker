@@ -57,6 +57,8 @@ export function sampleLog(over: Partial<WorkoutLogDoc> = {}): WorkoutLogDoc {
             plannedWorkoutExerciseId: null,
             swappedFromExerciseId: null,
             note: null,
+            substituteId: null,
+            substituteOptions: [],
             sets: [
               {
                 id: id(5),
