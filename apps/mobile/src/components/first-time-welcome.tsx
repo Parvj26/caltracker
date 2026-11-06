@@ -3,7 +3,8 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
 import type { Units } from '@caltracker/shared';
 import { Card, ErrorText, HandNote } from '@/components/ui';
-import { initials } from '@/lib/workouts';
+import { CoachAvatar } from '@/components/coach-avatar';
+import { useCoachProfile } from '@/lib/use-coach-profile';
 import { palette, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import capybara from '../../assets/stickers/capybara-locked@256.png';
@@ -23,6 +24,8 @@ type Props = {
 /** Today for a client with no workouts at all yet: meet the coach, what happens next, units, sticker teaser. */
 export function FirstTimeWelcome({ coachName, workspaceName, units, onChangeUnits }: Props) {
   const { text, space, radius } = useTheme();
+  const coach = useCoachProfile();
+  const shownName = coach?.name ?? coachName;
 
   return (
     <>
@@ -31,18 +34,17 @@ export function FirstTimeWelcome({ coachName, workspaceName, units, onChangeUnit
           Meet your coach
         </Text>
         <View style={[styles.row, { gap: space[3] }]}>
-          <View
-            style={[styles.avatar, { borderRadius: radius.pill }]}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Text style={text('sectionHeading')}>{initials(coachName ?? workspaceName)}</Text>
-          </View>
+          <CoachAvatar name={coach?.name ?? coachName ?? workspaceName} url={coach?.avatarUrl ?? null} />
           <View style={styles.flex}>
-            {coachName ? <Text style={text('sectionHeading')}>{coachName}</Text> : null}
-            <Text style={text('body')}>{workspaceName}</Text>
+            {shownName ? <Text style={text('sectionHeading')}>{shownName}</Text> : null}
+            <Text style={text('body')}>{coach?.businessName ?? workspaceName}</Text>
           </View>
         </View>
+        {coach?.bio ? (
+          <Text testID="coach-bio" style={text('body')}>
+            {coach.bio}
+          </Text>
+        ) : null}
         <HandNote>Your first workout is coming!</HandNote>
       </Card>
 
@@ -141,7 +143,6 @@ function UnitsCard({ units, onChange }: { units: Units; onChange: (units: Units)
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   flex: { flex: 1, minWidth: 120 },
-  avatar: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.pink },
   stepNumber: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.lime },
   segments: { flexDirection: 'row', backgroundColor: palette.surface },
   segment: { minHeight: tapTarget.min, minWidth: tapTarget.min + 12, alignItems: 'center', justifyContent: 'center' },

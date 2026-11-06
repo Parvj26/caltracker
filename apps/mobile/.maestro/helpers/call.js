@@ -8,6 +8,8 @@
 //   assign-today       clears EMAIL's logs, then assigns "E2E Log" today: Barbell Squat 3 x 8 @ 60 kg, 90 s rests
 //   assign-today-mixed like assign-today, "E2E Mixed": squat W 20 kg x 10 + 2 x 8 @ 60 kg; superset Pullups + Pushups
 //                      2 rounds of 8 (rests 0 / 60); Dumbbell Bicep Curl 2 x 12 @ 10 kg, the second with drops 7.5 kg, 5 kg
+//   coach-profile      sets the demo coach's business (EMAIL) and bio (NAME)
+//   coach-profile-reset  puts the demo business name back and clears the bio (EMAIL ignored; pass '-')
 //   cleanup-logs       deletes every workout log of client@demo.local (refuses any other EMAIL)
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);

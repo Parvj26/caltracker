@@ -1,0 +1,16 @@
+/* The coach's photo or initials. Colours and radii only via var(--ct-*). */
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ct-radius-pill);
+  object-fit: cover;
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+}
+.small { width: 28px; height: 28px; font-size: var(--ct-size-caption); }
+.large { width: 96px; height: 96px; font-size: 32px; }
+.lime { background: var(--ct-lime); }
+.pink { background: var(--ct-pink); }
+.blue { background: var(--ct-blue); }

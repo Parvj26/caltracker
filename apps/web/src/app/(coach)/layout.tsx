@@ -1,4 +1,6 @@
+import { CoachAvatar } from '@/components/coach-avatar';
 import { Logo } from '@/components/ui';
+import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { NAV_ICONS } from './nav-icons';
 import { NavLink } from './nav-link';
@@ -16,6 +18,8 @@ const NAV = [
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
   const coach = await requireCoach();
+  const avatarUrl = await coachAvatarUrl();
+  const fullName = `${coach.firstName} ${coach.lastName}`.trim() || coach.email;
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar} data-coach-sidebar="">
@@ -29,12 +33,15 @@ export default async function CoachLayout({ children }: { children: React.ReactN
             <NavLink key={item.href} {...item} />
           ))}
         </nav>
-        <form action="/auth/sign-out" method="post" className={styles.signOut}>
-          <button type="submit" aria-label="Sign out" className={styles.navItem}>
-            {NAV_ICONS.signOut}
-            <span className={styles.navLabel}>Sign out</span>
-          </button>
-        </form>
+        <div className={styles.bottom}>
+          <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
+          <form action="/auth/sign-out" method="post">
+            <button type="submit" aria-label="Sign out" className={styles.navItem}>
+              {NAV_ICONS.signOut}
+              <span className={styles.navLabel}>Sign out</span>
+            </button>
+          </form>
+        </div>
       </aside>
       <main className={styles.content}>{children}</main>
     </div>

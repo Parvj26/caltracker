@@ -1,0 +1,192 @@
+[
+  {
+    "id": "caltracker:dumbbell-walking-lunge",
+    "name": "Dumbbell Walking Lunge",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["glutes", "hamstrings", "calves"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Stand tall holding a dumbbell in each hand at your sides.",
+      "Step forward and lower until both knees are bent about 90 degrees, back knee just above the floor.",
+      "Push through the front foot and bring the back leg through into the next step.",
+      "Keep your chest up and alternate legs as you walk forward."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:medicine-ball-russian-twist",
+    "name": "Medicine Ball Russian Twist",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "medicine ball",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["lower back"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Sit on the floor, lean back slightly and lift your feet. Hold a medicine ball at your chest.",
+      "Keep your back long and brace your core.",
+      "Rotate your torso to one side and tap the ball near the floor.",
+      "Rotate to the other side. Each side counts as one rep."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:side-plank-single-leg-crunch",
+    "name": "Side Plank Single Leg Crunch",
+    "force": "pull",
+    "level": "intermediate",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["shoulders", "adductors"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your side and prop yourself on your forearm in a side plank, hips lifted.",
+      "Place your free hand behind your head.",
+      "Draw your top knee up toward your elbow while bringing the elbow down to meet it.",
+      "Extend back out under control. Finish all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:hip-thrust-machine",
+    "name": "Hip Thrust Machine",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "machine",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["hamstrings", "quadriceps"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Sit with your upper back against the pad and the belt or lever across your hips.",
+      "Plant your feet flat, about hip width apart.",
+      "Drive through your heels and lift your hips until your torso is level, squeezing your glutes.",
+      "Lower slowly and repeat."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:crunch-clap",
+    "name": "Crunch Clap",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your back with knees bent, feet flat and arms stretched overhead.",
+      "Curl your shoulders and chest off the floor while swinging your arms forward.",
+      "Clap your hands in front of your knees at the top.",
+      "Lower back down with control and repeat."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:medicine-ball-sit-up-and-overhead-throw",
+    "name": "Medicine Ball Sit Up & Overhead Throw",
+    "force": "pull",
+    "level": "intermediate",
+    "mechanic": "compound",
+    "equipment": "medicine ball",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["shoulders", "lats", "triceps"],
+    "category": "plyometrics",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Lie on your back with knees bent, holding a medicine ball overhead.",
+      "Sit up fast and throw the ball forward to a partner or a wall.",
+      "Catch the ball on the return and lower your back to the floor under control.",
+      "Reset the ball overhead and repeat."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:kettlebell-upright-row",
+    "name": "Kettlebell Upright Row",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "kettlebells",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": ["traps", "biceps"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Stand with feet shoulder width apart, holding a kettlebell by the handle in front of your thighs.",
+      "Pull the kettlebell up along your body, leading with your elbows.",
+      "Stop around chest height with elbows at or just below shoulder level.",
+      "Lower slowly to the start."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:kettlebell-sumo-squat",
+    "name": "Kettlebell Sumo Squat",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "kettlebells",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["glutes", "adductors", "hamstrings"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Stand with feet wider than your shoulders and toes turned out, holding a kettlebell with both hands in front of you.",
+      "Keep your chest tall and sit your hips down between your knees.",
+      "Lower until your thighs are about parallel to the floor, knees tracking over your toes.",
+      "Press through your whole foot to stand back up."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:dumbbell-romanian-deadlift",
+    "name": "Dumbbell Romanian Deadlift",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["hamstrings"],
+    "secondaryMuscles": ["glutes", "lower back", "forearms"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Stand holding a dumbbell in each hand in front of your thighs, knees slightly bent.",
+      "Push your hips back and slide the dumbbells down your legs with a flat back.",
+      "Stop when you feel a strong stretch in the back of your thighs.",
+      "Squeeze your glutes and drive your hips forward to stand tall."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:machine-assisted-pull-up",
+    "name": "Machine Assisted Pull Up",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "machine",
+    "primaryMuscles": ["lats"],
+    "secondaryMuscles": ["biceps", "middle back", "forearms"],
+    "category": "strength",
+    "trackingType": "weight_reps",
+    "instructions": [
+      "Set the assistance weight, kneel or stand on the platform and grip the bars slightly wider than your shoulders.",
+      "Pull your chest toward the bar by driving your elbows down and back.",
+      "Lower yourself fully under control until your arms are straight.",
+      "Log the assistance weight: less assistance means you are lifting more of your own bodyweight."
+    ],
+    "images": []
+  }
+]

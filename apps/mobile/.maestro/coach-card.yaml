@@ -1,0 +1,61 @@
+# A new client sees their coach's card on first-time Today: the coach's name, business and bio (initials, because
+# the demo coach has no photo). The flow renames the demo business and sets a bio, and puts both back at the end.
+appId: app.caltracker.client
+env:
+  EMAIL: e2e-coach-card@x.com
+  PASSWORD: e2e-password-123
+  BUSINESS: Peak Strength Co
+  BIO: Ten years helping busy people lift well.
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-profile-reset, EMAIL: '-' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/invite-link.js
+    env: { EMAIL: '${EMAIL}', NAME: 'Card Client' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-profile, EMAIL: '${BUSINESS}', NAME: '${BIO}' }
+- launchApp:
+    clearState: true
+- openLink: ${output.link}
+- repeat:
+    times: 3
+    while:
+      notVisible: 'Join ${BUSINESS}'
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+- extendedWaitUntil:
+    visible: 'Join ${BUSINESS}'
+    timeout: 20000
+# Show the password first: a visible field gets no "Use Strong Password?" sheet.
+- tapOn:
+    id: toggle-password
+- tapOn:
+    id: password-input
+- inputText: ${PASSWORD}
+- tapOn:
+    id: join-button
+- tapOn:
+    text: Not Now
+    optional: true
+- extendedWaitUntil:
+    visible: 'Welcome to ${BUSINESS}'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: ${BIO}
+    timeout: 20000
+- assertVisible: 'Meet your coach'
+- assertVisible: 'Demo Coach'
+- takeScreenshot: profile-phone
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-profile-reset, EMAIL: '-' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

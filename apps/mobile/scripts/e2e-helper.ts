@@ -10,6 +10,8 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today <email>   "E2E Log" (squat 3 × 8 @ 60 kg) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-mixed <email>   "E2E Mixed" (warm-up, superset, drops) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile "<business>" "<bio>"   set the demo coach's business name and bio
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile-reset -   put them back (Demo Coaching, no bio)
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -280,6 +282,20 @@ export async function cleanupWorkouts(): Promise<void> {
   }
 }
 
+const DEMO_BUSINESS = 'Demo Coaching';
+
+/** What the coach's profile page saves: the business name and bio (service role writes the same rows). */
+export async function setCoachProfile(business: string, bio: string): Promise<void> {
+  const coachId = await findUserId('coach@demo.local');
+  if (!coachId) throw new Error('Seed coach coach@demo.local not found (run pnpm db:reset).');
+  const { data: m, error } = await admin.from('workspace_members').select('workspace_id').eq('user_id', coachId).eq('role', 'owner').single();
+  if (error) throw error;
+  const { error: wsErr } = await admin.from('workspaces').update({ name: business }).eq('id', m.workspace_id);
+  if (wsErr) throw wsErr;
+  const { error: bioErr } = await admin.from('profiles').update({ bio }).eq('id', coachId);
+  if (bioErr) throw bioErr;
+}
+
 // Finds the newest confirmation email for `email` in Mailpit (local mail catcher) and returns its verify link.
 export async function confirmLink(email: string): Promise<string> {
   const base = (process.env.MAILPIT_URL as string | undefined) ?? 'http://127.0.0.1:54324';
@@ -306,6 +322,9 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
+  // For these two the "email" is the business name and the "name" is the bio.
+  else if (action === 'coach-profile') await setCoachProfile(email, name);
+  else if (action === 'coach-profile-reset') await setCoachProfile(DEMO_BUSINESS, '');
   else throw new Error(`Unknown action ${action}`);
 }
 
