@@ -384,4 +384,5 @@
 
 /* The whole card opens its workout (or its log once done); the name and "⋯" keep their own cursors. */
 .clickable { cursor: pointer; }
-.clickable:hover { filter: brightness(0.97); }
+/* A hover outline, not a filter: a filter would make the card the containing block of its "⋯" menu. */
+.clickable:hover { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ct-ink) 12%, transparent); }
