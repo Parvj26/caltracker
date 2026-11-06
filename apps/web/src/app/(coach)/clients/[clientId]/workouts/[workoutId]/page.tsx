@@ -4,9 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { loadWorkoutDoc } from '@/lib/workouts';
-import { loadClient } from '../../client';
+import { getClient, getWorkoutDoc } from '@/lib/page-data';
 import styles from '@/components/calendar/calendar.module.css';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string; workoutId: string }> }): Promise<Metadata> {
@@ -18,11 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 export default async function ClientWorkoutPage({ params }: { params: Promise<{ clientId: string; workoutId: string }> }) {
   const { workspaceId, units } = await requireCoach();
   const { clientId, workoutId } = await params;
-  const supabase = await createServerSupabase();
-  const [client, loaded] = await Promise.all([
-    loadClient(supabase, workspaceId, clientId),
-    loadWorkoutDoc(supabase, workoutId),
-  ]);
+  const [client, loaded] = await Promise.all([getClient(clientId), getWorkoutDoc(workoutId)]);
   // RLS already limits workouts to this coach's workspace; the copy must also belong to this client, who must still
   // be a client (a past client's calendar is read-only).
   if (!client || client.removedAt !== null || !loaded || loaded.clientId !== client.id || !loaded.scheduledOn) notFound();

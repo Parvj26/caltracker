@@ -57,6 +57,19 @@ test('coach pages have specific tab titles', async ({ page }) => {
     await page.goto(path);
     await expect(page, path).toHaveTitle(title);
   }
+  // A log opened under another client's URL is a 404 whose title doesn't name the log or either client.
+  const other = await admin.auth.admin.createUser({ email: `title-${unique()}@example.com`, password: 'client-password-123', email_confirm: true, user_metadata: { first_name: 'Otto', last_name: 'Other' } });
+  if (other.error) throw other.error;
+  try {
+    const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: other.data.user.id, role: 'client' });
+    if (m.error) throw m.error;
+    await page.goto(`/clients/${other.data.user.id}/logs/${logId}`);
+    await expect(page).toHaveTitle(/not (be )?found/i);
+    expect(await page.title()).not.toContain(logName);
+  } finally {
+    await admin.auth.admin.deleteUser(other.data.user.id);
+  }
+
   // A workout the coach can't see is a 404 whose title names nothing.
   await page.goto('/workouts/00000000-0000-4000-8000-000000000999');
   await expect(page).toHaveTitle(/not (be )?found/i);

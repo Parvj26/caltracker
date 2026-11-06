@@ -7,7 +7,7 @@ import { isMonth, shiftMonth } from '@/components/calendar/format';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from './client-calendar';
-import { loadClient } from './client';
+import { getClient } from '@/lib/page-data';
 import { StickersPanel } from './stickers-panel';
 import { StrengthPanel } from './strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
@@ -31,7 +31,7 @@ export default async function ClientPage({
   const { workspaceId, units } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
-  const client = await loadClient(supabase, workspaceId, clientId);
+  const client = await getClient(clientId);
   if (!client) notFound();
 
   // "Today" belongs to the coach's browser, not this (UTC) server. Without ?month= the browser picks the month from
