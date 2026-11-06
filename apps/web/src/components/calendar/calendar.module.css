@@ -328,6 +328,17 @@
   color: var(--ct-ink);
 }
 .pastMarker { color: var(--ct-amber); }
+.clashNote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber);
+  color: var(--ct-ink);
+}
+.clashTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.clashList { margin: 0; padding-left: var(--ct-space-4-5); max-height: 140px; overflow-y: auto; }
 
 /* ---------- Toast ---------- */
 .toastRegion { position: fixed; z-index: 20; right: var(--ct-space-4); bottom: var(--ct-space-4); max-width: min(420px, calc(100vw - 32px)); }

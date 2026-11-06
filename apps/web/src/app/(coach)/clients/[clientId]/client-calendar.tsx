@@ -12,7 +12,7 @@ import { WorkoutPicker } from '../../programs/[id]/workout-picker';
 import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
 import { AddWorkoutDialog } from './add-workout-dialog';
-import { AssignDialog } from './assign-dialog';
+import { AssignDialog, type ExistingWorkout } from './assign-dialog';
 import { AssignmentsPanel } from './assignments-panel';
 import { CalendarEmptyState } from './calendar-empty-state';
 import type { ClientRef } from './client';
@@ -50,6 +50,7 @@ export function ClientCalendar({
   assignments,
   library,
   programs,
+  upcomingWorkouts,
   openAssign = false,
 }: {
   client: ClientRef;
@@ -58,6 +59,8 @@ export function ClientCalendar({
   assignments: AssignmentSummary[];
   library: LibraryWorkout[];
   programs: PickerProgram[];
+  /** Every workout on the client's calendar from about a week back on (assign warns about days already taken). */
+  upcomingWorkouts: readonly ExistingWorkout[];
   /** Open the assign dialog on load (the Assign shortcut on Home, ?assign=1). */
   openAssign?: boolean;
 }) {
@@ -234,6 +237,7 @@ export function ClientCalendar({
           clientId={client.id}
           clientName={client.name}
           programs={programs}
+          existing={upcomingWorkouts}
           today={today}
           onAssigned={(programName, count) => {
             setAssigning(false);

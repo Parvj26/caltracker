@@ -108,6 +108,8 @@ export {
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
+export { programClashes } from './programs/clashes';
+export type { ProgramClash } from './programs/clashes';
 export {
   BAD_TODAY_ERROR,
   PAST_DATE_ERROR,

@@ -69,6 +69,12 @@ async function countOnCalendar(page: Page, name: string, dates: string[]): Promi
   return total;
 }
 
+/**
+ * The dialog's main button. Tests share the demo client and several assign from next Monday, so another test's
+ * program may already be on those days, and then the button says "Add alongside" (the same action).
+ */
+const assignButton = (dialog: Locator) => dialog.getByRole('button', { name: /^(Assign|Add alongside)$/ });
+
 async function openAssign(page: Page, program: string) {
   await page.getByRole('button', { name: 'Assign program' }).click();
   const dialog = page.getByRole('dialog', { name: 'Assign a program' });
@@ -81,7 +87,7 @@ async function assignFromNextMonday(page: Page, program: string): Promise<string
   const monday = nextMonday(await browserToday(page));
   const dialog = await openAssign(page, program);
   await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await assignButton(dialog).click();
   await expect(dialog).toBeHidden();
   return monday;
 }
@@ -112,7 +118,7 @@ test('assign a program from next Monday; a double click still copies it once', a
   await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
   await expect(dialog.getByText(`2 workouts from ${fmt(monday, true)} to ${fmt(end, true)}`)).toBeVisible();
 
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).dblclick();
+  await assignButton(dialog).dblclick();
   await expect(dialog).toBeHidden();
 
   await expect(page.getByRole('region', { name: 'Assigned programs' }).getByText(`${program} · ${fmt(monday, false)} – ${fmt(end, false)}`)).toBeVisible();
@@ -154,18 +160,18 @@ test('a lost response, then a different date, then the same date again still cop
   });
   const dialog = await openAssign(page, program);
   await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await assignButton(dialog).click();
   await expect(dialog.getByText("Couldn't assign. Check your connection and try again.")).toBeVisible();
   await page.unroute(pageUrl);
 
   // A different date with the same dialog is refused, not copied a second time.
   await dialog.getByLabel('Start date').fill(addDays(monday, 7));
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await assignButton(dialog).click();
   await expect(dialog.getByText('Assign was already sent with a different program or start date.', { exact: false })).toBeVisible();
 
   // Back to the first date: the retry finds the assignment already made.
   await dialog.getByLabel('Start date').fill(monday);
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await assignButton(dialog).click();
   await expect(dialog).toBeHidden();
 
   const assignments = await admin.from('program_assignments').select('id, start_date').eq('program_name', program);
@@ -594,12 +600,12 @@ test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigne
   await expect(dialog.getByLabel('Start date')).toHaveAttribute('min', addDays(today, -7));
   await dialog.getByLabel('Start date').fill(addDays(today, -8));
   await expect(dialog.getByText('Programs can start up to 7 days ago.')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toBeDisabled();
+  await expect(assignButton(dialog)).toBeDisabled();
 
   await dialog.getByLabel('Start date').fill(addDays(today, -3));
   await expect(dialog.getByText('Programs can start up to 7 days ago.')).toHaveCount(0);
   await expect(dialog.getByText('This start date is in the past. Workouts before today will show as missed later.')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
+  await assignButton(dialog).click();
   await expect(dialog).toBeHidden();
 
   const { data } = await admin.from('program_assignments').select('start_date').eq('program_name', program);
@@ -711,4 +717,71 @@ test('a sectioned workout opened from the calendar shows its section headings', 
   const boxes = page.getByRole('textbox', { name: 'Section name', exact: true });
   await expect(boxes).toHaveCount(3);
   expect(await boxes.evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['Warm-Up', 'Main', 'Finisher']);
+});
+
+test('assigning over days that already have workouts warns first, lists the days, and adds alongside only when asked', async ({ page }) => {
+  // Its own client, so no other test's workouts are on these days.
+  const user = await admin.auth.admin.createUser({
+    email: `clash-${unique()}@example.com`,
+    password: 'client-password-123',
+    email_confirm: true,
+    user_metadata: { first_name: 'Cleo', last_name: `Clash${unique()}` },
+  });
+  if (user.error) throw user.error;
+  const cleo = user.data.user.id;
+  created.users.push(cleo);
+  const member = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: cleo, role: 'client' });
+  if (member.error) throw member.error;
+
+  // A 1-week program on days 1 and 3, built straight in the tables.
+  const workout = `Clash lift ${unique()}`;
+  const program = `Clash plan ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  const lib = await admin.from('workouts').insert({ workspace_id: workspaceId, name: workout }).select('id').single();
+  if (lib.error) throw lib.error;
+  const prog = await admin.from('programs').insert({ workspace_id: workspaceId, name: program, weeks: 1 }).select('id').single();
+  if (prog.error) throw prog.error;
+  const slots = await admin.from('program_workouts').insert([1, 3].map((d) => ({ workspace_id: workspaceId, program_id: prog.data.id, workout_id: lib.data.id, week: 1, day: d })));
+  if (slots.error) throw slots.error;
+
+  await signInAsCoach(page);
+  await page.goto(`/clients/${cleo}`);
+  const monday = nextMonday(await browserToday(page));
+  // Already on Cleo's calendar: something on the Wednesday (program day 3), nothing on the Monday.
+  const taken = `Already there ${unique()}`;
+  created.workouts.push(taken);
+  const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: cleo, scheduled_on: addDays(monday, 2), name: taken });
+  if (w.error) throw w.error;
+  await page.reload();
+
+  const dialog = await openAssign(page, program);
+  const warning = dialog.getByRole('status').filter({ hasText: 'already has a workout' });
+  await expect(warning).toContainText('1 day already has a workout for Cleo');
+  await expect(warning.getByRole('listitem')).toHaveText([`${fmt(addDays(monday, 2), true)}: ${taken}`]);
+  await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toHaveCount(0);
+
+  // "Pick another date" puts the coach in the date box; a start that misses the Wednesday clears the warning.
+  await dialog.getByRole('button', { name: 'Pick another date' }).click();
+  await expect(dialog.getByLabel('Start date')).toBeFocused();
+  await dialog.getByLabel('Start date').fill(addDays(monday, 3));
+  await expect(warning).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toBeVisible();
+
+  // Back to Monday, and choose to add alongside: both workouts are on the Wednesday.
+  await dialog.getByLabel('Start date').fill(monday);
+  await expect(warning).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add alongside' }).click();
+  await expect(dialog).toBeHidden();
+  const wed = await admin.from('workouts').select('name').eq('client_id', cleo).eq('scheduled_on', addDays(monday, 2)).order('name');
+  expect(wed.data?.map((x) => x.name).sort()).toEqual([taken, workout].sort());
+
+  // Cancel leaves the calendar alone.
+  const before = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('client_id', cleo);
+  const again = await openAssign(page, program);
+  await expect(again.getByRole('status').filter({ hasText: 'already have a workout' })).toContainText('2 days already have a workout for Cleo');
+  await again.getByRole('button', { name: 'Cancel' }).click();
+  await expect(again).toBeHidden();
+  const after = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('client_id', cleo);
+  expect(after.count).toBe(before.count);
 });

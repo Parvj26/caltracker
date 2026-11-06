@@ -37,7 +37,7 @@ export default async function ClientPage({
   const rangeStart = monthGrid(firstMonth)[0]![0]!;
   const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
 
-  const [workouts, assignments, library, programs, stickers, strength] = await Promise.all([
+  const [workouts, assignments, library, programs, stickers, strength, scheduled] = await Promise.all([
     supabase
       .from('workouts')
       .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
@@ -72,11 +72,21 @@ export default async function ClientPage({
       .order('name'),
     loadClientStickers(supabase, workspaceId, client.id),
     loadClientStrength(supabase, workspaceId, client.id),
+    // Everything from the earliest day a program may start (7 days back, a day more for time zones) on, so the
+    // assign dialog can warn about days that already have a workout, however far ahead the program runs.
+    supabase
+      .from('workouts')
+      .select('name, scheduled_on')
+      .eq('workspace_id', workspaceId)
+      .eq('client_id', client.id)
+      .gte('scheduled_on', addDays(utcToday, -8))
+      .order('scheduled_on'),
   ]);
   if (workouts.error) throw new Error(`Could not load the calendar: ${workouts.error.message}`);
   if (assignments.error) throw new Error(`Could not load assignments: ${assignments.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
   if (programs.error) throw new Error(`Could not load programs: ${programs.error.message}`);
+  if (scheduled.error) throw new Error(`Could not load scheduled workouts: ${scheduled.error.message}`);
 
   // Each assignment's dates from yesterday (UTC) on, so the browser can count what "Remove from calendar" removes
   // from its own today.
@@ -133,6 +143,7 @@ export default async function ClientPage({
         assignments={summaries}
         library={library.data}
         programs={pickerPrograms}
+        upcomingWorkouts={scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : []))}
         openAssign={query.assign === '1'}
       />
       <StickersPanel data={stickers} units={units} />
