@@ -4,6 +4,10 @@ alter table public.profiles
   add column bio text not null default '' check (char_length(bio) <= 300),
   add column updated_at timestamptz default now();
 
+-- The photo path must live in the user's own folder (or be unset).
+alter table public.profiles add constraint profiles_avatar_path_own_folder
+  check (avatar_path is null or avatar_path like id::text || '/%');
+
 create trigger profiles_touch_updated_at before update on public.profiles
   for each row execute function public.touch_updated_at();
 
@@ -25,7 +29,8 @@ begin
   select m.workspace_id into v_ws
   from public.workspace_members m
   where m.user_id = (select auth.uid()) and m.role = 'owner'
-  limit 1;
+  order by m.created_at
+  limit 1; -- an owner owns exactly one workspace; the order only makes the pick deterministic
   if v_ws is null then
     raise exception 'only the owner can rename the business' using errcode = '42501';
   end if;
