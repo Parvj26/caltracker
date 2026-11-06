@@ -59,6 +59,7 @@ export {
   addDays,
   diffDays,
   isoWeekday,
+  localDateOf,
   localToday,
   monthGrid,
   programDayToDate,
@@ -118,6 +119,8 @@ export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate
 export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
 export type { PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
+export { programClashes } from './programs/clashes';
+export type { ProgramClash } from './programs/clashes';
 export {
   BAD_TODAY_ERROR,
   PAST_DATE_ERROR,

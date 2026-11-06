@@ -1,3 +1,6 @@
+import type { Metadata } from 'next';
+import { exercisePageTitle } from '@/lib/page-titles';
+import { getExercise } from '@/lib/page-data';
 import { notFound } from 'next/navigation';
 import { parseYoutubeUrl, youtubeFormSearchUrl } from '@caltracker/shared';
 import { ButtonLink, Card, Chip } from '@/components/ui';
@@ -8,6 +11,10 @@ import { TRACKING_LABELS } from '../filters';
 import styles from '../exercises.module.css';
 import { OverrideForm } from './override-form';
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  return exercisePageTitle((await params).id);
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ExercisePage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +24,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
 
   const supabase = await createServerSupabase();
   const [exercise, override] = await Promise.all([
-    supabase.from('exercises').select('*').eq('id', id).maybeSingle(),
+    getExercise(id),
     supabase
       .from('exercise_overrides')
       .select('youtube_url, coach_notes')
@@ -25,9 +32,8 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
       .eq('workspace_id', workspaceId)
       .maybeSingle(),
   ]);
-  if (exercise.error) throw new Error(`Could not load exercise: ${exercise.error.message}`);
   if (override.error) throw new Error(`Could not load exercise notes: ${override.error.message}`);
-  const ex = exercise.data;
+  const ex = exercise;
   if (!ex) notFound();
 
   const isCustom = ex.source === 'custom';

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { compareByLastName } from '@caltracker/shared';
 import { Card, Chip } from '@/components/ui';
@@ -12,6 +13,8 @@ import { PastClients } from './past-clients';
 import { ResendButton } from './resend-button';
 import { CancelInviteButton, RemoveClientButton } from './row-actions';
 import styles from './clients.module.css';
+
+export const metadata: Metadata = { title: 'Clients' };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });

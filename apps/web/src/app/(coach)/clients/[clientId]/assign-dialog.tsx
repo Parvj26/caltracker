@@ -9,6 +9,7 @@ import {
   isoWeekday,
   programDayToDate,
   programEndDate,
+  programClashes,
   programStartError,
 } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
@@ -19,6 +20,8 @@ import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
+
+export type ExistingWorkout = { date: IsoDate; name: string };
 
 /** The Monday after `today` (a week on, when today is a Monday). */
 const nextMonday = (today: IsoDate) => addDays(today, 8 - isoWeekday(today));
@@ -41,6 +44,7 @@ export function AssignDialog({
   clientId,
   clientName,
   programs,
+  existing,
   today,
   onAssigned,
   onClose,
@@ -48,6 +52,8 @@ export function AssignDialog({
   clientId: string;
   clientName: string;
   programs: PickerProgram[];
+  /** The client's workouts already on the calendar from a week back on, to warn about days the program lands on. */
+  existing: readonly ExistingWorkout[];
   /** The coach's own today, from the browser. */
   today: IsoDate;
   onAssigned: (programName: string, count: number) => void;
@@ -75,6 +81,11 @@ export function AssignDialog({
   const validStart = IsoDateSchema.safeParse(startDate).success;
   const startError = !validStart ? 'Pick a start date.' : programStartError(startDate, today);
   const inPast = startError === null && startDate < today;
+  // Assigning over days that already have workouts adds the program's workouts alongside them (no replacing), so
+  // say which days first; the coach can pick another start date, add alongside, or cancel.
+  const clashes = program && startError === null ? programClashes(program, startDate, existing) : [];
+  const dateInputId = useId();
+  const clashTitleId = useId();
 
   async function assign() {
     if (busy.current || !program || startError) return;
@@ -130,6 +141,7 @@ export function AssignDialog({
             ))}
           </SelectField>
           <TextField
+            id={dateInputId}
             label="Start date"
             type="date"
             min={earliestProgramStart(today)}
@@ -147,6 +159,25 @@ export function AssignDialog({
               <span>This start date is in the past. Workouts before today will show as missed later.</span>
             </p>
           ) : null}
+          {clashes.length > 0 ? (
+            <section className={styles.clashNote} aria-labelledby={clashTitleId} role="status">
+              <p id={clashTitleId} className={styles.clashTitle}>
+                <span aria-hidden="true" className={styles.pastMarker}>●</span>{' '}
+                {clashes.length === 1 ? '1 day already has' : `${clashes.length} days already have`} a workout for {clientName}
+              </p>
+              <ul className={styles.clashList}>
+                {clashes.map((c) => (
+                  <li key={c.date}>
+                    {formatShortDay(c.date)}: {c.names.join(', ')}
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.dialogBody}>
+                Pick another start date, or add the program&apos;s workouts alongside these. Nothing already there is
+                replaced.
+              </p>
+            </section>
+          ) : null}
         </>
       )}
       {error ? <ErrorText>{error}</ErrorText> : null}
@@ -155,9 +186,14 @@ export function AssignDialog({
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
           Cancel
         </Button>
+        {clashes.length > 0 ? (
+          <Button variant="secondary" onClick={() => document.getElementById(dateInputId)?.focus()} disabled={pending}>
+            Pick another date
+          </Button>
+        ) : null}
         {programs.length > 0 ? (
           <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null}>
-            {pending ? 'Assigning…' : 'Assign'}
+            {pending ? 'Assigning…' : clashes.length > 0 ? 'Add alongside' : 'Assign'}
           </Button>
         ) : null}
       </div>

@@ -61,7 +61,11 @@
 .item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); }
 .programItem { background: var(--ct-lime); }
 .singleItem { background: var(--ct-blue); }
-.itemRow { display: flex; align-items: stretch; }
+/* The "⋯" button sits in the card's top-right corner. The name flows around a spacer the button's size (.menuSpace),
+   so its first lines stop short of the button and later lines use the full width; names wrap only between words. */
+.itemRow { position: relative; }
+.itemControls { position: absolute; top: 0; right: 0; }
+.menuSpace { float: right; width: calc(var(--ct-tap-min) - var(--ct-space-2)); height: calc(var(--ct-tap-min) - var(--ct-space-1)); }
 /* Finished: a "✓ Done" line under the name that opens the log. Text on a pastel fill is always ink. */
 .doneNote {
   display: flex;
@@ -84,10 +88,8 @@
   color: var(--ct-ink);
 }
 .itemHandle {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
+  display: block;
+  width: 100%;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-2);
   border: 0;
@@ -97,16 +99,34 @@
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
-  overflow-wrap: anywhere;
 }
+/* Never breaks inside a word: a word that doesn't fit beside the button goes under it. A single word wider than the
+   whole card is cut with "…" (the full name is in the title). */
+.itemName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
 .grab { cursor: grab; touch-action: none; }
 .itemProgram {
   display: block;
   padding: 0 var(--ct-space-2) var(--ct-space-1);
   font-size: var(--ct-size-caption);
   color: var(--ct-ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
+/* Added by the client on the phone: dashed ink outline on white, so it reads as "not from your plan". */
+.clientItem { background: var(--ct-bg); border: var(--ct-border-width-secondary-button) dashed var(--ct-ink); }
+.clientLink {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+}
+.clientLink:hover, .clientLink:focus-visible { background: var(--ct-surface); }
+.clientTag { font-weight: var(--ct-weight-caption); }
 .dragging { opacity: 0.4; }
 .overlayItem {
   display: inline-flex;
@@ -323,6 +343,17 @@
   color: var(--ct-ink);
 }
 .pastMarker { color: var(--ct-amber); }
+.clashNote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber);
+  color: var(--ct-ink);
+}
+.clashTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.clashList { margin: 0; padding-left: var(--ct-space-4-5); max-height: 140px; overflow-y: auto; }
 
 /* ---------- Toast ---------- */
 .toastRegion { position: fixed; z-index: 20; right: var(--ct-space-4); bottom: var(--ct-space-4); max-width: min(420px, calc(100vw - 32px)); }

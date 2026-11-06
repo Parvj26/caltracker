@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { countExercises } from '@caltracker/shared';
 import { DuplicateButton } from '@/components/duplicate-button';
@@ -7,6 +8,8 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
 import { LocalDate } from './local-date';
 import styles from './workouts.module.css';
+
+export const metadata: Metadata = { title: 'Workouts' };
 
 // Libraries stay small in V1; past this the list says so instead of paging.
 const LIMIT = 200;

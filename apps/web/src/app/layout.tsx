@@ -6,7 +6,8 @@ import './globals.css';
 const sans = Bricolage_Grotesque({ subsets: ['latin'], weight: ['500', '700', '800'], variable: '--ct-font-sans' });
 const hand = Caveat({ subsets: ['latin'], weight: '700', variable: '--ct-font-hand' });
 
-export const metadata: Metadata = { title: 'CalTracker', description: 'Coach dashboard' };
+// Pages name themselves ("Home", "Maya Patel · Clients"); the template adds the product name to every tab.
+export const metadata: Metadata = { title: { template: '%s · CalTracker', default: 'CalTracker' }, description: 'Coach dashboard' };
 export const viewport: Viewport = { colorScheme: 'light' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

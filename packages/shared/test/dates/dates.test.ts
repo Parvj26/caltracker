@@ -4,6 +4,7 @@ import {
   addDays,
   diffDays,
   isoWeekday,
+  localDateOf,
   localToday,
   monthGrid,
   programDayToDate,
@@ -46,6 +47,21 @@ describe('program dates', () => {
   });
   it('computes the end date', () => {
     expect(programEndDate('2026-11-09', 4)).toBe('2026-12-06');
+  });
+});
+
+describe('localDateOf', () => {
+  it("gives the calendar day of an instant in the viewer's zone", () => {
+    // 11:30 pm on 31 Oct in Los Angeles is already 1 Nov in UTC and in Auckland.
+    const iso = '2026-11-01T06:30:00Z';
+    expect(localDateOf(iso, 'America/Los_Angeles')).toBe('2026-10-31');
+    expect(localDateOf(iso, 'UTC')).toBe('2026-11-01');
+    expect(localDateOf(iso, 'Pacific/Auckland')).toBe('2026-11-01');
+    expect(localDateOf('2026-11-01T12:30:00+00:00', 'Pacific/Auckland')).toBe('2026-11-02');
+  });
+
+  it('returns YYYY-MM-DD in the device zone too', () => {
+    expect(localDateOf('2026-11-01T06:30:00Z')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
 

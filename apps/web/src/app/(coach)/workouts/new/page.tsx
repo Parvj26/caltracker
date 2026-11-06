@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { emptyWorkout } from '@caltracker/shared';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
 import styles from '../workouts.module.css';
+
+export const metadata: Metadata = { title: 'New workout · Workouts' };
 
 export default async function NewWorkoutPage() {
   const { units, workspaceId } = await requireCoach();
