@@ -11,6 +11,7 @@ import { loadClient } from '../../client';
 import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
 import styles from './log.module.css';
+import { LiveRefresh } from '@/components/live-refresh';
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
 export default async function LogPage({ params }: { params: Promise<{ clientId: string; logId: string }> }) {
@@ -86,6 +87,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
 
       <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />
       <Comments logId={log.id} comments={commentViews} />
+      <LiveRefresh table="workout_logs" filter={`id=eq.${log.id}`} />
     </div>
   );
 }
