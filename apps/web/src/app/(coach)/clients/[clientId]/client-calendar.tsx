@@ -50,6 +50,7 @@ export function ClientCalendar({
   assignments,
   library,
   programs,
+  openAssign = false,
 }: {
   client: ClientRef;
   month: string | null;
@@ -57,6 +58,8 @@ export function ClientCalendar({
   assignments: AssignmentSummary[];
   library: LibraryWorkout[];
   programs: PickerProgram[];
+  /** Open the assign dialog on load (the Assign shortcut on Home, ?assign=1). */
+  openAssign?: boolean;
 }) {
   const today = useLocalToday();
   const readOnly = client.removedAt !== null;
@@ -68,7 +71,15 @@ export function ClientCalendar({
     setShown(entries);
     setItems(entries);
   }
-  const [assigning, setAssigning] = useState(false);
+  const [assigning, setAssigning] = useState(openAssign && !readOnly);
+  // Drop ?assign=1 once it has opened the dialog, so a reload doesn't open it again.
+  useEffect(() => {
+    if (!openAssign) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('assign')) return;
+    url.searchParams.delete('assign');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  }, [openAssign]);
   const [adding, setAdding] = useState(false);
   const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);

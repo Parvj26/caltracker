@@ -18,6 +18,7 @@ import { Card, Chip, Tile } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { useBrowserToday } from '@/lib/local-today';
+import { ClientSearch } from './client-search';
 import { avatarTone, initials } from '../clients/avatar';
 import styles from './home.module.css';
 
@@ -137,6 +138,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
       <header className={styles.header}>
         <h1 className={styles.title}>{greeting}{coachFirstName ? `, ${coachFirstName}` : ''}</h1>
         <p className={styles.caption}>{dayFormat.format(new Date(`${today}T00:00:00Z`))}</p>
+        <ClientSearch clients={data.clients} />
       </header>
 
       <div className={styles.tiles}>
@@ -238,7 +240,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                       <ClientLink client={c}>
                         <span className={styles.detail}>{e.daysLeft === 0 ? 'Ends today' : `Ends in ${plural(e.daysLeft, 'day', 'days')}`}</span>
                       </ClientLink>
-                      <Link href={`/clients/${c.id}`} className={styles.assign} aria-label={`Assign a program to ${fullName(c)}`}>Assign</Link>
+                      <Link href={`/clients/${c.id}?assign=1`} className={styles.assign} aria-label={`Assign a program to ${fullName(c)}`}>Assign</Link>
                     </li>
                   ) : null;
                 }}

@@ -164,3 +164,66 @@ test('the coming-soon parts are visible, disabled, and the console has no hydrat
   }
   expect(messages.filter((t) => t.includes('Hydration'))).toEqual([]);
 });
+
+test('typing part of a name in any case finds the client, and Enter opens their page', async ({ page }) => {
+  const last = `Findme${unique()}`;
+  const clientId = await newClient(last);
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const box = page.getByRole('combobox', { name: 'Find a client' });
+  await box.fill(last.toUpperCase());
+  const option = page.getByRole('option', { name: new RegExp(last) });
+  await expect(option).toBeVisible();
+  await expect(box).toHaveAttribute('aria-expanded', 'true');
+  await expect(box).toHaveAttribute('aria-activedescendant', (await option.getAttribute('id'))!);
+  await box.press('Escape');
+  await expect(box).toHaveValue('');
+  await box.fill(last.toLowerCase());
+  await box.press('ArrowDown');
+  await box.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}$`));
+});
+
+test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const box = page.getByRole('combobox', { name: 'Find a client' });
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+K');
+  await expect(box).toBeFocused();
+});
+
+test('Assign on an ending program opens the assign dialog, and a reload does not reopen it', async ({ page }) => {
+  const last = `Assn${unique()}`;
+  const clientId = await newClient(last);
+  const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: `Ending ${unique()}`, weeks: 1, start_date: dayOffset(-3) }).select('id').single();
+  if (a.error) throw a.error;
+  created.assignments.push(a.data.id);
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const group = page.getByRole('region', { name: 'Program ending soon' });
+  await expandGroup(group);
+  await group.locator('li').filter({ hasText: last }).getByRole('link', { name: /^Assign/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}`));
+  await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
+  await expect(page).not.toHaveURL(/assign=1/);
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('a workout on Los Angeles\'s today shows in Today\'s clients for a coach in Los Angeles', async ({ browser }) => {
+  const last = `LA${unique()}`;
+  const clientId = await newClient(last);
+  const laToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+  await plan(clientId, 'LA day', laToday);
+  const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
+  try {
+    const page = await context.newPage();
+    await signInAsCoach(page);
+    await page.goto('/home');
+    await expect(rowFor(page, last)).toContainText('Not started');
+  } finally {
+    await context.close();
+  }
+});
