@@ -1,24 +1,34 @@
--- Live updates for the coach (batch 4): the coach's website listens for changes to workout_logs through Supabase
--- Realtime and re-renders the page when a client's log changes.
+-- Live updates for the coach (batch 4): the coach's website listens for changes to workout_logs and awards through
+-- Supabase Realtime and re-renders the page when one changes.
 --
--- Only the log row is published, not log_blocks/log_exercises/log_sets: every applied save_workout_log updates the
--- row (revision, last_activity_at, status), and so do auto-finish and coach corrections, so one table is enough to
--- know "something changed" and the page reloads its own data. Realtime checks each change against the subscriber's
--- SELECT policies, so a coach only hears about their own workspace's logs and a client only about their own.
+-- workout_logs: the sets themselves live in log_sets, which is not published. The log row is enough to know that
+-- something changed, because every applied save_workout_log updates it (revision, status, and the phone's
+-- last_activity_at), and so do the auto-finish job (status, finished_at, auto_finished) and a coach correction
+-- (corrected_at). The page then reloads its own data.
+-- awards: stickers and PRs are worked out after the log is finished (apply_award, run with the service role), so
+-- they arrive a moment after the log's last change; publishing awards lets them appear without a refresh.
 --
--- Replica identity stays the default (primary key). The web filters (workspace_id, client_id, id) are matched
--- against the new row of an INSERT or UPDATE, which is always sent in full; only old values and DELETE filters
--- would need `replica identity full`, and the web does not listen for deletes.
+-- Realtime checks each change against the subscriber's SELECT policies (workout_logs_select, awards_select), so a
+-- coach only hears about their own workspace and a client only about their own rows.
 --
--- Same pattern as the messages migration: idempotent, and a no-op where the publication does not exist.
+-- Replica identity stays the default (primary key). The web filters (workspace_id, client_id, id, log_id) are
+-- matched against the new row of an INSERT or UPDATE, which is always sent in full; only old values and DELETE
+-- filters would need `replica identity full`, and the web does not listen for deletes.
+--
+-- Idempotent, and a no-op where the publication does not exist (a plain Postgres without Realtime).
 do $$
+declare
+  t text;
 begin
-  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
-     and not exists (
-       select 1 from pg_publication_tables
-       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'workout_logs'
-     ) then
-    alter publication supabase_realtime add table public.workout_logs;
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach t in array array['workout_logs', 'awards'] loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+      ) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
   end if;
 end;
 $$;

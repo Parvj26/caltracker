@@ -1,7 +1,7 @@
 begin;
-select plan(9);
+select plan(15);
 
--- Live updates for the coach: workout_logs is in the Realtime publication, and Realtime only forwards a change to
+-- Live updates for the coach: workout_logs and awards are in the Realtime publication, and Realtime only forwards a change to
 -- subscribers whose SELECT policies allow the row. These checks run the same SELECT a subscriber's change goes
 -- through, so they prove a coach of another workspace, and another client, never hear about the change.
 
@@ -27,6 +27,12 @@ select is((select count(*)::int from pg_publication_tables
 select is((select relreplident::text from pg_class where oid = 'public.workout_logs'::regclass), 'd',
   'workout_logs keeps the default replica identity (filters only read the new row)');
 select ok((select relrowsecurity from pg_class where oid = 'public.workout_logs'::regclass), 'workout_logs still has RLS on');
+select is((select count(*)::int from pg_publication_tables
+  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'awards'), 1,
+  'awards is in the realtime publication');
+select is((select relreplident::text from pg_class where oid = 'public.awards'::regclass), 'd',
+  'awards keeps the default replica identity');
+select ok((select relrowsecurity from pg_class where oid = 'public.awards'::regclass), 'awards still has RLS on');
 
 -- The phone starts a workout, then ticks off a set: each save updates the log row, which is what the web listens to.
 create function tests.rt_doc(revision int, done boolean, status text) returns jsonb
@@ -74,6 +80,21 @@ reset role;
 select tests.act_as(:'a2');
 select is((select count(*)::int from public.workout_logs where id = :'log_id'), 0,
   'another client of the same coach does not receive it');
+reset role;
+
+-- The award worked out for that log (as apply_award does, with the service role): who hears about it.
+insert into public.awards (log_id, client_id, workspace_id, result, log_revision)
+  values (:'log_id', :'a1', :'ws_a', '{}'::jsonb, 2);
+select tests.act_as(:'coach_a');
+select is((select count(*)::int from public.awards where log_id = :'log_id'), 1, 'the client''s coach receives the award');
+reset role;
+select tests.act_as(:'coach_b');
+select is((select count(*)::int from public.awards where log_id = :'log_id' or workspace_id = :'ws_a'), 0,
+  'a coach of another workspace does not receive the award');
+reset role;
+select tests.act_as(:'a2');
+select is((select count(*)::int from public.awards where log_id = :'log_id'), 0,
+  'another client of the same coach does not receive the award');
 reset role;
 
 select * from finish();
