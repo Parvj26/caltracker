@@ -26,7 +26,7 @@ test('proxy refreshes an expired session and rewrites the cookies', async ({ pag
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
 
   // Force a refresh: mark the stored session as expired (expires_at in 2001) while keeping the valid
   // refresh token. Supabase's client treats the session as expired on the next request and calls the
@@ -53,7 +53,7 @@ test('proxy refreshes an expired session and rewrites the cookies', async ({ pag
   );
 
   await page.reload();
-  await expect(page).toHaveURL(/\/clients$/); // still signed in, not bounced to /sign-in
+  await expect(page).toHaveURL(/\/home$/); // still signed in, not bounced to /sign-in
 
   const after = (await context.cookies()).filter((c) => isAuth(c.name));
   const afterJoined = [...after].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })).map((c) => c.value).join('');
@@ -73,7 +73,7 @@ test('signed-in coach can open the workouts and programs pages', async ({ page }
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
 
   await page.goto('/workouts');
   await expect(page.getByRole('heading', { name: 'Workouts' })).toBeVisible();
@@ -92,7 +92,7 @@ test('signed-in coach can open the activity page', async ({ page }) => {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
 
   await page.goto('/activity');
   await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
