@@ -215,12 +215,12 @@ create policy messages_insert on public.messages for insert to authenticated
 create policy conversation_reads_select on public.conversation_reads for select to authenticated
   using (public.can_read_conversation(conversation_id));
 
--- Storage: private bucket, WebP only, 5 MB. Participants read; participants of a live conversation write.
+-- Storage: private bucket, WebP (JPEG where a browser can't write WebP), 5 MB. Participants read; participants of a live conversation write.
 -- No update or delete policies: photos are not editable or removable in this version.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('message-images', 'message-images', false, 5242880, array['image/webp'])
+values ('message-images', 'message-images', false, 5242880, array['image/webp', 'image/jpeg'])
 on conflict (id) do update
-  set public = false, file_size_limit = 5242880, allowed_mime_types = array['image/webp'];
+  set public = false, file_size_limit = 5242880, allowed_mime_types = array['image/webp', 'image/jpeg'];
 
 create policy message_images_select on storage.objects for select to authenticated
   using (bucket_id = 'message-images' and public.can_access_message_image(name, false));

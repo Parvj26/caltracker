@@ -55,6 +55,20 @@
 
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 
+.navItem { position: relative; }
+.navBadge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-magenta);
+  color: var(--ct-bg);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  line-height: 20px;
+  text-align: center;
+}
+
 .content {
   min-width: 0;
   padding: var(--ct-space-6) 32px 48px;
@@ -69,6 +83,7 @@
   .logoMark { display: inline-flex; font-size: 22px; }
   .nav, .bottom { width: 100%; }
   .navItem { justify-content: center; width: 44px; padding: 0; margin: 0 auto; }
+  .navBadge { position: absolute; top: 2px; right: 0; margin: 0; }
   .navLabel {
     position: absolute;
     width: 1px;

@@ -2,6 +2,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { addDays, localToday, monthGrid } from '@caltracker/shared';
 import { isMonth, shiftMonth } from '@/components/calendar/format';
+import { Conversation } from '../../messages/conversation';
+import { loadThread } from '../../messages/data';
+import messageStyles from '../../messages/messages.module.css';
+import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type PickerProgram } from './client-calendar';
@@ -18,7 +22,7 @@ export default async function ClientPage({
   params: Promise<{ clientId: string }>;
   searchParams: Promise<{ month?: string | string[]; assign?: string | string[] }>;
 }) {
-  const { workspaceId } = await requireCoach();
+  const { userId, workspaceId } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
   const client = await loadClient(supabase, workspaceId, clientId);
@@ -116,6 +120,9 @@ export default async function ClientPage({
     slots: p.program_workouts.map((s) => ({ week: s.week, day: s.day })),
   }));
 
+  // A past client's chat history stays readable here (read-only).
+  const history = client.removedAt !== null ? await loadThread(supabase, workspaceId, userId, client) : null;
+
   return (
     <div className={styles.page}>
       <Link href="/clients" className={styles.back}>← Clients</Link>
@@ -128,6 +135,25 @@ export default async function ClientPage({
         programs={pickerPrograms}
         openAssign={query.assign === '1'}
       />
+      {history ? (
+        <section aria-labelledby="history-heading">
+          <h2 id="history-heading" className={styles.historyHeading}>Messages</h2>
+          <div className={cx(messageStyles.pane, messageStyles.embedded)}>
+            <Conversation
+              key={client.id}
+              conversationId={history.conversationId}
+              workspaceId={workspaceId}
+              me={userId}
+              clientId={client.id}
+              clientName={client.name}
+              rows={history.rows}
+              theirReadAt={history.theirReadAt}
+              readOnly
+              embedded
+            />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
