@@ -15,15 +15,22 @@ export type LoadedExerciseIndex = {
   refreshFailed: boolean;
 };
 
+const isStrOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
+const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
 function isRow(r: unknown): r is ExerciseIndexRow {
   if (typeof r !== 'object' || r === null) return false;
-  const o = r as Partial<ExerciseIndexRow>;
+  const o = r as Record<string, unknown>;
   return (
     typeof o.id === 'string' &&
     typeof o.name === 'string' &&
-    Array.isArray(o.primaryMuscles) &&
-    Array.isArray(o.secondaryMuscles) &&
-    typeof o.trackingType === 'string'
+    isStrings(o.primaryMuscles) &&
+    isStrings(o.secondaryMuscles) &&
+    isStrOrNull(o.equipment) &&
+    isStrOrNull(o.category) &&
+    typeof o.trackingType === 'string' &&
+    (o.source === 'builtin' || o.source === 'custom') &&
+    isStrOrNull(o.imagePath)
   );
 }
 
@@ -39,36 +46,76 @@ async function readStored(storage: KeyValueStorage, key: string): Promise<{ save
   }
 }
 
+const LAST_USER_KEY = 'caltracker.exerciseIndexUser.v1';
+
+/**
+ * Whose library to use: the signed-in user's, or (when the session can't be read, e.g. offline with an expired
+ * token) the last user who was signed in on this phone. Remembers the signed-in user, and removes the saved
+ * library of anyone else so one account's custom exercises never stay on the phone for the next.
+ */
+export async function resolveIndexUser(
+  storage: KeyValueStorage,
+  listKeys: () => Promise<readonly string[]>,
+  sessionUserId: string | null,
+): Promise<string | null> {
+  if (!sessionUserId) {
+    try {
+      return await storage.getItem(LAST_USER_KEY);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    if ((await storage.getItem(LAST_USER_KEY)) !== sessionUserId) {
+      const mine = `${EXERCISE_INDEX_KEY}.${sessionUserId}`;
+      const others = (await listKeys()).filter((k) => k.startsWith(`${EXERCISE_INDEX_KEY}.`) && k !== mine);
+      await Promise.all(others.map((k) => storage.removeItem(k)));
+      await storage.setItem(LAST_USER_KEY, sessionUserId);
+    }
+  } catch {
+    // Housekeeping only; never blocks the picker.
+  }
+  return sessionUserId;
+}
+
+/**
+ * Returns the saved library at once, however old. A copy older than 24 hours (or one from a clock set back) is
+ * refreshed in the background: `onUpdate` gets the new rows when they land, or the saved ones with
+ * `refreshFailed` when the fetch fails. With nothing saved it waits for the fetch (and rejects if that fails).
+ */
 export function createExerciseIndexLoader(
   storage: KeyValueStorage,
   fetchRows: () => Promise<ExerciseIndexRow[]>,
   userId: string,
   now: () => number = Date.now,
-): () => Promise<LoadedExerciseIndex> {
+): (onUpdate?: (next: LoadedExerciseIndex) => void) => Promise<LoadedExerciseIndex> {
   const key = `${EXERCISE_INDEX_KEY}.${userId}`;
-  let inFlight: Promise<LoadedExerciseIndex> | null = null;
+  let inFlight: Promise<ExerciseIndexRow[]> | null = null;
+  const fetchAndSave = () => {
+    inFlight ??= fetchRows()
+      .then(async (rows) => {
+        await storage.setItem(key, JSON.stringify({ savedAt: now(), rows })).catch(() => undefined);
+        return rows;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+    return inFlight;
+  };
 
-  async function run(): Promise<LoadedExerciseIndex> {
+  return async (onUpdate) => {
     const stored = await readStored(storage, key);
-    // A clock set back counts as stale rather than fresh forever.
-    const age = stored ? now() - stored.savedAt : Infinity;
-    if (stored && age >= 0 && age < EXERCISE_INDEX_TTL_MS) {
+    if (!stored) {
+      return { rows: await fetchAndSave(), fromCache: false, refreshFailed: false };
+    }
+    const age = now() - stored.savedAt;
+    if (age >= 0 && age < EXERCISE_INDEX_TTL_MS) {
       return { rows: stored.rows, fromCache: true, refreshFailed: false };
     }
-    try {
-      const rows = await fetchRows();
-      await storage.setItem(key, JSON.stringify({ savedAt: now(), rows })).catch(() => undefined);
-      return { rows, fromCache: false, refreshFailed: false };
-    } catch (e) {
-      if (stored) return { rows: stored.rows, fromCache: true, refreshFailed: true };
-      throw e;
-    }
-  }
-
-  return () => {
-    inFlight ??= run().finally(() => {
-      inFlight = null;
-    });
-    return inFlight;
+    fetchAndSave().then(
+      (rows) => onUpdate?.({ rows, fromCache: false, refreshFailed: false }),
+      () => onUpdate?.({ rows: stored.rows, fromCache: true, refreshFailed: true }),
+    );
+    return { rows: stored.rows, fromCache: true, refreshFailed: false };
   };
 }

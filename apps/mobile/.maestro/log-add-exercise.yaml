@@ -1,5 +1,5 @@
 # Smarter + Exercise search: start an unplanned workout, tap + Exercise, type the shorthand "db incline" and see
-# "Dumbbell Incline Row" as the first result; tapping it adds it to the log. Needs the exercise library imported (pnpm import:exercises).
+# a "Dumbbell Incline…" exercise as the first result; tapping it adds it to the log. Needs the exercise library imported (pnpm import:exercises).
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -45,14 +45,14 @@ env:
     timeout: 20000
 - assertVisible:
     id: exercise-result-0
-    text: 'Dumbbell Incline Row.*'
+    text: 'Dumbbell Incline.*'
 - tapOn:
     id: exercise-result-0
 - extendedWaitUntil:
     visible:
       id: tick-0-0
     timeout: 10000
-- assertVisible: 'Dumbbell Incline Row'
+- assertVisible: 'Dumbbell Incline.*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

@@ -47,6 +47,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
       testID={`chip-${label}`}
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={`${label} filter`}
       accessibilityState={{ selected: active }}
       style={[
         styles.chip,
@@ -91,7 +92,9 @@ export function ExercisePicker({
     }
     let stale = false;
     setError(null);
-    loadExerciseIndexCached()
+    loadExerciseIndexCached((next) => {
+      if (!stale) setData(next);
+    })
       .then((d) => {
         if (!stale) setData(d);
       })
