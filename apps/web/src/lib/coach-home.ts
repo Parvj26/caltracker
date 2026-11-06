@@ -29,14 +29,22 @@ const AHEAD_DAYS = PLANNED_AHEAD_DAYS + 1;
 const PR_WINDOW_DAYS = 9;
 const PAGE = 1000; // PostgREST's default max rows per response
 
-/** Reads every row of a query, a page at a time, so a busy coach never silently loses rows past the server cap. */
-async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>, what: string): Promise<T[]> {
+/**
+ * Reads every row of a query, a page at a time, so a busy coach never silently loses rows past the server cap. It
+ * stops only at an empty page: a short page is not proof of the end, because the server's row cap may be lower than
+ * PAGE.
+ */
+export async function readAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  what: string,
+): Promise<T[]> {
   const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
+  for (let from = 0; ; ) {
     const { data, error } = await page(from, from + PAGE - 1);
     if (error) throw new Error(`Could not load ${what}: ${error.message}`);
-    rows.push(...(data ?? []));
-    if ((data?.length ?? 0) < PAGE) return rows;
+    if (!data || data.length === 0) return rows;
+    rows.push(...data);
+    from += data.length;
   }
 }
 
