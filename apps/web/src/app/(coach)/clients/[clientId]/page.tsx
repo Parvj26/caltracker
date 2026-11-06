@@ -11,6 +11,7 @@ import { StrengthPanel } from './strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import { LiveRefresh } from '@/components/live-refresh';
+import { renderTime } from '@/lib/live-refresh';
 import styles from '@/components/calendar/calendar.module.css';
 
 // Same cap as the workout library page.
@@ -126,7 +127,7 @@ export default async function ClientPage({
   return (
     <div className={styles.page}>
       <Link href="/clients" className={styles.back}>← Clients</Link>
-      <LiveRefresh table="workout_logs" filter={`client_id=eq.${client.id}`} />
+      <LiveRefresh on={[{ table: 'workout_logs', filter: `client_id=eq.${client.id}` }]} renderedAt={renderTime()} />
       {/* The client's name and calendar (assign a program, add a workout) come first; progress sits below. */}
       <ClientCalendar
         client={client}

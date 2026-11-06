@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRefreshScheduler } from './live-refresh';
+import { createRefreshScheduler, rejoinDelayMs } from './live-refresh';
 
 describe('createRefreshScheduler', () => {
   let visible = true;
@@ -105,6 +105,39 @@ describe('createRefreshScheduler', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('the first join refreshes when the server render is more than 1 s old', () => {
+    const s = createRefreshScheduler({ refresh, isVisible: () => visible, now: () => Date.now(), renderedAt: Date.now() - 1500 });
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(500);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    // Only the first join: a second SUBSCRIBED without a drop does nothing.
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(500);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('the first join right after the render does not refresh', () => {
+    const s = createRefreshScheduler({ refresh, isVisible: () => visible, now: () => Date.now(), renderedAt: Date.now() - 300 });
+    s.status('SUBSCRIBED');
+    vi.advanceTimersByTime(1000);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('a longer maxWaitMs lets a steady stream wait longer (8 s on Home)', () => {
+    const s = createRefreshScheduler({ refresh, isVisible: () => visible, now: () => Date.now(), maxWaitMs: 8000 });
+    for (let i = 0; i < 20; i++) {
+      s.change();
+      vi.advanceTimersByTime(300);
+    }
+    // 6 s of changes every 300 ms: still waiting.
+    expect(refresh).not.toHaveBeenCalled();
+    for (let i = 0; i < 10; i++) {
+      s.change();
+      vi.advanceTimersByTime(300);
+    }
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('after dispose nothing refreshes, including a pending change', () => {
     const s = make();
     s.change();
@@ -116,5 +149,11 @@ describe('createRefreshScheduler', () => {
     s.visibility();
     vi.advanceTimersByTime(1000);
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('rejoinDelayMs', () => {
+  it('backs off from 1 s, doubling, up to 30 s', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 20].map(rejoinDelayMs)).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000]);
   });
 });
