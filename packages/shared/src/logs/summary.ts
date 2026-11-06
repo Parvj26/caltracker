@@ -25,7 +25,7 @@ export function completedSetCount(log: WorkoutLogDoc): number {
 }
 
 /**
- * Sets still to do: not-done sets of the exercises being done, plus for each pick-one group not yet picked from
+ * Counting rule: sets still to do: not-done sets of the exercises being done, plus for each pick-one group not yet picked from
  * its first option's normal sets (the best guess of what it will turn into).
  */
 export function openSetCount(log: WorkoutLogDoc): number {

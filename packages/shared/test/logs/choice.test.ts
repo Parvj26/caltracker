@@ -12,22 +12,28 @@ import {
   roundRestSeconds,
 } from '../../src/logs/flow';
 import {
+  addLogDrop,
   addLogExercise,
   addLogSet,
   completeSet,
   completeSetWith,
+  discardLog,
+  finishLog,
   pickChoice,
   removeLogExercise,
   removeLogSet,
+  reopenLog,
   setExerciseNote,
   stepActual,
+  swapLogExercise,
   updateActual,
   toggleSet,
   uncompleteSet,
 } from '../../src/logs/ops';
+import * as ops from '../../src/logs/ops';
 import { WorkoutLogDoc } from '../../src/logs/schema';
 import { startLogFromWorkout } from '../../src/logs/start';
-import { completedSetCount, logVolumeKg, openSetCount } from '../../src/logs/summary';
+import { autoFinish, completedSetCount, logVolumeKg, openSetCount } from '../../src/logs/summary';
 import { addChoice, addSection, addStraightBlock, emptyWorkout } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
@@ -228,7 +234,12 @@ describe('counts', () => {
 
 describe('every op keeps a choice-containing log valid (the phone drops a log that fails to parse)', () => {
   const T = LATER;
-  const ok = (l: WorkoutLogDoc) => expect(WorkoutLogDoc.safeParse(l).success).toBe(true);
+  // Each op's name is recorded as it is exercised, so the guard test below can prove none was forgotten.
+  const exercised = new Set<string>();
+  const ok = (l: WorkoutLogDoc, op?: string) => {
+    if (op) exercised.add(op);
+    expect(WorkoutLogDoc.safeParse(l).success).toBe(true);
+  };
   const values = { reps: 10, weightKg: 20, durationS: null, distanceM: null };
 
   it('on unpicked, picked and locked logs, for every set and option', () => {
@@ -239,25 +250,45 @@ describe('every op keeps a choice-containing log valid (the phone drops a log th
       ok(log);
       const allSets = log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.map((s) => s.id)));
       for (const id of allSets) {
-        ok(completeSet(log, id, T));
-        ok(completeSetWith(log, id, values, T));
-        ok(toggleSet(log, id, T).log);
-        ok(uncompleteSet(log, id, T));
-        ok(updateActual(log, id, { actualReps: 5 }));
-        for (const f of ['weight', 'reps'] as const) ok(stepActual(log, id, f, 1, 'kg', 10));
+        ok(completeSet(log, id, T), 'completeSet');
+        ok(completeSetWith(log, id, values, T), 'completeSetWith');
+        ok(toggleSet(log, id, T).log, 'toggleSet');
+        ok(uncompleteSet(log, id, T), 'uncompleteSet');
+        ok(updateActual(log, id, { actualReps: 5 }), 'updateActual');
+        for (const f of ['weight', 'reps'] as const) ok(stepActual(log, id, f, 1, 'kg', 10), 'stepActual');
       }
       for (const b of log.blocks) {
         for (const e of b.exercises) {
-          ok(removeLogExercise(log, e.id, T));
-          ok(addLogSet(log, e.id, uuid, T));
-          ok(removeLogSet(log, e.id, e.sets[0]!.id, T));
-          ok(setExerciseNote(log, e.id, 'n', T));
-          ok(pickChoice(log, b.id, e.id, T));
+          ok(removeLogExercise(log, e.id, T), 'removeLogExercise');
+          ok(addLogSet(log, e.id, uuid, T), 'addLogSet');
+          ok(addLogDrop(log, e.id, e.sets[0]!.id, uuid, T), 'addLogDrop');
+          ok(swapLogExercise(log, e.id, pick('Swapped'), T), 'swapLogExercise');
+          ok(removeLogSet(log, e.id, e.sets[0]!.id, T), 'removeLogSet');
+          ok(setExerciseNote(log, e.id, 'n', T), 'setExerciseNote');
+          ok(pickChoice(log, b.id, e.id, T), 'pickChoice');
         }
-        ok(pickChoice(log, b.id, null, T));
+        ok(pickChoice(log, b.id, null, T), 'pickChoice');
       }
-      ok(addLogExercise(log, pick('Row'), uuid, T));
+      ok(addLogExercise(log, pick('Row'), uuid, T), 'addLogExercise');
+      ok(discardLog(log, T), 'discardLog');
     }
+    // Finishing needs a ticked set; reopening needs a log finished automatically within the last day.
+    const finished = finishLog(locked, T);
+    ok(finished, 'finishLog');
+    expect(finished.status).toBe('completed');
+    ok(finishLog(pickedLog, T), 'finishLog');
+    const auto = autoFinish(locked);
+    ok(reopenLog(auto, T), 'reopenLog');
+    expect(reopenLog(auto, T).status).toBe('in_progress');
+  });
+  it('the test above exercises every function ops.ts exports', () => {
+    // dropParentId reads a doc and returns an id; it never returns a log.
+    const notLogOps = new Set(['dropParentId']);
+    const exported = Object.entries(ops)
+      .filter(([, v]) => typeof v === 'function')
+      .map(([name]) => name)
+      .filter((name) => !notLogOps.has(name));
+    expect([...exercised].sort()).toEqual(exported.sort());
   });
   it('refuses stepping and typing into an unpicked option', () => {
     const log = picked(build(), 1);

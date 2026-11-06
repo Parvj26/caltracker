@@ -331,7 +331,8 @@ export function removeLogExercise(log: WorkoutLogDoc, logExerciseId: string, now
 /**
  * Sets (or with null, clears) the pick of a pick-one group; `logExerciseId` is the option's log exercise id.
  * Refused (same object back) for a block that is not a pick-one group, an id that is not one of its options, or
- * once the picked option has a done set and the id would change the pick.
+ * once the picked option has a done set and the id would change the pick. Values typed into an option that is
+ * later left behind stay in the log, but only the picked option's sets ever count (flow, summary, volume).
  */
 export function pickChoice(log: WorkoutLogDoc, blockId: string, logExerciseId: string | null, nowIso: string): WorkoutLogDoc {
   const block = log.blocks.find((b) => b.id === blockId);
