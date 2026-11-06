@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Units } from '@caltracker/shared';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-export type CoachContext = { userId: string; workspaceId: string; workspaceName: string; units: Units };
+export type CoachContext = { userId: string; workspaceId: string; workspaceName: string; firstName: string; units: Units };
 
 /**
  * Signed-out visitors go to /sign-in. Signed-in users without an owner/staff membership go to
@@ -24,7 +24,7 @@ export const requireCoach = cache(async (): Promise<CoachContext> => {
       .in('role', ['owner', 'staff'])
       .order('created_at', { ascending: true })
       .limit(1),
-    supabase.from('profiles').select('units').eq('id', auth.user.id).maybeSingle(),
+    supabase.from('profiles').select('units, first_name').eq('id', auth.user.id).maybeSingle(),
   ]);
   if (error) throw new Error(`Could not load membership: ${error.message}`);
   if (profile.error) throw new Error(`Could not load profile: ${profile.error.message}`);
@@ -35,6 +35,7 @@ export const requireCoach = cache(async (): Promise<CoachContext> => {
     userId: auth.user.id,
     workspaceId: row.workspace_id,
     workspaceName: row.workspaces?.name ?? '',
+    firstName: profile.data?.first_name ?? '',
     units: profile.data?.units === 'lb' ? 'lb' : 'kg',
   };
 });

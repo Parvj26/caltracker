@@ -96,7 +96,8 @@ async function signInAsDemoCoach(page: Page) {
   await page.getByLabel('Email').fill('coach@demo.local');
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
+  await page.goto('/clients');
 }
 
 test('coach shell: sidebar nav marks Clients as the current page and the page uses token card borders', async ({ page }) => {

@@ -44,3 +44,8 @@ export function subscribeToDayChange(onChange: () => void): () => void {
 export function useLocalToday(): IsoDate {
   return useSyncExternalStore(subscribeToDayChange, () => localToday(), () => localToday('UTC'));
 }
+
+/** Today in the browser, or null on the server and during hydration, so a page can show a skeleton until it knows. */
+export function useBrowserToday(): IsoDate | null {
+  return useSyncExternalStore(subscribeToDayChange, () => localToday(), () => null);
+}

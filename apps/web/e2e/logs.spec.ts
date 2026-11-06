@@ -86,7 +86,7 @@ test('a finished workout shows in the activity feed with its sets and volume in 
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page).toHaveURL(/\/home$/);
   await page.getByRole('link', { name: 'Activity' }).click();
   await expect(page).toHaveURL(/\/activity$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();

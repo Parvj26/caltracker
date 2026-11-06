@@ -17,5 +17,5 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     const invalid = error.code === 'invalid_credentials' || error.status === 400;
     return { error: invalid ? 'Incorrect email or password' : 'Something went wrong. Please try again.' };
   }
-  redirect('/clients');
+  redirect('/home');
 }
