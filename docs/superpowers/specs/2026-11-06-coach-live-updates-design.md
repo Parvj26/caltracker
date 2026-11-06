@@ -12,9 +12,18 @@ weekly tiles, Needs attention), a client's log page, the client calendar and Act
 - **Why only `workout_logs`.** Sets live in `log_sets` (the tree `workout_logs -> log_blocks -> log_exercises ->
   log_sets`), but every applied `save_workout_log` from the phone also updates the `workout_logs` row (revision,
   last activity, status), as do auto-finish and coach corrections. One table is enough to know "something changed".
-- **Debounce and visibility.** Refreshes are debounced (500 ms, at most every 2 s under a steady stream), skipped while
-  the tab is hidden and done once when it becomes visible. After the channel drops and joins again the page refreshes
-  once, since changes made while disconnected were never sent. Logic: `apps/web/src/lib/live-refresh.ts` (unit tested);
+- **Awards too.** Stickers and PRs are worked out a moment after the finish (apply_award), so `awards` is published as
+  well and Home, Activity and the log page listen to it with the same filters.
+- **Debounce and visibility.** Refreshes are debounced (500 ms; under a steady stream at most every 2 s on the log and
+  client pages, 8 s on Home and Activity, which see the whole workspace), skipped while the tab is hidden and done
+  once when it becomes visible. After the channel drops and joins again the page refreshes once, since changes made
+  while disconnected were never sent; a channel that closes for good is rebuilt with backoff (1 s doubling to 30 s).
+  The first join refreshes only when the server render is more than 1 s old. The token is loaded into Realtime before
+  joining (otherwise the join can go out as anon and RLS hides everything); without a session the page shows offline.
+- **Corrections.** A coach correcting a log compares against the numbers shown when Correct was clicked, and if the
+  phone syncs meanwhile (revision or last activity changes) saving waits until the coach takes the latest numbers.
+- **Avatar.** The sidebar photo keeps its first signed link while only the token changes, so refreshes don't download
+  it again. Logic: `apps/web/src/lib/live-refresh.ts` (unit tested);
   component: `apps/web/src/components/live-refresh.tsx`, one line per page.
 - **Security.** Realtime checks each change against the subscriber's SELECT policies (RLS), so a coach only hears about
   their workspace and a client only about their own logs; the filter only narrows that. pgTAP:
