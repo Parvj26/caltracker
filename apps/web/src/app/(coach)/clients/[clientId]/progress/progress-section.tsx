@@ -124,7 +124,7 @@ export function ProgressSection({
   return (
     <section className={styles.section} aria-labelledby="progress-heading">
       <div className={styles.head}>
-        <h2 id="progress-heading" className={styles.heading}>Progress</h2>
+        <h2 id="progress-heading" className={styles.heading}>Body scans</h2>
         <div className={styles.headActions}>
           <ul className={styles.ranges} aria-label="Chart range">
             {CHART_RANGES.map((r) => (

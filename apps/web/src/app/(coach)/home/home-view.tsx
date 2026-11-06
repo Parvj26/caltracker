@@ -106,7 +106,7 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}`} className={styles.assign} aria-label={`Open ${name}`}>Open</Link>
         {assign ? (
-          <Link href={`/clients/${client.id}?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
+          <Link href={`/clients/${client.id}/training?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
         ) : null}
         {message ? <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link> : null}
       </span>

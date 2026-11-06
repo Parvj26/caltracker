@@ -50,6 +50,7 @@ export async function removeClient(userId: string): Promise<SimpleOutcome> {
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('remove_client', { p_workspace_id: workspaceId, p_user_id: userId });
   revalidatePath('/clients');
+  revalidatePath('/clients/[clientId]', 'layout');
   // P0002: already removed (for example in another tab), which is the outcome the coach wanted.
   if (error && error.code !== 'P0002') return { ok: false, error: "Couldn't remove this client. Please try again." };
   return { ok: true };

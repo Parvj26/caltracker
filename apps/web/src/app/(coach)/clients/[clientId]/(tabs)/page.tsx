@@ -1,0 +1,43 @@
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import { localToday } from '@caltracker/shared';
+import { requireCoach } from '@/lib/auth';
+import { loadClientOverview } from '@/lib/client-overview';
+import { getClient } from '@/lib/page-data';
+import { clientPageTitle } from '@/lib/page-titles';
+import { createServerSupabase } from '@/lib/supabase/server';
+import { OverviewView } from '../overview/overview-view';
+
+export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
+  return clientPageTitle((await params).clientId);
+}
+
+type Query = Record<string, string | string[] | undefined>;
+
+/** Links made before the tabs (?assign=1, ?month=, ?scan=1) still land where they meant to. */
+function oldLinkTarget(clientId: string, query: Query): string | null {
+  const keep = (keys: string[]) => {
+    const p = new URLSearchParams();
+    for (const k of keys) {
+      const v = query[k];
+      if (typeof v === 'string') p.set(k, v);
+    }
+    const s = p.toString();
+    return s ? `?${s}` : '';
+  };
+  if (query.scan !== undefined) return `/clients/${clientId}/body${keep(['scan'])}`;
+  if (query.assign !== undefined || query.month !== undefined) return `/clients/${clientId}/training${keep(['assign', 'month'])}`;
+  return null;
+}
+
+export default async function ClientOverviewPage({ params, searchParams }: { params: Promise<{ clientId: string }>; searchParams: Promise<Query> }) {
+  const { workspaceId, units } = await requireCoach();
+  const [{ clientId }, query] = await Promise.all([params, searchParams]);
+  const client = await getClient(clientId);
+  if (!client) notFound();
+  const target = oldLinkTarget(client.id, query);
+  if (target) redirect(target);
+
+  const data = await loadClientOverview(await createServerSupabase(), workspaceId, client, localToday('UTC'));
+  return <OverviewView data={data} units={units} readOnly={client.removedAt !== null} />;
+}

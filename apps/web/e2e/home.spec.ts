@@ -150,7 +150,7 @@ test('a client with nothing planned is under Nothing planned, with Open and Assi
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Nothing in the next 7 days');
   await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.getByRole('link', { name: /^Assign a program to / })).toHaveAttribute('href', `/clients/${clientId}?assign=1`);
+  await expect(row.getByRole('link', { name: /^Assign a program to / })).toHaveAttribute('href', `/clients/${clientId}/training?assign=1`);
 });
 
 test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {

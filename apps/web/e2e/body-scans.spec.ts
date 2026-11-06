@@ -63,7 +63,7 @@ const pdf = (bytes = 600) => Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.al
 
 async function openForm(page: Page, clientId: string) {
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/body`);
   await page.getByRole('button', { name: 'Add scan' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a scan' });
   await expect(dialog).toBeVisible();
@@ -107,7 +107,7 @@ test('a client with one scan shows a note instead of a chart', async ({ page }) 
   const c = await newClient();
   await seedScan(c.id, 3, { body_fat_pct: 22 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}`);
+  await page.goto(`/clients/${c.id}/body`);
   await expect(page.getByText('Add another scan to see a trend.')).toBeVisible();
   await expect(page.getByRole('group', { name: 'Body fat chart' })).toHaveCount(0);
 });
@@ -116,7 +116,7 @@ test('editing a scan changes its values, and the date can not be in the future',
   const c = await newClient();
   await seedScan(c.id, 5, { body_fat_pct: 22 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}`);
+  await page.goto(`/clients/${c.id}/body`);
   await page.getByRole('button', { name: /^Edit scan of/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit scan' });
   await expect(dialog.getByLabel('Body fat (%)', { exact: true })).toHaveValue('22');
@@ -141,7 +141,7 @@ test('deleting a scan asks first, removes its row and its printout file', async 
   if (up.error) throw up.error;
   await seedScan(c.id, 5, { body_fat_pct: 22 }, { attachmentPath: path });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}`);
+  await page.goto(`/clients/${c.id}/body`);
   await page.getByRole('button', { name: /^Delete scan of/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete this scan?' });
   await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -213,7 +213,7 @@ test('a client-entered weight can be deleted but not edited: Add a new scan inst
   const c = await newClient();
   await seedScan(c.id, 2, { weight_kg: 80 }, { source: 'client' });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}`);
+  await page.goto(`/clients/${c.id}/body`);
   const row = history(page).getByRole('row').filter({ hasText: 'Logged by client' });
   await expect(row).toBeVisible();
   await expect(row.getByRole('button', { name: /^Edit scan of/ })).toHaveCount(0);
@@ -257,7 +257,7 @@ test('a save whose answer never arrives keeps the uploaded printout (it may have
   await dialog.getByLabel('Body fat (%)', { exact: true }).fill('20');
   await dialog.getByLabel(/^Printout/).setInputFiles({ name: 'inbody.pdf', mimeType: 'application/pdf', buffer: pdf() });
   // The browser loses the connection when it sends the save (the server action call).
-  await page.route(`**/clients/${c.id}*`, (route) => (route.request().headers()['next-action'] ? route.abort() : route.continue()));
+  await page.route(`**/clients/${c.id}/body*`, (route) => (route.request().headers()['next-action'] ? route.abort() : route.continue()));
   await dialog.getByRole('button', { name: 'Save scan' }).click();
   await expect(dialog.getByRole('alert')).toContainText("Couldn't save the scan");
   await expect.poll(async () => (await admin.storage.from('scan-attachments').list(`${workspaceId}/${c.id}`)).data?.length).toBe(1);
@@ -274,7 +274,7 @@ test('scans only outside the chosen range say so and Show all brings the chart b
   await seedScan(c.id, 380, { body_fat_pct: 23 });
   await seedScan(c.id, 3, { body_fat_pct: 21 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}`);
+  await page.goto(`/clients/${c.id}/body`);
   await expect(page.getByRole('group', { name: /^Body fat chart/ })).toHaveCount(0);
   await expect(page.getByText('Not enough scans in this range for a chart.')).toBeVisible();
   await page.getByRole('button', { name: 'Show all' }).click();

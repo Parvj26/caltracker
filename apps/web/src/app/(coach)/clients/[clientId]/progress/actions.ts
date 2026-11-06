@@ -17,7 +17,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const BUCKET = 'scan-attachments';
 const UPLOAD_LEFT_BEHIND = "The scan wasn't saved, and the uploaded printout file could not be removed.";
 const GENERIC = "Couldn't save. Please try again.";
-const refresh = () => revalidatePath('/clients/[clientId]', 'page');
+const refresh = () => revalidatePath('/clients/[clientId]', 'layout');
 
 export type SaveScanInput = {
   /** Made in the browser when the form opens, so a retry edits the same scan instead of adding another. */
