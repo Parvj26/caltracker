@@ -6,7 +6,7 @@ import { dayLabel, isAlreadyUploaded, mergeById, mergeOutbox, messageYoutubeIds,
 import type { Message, OutboxItem } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
-import { PhotoError, compressPhoto } from '@/lib/compress-image';
+import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { avatarTone, initials } from '../clients/avatar';
 import { markRead, sendMessage } from './actions';
 import { Composer, type Draft } from './composer';

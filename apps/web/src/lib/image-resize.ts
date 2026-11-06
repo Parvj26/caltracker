@@ -1,5 +1,11 @@
-/** Browser-side avatar processing: centre-crop to a square, then WebP (JPEG where the browser can't make WebP) at 1600 px max plus a 256 px thumbnail. */
+/**
+ * The one browser-side image path, used for the coach's photo and for chat photos. Both are decoded upright, drawn at
+ * most 1600 px on the long edge plus a small thumbnail, and encoded as WebP (JPEG where the browser can't make WebP).
+ * Avatars are centre-cropped to a square with a 256 px thumbnail; chat photos keep their shape with a 320 px thumbnail
+ * (the sizes for chat photos live in @caltracker/shared).
+ */
 
+import { FULL_MAX_EDGE, THUMB_MAX_EDGE, fitWithin, type PhotoExt } from '@caltracker/shared';
 import type { AvatarExt } from './avatar-files';
 
 export const AVATAR_MAX_PX = 1600;
@@ -42,19 +48,34 @@ export type ProcessedAvatar = { avatar: Blob; thumb: Blob; ext: AvatarExt };
 const canvasToBlob = (canvas: HTMLCanvasElement): ToBlob => (type, quality) =>
   new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
-function drawSquare(source: ImageBitmap | HTMLImageElement, w: number, h: number, max: number): HTMLCanvasElement {
-  const { sx, sy, side, size } = fitSquare(w, h, max);
+type Source = ImageBitmap | HTMLImageElement;
+
+function canvasOf(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('no canvas');
   ctx.imageSmoothingQuality = 'high';
+  return { canvas, ctx };
+}
+
+function drawSquare(source: Source, w: number, h: number, max: number): HTMLCanvasElement {
+  const { sx, sy, side, size } = fitSquare(w, h, max);
+  const { canvas, ctx } = canvasOf(size, size);
   ctx.drawImage(source, sx, sy, side, side, 0, 0, size, size);
   return canvas;
 }
 
-async function decode(file: File): Promise<{ source: ImageBitmap | HTMLImageElement; w: number; h: number; close: () => void }> {
+/** The whole picture, scaled down (never up) to fit a `max` px long edge. */
+function drawFit(source: Source, w: number, h: number, max: number): HTMLCanvasElement {
+  const { width, height } = fitWithin(w, h, max);
+  const { canvas, ctx } = canvasOf(width, height);
+  ctx.drawImage(source, 0, 0, width, height);
+  return canvas;
+}
+
+async function decode(file: File): Promise<{ source: Source; w: number; h: number; close: () => void }> {
   try {
     // imageOrientation applies the camera's rotation, so phone photos are not sideways.
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -90,5 +111,34 @@ export async function processAvatar(file: File): Promise<ProcessedAvatar> {
     }
   } catch {
     throw new Error(IMAGE_ERROR);
+  }
+}
+
+/** A chat photo that can't be prepared; the message is shown to the coach. */
+export class PhotoError extends Error {}
+
+const PHOTO_ERROR = "This browser can't prepare photos.";
+
+/** Decodes a picked chat photo (upright) and returns the full-size and thumbnail blobs, always in the same format. */
+export async function compressPhoto(file: File): Promise<{ full: Blob; thumb: Blob; ext: PhotoExt }> {
+  if (!file.type.startsWith('image/')) throw new PhotoError('Only photos can be sent.');
+  let decoded: Awaited<ReturnType<typeof decode>>;
+  try {
+    decoded = await decode(file);
+  } catch {
+    throw new PhotoError("That file isn't a photo this browser can read.");
+  }
+  const { source, w, h, close } = decoded;
+  try {
+    if (!(w > 0 && h > 0)) throw new PhotoError("That file isn't a photo this browser can read.");
+    const full = await encodeWithFallback(canvasToBlob(drawFit(source, w, h, FULL_MAX_EDGE)), 0.85);
+    // Same format as the full photo, so the photo and its thumbnail always share one extension (and path pattern).
+    const thumb = await canvasToBlob(drawFit(source, w, h, THUMB_MAX_EDGE))(full.blob.type, 0.85);
+    if (!thumb || thumb.type !== full.blob.type) throw new PhotoError(PHOTO_ERROR);
+    return { full: full.blob, thumb, ext: full.ext };
+  } catch (e) {
+    throw e instanceof PhotoError ? e : new PhotoError(PHOTO_ERROR);
+  } finally {
+    close();
   }
 }
