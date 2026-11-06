@@ -35,6 +35,20 @@ export const pressedOpacity = 0.75;
 
 export { radius, space };
 
+/** Sticker sizes and fades (reveal, sheet, zoo book). */
+export const stickerTheme = {
+  revealSize: { phone: 220, tablet: 280 },
+  sheetSize: 200,
+  landmarkSize: 64,
+  summarySize: 72,
+  burstScale: 1.35,
+  burstOpacity: 0.9,
+  scrimOpacity: 0.4,
+  dimOpacity: 0.7,
+  factOpacity: 0.85,
+  pathDot: 12,
+} as const;
+
 /** The square exercise photo beside an exercise name. */
 export const exerciseThumbSize = 40;
 

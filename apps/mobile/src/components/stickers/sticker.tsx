@@ -2,14 +2,14 @@ import { useEffect, useRef } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 import { useReduceMotion } from '@/components/ui';
 import { stickerImage } from '@/lib/sticker-assets';
-import { palette } from '@/theme/theme';
+import { palette, stickerTheme } from '@/theme/theme';
 import { Foil } from './foil';
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
 /**
  * A sticker's art. With `pop` it springs in over a pink burst; `shiny` lays the foil shimmer over it.
- * The colours come from the theme tokens; the art itself is a generated image (stickerImage).
+ * Decorative: the name is always read from the text beside it. The colours come from the theme tokens; the art itself is a generated image (stickerImage).
  */
 export function Sticker({
   stickerKey,
@@ -41,9 +41,9 @@ export function Sticker({
     ]).start();
   }, [pop, reduce, scale, burst]);
 
-  const burstSize = size * 1.35;
+  const burstSize = size * stickerTheme.burstScale;
   return (
-    <View style={{ width: burstSize, height: burstSize }} testID="sticker-art" accessibilityLabel={stickerKey}>
+    <View style={{ width: burstSize, height: burstSize }} testID="sticker-art" accessible={false}>
       {pop ? (
         <Animated.View
           style={[
@@ -52,7 +52,7 @@ export function Sticker({
               width: burstSize,
               height: burstSize,
               borderRadius: burstSize / 2,
-              opacity: burst.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] }),
+              opacity: burst.interpolate({ inputRange: [0, 1], outputRange: [0, stickerTheme.burstOpacity] }),
               transform: [{ scale: burst.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }],
             },
           ]}

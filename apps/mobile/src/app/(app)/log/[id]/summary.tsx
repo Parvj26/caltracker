@@ -13,7 +13,7 @@ import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
 import { REOPEN_OFFLINE, useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
-import { palette } from '@/theme/theme';
+import { palette, stickerTheme } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
@@ -175,7 +175,7 @@ export default function SummaryScreen() {
           <View style={[styles.row, { gap: space[3] }]}>
             {summaryStickers(award).map((s) => (
               <View key={s.key} style={[styles.sticker, { gap: space[1] }]}>
-                <Sticker stickerKey={s.key} size={72} shiny={s.shiny} variant="sm" />
+                <Sticker stickerKey={s.key} size={stickerTheme.summarySize} shiny={s.shiny} variant="sm" />
                 <Text style={text('caption')}>{s.label}</Text>
               </View>
             ))}

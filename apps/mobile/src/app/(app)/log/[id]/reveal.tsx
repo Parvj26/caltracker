@@ -1,6 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logVolumeKg, type AwardResult } from '@caltracker/shared';
 import { RevealCard } from '@/components/stickers/reveal-card';
@@ -9,7 +15,9 @@ import { buildRevealCards, surpriseCards } from '@/lib/awards-logic';
 import { useSession } from '@/lib/session';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
-import { palette } from '@/theme/theme';
+import { buttonMinHeight } from '@caltracker/design-tokens';
+import { palette, pressedOpacity, stickerTheme, white } from '@/theme/theme';
+import { useTheme } from '@/theme/use-theme';
 
 /**
  * The big reveal after Finish: a dark full screen showing the sticker this workout's weight earned, then any
@@ -21,10 +29,14 @@ import { palette } from '@/theme/theme';
  *   * a workout with nothing to show (cardio only, nothing new) goes straight on to the summary
  */
 export default function RevealScreen() {
-  const { id, surprise } = useLocalSearchParams<{ id: string; surprise?: string }>();
+  const { id, surprise } = useLocalSearchParams<{
+    id: string;
+    surprise?: string;
+  }>();
   const isSurprise = surprise === '1';
   const router = useRouter();
   const units = useUnits();
+  const { text, space, radius, device } = useTheme();
   const userId = useSession().session?.user.id ?? null;
   const { finishedLog, log: active, pending, ready } = useActiveLog();
 
@@ -33,11 +45,14 @@ export default function RevealScreen() {
       ? finishedLog
       : active?.id === id && active.status === 'completed'
         ? active
-        : (pending.find((p) => p.id === id && p.status === 'completed') ?? null);
+        : (pending.find((p) => p.id === id && p.status === 'completed') ??
+          null);
 
   const [award, setAward] = useState<AwardResult | null>(null);
   const [settled, setSettled] = useState(false);
-  const [queued, setQueued] = useState<{ result: AwardResult; volumeKg: number } | null | 'none'>(null);
+  const [queued, setQueued] = useState<
+    { result: AwardResult; volumeKg: number } | null | 'none'
+  >(null);
   const [index, setIndex] = useState(0);
   const left = useRef(false);
   const asked = useRef(false);
@@ -56,7 +71,12 @@ export default function RevealScreen() {
   useEffect(() => {
     if (isSurprise || !log || !userId || asked.current) return;
     asked.current = true;
-    void requestAward(log.id, userId, logVolumeKg(log), () => left.current).then((r) => {
+    void requestAward(
+      log.id,
+      userId,
+      logVolumeKg(log),
+      () => left.current,
+    ).then((r) => {
       setAward(r);
       setSettled(true);
     });
@@ -76,7 +96,10 @@ export default function RevealScreen() {
       .list()
       .then((all) => {
         const e = all.find((x) => x.logId === id);
-        if (alive) setQueued(e?.result ? { result: e.result, volumeKg: e.volumeKg } : 'none');
+        if (alive)
+          setQueued(
+            e?.result ? { result: e.result, volumeKg: e.volumeKg } : 'none',
+          );
       });
     return () => {
       alive = false;
@@ -85,7 +108,10 @@ export default function RevealScreen() {
 
   const cards = useMemo(() => {
     if (units === null) return [];
-    if (isSurprise) return queued && queued !== 'none' ? surpriseCards(queued.result, units, queued.volumeKg) : [];
+    if (isSurprise)
+      return queued && queued !== 'none'
+        ? surpriseCards(queued.result, units, queued.volumeKg)
+        : [];
     return log ? buildRevealCards(log, award, units) : [];
   }, [units, isSurprise, queued, log, award]);
 
@@ -96,12 +122,18 @@ export default function RevealScreen() {
   }, [isSurprise, userId, id, toToday, toSummary]);
 
   // Nothing to reveal: on to the summary (or back to Today for an empty surprise).
-  const nothing = isSurprise ? queued === 'none' || (queued !== null && cards.length === 0) : settled && cards.length === 0;
+  const nothing = isSurprise
+    ? queued === 'none' || (queued !== null && cards.length === 0)
+    : settled && units !== null && cards.length === 0;
   const missing = !isSurprise && ready && !log;
   useEffect(() => {
     if (nothing) void finish();
     else if (missing) toSummary();
   }, [nothing, missing, finish, toSummary]);
+
+  // No card yet and the server hasn't answered: let the client move on instead of staring at a spinner.
+  const waitingForServer =
+    !isSurprise && !settled && cards.length === 0 && !missing;
 
   const card = cards[Math.min(index, cards.length - 1)];
   const last = index >= cards.length - 1;
@@ -117,7 +149,43 @@ export default function RevealScreen() {
         />
       ) : (
         <View style={styles.wait}>
-          {nothing || missing ? null : <ActivityIndicator color={palette.lime} accessibilityLabel="Loading" />}
+          {nothing || missing ? null : (
+            <ActivityIndicator
+              color={palette.lime}
+              accessibilityLabel="Loading"
+            />
+          )}
+          {waitingForServer ? (
+            <>
+              <Text
+                style={[
+                  text('caption'),
+                  styles.waitText,
+                  { opacity: stickerTheme.dimOpacity, marginTop: space[3] },
+                ]}
+              >
+                Checking for surprises…
+              </Text>
+              {/* The late answer is already queued (abandoned()), so leaving now loses nothing. */}
+              <Pressable
+                testID="reveal-continue"
+                accessibilityRole="button"
+                onPress={toSummary}
+                style={({ pressed }) => [
+                  styles.waitButton,
+                  {
+                    borderRadius: radius.button,
+                    minHeight: buttonMinHeight[device],
+                    marginTop: space[6],
+                    paddingHorizontal: space[6],
+                    opacity: pressed ? pressedOpacity : 1,
+                  },
+                ]}
+              >
+                <Text style={text('button')}>Continue</Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       )}
     </SafeAreaView>
@@ -127,4 +195,10 @@ export default function RevealScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.ink },
   wait: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  waitText: { color: white, textAlign: 'center' },
+  waitButton: {
+    backgroundColor: palette.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

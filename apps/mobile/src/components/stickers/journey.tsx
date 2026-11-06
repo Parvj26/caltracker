@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AlbumModel } from '@/lib/album-logic';
-import { palette } from '@/theme/theme';
+import { palette, stickerTheme } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { Sticker } from './sticker';
 
-const DOT = 12;
+const DOT = stickerTheme.pathDot;
 
 /** Section 1: "🔥 3-week streak", a path of dots (filled up to this week), "next: ...", and the landmarks collected. */
 export function Journey({ journey, onOpen }: { journey: AlbumModel['journey']; onOpen: (key: string) => void }) {
@@ -15,7 +15,7 @@ export function Journey({ journey, onOpen }: { journey: AlbumModel['journey']; o
       <Text style={text('sectionHeading')} accessibilityRole="header" testID="zoo-streak">
         {journey.title}
       </Text>
-      <View style={[styles.path, { gap: space[1] }]} accessibilityLabel={`${journey.streak} weeks of the journey`}>
+      <View style={[styles.path, { gap: space[1] }]} accessible accessibilityLabel={`${journey.streak} weeks of the journey`}>
         {journey.dots.map((d) => (
           <View key={d.key} style={[styles.dot, d.reached && styles.dotOn]} />
         ))}
@@ -28,7 +28,7 @@ export function Journey({ journey, onOpen }: { journey: AlbumModel['journey']; o
           {journey.collected.map((c) => (
             <Tappable key={c.key} id={`zoo-landmark-${c.key}`} label={c.name} onPress={() => onOpen(c.key)}>
               <View style={styles.landmark}>
-                <Sticker stickerKey={c.key} size={64} variant="sm" />
+                <Sticker stickerKey={c.key} size={stickerTheme.landmarkSize} variant="sm" />
                 {c.count > 1 ? <Text style={[text('caption'), styles.ink]}>{c.badge}</Text> : null}
               </View>
             </Tappable>

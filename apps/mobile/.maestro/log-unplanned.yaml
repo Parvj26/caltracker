@@ -63,6 +63,11 @@ env:
     visible: 'Finish with 2 sets not done\? They won’t count\.'
     timeout: 10000
 - tapOn: 'Finish'
+# The sticker reveal may come first (a short unplanned session can earn no card and go straight to the summary),
+# so this tap is optional.
+- tapOn:
+    id: reveal-continue
+    optional: true
 - extendedWaitUntil:
     visible: '1 set completed'
     timeout: 10000
