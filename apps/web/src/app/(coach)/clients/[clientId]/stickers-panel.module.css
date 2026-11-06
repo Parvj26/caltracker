@@ -1,0 +1,16 @@
+/* Streak, stickers and personal bests on the client page. Colours, radii and sizes only via var(--ct-*). */
+.wrap { display: grid; gap: var(--ct-space-3); grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
+.card { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3) var(--ct-space-4-5); min-width: 0; }
+.heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.streak { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.stickers { display: flex; flex-wrap: wrap; gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+.sticker { display: flex; flex-direction: column; align-items: center; gap: var(--ct-space-1); width: 5rem; text-align: center; }
+.stickerName { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.scroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: var(--ct-space-1) var(--ct-space-2); text-align: left; border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.table thead th { border-top: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.table tbody th { font-weight: var(--ct-weight-section-heading); }
+.table th:first-child, .table td:first-child { padding-left: 0; }
+.numeric { white-space: nowrap; }

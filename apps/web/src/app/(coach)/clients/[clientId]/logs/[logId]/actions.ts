@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { distanceUnitFor, toKg, toMeters, type Database } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
+import { recomputeAward } from '@/lib/recompute-award';
 import { createServerSupabase } from '@/lib/supabase/server';
 
 // Every action starts with requireCoach(). The database does the real authorization: correct_workout_log checks the
@@ -104,6 +105,10 @@ export async function correctLog(input: { logId: string; sets: SetCorrection[] }
     }
     return { ok: false, error: GENERIC };
   }
+  // The correction is saved. Recompute the client's bests and totals from the corrected sets (stickers stay as they were).
+  await recomputeAward(supabase, input.logId);
+  revalidatePath('/clients/[clientId]', 'page');
+  revalidatePath('/activity');
   refresh();
   return { ok: true };
 }

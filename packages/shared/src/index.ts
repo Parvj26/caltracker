@@ -175,6 +175,8 @@ export { milestoneFor, newRareFinds } from './awards/rare';
 export type { ClientStats } from './awards/rare';
 export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
 export type { Rng } from './awards/rolls';
+export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
+export type { NamedRecord, PersonalBestRow } from './awards/bests';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';
 export {
