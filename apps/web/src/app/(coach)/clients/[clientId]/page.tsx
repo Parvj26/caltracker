@@ -125,8 +125,7 @@ export default async function ClientPage({
   return (
     <div className={styles.page}>
       <Link href="/clients" className={styles.back}>← Clients</Link>
-      <StickersPanel data={stickers} units={units} />
-      <StrengthPanel data={strength} units={units} />
+      {/* The client's name and calendar (assign a program, add a workout) come first; progress sits below. */}
       <ClientCalendar
         client={client}
         month={month}
@@ -136,6 +135,8 @@ export default async function ClientPage({
         programs={pickerPrograms}
         openAssign={query.assign === '1'}
       />
+      <StickersPanel data={stickers} units={units} />
+      <StrengthPanel data={strength} units={units} />
     </div>
   );
 }
