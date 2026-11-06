@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { REALTIME_SUBSCRIBE_STATES, createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
 import { serviceClient, signInAsCoach } from './helpers';
 
@@ -199,4 +199,45 @@ test('a finished workout appears on Activity and turns Done on the client calend
   await log2.save(client.phone, 1, 'completed');
   await expect(item.getByRole('link', { name: /Done/ })).toBeVisible(LIVE);
   await expectNoReload(page);
+});
+
+/** Listens, as `who`, for workout_logs changes matching `filter`; returns the ids it heard about. */
+async function listen(who: SupabaseClient<Database>, filter: string) {
+  const heard: string[] = [];
+  const session = await who.auth.getSession();
+  await who.realtime.setAuth(session.data.session?.access_token ?? null);
+  const channel = who.channel(`test:${unique()}`);
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'workout_logs', filter }, (p) => {
+    heard.push((p.new as { id?: string }).id ?? '');
+  });
+  await new Promise<void>((resolve, reject) => {
+    channel.subscribe((status, err) => {
+      if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) resolve();
+      else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR || status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT) reject(err ?? new Error(status));
+    });
+  });
+  return { heard, stop: () => who.removeChannel(channel) };
+}
+
+test('Realtime sends a client\'s change to their coach and not to another client', async () => {
+  const client = await newClient(`Rt${unique()}`);
+  const other = await newClient(`RtOther${unique()}`);
+  const coach = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const signedIn = await coach.auth.signInWithPassword({ email: 'coach@demo.local', password: 'demo-password-123' });
+  if (signedIn.error) throw signedIn.error;
+
+  const coachEars = await listen(coach, `workspace_id=eq.${workspaceId}`);
+  const otherEars = await listen(other.phone, `workspace_id=eq.${workspaceId}`);
+  try {
+    const log = makeLog(null, 'Realtime check', 1);
+    await log.save(client.phone, 0);
+    await log.save(client.phone, 1);
+    await expect.poll(() => coachEars.heard.filter((id) => id === log.id).length, LIVE).toBeGreaterThanOrEqual(2);
+    expect(otherEars.heard).not.toContain(log.id);
+  } finally {
+    await coachEars.stop();
+    await otherEars.stop();
+  }
 });

@@ -38,11 +38,21 @@ export function LiveRefresh({ table, filter }: { table: LiveTable; filter: strin
       .channel(topic)
       // No DELETE: the app never deletes logs from the phone (it discards them), and DELETE events skip filters.
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter }, onChange)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, onChange)
-      .subscribe((status) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, onChange);
+    // Load the coach's token into Realtime before joining. Otherwise the first join can go out with only the anon key
+    // (the token is fetched in the background), Realtime then checks every change as anon, RLS hides them all, and
+    // nothing arrives even though the channel says it is subscribed. setAuth() with no argument keeps refreshing the
+    // token from the session afterwards.
+    void supabase.realtime
+      .setAuth()
+      .catch(() => undefined)
+      .then(() => {
         if (!active) return;
-        scheduler.status(status);
-        setState(status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED ? 'live' : 'offline');
+        channel.subscribe((status) => {
+          if (!active) return;
+          scheduler.status(status);
+          setState(status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED ? 'live' : 'offline');
+        });
       });
     const onVisibility = () => scheduler.visibility();
     document.addEventListener('visibilitychange', onVisibility);
