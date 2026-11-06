@@ -19,7 +19,7 @@
 .soonTile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--ct-space-1); height: 100%; border-radius: var(--ct-radius-card); padding: var(--ct-space-3) var(--ct-space-3-5); }
 .soonValue { font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); line-height: 1.1; }
 
-.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: var(--ct-space-4); align-items: start; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: var(--ct-space-4); align-items: start; }
 .main, .sideCard { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .sectionHeading { margin: 0 0 var(--ct-space-2); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
@@ -39,7 +39,7 @@
   text-decoration: none;
 }
 .rowLink:hover .rowText { text-decoration: underline; }
-.rowText { flex: 1 1 auto; min-width: 0; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.rowText { flex: 1 1 auto; min-width: 0; font-weight: var(--ct-weight-section-heading); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .detail { flex: none; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
 .avatar {
@@ -86,7 +86,7 @@
 .skeletonTile { height: 88px; }
 .skeletonList { height: 240px; }
 
-@media (max-width: 1000px) {
+@media (max-width: 1200px) {
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {

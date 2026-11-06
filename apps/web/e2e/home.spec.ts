@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { COACH_EMAIL, seedLog, serviceClient, signInAsCoach } from './helpers';
 
 // Coach home (/home). Every test seeds its own uniquely named client(s) in the demo workspace and only looks at its
@@ -51,6 +51,13 @@ async function plan(clientId: string, name: string, date: string): Promise<strin
 /** A row of Today's clients. */
 const rowFor = (page: Page, lastName: string) => page.locator('#today li').filter({ hasText: lastName });
 
+/** Opens a Needs attention group in full (each shows 5 rows first), so a test never loses its client behind the cap. */
+async function expandGroup(group: Locator) {
+  await expect(group).toBeVisible();
+  const showAll = group.getByRole('button', { name: /^Show all \d+$/ });
+  if (await showAll.count()) await showAll.click();
+}
+
 test('signing in lands on /home and Home is the current nav item', async ({ page }) => {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(COACH_EMAIL);
@@ -100,6 +107,7 @@ test('two undone workouts in the last 2 days list the client under Missed 2+', a
   await signInAsCoach(page);
   await page.goto('/home');
   const group = page.locator('#missed');
+  await expandGroup(group);
   await expect(group.getByRole('heading', { name: 'Missed 2+' })).toBeVisible();
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Missed 2 in the last 7 days');
@@ -109,12 +117,13 @@ test('two undone workouts in the last 2 days list the client under Missed 2+', a
   expect(Number((await tile.innerText()).match(/\d+/g)?.at(-1))).toBeGreaterThanOrEqual(1);
 });
 
-test('a client who joined 10 days ago with no logs is under No workout in 5+ days', async ({ page }) => {
+test('a client who joined 29 days ago with no logs is under No workout in 5+ days', async ({ page }) => {
   const last = `Quiet${unique()}`;
-  await newClient(last, 10);
+  await newClient(last, 29);
   await signInAsCoach(page);
   await page.goto('/home');
   const group = page.getByRole('region', { name: 'No workout in 5+ days' });
+  await expandGroup(group);
   await expect(group.locator('li').filter({ hasText: last })).toContainText(/\d+ days/);
 });
 
@@ -126,7 +135,9 @@ test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
   created.assignments.push(a.data.id);
   await signInAsCoach(page);
   await page.goto('/home');
-  await expect(page.getByRole('region', { name: 'Program ending soon' }).locator('li').filter({ hasText: last })).toContainText('Ends in 3 days');
+  const group = page.getByRole('region', { name: 'Program ending soon' });
+  await expandGroup(group);
+  await expect(group.locator('li').filter({ hasText: last })).toContainText('Ends in 3 days');
 });
 
 test('past clients are not counted', async ({ page }) => {
