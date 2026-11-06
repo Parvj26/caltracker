@@ -29,7 +29,8 @@ const createExerciseIndexLoader = (
 };
 /** The loaded result without its built index, for comparing. */
 const plain = (r: unknown) => {
-  const { index: _index, ...rest } = r as { index: unknown };
+  const rest: Record<string, unknown> = { ...(r as Record<string, unknown>) };
+  delete rest.index;
   return rest;
 };
 const tick = () => new Promise((r) => setTimeout(r, 0));
