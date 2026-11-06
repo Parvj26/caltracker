@@ -2015,9 +2015,9 @@ export type Database = {
       }
       report_community_content: {
         Args: {
-          p_comment_id: string
+          p_comment_id?: string
           p_note?: string
-          p_post_id: string
+          p_post_id?: string
           p_reason: string
         }
         Returns: string

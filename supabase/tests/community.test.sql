@@ -147,7 +147,7 @@ select throws_ok(format($$insert into public.community_comments (post_id, body) 
   'B1 cannot comment on A''s post');
 select throws_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p1'), '42501', null,
   'B1 cannot like A''s post');
-select throws_ok(format($$select public.report_community_content(%L, null, 'spam')$$, :'p1'), '42501', null,
+select throws_ok(format($$select public.report_community_content('spam', %L)$$, :'p1'), '42501', null,
   'B1 cannot report A''s post');
 select throws_ok(format($$insert into public.community_blocks (workspace_id, blocked_id) values (%L, %L)$$, :'ws_a', :'a1'),
   '42501', null, 'B1 cannot block in workspace A');
@@ -275,26 +275,26 @@ reset role;
 -- Reports
 -- ---------------------------------------------------------------------------------------------------------------
 select tests.act_as(:'a2');
-select public.report_community_content(:'p1', null, 'spam', 'Selling stuff') as report1 \gset
-select is(public.report_community_content(:'p1', null, 'harassment'), :'report1'::uuid, 'a repeat report returns the first');
+select public.report_community_content('spam', :'p1', null, 'Selling stuff') as report1 \gset
+select is(public.report_community_content('harassment', :'p1'), :'report1'::uuid, 'a repeat report returns the first');
 select is((select count(*)::int from public.community_reports), 0, 'the reporter cannot read reports back');
 select throws_ok(format($$select public.resolve_community_report(%L, 'removed')$$, :'report1'), '42501', null,
   'a client cannot handle reports');
-select throws_ok($$select public.report_community_content(null, null, 'spam')$$, '22023', null,
+select throws_ok($$select public.report_community_content('spam')$$, '22023', null,
   'a report names a post or a comment');
-select throws_ok(format($$select public.report_community_content(%L, null, 'rude')$$, :'p2'), '23514', null,
+select throws_ok(format($$select public.report_community_content('rude', %L)$$, :'p2'), '23514', null,
   'the reason must be one of the list');
 reset role;
 
 select tests.act_as(:'a1');
-select throws_ok(format($$select public.report_community_content(%L, null, 'spam')$$, :'p1'), '22023', null,
+select throws_ok(format($$select public.report_community_content('spam', %L)$$, :'p1'), '22023', null,
   'a member cannot report their own post');
 select is((select count(*)::int from public.community_reports), 0, 'the reported member cannot read reports');
 select id as a1_comment from public.community_comments where post_id = :'p_coach' and author_id = :'a1' \gset
 reset role;
 
 select tests.act_as(:'a3');
-select ok(public.report_community_content(null, :'a1_comment', 'inappropriate') is not null, 'A3 reports A1''s comment');
+select ok(public.report_community_content('inappropriate', null, :'a1_comment') is not null, 'A3 reports A1''s comment');
 reset role;
 
 select tests.act_as(:'coach_b');

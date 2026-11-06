@@ -554,7 +554,7 @@ $$;
 -- Report a post or a comment the caller can see (exactly one of the two). A repeat of an open report by the same
 -- person returns it. Returns the report id. 42501 for anything the caller can't see (nothing leaks).
 create function public.report_community_content(
-  p_post_id uuid, p_comment_id uuid, p_reason text, p_note text default ''
+  p_reason text, p_post_id uuid default null, p_comment_id uuid default null, p_note text default ''
 ) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -658,7 +658,7 @@ revoke execute on function
   public.check_community_card(uuid, uuid, jsonb),
   public.create_community_post(uuid, uuid, text, jsonb, jsonb), public.set_community_post_pinned(uuid, boolean),
   public.remove_community_member(uuid, uuid), public.restore_community_member(uuid, uuid),
-  public.report_community_content(uuid, uuid, text, text), public.resolve_community_report(uuid, text),
+  public.report_community_content(text, uuid, uuid, text), public.resolve_community_report(uuid, text),
   public.mark_community_notifications_read()
   from public, anon, authenticated;
 -- Policies (and storage policies) run as the caller, so they need the helpers.
@@ -667,7 +667,7 @@ grant execute on function
   public.can_upload_community_image(text), public.can_read_community_image(text),
   public.create_community_post(uuid, uuid, text, jsonb, jsonb), public.set_community_post_pinned(uuid, boolean),
   public.remove_community_member(uuid, uuid), public.restore_community_member(uuid, uuid),
-  public.report_community_content(uuid, uuid, text, text), public.resolve_community_report(uuid, text),
+  public.report_community_content(text, uuid, uuid, text), public.resolve_community_report(uuid, text),
   public.mark_community_notifications_read()
   to authenticated;
 
