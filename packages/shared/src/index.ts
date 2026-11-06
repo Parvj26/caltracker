@@ -24,6 +24,7 @@ export type { CsvError, ParsedClientCsv } from './invites/csv';
 export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
 export { FREE_EXERCISE_DB_IMAGE_PREFIX, mapFreeExercise } from './exercises/free-exercise-db';
+export { equipmentLabel, workoutEquipment } from './exercises/equipment';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
 export { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
 export { CustomExerciseInput, ExerciseOverrideInput, OptionalYoutubeUrl, YOUTUBE_URL_ERROR } from './exercises/schema';
@@ -80,7 +81,7 @@ export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow } from './workouts/tree';
-export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget } from './workouts/targets';
+export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
 export {
   addDrop,
   addExerciseToSuperset,
