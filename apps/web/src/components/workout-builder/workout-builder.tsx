@@ -29,6 +29,7 @@ import {
   updateSet,
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
+import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { saveWorkout, type SaveIssue } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
@@ -45,6 +46,8 @@ export type BuilderMode = 'library' | { clientName: string; date: IsoDate };
 type Props = {
   initial: WorkoutDoc;
   units: Units;
+  /** The coach's workspace (from requireCoach), for the exercise picker. */
+  workspaceId: string;
   mode: BuilderMode;
   /** Called after each successful save. Without it, a new library workout moves to /workouts/[id]. */
   onSaved?: (id: string) => void;
@@ -108,7 +111,7 @@ const formatDay = (date: IsoDate) =>
     new Date(`${date}T00:00:00Z`),
   );
 
-export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }: Props) {
+export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isNew = false }: Props) {
   const router = useRouter();
   const [doc, setDoc] = useState<WorkoutDoc>(initial);
   const [savedJson, setSavedJson] = useState(() => JSON.stringify(initial));
@@ -154,6 +157,8 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
         setFormError(failureMessage(e, "Couldn't save. Check your connection and try again."));
         return;
       }
+      // A saved workout changes the coach's "recently used" list.
+      if (outcome.ok) invalidateExerciseIndex();
       if (!outcome.ok) {
         setErrors(issuesByKey(snapshot, outcome.issues ?? []));
         setFormError(outcome.error);
@@ -364,9 +369,10 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       {picker ? (
         <ExercisePicker
           title={pickerTitle}
+          workspaceId={workspaceId}
           multiple={picker.kind === 'superset' || picker.kind === 'choice'}
           {...(picker.kind === 'choice'
-            ? { min: MIN_CHOICE_OPTIONS, max: MAX_CHOICE_OPTIONS, hint: 'Pick 2 to 5 exercises. The client does just one of them.' }
+            ? { min: MIN_CHOICE_OPTIONS, max: MAX_CHOICE_OPTIONS, hint: 'Pick 2 to 5 exercises. The client does just one of them.', groupLabel: 'pick-one group' }
             : {})}
           onPick={onPick}
           onClose={() => setPicker(null)}

@@ -14,6 +14,8 @@
 //     phone's copy is kept (store.keepRejected) and onRejected tells the client.
 //   * an error with hint 'not_a_client' (NOT_A_CLIENT): the coach removed this client. That is final: the log
 //     leaves the phone (a copy is kept), onGone tells the client, and it is never retried.
+//   * an error 42501 "Exercise … is not available in this workspace." (isExerciseUnavailable): the log names an
+//     exercise that was deleted or is not this workspace's. Final in the same way, but onUnavailable tells the client.
 // Finished logs waiting in the store's pending list (park(), so a new workout could start offline) are sent
 // first, oldest first, with the same rules; the active log follows.
 import { autoFinish, shouldAutoFinish, type LogStatus, type WorkoutLogDoc } from '@caltracker/shared';
@@ -54,6 +56,8 @@ export type LogSyncDeps = {
   onRejected?: (local: WorkoutLogDoc, lostSetIds: string[]) => void;
   /** The client is no longer a client of this log's coach: the log has left the phone (a copy is kept). */
   onGone?: (local: WorkoutLogDoc) => void;
+  /** The log names an exercise that is no longer available: the log has left the phone (a copy is kept). */
+  onUnavailable?: (local: WorkoutLogDoc) => void;
   /**
    * The sync finished a forgotten workout itself (a retry 3 h after the last activity, with the app open), so
    * the screen can do what it does for a finish: cancel the reminder, show the note, remember it for Done ✓.
@@ -82,6 +86,19 @@ export const NOT_A_CLIENT = 'not_a_client';
 export function isNotAClient(e: unknown): boolean {
   return typeof e === 'object' && e !== null && (e as { hint?: unknown }).hint === NOT_A_CLIENT;
 }
+
+/**
+ * True for save_workout_log's "Exercise <id> is not available in this workspace." refusal (42501 without the
+ * not-a-client hint): a deleted exercise, or one from another workspace. Retrying never helps.
+ */
+export function isExerciseUnavailable(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null || isNotAClient(e)) return false;
+  const { code, message } = e as { code?: unknown; message?: unknown };
+  return code === '42501' && typeof message === 'string' && /\bExercise \S+ is not available in this workspace\b/.test(message);
+}
+
+/** A refusal that no retry can change: the log leaves the phone (a copy is kept) and the screen is told why. */
+type Final = 'gone' | 'unavailable';
 
 /**
  * Ids of the sets the phone has ticked that the server's copy does not have ticked (missing, or not done there).
@@ -180,16 +197,22 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
     return stored;
   }
 
-  /** save(), with the not-a-client refusal as a value instead of an error. */
-  async function send(doc: WorkoutLogDoc): Promise<SaveLogResult | 'gone'> {
+  /** save(), with the final refusals (not a client, an unavailable exercise) as values instead of errors. */
+  async function send(doc: WorkoutLogDoc): Promise<SaveLogResult | Final> {
     // Never upload after stop(): a save now would go out under whoever is signed in next.
     if (stopped) throw new Error('log sync stopped');
     try {
       return await save(doc);
     } catch (e) {
       if (isNotAClient(e)) return 'gone';
+      if (isExerciseUnavailable(e)) return 'unavailable';
       throw e;
     }
+  }
+
+  function notifyFinal(kind: Final, local: WorkoutLogDoc) {
+    if (kind === 'gone') notify('onGone', deps.onGone, local);
+    else notify('onUnavailable', deps.onUnavailable, local);
   }
 
   function notify<A extends unknown[]>(what: string, fn: ((...args: A) => void) | undefined, ...args: A) {
@@ -216,10 +239,10 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
       if (stopped) return 'done';
       const result = await send(p.log);
       networkFailures = 0;
-      if (result === 'gone') {
+      if (result === 'gone' || result === 'unavailable') {
         await store.keepRejected(p.log);
         await store.removePending(p.log.id);
-        notify('onGone', deps.onGone, p.log);
+        notifyFinal(result, p.log);
         continue;
       }
       if (result.applied) {
@@ -270,8 +293,9 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
         const result = await send(sent);
         networkFailures = 0; // the server answered, so the phone is online
 
-        if (result === 'gone') {
-          // Removed by the coach: final. The phone's latest copy is kept, then the log leaves the phone.
+        if (result === 'gone' || result === 'unavailable') {
+          // Removed by the coach, or an exercise is gone: final. The phone's latest copy is kept, then the log
+          // leaves the phone.
           let local: WorkoutLogDoc = sent;
           await store.update((s) => {
             if (s === null || s.log.id !== sent.id) return s;
@@ -279,7 +303,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
             return null;
           });
           await store.keepRejected(local);
-          notify('onGone', deps.onGone, local);
+          notifyFinal(result, local);
           continue;
         }
 

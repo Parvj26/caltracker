@@ -205,6 +205,32 @@ export type Database = {
           },
         ]
       }
+      exercise_favorites: {
+        Row: {
+          coach_id: string
+          created_at: string | null
+          exercise_id: string
+        }
+        Insert: {
+          coach_id?: string
+          created_at?: string | null
+          exercise_id: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string | null
+          exercise_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_favorites_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_overrides: {
         Row: {
           coach_notes: string | null
@@ -1331,6 +1357,7 @@ export type Database = {
         }[]
       }
       is_client_in: { Args: { uid: string; ws: string }; Returns: boolean }
+      is_coach_anywhere: { Args: never; Returns: boolean }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
       is_library_workout_of: {
         Args: { w: string; ws: string }
@@ -1364,6 +1391,20 @@ export type Database = {
         Returns: {
           removed_at: string
           workspace_name: string
+        }[]
+      }
+      recent_exercises_for_client: {
+        Args: { p_limit?: number }
+        Returns: {
+          exercise_id: string
+          last_used: string
+        }[]
+      }
+      recent_exercises_for_coach: {
+        Args: { p_limit?: number }
+        Returns: {
+          exercise_id: string
+          last_used: string
         }[]
       }
       remove_client: {

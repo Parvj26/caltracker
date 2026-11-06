@@ -1,3 +1,5 @@
+-- Pick-one groups (20261106001000) and two functions that read logs.
+--
 -- award_inputs (from 20261106000300) now also hands over each log block's section and pick (columns added in
 -- 20261106001000), so the award-workout Edge Function rebuilds the same log doc the apps see. The shared award
 -- rules count only the done sets of a pick-one group's picked option, so without the pick a choice block would
@@ -53,3 +55,20 @@ $$;
 
 revoke execute on function public.award_inputs(uuid) from public, anon, authenticated;
 grant execute on function public.award_inputs(uuid) to service_role;
+
+-- recent_exercises_for_client (from 20261106000100): a pick-one group's options that were not picked were never
+-- done, so they are not "recent". Everything else is unchanged.
+create or replace function public.recent_exercises_for_client(p_limit int default 20)
+returns table (exercise_id uuid, last_used timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select le.exercise_id, max(l.finished_at) as last_used
+  from public.workout_logs l
+  join public.log_exercises le on le.log_id = l.id
+  join public.log_blocks b on b.id = le.block_id
+  where l.client_id = (select auth.uid())
+    and l.status = 'completed'
+    and (b.kind <> 'choice' or b.picked_exercise_id = le.id)
+  group by le.exercise_id
+  order by last_used desc, le.exercise_id
+  limit least(greatest(coalesce(p_limit, 20), 0), 100);
+$$;

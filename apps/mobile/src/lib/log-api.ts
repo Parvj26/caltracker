@@ -8,7 +8,6 @@ import {
   WorkoutDoc,
   logRowToDoc,
   type Database,
-  type ExercisePick,
   type IsoDate,
   type LogStatus,
   type LogTreeRow,
@@ -249,15 +248,4 @@ export async function readCachedDetail(today: IsoDate, workoutId: string): Promi
   } catch {
     return null; // a cache miss is never worth failing the screen over
   }
-}
-
-/** Built-in exercises plus the coach's own (RLS limits custom ones to the client's workspace), by name. */
-export async function searchExercises(query: string): Promise<ExercisePick[]> {
-  // Drop the LIKE wildcards and the escape character so typed text only ever matches itself.
-  const q = query.trim().slice(0, 100).replace(/[%_\\]/g, '');
-  let request = supabase.from('exercises').select('id, name, tracking_type');
-  if (q) request = request.ilike('name', `%${q}%`);
-  const { data, error } = await request.order('name').limit(30);
-  if (error) throw failed('search exercises', error);
-  return data.map((e) => ({ id: e.id, name: e.name, trackingType: e.tracking_type }));
 }

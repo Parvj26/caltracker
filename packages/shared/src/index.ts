@@ -233,6 +233,30 @@ export type { AwardContext } from './awards/history';
 export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
 export {
+  COMMON_EXERCISES,
+  EQUIPMENT_CHIPS,
+  EXERCISE_ALIASES,
+  EXERCISE_INDEX_COLUMNS,
+  EXERCISE_OTHER_NAMES,
+  MUSCLE_CHIPS,
+  MUSCLE_CHIP_MUSCLES,
+  buildExerciseIndex,
+  equipmentChipOf,
+  exerciseIndexRowFromDb,
+  normalizeSearchText,
+  searchExercises,
+} from './exercises/search';
+export type {
+  EquipmentChip,
+  ExerciseIndex,
+  ExerciseIndexDbRow,
+  ExerciseIndexRow,
+  MuscleChip,
+  SearchBoosts,
+  SearchFilters,
+  SearchHit,
+} from './exercises/search';
+export {
   BIO_MAX_LENGTH,
   BUSINESS_NAME_MAX_LENGTH,
   Bio,

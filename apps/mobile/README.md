@@ -86,6 +86,7 @@ pnpm --filter mobile env:local
 # Build and install a Release build (JS is embedded; no Metro needed). First build takes minutes.
 xcrun simctl boot "iPhone 18 Pro"
 pnpm --filter mobile exec expo run:ios --configuration Release --device "iPhone 18 Pro"
+# The exercise flows (calendar, log-add-exercise) need the exercise library: pnpm import:exercises
 # Run the flows
 pnpm --filter mobile e2e
 ```

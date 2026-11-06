@@ -1,0 +1,886 @@
+3/4 Sit-Up|body only|abdominals|strength
+90/90 Hamstring|body only|hamstrings|stretching
+Ab Crunch Machine|machine|abdominals|strength
+Ab Roller|other|abdominals|strength
+Adductor/Groin||adductors|stretching
+Adductor|foam roll|adductors|stretching
+Advanced Kettlebell Windmill|kettlebells|abdominals|strength
+Air Bike|body only|abdominals|strength
+All Fours Quad Stretch|body only|quadriceps|stretching
+Alternate Hammer Curl|dumbbell|biceps|strength
+Alternate Heel Touchers|body only|abdominals|strength
+Alternate Incline Dumbbell Curl|dumbbell|biceps|strength
+Alternate Leg Diagonal Bound||quadriceps|plyometrics
+Alternating Cable Shoulder Press|cable|shoulders|strength
+Alternating Deltoid Raise|dumbbell|shoulders|strength
+Alternating Floor Press|kettlebells|chest|strength
+Alternating Hang Clean|kettlebells|hamstrings|strength
+Alternating Kettlebell Press|kettlebells|shoulders|strength
+Alternating Kettlebell Row|kettlebells|middle back|strength
+Alternating Renegade Row|kettlebells|middle back|strength
+Ankle Circles||calves|stretching
+Ankle On The Knee||glutes|stretching
+Anterior Tibialis-SMR|other|calves|stretching
+Anti-Gravity Press|barbell|shoulders|strength
+Arm Circles||shoulders|stretching
+Arnold Dumbbell Press|dumbbell|shoulders|strength
+Around The Worlds|dumbbell|chest|strength
+Atlas Stone Trainer|other|lower back|strongman
+Atlas Stones|other|lower back|strongman
+Axle Deadlift|other|lower back|strongman
+Back Flyes - With Bands|bands|shoulders|strength
+Backward Drag|other|quadriceps|strongman
+Backward Medicine Ball Throw|medicine ball|shoulders|plyometrics
+Balance Board|other|calves|strength
+Ball Leg Curl|exercise ball|hamstrings|strength
+Band Assisted Pull-Up|other|lats|strength
+Band Good Morning (Pull Through)|bands|hamstrings|powerlifting
+Band Good Morning|bands|hamstrings|powerlifting
+Band Hip Adductions|bands|adductors|strength
+Band Pull Apart|bands|shoulders|strength
+Band Skull Crusher|bands|triceps|strength
+Barbell Ab Rollout - On Knees|barbell|abdominals|strength
+Barbell Ab Rollout|barbell|abdominals|strength
+Barbell Bench Press - Medium Grip|barbell|chest|strength
+Barbell Curls Lying Against An Incline|barbell|biceps|strength
+Barbell Curl|barbell|biceps|strength
+Barbell Deadlift|barbell|lower back|strength
+Barbell Full Squat|barbell|quadriceps|strength
+Barbell Glute Bridge|barbell|glutes|powerlifting
+Barbell Guillotine Bench Press|barbell|chest|strength
+Barbell Hack Squat|barbell|quadriceps|strength
+Barbell Hip Thrust|barbell|glutes|powerlifting
+Barbell Incline Bench Press - Medium Grip|barbell|chest|strength
+Barbell Incline Shoulder Raise|barbell|shoulders|strength
+Barbell Lunge|barbell|quadriceps|strength
+Barbell Rear Delt Row|barbell|shoulders|strength
+Barbell Rollout from Bench|barbell|abdominals|strength
+Barbell Seated Calf Raise|barbell|calves|strength
+Barbell Shoulder Press|barbell|shoulders|strength
+Barbell Shrug Behind The Back|barbell|traps|strength
+Barbell Shrug|barbell|traps|strength
+Barbell Side Bend|barbell|abdominals|strength
+Barbell Side Split Squat|barbell|quadriceps|strength
+Barbell Squat To A Bench|barbell|quadriceps|strength
+Barbell Squat|barbell|quadriceps|strength
+Barbell Step Ups|barbell|quadriceps|strength
+Barbell Walking Lunge|barbell|quadriceps|strength
+Battling Ropes|other|shoulders|strength
+Bear Crawl Sled Drags|other|quadriceps|strongman
+Behind Head Chest Stretch|other|chest|stretching
+Bench Dips|body only|triceps|strength
+Bench Jump|body only|quadriceps|plyometrics
+Bench Press - Powerlifting|barbell|triceps|powerlifting
+Bench Press - With Bands|bands|chest|strength
+Bench Press with Chains|barbell|triceps|powerlifting
+Bench Sprint|other|quadriceps|plyometrics
+Bent Over Barbell Row|barbell|middle back|strength
+Bent Over Dumbbell Rear Delt Raise With Head On Bench|dumbbell|shoulders|strength
+Bent Over Low-Pulley Side Lateral|cable|shoulders|strength
+Bent Over One-Arm Long Bar Row|barbell|middle back|strength
+Bent Over Two-Arm Long Bar Row|barbell|middle back|strength
+Bent Over Two-Dumbbell Row With Palms In|dumbbell|middle back|strength
+Bent Over Two-Dumbbell Row|dumbbell|middle back|strength
+Bent Press|kettlebells|abdominals|strength
+Bent-Arm Barbell Pullover|barbell|lats|strength
+Bent-Arm Dumbbell Pullover|dumbbell|chest|strength
+Bent-Knee Hip Raise|body only|abdominals|strength
+Bicycling, Stationary|machine|quadriceps|cardio
+Bicycling|other|quadriceps|cardio
+Board Press|barbell|triceps|powerlifting
+Body Tricep Press|body only|triceps|strength
+Body-Up|body only|triceps|strength
+Bodyweight Flyes|e-z curl bar|chest|strength
+Bodyweight Mid Row|other|middle back|strength
+Bodyweight Squat|body only|quadriceps|strength
+Bodyweight Walking Lunge||quadriceps|strength
+Bosu Ball Cable Crunch With Side Bends|cable|abdominals|strength
+Bottoms Up|body only|abdominals|strength
+Bottoms-Up Clean From The Hang Position|kettlebells|forearms|strength
+Box Jump (Multiple Response)|other|hamstrings|plyometrics
+Box Skip|other|hamstrings|plyometrics
+Box Squat with Bands|barbell|quadriceps|powerlifting
+Box Squat with Chains|barbell|quadriceps|strength
+Box Squat|barbell|quadriceps|powerlifting
+Brachialis-SMR|foam roll|biceps|stretching
+Bradford/Rocky Presses|barbell|shoulders|strength
+Butt Lift (Bridge)|body only|glutes|strength
+Butt-Ups|body only|abdominals|strength
+Butterfly|machine|chest|strength
+Cable Chest Press|cable|chest|strength
+Cable Crossover|cable|chest|strength
+Cable Crunch|cable|abdominals|strength
+Cable Deadlifts|cable|quadriceps|strength
+Cable Hammer Curls - Rope Attachment|cable|biceps|strength
+Cable Hip Adduction|cable|quadriceps|strength
+Cable Incline Pushdown|cable|lats|strength
+Cable Incline Triceps Extension|cable|triceps|strength
+Cable Internal Rotation|cable|shoulders|strength
+Cable Iron Cross|cable|chest|strength
+Cable Judo Flip|cable|abdominals|strength
+Cable Lying Triceps Extension|cable|triceps|strength
+Cable One Arm Tricep Extension|cable|triceps|strength
+Cable Preacher Curl|cable|biceps|strength
+Cable Rear Delt Fly|cable|shoulders|strength
+Cable Reverse Crunch|cable|abdominals|strength
+Cable Rope Overhead Triceps Extension|cable|triceps|strength
+Cable Rope Rear-Delt Rows|cable|shoulders|strength
+Cable Russian Twists|cable|abdominals|strength
+Cable Seated Crunch|cable|abdominals|strength
+Cable Seated Lateral Raise|cable|shoulders|strength
+Cable Shoulder Press|cable|shoulders|strength
+Cable Shrugs|cable|traps|strength
+Cable Wrist Curl|cable|forearms|strength
+Calf Press On The Leg Press Machine|machine|calves|strength
+Calf Press|machine|calves|strength
+Calf Raise On A Dumbbell|dumbbell|calves|strength
+Calf Raises - With Bands|bands|calves|strength
+Calf Stretch Elbows Against Wall||calves|stretching
+Calf Stretch Hands Against Wall||calves|stretching
+Calf-Machine Shoulder Shrug|machine|traps|strength
+Calves-SMR|foam roll|calves|stretching
+Car Deadlift|other|quadriceps|strongman
+Car Drivers|barbell|shoulders|strength
+Carioca Quick Step||adductors|plyometrics
+Cat Stretch||lower back|stretching
+Catch and Overhead Throw|medicine ball|lats|plyometrics
+Chain Handle Extension|other|triceps|powerlifting
+Chain Press|other|chest|powerlifting
+Chair Leg Extended Stretch|other|hamstrings|stretching
+Chair Lower Back Stretch||lats|stretching
+Chair Squat|machine|quadriceps|strength
+Chair Upper Body Stretch|other|shoulders|stretching
+Chest And Front Of Shoulder Stretch|other|chest|stretching
+Chest Push (multiple response)|medicine ball|chest|plyometrics
+Chest Push (single response)|medicine ball|chest|plyometrics
+Chest Push from 3 point stance|medicine ball|chest|plyometrics
+Chest Push with Run Release|medicine ball|chest|plyometrics
+Chest Stretch on Stability Ball|exercise ball|chest|stretching
+Child's Pose||lower back|stretching
+Chin To Chest Stretch||neck|stretching
+Chin-Up|body only|lats|strength
+Circus Bell|other|shoulders|strongman
+Clean and Jerk|barbell|shoulders|olympic weightlifting
+Clean and Press|barbell|shoulders|strength
+Clean Deadlift|barbell|hamstrings|olympic weightlifting
+Clean from Blocks|barbell|quadriceps|olympic weightlifting
+Clean Pull|barbell|quadriceps|olympic weightlifting
+Clean Shrug|barbell|traps|olympic weightlifting
+Clean|barbell|hamstrings|olympic weightlifting
+Clock Push-Up|body only|chest|strength
+Close-Grip Barbell Bench Press|barbell|triceps|strength
+Close-Grip Dumbbell Press|dumbbell|triceps|strength
+Close-Grip EZ Bar Curl|barbell|biceps|strength
+Close-Grip EZ-Bar Curl with Band|e-z curl bar|biceps|strength
+Close-Grip EZ-Bar Press|e-z curl bar|triceps|strength
+Close-Grip Front Lat Pulldown|cable|lats|strength
+Close-Grip Push-Up off of a Dumbbell|body only|triceps|strength
+Close-Grip Standing Barbell Curl|barbell|biceps|strength
+Cocoons|body only|abdominals|strength
+Conan's Wheel|other|quadriceps|strongman
+Concentration Curls|dumbbell|biceps|strength
+Cross Body Hammer Curl|dumbbell|biceps|strength
+Cross Over - With Bands|bands|chest|strength
+Cross-Body Crunch|body only|abdominals|strength
+Crossover Reverse Lunge||lower back|stretching
+Crucifix|other|shoulders|strongman
+Crunch - Hands Overhead|body only|abdominals|strength
+Crunch - Legs On Exercise Ball|body only|abdominals|strength
+Crunch Clap|body only|abdominals|strength
+Crunches|body only|abdominals|strength
+Cuban Press|dumbbell|shoulders|strength
+Dancer's Stretch||lower back|stretching
+Dead Bug|body only|abdominals|strength
+Deadlift with Bands|barbell|lower back|powerlifting
+Deadlift with Chains|barbell|lower back|powerlifting
+Decline Barbell Bench Press|barbell|chest|strength
+Decline Close-Grip Bench To Skull Crusher|barbell|triceps|strength
+Decline Crunch|body only|abdominals|strength
+Decline Dumbbell Bench Press|dumbbell|chest|strength
+Decline Dumbbell Flyes|dumbbell|chest|strength
+Decline Dumbbell Triceps Extension|dumbbell|triceps|strength
+Decline EZ Bar Triceps Extension|barbell|triceps|strength
+Decline Oblique Crunch|body only|abdominals|strength
+Decline Push-Up||chest|strength
+Decline Reverse Crunch|body only|abdominals|strength
+Decline Smith Press|machine|chest|strength
+Deficit Deadlift|barbell|lower back|powerlifting
+Depth Jump Leap|other|quadriceps|plyometrics
+Dip Machine|machine|triceps|strength
+Dips - Chest Version|other|chest|strength
+Dips - Triceps Version|body only|triceps|strength
+Donkey Calf Raises|other|calves|strength
+Double Kettlebell Alternating Hang Clean|kettlebells|hamstrings|strength
+Double Kettlebell Jerk|kettlebells|shoulders|strength
+Double Kettlebell Push Press|kettlebells|shoulders|strength
+Double Kettlebell Snatch|kettlebells|shoulders|strength
+Double Kettlebell Windmill|kettlebells|abdominals|strength
+Double Leg Butt Kick|body only|quadriceps|plyometrics
+Downward Facing Balance|exercise ball|glutes|strength
+Drag Curl|barbell|biceps|strength
+Drop Push|other|chest|plyometrics
+Dumbbell Alternate Bicep Curl|dumbbell|biceps|strength
+Dumbbell Bench Press with Neutral Grip|dumbbell|chest|strength
+Dumbbell Bench Press|dumbbell|chest|strength
+Dumbbell Bicep Curl|dumbbell|biceps|strength
+Dumbbell Clean|dumbbell|hamstrings|strength
+Dumbbell Floor Press|dumbbell|triceps|powerlifting
+Dumbbell Flyes|dumbbell|chest|strength
+Dumbbell Incline Row|dumbbell|middle back|strength
+Dumbbell Incline Shoulder Raise|dumbbell|shoulders|strength
+Dumbbell Lunges|dumbbell|quadriceps|strength
+Dumbbell Lying One-Arm Rear Lateral Raise|dumbbell|shoulders|strength
+Dumbbell Lying Pronation|dumbbell|forearms|strength
+Dumbbell Lying Rear Lateral Raise|dumbbell|shoulders|strength
+Dumbbell Lying Supination|dumbbell|forearms|strength
+Dumbbell One-Arm Shoulder Press|dumbbell|shoulders|strength
+Dumbbell One-Arm Triceps Extension|dumbbell|triceps|strength
+Dumbbell One-Arm Upright Row|dumbbell|shoulders|strength
+Dumbbell Prone Incline Curl|dumbbell|biceps|strength
+Dumbbell Raise|dumbbell|shoulders|strength
+Dumbbell Rear Lunge|dumbbell|quadriceps|strength
+Dumbbell Romanian Deadlift|dumbbell|hamstrings|strength
+Dumbbell Scaption|dumbbell|shoulders|strength
+Dumbbell Seated Box Jump|dumbbell|quadriceps|plyometrics
+Dumbbell Seated One-Leg Calf Raise|dumbbell|calves|strength
+Dumbbell Shoulder Press|dumbbell|shoulders|strength
+Dumbbell Shrug|dumbbell|traps|strength
+Dumbbell Side Bend|dumbbell|abdominals|strength
+Dumbbell Squat To A Bench|dumbbell|quadriceps|strength
+Dumbbell Squat|dumbbell|quadriceps|strength
+Dumbbell Step Ups|dumbbell|quadriceps|strength
+Dumbbell Tricep Extension -Pronated Grip|dumbbell|triceps|strength
+Dumbbell Walking Lunge|dumbbell|quadriceps|strength
+Dynamic Back Stretch||lats|stretching
+Dynamic Chest Stretch||chest|stretching
+Elbow Circles||shoulders|stretching
+Elbow to Knee|body only|abdominals|strength
+Elbows Back||chest|stretching
+Elevated Back Lunge|barbell|quadriceps|strength
+Elevated Cable Rows|cable|lats|strength
+Elliptical Trainer|machine|quadriceps|cardio
+Exercise Ball Crunch|exercise ball|abdominals|strength
+Exercise Ball Pull-In|exercise ball|abdominals|strength
+Extended Range One-Arm Kettlebell Floor Press|kettlebells|chest|strength
+External Rotation with Band|bands|shoulders|strength
+External Rotation with Cable|cable|shoulders|strength
+External Rotation|dumbbell|shoulders|strength
+EZ-Bar Curl|e-z curl bar|biceps|strength
+EZ-Bar Skullcrusher|e-z curl bar|triceps|strength
+Face Pull|cable|shoulders|strength
+Farmer's Walk|other|forearms|strongman
+Fast Skipping|body only|quadriceps|plyometrics
+Finger Curls|barbell|forearms|strength
+Flat Bench Cable Flyes|cable|chest|strength
+Flat Bench Leg Pull-In|body only|abdominals|strength
+Flat Bench Lying Leg Raise|body only|abdominals|strength
+Flexor Incline Dumbbell Curls|dumbbell|biceps|strength
+Floor Glute-Ham Raise||hamstrings|strength
+Floor Press with Chains|barbell|triceps|powerlifting
+Floor Press|barbell|triceps|powerlifting
+Flutter Kicks|body only|glutes|strength
+Foot-SMR|other|calves|stretching
+Forward Drag with Press|other|chest|strongman
+Frankenstein Squat|barbell|quadriceps|olympic weightlifting
+Freehand Jump Squat|body only|quadriceps|strength
+Frog Hops||quadriceps|stretching
+Frog Sit-Ups|body only|abdominals|strength
+Front Barbell Squat To A Bench|barbell|quadriceps|strength
+Front Barbell Squat|barbell|quadriceps|strength
+Front Box Jump|other|hamstrings|plyometrics
+Front Cable Raise|cable|shoulders|strength
+Front Cone Hops (or hurdle hops)|other|quadriceps|plyometrics
+Front Dumbbell Raise|dumbbell|shoulders|strength
+Front Incline Dumbbell Raise|dumbbell|shoulders|strength
+Front Leg Raises|body only|hamstrings|stretching
+Front Plate Raise|other|shoulders|strength
+Front Raise And Pullover|barbell|chest|strength
+Front Squat (Clean Grip)|barbell|quadriceps|strength
+Front Squats With Two Kettlebells|kettlebells|quadriceps|strength
+Front Two-Dumbbell Raise|dumbbell|shoulders|strength
+Full Range-Of-Motion Lat Pulldown|cable|lats|strength
+Gironda Sternum Chins|other|lats|strength
+Glute Ham Raise|machine|hamstrings|powerlifting
+Glute Kickback|body only|glutes|strength
+Goblet Squat|kettlebells|quadriceps|strength
+Good Morning off Pins|barbell|hamstrings|powerlifting
+Good Morning|barbell|hamstrings|powerlifting
+Gorilla Chin/Crunch|body only|abdominals|strength
+Groin and Back Stretch||adductors|stretching
+Groiners|body only|adductors|stretching
+Hack Squat|machine|quadriceps|strength
+Hammer Curls|dumbbell|biceps|strength
+Hammer Grip Incline DB Bench Press|dumbbell|chest|strength
+Hamstring Stretch||hamstrings|stretching
+Hamstring-SMR|foam roll|hamstrings|stretching
+Handstand Push-Ups|body only|shoulders|strength
+Hang Clean - Below the Knees|barbell|quadriceps|olympic weightlifting
+Hang Clean|barbell|quadriceps|olympic weightlifting
+Hang Snatch - Below Knees|barbell|hamstrings|olympic weightlifting
+Hang Snatch|barbell|hamstrings|olympic weightlifting
+Hanging Bar Good Morning|barbell|hamstrings|powerlifting
+Hanging Leg Raise|body only|abdominals|strength
+Hanging Pike|body only|abdominals|strength
+Heaving Snatch Balance|barbell|quadriceps|olympic weightlifting
+Heavy Bag Thrust|other|chest|plyometrics
+High Cable Curls|cable|biceps|strength
+Hip Circles (prone)|body only|abductors|stretching
+Hip Extension with Bands|bands|glutes|strength
+Hip Flexion with Band|bands|quadriceps|strength
+Hip Lift with Band|bands|glutes|powerlifting
+Hip Thrust Machine|machine|glutes|strength
+Hug A Ball|exercise ball|lower back|stretching
+Hug Knees To Chest||lower back|stretching
+Hurdle Hops|other|hamstrings|plyometrics
+Hyperextensions (Back Extensions)|other|lower back|strength
+Hyperextensions With No Hyperextension Bench|body only|lower back|strength
+Iliotibial Tract-SMR|foam roll|abductors|stretching
+Inchworm|body only|hamstrings|stretching
+Incline Barbell Triceps Extension|barbell|triceps|strength
+Incline Bench Pull|barbell|middle back|strength
+Incline Cable Chest Press|cable|chest|strength
+Incline Cable Flye|cable|chest|strength
+Incline Dumbbell Bench With Palms Facing In|dumbbell|chest|strength
+Incline Dumbbell Curl|dumbbell|biceps|strength
+Incline Dumbbell Flyes - With A Twist|dumbbell|chest|strength
+Incline Dumbbell Flyes|dumbbell|chest|strength
+Incline Dumbbell Press|dumbbell|chest|strength
+Incline Hammer Curls|dumbbell|biceps|strength
+Incline Inner Biceps Curl|dumbbell|biceps|strength
+Incline Push-Up Close-Grip|body only|triceps|strength
+Incline Push-Up Depth Jump|other|chest|plyometrics
+Incline Push-Up Medium|body only|chest|strength
+Incline Push-Up Reverse Grip|body only|chest|strength
+Incline Push-Up Wide|body only|chest|strength
+Incline Push-Up|body only|chest|strength
+Intermediate Groin Stretch|other|hamstrings|stretching
+Intermediate Hip Flexor and Quad Stretch|other|quadriceps|stretching
+Internal Rotation with Band|bands|shoulders|strength
+Inverted Row with Straps|other|middle back|strength
+Inverted Row||middle back|strength
+Iron Crosses (stretch)||quadriceps|stretching
+Iron Cross|dumbbell|shoulders|strength
+Isometric Chest Squeezes|body only|chest|plyometrics
+Isometric Neck Exercise - Front And Back|body only|neck|strength
+Isometric Neck Exercise - Sides|body only|neck|strength
+Isometric Wipers|body only|chest|strength
+IT Band and Glute Stretch|other|abductors|stretching
+Jackknife Sit-Up|body only|abdominals|strength
+Janda Sit-Up|body only|abdominals|strength
+Jefferson Squats|barbell|quadriceps|strength
+Jerk Balance|barbell|shoulders|olympic weightlifting
+Jerk Dip Squat|barbell|quadriceps|olympic weightlifting
+JM Press|barbell|triceps|strength
+Jogging, Treadmill|machine|quadriceps|cardio
+Keg Load|other|lower back|strongman
+Kettlebell Arnold Press|kettlebells|shoulders|strength
+Kettlebell Dead Clean|kettlebells|hamstrings|strength
+Kettlebell Figure 8|kettlebells|abdominals|strength
+Kettlebell Halo with Overhead Extension|kettlebells|shoulders,triceps|strength
+Kettlebell Halo|kettlebells|shoulders|strength
+Kettlebell Hang Clean|kettlebells|hamstrings|strength
+Kettlebell One-Legged Deadlift|kettlebells|hamstrings|strength
+Kettlebell Overhead Triceps Extension|kettlebells|triceps|strength
+Kettlebell Pass Between The Legs|kettlebells|abdominals|strength
+Kettlebell Pirate Ships|kettlebells|shoulders|strength
+Kettlebell Pistol Squat|kettlebells|quadriceps|strength
+Kettlebell Seated Press|kettlebells|shoulders|strength
+Kettlebell Seesaw Press|kettlebells|shoulders|strength
+Kettlebell Sumo High Pull|kettlebells|traps|strength
+Kettlebell Sumo Squat|kettlebells|quadriceps|strength
+Kettlebell Thruster|kettlebells|shoulders|strength
+Kettlebell Turkish Get-Up (Lunge style)|kettlebells|shoulders|strength
+Kettlebell Turkish Get-Up (Squat style)|kettlebells|shoulders|strength
+Kettlebell Upright Row|kettlebells|shoulders|strength
+Kettlebell Windmill|kettlebells|abdominals|strength
+Kipping Muscle Up|other|lats|strength
+Knee Across The Body||glutes|stretching
+Knee Circles|body only|calves|stretching
+Knee Tuck Jump|body only|hamstrings|plyometrics
+Knee/Hip Raise On Parallel Bars|other|abdominals|strength
+Kneeling Arm Drill||shoulders|plyometrics
+Kneeling Cable Crunch With Alternating Oblique Twists|cable|abdominals|strength
+Kneeling Cable Triceps Extension|cable|triceps|strength
+Kneeling Forearm Stretch||forearms|stretching
+Kneeling High Pulley Row|cable|lats|strength
+Kneeling Hip Flexor||quadriceps|stretching
+Kneeling Jump Squat|barbell|glutes|olympic weightlifting
+Kneeling Single-Arm High Pulley Row|cable|lats|strength
+Kneeling Squat|barbell|glutes|powerlifting
+Landmine 180's|barbell|abdominals|strength
+Landmine Linear Jammer|barbell|shoulders|strength
+Lateral Bound|body only|adductors|plyometrics
+Lateral Box Jump|other|adductors|plyometrics
+Lateral Cone Hops|other|adductors|plyometrics
+Lateral Raise - With Bands|bands|shoulders|strength
+Latissimus Dorsi-SMR|foam roll|lats|stretching
+Leg Extensions|machine|quadriceps|strength
+Leg Lift|body only|glutes|strength
+Leg Press|machine|quadriceps|strength
+Leg Pull-In|body only|abdominals|strength
+Leg-Over Floor Press|kettlebells|chest|strength
+Leg-Up Hamstring Stretch||hamstrings|stretching
+Leverage Chest Press|machine|chest|strength
+Leverage Deadlift|machine|quadriceps|strength
+Leverage Decline Chest Press|machine|chest|strength
+Leverage High Row|machine|middle back|strength
+Leverage Incline Chest Press|machine|chest|strength
+Leverage Iso Row|machine|lats|strength
+Leverage Shoulder Press|machine|shoulders|strength
+Leverage Shrug|machine|traps|strength
+Linear 3-Part Start Technique||hamstrings|plyometrics
+Linear Acceleration Wall Drill||hamstrings|plyometrics
+Linear Depth Jump|other|quadriceps|plyometrics
+Log Lift|other|shoulders|strongman
+London Bridges|other|lats|strength
+Looking At Ceiling||quadriceps|stretching
+Low Cable Crossover|cable|chest|strength
+Low Cable Triceps Extension|cable|triceps|strength
+Low Pulley Row To Neck|cable|shoulders|strength
+Lower Back Curl|body only|abdominals|stretching
+Lower Back-SMR|foam roll|lower back|stretching
+Lunge Pass Through|kettlebells|hamstrings|strength
+Lunge Sprint|machine|quadriceps|strength
+Lying Bent Leg Groin|other|adductors|stretching
+Lying Cable Curl|cable|biceps|strength
+Lying Cambered Barbell Row|barbell|middle back|strength
+Lying Close-Grip Bar Curl On High Pulley|cable|biceps|strength
+Lying Close-Grip Barbell Triceps Extension Behind The Head|barbell|triceps|strength
+Lying Close-Grip Barbell Triceps Press To Chin|e-z curl bar|triceps|strength
+Lying Crossover|body only|abductors|stretching
+Lying Dumbbell Tricep Extension|dumbbell|triceps|strength
+Lying Face Down Plate Neck Resistance|other|neck|strength
+Lying Face Up Plate Neck Resistance|other|neck|strength
+Lying Glute|body only|glutes|stretching
+Lying Hamstring|other|hamstrings|stretching
+Lying High Bench Barbell Curl|barbell|biceps|strength
+Lying Leg Curls|machine|hamstrings|strength
+Lying Machine Squat|machine|quadriceps|strength
+Lying One-Arm Lateral Raise|dumbbell|shoulders|strength
+Lying Prone Quadriceps|body only|quadriceps|stretching
+Lying Rear Delt Raise|dumbbell|shoulders|strength
+Lying Supine Dumbbell Curl|dumbbell|biceps|strength
+Lying T-Bar Row|machine|middle back|strength
+Lying Triceps Press|e-z curl bar|triceps|strength
+Machine Assisted Pull Up|machine|lats|strength
+Machine Bench Press|machine|chest|strength
+Machine Bicep Curl|machine|biceps|strength
+Machine Preacher Curls|machine|biceps|strength
+Machine Shoulder (Military) Press|machine|shoulders|strength
+Machine Triceps Extension|machine|triceps|strength
+Medicine Ball Chest Pass|medicine ball|chest|plyometrics
+Medicine Ball Full Twist|medicine ball|abdominals|plyometrics
+Medicine Ball Russian Twist|medicine ball|abdominals|strength
+Medicine Ball Scoop Throw|medicine ball|shoulders|plyometrics
+Medicine Ball Sit Up & Overhead Throw|medicine ball|abdominals|plyometrics
+Middle Back Shrug|dumbbell|middle back|strength
+Middle Back Stretch||middle back|stretching
+Mixed Grip Chin|other|middle back|strength
+Monster Walk|bands|abductors|strength
+Mountain Climbers||quadriceps|plyometrics
+Moving Claw Series||hamstrings|plyometrics
+Muscle Snatch|barbell|hamstrings|olympic weightlifting
+Muscle Up|other|lats|strength
+Narrow Stance Hack Squats|machine|quadriceps|strength
+Narrow Stance Leg Press|machine|quadriceps|strength
+Narrow Stance Squats|barbell|quadriceps|strength
+Natural Glute Ham Raise|body only|hamstrings|strength
+Neck Press|barbell|chest|strength
+Neck-SMR|other|neck|stretching
+Oblique Crunches - On The Floor|body only|abdominals|strength
+Oblique Crunches|body only|abdominals|strength
+Olympic Squat|barbell|quadriceps|olympic weightlifting
+On Your Side Quad Stretch||quadriceps|stretching
+On-Your-Back Quad Stretch|other|quadriceps|stretching
+One Arm Against Wall||lats|stretching
+One Arm Chin-Up|other|middle back|strength
+One Arm Dumbbell Bench Press|dumbbell|chest|strength
+One Arm Dumbbell Preacher Curl|dumbbell|biceps|strength
+One Arm Floor Press|barbell|triceps|strength
+One Arm Lat Pulldown|cable|lats|strength
+One Arm Pronated Dumbbell Triceps Extension|dumbbell|triceps|strength
+One Arm Supinated Dumbbell Triceps Extension|dumbbell|triceps|strength
+One Half Locust||quadriceps|stretching
+One Handed Hang|other|lats|stretching
+One Knee To Chest||glutes|stretching
+One Leg Barbell Squat|barbell|quadriceps|strength
+One-Arm Dumbbell Row|dumbbell|middle back|strength
+One-Arm Flat Bench Dumbbell Flye|dumbbell|chest|strength
+One-Arm High-Pulley Cable Side Bends|cable|abdominals|strength
+One-Arm Incline Lateral Raise|dumbbell|shoulders|strength
+One-Arm Kettlebell Clean and Jerk|kettlebells|shoulders|strength
+One-Arm Kettlebell Clean|kettlebells|hamstrings|strength
+One-Arm Kettlebell Floor Press|kettlebells|chest|strength
+One-Arm Kettlebell Jerk|kettlebells|shoulders|strength
+One-Arm Kettlebell Military Press To The Side|kettlebells|shoulders|strength
+One-Arm Kettlebell Para Press|kettlebells|shoulders|strength
+One-Arm Kettlebell Push Press|kettlebells|shoulders|strength
+One-Arm Kettlebell Row|kettlebells|middle back|strength
+One-Arm Kettlebell Snatch|kettlebells|shoulders|strength
+One-Arm Kettlebell Split Jerk|kettlebells|shoulders|strength
+One-Arm Kettlebell Split Snatch|kettlebells|shoulders|strength
+One-Arm Kettlebell Swings|kettlebells|hamstrings|strength
+One-Arm Long Bar Row|barbell|middle back|strength
+One-Arm Medicine Ball Slam|medicine ball|abdominals|strength
+One-Arm Open Palm Kettlebell Clean|kettlebells|hamstrings|strength
+One-Arm Overhead Kettlebell Squats|kettlebells|quadriceps|strength
+One-Arm Side Deadlift|barbell|quadriceps|strength
+One-Arm Side Laterals|dumbbell|shoulders|strength
+One-Legged Cable Kickback|cable|glutes|strength
+Open Palm Kettlebell Clean|kettlebells|hamstrings|strength
+Otis-Up|other|abdominals|strength
+Overhead Cable Curl|cable|biceps|strength
+Overhead Lat|other|lats|stretching
+Overhead Slam|medicine ball|lats|plyometrics
+Overhead Squat|barbell|quadriceps|olympic weightlifting
+Overhead Stretch||abdominals|stretching
+Overhead Triceps|body only|triceps|stretching
+Pallof Press With Rotation|cable|abdominals|strength
+Pallof Press|cable|abdominals|strength
+Palms-Down Dumbbell Wrist Curl Over A Bench|dumbbell|forearms|strength
+Palms-Down Wrist Curl Over A Bench|barbell|forearms|strength
+Palms-Up Barbell Wrist Curl Over A Bench|barbell|forearms|strength
+Palms-Up Dumbbell Wrist Curl Over A Bench|dumbbell|forearms|strength
+Parallel Bar Dip|other|triceps|strength
+Pelvic Tilt Into Bridge||lower back|stretching
+Peroneals Stretch|other|calves|stretching
+Peroneals-SMR|foam roll|calves|stretching
+Physioball Hip Bridge|exercise ball|glutes|strength
+Pin Presses|barbell|triceps|powerlifting
+Piriformis-SMR|foam roll|glutes|stretching
+Plank|body only|abdominals|strength
+Plate Pinch|other|forearms|strength
+Plate Twist|other|abdominals|strength
+Platform Hamstring Slides|other|hamstrings|strength
+Plie Dumbbell Squat|dumbbell|quadriceps|strength
+Plyo Kettlebell Pushups|kettlebells|chest|strength
+Plyo Push-up|body only|chest|plyometrics
+Posterior Tibialis Stretch|other|calves|stretching
+Power Clean from Blocks|barbell|hamstrings|olympic weightlifting
+Power Clean|barbell|hamstrings|strength
+Power Jerk|barbell|quadriceps|olympic weightlifting
+Power Partials|dumbbell|shoulders|strength
+Power Snatch from Blocks|barbell|quadriceps|olympic weightlifting
+Power Snatch|barbell|hamstrings|olympic weightlifting
+Power Stairs|other|hamstrings|strongman
+Preacher Curl|barbell|biceps|strength
+Preacher Hammer Dumbbell Curl|dumbbell|biceps|strength
+Press Sit-Up|barbell|abdominals|strength
+Prone Manual Hamstring||hamstrings|strength
+Prowler Sprint|other|hamstrings|cardio
+Pull Through|cable|glutes|strength
+Pullups|body only|lats|strength
+Push Press - Behind the Neck|barbell|shoulders|olympic weightlifting
+Push Press|barbell|shoulders|olympic weightlifting
+Push Up to Side Plank|body only|chest|strength
+Push-Up Wide|body only|chest|strength
+Push-Ups - Close Triceps Position|body only|triceps|strength
+Push-Ups With Feet Elevated|body only|chest|strength
+Push-Ups With Feet On An Exercise Ball|exercise ball|chest|strength
+Pushups (Close and Wide Hand Positions)|body only|chest|strength
+Pushups|body only|chest|strength
+Pyramid|exercise ball|lower back|stretching
+Quad Stretch|other|quadriceps|stretching
+Quadriceps-SMR|foam roll|quadriceps|stretching
+Quick Leap|other|quadriceps|plyometrics
+Rack Delivery|barbell|shoulders|olympic weightlifting
+Rack Pull with Bands|barbell|lower back|powerlifting
+Rack Pulls|barbell|lower back|powerlifting
+Rear Leg Raises|body only|quadriceps|stretching
+Recumbent Bike|machine|quadriceps|cardio
+Return Push from Stance|medicine ball|shoulders|plyometrics
+Reverse Band Bench Press|barbell|triceps|powerlifting
+Reverse Band Box Squat|barbell|quadriceps|powerlifting
+Reverse Band Deadlift|barbell|lower back|powerlifting
+Reverse Band Power Squat|barbell|quadriceps|powerlifting
+Reverse Band Sumo Deadlift|barbell|hamstrings|powerlifting
+Reverse Barbell Curl|barbell|biceps|strength
+Reverse Barbell Preacher Curls|e-z curl bar|biceps|strength
+Reverse Cable Curl|cable|biceps|strength
+Reverse Crunch|body only|abdominals|strength
+Reverse Flyes With External Rotation|dumbbell|shoulders|strength
+Reverse Flyes|dumbbell|shoulders|strength
+Reverse Grip Bent-Over Rows|barbell|middle back|strength
+Reverse Grip Triceps Pushdown|cable|triceps|strength
+Reverse Hyperextension|machine|hamstrings|strength
+Reverse Machine Flyes|machine|shoulders|strength
+Reverse Plate Curls|other|biceps|strength
+Reverse Triceps Bench Press|barbell|triceps|strength
+Rhomboids-SMR|foam roll|middle back|stretching
+Rickshaw Carry|other|forearms|strongman
+Rickshaw Deadlift|other|quadriceps|strongman
+Ring Dips|other|triceps|strength
+Rocket Jump|body only|quadriceps|plyometrics
+Rocking Standing Calf Raise|barbell|calves|strength
+Rocky Pull-Ups/Pulldowns|other|lats|strength
+Romanian Deadlift from Deficit|barbell|hamstrings|olympic weightlifting
+Romanian Deadlift|barbell|hamstrings|strength
+Rope Climb|other|lats|strength
+Rope Crunch|cable|abdominals|strength
+Rope Jumping|other|quadriceps|cardio
+Rope Straight-Arm Pulldown|cable|lats|strength
+Round The World Shoulder Stretch|other|shoulders|stretching
+Rowing, Stationary|machine|quadriceps|cardio
+Runner's Stretch||hamstrings|stretching
+Running, Treadmill|machine|quadriceps|cardio
+Russian Twist|body only|abdominals|strength
+Sandbag Load|other|quadriceps|strongman
+Scapular Pull-Up||traps|strength
+Scissor Kick|body only|abdominals|stretching
+Scissors Jump|body only|quadriceps|plyometrics
+Seated Band Hamstring Curl|other|hamstrings|strength
+Seated Barbell Military Press|barbell|shoulders|strength
+Seated Barbell Twist|barbell|abdominals|strength
+Seated Bent-Over One-Arm Dumbbell Triceps Extension|dumbbell|triceps|strength
+Seated Bent-Over Rear Delt Raise|dumbbell|shoulders|strength
+Seated Bent-Over Two-Arm Dumbbell Triceps Extension|dumbbell|triceps|strength
+Seated Biceps|body only|biceps|stretching
+Seated Cable Rows|cable|middle back|strength
+Seated Cable Shoulder Press|cable|shoulders|strength
+Seated Calf Raise|machine|calves|strength
+Seated Calf Stretch||calves|stretching
+Seated Close-Grip Concentration Barbell Curl|barbell|biceps|strength
+Seated Dumbbell Curl|dumbbell|biceps|strength
+Seated Dumbbell Inner Biceps Curl|dumbbell|biceps|strength
+Seated Dumbbell Palms-Down Wrist Curl|dumbbell|forearms|strength
+Seated Dumbbell Palms-Up Wrist Curl|dumbbell|forearms|strength
+Seated Dumbbell Press|dumbbell|shoulders|strength
+Seated Flat Bench Leg Pull-In|body only|abdominals|strength
+Seated Floor Hamstring Stretch||hamstrings|stretching
+Seated Front Deltoid|body only|shoulders|stretching
+Seated Glute|body only|glutes|stretching
+Seated Good Mornings|barbell|lower back|powerlifting
+Seated Hamstring and Calf Stretch|other|hamstrings|stretching
+Seated Hamstring||hamstrings|stretching
+Seated Head Harness Neck Resistance|other|neck|strength
+Seated Leg Curl|machine|hamstrings|strength
+Seated Leg Tucks|body only|abdominals|strength
+Seated One-arm Cable Pulley Rows|cable|middle back|strength
+Seated One-Arm Dumbbell Palms-Down Wrist Curl|dumbbell|forearms|strength
+Seated One-Arm Dumbbell Palms-Up Wrist Curl|dumbbell|forearms|strength
+Seated Overhead Stretch||abdominals|stretching
+Seated Palm-Up Barbell Wrist Curl|barbell|forearms|strength
+Seated Palms-Down Barbell Wrist Curl|barbell|forearms|strength
+Seated Side Lateral Raise|dumbbell|shoulders|strength
+Seated Triceps Press|dumbbell|triceps|strength
+Seated Two-Arm Palms-Up Low-Pulley Wrist Curl|cable|forearms|strength
+See-Saw Press (Alternating Side Press)|dumbbell|shoulders|strength
+Shotgun Row|cable|lats|strength
+Shoulder Circles||shoulders|stretching
+Shoulder Press - With Bands|bands|shoulders|strength
+Shoulder Raise||shoulders|stretching
+Shoulder Stretch||shoulders|stretching
+Side Bridge|body only|abdominals|strength
+Side Hop-Sprint|other|quadriceps|plyometrics
+Side Jackknife|body only|abdominals|strength
+Side Lateral Raise|dumbbell|shoulders|strength
+Side Laterals to Front Raise|dumbbell|shoulders|strength
+Side Leg Raises|body only|adductors|stretching
+Side Lying Groin Stretch||adductors|stretching
+Side Neck Stretch||neck|stretching
+Side Plank Single Leg Crunch|body only|abdominals|strength
+Side Standing Long Jump||quadriceps|plyometrics
+Side to Side Box Shuffle|other|quadriceps|plyometrics
+Side To Side Chins|other|lats|strength
+Side Wrist Pull||shoulders|stretching
+Side-Lying Floor Stretch||lats|stretching
+Single Dumbbell Raise|dumbbell|shoulders|strength
+Single Leg Butt Kick|body only|quadriceps|plyometrics
+Single Leg Glute Bridge|body only|glutes|strength
+Single Leg Push-off|other|quadriceps|plyometrics
+Single-Arm Cable Crossover|cable|chest|strength
+Single-Arm Linear Jammer|barbell|shoulders|strength
+Single-Arm Push-Up|body only|chest|strength
+Single-Cone Sprint Drill|other|quadriceps|plyometrics
+Single-Leg High Box Squat|other|quadriceps|strength
+Single-Leg Hop Progression|other|quadriceps|plyometrics
+Single-Leg Lateral Hop|other|quadriceps|plyometrics
+Single-Leg Leg Extension|machine|quadriceps|strength
+Single-Leg Stride Jump|other|quadriceps|plyometrics
+Sit Squats||quadriceps|stretching
+Sit-Up|body only|abdominals|strength
+Skating|other|quadriceps|cardio
+Sled Drag - Harness|other|quadriceps|strongman
+Sled Overhead Backward Walk|other|shoulders|strength
+Sled Overhead Triceps Extension|other|triceps|strength
+Sled Push|other|quadriceps|strongman
+Sled Reverse Flye|other|shoulders|strength
+Sled Row|other|middle back|strength
+Sledgehammer Swings|other|abdominals|plyometrics
+Smith Incline Shoulder Raise|barbell|shoulders|strength
+Smith Machine Behind the Back Shrug|machine|traps|strength
+Smith Machine Bench Press|machine|chest|strength
+Smith Machine Bent Over Row|machine|middle back|strength
+Smith Machine Calf Raise|machine|calves|strength
+Smith Machine Close-Grip Bench Press|machine|triceps|strength
+Smith Machine Decline Press|machine|chest|strength
+Smith Machine Hang Power Clean|machine|hamstrings|strength
+Smith Machine Hip Raise|machine|abdominals|strength
+Smith Machine Incline Bench Press|machine|chest|strength
+Smith Machine Leg Press|machine|quadriceps|strength
+Smith Machine One-Arm Upright Row|machine|shoulders|strength
+Smith Machine Overhead Shoulder Press|machine|shoulders|strength
+Smith Machine Pistol Squat|machine|quadriceps|strength
+Smith Machine Reverse Calf Raises|machine|calves|strength
+Smith Machine Squat|machine|quadriceps|strength
+Smith Machine Stiff-Legged Deadlift|machine|hamstrings|strength
+Smith Machine Upright Row|machine|traps|strength
+Smith Single-Leg Split Squat|machine|quadriceps|strength
+Snatch Balance|barbell|quadriceps|olympic weightlifting
+Snatch Deadlift|barbell|hamstrings|olympic weightlifting
+Snatch from Blocks|barbell|quadriceps|olympic weightlifting
+Snatch Pull|barbell|hamstrings|strength
+Snatch Shrug|barbell|traps|olympic weightlifting
+Snatch|barbell|quadriceps|olympic weightlifting
+Speed Band Overhead Triceps|bands|triceps|strength
+Speed Box Squat|barbell|quadriceps|powerlifting
+Speed Squats|barbell|quadriceps|strength
+Spell Caster|dumbbell|abdominals|strength
+Spider Crawl|body only|abdominals|strength
+Spider Curl|e-z curl bar|biceps|strength
+Spinal Stretch||middle back|stretching
+Split Clean|barbell|quadriceps|olympic weightlifting
+Split Jerk|barbell|quadriceps|olympic weightlifting
+Split Jump|body only|quadriceps|plyometrics
+Split Snatch|barbell|hamstrings|olympic weightlifting
+Split Squat with Dumbbells|dumbbell|quadriceps|strength
+Split Squats||hamstrings|stretching
+Squat Jerk|barbell|quadriceps|strength
+Squat with Bands|barbell|quadriceps|powerlifting
+Squat with Chains|barbell|quadriceps|powerlifting
+Squat with Plate Movers|barbell|quadriceps|strength
+Squats - With Bands|bands|quadriceps|strength
+Stairmaster|machine|quadriceps|cardio
+Standing Alternating Dumbbell Press|dumbbell|shoulders|strength
+Standing Barbell Calf Raise|barbell|calves|strength
+Standing Barbell Press Behind Neck|barbell|shoulders|strength
+Standing Bent-Over One-Arm Dumbbell Triceps Extension|dumbbell|triceps|strength
+Standing Bent-Over Two-Arm Dumbbell Triceps Extension|dumbbell|triceps|strength
+Standing Biceps Cable Curl|cable|biceps|strength
+Standing Biceps Stretch|other|biceps|stretching
+Standing Bradford Press|barbell|shoulders|strength
+Standing Cable Chest Press|cable|chest|strength
+Standing Cable Lift|cable|abdominals|strength
+Standing Cable Wood Chop|cable|abdominals|strength
+Standing Calf Raises|machine|calves|strength
+Standing Concentration Curl|dumbbell|biceps|strength
+Standing Dumbbell Calf Raise|dumbbell|calves|strength
+Standing Dumbbell Press|dumbbell|shoulders|strength
+Standing Dumbbell Reverse Curl|dumbbell|biceps|strength
+Standing Dumbbell Straight-Arm Front Delt Raise Above Head|dumbbell|shoulders|strength
+Standing Dumbbell Triceps Extension|dumbbell|triceps|strength
+Standing Dumbbell Upright Row|dumbbell|traps|strength
+Standing Elevated Quad Stretch|other|quadriceps|stretching
+Standing Front Barbell Raise Over Head|barbell|shoulders|strength
+Standing Gastrocnemius Calf Stretch||calves|stretching
+Standing Hamstring and Calf Stretch|other|hamstrings|stretching
+Standing Hip Circles|body only|abductors|stretching
+Standing Hip Flexors||quadriceps|stretching
+Standing Inner-Biceps Curl|dumbbell|biceps|strength
+Standing Lateral Stretch||abdominals|stretching
+Standing Leg Curl|machine|hamstrings|strength
+Standing Long Jump|body only|quadriceps|plyometrics
+Standing Low-Pulley Deltoid Raise|cable|shoulders|strength
+Standing Low-Pulley One-Arm Triceps Extension|cable|triceps|strength
+Standing Military Press|barbell|shoulders|strength
+Standing Olympic Plate Hand Squeeze|other|forearms|strength
+Standing One-Arm Cable Curl|cable|biceps|strength
+Standing One-Arm Dumbbell Curl Over Incline Bench|dumbbell|biceps|strength
+Standing One-Arm Dumbbell Triceps Extension|dumbbell|triceps|strength
+Standing Overhead Barbell Triceps Extension|barbell|triceps|strength
+Standing Palm-In One-Arm Dumbbell Press|dumbbell|shoulders|strength
+Standing Palms-In Dumbbell Press|dumbbell|shoulders|strength
+Standing Palms-Up Barbell Behind The Back Wrist Curl|barbell|forearms|strength
+Standing Pelvic Tilt||lower back|stretching
+Standing Rope Crunch|cable|abdominals|strength
+Standing Soleus And Achilles Stretch||calves|stretching
+Standing Toe Touches||hamstrings|stretching
+Standing Towel Triceps Extension|body only|triceps|strength
+Standing Two-Arm Overhead Throw|medicine ball|shoulders|plyometrics
+Star Jump|body only|quadriceps|plyometrics
+Step Mill|machine|quadriceps|cardio
+Step-up with Knee Raise|body only|glutes|strength
+Stiff Leg Barbell Good Morning|barbell|lower back|strength
+Stiff-Legged Barbell Deadlift|barbell|hamstrings|strength
+Stiff-Legged Dumbbell Deadlift|dumbbell|hamstrings|strength
+Stomach Vacuum|body only|abdominals|stretching
+Straight Bar Bench Mid Rows|barbell|middle back|strength
+Straight Raises on Incline Bench|barbell|shoulders|strength
+Straight-Arm Dumbbell Pullover|dumbbell|chest|strength
+Straight-Arm Pulldown|cable|lats|strength
+Stride Jump Crossover|other|quadriceps|plyometrics
+Sumo Deadlift with Bands|barbell|hamstrings|powerlifting
+Sumo Deadlift with Chains|barbell|hamstrings|powerlifting
+Sumo Deadlift|barbell|hamstrings|powerlifting
+Superman|body only|lower back|stretching
+Supine Chest Throw|medicine ball|triceps|plyometrics
+Supine One-Arm Overhead Throw|medicine ball|abdominals|plyometrics
+Supine Two-Arm Overhead Throw|medicine ball|abdominals|plyometrics
+Suspended Fallout|other|abdominals|strength
+Suspended Push-Up|other|chest|strength
+Suspended Reverse Crunch|other|abdominals|strength
+Suspended Row|other|middle back|strength
+Suspended Split Squat|other|quadriceps|strength
+Svend Press|other|chest|strength
+T-Bar Row with Handle|barbell|middle back|strength
+Tate Press|dumbbell|triceps|strength
+The Straddle||hamstrings|stretching
+Thigh Abductor|machine|abductors|strength
+Thigh Adductor|machine|adductors|strength
+Tire Flip|other|quadriceps|strongman
+Toe Touchers|body only|abdominals|stretching
+Torso Rotation|exercise ball|abdominals|stretching
+Trail Running/Walking||quadriceps|cardio
+Trap Bar Deadlift|other|quadriceps|strength
+Tricep Dumbbell Kickback|dumbbell|triceps|strength
+Tricep Side Stretch||triceps|stretching
+Triceps Overhead Extension with Rope|cable|triceps|strength
+Triceps Pushdown - Rope Attachment|cable|triceps|strength
+Triceps Pushdown - V-Bar Attachment|cable|triceps|strength
+Triceps Pushdown|cable|triceps|strength
+Triceps Stretch||triceps|stretching
+Tuck Crunch|body only|abdominals|strength
+Two-Arm Dumbbell Preacher Curl|dumbbell|biceps|strength
+Two-Arm Kettlebell Clean|kettlebells|shoulders|strength
+Two-Arm Kettlebell Jerk|kettlebells|shoulders|strength
+Two-Arm Kettlebell Military Press|kettlebells|shoulders|strength
+Two-Arm Kettlebell Row|kettlebells|middle back|strength
+Underhand Cable Pulldowns|cable|lats|strength
+Upper Back Stretch||middle back|stretching
+Upper Back-Leg Grab||hamstrings|stretching
+Upright Barbell Row|barbell|shoulders|strength
+Upright Cable Row|cable|traps|strength
+Upright Row - With Bands|bands|traps|strength
+Upward Stretch||shoulders|stretching
+V-Bar Pulldown|cable|lats|strength
+V-Bar Pullup|body only|lats|strength
+Vertical Swing|dumbbell|hamstrings|plyometrics
+Walking, Treadmill|machine|quadriceps|cardio
+Weighted Ball Hyperextension|exercise ball|lower back|strength
+Weighted Ball Side Bend|exercise ball|abdominals|strength
+Weighted Bench Dip|other|triceps|strength
+Weighted Crunches|medicine ball|abdominals|strength
+Weighted Jump Squat|barbell|quadriceps|strength
+Weighted Pull Ups|other|lats|strength
+Weighted Sissy Squat|barbell|quadriceps|strength
+Weighted Sit-Ups - With Bands|other|abdominals|strength
+Weighted Squat|other|quadriceps|strength
+Wide Stance Barbell Squat|barbell|quadriceps|strength
+Wide Stance Stiff Legs|barbell|hamstrings|olympic weightlifting
+Wide-Grip Barbell Bench Press|barbell|chest|strength
+Wide-Grip Decline Barbell Bench Press|barbell|chest|strength
+Wide-Grip Decline Barbell Pullover|barbell|chest|strength
+Wide-Grip Lat Pulldown|cable|lats|strength
+Wide-Grip Pulldown Behind The Neck|cable|lats|strength
+Wide-Grip Rear Pull-Up|body only|lats|strength
+Wide-Grip Standing Barbell Curl|barbell|biceps|strength
+Wind Sprints|body only|abdominals|strength
+Windmills||abductors|stretching
+World's Greatest Stretch||hamstrings|stretching
+Wrist Circles|body only|forearms|stretching
+Wrist Roller|other|forearms|strength
+Wrist Rotations with Straight Bar|barbell|forearms|strength
+Yoke Walk|other|quadriceps|strongman
+Zercher Squats|barbell|quadriceps|strength
+Zottman Curl|dumbbell|biceps|strength
+Zottman Preacher Curl|dumbbell|biceps|strength

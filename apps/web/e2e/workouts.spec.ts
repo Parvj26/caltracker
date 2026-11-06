@@ -67,11 +67,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
   await expect(picker.getByText('A superset needs 2 or more exercises. Search and tap each one.')).toBeVisible();
   await picker.getByLabel('Search exercises').fill('Pushups');
-  await picker.getByRole('button', { name: 'Pushups', exact: true }).click();
+  await picker.getByRole('option', { name: 'Pushups', exact: true }).click();
   // One pick is not a superset yet.
   await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
   await picker.getByLabel('Search exercises').fill('Pullups');
-  await picker.getByRole('button', { name: 'Pullups', exact: true }).click();
+  await picker.getByRole('option', { name: 'Pullups', exact: true }).click();
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
   await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
 
@@ -264,7 +264,7 @@ test.describe('sections and pick-one groups', () => {
     const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
     for (const n of names) {
       await picker.getByLabel('Search exercises').fill(n);
-      await picker.getByRole('button', { name: n, exact: true }).click();
+      await picker.getByRole('option', { name: n, exact: true }).click();
     }
     await picker.getByRole('button', { name: `Add ${names.length} exercises` }).click();
     await expect(picker).toBeHidden();
@@ -311,10 +311,10 @@ test.describe('sections and pick-one groups', () => {
     await page.getByRole('button', { name: '+ Pick one', exact: true }).click();
     const picker = page.getByRole('dialog', { name: 'Add a pick-one group' });
     await picker.getByLabel('Search exercises').fill(X('Medicine Ball Slam'));
-    await picker.getByRole('button', { name: X('Medicine Ball Slam'), exact: true }).click();
+    await picker.getByRole('option', { name: X('Medicine Ball Slam'), exact: true }).click();
     await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
     await picker.getByLabel('Search exercises').fill(X("Farmer's Walk"));
-    await picker.getByRole('button', { name: X("Farmer's Walk"), exact: true }).click();
+    await picker.getByRole('option', { name: X("Farmer's Walk"), exact: true }).click();
     await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
     await expect(page.getByRole('heading', { name: 'Pick one · 2 options' })).toBeVisible();
     for (const n of [1, 2, 3]) await fillSet(page, X('Medicine Ball Slam'), n, 12, 15);

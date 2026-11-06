@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CustomExerciseInput, TRACKING_TYPES } from '@caltracker/shared';
 import { Button, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
+import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { createCustomExercise, updateCustomExercise } from './actions';
 import { EQUIPMENT, TRACKING_LABELS } from './filters';
 import { formText } from './form-text';
@@ -55,9 +56,11 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
       try {
         if (exerciseId) {
           await updateCustomExercise(exerciseId, parsed.data);
+          invalidateExerciseIndex();
           setSaved(true);
         } else {
           const { id } = await createCustomExercise(parsed.data);
+          invalidateExerciseIndex();
           router.push(`/exercises/${id}`);
         }
       } catch {

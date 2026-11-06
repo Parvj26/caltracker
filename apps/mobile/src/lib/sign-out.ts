@@ -1,10 +1,15 @@
-// Signing out on purpose: forget the copy of the sticker book kept for this account, then end the session.
+// The one explicit sign-out. Before ending the session it forgets what this device keeps for the account:
+// - the saved exercise library (it can hold the account's custom exercises), and
+// - the copy of the sticker book.
+// Only this explicit action does that: a failed offline token refresh must keep the saved library usable.
 // The not-yet-shown surprises (pendingReveals) stay, so they still show when the same client signs back in.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { albumCachePrefix } from './album-logic';
+import { forgetIndexUser } from './exercise-index';
 import { supabase } from './supabase';
 
 export async function signOutAndForget(): Promise<void> {
+  await forgetIndexUser(AsyncStorage);
   try {
     const { data } = await supabase.auth.getSession();
     const id = data.session?.user.id;

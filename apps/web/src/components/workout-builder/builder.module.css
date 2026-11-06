@@ -131,54 +131,6 @@
   border-top: var(--ct-border-width-card) solid var(--ct-border);
 }
 
-/* ---------- Exercise picker ---------- */
-.dialog {
-  width: min(520px, calc(100vw - 32px));
-  max-height: min(640px, calc(100dvh - 32px));
-  padding: var(--ct-space-6);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-bg);
-  color: var(--ct-ink);
-}
-.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
-.dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
-.dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
-.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); }
-.searchLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
-.selectedList { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
-.selectedList li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ct-space-1);
-  padding-left: var(--ct-space-3);
-  border-radius: var(--ct-radius-pill);
-  background: var(--ct-lime);
-  font-weight: var(--ct-weight-section-heading);
-}
-.selectedList .smallButton { box-shadow: none; border-radius: var(--ct-radius-pill); }
-.results { flex: 1; min-height: 120px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.result {
-  display: flex;
-  width: 100%;
-  min-height: var(--ct-tap-min);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ct-space-3);
-  padding: var(--ct-space-2) var(--ct-space-3);
-  border: 0;
-  border-radius: var(--ct-radius-input);
-  background: transparent;
-  color: var(--ct-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.result:hover { background: var(--ct-surface); }
-.result[aria-pressed='true'] { background: var(--ct-lime); }
-/* Text on a pastel fill is always ink. */
-.result[aria-pressed='true'] .caption { color: var(--ct-ink); }
-
 /* ---------- Sections and pick-one groups ---------- */
 .sectionHeader { display: flex; flex-direction: column; gap: var(--ct-space-2); padding-top: var(--ct-space-3); }
 .sectionRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); border-bottom: var(--ct-border-width-card) solid var(--ct-ink); padding-bottom: var(--ct-space-2); }

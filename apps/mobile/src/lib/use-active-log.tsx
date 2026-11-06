@@ -31,6 +31,7 @@ import {
   finishedFrom,
   foregroundCheck,
   goneNote,
+  unavailableNote,
   keepEnded,
   keepFinished,
   logChange,
@@ -264,6 +265,11 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       onGone: () => {
         if (!mine()) return;
         setBanner(goneNote(coachName.current));
+        void reload();
+      },
+      onUnavailable: (local) => {
+        if (!mine()) return;
+        setBanner(unavailableNote(local.name));
         void reload();
       },
       onAutoFinish: (doc) => {
