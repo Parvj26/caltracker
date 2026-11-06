@@ -64,7 +64,10 @@ env:
 - scrollUntilVisible:
     element:
       id: sticker-giraffe
-- assertVisible: '×1'
+# The tile is one element for VoiceOver ("Giraffe, 1 collected"), so its ×1 badge is read from the tile's label.
+- assertVisible:
+    id: sticker-giraffe
+    text: 'Giraffe, 1 collected'
 - tapOn:
     id: sticker-giraffe
 - assertVisible:
