@@ -1,11 +1,12 @@
 'use client';
 
 import { useId } from 'react';
-import { MAX_CHOICE_OPTIONS, TRACKING_TYPE_LABELS, setLabels, setShowsRest } from '@caltracker/shared';
+import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, TRACKING_TYPE_LABELS, setLabels, setShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { gridTemplate, setColumns } from './set-columns';
 import { SetRow, type SetPatch } from './set-row';
+import { SubstituteEditor, type SubstituteActions } from './substitute-editor';
 import styles from './builder.module.css';
 
 /** Row names for screen readers and tests: "set 1", "warm-up set", "drop after set 3", "drop 2 after set 3". */
@@ -46,6 +47,8 @@ export type BlockActions = {
   onAddDrop: (exId: string, setId: string) => void;
   onRemoveSet: (exId: string, setId: string) => void;
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
+  onAddSubstitute: (exId: string) => void;
+  substitute: (exId: string, substituteId: string) => SubstituteActions;
 };
 
 type Props = {
@@ -219,6 +222,19 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               >
                 + Set
               </button>
+              {/* Pick-one options are already alternatives to each other, so they get no substitutes. */}
+              {!choice ? (
+                <button
+                  type="button"
+                  className={styles.smallButton}
+                  aria-label={`Add a substitute for ${ex.exerciseName}`}
+                  disabled={ex.substitutes.length >= MAX_SUBSTITUTES}
+                  title={ex.substitutes.length >= MAX_SUBSTITUTES ? `At most ${MAX_SUBSTITUTES} substitutes` : undefined}
+                  onClick={() => actions.onAddSubstitute(ex.id)}
+                >
+                  + Substitute
+                </button>
+              ) : null}
               <label className={styles.exerciseNote}>
                 <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
                 <input
@@ -231,6 +247,17 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
                 />
               </label>
             </div>
+            {ex.substitutes.map((sub) => (
+              <SubstituteEditor
+                key={sub.id}
+                block={block}
+                exerciseIndex={ei}
+                substitute={sub}
+                units={units}
+                errors={errors}
+                actions={actions.substitute(ex.id, sub.id)}
+              />
+            ))}
           </div>
         );
       })}
