@@ -34,11 +34,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_catchup_attempts: {
+        Row: {
+          attempts: number
+          last_attempt_at: string
+          log_id: string
+        }
+        Insert: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id: string
+        }
+        Update: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "award_catchup_attempts_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       awards: {
         Row: {
           client_id: string
           created_at: string
           log_id: string
+          log_revision: number
           result: Json
           workspace_id: string
         }
@@ -46,6 +73,7 @@ export type Database = {
           client_id: string
           created_at?: string
           log_id: string
+          log_revision?: number
           result: Json
           workspace_id: string
         }
@@ -53,6 +81,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           log_id?: string
+          log_revision?: number
           result?: Json
           workspace_id?: string
         }
@@ -1208,6 +1237,7 @@ export type Database = {
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
       award_catchup: { Args: never; Returns: number }
+      award_history_version: { Args: { p_client_id: string }; Returns: string }
       award_inputs: { Args: { p_log_id: string }; Returns: Json }
       claim_invites: {
         Args: never

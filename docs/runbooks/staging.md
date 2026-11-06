@@ -39,7 +39,7 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
    - The link only shows a **Continue** button; the one-time token is spent when the coach presses it. Email scanners (Outlook Safe Links and similar) open links but do not click, so they can no longer use the link up. The link format in the templates did not change.
 5. Supabase Dashboard -> Authentication -> Providers (Email) / Policies: set **Minimum password length** to **8**. Local config already says 8 (`minimum_password_length` in `supabase/config.toml`); the hosted project does not read it. The web and mobile apps also require 8.
 6. Cloudflare: `caltracker.app` must be an active zone on the account the API token belongs to. The first deploy creates the `staging.caltracker.app` DNS record and certificate automatically (custom domain in `apps/web/wrangler.jsonc`).
-7. **Sticker catch-up job** (once per project, staging and production each with their own value). Every 15 minutes the database awards stickers for finished workouts the phone never reported, by calling the `award-workout` Edge Function with a shared secret. Until these are set, the job does nothing (it logs a warning) and only the phone's own call awards stickers.
+7. **Sticker catch-up job** (once per project, staging and production each with their own value). Every 15 minutes the database awards stickers for finished workouts the phone never reported, by calling the `award-workout` Edge Function with a shared secret. Until these are set, every run of the job fails (shown in `cron.job_run_details`) and only the phone's own call awards stickers.
    - Make a long random secret on your computer, for example `openssl rand -hex 32`. Do not paste it into chat, files or GitHub.
    - Give it to the function: `supabase secrets set --project-ref <ref> AWARD_WORKOUT_SECRET=<secret>`. (Deploys do not overwrite it: the workflow only sets the invite secrets.)
    - Store the same secret, and the function URL, in Vault. Supabase Dashboard -> SQL Editor, run:
@@ -48,7 +48,9 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
      select vault.create_secret('https://<ref>.supabase.co/functions/v1/award-workout', 'award_workout_url', 'award-workout URL for the catch-up job');
      ```
    - Rotate: `supabase secrets set` the new value, then in the SQL Editor `select vault.update_secret(id, '<new secret>') from vault.secrets where name = 'award_workout_secret';`. Calls made between the two steps are refused and retried 15 minutes later.
-   - Check: `select * from cron.job_run_details where command like '%award_catchup%' order by start_time desc limit 5;` shows the runs, and `net._http_response` the function's answers (200 = awarded).
+   - Check the runs: `select status, return_message, start_time from cron.job_run_details where command like '%award_catchup%' order by start_time desc limit 5;`
+   - Check the function's answers: `select status_code, content, created from net._http_response order by created desc limit 20;` (200 = awarded; 401 = the two secrets differ; 403 = a removed client's workout). pg_net keeps these for about 6 hours.
+   - A workout the job could not award is tried at most 8 times: `select * from public.award_catchup_attempts where attempts >= 8;` lists the ones it gave up on.
 
 ## Deploy
 
