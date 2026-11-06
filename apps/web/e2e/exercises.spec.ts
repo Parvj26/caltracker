@@ -23,10 +23,8 @@ test.beforeEach(async ({ page }) => {
 
 test('search "squat" finds Barbell Squat', async ({ page }) => {
   await page.goto('/exercises');
-  await page.getByLabel('Search').fill('squat');
-  await page.getByRole('button', { name: 'Search' }).click();
-  await expect(page).toHaveURL(/q=squat/);
-  await expect(page.getByRole('link', { name: /Barbell Squat/ }).first()).toBeVisible();
+  await page.getByLabel('Search exercises').fill('squat');
+  await expect(page.getByRole('option', { name: 'Barbell Squat', exact: true })).toBeVisible();
 });
 
 test('pin a YouTube video on a built-in exercise, and reject a bad link', async ({ page }) => {
@@ -68,9 +66,15 @@ test('create a custom exercise and see it under My exercises', async ({ page }) 
     await expect(page.getByRole('heading', { name })).toBeVisible();
 
     await page.goto('/exercises?source=custom');
-    await expect(page.getByRole('link', { name: new RegExp(name) })).toBeVisible();
+    const option = page.getByRole('option', { name, exact: true });
+    await expect(option).toBeVisible();
+    // A custom exercise offers Edit, which opens the existing form.
+    await option.click();
+    await page.getByRole('region', { name: 'Exercise preview' }).getByRole('link', { name: 'Edit' }).click();
+    await expect(page).toHaveURL(/\/exercises\/[0-9a-f-]{36}$/);
     await page.goto('/exercises?source=builtin');
-    await expect(page.getByRole('link', { name: new RegExp(name) })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'Barbell Squat', exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name, exact: true })).toHaveCount(0);
   } finally {
     await admin().from('exercises').delete().eq('name', name);
   }
@@ -81,12 +85,37 @@ test('out-of-range and absurd ?page values never show an error page', async ({ p
     const response = await page.goto(`/exercises?page=${value}`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: 'Exercises' })).toBeVisible();
-    // Which of these shows depends on library size: the pager (more than one page), an exercise card
-    // (a single page) or the empty message (no exercises). Any one means the list rendered, not an error.
-    const rendered = page
-      .getByRole('navigation', { name: 'Pagination' })
-      .or(page.locator('a[href^="/exercises/"]:not([href="/exercises/new"])'))
-      .or(page.getByText('No exercises match.'));
-    await expect(rendered.first()).toBeVisible();
+    // The old ?page= is ignored: the list still renders.
+    await expect(page.getByRole('option').first()).toBeVisible();
+  }
+});
+
+test('"bb squat" on the Exercises page finds Barbell Squat first', async ({ page }) => {
+  await page.goto('/exercises');
+  await page.getByLabel('Search exercises').fill('bb squat');
+  await expect(page.getByRole('option').first()).toHaveAccessibleName('Barbell Squat');
+  // Built-ins have no Edit; they link to their details instead.
+  const preview = page.getByRole('region', { name: 'Exercise preview' });
+  await expect(preview.getByRole('link', { name: 'Edit' })).toHaveCount(0);
+  await expect(preview.getByRole('link', { name: 'Details' })).toBeVisible();
+});
+
+test('a star set on the Exercises page shows first in the builder picker', async ({ page }) => {
+  const user = (await admin().auth.admin.listUsers({ perPage: 200 })).data.users.find((u) => u.email === 'coach@demo.local');
+  await admin().from('exercise_favorites').delete().eq('coach_id', user!.id);
+  try {
+    await page.goto('/exercises');
+    await page.getByLabel('Search exercises').fill('Pullups');
+    const star = page.getByRole('button', { name: 'Favourite Pullups' });
+    await star.click();
+    await expect(star).toHaveAttribute('aria-pressed', 'true');
+    // Wait for the save before leaving the page.
+    await expect.poll(async () => (await admin().from('exercise_favorites').select('exercise_id').eq('coach_id', user!.id)).data?.length).toBe(1);
+
+    await page.goto('/workouts/new');
+    await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('option').first()).toHaveAccessibleName('Pullups');
+  } finally {
+    await admin().from('exercise_favorites').delete().eq('coach_id', user!.id);
   }
 });
