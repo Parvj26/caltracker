@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import {
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+} from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
-import type { StepField } from '@caltracker/shared';
-import { parseActualInput } from '@/lib/active-log-logic';
-import type { CellModel, RowModel } from '@/lib/log-flow-model';
+import type { ActualPatch, StepField, Units } from '@caltracker/shared';
+import { readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { SwipeToDelete } from './swipe-to-delete';
@@ -17,22 +26,52 @@ const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
 
 const SPOKEN: Record<StepField, string> = { weight: 'weight', reps: 'reps', duration: 'time', distance: 'distance' };
 
+/** Numbers grow with the phone's text size up to this much; beyond it they would no longer fit their box. */
+const MAX_FONT_SCALE = 1.4;
+
+/** The bar above the number pad (iOS): number pads have no return key, so this is how the keyboard goes away. */
+export const KEYBOARD_BAR_ID = 'log-number-pad';
+
+export function KeyboardBar() {
+  const { text, space } = useTheme();
+  if (Platform.OS !== 'ios') return null;
+  return (
+    <InputAccessoryView nativeID={KEYBOARD_BAR_ID}>
+      <View style={[styles.bar, { paddingHorizontal: space[4] }]}>
+        <Pressable
+          testID="keyboard-done"
+          onPress={() => Keyboard.dismiss()}
+          accessibilityRole="button"
+          accessibilityLabel="Done typing"
+          style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}
+        >
+          <Text style={text('sectionHeading')}>Done typing</Text>
+        </Pressable>
+      </View>
+    </InputAccessoryView>
+  );
+}
+
 export type TableHandlers = {
-  /** A number typed in the box's own unit (null when cleared). Saved on every readable keystroke. */
-  onType: (row: RowModel, field: StepField, typed: number | null) => void;
+  /** A number typed in a box, already checked and turned into the stored patch. Saved on every readable keystroke. */
+  onType: (row: RowModel, patch: ActualPatch) => void;
   /** ✓: ticks an open set with what the boxes show; unticks a ticked one. */
   onTick: (row: RowModel) => void;
   onDelete: (row: RowModel) => void;
-  /** False for the only set of an exercise (the shared rule refuses removing it). */
-  canDelete: (row: RowModel) => boolean;
   /** The W / D / F tag: what it means. */
   onTag: (row: RowModel) => void;
 };
 
-/** One number box. Keeps what is being typed; shows the stored value again once it loses focus. */
+/**
+ * One number box. Keeps what is being typed and saves every number that can be stored. Something that can't (12.5
+ * reps, 1:75, too heavy, or a blank on a ticked set) shows as invalid with a short reason, and the saved number
+ * comes back when the box is left.
+ */
 function Cell({
   cell,
   row,
+  who,
+  units,
   testID,
   unitBelow,
   disabled,
@@ -40,17 +79,21 @@ function Cell({
 }: {
   cell: CellModel;
   row: RowModel;
+  who: string;
+  units: Units;
   testID: string;
   unitBelow: boolean;
   disabled: boolean;
-  onType: (typed: number | null) => void;
+  onType: (patch: ActualPatch) => void;
 }) {
   const { text, space, radius } = useTheme();
   const [draft, setDraft] = useState(cell.value);
   const [focused, setFocused] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
   useEffect(() => {
     if (!focused) setDraft(cell.value);
   }, [cell.value, focused]);
+  const label = `${who}${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`;
   return (
     <View style={[styles.cell, { gap: space[1] / 2 }]}>
       <TextInput
@@ -59,19 +102,28 @@ function Cell({
         editable={!disabled}
         keyboardType={KEYBOARD[cell.field]}
         returnKeyType="done"
+        inputAccessoryViewID={KEYBOARD_BAR_ID}
         selectTextOnFocus
-        accessibilityLabel={`${row.name} ${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`}
-        placeholder={cell.placeholder || '–'}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        accessibilityLabel={label}
+        accessibilityHint={invalid ?? undefined}
+        placeholder={row.done ? '' : cell.placeholder || '–'}
         placeholderTextColor={palette.inkMuted}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
+          setInvalid(null);
           setDraft(cell.value);
         }}
         onChangeText={(t) => {
           setDraft(t);
-          const v = parseActualInput(t, cell.field);
-          if (v !== undefined) onType(v);
+          const read = readTyped(cell.field, t, units, row.done);
+          if (read.kind === 'invalid') {
+            setInvalid(read.message);
+            return;
+          }
+          setInvalid(null);
+          onType(read.patch);
         }}
         style={[
           text('sectionHeading'),
@@ -79,39 +131,49 @@ function Cell({
           { borderRadius: radius.input, paddingHorizontal: space[1] },
           row.done && styles.inputDone,
           focused && styles.inputFocused,
+          invalid !== null && styles.inputInvalid,
         ]}
       />
-      {unitBelow ? <Text style={[text('caption'), styles.centre, row.done && styles.ink]}>{cell.unit}</Text> : null}
+      {invalid !== null ? (
+        <Text testID={`invalid-${testID}`} accessibilityLiveRegion="polite" maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.invalidText]}>
+          {invalid}
+        </Text>
+      ) : unitBelow ? (
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.centre, row.done && styles.ink]}>
+          {cell.unit}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-/** One set: tag, number boxes, ✓. Swipe left to delete. */
-export function SetRowLine({
-  row,
-  idKey,
-  unitBelow,
-  disabled = false,
-  handlers,
-}: {
+type RowProps = {
   row: RowModel;
   /** "<page>-<exercise>": test ids are `<what>-<idKey>-<setIndex>`. */
   idKey: string;
   /** Superset rows have no column headings, so each box says its unit. */
   unitBelow: boolean;
+  /** "A2 Curl, ": the exercise, for screen readers, on a superset where rows of several exercises sit together. */
+  exerciseLabel: string | null;
+  units: Units;
   disabled?: boolean;
   handlers: TableHandlers;
-}) {
+};
+
+/** One set: tag, number boxes, ✓. Swipe left to delete. */
+function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, handlers }: RowProps) {
   const { text, space, radius } = useTheme();
   const indented = row.tagKind === 'drop' || row.tagKind === 'failure';
   const tagged = row.tagKind !== 'normal';
   const id = `${idKey}-${row.setIndex}`;
-  const deletable = !disabled && handlers.canDelete(row);
+  const deletable = !disabled && row.deletable;
+  const setWords = row.name.charAt(0).toLowerCase() + row.name.slice(1);
+  const who = `${exerciseLabel ? `${exerciseLabel}, ` : ''}${row.name}, `;
   return (
-    <SwipeToDelete testID={`set-delete-${id}`} label={`Delete ${row.name.toLowerCase()}`} onDelete={() => handlers.onDelete(row)} enabled={deletable}>
+    <SwipeToDelete testID={`set-delete-${id}`} label={`Delete ${setWords}`} onDelete={() => handlers.onDelete(row)} enabled={deletable}>
       <View
         testID={`set-${id}`}
-        accessibilityActions={deletable ? [{ name: 'delete', label: `Delete ${row.name.toLowerCase()}` }] : undefined}
+        accessibilityActions={deletable ? [{ name: 'delete', label: `Delete ${setWords}` }] : undefined}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === 'delete') handlers.onDelete(row);
         }}
@@ -130,17 +192,21 @@ export function SetRowLine({
           accessibilityLabel={tagged ? `${row.name}. What does ${row.tag} mean?` : row.name}
           style={({ pressed }) => [styles.tag, tagged && [styles.tagChip, { borderRadius: radius.pill }], pressed && styles.pressed]}
         >
-          <Text style={[text('sectionHeading'), styles.ink]}>{row.tag}</Text>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), styles.ink]}>
+            {row.tag}
+          </Text>
         </Pressable>
         {row.cells.map((cell) => (
           <Cell
             key={cell.field}
             cell={cell}
             row={row}
+            who={who}
+            units={units}
             testID={`actual-${cell.field}-${id}`}
             unitBelow={unitBelow}
             disabled={disabled}
-            onType={(v) => handlers.onType(row, cell.field, v)}
+            onType={(patch) => handlers.onType(row, patch)}
           />
         ))}
         <Pressable
@@ -150,26 +216,52 @@ export function SetRowLine({
           hitSlop={4}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: row.done, disabled }}
-          accessibilityLabel={`${row.name} done`}
+          accessibilityLabel={`${row.done ? 'Untick' : 'Tick'} ${exerciseLabel ? `${exerciseLabel}, ` : ''}${setWords}`}
           style={({ pressed }) => [styles.tick, row.done ? styles.tickDone : styles.tickOpen, pressed && styles.pressed, disabled && styles.disabled]}
         >
-          <Text style={[text('sectionHeading'), row.done ? styles.tickMarkDone : styles.tickMarkOpen]}>✓</Text>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), row.done ? styles.tickMarkDone : styles.tickMarkOpen]}>
+            ✓
+          </Text>
         </Pressable>
       </View>
     </SwipeToDelete>
   );
 }
 
+const sameCells = (a: CellModel[], b: CellModel[]) =>
+  a.length === b.length && a.every((c, i) => c.value === b[i].value && c.placeholder === b[i].placeholder && c.unit === b[i].unit);
+
+/** Redraws a row only when what it shows changed (every edit builds new row objects for the whole page). */
+export const SetRowLine = memo(
+  SetRowLineView,
+  (a, b) =>
+    a.handlers === b.handlers &&
+    a.idKey === b.idKey &&
+    a.units === b.units &&
+    a.disabled === b.disabled &&
+    a.unitBelow === b.unitBelow &&
+    a.exerciseLabel === b.exerciseLabel &&
+    a.row.setId === b.row.setId &&
+    a.row.setIndex === b.row.setIndex &&
+    a.row.done === b.row.done &&
+    a.row.tag === b.row.tag &&
+    a.row.name === b.row.name &&
+    a.row.deletable === b.row.deletable &&
+    sameCells(a.row.cells, b.row.cells),
+);
+
 /** A straight exercise's sets: SET | LB | REPS | ✓ (columns follow the tracking type), then + Add set. */
 export function SetTable({
   rows,
   idKey,
+  units,
   disabled,
   handlers,
   onAddSet,
 }: {
   rows: RowModel[];
   idKey: string;
+  units: Units;
   disabled?: boolean;
   handlers: TableHandlers;
   onAddSet: (() => void) | null;
@@ -179,16 +271,18 @@ export function SetTable({
   return (
     <View style={[styles.table, { borderRadius: radius.card, padding: space[2], gap: space[1] }]}>
       <View style={[styles.row, { gap: space[2], paddingHorizontal: space[2] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={[text('caption'), styles.tag, styles.headingText]}>SET</Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.tag, styles.headingText]}>
+          SET
+        </Text>
         {headings.map((h) => (
-          <Text key={h} style={[text('caption'), styles.cell, styles.centre, styles.headingText]}>
+          <Text key={h} maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.cell, styles.centre, styles.headingText]}>
             {h}
           </Text>
         ))}
         <View style={styles.tickSpace} />
       </View>
       {rows.map((row) => (
-        <SetRowLine key={row.setId} row={row} idKey={idKey} unitBelow={false} disabled={disabled} handlers={handlers} />
+        <SetRowLine key={row.setId} row={row} idKey={idKey} unitBelow={false} exerciseLabel={null} units={units} disabled={disabled} handlers={handlers} />
       ))}
       {onAddSet ? <AddSetButton testID={`add-set-${idKey}`} onPress={onAddSet} /> : null}
     </View>
@@ -227,6 +321,8 @@ const styles = StyleSheet.create({
   },
   inputDone: { borderColor: palette.lime },
   inputFocused: { borderColor: palette.ink },
+  inputInvalid: { borderColor: palette.magentaDeep },
+  invalidText: { color: palette.magentaDeep, textAlign: 'center' },
   centre: { textAlign: 'center' },
   ink: { color: palette.ink },
   tick: {
@@ -245,4 +341,6 @@ const styles = StyleSheet.create({
   pressed: { opacity: pressedOpacity },
   disabled: { opacity: 0.4 },
   addSet: { minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
+  bar: { flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: palette.surface, borderTopWidth: 1, borderTopColor: palette.border },
+  barButton: { minHeight: tapTarget.min, justifyContent: 'center', paddingHorizontal: 8 },
 });

@@ -105,7 +105,21 @@ env:
 - tapOn:
     id: finish-note
 - inputText: 'Felt strong'
-- tapOn: 'Finish workout?'
+- hideKeyboard
+# Keep going keeps the draft: the feeling and the note are back when the sheet opens again.
+- tapOn:
+    id: finish-keep-going
+- extendedWaitUntil:
+    notVisible:
+      id: finish-sheet
+    timeout: 5000
+- tapOn:
+    id: page-done
+- extendedWaitUntil:
+    visible:
+      id: finish-note
+      text: 'Felt strong'
+    timeout: 10000
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
     visible: '3 sets completed'

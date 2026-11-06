@@ -43,6 +43,35 @@ env:
 - assertVisible:
     id: tick-0-0-1
     text: 'checkbox, checked'
+# ---- A number that can't be saved says why, and the saved one comes back ----
+- tapOn:
+    id: actual-reps-0-0-2
+- waitForAnimationToEnd
+- inputText: '12.5'
+- extendedWaitUntil:
+    visible:
+      id: invalid-actual-reps-0-0-2
+      text: 'Whole reps only'
+    timeout: 5000
+- tapOn:
+    id: keyboard-done
+- assertNotVisible:
+    id: invalid-actual-reps-0-0-2
+# A ticked set's box can't be left blank.
+- tapOn:
+    id: actual-weight-0-0-0
+- waitForAnimationToEnd
+- eraseText
+- extendedWaitUntil:
+    visible:
+      id: invalid-actual-weight-0-0-0
+      text: 'A ticked set needs a number'
+    timeout: 5000
+- tapOn:
+    id: keyboard-done
+- assertVisible:
+    id: actual-weight-0-0-0
+    text: '50'
 # Online, with every change uploaded: no "Not synced yet".
 - assertNotVisible:
     id: sync-pill

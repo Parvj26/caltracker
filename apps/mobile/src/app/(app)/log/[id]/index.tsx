@@ -2,6 +2,7 @@ import { randomUUID } from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   FlatList,
@@ -11,7 +12,9 @@ import {
   StyleSheet,
   Text,
   View,
+  findNodeHandle,
   useWindowDimensions,
+  type HostInstance,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -49,6 +52,7 @@ import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
 import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
+import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
@@ -61,6 +65,8 @@ import {
   hasTypedValues,
   historyLines,
   markAll,
+  markAllPlan,
+  markAllQuestion,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -68,7 +74,6 @@ import {
   startGroups,
   substituteCards,
   substituteOf,
-  typedPatch,
   type ExerciseModel,
   type FlowPage,
   type FlowSection,
@@ -250,10 +255,6 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   }, [exerciseKey]);
   const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
 
-  const exerciseDoc = useCallback(
-    (logExerciseId: string) => log.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId) ?? null,
-    [log.blocks],
-  );
   const blockOf = useCallback((logExerciseId: string) => log.blocks.find((b) => b.exercises.some((e) => e.id === logExerciseId)) ?? null, [log.blocks]);
 
   /** On a pick-one option, the edit picks that option first (or switches to it while nothing is ticked). */
@@ -266,15 +267,26 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   );
 
   // ---- Edits ----
-  const tableHandlers = useCallback(
-    (ex: ExerciseModel): TableHandlers => {
+  // The handlers stay the same object across edits (they read the latest log and last time from refs), so a set
+  // row redraws only when its own numbers change.
+  const logRef = useRef(log);
+  logRef.current = log;
+  const lastRef = useRef(last);
+  lastRef.current = last;
+  const docOf = useCallback(
+    (logExerciseId: string) => logRef.current.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId) ?? null,
+    [],
+  );
+
+  const tableFor = useMemo(() => {
+    const cache = new Map<string, TableHandlers>();
+    return (ex: ExerciseModel): TableHandlers => {
       const exId = ex.logExerciseId;
+      const known = cache.get(exId);
+      if (known) return known;
       const pickFirst = withPick(exId);
-      return {
-        onType: (row: RowModel, field, typed) => {
-          const patch = typedPatch(field, typed, units);
-          if (patch) void op((l) => updateActual(pickFirst(l), row.setId, patch));
-        },
+      const made: TableHandlers = {
+        onType: (row: RowModel, patch) => void op((l) => updateActual(pickFirst(l), row.setId, patch)),
         onTick: (row) => {
           const now = Date.now();
           if (ignoreTick(lastTick.current, row.setId, now)) return;
@@ -289,57 +301,85 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
             const picked = pickFirst(l);
             const doc = picked.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
             if (!doc) return l;
-            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, last[doc.exerciseId]?.sets ?? []), nowIso());
+            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, lastRef.current[doc.exerciseId]?.sets ?? []), nowIso());
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
-        canDelete: (row) => removeLogSet(log, exId, row.setId, nowIso()) !== log,
         onTag: (row) => {
           if (row.tagKind !== 'normal') setInfo(TAG_INFO[row.tagKind]);
         },
       };
-    },
-    [withPick, units, op, tick, markDone, last, log],
+      cache.set(exId, made);
+      return made;
+    };
+  }, [withPick, op, tick, markDone]);
+
+  const handlers: PageHandlers = useMemo(
+    () => ({
+      table: tableFor,
+      onAddSet: (ex) => void op((l) => addLogSet(withPick(ex.logExerciseId)(l), ex.logExerciseId, randomUUID, nowIso())),
+      onInfo: (ex) => setInfoFor({ name: ex.name, exerciseId: ex.exerciseId }),
+      onHistory: (ex) => {
+        const doc = docOf(ex.logExerciseId);
+        const lines = doc ? historyLines(doc, ex.lastTime, units) : [];
+        const when = lastRef.current[ex.exerciseId]?.finishedAt;
+        setInfo({
+          title: `Last time · ${ex.name}`,
+          lines:
+            lines.length > 0
+              ? [...(when ? [new Date(when).toDateString()] : []), ...lines]
+              : ['No history yet. Your numbers will show here next time.'],
+          testID: 'history-sheet',
+        });
+      },
+      onMessage: (ex) => {
+        const doc = docOf(ex.logExerciseId);
+        if (doc) setNoteFor(doc);
+      },
+      // ⇄: the coach's substitute when there is one still to choose, else any exercise from the library.
+      onSwap: (ex) => {
+        const doc = docOf(ex.logExerciseId);
+        if (!doc) return;
+        const sub = substituteOf(doc);
+        if (sub && !sub.locked) setSubFor(doc);
+        else setPicker({ mode: 'swap', ex: doc });
+      },
+      onSubstitute: (ex) => {
+        Keyboard.dismiss();
+        const doc = docOf(ex.logExerciseId);
+        if (doc && substituteOf(doc)?.locked === false) setSubFor(doc);
+      },
+      onMore: (ex) => {
+        const doc = docOf(ex.logExerciseId);
+        if (doc) setMenuFor(doc);
+      },
+    }),
+    [tableFor, op, withPick, docOf, units],
   );
 
-  const handlers: PageHandlers = {
-    table: tableHandlers,
-    onAddSet: (ex) => void op((l) => addLogSet(withPick(ex.logExerciseId)(l), ex.logExerciseId, randomUUID, nowIso())),
-    onInfo: (ex) => setInfoFor({ name: ex.name, exerciseId: ex.exerciseId }),
-    onHistory: (ex) => {
-      const doc = exerciseDoc(ex.logExerciseId);
-      const lines = doc ? historyLines(doc, ex.lastTime, units) : [];
-      const when = last[ex.exerciseId]?.finishedAt;
+  /** Mark all: asks first when it ticks more than one set, and says which sets it leaves (nothing to save yet). */
+  const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
+    Keyboard.dismiss();
+    const picked = pickOf ? withPick(pickOf)(log) : log;
+    const plan = markAllPlan(picked, logExerciseIds, last);
+    const run = () =>
+      void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, logExerciseIds, lastRef.current, nowIso())).then(
+        (ticked) => ticked && tapHaptic(),
+      );
+    if (plan.tick === 0) {
       setInfo({
-        title: `Last time · ${ex.name}`,
-        lines:
-          lines.length > 0
-            ? [...(when ? [new Date(when).toDateString()] : []), ...lines]
-            : ['No history yet. Your numbers will show here next time.'],
-        testID: 'history-sheet',
+        title: 'Nothing to tick yet',
+        lines: ['These sets have no numbers yet. Type them in, then tick each one.'],
+        testID: 'mark-all-info',
       });
-    },
-    onMessage: (ex) => {
-      const doc = exerciseDoc(ex.logExerciseId);
-      if (doc) setNoteFor(doc);
-    },
-    // ⇄: the coach's substitute when there is one still to choose, else any exercise from the library.
-    onSwap: (ex) => {
-      const doc = exerciseDoc(ex.logExerciseId);
-      if (!doc) return;
-      const sub = substituteOf(doc);
-      if (sub && !sub.locked) setSubFor(doc);
-      else setPicker({ mode: 'swap', ex: doc });
-    },
-    onSubstitute: (ex) => {
-      Keyboard.dismiss();
-      const doc = exerciseDoc(ex.logExerciseId);
-      if (doc && substituteOf(doc)?.locked === false) setSubFor(doc);
-    },
-    onMore: (ex) => {
-      const doc = exerciseDoc(ex.logExerciseId);
-      if (doc) setMenuFor(doc);
-    },
+      return;
+    }
+    if (plan.tick === 1 && plan.skip === 0) return run();
+    const q = markAllQuestion(plan);
+    Alert.alert(q.title, q.message ?? undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Tick them', onPress: run },
+    ]);
   };
 
   const menuItems: MenuItem[] = (() => {
@@ -461,13 +501,18 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onClose={() => setSubFor(null)}
       />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
+      <KeyboardBar />
       <FinishSheet
         visible={finishOpen}
         model={finishModel(log)}
         initialFeel={saved.feel}
         initialNote={saved.note}
         busy={finishing}
-        onKeepGoing={() => setFinishOpen(false)}
+        onKeepGoing={(feel, note) => {
+          // Keep the draft: the feeling and the note are saved with the workout, so closing loses nothing.
+          setFinishOpen(false);
+          void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
+        }}
         onFinish={(feel, note) => void finishNow(feel, note)}
         onDiscard={() => {
           setFinishOpen(false);
@@ -550,9 +595,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         handlers={handlers}
         onPage={(page) => setScreen({ mode: 'pages', section: sectionIndex, page })}
         onClose={() => setScreen({ mode: 'start', section: sectionIndex })}
-        onMarkAll={(ids, pickOf) =>
-          void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, ids, last, nowIso())).then((ticked) => ticked && tapHaptic())
-        }
+        onMarkAll={markAllNow}
         onDone={(page) => {
           const next = afterDone(sections, { section: sectionIndex, page });
           if (next.kind === 'page') setScreen({ mode: 'pages', section: sectionIndex, page: next.page });
@@ -609,6 +652,25 @@ function SectionPages({
     listRef.current?.scrollToOffset({ offset: page * width, animated: true });
   }, [page, width]);
 
+  // VoiceOver: each page that comes on screen (swiped, a dot, Done) is read from its heading.
+  const headings = useRef(new Map<number, HostInstance>());
+  const headingRef = useCallback(
+    (index: number) => (node: HostInstance | null) => {
+      if (node) headings.current.set(index, node);
+      else headings.current.delete(index);
+    },
+    [],
+  );
+  const refFor = useMemo(() => section.pages.map((_, i) => headingRef(i)), [section.pages, headingRef]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const node = headings.current.get(page);
+      const tag = node ? findNodeHandle(node) : null;
+      if (tag) AccessibilityInfo.setAccessibilityFocus(tag);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [page]);
+
   // A rotation or iPad resize changes the page width: stay on the same page.
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: shown.current * width, animated: false });
@@ -623,14 +685,13 @@ function SectionPages({
     onPage(i);
   };
 
-  const model: PageModel | undefined = models[page];
   const dots = pageDots(log, section, page);
-  const markIds = !model
-    ? []
-    : model.kind === 'superset'
-      ? model.exercises.map((e) => e.logExerciseId)
-      : [model.exercise.logExerciseId];
-  const showMark = model !== undefined && !model.allDone && !(model.kind === 'option' && model.lockedOut !== null);
+  /** Mark all for a page, or null when there is nothing to mark (all ticked, or an option locked out). */
+  const markFor = (m: PageModel): (() => void) | null => {
+    if (m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
+    const ids = m.kind === 'superset' ? m.exercises.map((e) => e.logExerciseId) : [m.exercise.logExerciseId];
+    return () => onMarkAll(ids, m.kind === 'option' ? m.exercise.logExerciseId : null);
+  };
   const what = (p: FlowPage) => (p.kind === 'superset' ? 'Superset' : p.kind === 'option' ? 'Option' : 'Exercise');
 
   return (
@@ -668,6 +729,7 @@ function SectionPages({
           onMomentumScrollEnd={onMomentumScrollEnd}
           onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: info.index * width, animated: false })}
           renderItem={({ item, index }) => {
+            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null });
             const m = models[index];
             return (
               <ScrollView
@@ -681,11 +743,11 @@ function SectionPages({
               >
                 <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
                   {m.kind === 'superset' ? (
-                    <SupersetPage model={m} page={index} details={details} handlers={handlers} />
+                    <SupersetPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
                   ) : m.kind === 'option' ? (
-                    <OptionPage model={m} page={index} details={details} handlers={handlers} />
+                    <OptionPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
                   ) : (
-                    <StraightPage model={m} page={index} details={details} handlers={handlers} />
+                    <StraightPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
                   )}
                 </View>
               </ScrollView>
@@ -693,16 +755,6 @@ function SectionPages({
           }}
         />
         <View style={[styles.footer, { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: insets.bottom + space[2], gap: space[2] }]}>
-          {showMark ? (
-            <Pressable
-              testID="mark-all"
-              onPress={() => onMarkAll(markIds, model?.kind === 'option' ? model.exercise.logExerciseId : null)}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.markAll, pressed && { opacity: pressedOpacity }]}
-            >
-              <Text style={text('sectionHeading')}>{model?.kind === 'superset' ? 'Mark all rounds' : 'Mark all'}</Text>
-            </Pressable>
-          ) : null}
           <Pressable
             testID="page-done"
             onPress={() => onDone(page)}
@@ -711,7 +763,11 @@ function SectionPages({
           >
             <Text style={[text('button'), styles.onInk]}>Done</Text>
           </Pressable>
-          {dots.length > 1 ? (
+          {dots.length > MAX_DOTS ? (
+            <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
+              {`${page + 1} / ${dots.length}`}
+            </Text>
+          ) : dots.length > 1 ? (
             <View style={styles.dots} accessibilityRole="tablist">
               {dots.map((d, i) => (
                 <Pressable
@@ -735,6 +791,8 @@ function SectionPages({
 }
 
 const DOT = 8;
+/** Past this many pages the dots no longer fit a phone's width: "3 / 12" instead. */
+const MAX_DOTS = 8;
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
@@ -747,7 +805,6 @@ const styles = StyleSheet.create({
   pageContent: { alignItems: 'center' },
   column: { width: '100%', maxWidth: contentMaxWidth },
   footer: { alignItems: 'center', borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.bg },
-  markAll: { minHeight: tapTarget.min, justifyContent: 'center', paddingHorizontal: 16 },
   done: {
     alignSelf: 'stretch',
     maxWidth: contentMaxWidth,

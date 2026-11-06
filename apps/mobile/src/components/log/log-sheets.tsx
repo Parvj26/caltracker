@@ -117,7 +117,8 @@ export function FinishSheet({
   initialFeel: Feeling | null;
   initialNote: string;
   busy: boolean;
-  onKeepGoing: () => void;
+  /** Keep going, or the sheet closed: the feeling and note so far, to keep as a draft. */
+  onKeepGoing: (feel: Feeling | null, note: string) => void;
   onFinish: (feel: Feeling | null, note: string) => void;
   onDiscard: () => void;
 }) {
@@ -131,7 +132,7 @@ export function FinishSheet({
   }, [visible, initialFeel, initialNote]);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onKeepGoing}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => onKeepGoing(feel, note)}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <ScrollView testID="finish-sheet" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={[styles.column, { padding: space[4], gap: space[4] }]}>
           <Text style={text('screenTitle')} accessibilityRole="header">
@@ -145,7 +146,7 @@ export function FinishSheet({
               <Text testID="finish-none" style={text('sectionHeading')}>
                 Complete at least one set to finish.
               </Text>
-              <Button testID="finish-keep-going" title="Keep going" onPress={onKeepGoing} />
+              <Button testID="finish-keep-going" title="Keep going" onPress={() => onKeepGoing(feel, note)} />
               <TextButton testID="finish-discard" title="Discard workout" onPress={onDiscard} />
             </>
           ) : (
@@ -185,7 +186,7 @@ export function FinishSheet({
               />
               <View style={[styles.actions, { gap: space[3] }]}>
                 <View style={styles.flex}>
-                  <Button testID="finish-keep-going" variant="secondary" title="Keep going" onPress={onKeepGoing} />
+                  <Button testID="finish-keep-going" variant="secondary" title="Keep going" onPress={() => onKeepGoing(feel, note)} />
                 </View>
                 <View style={styles.flex}>
                   <Button testID="finish-confirm" variant="finish" title="Finish" busy={busy} onPress={() => onFinish(feel, note)} />

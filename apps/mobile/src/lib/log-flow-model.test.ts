@@ -4,6 +4,7 @@ import {
   chooseSubstitute,
   completeSet,
   completeSetWith,
+  addLogExercise,
   emptyLog,
   pickChoice,
   startLogFromWorkout,
@@ -22,6 +23,9 @@ import {
   finishModel,
   historyLines,
   markAll,
+  markAllPlan,
+  markAllQuestion,
+  readTyped,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -426,5 +430,51 @@ describe('coach-added substitutes', () => {
     log = completeSet(log, ex().sets[0].id, NOW);
     expect(planChanges(log, () => null)).toEqual(['⇄ Did Machine Assisted Pull Up instead of Dumbbell Bench Press']);
     expect(LogSchema.safeParse(log).success).toBe(true);
+  });
+});
+
+describe('readTyped', () => {
+  it('says why a number can’t be saved instead of dropping it', () => {
+    expect(readTyped('reps', '12.5', 'lb', false)).toEqual({ kind: 'invalid', message: 'Whole reps only' });
+    expect(readTyped('reps', '1001', 'lb', false)).toEqual({ kind: 'invalid', message: 'That’s more than a set can hold' });
+    expect(readTyped('weight', '2500', 'lb', false)).toEqual({ kind: 'invalid', message: 'That’s more than a set can hold' });
+    expect(readTyped('weight', '1500', 'kg', false)).toEqual({ kind: 'invalid', message: 'That’s more than a set can hold' });
+    expect(readTyped('duration', '1:75', 'lb', false)).toEqual({ kind: 'invalid', message: 'Use m:ss, like 1:30' });
+    expect(readTyped('weight', 'abc', 'lb', false)).toEqual({ kind: 'invalid', message: 'Numbers only' });
+    expect(readTyped('reps', '8', 'lb', false)).toEqual({ kind: 'ok', patch: { actualReps: 8 } });
+  });
+
+  it('clears an open set’s box, but refuses a blank on a ticked set', () => {
+    expect(readTyped('reps', '', 'lb', false)).toEqual({ kind: 'ok', patch: { actualReps: null } });
+    expect(readTyped('reps', ' ', 'lb', true)).toEqual({ kind: 'invalid', message: 'A ticked set needs a number' });
+  });
+});
+
+describe('rows on ticked sets and deleting', () => {
+  it('a ticked row never shows the greyed pre-fill; the only set of an exercise can’t be deleted', () => {
+    let log = mockLog();
+    const circles = () => log.blocks[0].exercises[0];
+    expect(setRows(circles(), 'lb', [])[0].deletable).toBe(false);
+    log = completeSet(log, circles().sets[0].id, NOW);
+    expect(setRows(circles(), 'lb', [])[0].cells[0].placeholder).toBe('');
+    const push = log.blocks[2].exercises[0];
+    expect(setRows(push, 'lb', []).map((r) => r.deletable)).toEqual([true, true, true, true]);
+  });
+});
+
+describe('markAllPlan', () => {
+  it('counts the sets it would tick and the ones with nothing to save', () => {
+    let log = emptyLog('Quick', uuid, NOW);
+    log = addLogExercise(log, { id: uuid(), name: 'Pushups', trackingType: 'reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    log = updateActual(log, ex.sets[0].id, { actualReps: 10 });
+    // 10 typed on set 1; sets 2 and 3 take the client's own reps from the set before.
+    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0 });
+    const blank = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
+    const bex = blank.blocks[0].exercises[0];
+    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3 });
+    expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
+    expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
+    expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
   });
 });

@@ -117,13 +117,14 @@ env:
 - assertVisible:
     id: pages-title
     text: 'Upper'
-- tapOn:
-    id: mark-all
-- extendedWaitUntil:
-    visible:
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '0' }
+- scrollUntilVisible:
+    element:
       id: superset-heading-0
       text: 'Superset 1 · Round 3 of 3'
-    timeout: 5000
+    direction: UP
 # Round 3 is Pullups alone: Pushups has only two sets.
 - scrollUntilVisible:
     element:
@@ -160,8 +161,9 @@ env:
     id: actual-reps-0-0-0
 - waitForAnimationToEnd
 - inputText: '7'
+# Done typing: the bar above the number pad.
 - tapOn:
-    id: exercise-name-0
+    id: keyboard-done
 - extendedWaitUntil:
     visible:
       id: option-line-0

@@ -87,13 +87,9 @@ env:
 - takeScreenshot: mock-05-superset-1
 - assertNotVisible:
     id: tick-0-1-3
-- tapOn:
-    id: mark-all
-- extendedWaitUntil:
-    visible:
-      id: superset-heading-0
-      text: 'Superset 1 · Round 4 of 4'
-    timeout: 5000
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '0' }
 - scrollUntilVisible:
     element:
       id: tick-0-0-3
@@ -141,8 +137,9 @@ env:
 - assertNotVisible:
     id: substitute-switch-1-0
 - takeScreenshot: mock-08-substitute-logged
-- tapOn:
-    id: mark-all
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '1' }
 - tapOn:
     id: page-done
 # The rope pushdown: W, a working set, D and F rows.
@@ -155,8 +152,9 @@ env:
     id: tag-2-0-3
     text: 'Drop set to failure. What does F mean.*'
 - takeScreenshot: mock-08b-drops
-- tapOn:
-    id: mark-all
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '2' }
 - tapOn:
     id: page-done
 
@@ -179,8 +177,9 @@ env:
       id: option-line-0
     timeout: 10000
 - swipe:
-    start: 90%,30%
-    end: 10%,30%
+    from:
+      id: option-line-0
+    direction: LEFT
 - extendedWaitUntil:
     visible:
       id: exercise-name-1
@@ -217,7 +216,7 @@ env:
 - tapOn:
     id: finish-note
 - inputText: 'Lat pulldown was taken, did assisted pull ups.'
-- tapOn: 'Finish workout?'
+- hideKeyboard
 - takeScreenshot: mock-11-finish
 - runFlow: helpers/finish-from-sheet.yaml
 

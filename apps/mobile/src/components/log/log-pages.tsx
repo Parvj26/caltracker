@@ -1,6 +1,9 @@
 // The pages inside a section: a straight exercise, a superset (round by round) and a pick-one option.
 // They only draw the page model (log-flow-model.ts); every edit goes back to the screen through the handlers.
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
+import type { Units } from '@caltracker/shared';
+import { Button } from '@/components/ui';
 import { tapTarget } from '@caltracker/design-tokens';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import type { ExerciseModel, OptionPageModel, RowModel, StraightPageModel, SupersetPageModel } from '@/lib/log-flow-model';
@@ -21,7 +24,27 @@ export type PageHandlers = {
   onMore: (ex: ExerciseModel) => void;
 };
 
-type Common = { page: number; details: Record<string, ExerciseDetail>; handlers: PageHandlers };
+type Common = {
+  page: number;
+  units: Units;
+  details: Record<string, ExerciseDetail>;
+  handlers: PageHandlers;
+  /** The page's heading: VoiceOver moves here when the page comes on screen. */
+  headingRef: Ref<HostInstance>;
+  /** Mark all (or Mark all rounds); null hides it (everything ticked, or an option locked out). */
+  onMarkAll: (() => void) | null;
+};
+
+/** Mark all sits at the end of the page, well away from Done. */
+function MarkAll({ page, title, onPress }: { page: number; title: string; onPress: (() => void) | null }) {
+  const { space } = useTheme();
+  if (!onPress) return null;
+  return (
+    <View style={{ marginTop: space[2] }}>
+      <Button variant="secondary" testID={`mark-all-${page}`} title={title} onPress={onPress} />
+    </View>
+  );
+}
 
 const keyOf = (page: number, ex: ExerciseModel) => `${page}-${ex.exerciseIndex}`;
 
@@ -84,15 +107,18 @@ function SingleExercise({
   ex,
   rows,
   disabled,
+  units,
   details,
   handlers,
+  headingRef,
+  onMarkAll,
 }: Common & { ex: ExerciseModel; rows: RowModel[]; disabled: boolean }) {
   const { text, space } = useTheme();
   const idKey = keyOf(page, ex);
   return (
     <View style={{ gap: space[3] }}>
       <ExerciseDemo name={ex.name} detail={details[ex.exerciseId]} size="big" testID={`demo-${idKey}`} onPress={() => handlers.onInfo(ex)} />
-      <Text testID={`exercise-name-${page}`} style={text('screenTitle')} accessibilityRole="header">
+      <Text ref={headingRef} testID={`exercise-name-${page}`} style={text('screenTitle')} accessibilityRole="header">
         {ex.name}
       </Text>
       <Notes ex={ex} idKey={idKey} />
@@ -106,7 +132,15 @@ function SingleExercise({
         onMore={() => handlers.onMore(ex)}
       />
       <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} />
-      <SetTable rows={rows} idKey={idKey} disabled={disabled} handlers={handlers.table(ex)} onAddSet={disabled ? null : () => handlers.onAddSet(ex)} />
+      <SetTable
+        rows={rows}
+        idKey={idKey}
+        units={units}
+        disabled={disabled}
+        handlers={handlers.table(ex)}
+        onAddSet={disabled ? null : () => handlers.onAddSet(ex)}
+      />
+      <MarkAll page={page} title="Mark all" onPress={onMarkAll} />
     </View>
   );
 }
@@ -116,10 +150,13 @@ export function StraightPage({ model, ...common }: Common & { model: StraightPag
 }
 
 export function OptionPage({ model, ...common }: Common & { model: OptionPageModel }) {
+  // The option line is the heading here (it says which option this is); the exercise name follows it.
   const { text, space, radius } = useTheme();
   return (
     <View style={{ gap: space[3] }}>
       <Text
+        ref={common.headingRef}
+        accessibilityRole="header"
         testID={`option-line-${common.page}`}
         style={[text('sectionHeading'), model.picked && [styles.pickedLine, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]]}
       >
@@ -130,17 +167,17 @@ export function OptionPage({ model, ...common }: Common & { model: OptionPageMod
           {model.lockedOut}
         </Text>
       ) : null}
-      <SingleExercise {...common} ex={model.exercise} rows={model.rows} disabled={model.lockedOut !== null} />
+      <SingleExercise {...common} headingRef={null} ex={model.exercise} rows={model.rows} disabled={model.lockedOut !== null} />
     </View>
   );
 }
 
 /** A superset: every round stacked, the current round with each exercise's photo and tools. */
-export function SupersetPage({ model, page, details, handlers }: Common & { model: SupersetPageModel }) {
+export function SupersetPage({ model, page, units, details, handlers, headingRef, onMarkAll }: Common & { model: SupersetPageModel }) {
   const { text, space } = useTheme();
   return (
     <View style={{ gap: space[4] }}>
-      <Text testID={`superset-heading-${page}`} style={[text('screenTitle'), styles.centre]} accessibilityRole="header">
+      <Text ref={headingRef} testID={`superset-heading-${page}`} style={[text('screenTitle'), styles.centre]} accessibilityRole="header">
         {model.heading}
       </Text>
       {model.rounds.map((round) => {
@@ -183,7 +220,15 @@ export function SupersetPage({ model, page, details, handlers }: Common & { mode
                   {current ? <Notes ex={{ ...ex, restLine: null }} idKey={idKey} /> : null}
                   {current ? <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} /> : null}
                   {entry.rows.map((row) => (
-                    <SetRowLine key={row.setId} row={row} idKey={idKey} unitBelow handlers={handlers.table(ex)} />
+                    <SetRowLine
+                      key={row.setId}
+                      row={row}
+                      idKey={idKey}
+                      unitBelow
+                      exerciseLabel={`${ex.label ?? ''} ${ex.name}`.trim()}
+                      units={units}
+                      handlers={handlers.table(ex)}
+                    />
                   ))}
                 </View>
               );
@@ -206,6 +251,7 @@ export function SupersetPage({ model, page, details, handlers }: Common & { mode
           />
         ))}
       </View>
+      <MarkAll page={page} title="Mark all rounds" onPress={onMarkAll} />
     </View>
   );
 }

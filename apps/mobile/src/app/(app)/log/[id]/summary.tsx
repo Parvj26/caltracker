@@ -181,8 +181,9 @@ export default function SummaryScreen() {
           <Text style={text('sectionHeading')} accessibilityRole="header">
             Changes from the plan
           </Text>
-          {changes.map((c) => (
-            <Text key={c} style={text('body')}>
+          {changes.map((c, i) => (
+            // Two identical lines are possible (the same swap in two slots), so the key includes the position.
+            <Text key={`${i}-${c}`} style={text('body')}>
               {c}
             </Text>
           ))}

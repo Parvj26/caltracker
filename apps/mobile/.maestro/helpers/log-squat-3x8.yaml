@@ -7,8 +7,14 @@ appId: app.caltracker.client
     env: { NAME: 'E2E Log' }
 - tapOn:
     id: tick-0-0-0
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
 - tapOn:
     id: tick-0-0-1
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, checked'
 - tapOn:
     id: tick-0-0-2
 - assertVisible:

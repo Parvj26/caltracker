@@ -58,8 +58,9 @@ env:
 - waitForAnimationToEnd
 - eraseText
 - inputText: '6'
+# Done typing: the bar above the number pad.
 - tapOn:
-    id: exercise-name-0
+    id: keyboard-done
 - assertVisible:
     id: actual-reps-0-0-2
     text: '6'
@@ -102,8 +103,9 @@ env:
       id: superset-heading-1
       text: 'Superset 1 · Round 2 of 2'
     timeout: 5000
-- tapOn:
-    id: mark-all
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '1' }
 - assertVisible:
     id: tick-1-1-1
     text: 'checkbox, checked'
@@ -156,8 +158,9 @@ env:
     timeout: 5000
 # Swipe right: back to the superset.
 - swipe:
-    start: 10%,30%
-    end: 90%,30%
+    from:
+      id: exercise-name-2
+    direction: RIGHT
 - extendedWaitUntil:
     visible:
       id: superset-heading-1

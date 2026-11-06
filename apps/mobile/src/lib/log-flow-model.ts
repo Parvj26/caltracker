@@ -11,6 +11,7 @@ import {
   blockRoundCount,
   completeSetWith,
   completedSetCount,
+  removeLogSet,
   currentStep,
   distanceUnitFor,
   formatClock,
@@ -43,6 +44,7 @@ import {
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import { parseActualInput } from './active-log-logic';
 import type { LastResultSet, LastResults } from './log-api';
 import { orList, supersetLetters } from './workouts';
 
@@ -319,6 +321,8 @@ export type RowModel = {
   cells: CellModel[];
   /** What ✓ saves into the actuals still empty. */
   values: SetValues;
+  /** The shared rule allows removing it (not the only set of the exercise). */
+  deletable: boolean;
 };
 
 const FIELD_ORDER: readonly StepField[] = ['weight', 'reps', 'duration', 'distance'];
@@ -351,6 +355,30 @@ export function fieldsFor(ex: Pick<LogExerciseDoc, 'trackingType'>): StepField[]
   return FIELD_ORDER.filter((f) => keep.includes(f));
 }
 
+const DELETABLE_AT = '1970-01-01T00:00:00.000Z';
+
+/**
+ * The sets the shared removeLogSet would remove, asked once per exercise on a doc holding only that exercise
+ * (cheap, and the rule stays in @caltracker/shared).
+ */
+function deletableSets(ex: LogExerciseDoc): Set<string> {
+  const mini: WorkoutLogDoc = {
+    id: ex.id,
+    workoutId: null,
+    name: 'x',
+    status: 'in_progress',
+    startedAt: DELETABLE_AT,
+    finishedAt: null,
+    lastActivityAt: DELETABLE_AT,
+    autoFinished: false,
+    revision: 0,
+    notes: null,
+    sections: [],
+    blocks: [{ id: ex.id, sectionId: null, pickedExerciseId: null, kind: 'straight', exercises: [ex] }],
+  };
+  return new Set(ex.sets.filter((s) => removeLogSet(mini, ex.id, s.id, DELETABLE_AT) !== mini).map((s) => s.id));
+}
+
 /** One row per set of the exercise, or only the sets at `setIndexes` (a superset round). */
 export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly LastResultSet[], setIndexes?: readonly number[]): RowModel[] {
   const fields = fieldsFor(ex);
@@ -373,8 +401,13 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
       tagKind,
       name,
       done: set.completedAt !== null,
-      cells: fields.map((f) => cellFor(f, set, values, units)),
+      // A ticked set shows only what was saved: never the greyed pre-fill.
+      cells: fields.map((f) => {
+        const cell = cellFor(f, set, values, units);
+        return set.completedAt === null ? cell : { ...cell, placeholder: '' };
+      }),
       values,
+      deletable: deletableSets(ex).has(set.id),
     };
   });
 }
@@ -543,9 +576,34 @@ export function pickingFirst(log: WorkoutLogDoc, blockId: string, logExerciseId:
   return pickChoice(log, blockId, logExerciseId, nowIso);
 }
 
+const isEmpty = (v: SetValues) => v.reps === null && v.weightKg === null && v.durationS === null && v.distanceM === null;
+
+/**
+ * What "Mark all" would do: the open sets it ticks, and the open sets it leaves because there are no numbers to
+ * save for them yet (nothing typed, no coach target, no last time).
+ */
+export function markAllPlan(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults): { tick: number; skip: number } {
+  const done = markAll(log, logExerciseIds, last, DELETABLE_AT);
+  const open = (l: WorkoutLogDoc) =>
+    l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)).flatMap((e) => e.sets)).filter((x) => x.completedAt === null).length;
+  const tick = open(log) - open(done);
+  return { tick, skip: open(done) };
+}
+
+/** "Tick 4 sets with these numbers?" and, when some are left, why. */
+export function markAllQuestion(plan: { tick: number; skip: number }): { title: string; message: string | null } {
+  const title = `Tick ${plural(plan.tick, 'set')} with these numbers?`;
+  const message =
+    plan.skip > 0
+      ? `${plural(plan.skip, 'set')} ${plan.skip === 1 ? 'has' : 'have'} no numbers yet, so ${plan.skip === 1 ? 'it stays' : 'they stay'} unticked.`
+      : null;
+  return { title, message };
+}
+
 /**
  * "Mark all": ticks every open set of these exercises (in order), each with its pre-fill worked out from the doc as
- * it stands then, so a weight typed on set 1 carries into the sets after it.
+ * it stands then, so a weight typed on set 1 carries into the sets after it. A set with nothing to save (no typed
+ * number, no coach target, no last time) is left open.
  */
 export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults, nowIso: string): WorkoutLogDoc {
   let next = log;
@@ -555,10 +613,40 @@ export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], l
       const ex = next.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
       const set = ex?.sets.find((s) => s.id === setId);
       if (!ex || !set || set.completedAt !== null) continue;
-      next = completeSetWith(next, setId, resolveSetValues(ex, setId, last[ex.exerciseId]?.sets ?? []), nowIso);
+      const values = resolveSetValues(ex, setId, last[ex.exerciseId]?.sets ?? []);
+      if (isEmpty(values)) continue;
+      next = completeSetWith(next, setId, values, nowIso);
     }
   }
   return next;
+}
+
+export type TypedResult = { kind: 'ok'; patch: ActualPatch } | { kind: 'invalid'; message: string };
+
+const FIELD_HINT: Record<StepField, string> = {
+  weight: 'Numbers only',
+  reps: 'Whole reps only',
+  duration: 'Use m:ss, like 1:30',
+  distance: 'Numbers only',
+};
+
+/**
+ * What a box's text means. Blank clears the field, except on a ticked set, where it is refused (the saved number
+ * comes back when the box is left). Anything that can't be stored says why instead of being dropped silently.
+ */
+export function readTyped(field: StepField, text: string, units: Units, ticked: boolean): TypedResult {
+  if (text.trim() === '') {
+    return ticked ? { kind: 'invalid', message: 'A ticked set needs a number' } : { kind: 'ok', patch: typedPatch(field, null, units)! };
+  }
+  const v = parseActualInput(text, field);
+  if (v === undefined || v === null) {
+    const tooBig =
+      (field === 'reps' && /^\d+$/.test(text.trim())) ||
+      ((field === 'weight' || field === 'distance') && /^\d+([.,]\d*)?$/.test(text.trim()));
+    return { kind: 'invalid', message: tooBig ? 'That’s more than a set can hold' : FIELD_HINT[field] };
+  }
+  const patch = typedPatch(field, v, units);
+  return patch ? { kind: 'ok', patch } : { kind: 'invalid', message: 'That’s more than a set can hold' };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
