@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { Button, Card, ErrorText, Logo, Screen, TextButton } from '@/components/ui';
 import { useSession } from '@/lib/session';
 import { useActiveLog } from '@/lib/use-active-log';
-import { supabase } from '@/lib/supabase';
+import { signOutAndForget } from '@/lib/sign-out';
 import { useTheme } from '@/theme/use-theme';
 
 /** Shown only while the client has no coach: never invited, or removed. With a coach they get the tabs. */
@@ -43,7 +43,7 @@ export default function Home() {
         {claimError ? <ErrorText>{claimError}</ErrorText> : null}
         <Button testID="check-again" title="Check again" onPress={() => void checkAgain()} busy={checking} />
       </Card>
-      <TextButton testID="sign-out" title="Sign out" onPress={() => void supabase.auth.signOut()} />
+      <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />
     </Screen>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExerciseIndexRow } from '@caltracker/shared';
-import { EXERCISE_INDEX_KEY, EXERCISE_INDEX_TTL_MS, createExerciseIndexLoader, resolveIndexUser } from './exercise-index';
+import { LAST_USER_KEY, forgetIndexUser, EXERCISE_INDEX_KEY, EXERCISE_INDEX_TTL_MS, createExerciseIndexLoader as makeLoader, resolveIndexUser } from './exercise-index';
 import { memoryStorage } from './log-fixtures';
 
 const row = (id: string, over: Partial<ExerciseIndexRow> = {}): ExerciseIndexRow => ({
@@ -15,6 +15,12 @@ const row = (id: string, over: Partial<ExerciseIndexRow> = {}): ExerciseIndexRow
   imagePath: null,
   ...over,
 });
+type Store = ReturnType<typeof memoryStorage>;
+// In the app the signed-in user is remembered before the loader runs; do the same here.
+const createExerciseIndexLoader = (s: Store, f: Parameters<typeof makeLoader>[1], u: string, n?: () => number) => {
+  s.map.set(LAST_USER_KEY, u);
+  return makeLoader(s, f, u, n);
+};
 const never = () => Promise.reject(new Error('Network request failed'));
 
 describe('createExerciseIndexLoader', () => {
@@ -146,6 +152,32 @@ describe('resolveIndexUser', () => {
     await resolveIndexUser(storage, keysOf(storage), 'u1');
     await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1')();
     await resolveIndexUser(storage, keysOf(storage), 'u2');
+    expect(storage.map.has(`${EXERCISE_INDEX_KEY}.u1`)).toBe(false);
+  });
+});
+
+describe('sign-out and changes of user', () => {
+  it('forgetIndexUser removes the remembered user and their saved library, and nobody else’s', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    storage.map.set(`${EXERCISE_INDEX_KEY}.other`, 'x');
+    await forgetIndexUser(storage);
+    expect(storage.map.has(LAST_USER_KEY)).toBe(false);
+    expect(storage.map.has(`${EXERCISE_INDEX_KEY}.u1`)).toBe(false);
+    expect(storage.map.has(`${EXERCISE_INDEX_KEY}.other`)).toBe(true);
+    await expect(createExerciseIndexLoader(memoryStorage(), never, 'u1')()).rejects.toThrow();
+  });
+
+  it('saves nothing and tells nobody when the user changed during the fetch', async () => {
+    const storage = memoryStorage();
+    await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();
+    let release: (r: ExerciseIndexRow[]) => void = () => undefined;
+    const onUpdate = vi.fn();
+    await makeLoader(storage, () => new Promise((res) => (release = res)), 'u1', () => EXERCISE_INDEX_TTL_MS + 1)(onUpdate);
+    await forgetIndexUser(storage);
+    release([row('b')]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onUpdate).not.toHaveBeenCalled();
     expect(storage.map.has(`${EXERCISE_INDEX_KEY}.u1`)).toBe(false);
   });
 });
