@@ -39,7 +39,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
       for (const issue of parsed.error.issues) {
         const key = issue.path[0];
         if ((key === 'firstName' || key === 'lastName' || key === 'businessName' || key === 'bio') && !next[key]) {
-          next[key] = key === 'firstName' ? 'Enter your first name.' : issue.message;
+          next[key] = key === 'firstName' && values.firstName.trim() === '' ? 'Enter your first name.' : issue.message;
         }
       }
       setErrors(next);
@@ -55,6 +55,8 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
     try {
       const outcome = await saveProfile(parsed.data);
       if (!outcome.ok) {
+        // The details were saved but the business rename was refused: the saved state follows what the server kept.
+        if (outcome.partial) setSaved({ ...parsed.data, businessName: saved.businessName });
         setFormError(outcome.error);
         return;
       }

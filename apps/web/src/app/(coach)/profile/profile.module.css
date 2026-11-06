@@ -27,7 +27,6 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
-.fileInput:focus-visible + .chooseLabel { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .smallButton {
   min-height: var(--ct-tap-min);
   min-width: var(--ct-tap-min);

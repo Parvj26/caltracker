@@ -1,5 +1,7 @@
 /** Browser-side avatar processing: centre-crop to a square, then WebP (JPEG where the browser can't make WebP) at 1600 px max plus a 256 px thumbnail. */
 
+import type { AvatarExt } from './avatar-files';
+
 export const AVATAR_MAX_PX = 1600;
 export const THUMB_PX = 256;
 export const IMAGE_ERROR = "That image couldn't be used. Try a JPEG or PNG.";
@@ -20,7 +22,6 @@ export function fitSquare(w: number, h: number, max: number): SquareCrop {
   };
 }
 
-export type AvatarExt = 'webp' | 'jpg';
 export type Encoded = { blob: Blob; ext: AvatarExt };
 export type ToBlob = (type: string, quality: number) => Promise<Blob | null>;
 

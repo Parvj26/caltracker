@@ -64,6 +64,7 @@ export function AvatarPicker({ preview, hasPhoto }: { preview: ReactNode; hasPho
             type="file"
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
             className={styles.fileInput}
+            tabIndex={-1}
             aria-label="Choose a photo"
             disabled={busy !== null}
             onChange={(e) => void choose(e.target.files?.[0])}

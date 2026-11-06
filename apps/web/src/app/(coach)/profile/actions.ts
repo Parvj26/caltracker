@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, ProfileInput, passwordBytes } from '@caltracker/shared';
+import { acceptableAvatarFiles, type AvatarExt } from '@/lib/avatar-files';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-export type ProfileOutcome = { ok: true } | { ok: false; error: string };
+/** `partial`: the name, bio and units were saved even though the business rename was refused. */
+export type ProfileOutcome = { ok: true } | { ok: false; error: string; partial?: true };
 
 const GENERIC = 'Something went wrong. Please try again.';
 const WRONG_CURRENT_PASSWORD = "That's not your current password.";
@@ -31,29 +33,19 @@ export async function saveProfile(input: ProfileInput): Promise<ProfileOutcome> 
     // Owner-only in the database; a staff coach gets the refusal here.
     const { error } = await supabase.rpc('update_workspace_name', { p_name: next.businessName });
     if (error) {
-      return {
-        ok: false,
-        error: error.code === '42501' ? 'Only the business owner can change the business name.' : "Couldn't save the business name. Please try again.",
-      };
+      const why = error.code === '42501' ? 'Only the business owner can change the business name.' : "Couldn't save the business name. Please try again.";
+      if (profileChanged) {
+        revalidatePath('/', 'layout');
+        return { ok: false, error: `${why} Your other changes were saved.`, partial: true };
+      }
+      return { ok: false, error: why };
     }
   }
   if (profileChanged || next.businessName !== coach.workspaceName) revalidatePath('/', 'layout');
   return { ok: true };
 }
 
-const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
-const THUMB_MAX_BYTES = 300 * 1024;
-
-type Ext = 'webp' | 'jpg';
-const CONTENT_TYPE: Record<Ext, string> = { webp: 'image/webp', jpg: 'image/jpeg' };
-
-/** Checks the file's own first bytes, not the type the browser claims. WebP is "RIFF" + 4 length bytes + "WEBP"; JPEG starts FF D8 FF. */
-async function looksLike(blob: Blob, ext: Ext): Promise<boolean> {
-  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
-  if (ext === 'jpg') return head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
-  const text = (from: number, to: number) => String.fromCharCode(...head.slice(from, to));
-  return head.length === 12 && text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
-}
+const CONTENT_TYPE: Record<AvatarExt, string> = { webp: 'image/webp', jpg: 'image/jpeg' };
 
 /**
  * Saves the photo the browser already cropped and compressed: form fields `avatar` (<= 1600 px) and `thumb` (256 px),
@@ -66,8 +58,7 @@ export async function uploadAvatar(formData: FormData): Promise<ProfileOutcome> 
   const ext = formData.get('ext');
   const refused: ProfileOutcome = { ok: false, error: "That image couldn't be used. Try a JPEG or PNG." };
   if (!(avatar instanceof Blob) || !(thumb instanceof Blob) || (ext !== 'webp' && ext !== 'jpg')) return { ok: false, error: GENERIC };
-  if (avatar.size === 0 || avatar.size > AVATAR_MAX_BYTES || thumb.size === 0 || thumb.size > THUMB_MAX_BYTES) return refused;
-  if (!(await looksLike(avatar, ext)) || !(await looksLike(thumb, ext))) return refused;
+  if (!(await acceptableAvatarFiles(avatar, thumb, ext))) return refused;
 
   const supabase = await createServerSupabase();
   const folder = coach.userId;
@@ -81,7 +72,7 @@ export async function uploadAvatar(formData: FormData): Promise<ProfileOutcome> 
   const { error } = await supabase.from('profiles').update({ avatar_path: `${folder}/avatar.${ext}` }).eq('id', coach.userId);
   if (error) return { ok: false, error: "Couldn't save your photo. Please try again." };
   // Best effort: drop the other format's files if the photo used to be saved the other way.
-  const other: Ext = ext === 'webp' ? 'jpg' : 'webp';
+  const other: AvatarExt = ext === 'webp' ? 'jpg' : 'webp';
   await supabase.storage.from('avatars').remove([`${folder}/avatar.${other}`, `${folder}/avatar-thumb.${other}`]);
   revalidatePath('/', 'layout');
   return { ok: true };
