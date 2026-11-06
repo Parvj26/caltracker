@@ -599,6 +599,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_path: string | null
+          bio: string
           created_at: string | null
           first_name: string
           full_name: string
@@ -606,9 +607,11 @@ export type Database = {
           last_name: string
           time_zone: string
           units: string
+          updated_at: string | null
         }
         Insert: {
           avatar_path?: string | null
+          bio?: string
           created_at?: string | null
           first_name?: string
           full_name?: string
@@ -616,9 +619,11 @@ export type Database = {
           last_name?: string
           time_zone?: string
           units?: string
+          updated_at?: string | null
         }
         Update: {
           avatar_path?: string | null
+          bio?: string
           created_at?: string | null
           first_name?: string
           full_name?: string
@@ -626,6 +631,7 @@ export type Database = {
           last_name?: string
           time_zone?: string
           units?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1284,6 +1290,16 @@ export type Database = {
           coach_name: string
         }[]
       }
+      get_my_coach_profile: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          bio: string
+          business_name: string
+          coach_name: string
+          updated_at: string
+        }[]
+      }
       invite_for_join: {
         Args: { token: string }
         Returns: {
@@ -1363,6 +1379,7 @@ export type Database = {
         Args: { p_assignment_id: string; p_from_date: string }
         Returns: number
       }
+      update_workspace_name: { Args: { p_name: string }; Returns: undefined }
     }
     Enums: {
       block_kind: "straight" | "superset"

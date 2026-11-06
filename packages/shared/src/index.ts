@@ -193,3 +193,11 @@ export {
   safeTimeZone,
 } from './awards/history';
 export type { AwardContext } from './awards/history';
+export {
+  BIO_MAX_LENGTH,
+  BUSINESS_NAME_MAX_LENGTH,
+  Bio,
+  BusinessName,
+  ProfileInput,
+  characterCount,
+} from './profile/schema';
