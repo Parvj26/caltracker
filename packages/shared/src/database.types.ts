@@ -1299,6 +1299,23 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      coach_last_results: {
+        Args: { p_client_id: string; p_exercise_ids: string[] }
+        Returns: {
+          actual_distance_m: number
+          actual_duration_s: number
+          actual_reps: number
+          actual_weight_kg: number
+          exercise_id: string
+          finished_at: string
+          position: number
+          set_type: Database["public"]["Enums"]["set_type"]
+        }[]
+      }
+      coach_save_workout_log: {
+        Args: { p_client_id: string; p_doc: Json }
+        Returns: Json
+      }
       copy_workout: {
         Args: {
           p_assignment: string
@@ -1431,6 +1448,7 @@ export type Database = {
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
+      take_over_workout_log: { Args: { p_log_id: string }; Returns: Json }
       unassign_program: {
         Args: { p_assignment_id: string; p_from_date: string }
         Returns: number
