@@ -50,6 +50,8 @@ export type Outbox = {
   flush(): Promise<void>;
   /** "Retry" on a failed message. */
   retry(clientMsgId: string): Promise<void>;
+  /** "Delete" on a failed message: it will never be sent (also the way out of a permanent refusal). */
+  remove(clientMsgId: string): Promise<void>;
   stop(): void;
 };
 
@@ -62,6 +64,8 @@ export type OutboxDeps = {
   onChange?: (items: OutboxEntry[]) => void;
   /** Called once an entry is on the server. */
   onSent?: (entry: OutboxEntry) => void;
+  /** Called when a failed entry is deleted by the person. */
+  onRemoved?: (entry: OutboxEntry) => void;
   schedule?: (fn: () => void, ms: number) => () => void;
 };
 
@@ -192,6 +196,14 @@ export function createOutbox(deps: OutboxDeps): Outbox {
       if (!target || target.state !== 'failed') return;
       await patch(id, { state: 'sending', error: undefined });
       await flush();
+    },
+    async remove(id) {
+      if (!loaded) await load();
+      const target = list.find((e) => e.clientMsgId === id);
+      // Only a failed message can be deleted: one that is Sending… is still on its way.
+      if (!target || target.state !== 'failed') return;
+      await persist(list.filter((e) => e.clientMsgId !== id));
+      deps.onRemoved?.(target);
     },
     stop() {
       stopped = true;

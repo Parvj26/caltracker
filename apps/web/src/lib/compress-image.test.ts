@@ -1,37 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PhotoError, encodeWithFallback, fitWithin, photoPaths, thumbPathOf } from './compress-image';
-
-describe('fitWithin', () => {
-  it('shrinks a landscape photo to the long edge', () => {
-    expect(fitWithin(4000, 3000, 1600)).toEqual({ width: 1600, height: 1200 });
-  });
-  it('shrinks a portrait photo to the long edge', () => {
-    expect(fitWithin(3000, 4000, 1600)).toEqual({ width: 1200, height: 1600 });
-  });
-  it('never enlarges a small photo', () => {
-    expect(fitWithin(800, 600, 1600)).toEqual({ width: 800, height: 600 });
-    expect(fitWithin(1600, 1600, 1600)).toEqual({ width: 1600, height: 1600 });
-  });
-  it('keeps a very thin photo at least 1 px', () => {
-    expect(fitWithin(10000, 2, 1600)).toEqual({ width: 1600, height: 1 });
-  });
-});
-
-describe('photoPaths', () => {
-  it('lays the photo out under its workspace and conversation', () => {
-    expect(photoPaths('w', 'c', 'p')).toEqual({ full: 'w/c/p.webp', thumb: 'w/c/p-thumb.webp' });
-  });
-  it('finds the thumbnail of a stored path', () => {
-    expect(thumbPathOf('w/c/p.webp')).toBe('w/c/p-thumb.webp');
-  });
-});
-
-describe('photo paths for JPEG', () => {
-  it('uses the jpg extension for the photo and its thumbnail', () => {
-    expect(photoPaths('w', 'c', 'p', 'jpg')).toEqual({ full: 'w/c/p.jpg', thumb: 'w/c/p-thumb.jpg' });
-    expect(thumbPathOf('w/c/p.jpg')).toBe('w/c/p-thumb.jpg');
-  });
-});
+import { PhotoError, encodeWithFallback } from './compress-image';
 
 describe('encodeWithFallback', () => {
   const blob = (type: string) => new Blob(['x'], { type });

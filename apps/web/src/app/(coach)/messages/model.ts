@@ -72,17 +72,3 @@ export function filterInbox(rows: InboxRow[], opts: { unreadOnly: boolean; query
 
 /** "3", or "99+" past 99. */
 export const badgeText = (n: number): string => (n > 99 ? '99+' : String(n));
-
-/** Messages merged by id (a repeat replaces the earlier copy), oldest first. */
-export function mergeById<T extends { id: string; createdAt: string }>(existing: T[], incoming: T[]): T[] {
-  const byId = new Map(existing.map((m) => [m.id, m]));
-  for (const m of incoming) byId.set(m.id, m);
-  return [...byId.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-}
-
-/** True for the storage error a repeated upload of the same path gives (the photo is already there: a success). */
-export function isAlreadyUploaded(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const e = error as { status?: unknown; statusCode?: unknown; message?: unknown };
-  return String(e.statusCode) === '409' || String(e.status) === '409' || (typeof e.message === 'string' && /already exists/i.test(e.message));
-}

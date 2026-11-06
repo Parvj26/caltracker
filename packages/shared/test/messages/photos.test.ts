@@ -8,6 +8,7 @@ describe('fitWithin', () => {
   });
   it('never enlarges', () => {
     expect(fitWithin(800, 600, 1600)).toEqual({ width: 800, height: 600 });
+    expect(fitWithin(1600, 1600, 1600)).toEqual({ width: 1600, height: 1600 });
   });
   it('keeps at least 1 px', () => {
     expect(fitWithin(10000, 2, 1600)).toEqual({ width: 1600, height: 1 });
@@ -36,12 +37,19 @@ describe('isAlreadyUploaded', () => {
   });
   it('does not for other errors', () => {
     expect(isAlreadyUploaded({ statusCode: '500' })).toBe(false);
+    expect(isAlreadyUploaded({ statusCode: '413', message: 'Payload too large' })).toBe(false);
+    expect(isAlreadyUploaded(new Error('The resource already exists'))).toBe(true);
     expect(isAlreadyUploaded(null)).toBe(false);
   });
 });
 
 describe('mergeById', () => {
   const m = (id: string, createdAt: string, body = id) => ({ id, createdAt, body });
+  it('keeps equal times in id order', () => {
+    const x = { id: 'x', createdAt: '2026-11-05T10:00:00Z' };
+    const y = { id: 'y', createdAt: '2026-11-05T10:00:00Z' };
+    expect(mergeById([y], [x]).map((m) => m.id)).toEqual(['x', 'y']);
+  });
   it('replaces repeats, sorts oldest first, ties by id', () => {
     const out = mergeById([m('b', '2026-01-01T00:00:02Z'), m('a', '2026-01-01T00:00:01Z')], [m('b', '2026-01-01T00:00:02Z', 'new'), m('c', '2026-01-01T00:00:02Z')]);
     expect(out.map((x) => x.id)).toEqual(['a', 'b', 'c']);

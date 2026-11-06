@@ -29,7 +29,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CalTracker uses your photos so you can send them to your coach."
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [

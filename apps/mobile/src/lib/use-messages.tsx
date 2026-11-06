@@ -22,6 +22,8 @@ import {
   type MessageRowLite,
 } from './messages-api';
 import { createOutbox, type Outbox, type OutboxEntry, type OutboxPhoto } from './outbox';
+import { deletePhotoFiles, persistPhoto } from './outbox-files';
+import { shouldMarkRead } from './read-rules';
 import { useSession } from './session';
 
 export type ThreadItem = Message | OutboxItem;
@@ -41,6 +43,8 @@ type MessagesState = {
   hasMore: boolean;
   send: (draft: Draft) => void;
   retry: (clientMsgId: string) => void;
+  /** Deletes a failed message (it will never be sent). */
+  remove: (clientMsgId: string) => void;
   reload: () => void;
   loadEarlier: () => Promise<void>;
   /** The Coach tab reports whether it is on screen; the thread is marked read only while it is. */
@@ -73,6 +77,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
   const [viewing, setViewing] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const convRef = useRef<string | null>(null);
   const boxRef = useRef<Outbox | null>(null);
   const markingRef = useRef(false);
@@ -89,6 +94,9 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
         addMessages([toMessage(row)]);
       },
       onChange: setEntries,
+      // The queued photo files go once the message is on the server or the person deleted it.
+      onSent: (entry) => deletePhotoFiles(entry.photos),
+      onRemoved: (entry) => deletePhotoFiles(entry.photos),
     });
     boxRef.current = box;
     void box.load().then(() => box.flush());
@@ -171,6 +179,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
   // Back in the app: catch up and send what is waiting.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
       if (state !== 'active') return;
       void boxRef.current?.flush();
       if (convRef.current) void refetch(convRef.current);
@@ -184,10 +193,10 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
     return best;
   }, [messages, me]);
 
-  // Mark read while the Coach tab is on screen and the app is open.
+  // Mark read only while the Coach tab is on screen AND the app is in the foreground (never from a locked phone).
   useEffect(() => {
-    if (!viewing || !conversationId || latestFromCoach === null || markingRef.current) return;
-    if (myReadAt !== null && Date.parse(myReadAt) >= Date.parse(latestFromCoach)) return;
+    if (markingRef.current) return;
+    if (!shouldMarkRead({ viewing, appActive, conversationId, latestFromCoach, myReadAt }) || !conversationId || latestFromCoach === null) return;
     markingRef.current = true;
     serverMarkRead(conversationId)
       .then(() => setMyReadAt((prev) => later(prev, latestFromCoach)))
@@ -195,27 +204,38 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       .finally(() => {
         markingRef.current = false;
       });
-  }, [viewing, conversationId, latestFromCoach, myReadAt]);
+  }, [viewing, appActive, conversationId, latestFromCoach, myReadAt]);
 
   const send = useCallback(
     (draft: Draft) => {
       const id = convRef.current;
       const box = boxRef.current;
       if (!id || !box) return;
-      void box
-        .enqueue({
-          clientMsgId: randomUUID(),
+      const clientMsgId = randomUUID();
+      const createdAt = new Date().toISOString();
+      void (async () => {
+        // Move the photos out of the cache so they survive until there is signal.
+        let queued = draft.photos;
+        try {
+          queued = await Promise.all(draft.photos.map(persistPhoto));
+        } catch {
+          // keep the cache copies: better than not sending
+        }
+        await box.enqueue({
+          clientMsgId,
           conversationId: id,
           body: draft.body.trim(),
-          createdAt: new Date().toISOString(),
-          photos: draft.photos,
+          createdAt,
+          photos: queued,
           state: 'sending',
-        })
-        .then(() => box.flush());
+        });
+        await box.flush();
+      })();
     },
     [],
   );
   const retry = useCallback((clientMsgId: string) => void boxRef.current?.retry(clientMsgId), []);
+  const remove = useCallback((clientMsgId: string) => void boxRef.current?.remove(clientMsgId), []);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   const loadEarlier = useCallback(async () => {
@@ -247,11 +267,12 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       hasMore,
       send,
       retry,
+      remove,
       reload,
       loadEarlier,
       setViewing,
     };
-  }, [status, conversationId, me, messages, entries, myReadAt, theirReadAt, hasMore, send, retry, reload, loadEarlier]);
+  }, [status, conversationId, me, messages, entries, myReadAt, theirReadAt, hasMore, send, retry, remove, reload, loadEarlier]);
 
   return <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>;
 }

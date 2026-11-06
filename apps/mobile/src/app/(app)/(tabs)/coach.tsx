@@ -125,6 +125,7 @@ export default function CoachTab() {
                   urls={urls}
                   error={chat.failedError[r.item.clientMsgId]}
                   onRetry={chat.retry}
+                  onDelete={chat.remove}
                   onOpenPhoto={setOpenPhoto}
                 />
               )

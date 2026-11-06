@@ -3,6 +3,7 @@
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { randomUUID } from 'expo-crypto';
 import { isAlreadyUploaded, photoPaths, type Database, type Message } from '@caltracker/shared';
+import { isNetworkFailure } from './network-failure';
 import { OutboxSendError, type OutboxEntry } from './outbox';
 import { supabase } from './supabase';
 
@@ -26,16 +27,6 @@ export const toMessage = (r: MessageRowLite): Message => ({
   clientMsgId: r.client_msg_id,
   createdAt: r.created_at,
 });
-
-const NETWORK = /network request failed|failed to fetch|network ?error|load failed|timed? ?out|internet connection/i;
-
-/** True when the failure is the connection (no signal), not an answer from the server. */
-export function isNetworkFailure(e: unknown): boolean {
-  if (typeof e !== 'object' || e === null) return false;
-  const x = e as { name?: unknown; message?: unknown; code?: unknown; status?: unknown };
-  if (typeof x.code === 'string' && x.code !== '') return false;
-  return NETWORK.test(`${String(x.name)}: ${String(x.message)}`) || x.status === 0;
-}
 
 async function myId(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -115,7 +106,11 @@ async function uploadPhoto(path: string, uri: string, contentType: string): Prom
   }
   const { error } = await supabase.storage.from(BUCKET).upload(path, body, { contentType, upsert: false });
   // A retry finds the photo already there: that is a success.
-  if (error && !isAlreadyUploaded(error)) throw new OutboxSendError('photo', "Couldn't upload the photo. Please try again.");
+  if (error && !isAlreadyUploaded(error)) {
+    // No signal keeps the message "Sending…" (it goes out when the phone reconnects); anything else needs a tap on Retry.
+    if (isNetworkFailure(error)) throw new OutboxSendError('network', error.message);
+    throw new OutboxSendError('photo', "Couldn't upload the photo. Please try again.");
+  }
 }
 
 /**
@@ -156,7 +151,7 @@ export async function sendEntry(entry: OutboxEntry, workspaceId: string): Promis
       await uploadPhoto(target.full, p.fullUri, type);
       await uploadPhoto(target.thumb, p.thumbUri, type);
     } catch (e) {
-      // A photo that will not upload shows "Didn't send · Retry", even when the cause was the connection.
+      // A dropped connection stays 'network' (still Sending…); only a photo that will not upload becomes Didn't send.
       throw e instanceof OutboxSendError ? e : new OutboxSendError('photo', "Couldn't upload the photo. Please try again.");
     }
     imagePaths.push(target.full);

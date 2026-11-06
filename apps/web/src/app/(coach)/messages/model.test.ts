@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeText, buildInbox, filterInbox, isAlreadyUploaded, mergeById, previewOf } from './model';
+import { badgeText, buildInbox, filterInbox, previewOf } from './model';
 
 const ME = 'coach';
 
@@ -77,31 +77,5 @@ describe('badgeText', () => {
   it('caps at 99+', () => {
     expect(badgeText(5)).toBe('5');
     expect(badgeText(100)).toBe('99+');
-  });
-});
-
-describe('mergeById', () => {
-  it('adds new messages, replaces repeats and keeps time order', () => {
-    const a = { id: 'a', createdAt: '2026-11-05T10:00:00Z', v: 1 };
-    const b = { id: 'b', createdAt: '2026-11-05T09:00:00Z', v: 1 };
-    const a2 = { ...a, v: 2 };
-    expect(mergeById([a], [b, a2])).toEqual([b, a2]);
-  });
-  it('orders equal times by id', () => {
-    const x = { id: 'x', createdAt: '2026-11-05T10:00:00Z' };
-    const y = { id: 'y', createdAt: '2026-11-05T10:00:00Z' };
-    expect(mergeById([y], [x]).map((m) => m.id)).toEqual(['x', 'y']);
-  });
-});
-
-describe('isAlreadyUploaded', () => {
-  it('recognises a 409 from storage', () => {
-    expect(isAlreadyUploaded({ statusCode: '409', message: 'The resource already exists' })).toBe(true);
-    expect(isAlreadyUploaded({ status: 409 })).toBe(true);
-    expect(isAlreadyUploaded(new Error('The resource already exists'))).toBe(true);
-  });
-  it('does not hide other failures', () => {
-    expect(isAlreadyUploaded({ statusCode: '413', message: 'Payload too large' })).toBe(false);
-    expect(isAlreadyUploaded(null)).toBe(false);
   });
 });

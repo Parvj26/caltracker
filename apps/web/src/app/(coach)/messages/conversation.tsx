@@ -2,16 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dayLabel, mergeOutbox, messageYoutubeIds, seenMessageId } from '@caltracker/shared';
+import { dayLabel, isAlreadyUploaded, mergeById, mergeOutbox, messageYoutubeIds, photoPaths, seenMessageId, thumbPathOf, type PhotoExt } from '@caltracker/shared';
 import type { Message, OutboxItem } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
-import { PhotoError, compressPhoto, photoPaths, thumbPathOf, type PhotoExt } from '@/lib/compress-image';
+import { PhotoError, compressPhoto } from '@/lib/compress-image';
 import { avatarTone, initials } from '../clients/avatar';
 import { markRead, sendMessage } from './actions';
 import { Composer, type Draft } from './composer';
 import { PAGE_SIZE, loadMessages, loadTheirRead, toMessage, type MessageRow } from './data';
-import { isAlreadyUploaded, mergeById } from './model';
 import { clockTime, useNow, useTimeZone } from './time';
 import { useBrowserSupabase, useChanges, useOnWake } from './use-realtime';
 import styles from './messages.module.css';
