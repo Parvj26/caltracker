@@ -246,6 +246,8 @@ export type SubstituteCard = {
   name: string;
   /** The option's planned sets in one line ("85 lb × 12, 115 lb × 12"). */
   summary: string;
+  /** The coach's note on the substitute, when the plan carries one. */
+  note: string | null;
   chosen: boolean;
 };
 
@@ -258,6 +260,8 @@ export function substituteCards(ex: LogExerciseDoc, units: Units): SubstituteCar
       kind: c.planned ? 'Planned' : 'Substitute',
       name: c.exerciseName,
       summary: formatSetsSummary(option.sets.map(asPlanSet), option.trackingType, units).text,
+      // Read defensively: the plan's substitute note reaches the log in a later version of the shared doc.
+      note: 'note' in option && typeof option.note === 'string' && option.note.trim() !== '' ? option.note : null,
       chosen: c.chosen,
     };
   });
@@ -618,6 +622,11 @@ export function planChanges(log: WorkoutLogDoc, nameOf: (exerciseId: string) => 
     }
   }
   return out;
+}
+
+/** True when switching this exercise to another option would clear numbers typed into its sets. */
+export function hasTypedValues(ex: LogExerciseDoc): boolean {
+  return ex.sets.some((s) => s.actualReps !== null || s.actualWeightKg !== null || s.actualDurationS !== null || s.actualDistanceM !== null);
 }
 
 /** "Last time" rows for the history sheet: one line per set ("W · 20 lb × 10", "1 · 35 lb × 12"). */

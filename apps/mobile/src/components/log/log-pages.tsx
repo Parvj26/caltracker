@@ -137,7 +137,7 @@ export function OptionPage({ model, ...common }: Common & { model: OptionPageMod
 
 /** A superset: every round stacked, the current round with each exercise's photo and tools. */
 export function SupersetPage({ model, page, details, handlers }: Common & { model: SupersetPageModel }) {
-  const { text, space, radius } = useTheme();
+  const { text, space } = useTheme();
   return (
     <View style={{ gap: space[4] }}>
       <Text testID={`superset-heading-${page}`} style={[text('screenTitle'), styles.centre]} accessibilityRole="header">

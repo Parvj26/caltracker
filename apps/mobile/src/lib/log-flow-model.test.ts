@@ -29,6 +29,7 @@ import {
   resumePlace,
   setRows,
   startGroups,
+  hasTypedValues,
   substituteCards,
   substituteOf,
   supersetRounds,
@@ -416,6 +417,9 @@ describe('coach-added substitutes', () => {
       ['Substitute', 'Machine Assisted Pull Up', false],
     ]);
     expect(cards[1].summary).toBe('35 lb × 12, 45 lb × 12, 35 lb × 12, 35 lb × 12');
+    expect(cards[1].note).toBeNull();
+    expect(hasTypedValues(ex())).toBe(false);
+    expect(hasTypedValues(updateActual(log, ex().sets[0].id, { actualReps: 5 }).blocks[1].exercises[0])).toBe(true);
     log = chooseSubstitute(log, ex().id, cards[1].substituteId, uuid, NOW);
     expect(ex().exerciseName).toBe('Machine Assisted Pull Up');
     expect(substituteOf(ex())).toEqual({ otherNames: 'Dumbbell Bench Press', doingInsteadOf: 'Dumbbell Bench Press', locked: false });

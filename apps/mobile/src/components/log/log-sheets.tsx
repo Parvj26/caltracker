@@ -87,6 +87,7 @@ export function SubstituteSheet({
               <Text style={[text('caption'), styles.ink]}>{c.chosen ? `${c.kind} · doing this one` : c.kind}</Text>
               <Text style={[text('sectionHeading'), styles.ink]}>{`${c.name}${c.chosen ? '' : '  ›'}`}</Text>
               <Text style={[text('caption'), styles.ink]}>{c.summary}</Text>
+              {c.note ? <Text style={[text('caption'), styles.ink]}>{`Coach: ${c.note}`}</Text> : null}
             </Pressable>
           ))}
           <Text style={text('caption')}>Your coach will see which one you did.</Text>

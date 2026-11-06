@@ -58,6 +58,7 @@ import {
   buildPage,
   buildSections,
   finishModel,
+  hasTypedValues,
   historyLines,
   markAll,
   pageDots,
@@ -118,6 +119,8 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
 /** The workout being logged: overview, each section's start page, and the section's pages. */
 export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Hook-up point for the coach-logging banner (PR #37): call useCoachLogging(id) here, before the early returns,
+  // and render its read-only banner above OpenLog when byCoach.
   const router = useRouter();
   const { text } = useTheme();
   const { log: active, ready } = useActiveLog();
@@ -318,6 +321,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       else setPicker({ mode: 'swap', ex: doc });
     },
     onSubstitute: (ex) => {
+      Keyboard.dismiss();
       const doc = exerciseDoc(ex.logExerciseId);
       if (doc && substituteOf(doc)?.locked === false) setSubFor(doc);
     },
@@ -429,7 +433,19 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onChoose={(substituteId) => {
           const ex = subFor;
           setSubFor(null);
-          if (ex) void op((l) => chooseSubstitute(l, ex.id, substituteId, randomUUID, nowIso()));
+          if (!ex) return;
+          // The other option gets its own planned sets: anything typed here (nothing is ticked yet) is cleared.
+          const run = () => void op((l) => chooseSubstitute(l, ex.id, substituteId, randomUUID, nowIso()));
+          if (!hasTypedValues(ex)) return run();
+          // After the sheet has gone: iOS can't show an alert while a sheet is still closing.
+          setTimeout(
+            () =>
+              Alert.alert('Switch exercise?', `The numbers you typed for ${ex.exerciseName} will be cleared.`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Switch', onPress: run },
+              ]),
+            400,
+          );
         }}
         onClose={() => setSubFor(null)}
       />
