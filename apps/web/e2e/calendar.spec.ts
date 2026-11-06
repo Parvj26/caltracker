@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Client calendar and assignment (phase 2 Task 16). Every test builds its own workouts and programs with unique
 // names, so tests can share the demo client and still run side by side.
@@ -612,7 +612,7 @@ test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigne
   expect(data).toEqual([{ start_date: addDays(today, -3) }]);
 });
 
-test('a past workout can be deleted, but not moved or edited', async ({ page }) => {
+test('a missed past workout can be deleted or moved to another day, but not edited or dragged', async ({ page }) => {
   const workout = `Missed ${unique()}`;
   created.workouts.push(workout);
   await signInAsCoach(page);
@@ -631,10 +631,10 @@ test('a past workout can be deleted, but not moved or edited', async ({ page }) 
   await expect(item(page, pastDate, workout)).toHaveCount(0);
   await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
   const menu = cell.getByRole('menu', { name: `Options for ${workout}` });
-  await expect(menu.getByRole('menuitem')).toHaveCount(1);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Move to another day', 'Delete']);
   await expect(menu.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Move to…' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'View log' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Move to another day' })).toBeFocused();
 
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   const confirm = page.getByRole('dialog', { name: `Delete ${workout}?` });
@@ -784,4 +784,56 @@ test('assigning over days that already have workouts warns first, lists the days
   await expect(again).toBeHidden();
   const after = await admin.from('workouts').select('id', { count: 'exact', head: true }).eq('client_id', cleo);
   expect(after.count).toBe(before.count);
+});
+
+test('a missed workout is rescheduled with "Move to another day"; a done one offers View log and Delete', async ({ page }) => {
+  const missed = `Resched ${unique()}`;
+  const done = `Finished ${unique()}`;
+  created.workouts.push(missed, done);
+  await signInAsCoach(page);
+  await page.goto(calendarUrl());
+  const today = await browserToday(page);
+  const pastDate = addDays(today, -2);
+  const target = addDays(today, 1);
+  const rows = await admin
+    .from('workouts')
+    .insert([missed, done].map((name) => ({ workspace_id: workspaceId, client_id: clientId, scheduled_on: pastDate, name })))
+    .select('id, name');
+  if (rows.error) throw rows.error;
+  const doneId = rows.data.find((r) => r.name === done)!.id;
+  const logId = await seedLog(admin, {
+    workspaceId, clientId, name: done, plannedWorkoutId: doneId, startedAt: `${pastDate}T12:00:00Z`, finishedAt: `${pastDate}T12:40:00Z`,
+  });
+
+  try {
+    await page.goto(calendarUrl(monthOf(pastDate)));
+    const cell = day(page, pastDate);
+    await expect(cell.getByRole('listitem').filter({ hasText: missed }).getByText('Missed')).toBeVisible();
+    await expect(cell.getByRole('listitem').filter({ hasText: done }).getByText('Missed')).toHaveCount(0);
+    await cell.getByRole('button', { name: `Options for ${missed}`, exact: true }).click();
+    await cell.getByRole('menuitem', { name: 'Move to another day' }).click();
+    const dialog = page.getByRole('dialog', { name: `Move ${missed}` });
+    await expect(dialog.getByLabel('Date')).toHaveAttribute('min', today);
+    // The old (past) day can't be kept: Move stays off until a day from today on is picked.
+    await expect(dialog.getByRole('button', { name: 'Move', exact: true })).toBeDisabled();
+    await dialog.getByLabel('Date').fill(target);
+    await dialog.getByRole('button', { name: 'Move', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+    const moved = await admin.from('workouts').select('scheduled_on').eq('name', missed).single();
+    expect(moved.data?.scheduled_on).toBe(target);
+    await page.goto(calendarUrl(monthOf(target)));
+    await expect(item(page, target, missed)).toBeVisible();
+    await expect(day(page, target).getByRole('listitem').filter({ hasText: missed }).getByText('Missed')).toHaveCount(0);
+
+    // The done one: View log first, then Delete; no move or edit.
+    await page.goto(calendarUrl(monthOf(pastDate)));
+    await day(page, pastDate).getByRole('button', { name: `Options for ${done}`, exact: true }).click();
+    const menu = day(page, pastDate).getByRole('menu', { name: `Options for ${done}` });
+    await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Delete']);
+    await menu.getByRole('menuitem', { name: 'View log' }).click();
+    await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/logs/${logId}$`));
+  } finally {
+    await admin.from('workout_logs').delete().eq('id', logId);
+  }
 });

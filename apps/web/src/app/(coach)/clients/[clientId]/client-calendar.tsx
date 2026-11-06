@@ -46,8 +46,9 @@ const forCoach = (message: string) => message.startsWith('You ') || message.star
 /**
  * One client's month: assign a program, add single library workouts ("+ Add workout" or a day's "+"), and move
  * (drag or "Move to…"), edit or delete single workouts. Single workouts go on today or later, so past days are
- * read-only except for Delete (to clear a missed workout). Moves and deletes show at once and are undone, with a message, if saving fails; the server re-sends the
- * calendar after every change. A past client's calendar is read-only: no assigning, adding, moving, editing or
+ * not drag targets: a missed workout can be moved to today or later ("Move to another day") or deleted, and a done
+ * one opens its log ("View log") or is deleted (the log stays). Moves and deletes show at once and are undone, with
+ * a message, if saving fails; the server re-sends the calendar after every change. A past client's calendar is read-only: no assigning, adding, moving, editing or
  * removing.
  */
 export function ClientCalendar({
@@ -234,13 +235,22 @@ export function ClientCalendar({
             editable ? (
               <ItemMenu
                 item={item}
+                logHref={item.logId ? logHref(item.logId) : undefined}
                 editHref={`/clients/${client.id}/workouts/${item.id}`}
                 onMove={() => setMoving({ ...item, date })}
                 onDelete={() => setDeleting({ ...item, date })}
               />
+            ) : item.logId ? (
+              // A past day, done: open its log, or clear it from the calendar (the log stays).
+              <ItemMenu item={item} logHref={logHref(item.logId)} onDelete={() => setDeleting({ ...item, date })} />
             ) : (
-              // A past day: no moving or editing, but a missed workout can still be cleared.
-              <ItemMenu item={item} onDelete={() => setDeleting({ ...item, date })} />
+              // A past day, missed: no editing, but it can be rescheduled to today or later, or cleared.
+              <ItemMenu
+                item={item}
+                onMove={() => setMoving({ ...item, date })}
+                moveLabel="Move to another day"
+                onDelete={() => setDeleting({ ...item, date })}
+              />
             )
           }
         />
