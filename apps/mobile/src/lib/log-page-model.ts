@@ -18,6 +18,7 @@ import {
   isChoiceLocked,
   liveExercises,
   needsPick,
+  pickChoice,
   kgToInput,
   nextOpenBlock,
   sectionPlace,
@@ -390,6 +391,16 @@ export function progressLabel(states: ReadonlyArray<Progress>): string {
   const at = states.indexOf('current');
   const done = states.filter((s) => s === 'done').length;
   return `Exercise ${at < 0 ? 0 : at + 1} of ${states.length}. ${done} done.`;
+}
+
+/**
+ * A tap on a pick-one card: picks only while nothing is picked yet, so two quick taps on different cards cannot
+ * flip the pick. Changing it goes through Switch (clear the pick) first.
+ */
+export function pickFirstOnly(log: WorkoutLogDoc, blockId: string, logExerciseId: string, nowIso: string): WorkoutLogDoc {
+  const block = log.blocks.find((b) => b.id === blockId);
+  if (!block || block.pickedExerciseId !== null) return log;
+  return pickChoice(log, blockId, logExerciseId, nowIso);
 }
 
 /** The progress strip in groups: one array of page states per section run (one group when there are no sections). */

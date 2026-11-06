@@ -63,6 +63,7 @@ import {
   listSections,
   pageAfterDone,
   pageIndexAfterChange,
+  pickFirstOnly,
   progressGroups,
   type PageModel,
 } from '@/lib/log-page-model';
@@ -406,12 +407,15 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     };
   };
 
-  /** A card on a pick-one page: saved and synced like every other edit (op → applyEdit → sync). */
+  /**
+   * A card on a pick-one page: saved and synced like every other edit (op → applyEdit → sync). Only the first
+   * tap picks (decided from the stored doc); changing the pick goes through Switch.
+   */
   const pickOption = (p: number, logExerciseId: string) => {
     const block = log.blocks[p];
     if (!block) return;
     tapHaptic();
-    void op((l) => pickChoice(l, block.id, logExerciseId, nowIso()));
+    void op((l) => pickFirstOnly(l, block.id, logExerciseId, nowIso()));
   };
 
   // ---- Edit sets ----

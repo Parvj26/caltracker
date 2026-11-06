@@ -8,7 +8,7 @@ import { ExerciseThumb } from './exercise-thumb';
 
 /**
  * A pick-one page before anything is picked: "Finisher · pick one", how picking works, then one card per option
- * (photo, name, plan). Tapping a card (or its photo) picks it. No Done button: there is nothing to log yet.
+ * (photo, name, plan). Tapping a card picks it. No Done button: there is nothing to log yet.
  *
  * testIDs for Maestro: choice-heading-{p}, choice-option-{index} (index = the option's place in the group).
  */
@@ -34,12 +34,11 @@ export function ChoicePage({
         <Text style={text('body')}>Tap the one you want to do. You can switch until you finish your first set.</Text>
       </View>
       {model.options.map((option, index) => {
-        const pick = () => onPick(option.logExerciseId);
         return (
           <Pressable
             key={option.logExerciseId}
             testID={`choice-option-${index}`}
-            onPress={pick}
+            onPress={() => onPick(option.logExerciseId)}
             accessibilityRole="button"
             accessibilityLabel={option.plan ? `${option.name}, ${option.plan}` : option.name}
             accessibilityHint="Picks this exercise"
@@ -49,12 +48,8 @@ export function ChoicePage({
               pressed && { opacity: pressedOpacity },
             ]}
           >
-            <ExerciseThumb
-              name={option.name}
-              detail={details[option.exerciseId]}
-              testID={`choice-thumb-${index}`}
-              onPress={pick}
-            />
+            {/* No onPress: the whole card is the one button and the one screen-reader stop. */}
+            <ExerciseThumb name={option.name} detail={details[option.exerciseId]} testID={`choice-thumb-${index}`} />
             <View style={[styles.flex, { gap: space[1] }]}>
               <Text style={[text('sectionHeading'), styles.ink]}>{option.name}</Text>
               {option.plan ? <Text style={[text('caption'), styles.ink]}>{option.plan}</Text> : null}

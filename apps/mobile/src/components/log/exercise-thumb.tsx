@@ -19,7 +19,10 @@ export function PlaceholderIcon() {
   );
 }
 
-/** The exercise's first photo as a small rounded square (or a placeholder). Tap opens its info sheet. */
+/**
+ * The exercise's first photo as a small rounded square (or a placeholder). Tap opens its info sheet. Without
+ * onPress it is only a picture inside something tappable (a pick-one card): no tap and no screen-reader stop.
+ */
 export function ExerciseThumb({
   name,
   detail,
@@ -29,12 +32,35 @@ export function ExerciseThumb({
   name: string;
   detail: ExerciseDetail | undefined;
   testID: string;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const { radius } = useTheme();
   const first = detail?.imagePaths[0];
   // A photo that can't load (offline, removed) shows the placeholder instead of an empty square.
   const [failed, setFailed] = useState<string | null>(null);
+  const photo =
+    first && failed !== first ? (
+      <Image
+        source={{ uri: exerciseImageUrl(first) }}
+        style={styles.image}
+        resizeMode="cover"
+        onError={() => setFailed(first)}
+      />
+    ) : (
+      <PlaceholderIcon />
+    );
+  if (!onPress) {
+    return (
+      <View
+        testID={testID}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.thumb, { borderRadius: radius.input }]}
+      >
+        {photo}
+      </View>
+    );
+  }
   return (
     <Pressable
       testID={testID}
@@ -47,16 +73,7 @@ export function ExerciseThumb({
       hitSlop={space[1]}
       style={({ pressed }) => [styles.thumb, { borderRadius: radius.input }, pressed && { opacity: pressedOpacity }]}
     >
-      {first && failed !== first ? (
-        <Image
-          source={{ uri: exerciseImageUrl(first) }}
-          style={styles.image}
-          resizeMode="cover"
-          onError={() => setFailed(first)}
-        />
-      ) : (
-        <PlaceholderIcon />
-      )}
+      {photo}
     </Pressable>
   );
 }

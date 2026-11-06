@@ -279,6 +279,23 @@ describe('finishPrompt', () => {
     expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 3 });
   });
 
+  it('counts the first option before the pick and the picked option after, when their set counts differ', () => {
+    let log = upperCoreLog();
+    // Option 2 (Farmer's Walk) has 2 sets; option 1 keeps its 3.
+    log = {
+      ...log,
+      blocks: log.blocks.map((b, bi) =>
+        bi === 5 ? { ...b, exercises: b.exercises.map((e, ei) => (ei === 1 ? { ...e, sets: e.sets.slice(0, 2) } : e)) } : b,
+      ),
+    };
+    const ids = (bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((x) => x.id));
+    for (const bi of [0, 1, 2, 3, 4]) log = ids(bi).reduce((acc, sid) => completeSet(acc, sid, NOW), log);
+    expect(log.blocks[5].exercises.map((e) => e.sets.length)).toEqual([3, 2]);
+    expect(finishPrompt(log, NOW)).toEqual({ kind: 'unticked', count: 3 });
+    const picked = pickChoice(log, log.blocks[5].id, log.blocks[5].exercises[1].id, NOW);
+    expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 2 });
+  });
+
   it('words the question with the exact copy', () => {
     expect(finishQuestion(3)).toBe('Finish with 3 sets not done? They won’t count.');
     expect(finishQuestion(1)).toBe('Finish with 1 set not done? It won’t count.');

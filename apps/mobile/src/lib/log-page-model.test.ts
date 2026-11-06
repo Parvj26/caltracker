@@ -1,4 +1,18 @@
-import { WorkoutDoc, completeSetWith, pickChoice, removeLogExercise, startLogFromWorkout, updateActual, type WorkoutLogDoc } from '@caltracker/shared';
+import {
+  WorkoutDoc,
+  addChoice,
+  addSection,
+  addStraightBlock,
+  addSuperset,
+  completeSetWith,
+  emptyWorkout,
+  pickChoice,
+  removeLogExercise,
+  startLogFromWorkout,
+  updateActual,
+  type ExercisePick,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 import { describe, expect, it } from 'vitest';
 import type { LastResults } from './log-api';
 import { sampleLog, upperCoreLog } from './log-fixtures';
@@ -9,7 +23,8 @@ import {
   progressGroups,
   sectionLine,
   pageAfterDone,
-  pageIndexAfterChange, 
+  pageIndexAfterChange,
+  pickFirstOnly,
   progressLabel,
   progressStates,
   restLeftLabel,
@@ -268,6 +283,32 @@ describe('sections and pick-one pages', () => {
     expect(sectionLine({ name: 'Core (Activation)', at: 1, of: 2 })).toBe('Core (Activation) · 1 of 2');
     expect(build(fixture(), 0).section).toBeNull();
     expect(build(sampleLog(), 0).section).toBeNull();
+  });
+
+  it('counts places across straight, superset and pick-one pages of one section', () => {
+    const pick = (name: string): ExercisePick => ({ id: uuid(), name, trackingType: 'weight_reps' });
+    let d = emptyWorkout(uuid, 'Mixed');
+    d = addSection(d, 'Main', uuid);
+    d = addStraightBlock(d, pick('Squat'), uuid);
+    d = addSuperset(d, [pick('Pull-up'), pick('Push-up')], uuid);
+    d = addChoice(d, [pick('Slam'), pick('Carry')], uuid);
+    const log = startLogFromWorkout(WorkoutDoc.parse(d), uuid, NOW);
+    expect(log.blocks.map((b) => b.kind)).toEqual(['straight', 'superset', 'choice']);
+    expect([0, 1, 2].map((p) => build(log, p).section)).toEqual([
+      { name: 'Main', at: 1, of: 3 },
+      { name: 'Main', at: 2, of: 3 },
+      { name: 'Main', at: 3, of: 3 },
+    ]);
+  });
+
+  it('pickFirstOnly picks only while nothing is picked, so a second quick tap cannot flip the pick', () => {
+    const log = upperCoreLog();
+    const block = log.blocks[FINISHER];
+    const [slam, walk] = block.exercises;
+    const picked = pickFirstOnly(log, block.id, slam.id, NOW);
+    expect(picked.blocks[FINISHER].pickedExerciseId).toBe(slam.id);
+    expect(pickFirstOnly(picked, block.id, walk.id, NOW)).toBe(picked);
+    expect(pickFirstOnly(log, 'no-such-block', slam.id, NOW)).toBe(log);
   });
 
   it('progressGroups: one group per section run, with the current page marked', () => {
