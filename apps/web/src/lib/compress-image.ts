@@ -66,7 +66,8 @@ export async function compressPhoto(file: File): Promise<{ full: Blob; thumb: Bl
   try {
     const full = await encode(bitmap, FULL_MAX_EDGE);
     const thumb = await encode(bitmap, THUMB_MAX_EDGE);
-    // Both come from the same browser, so they match; if not, use JPEG for both would need a re-encode, so refuse.
+    // Both sizes come from the same browser and normally end up in the same format. If they differ, refuse rather
+    // than store a photo and a thumbnail whose paths would not match.
     if (full.ext !== thumb.ext) throw new PhotoError("This browser can't prepare photos.");
     return { full: full.blob, thumb: thumb.blob, ext: full.ext };
   } finally {

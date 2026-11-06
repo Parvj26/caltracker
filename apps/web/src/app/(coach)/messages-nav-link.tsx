@@ -20,10 +20,10 @@ export function MessagesNavLink({ userId, workspaceId, initial }: { userId: stri
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const refetch = useCallback(() => {
-    loadUnreadTotal(supabase, userId).then(setCount, () => {
+    loadUnreadTotal(supabase, workspaceId, userId).then(setCount, () => {
       // Keep the last number; the next event or focus tries again.
     });
-  }, [supabase, userId]);
+  }, [supabase, workspaceId, userId]);
   const soon = useCallback(() => {
     clearTimeout(timer.current);
     timer.current = setTimeout(refetch, 150);

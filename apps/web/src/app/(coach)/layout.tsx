@@ -21,7 +21,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   const coach = await requireCoach();
   // A failed count must not take the whole dashboard down; the sidebar badge refetches by itself in the browser.
   const unread = await createServerSupabase()
-    .then((supabase) => loadUnreadTotal(supabase, coach.userId))
+    .then((supabase) => loadUnreadTotal(supabase, coach.workspaceId, coach.userId))
     .catch(() => 0);
   return (
     <div className={styles.shell}>

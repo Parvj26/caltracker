@@ -57,41 +57,15 @@ export async function loadTheirRead(supabase: Db, conversationId: string, me: st
   return data?.last_read_at ?? null;
 }
 
-/** Unread messages across the coach's current clients (the sidebar badge). Works with the server or browser client. */
-export async function loadUnreadTotal(supabase: Db, me: string): Promise<number> {
-  const [members, conversations, reads, recent] = await Promise.all([
-    supabase.from('workspace_members').select('user_id').eq('role', 'client'),
-    supabase.from('conversations').select('id, client_id'),
-    supabase.from('conversation_reads').select('conversation_id, last_read_at').eq('user_id', me),
-    supabase
-      .from('messages')
-      .select('conversation_id, sender_id, created_at')
-      .neq('sender_id', me)
-      .order('created_at', { ascending: false })
-      .limit(RECENT_LIMIT),
-  ]);
-  for (const r of [members, conversations, reads, recent]) {
-    if (r.error) throw new Error(`Could not count unread messages: ${r.error.message}`);
-  }
-  const current = new Set(members.data!.map((m) => m.user_id));
-  const readAt = new Map(reads.data!.map((r) => [r.conversation_id, r.last_read_at]));
-  const byConversation = new Map<string, { senderId: string; createdAt: string }[]>();
-  for (const m of recent.data!) {
-    const list = byConversation.get(m.conversation_id) ?? [];
-    list.push({ senderId: m.sender_id, createdAt: m.created_at });
-    byConversation.set(m.conversation_id, list);
-  }
-  let total = 0;
-  for (const c of conversations.data!) {
-    // Past clients' conversations stay readable but never count.
-    if (!current.has(c.client_id)) continue;
-    total += unreadCount(byConversation.get(c.id) ?? [], me, readAt.get(c.id) ?? null);
-  }
-  return total;
-}
+type Latest = { body: string; imagePaths: string[]; senderId: string };
+type Stamped = { senderId: string; createdAt: string };
 
-/** Every current client as an inbox row (server side; names come from profiles). */
-export async function loadInbox(supabase: Db, workspaceId: string, me: string): Promise<InboxRow[]> {
+/**
+ * What the inbox and the sidebar badge both read, so they always agree: the workspace's current clients and
+ * conversations, the coach's reads, previews and recent messages (the latest RECENT_LIMIT), and exact unread counts
+ * for conversations whose messages are all older than that window.
+ */
+async function loadActivity(supabase: Db, workspaceId: string, me: string) {
   const [members, conversations, reads, recent] = await Promise.all([
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client'),
     supabase.from('conversations').select('id, client_id, last_message_at').eq('workspace_id', workspaceId),
@@ -108,16 +82,9 @@ export async function loadInbox(supabase: Db, workspaceId: string, me: string): 
   if (reads.error) throw new Error(`Could not load read state: ${reads.error.message}`);
   if (recent.error) throw new Error(`Could not load messages: ${recent.error.message}`);
 
-  const ids = members.data.map((m) => m.user_id);
-  const profiles = ids.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', ids)
-    : { data: [], error: null };
-  if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
-  const nameOf = new Map(profiles.data.map((p) => [p.id, p.full_name]));
-  const clients = ids.map((id) => ({ id, name: nameOf.get(id) || 'Client' }));
-
-  const latest = new Map<string, { body: string; imagePaths: string[]; senderId: string }>();
-  const recentBy = new Map<string, { senderId: string; createdAt: string }[]>();
+  const clientIds = members.data.map((m) => m.user_id);
+  const latest = new Map<string, Latest>();
+  const recentBy = new Map<string, Stamped[]>();
   for (const m of recent.data) {
     // Newest first, so the first one seen per conversation is its latest.
     if (!latest.has(m.conversation_id)) latest.set(m.conversation_id, { body: m.body, imagePaths: m.image_paths, senderId: m.sender_id });
@@ -128,7 +95,7 @@ export async function loadInbox(supabase: Db, workspaceId: string, me: string): 
   const readAt = new Map(reads.data.map((r) => [r.conversation_id, r.last_read_at]));
 
   // A conversation whose messages are all older than the recent window still needs a preview and an unread count.
-  const current = new Set(ids);
+  const current = new Set(clientIds);
   const missing = conversations.data.filter((c) => current.has(c.client_id) && c.last_message_at !== null && !latest.has(c.id));
   const unreadOverride = new Map<string, number>();
   await Promise.all(
@@ -154,15 +121,38 @@ export async function loadInbox(supabase: Db, workspaceId: string, me: string): 
       unreadOverride.set(c.id, count.count ?? 0);
     }),
   );
+  return { clientIds, conversations: conversations.data, latest, recentBy, readAt, unreadOverride };
+}
 
+/** Unread messages across the coach's current clients (the sidebar badge). Works with the server or browser client. */
+export async function loadUnreadTotal(supabase: Db, workspaceId: string, me: string): Promise<number> {
+  const a = await loadActivity(supabase, workspaceId, me);
+  const current = new Set(a.clientIds);
+  let total = 0;
+  for (const c of a.conversations) {
+    // Past clients' conversations stay readable but never count.
+    if (!current.has(c.client_id)) continue;
+    total += a.unreadOverride.get(c.id) ?? unreadCount(a.recentBy.get(c.id) ?? [], me, a.readAt.get(c.id) ?? null);
+  }
+  return total;
+}
+
+/** Every current client as an inbox row (server side; names come from profiles). */
+export async function loadInbox(supabase: Db, workspaceId: string, me: string): Promise<InboxRow[]> {
+  const a = await loadActivity(supabase, workspaceId, me);
+  const profiles = a.clientIds.length
+    ? await supabase.from('profiles').select('id, full_name').in('id', a.clientIds)
+    : { data: [], error: null };
+  if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
+  const nameOf = new Map(profiles.data.map((p) => [p.id, p.full_name]));
   return buildInbox({
     me,
-    clients,
-    conversations: conversations.data.map((c) => ({ id: c.id, clientId: c.client_id, lastMessageAt: c.last_message_at })),
-    latest,
-    recent: recentBy,
-    reads: readAt,
-    unreadOverride,
+    clients: a.clientIds.map((id) => ({ id, name: nameOf.get(id) || 'Client' })),
+    conversations: a.conversations.map((c) => ({ id: c.id, clientId: c.client_id, lastMessageAt: c.last_message_at })),
+    latest: a.latest,
+    recent: a.recentBy,
+    reads: a.readAt,
+    unreadOverride: a.unreadOverride,
   });
 }
 
