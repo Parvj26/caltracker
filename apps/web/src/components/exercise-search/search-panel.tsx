@@ -9,8 +9,9 @@ import {
   type ExerciseIndexRow,
   type SearchFilters,
 } from '@caltracker/shared';
-import { toggleFavourite } from '@/app/(coach)/workouts/actions';
-import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, type LoadedExerciseIndex } from '@/lib/exercise-index';
+import { setFavourite } from '@/app/(coach)/workouts/actions';
+import { failureMessage } from '@/lib/action-errors';
+import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, rememberFavourite, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { Button, ErrorText } from '@/components/ui';
 import { FilterChips, hasActiveFilters } from './filter-chips';
@@ -50,6 +51,10 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<ExercisePick[]>([]);
   const [detail, setDetail] = useState<{ id: string; imagePaths: string[]; instructions: string[] } | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const [starError, setStarError] = useState<string | null>(null);
+  const starSeq = useRef(new Map<string, number>());
+  const searchRef = useRef<HTMLInputElement>(null);
   const details = useRef(new Map<string, { imagePaths: string[]; instructions: string[] }>());
 
   useEffect(() => {
@@ -101,7 +106,8 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
         if (!stale) setDetail({ id: activeId, ...d });
       })
       .catch(() => {
-        // The preview still shows the first photo and the tags from the index.
+        // The preview still shows the first photo and the tags from the index, plus a quiet note.
+        if (!stale) setFailedId(activeId);
       });
     return () => {
       stale = true;
@@ -130,17 +136,33 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
   }
 
   async function toggleStar(id: string) {
-    const was = favourites.has(id);
-    const flip = (on: boolean) =>
+    const want = !favourites.has(id);
+    const set = (on: boolean) =>
       setFavourites((cur) => {
         const next = new Set(cur);
         if (on) next.add(id);
         else next.delete(id);
         return next;
       });
-    flip(!was);
-    const result = await toggleFavourite(id).catch(() => null);
-    if (!result?.ok) flip(was);
+    // The newest click for an exercise wins: older answers are ignored, whether they succeed or fail.
+    const seq = (starSeq.current.get(id) ?? 0) + 1;
+    starSeq.current.set(id, seq);
+    const before = !want;
+    set(want);
+    setStarError(null);
+    let ok = false;
+    let message = "Couldn't save favourite. Try again.";
+    try {
+      ok = (await setFavourite(id, want)).ok;
+    } catch (e) {
+      message = failureMessage(e, message);
+    }
+    if (starSeq.current.get(id) !== seq) return;
+    if (ok) rememberFavourite(id, want);
+    else {
+      set(before);
+      setStarError(message);
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -179,7 +201,9 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
         <span>Search exercises</span>
         <input
           type="text"
+          ref={searchRef}
           role="combobox"
+          // The list is always shown beside the box (never collapsed), so the combobox is always expanded.
           aria-expanded="true"
           aria-controls={listId}
           aria-autocomplete="list"
@@ -227,6 +251,7 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
       ) : null}
 
       {error ? <ErrorText>Couldn&apos;t load exercises. Please try again.</ErrorText> : null}
+      {starError ? <ErrorText>{starError}</ErrorText> : null}
 
       <div className={styles.split} data-preview={previewOpen || undefined}>
         <div className={styles.listPane} aria-busy={!data && !error}>
@@ -264,7 +289,11 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
               detail={detail?.id === active.id ? detail : null}
               imageUrl={imageUrl}
               action={action}
-              onBack={() => setPreviewOpen(false)}
+              detailFailed={failedId === active.id}
+              onBack={() => {
+                setPreviewOpen(false);
+                searchRef.current?.focus();
+              }}
             />
           ) : (
             <p className={styles.caption}>Pick an exercise to see photos and instructions.</p>

@@ -170,6 +170,24 @@ describe('empty query, filters, ties', () => {
   });
 });
 
+describe('plain names rank first', () => {
+  const idx = buildExerciseIndex([
+    row('Squat Jerk', { equipment: 'barbell', primaryMuscles: ['quadriceps'] }),
+    row('Barbell Squat', { equipment: 'barbell', primaryMuscles: ['quadriceps'] }),
+    row('Bicep Curl Machine', { equipment: 'machine', primaryMuscles: ['biceps'] }),
+    row('Dumbbell Bicep Curl', { equipment: 'dumbbell', primaryMuscles: ['biceps'] }),
+  ]);
+  const top = (q: string) => searchExercises(idx, q, NO_FILTERS, NO_BOOSTS).map((h) => h.row.name);
+  it('"squat" puts Barbell Squat ahead of Squat Jerk', () => {
+    const r = searchExercises(idx, 'squat', NO_FILTERS, NO_BOOSTS);
+    expect(r[0]?.row.name).toBe('Barbell Squat');
+    expect(r[0]?.tier).toBe(1);
+  });
+  it('"bicep curl" puts Dumbbell Bicep Curl ahead of Bicep Curl Machine', () => {
+    expect(top('bicep curl')[0]).toBe('Dumbbell Bicep Curl');
+  });
+});
+
 describe('highlight', () => {
   it('covers the matched name words', () => {
     const h = hits('incline dumbbell').find((x) => x.row.name === 'Dumbbell Incline Bench Press');

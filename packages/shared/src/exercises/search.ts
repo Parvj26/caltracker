@@ -45,6 +45,8 @@ export type IndexEntry = {
   words: NameWord[];
   /** Normalised name, words joined by single spaces. */
   nameNorm: string;
+  /** `nameNorm` without a leading equipment word ("barbell squat" -> "squat"), so plain queries rank plain names first. */
+  plainNorm: string;
   /** Name words with no spaces, for "benchpress" style queries. */
   joined: string;
   /** For each character of `joined`, the index of the name word it belongs to. */
@@ -96,6 +98,15 @@ export function equipmentChipOf(equipment: string | null): EquipmentChip {
     default:
       return 'Other';
   }
+}
+
+const LEADING_EQUIPMENT = ['barbell', 'dumbbell', 'cable', 'machine', 'kettlebell', 'smith machine', 'ez bar', 'band', 'bodyweight'];
+
+function withoutLeadingEquipment(nameNorm: string): string {
+  for (const e of LEADING_EQUIPMENT) {
+    if (nameNorm.startsWith(`${e} `)) return nameNorm.slice(e.length + 1);
+  }
+  return nameNorm;
 }
 
 export function normalizeSearchText(s: string): string {
@@ -203,6 +214,7 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
       row,
       words,
       nameNorm: nameWords.map((t) => t.text).join(' '),
+      plainNorm: withoutLeadingEquipment(nameWords.map((t) => t.text).join(' ')),
       joined,
       joinedWord,
       other: [...other],
@@ -429,8 +441,11 @@ export function searchExercises(
     let tier: 1 | 2 | 3 | 4 | 5;
     if (worst === OTHER) tier = 5;
     else if (worst === TYPO) tier = 4;
-    else if (e.nameNorm === normQuery || e.nameNorm === expanded) tier = 1;
-    else if (e.nameNorm.startsWith(normQuery) || e.nameNorm.startsWith(expanded)) tier = 2;
+    else if (e.nameNorm === normQuery || e.nameNorm === expanded || e.plainNorm === normQuery || e.plainNorm === expanded) tier = 1;
+    else if (
+      e.nameNorm.startsWith(normQuery) || e.nameNorm.startsWith(expanded) ||
+      e.plainNorm.startsWith(normQuery) || e.plainNorm.startsWith(expanded)
+    ) tier = 2;
     else tier = 3;
 
     const fav = boosts.favourites.has(e.row.id) ? 0 : 1;

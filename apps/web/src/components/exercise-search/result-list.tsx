@@ -1,5 +1,6 @@
 import type { SearchHit } from '@caltracker/shared';
 import { Chip } from '@/components/ui';
+import { Photo } from './photo';
 import { FavouriteButton } from './favourite-button';
 import styles from './exercise-search.module.css';
 
@@ -53,12 +54,7 @@ export function ResultList({
                 onClick={() => onActivate(row.id)}
               >
                 {selectedIds ? <span className={styles.box} aria-hidden="true">{picked ? '✓' : ''}</span> : null}
-                {row.imagePath ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
-                  <img src={imageUrl(row.imagePath)} alt="" width={48} height={48} loading="lazy" className={styles.thumb} />
-                ) : (
-                  <span className={styles.thumbPlaceholder} aria-hidden="true" />
-                )}
+                <Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={48} height={48} className={styles.thumb} />
                 <span className={styles.rowText} aria-hidden="true">
                   <span className={styles.rowName}><Highlighted name={row.name} ranges={highlight} /></span>
                   <span className={styles.tags}>

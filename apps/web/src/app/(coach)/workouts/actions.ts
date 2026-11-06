@@ -79,17 +79,17 @@ export async function countProgramUses(id: string): Promise<number> {
   return new Set(data.map((r) => r.program_id)).size;
 }
 
-/** Star or unstar an exercise for the signed-in coach. Favourites are personal, not shared across the workspace. */
-export async function toggleFavourite(exerciseId: string): Promise<{ ok: true; favourite: boolean } | { ok: false }> {
+/** Set whether the signed-in coach has starred an exercise. Favourites are personal, not shared across the workspace. */
+export async function setFavourite(exerciseId: string, on: boolean): Promise<{ ok: boolean }> {
   await requireCoach();
-  if (!UUID.test(exerciseId)) return { ok: false };
+  if (!UUID.test(exerciseId) || typeof on !== 'boolean') return { ok: false };
   const supabase = await createServerSupabase();
-  const existing = await supabase.from('exercise_favorites').select('exercise_id').eq('exercise_id', exerciseId).maybeSingle();
-  if (existing.error) return { ok: false };
-  if (existing.data) {
-    const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId);
-    return error ? { ok: false } : { ok: true, favourite: false };
+  if (on) {
+    const { error } = await supabase
+      .from('exercise_favorites')
+      .upsert({ exercise_id: exerciseId }, { onConflict: 'coach_id,exercise_id', ignoreDuplicates: true });
+    return { ok: !error };
   }
-  const { error } = await supabase.from('exercise_favorites').insert({ exercise_id: exerciseId });
-  return error ? { ok: false } : { ok: true, favourite: true };
+  const { error } = await supabase.from('exercise_favorites').delete().eq('exercise_id', exerciseId);
+  return { ok: !error };
 }
