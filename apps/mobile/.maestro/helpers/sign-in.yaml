@@ -6,6 +6,8 @@ appId: app.caltracker.client
 - inputText: ${EMAIL}
 - tapOn:
     id: password-input
+# The focus must have moved before typing, or the password lands in the email box.
+- waitForAnimationToEnd
 - inputText: ${PASSWORD}
 - runFlow: submit.yaml
 # iOS may offer to save the password; dismiss it if shown.

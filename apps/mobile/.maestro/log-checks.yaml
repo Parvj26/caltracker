@@ -24,6 +24,7 @@ env:
 # ---- ✓ with the keyboard up: the typed weight is what is saved ----
 - tapOn:
     id: actual-weight-0-0-0
+- waitForAnimationToEnd
 # Let the keypad finish coming up (the page scrolls the box above it) before typing.
 - waitForAnimationToEnd
 - inputText: '50'
@@ -155,6 +156,7 @@ env:
 # A timed exercise: one TIME column, typed as m:ss.
 - tapOn:
     id: actual-duration-3-0-0
+- waitForAnimationToEnd
 - inputText: '1:15'
 - tapOn:
     id: tick-3-0-0

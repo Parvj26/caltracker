@@ -39,6 +39,7 @@ env:
     text: '44'
 - tapOn:
     id: actual-weight-0-0-1
+- waitForAnimationToEnd
 - inputText: '140'
 - tapOn:
     id: tick-0-0-1
@@ -54,6 +55,7 @@ env:
 # Change a ticked set: it stays ticked with the new number.
 - tapOn:
     id: actual-reps-0-0-2
+- waitForAnimationToEnd
 - eraseText
 - inputText: '6'
 - tapOn:

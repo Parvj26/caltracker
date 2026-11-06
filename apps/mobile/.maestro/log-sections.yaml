@@ -158,6 +158,7 @@ env:
 # Typing a number picks that option.
 - tapOn:
     id: actual-reps-0-0-0
+- waitForAnimationToEnd
 - inputText: '7'
 - tapOn:
     id: exercise-name-0

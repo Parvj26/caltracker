@@ -53,6 +53,7 @@ env:
 # Pushups count reps only: one REPS column, typed straight into the box.
 - tapOn:
     id: actual-reps-0-0-0
+- waitForAnimationToEnd
 - inputText: '12'
 - tapOn:
     id: tick-0-0-0
