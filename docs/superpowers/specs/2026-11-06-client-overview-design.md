@@ -86,8 +86,17 @@ two columns, and below 700 px in one.
   - Video and any other file type are refused, both in the browser and by the storage bucket.
 - **Each file has:** a name of 1–120 characters, its size, its date, and a "Shared with client" switch that is off by
   default.
-- **Actions:** open the file through a link that lasts 1 hour, rename it, share or unshare it, and delete it after
-  confirming.
+- **Actions:** open the file, rename it, share or unshare it, and delete it after confirming.
+  - The link to a file is made only when the coach opens it, and lasts 5 minutes.
+  - For a removed client, the coach can still unshare a document, so it isn't shared again if they come back. Sharing
+    and renaming are refused.
+- **No thumbnails (an exception to the media rule):** document images get no thumbnail. The list shows only names and
+  sizes, never the images, so there is nothing for a thumbnail to speed up. An image opens at full size, at most
+  1600 px.
+- **Checked on save:** the server compares the uploaded file's size and type, as Storage recorded them, with what the
+  browser said. If they differ, it removes the file and refuses the document.
+- **A save whose answer never arrives** keeps the uploaded file, since the document may have been saved. This matches
+  the scan printouts.
 - **Scope:** PDFs on the Documents tab go beyond the main spec's "PDFs for InBody only". The product owner approved
   this on 2026-11-06 as part of the trainer's list.
 
@@ -118,6 +127,13 @@ not add to or edit them.
   - the client can't read notes or limitations, and can't write anything
   - the client sees only shared documents and their files
   - the length checks hold, and a removed client can't be written for
+
+## Coach home: Body scans 30+ days
+
+- Home reads each client's latest coach-entered scan through `latest_coach_scans(workspace)`. It returns one row per
+  client, so Home never pages through every scan.
+- The function runs with the caller's own access, so the RLS on `body_measurements` applies. A pgTAP test proves that
+  another workspace's coach and other clients get nothing.
 
 ## Follow-ups (not in this change)
 
