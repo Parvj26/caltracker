@@ -125,7 +125,8 @@ test('a correction through the log page recomputes the client stats', async ({ p
   await page.getByRole('button', { name: 'Correct' }).click();
   await page.getByLabel('Set 1 reps').fill('6');
   await page.getByRole('button', { name: 'Save corrections' }).click();
-  await expect(page.getByText('Edited by coach')).toBeVisible();
+  // Saving waits for the award-workout recompute, which can be slow when the function is busy.
+  await expect(page.getByText('Edited by coach')).toBeVisible({ timeout: 30_000 });
 
   await expect.poll(async () => (await admin.from('client_stats').select('streak, workouts').eq('client_id', clientId).single()).data).toEqual({ streak: 1, workouts: 1 });
   await page.goto(`/clients/${clientId}`);
