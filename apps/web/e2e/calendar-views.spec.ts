@@ -93,6 +93,8 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await expect(page).toHaveURL(new RegExp(`\\?view=2w&from=${addDays(monday, 14)}$`));
   await expectWeeks(page, addDays(monday, 14), 2);
   await page.getByRole('link', { name: 'Previous 2 weeks' }).click();
+  // Wait for each step to land: the link's address is worked out from the days on screen.
+  await expectWeeks(page, monday, 2);
   await page.getByRole('link', { name: 'Previous 2 weeks' }).click();
   await expectWeeks(page, addDays(monday, -14), 2);
   await page.getByRole('link', { name: 'Today', exact: true }).click();
@@ -119,6 +121,7 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
 
   // Month: the whole month, and ‹ › move a month. An older ?month= link still opens the month.
   await page.getByRole('link', { name: 'Today', exact: true }).click();
+  await expectWeeks(page, monday, 1);
   await viewLink(page, 'Month').click();
   await expect(page.getByRole('table', { name: monthName(today) })).toBeVisible();
   await expect(page.getByRole('heading', { level: 2, name: monthName(today) })).toBeVisible();
@@ -242,6 +245,8 @@ test('drag a workout to another day in the 2-week view; a done one is not dragga
   await page.goto(`/clients/${clientId}?view=2w&from=${today}`);
   const handle = day(page, next).getByRole('button', { name, exact: true });
   await expect(handle).toBeVisible();
+  // The second week's tall row can start below the fold; mouse events only reach what is on screen.
+  await day(page, addDays(next, 2)).scrollIntoViewIfNeeded();
   await drag(page, handle, day(page, addDays(next, 2)));
   await expect(day(page, addDays(next, 2)).getByRole('button', { name, exact: true })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
