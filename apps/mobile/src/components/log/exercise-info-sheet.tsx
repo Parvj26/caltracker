@@ -1,7 +1,7 @@
 import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
-import { demoUrl } from '@/lib/demo-link';
+import { exerciseDemoUrl } from '@/lib/demo-link';
 import { exerciseImageUrl } from '@/lib/exercise-detail-api';
 import { openDemo } from '@/lib/open-demo';
 import { Button, TextButton } from '@/components/ui';
@@ -12,8 +12,8 @@ import { useTheme } from '@/theme/use-theme';
 const title = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * What an exercise is: start and end photos, muscles, equipment, numbered steps and a "Watch demo" button when
- * there is a YouTube link. Same page-sheet pattern as the note sheet. `detail` is undefined while it loads or when
+ * What an exercise is: start and end photos, muscles, equipment, numbered steps and a "Watch demo" button (the saved
+ * YouTube video, or a YouTube search for the exercise when there is none). Same page-sheet pattern as the note sheet. `detail` is undefined while it loads or when
  * it was never loaded and the phone is offline.
  */
 export function ExerciseInfoSheet({
@@ -28,8 +28,8 @@ export function ExerciseInfoSheet({
 }) {
   const { text, space, radius } = useTheme();
   const muscles = detail ? [...detail.primaryMuscles, ...detail.secondaryMuscles] : [];
-  // Re-checked here as well as when it was loaded: only a real YouTube video link gets a button.
-  const videoUrl = demoUrl(detail?.videoUrl);
+  // Re-checked here as well as when it was loaded: a real YouTube video link, else a YouTube search for the exercise.
+  const videoUrl = exerciseDemoUrl(detail?.videoUrl, name);
 
   return (
     <Modal visible={name !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
