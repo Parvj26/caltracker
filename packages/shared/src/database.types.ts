@@ -1440,6 +1440,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      hand_back_workout_log: { Args: { p_log_id: string }; Returns: Json }
       invite_for_join: {
         Args: { token: string }
         Returns: {
@@ -1506,6 +1507,7 @@ export type Database = {
           last_used: string
         }[]
       }
+      reclaim_workout_log: { Args: { p_log_id: string }; Returns: Json }
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
@@ -1536,6 +1538,7 @@ export type Database = {
         Returns: number
       }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
+      workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"

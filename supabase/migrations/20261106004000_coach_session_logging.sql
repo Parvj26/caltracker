@@ -2,11 +2,14 @@
 --
 -- The coach logs a client's workout from the website during an in-person session. The log is the client's
 -- (client_id), exactly like one from the phone, so history, PRs, streaks and stickers count it the same way;
--- logged_by is the coach. One person logs a workout at a time ("single active logger"):
+-- logged_by is whoever logs it now. One person logs a workout at a time ("single active logger"):
 --   * save_workout_log (the phone) and coach_save_workout_log (the website) share one body,
 --     private.save_workout_log_as, which refuses (applied=false, loggedByOther) a change from anyone but the
 --     log's logged_by;
---   * take_over_workout_log hands a client's in-progress log to their coach.
+--   * take_over_workout_log hands an in-progress log to a coach, hand_back_workout_log gives it back to the
+--     client, and reclaim_workout_log lets the client take it back once the coach has stopped (20 minutes with
+--     no activity) or is no longer a coach of the workspace;
+--   * workout_log_logger lets the client's phone ask who holds its log.
 -- No new tables, so no new RLS policies: coaches already read every log of their workspace, and all writes go
 -- through these security definer functions, which check the workspace themselves.
 
@@ -14,8 +17,8 @@
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated, service_role;
 
--- logged_by may now change, but only to a coach of the log's workspace while the log is in progress (a take
--- over), or to null (the account was deleted). workspace_id and client_id still never change.
+-- logged_by may now change while the log is in progress, to a coach of the log's workspace or back to its client;
+-- or to null (the account was deleted). workspace_id and client_id still never change.
 drop trigger workout_logs_refuse_owner_change on public.workout_logs;
 create trigger workout_logs_refuse_owner_change before update on public.workout_logs
   for each row execute function public.refuse_owner_change('workspace_id', 'client_id');
@@ -24,9 +27,10 @@ create function public.check_logged_by_change() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if new.logged_by is distinct from old.logged_by and new.logged_by is not null
-     and not (old.status = 'in_progress' and new.status = 'in_progress' and exists (
-       select 1 from public.workspace_members m
-       where m.workspace_id = new.workspace_id and m.user_id = new.logged_by and m.role in ('owner', 'staff'))) then
+     and not (old.status = 'in_progress' and new.status = 'in_progress' and (
+       new.logged_by = new.client_id
+       or exists (select 1 from public.workspace_members m
+         where m.workspace_id = new.workspace_id and m.user_id = new.logged_by and m.role in ('owner', 'staff')))) then
     raise exception 'Column logged_by of workout_logs cannot be changed.' using errcode = '42501';
   end if;
   return new;
@@ -37,15 +41,15 @@ revoke execute on function public.check_logged_by_change() from public, anon, au
 create trigger workout_logs_check_logged_by before update on public.workout_logs
   for each row execute function public.check_logged_by_change();
 
--- private.save_workout_log_as: save_workout_log's body (from 20261106001000) for a log of p_client written by
--- p_logger. Changed only to:
+-- private.save_workout_log_as: save_workout_log's body (from 20261106002100_substitutes, substitute checks
+-- included) for a log of p_client written by p_logger. Changed only to:
 --   * take the client and the logger as arguments instead of auth.uid();
 --   * when the logger is not the client, require them to coach the log's workspace (an unplanned log goes in the
 --     workspace they coach the client in);
 --   * refuse a change from anyone but the stored logged_by (single active logger);
 --   * store logged_by = p_logger on insert.
--- Every other rule (plan ownership, current client, revisions, document guards, row ids) is unchanged, so a
--- coach's save is held to exactly what the phone's is.
+-- Every other rule (plan ownership, current client, revisions, document guards, row ids, substitutes) is
+-- unchanged, so a coach's save is held to exactly what the phone's is.
 create function private.save_workout_log_as(p_doc jsonb, p_client uuid, p_logger uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -134,24 +138,26 @@ begin
     v_workspace_id := v_workspaces[1];
   end if;
 
-  if not public.is_client_in(v_workspace_id, v_uid) then
-    raise exception 'Only a current client of this coach can save workouts.'
-      using errcode = '42501', hint = 'not_a_client';
-  end if;
-
-  -- A coach logs only for a client of a workspace they coach.
+  -- A coach logs only for a client of a workspace they coach. Checked before the client check, so another
+  -- workspace's coach (or another client) gets the plain refusal, never the removed-client hint.
   if p_logger <> v_uid and not exists (select 1 from public.workspace_members c
       where c.workspace_id = v_workspace_id and c.user_id = p_logger and c.role in ('owner', 'staff')) then
     raise exception 'Only a coach of this client can log their workout.' using errcode = '42501';
+  end if;
+
+  if not public.is_client_in(v_workspace_id, v_uid) then
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
   end if;
 
   if v_revision < 1 then
     raise exception 'Revision must be at least 1.' using errcode = '23514';
   end if;
 
-  -- Single active logger: only the person logging a workout changes it (the coach takes over with
-  -- take_over_workout_log). Not an error, like a stale save: the other side adopts the server copy.
-  -- A log whose logger's account was deleted (logged_by null) stays the client's.
+  -- Single active logger: only the person logging a workout changes it (take_over_workout_log,
+  -- hand_back_workout_log and reclaim_workout_log move it). Not an error, like a stale save: the other side
+  -- adopts the server copy and never pushes its own (loggedByOther). A log whose logger's account was deleted
+  -- (logged_by null) stays the client's.
   if v_exists and coalesce(v_log.logged_by, v_log.client_id) <> p_logger then
     return jsonb_build_object('applied', false, 'revision', v_log.revision, 'status', v_log.status,
       'loggedByOther', true);
@@ -204,6 +210,20 @@ begin
     for v_ex in select value from jsonb_array_elements(coalesce(v_block -> 'exercises', '[]'::jsonb)) loop
       if coalesce(jsonb_array_length(v_ex -> 'sets'), 0) = 0 then
         raise exception 'Every exercise needs at least one set.' using errcode = '23514';
+      end if;
+      -- Substitutes: the exercise's own fields and sets are the option being done; the options are a planned
+      -- snapshot. A log saved before substitutes has neither key.
+      if v_ex ? 'substituteOptions' and jsonb_typeof(v_ex -> 'substituteOptions') is distinct from 'array'
+         or coalesce(jsonb_array_length(case when jsonb_typeof(v_ex -> 'substituteOptions') = 'array'
+              then v_ex -> 'substituteOptions' end), 0) > 4 then
+        raise exception 'An exercise has at most 4 substitute options.' using errcode = '23514';
+      end if;
+      if v_ex ->> 'substituteId' is not null and not jsonb_path_exists(v_ex,
+          '$.substituteOptions[*] ? (@.substituteId == $p)', jsonb_build_object('p', v_ex ->> 'substituteId')) then
+        raise exception 'The substitute must be one of the options.' using errcode = '23514';
+      end if;
+      if jsonb_path_exists(v_ex, '$.substituteOptions[*].sets[*] ? (@.completedAt != null)') then
+        raise exception 'Only the exercise being done can have done sets.' using errcode = '23514';
       end if;
       if v_ex -> 'sets' -> 0 ->> 'setType' = 'drop' then
         raise exception 'A drop set must follow a normal or warm-up set.' using errcode = '23514';
@@ -311,18 +331,20 @@ begin
       delete from public.log_exercises e where e.id = v_ex_id and e.log_id = v_log_id and e.block_id <> v_block_id;
 
       insert into public.log_exercises (id, block_id, position, exercise_id, planned_workout_exercise_id,
-        swapped_from_exercise_id, note)
+        swapped_from_exercise_id, note, substitute_id, substitute_options)
       values (v_ex_id, v_block_id, v_ex_pos, (v_ex ->> 'exerciseId')::uuid,
-        (v_ex ->> 'plannedWorkoutExerciseId')::uuid, (v_ex ->> 'swappedFromExerciseId')::uuid, v_ex ->> 'note')
+        (v_ex ->> 'plannedWorkoutExerciseId')::uuid, (v_ex ->> 'swappedFromExerciseId')::uuid, v_ex ->> 'note',
+        (v_ex ->> 'substituteId')::uuid, coalesce(v_ex -> 'substituteOptions', '[]'::jsonb))
       on conflict (id) do update set position = excluded.position, exercise_id = excluded.exercise_id,
           planned_workout_exercise_id = excluded.planned_workout_exercise_id,
-          swapped_from_exercise_id = excluded.swapped_from_exercise_id, note = excluded.note
+          swapped_from_exercise_id = excluded.swapped_from_exercise_id, note = excluded.note,
+          substitute_id = excluded.substitute_id, substitute_options = excluded.substitute_options
         where public.log_exercises.log_id = excluded.log_id
           and (public.log_exercises.position, public.log_exercises.exercise_id,
                public.log_exercises.planned_workout_exercise_id, public.log_exercises.swapped_from_exercise_id,
-               public.log_exercises.note)
+               public.log_exercises.note, public.log_exercises.substitute_id, public.log_exercises.substitute_options)
             is distinct from (excluded.position, excluded.exercise_id, excluded.planned_workout_exercise_id,
-               excluded.swapped_from_exercise_id, excluded.note);
+               excluded.swapped_from_exercise_id, excluded.note, excluded.substitute_id, excluded.substitute_options);
       if not found and not exists (
         select 1 from public.log_exercises e where e.id = v_ex_id and e.log_id = v_log_id and e.block_id = v_block_id
       ) then
@@ -420,11 +442,12 @@ $$;
 revoke execute on function public.coach_save_workout_log(uuid, jsonb) from public, anon, service_role;
 grant execute on function public.coach_save_workout_log(uuid, jsonb) to authenticated;
 
--- take_over_workout_log: the coach takes a client's in-progress log over (the client was logging it on the
--- phone). From now on only the coach's saves apply; the phone's are refused and it shows the coach's copy.
--- The revision jumps by 1000, above anything the phone could still have queued, so a phone that saves again
--- adopts the server copy instead of pushing its own (the phone pushes again whenever its revision is higher).
--- Taking over a log the caller already logs changes nothing. It returns { revision, status }.
+-- How long a coach-held log must go without activity before the client may take it back on the phone.
+create function private.reclaim_after() returns interval language sql immutable set search_path = '' as $$ select interval '20 minutes' $$;
+
+-- take_over_workout_log: a coach takes an in-progress log over (the client, or another coach, was logging it).
+-- From now on only this coach's saves apply; the phone's are refused with loggedByOther and it shows the coach's
+-- copy. Taking over a log the caller already logs changes nothing. It returns { revision, status }.
 create function public.take_over_workout_log(p_log_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -447,18 +470,114 @@ begin
   if v_log.status <> 'in_progress' then
     raise exception 'This workout is not in progress any more.' using errcode = '23514';
   end if;
-  if v_log.logged_by = v_uid then
-    return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+  if v_log.logged_by is distinct from v_uid then
+    update public.workout_logs l set logged_by = v_uid, last_activity_at = now() where l.id = p_log_id;
   end if;
-
-  update public.workout_logs l set logged_by = v_uid, revision = l.revision + 1000, last_activity_at = now()
-  where l.id = p_log_id;
-  return jsonb_build_object('revision', v_log.revision + 1000, 'status', v_log.status);
+  return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
 end;
 $$;
 
 revoke execute on function public.take_over_workout_log(uuid) from public, anon, service_role;
 grant execute on function public.take_over_workout_log(uuid) to authenticated;
+
+-- hand_back_workout_log: the coach logging an in-progress log gives it back to the client's phone.
+-- The revision jumps by 1000: a phone that was offline with edits queued since before the take over would
+-- otherwise push its older copy over the coach's sets. With the jump it adopts the coach's copy instead (and
+-- keeps its own as a rejected copy, as for any refusal). Returns { revision, status }.
+create function public.hand_back_workout_log(p_log_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_uid uuid := auth.uid();
+  v_log public.workout_logs%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'Sign in to log a workout.' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('save_workout_log:' || p_log_id::text, 0));
+  select * into v_log from public.workout_logs l where l.id = p_log_id for update;
+  if not found or not public.is_coach_of(v_log.workspace_id) or v_log.logged_by is distinct from v_uid then
+    raise exception 'Only the coach logging this workout can hand it back.' using errcode = '42501';
+  end if;
+  if not public.is_client_in(v_log.workspace_id, v_log.client_id) then
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
+  end if;
+  if v_log.status <> 'in_progress' then
+    raise exception 'This workout is not in progress any more.' using errcode = '23514';
+  end if;
+  update public.workout_logs l set logged_by = l.client_id, revision = l.revision + 1000, last_activity_at = now()
+  where l.id = p_log_id;
+  return jsonb_build_object('revision', v_log.revision + 1000, 'status', v_log.status);
+end;
+$$;
+
+revoke execute on function public.hand_back_workout_log(uuid) from public, anon, service_role;
+grant execute on function public.hand_back_workout_log(uuid) to authenticated;
+
+-- workout_log_logger: for the client's own log, who holds it. { status, heldByOther, lastActivityAt, canReclaim }.
+-- canReclaim: held by someone else, in progress, and either 20 minutes without activity or the holder is no
+-- longer a coach of the workspace (a removed staff coach). The holder's id is never returned to the client.
+create function public.workout_log_logger(p_log_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_uid uuid := auth.uid();
+  v_log public.workout_logs%rowtype;
+  v_held boolean;
+  v_holder_is_coach boolean;
+begin
+  select * into v_log from public.workout_logs l where l.id = p_log_id;
+  if not found or v_uid is null or v_log.client_id <> v_uid or not public.is_client_in(v_log.workspace_id, v_uid) then
+    return null;
+  end if;
+  v_held := coalesce(v_log.logged_by, v_log.client_id) <> v_log.client_id;
+  v_holder_is_coach := exists (select 1 from public.workspace_members m
+    where m.workspace_id = v_log.workspace_id and m.user_id = v_log.logged_by and m.role in ('owner', 'staff'));
+  return jsonb_build_object('status', v_log.status, 'heldByOther', v_held, 'lastActivityAt', v_log.last_activity_at,
+    'canReclaim', v_held and v_log.status = 'in_progress'
+      and (not v_holder_is_coach or v_log.last_activity_at < now() - private.reclaim_after()));
+end;
+$$;
+
+revoke execute on function public.workout_log_logger(uuid) from public, anon, service_role;
+grant execute on function public.workout_log_logger(uuid) to authenticated;
+
+-- reclaim_workout_log: the client takes their in-progress log back on the phone, when workout_log_logger says
+-- canReclaim. Returns { revision, status }; the phone then adopts the server copy and carries on from it.
+create function public.reclaim_workout_log(p_log_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_uid uuid := auth.uid();
+  v_log public.workout_logs%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'Sign in to log a workout.' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('save_workout_log:' || p_log_id::text, 0));
+  select * into v_log from public.workout_logs l where l.id = p_log_id for update;
+  if not found or v_log.client_id <> v_uid then
+    raise exception 'This workout belongs to someone else.' using errcode = '42501';
+  end if;
+  if not public.is_client_in(v_log.workspace_id, v_uid) then
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
+  end if;
+  if v_log.status <> 'in_progress' then
+    raise exception 'This workout is not in progress any more.' using errcode = '23514';
+  end if;
+  if coalesce(v_log.logged_by, v_uid) = v_uid then
+    return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+  end if;
+  if v_log.last_activity_at >= now() - private.reclaim_after() and exists (select 1 from public.workspace_members m
+      where m.workspace_id = v_log.workspace_id and m.user_id = v_log.logged_by and m.role in ('owner', 'staff')) then
+    raise exception 'Your coach is still logging this workout.' using errcode = '55000';
+  end if;
+  update public.workout_logs l set logged_by = v_uid, last_activity_at = now() where l.id = p_log_id;
+  return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+end;
+$$;
+
+revoke execute on function public.reclaim_workout_log(uuid) from public, anon, service_role;
+grant execute on function public.reclaim_workout_log(uuid) to authenticated;
 
 -- coach_last_results: last_results (20261105000800) for one client, read by their coach ("Last time: 135 × 8"
 -- on the coach's logging screen). Security invoker: RLS lets a coach read only their own workspace's logs, so

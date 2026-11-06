@@ -1,7 +1,7 @@
 -- Coach session logging (20261106004000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
-select plan(54);
+select plan(82);
 
 -- Fixtures (as postgres)
 select tests.create_user('cs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -9,6 +9,7 @@ select tests.create_user('cs-a1@t.local', 'Client A1') as a1 \gset
 select tests.create_user('cs-a2@t.local', 'Client A2') as a2 \gset
 select tests.create_user('cs-a3@t.local', 'Client A3') as a3 \gset
 select tests.create_user('cs-coach-b@t.local', 'Coach B') as coach_b \gset
+select tests.create_user('cs-staff-a@t.local', 'Staff A') as staff_a \gset
 select tests.create_user('cs-b1@t.local', 'Client B1') as b1 \gset
 select tests.create_workspace('CS Workspace A', :'coach_a') as ws_a \gset
 select tests.create_workspace('CS Workspace B', :'coach_b') as ws_b \gset
@@ -16,10 +17,12 @@ select tests.add_client(:'ws_a', :'a1');
 select tests.add_client(:'ws_a', :'a2');
 select tests.add_client(:'ws_a', :'a3');
 select tests.add_client(:'ws_b', :'b1');
+insert into public.workspace_members (workspace_id, user_id, role) values (:'ws_a', :'staff_a', 'staff');
 
 select tests.create_exercise(null, 'CS Builtin') as ex \gset
 select tests.create_workout(:'ws_a', 'A1 Session', :'a1', '2026-11-06', :'ex') as w_a1 \gset
 select tests.create_workout(:'ws_a', 'A2 Session', :'a2', '2026-11-06', :'ex') as w_a2 \gset
+select tests.create_workout(:'ws_a', 'A1 Second', :'a1', '2026-11-07', :'ex') as w_a1b \gset
 select tests.create_workout(:'ws_a', 'A3 Session', :'a3', '2026-11-06', :'ex') as w_a3 \gset
 select tests.create_workout(:'ws_b', 'B1 Session', :'b1', '2026-11-06', :'ex') as w_b1 \gset
 -- A finished log of A2's, for the "belongs to someone else" case.
@@ -62,6 +65,7 @@ $$;
 \set l1 '6c000000-0000-4000-8000-000000000001'
 \set l2 '6c000000-0000-4000-8000-000000000002'
 \set l3 '6c000000-0000-4000-8000-000000000003'
+\set l4 '6c000000-0000-4000-8000-000000000004'
 \set lb '6c000000-0000-4000-8000-0000000000b1'
 
 -- ---------------------------------------------------------------------------------------------
@@ -89,6 +93,17 @@ select ok(not has_function_privilege('authenticated', 'private.save_workout_log_
   and not has_function_privilege('service_role', 'private.save_workout_log_as(jsonb, uuid, uuid)', 'execute')
   and not has_schema_privilege('authenticated', 'private', 'usage'),
   'the shared save body cannot be called directly');
+select ok((select prosrc from pg_proc where oid = 'public.save_workout_log(jsonb)'::regprocedure)
+  like '%private.save_workout_log_as(p_doc, v_uid, v_uid)%', 'the phone''s save_workout_log uses the shared body');
+select ok((select prosrc from pg_proc where oid = 'private.save_workout_log_as(jsonb, uuid, uuid)'::regprocedure)
+  like '%substitute_options%', 'the shared body keeps the substitute checks');
+select ok(has_function_privilege('authenticated', 'public.hand_back_workout_log(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.reclaim_workout_log(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.workout_log_logger(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.hand_back_workout_log(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.reclaim_workout_log(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.workout_log_logger(uuid)', 'execute'),
+  'hand back, reclaim and the logger check are for signed-in users only');
 
 -- ---------------------------------------------------------------------------------------------
 -- The coach logs A1's planned workout
@@ -187,19 +202,84 @@ select tests.act_as(:'coach_a');
 select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'in_progress', 6, true)),
   '{"applied": false, "revision": 5, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the coach cannot change a workout the client is logging');
-select is(public.take_over_workout_log(:'l3'), '{"revision": 1005, "status": "in_progress"}'::jsonb,
-  'the coach takes over; the revision jumps above anything the phone has queued');
-select is(public.take_over_workout_log(:'l3'), '{"revision": 1005, "status": "in_progress"}'::jsonb,
+select is(public.take_over_workout_log(:'l3'), '{"revision": 5, "status": "in_progress"}'::jsonb,
+  'the coach takes over; the revision stays the phone''s');
+select is(public.take_over_workout_log(:'l3'), '{"revision": 5, "status": "in_progress"}'::jsonb,
   'taking over again changes nothing');
 select is((select logged_by from public.workout_logs where id = :'l3'), :'coach_a'::uuid, 'the coach logs it now');
 select tests.act_as(:'a2');
-select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 6, true))->>'applied', 'false',
-  'the phone''s next save is refused');
+select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 9, true)),
+  '{"applied": false, "revision": 5, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the phone''s next save is refused, even with a higher revision, and says someone else logs it');
 select tests.act_as(:'coach_a');
-select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 1006, true))->>'applied', 'true',
+select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 6, true))->>'applied', 'true',
   'the coach finishes the taken-over session');
 select is(tests.cs_error(format('select public.take_over_workout_log(%L)', :'l3')), '23514 -',
   'a finished workout cannot be taken over');
+
+-- ---------------------------------------------------------------------------------------------
+-- Hand back and reclaim: the coach logs A1's second workout, gives it back, takes it again and stops.
+select tests.act_as(:'coach_a');
+select is(public.coach_save_workout_log(:'a1', tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 1, true))->>'applied', 'true',
+  'the coach starts A1''s second workout');
+select tests.act_as(:'a1');
+select is(public.workout_log_logger(:'l4') - 'lastActivityAt',
+  '{"status": "in_progress", "heldByOther": true, "canReclaim": false}'::jsonb,
+  'the phone learns the coach holds it and cannot take it back yet');
+select is(tests.cs_error(format('select public.reclaim_workout_log(%L)', :'l4')), '55000 -',
+  'the client cannot take it back while the coach is active');
+select is(tests.cs_error(format('select public.hand_back_workout_log(%L)', :'l4')), '42501 -', 'a client cannot hand back');
+select tests.act_as(:'a2');
+select is(public.workout_log_logger(:'l4'), null, 'another client learns nothing about it');
+select is(tests.cs_error(format('select public.reclaim_workout_log(%L)', :'l4')), '42501 -',
+  'another client cannot reclaim it');
+select tests.act_as(:'coach_b');
+select is(tests.cs_error(format('select public.hand_back_workout_log(%L)', :'l4')), '42501 -',
+  'another workspace''s coach cannot hand it back');
+select tests.act_as(:'staff_a');
+select is(tests.cs_error(format('select public.hand_back_workout_log(%L)', :'l4')), '42501 -',
+  'only the coach logging it hands it back');
+select tests.act_as(:'coach_a');
+select is(public.hand_back_workout_log(:'l4'), '{"revision": 1001, "status": "in_progress"}'::jsonb,
+  'the coach hands it back; the revision jumps above anything an offline phone queued');
+select is((select logged_by from public.workout_logs where id = :'l4'), :'a1'::uuid, 'the client logs it again');
+select is(public.coach_save_workout_log(:'a1', tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 1002, true))->>'loggedByOther',
+  'true', 'the coach''s saves are refused after the hand back');
+select tests.act_as(:'a1');
+select is(public.save_workout_log(tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 7, true)),
+  '{"applied": false, "revision": 1001, "status": "in_progress"}'::jsonb,
+  'an offline phone''s older copy is refused as stale, so it adopts the coach''s sets');
+select is(public.save_workout_log(tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 1002, true))->>'applied', 'true',
+  'the phone carries on from the server copy');
+select is(public.workout_log_logger(:'l4') - 'lastActivityAt',
+  '{"status": "in_progress", "heldByOther": false, "canReclaim": false}'::jsonb, 'the client holds it now');
+
+-- The coach takes it again and goes quiet for 30 minutes: the client may take it back.
+select tests.act_as(:'coach_a');
+select is(public.take_over_workout_log(:'l4')->>'revision', '1002', 'the coach takes it again');
+reset role;
+update public.workout_logs set last_activity_at = now() - interval '30 minutes' where id = :'l4';
+select tests.act_as(:'a1');
+select is((public.workout_log_logger(:'l4') ->> 'canReclaim')::boolean, true,
+  'after 20 minutes without the coach the client may take it back');
+select is(public.reclaim_workout_log(:'l4'), '{"revision": 1002, "status": "in_progress"}'::jsonb, 'the client takes it back');
+select is((select logged_by from public.workout_logs where id = :'l4'), :'a1'::uuid, 'the phone logs it again');
+select is(public.reclaim_workout_log(:'l4')->>'revision', '1002', 'reclaiming one''s own log changes nothing');
+
+-- Another coach of the workspace can take over a colleague's session; a removed staff coach's session can be
+-- taken back by the client straight away.
+select tests.act_as(:'staff_a');
+select is(public.take_over_workout_log(:'l4')->>'status', 'in_progress', 'a staff coach takes it over');
+select tests.act_as(:'coach_a');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l4'), 'another coach takes it from the staff coach');
+select tests.act_as(:'staff_a');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l4'), 'the staff coach takes it once more');
+reset role;
+delete from public.workspace_members where workspace_id = :'ws_a' and user_id = :'staff_a';
+select tests.act_as(:'a1');
+select is((public.workout_log_logger(:'l4') ->> 'canReclaim')::boolean, true,
+  'a removed staff coach''s session can be taken back at once');
+select lives_ok(format('select public.reclaim_workout_log(%L)', :'l4'), 'the client takes it back from a removed coach');
 
 -- A removed client: the coach can neither log for them nor take their workout over.
 reset role;
@@ -217,10 +297,12 @@ select is(tests.cs_error(format('update public.workout_logs set logged_by = %L w
   '42501 -', 'logged_by cannot become another client');
 select is(tests.cs_error(format('update public.workout_logs set logged_by = %L where id = %L', :'coach_b', :'log_a3')),
   '42501 -', 'logged_by cannot become another workspace''s coach');
-select is(tests.cs_error(format('update public.workout_logs set logged_by = %L where id = %L', :'coach_a', :'l1')),
+select is(tests.cs_error(format('update public.workout_logs set logged_by = %L where id = %L', :'coach_a', :'log_a2_done')),
   '42501 -', 'a finished log''s logged_by cannot change');
 select lives_ok(format('update public.workout_logs set logged_by = %L where id = %L', :'coach_a', :'log_a3'),
   'an in-progress log can pass to the workspace''s coach');
+select lives_ok(format('update public.workout_logs set logged_by = %L where id = %L', :'a3', :'log_a3'),
+  'and back to its own client');
 
 select * from finish();
 rollback;
