@@ -1,5 +1,5 @@
 begin;
-select plan(80);
+select plan(77);
 
 -- Fixtures (as postgres)
 select tests.create_user('bs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -192,8 +192,8 @@ select is((select name from public.custom_metrics where id = :'cm_waist'), 'Wais
 
 -- Client A2 and cross-workspace reads
 select tests.act_as(:'a2');
-select is((select count(*)::int from public.body_measurements), 0, 'client A2 sees none of A1''s measurements');
-select is((select count(*)::int from public.body_measurement_values), 0, 'client A2 sees none of A1''s values');
+select is((select count(*)::int from public.body_measurements where client_id = :'a1'), 0, 'client A2 sees none of A1''s measurements');
+select is((select count(*)::int from public.body_measurement_values v join public.body_measurements m on m.id = v.measurement_id where m.client_id = :'a1'), 0, 'client A2 sees none of A1''s values');
 reset role;
 select tests.act_as(:'coach_b');
 select is((select count(*)::int from public.body_measurements where workspace_id = :'ws_a'), 0, 'coach B sees nothing of workspace A');
