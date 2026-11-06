@@ -1,0 +1,287 @@
+'use client';
+
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  buildExerciseIndex,
+  searchExercises,
+  type ExercisePick,
+  type ExerciseIndexRow,
+  type SearchFilters,
+} from '@caltracker/shared';
+import { toggleFavourite } from '@/app/(coach)/workouts/actions';
+import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, type LoadedExerciseIndex } from '@/lib/exercise-index';
+import { createBrowserSupabase } from '@/lib/supabase/client';
+import { Button, ErrorText } from '@/components/ui';
+import { FilterChips, hasActiveFilters } from './filter-chips';
+import { Preview } from './preview';
+import { ResultList } from './result-list';
+import styles from './exercise-search.module.css';
+
+type Props = {
+  mode: 'pick-one' | 'pick-many' | 'browse';
+  onPick?: (exercises: ExercisePick[]) => void;
+  /** Browse mode: open a custom exercise to edit it. */
+  onOpen?: (id: string) => void;
+  /** Shows a Cancel button in the footer. */
+  onCancel?: () => void;
+};
+
+const PAGE_SIZE = 50;
+const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
+
+const toPick = (r: ExerciseIndexRow): ExercisePick => ({ id: r.id, name: r.name, trackingType: r.trackingType });
+
+/** Layout A: search box and filter chips on top, a results list on the left, a preview pane on the right. */
+export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
+  const supabase = useMemo(() => createBrowserSupabase(), []);
+  const listId = useId();
+  const hintId = useId();
+  const baseId = useId();
+  const optionId = (id: string) => `${baseId}-${id}`;
+
+  const [data, setData] = useState<LoadedExerciseIndex | null>(null);
+  const [error, setError] = useState(false);
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const [highlightId, setHighlightId] = useState<string | undefined>();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<ExercisePick[]>([]);
+  const [detail, setDetail] = useState<{ id: string; imagePaths: string[]; instructions: string[] } | null>(null);
+  const details = useRef(new Map<string, { imagePaths: string[]; instructions: string[] }>());
+
+  useEffect(() => {
+    let stale = false;
+    loadExerciseIndex(supabase)
+      .then((d) => {
+        if (stale) return;
+        setData(d);
+        setFavourites(new Set(d.favourites));
+      })
+      .catch(() => {
+        if (!stale) setError(true);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [supabase]);
+
+  const index = useMemo(() => (data ? buildExerciseIndex(data.index) : null), [data]);
+  // Ranking uses the favourites as loaded, so starring a row does not make it jump while the coach is looking at it.
+  const boosts = useMemo(
+    () => ({ favourites: new Set(data?.favourites ?? []), recent: data?.recent ?? [] }),
+    [data],
+  );
+  const hits = useMemo(
+    () => (index ? searchExercises(index, query, filters, boosts) : []),
+    [index, query, filters, boosts],
+  );
+
+  const activeId = hits.some((h) => h.row.id === highlightId) ? highlightId : hits[0]?.row.id;
+  const active = hits.find((h) => h.row.id === activeId)?.row;
+
+  useEffect(() => {
+    if (!activeId) return;
+    document.getElementById(`${baseId}-${activeId}`)?.scrollIntoView({ block: 'nearest' });
+  }, [activeId, baseId]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const cached = details.current.get(activeId);
+    if (cached) {
+      setDetail({ id: activeId, ...cached });
+      return;
+    }
+    let stale = false;
+    loadExerciseDetail(supabase, activeId)
+      .then((d) => {
+        details.current.set(activeId, d);
+        if (!stale) setDetail({ id: activeId, ...d });
+      })
+      .catch(() => {
+        // The preview still shows the first photo and the tags from the index.
+      });
+    return () => {
+      stale = true;
+    };
+  }, [activeId, supabase]);
+
+  const many = mode === 'pick-many';
+  const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected]);
+  const imageUrl = (path: string) => exerciseImageUrl(supabase, path);
+
+  function toggleSelected(row: ExerciseIndexRow) {
+    setSelected((cur) => (cur.some((s) => s.id === row.id) ? cur.filter((s) => s.id !== row.id) : [...cur, toPick(row)]));
+  }
+
+  function activate(id: string) {
+    setHighlightId(id);
+    setPreviewOpen(true);
+    const row = hits.find((h) => h.row.id === id)?.row;
+    if (many && row) toggleSelected(row);
+  }
+
+  function primary(row: ExerciseIndexRow) {
+    if (mode === 'pick-one') onPick?.([toPick(row)]);
+    else if (many) toggleSelected(row);
+    else if (row.source === 'custom') onOpen?.(row.id);
+  }
+
+  async function toggleStar(id: string) {
+    const was = favourites.has(id);
+    const flip = (on: boolean) =>
+      setFavourites((cur) => {
+        const next = new Set(cur);
+        if (on) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+    flip(!was);
+    const result = await toggleFavourite(id).catch(() => null);
+    if (!result?.ok) flip(was);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const visible = hits.slice(0, shown);
+      const at = visible.findIndex((h) => h.row.id === activeId);
+      const next = visible[Math.min(visible.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (next) setHighlightId(next.row.id);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (active) primary(active);
+    }
+  }
+
+  function changeFilters(next: SearchFilters) {
+    setFilters(next);
+    setShown(PAGE_SIZE);
+  }
+
+  const action = !active
+    ? null
+    : mode === 'pick-one'
+      ? { label: 'Add to workout', onClick: () => primary(active) }
+      : many
+        ? { label: selectedIds.has(active.id) ? 'Remove from superset' : 'Add to superset', onClick: () => primary(active) }
+        : active.source === 'custom'
+          ? onOpen
+            ? { label: 'Edit', onClick: () => primary(active) }
+            : { label: 'Edit', href: `/exercises/${active.id}` }
+          : null;
+
+  return (
+    <div className={styles.panel}>
+      <label className={styles.searchLabel}>
+        <span>Search exercises</span>
+        <input
+          type="text"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeId ? optionId(activeId) : undefined}
+          aria-describedby={many ? hintId : undefined}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          className={styles.input}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShown(PAGE_SIZE);
+          }}
+          onKeyDown={onKeyDown}
+        />
+      </label>
+      {many ? (
+        <p id={hintId} className={styles.caption}>
+          A superset needs 2 or more exercises. Search and tap each one.
+        </p>
+      ) : null}
+      <FilterChips filters={filters} onChange={changeFilters} />
+      {many ? (
+        // Always mounted, so screen readers hear each pick as it is added.
+        <div aria-live="polite">
+          {selected.length > 0 ? (
+            <ol className={styles.picked} aria-label="Picked, in the order they're done">
+              {selected.map((ex) => (
+                <li key={ex.id}>
+                  {ex.name}
+                  <button
+                    type="button"
+                    className={styles.pickedRemove}
+                    aria-label={`Remove ${ex.name}`}
+                    onClick={() => setSelected((cur) => cur.filter((s) => s.id !== ex.id))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      ) : null}
+
+      {error ? <ErrorText>Couldn&apos;t load exercises. Please try again.</ErrorText> : null}
+
+      <div className={styles.split} data-preview={previewOpen || undefined}>
+        <div className={styles.listPane} aria-busy={!data && !error}>
+          {data && hits.length === 0 ? (
+            <div className={styles.empty}>
+              <p>No exercises match &quot;{query.trim()}&quot;</p>
+              <div className={styles.emptyActions}>
+                {hasActiveFilters(filters) ? (
+                  <Button variant="secondary" onClick={() => changeFilters(NO_FILTERS)}>Clear filters</Button>
+                ) : null}
+                <Link href="/exercises/new" className={styles.link} target="_blank">Create a custom exercise</Link>
+              </div>
+            </div>
+          ) : (
+            <ResultList
+              listId={listId}
+              hits={hits}
+              shown={shown}
+              activeId={activeId}
+              selectedIds={many ? selectedIds : null}
+              favourites={favourites}
+              imageUrl={imageUrl}
+              optionId={optionId}
+              onActivate={activate}
+              onToggleFavourite={(id) => void toggleStar(id)}
+              onShowMore={() => setShown((n) => n + PAGE_SIZE)}
+            />
+          )}
+        </div>
+        <section className={styles.previewPane} aria-label="Exercise preview">
+          {active ? (
+            <Preview
+              key={active.id}
+              row={active}
+              detail={detail?.id === active.id ? detail : null}
+              imageUrl={imageUrl}
+              action={action}
+              onBack={() => setPreviewOpen(false)}
+            />
+          ) : (
+            <p className={styles.caption}>Pick an exercise to see photos and instructions.</p>
+          )}
+        </section>
+      </div>
+
+      {onCancel || many ? (
+        <div className={styles.footer}>
+          {onCancel ? <Button variant="secondary" onClick={onCancel}>Cancel</Button> : null}
+          {many ? (
+            <Button disabled={selected.length < 2} onClick={() => onPick?.(selected)}>
+              {selected.length < 2 ? 'Pick at least 2 exercises' : `Add ${selected.length} exercises`}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}

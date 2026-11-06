@@ -39,7 +39,8 @@ export async function pickExercise(page: Page, buttonName: string, exercise: str
   await page.getByRole('button', { name: buttonName, exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Search exercises').fill(exercise);
-  await dialog.getByRole('button', { name: exercise, exact: true }).click();
+  await dialog.getByRole('option', { name: exercise, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Add to workout', exact: true }).click();
   await expect(dialog).toBeHidden();
 }
 
