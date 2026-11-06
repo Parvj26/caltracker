@@ -1,7 +1,7 @@
 -- Coach session logging (20261106004000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
-select plan(82);
+select plan(87);
 
 -- Fixtures (as postgres)
 select tests.create_user('cs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -257,14 +257,29 @@ select is(public.workout_log_logger(:'l4') - 'lastActivityAt',
 -- The coach takes it again and goes quiet for 30 minutes: the client may take it back.
 select tests.act_as(:'coach_a');
 select is(public.take_over_workout_log(:'l4')->>'revision', '1002', 'the coach takes it again');
+-- A coach save is activity on the server's clock: a browser clock an hour behind (the doc's lastActivityAt) and an
+-- edit that is only typing still count as now.
+select is(public.coach_save_workout_log(:'a1', tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 1003, true, 9)
+  || jsonb_build_object('lastActivityAt', now() - interval '1 hour'))->>'applied', 'true', 'the coach types a number');
+select ok((select last_activity_at from public.workout_logs where id = :'l4') = now(),
+  'a coach save sets the activity time to the server''s now');
+select tests.act_as(:'a1');
+select is((public.workout_log_logger(:'l4') ->> 'canReclaim')::boolean, false,
+  'so the client cannot take it back right after the coach typed');
 reset role;
 update public.workout_logs set last_activity_at = now() - interval '30 minutes' where id = :'l4';
 select tests.act_as(:'a1');
 select is((public.workout_log_logger(:'l4') ->> 'canReclaim')::boolean, true,
   'after 20 minutes without the coach the client may take it back');
-select is(public.reclaim_workout_log(:'l4'), '{"revision": 1002, "status": "in_progress"}'::jsonb, 'the client takes it back');
+select is(public.reclaim_workout_log(:'l4'), '{"revision": 2003, "status": "in_progress"}'::jsonb,
+  'the client takes it back; the revision jumps like a hand back');
 select is((select logged_by from public.workout_logs where id = :'l4'), :'a1'::uuid, 'the phone logs it again');
-select is(public.reclaim_workout_log(:'l4')->>'revision', '1002', 'reclaiming one''s own log changes nothing');
+select is(public.reclaim_workout_log(:'l4')->>'revision', '2003', 'reclaiming one''s own log changes nothing');
+select is(public.save_workout_log(tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 1500, false)),
+  '{"applied": false, "revision": 2003, "status": "in_progress"}'::jsonb,
+  'an offline phone''s older copy is refused after a reclaim, so it adopts the coach''s sets');
+select is(public.save_workout_log(tests.cs_doc(:'l4', :'w_a1b', 'in_progress', 2004, true))->>'applied', 'true',
+  'the phone carries on from the server copy after a reclaim');
 
 -- Another coach of the workspace can take over a colleague's session; a removed staff coach's session can be
 -- taken back by the client straight away.

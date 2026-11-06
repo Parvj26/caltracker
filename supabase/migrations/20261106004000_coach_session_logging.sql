@@ -310,7 +310,8 @@ begin
       name = btrim(p_doc ->> 'name'),
       status = v_status,
       finished_at = v_finished_at,
-      last_activity_at = least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()),
+      last_activity_at = case when p_logger <> v_uid then now()
+        else least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()) end,
       auto_finished = v_auto_finished,
       revision = v_revision,
       notes = p_doc ->> 'notes'
@@ -320,7 +321,8 @@ begin
       last_activity_at, auto_finished, logged_by, revision, notes)
     values (v_log_id, v_workspace_id, v_uid, v_workout_id, btrim(p_doc ->> 'name'), v_status,
       coalesce((p_doc ->> 'startedAt')::timestamptz, now()), v_finished_at,
-      least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()),
+      case when p_logger <> v_uid then now()
+        else least(coalesce((p_doc ->> 'lastActivityAt')::timestamptz, now()), now()) end,
       v_auto_finished, p_logger, v_revision, p_doc ->> 'notes');
   end if;
 
@@ -536,7 +538,9 @@ $$;
 revoke execute on function public.hand_back_workout_log(uuid) from public, anon, service_role;
 grant execute on function public.hand_back_workout_log(uuid) to authenticated;
 
--- workout_log_logger: for the client's own log, who holds it. { status, heldByOther, lastActivityAt, canReclaim }.
+-- workout_log_logger: for the client's own log, who holds it. Activity is the server's clock: a coach's save sets
+-- last_activity_at to now() (see private.save_workout_log_as), so typing counts and a wrong browser clock can't
+-- make a session look abandoned. { status, heldByOther, lastActivityAt, canReclaim }.
 -- canReclaim: held by someone else, in progress, and either 20 minutes without activity or the holder is no
 -- longer a coach of the workspace (a removed staff coach). The holder's id is never returned to the client.
 create function public.workout_log_logger(p_log_id uuid) returns jsonb
@@ -564,7 +568,9 @@ revoke execute on function public.workout_log_logger(uuid) from public, anon, se
 grant execute on function public.workout_log_logger(uuid) to authenticated;
 
 -- reclaim_workout_log: the client takes their in-progress log back on the phone, when workout_log_logger says
--- canReclaim. Returns { revision, status }; the phone then adopts the server copy and carries on from it.
+-- canReclaim. Like hand back, the revision jumps by 1000, so the phone's own older copy (edits queued before the
+-- coach took over) is refused as stale and the phone adopts the server copy, with the coach's sets, instead of
+-- overwriting it. Returns { revision, status }; the phone then carries on from the server copy.
 create function public.reclaim_workout_log(p_log_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -593,8 +599,9 @@ begin
       where m.workspace_id = v_log.workspace_id and m.user_id = v_log.logged_by and m.role in ('owner', 'staff')) then
     raise exception 'Your coach is still logging this workout.' using errcode = '55000';
   end if;
-  update public.workout_logs l set logged_by = v_uid, last_activity_at = now() where l.id = p_log_id;
-  return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+  update public.workout_logs l set logged_by = v_uid, revision = l.revision + 1000, last_activity_at = now()
+  where l.id = p_log_id;
+  return jsonb_build_object('revision', v_log.revision + 1000, 'status', v_log.status);
 end;
 $$;
 

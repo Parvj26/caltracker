@@ -213,6 +213,18 @@ describe('createLogSync', () => {
     expect(await store.load()).toEqual({ log: coach, lastSyncedRevision: 6 });
   });
 
+  it('after a reclaim (or hand back) adopts the server copy over its own older queued edits', async () => {
+    // The phone queued revision 9 before the coach took over; the reclaim put the server at 1009 with the coach's sets.
+    const store = await storeWith(sampleLog({ revision: 9 }), 4);
+    const server = sampleLog({ revision: 1009, name: 'Coach sets' });
+    const save = vi.fn((): Promise<SaveLogResult> => Promise.resolve({ applied: false, revision: 1009, status: 'in_progress' }));
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store });
+    expect(await sync.recheck()).toEqual({ status: 'synced', adopted: server });
+    expect(save).toHaveBeenCalledTimes(1);
+    // The next edit goes above the server's revision, so it applies.
+    expect(await store.load()).toEqual({ log: server, lastSyncedRevision: 1009 });
+  });
+
   it('settles a pending finished log the coach holds from the server copy, without pushing again', async () => {
     const store = createLogStore(memoryStorage(), 'user-1');
     await store.save({ log: sampleLog({ revision: 8, status: 'completed', finishedAt: '2026-11-05T09:20:00.000Z' }), lastSyncedRevision: 2 });
