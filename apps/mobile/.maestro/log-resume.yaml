@@ -1,5 +1,6 @@
-# Review Focus 1: closing the app mid-workout never loses a ticked set. Start, tick set 1, close the app,
-# open it again (same install, no clearState): Today offers Resume, and set 1 is still ticked.
+# Review Focus 1: closing the app mid-workout never loses a ticked set. Start, Done on set 1, close the app,
+# open it again (same install, no clearState): Today offers Resume, the page is on set 2, and Edit sets shows set 1
+# ticked.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -11,6 +12,8 @@ env:
     env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
@@ -18,15 +21,12 @@ env:
     visible: 'E2E Log'
     timeout: 20000
 - tapOn: 'Start'
-- tapOn:
-    text: Allow
-    optional: true
 - extendedWaitUntil:
     visible:
-      id: tick-0-0
+      id: done-0
     timeout: 20000
 - tapOn:
-    id: tick-0-0
+    id: done-0
 - tapOn:
     id: rest-skip
 - stopApp
@@ -40,8 +40,15 @@ env:
     id: resume-banner
 - extendedWaitUntil:
     visible:
-      id: tick-0-0
+      id: done-0
     timeout: 20000
+- assertVisible: 'Set 2 of 3'
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 10000
 # iOS reads a checkbox's state as its value ("checkbox, checked"), which Maestro matches as text.
 - assertVisible:
     id: tick-0-0
@@ -49,9 +56,13 @@ env:
 - assertVisible:
     id: tick-0-1
     text: 'checkbox, unchecked'
+- tapOn:
+    id: edit-sets-close
+- assertNotVisible:
+    id: edit-sets-sheet
 # Leave nothing in progress for the next flow.
 - tapOn:
-    id: log-menu
+    id: log-pill
 - tapOn:
     id: discard-button
 - tapOn: 'Discard'

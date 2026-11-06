@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WorkoutLogDoc } from '../../src/logs/schema';
-import { emptyLog, prefillActuals, startLogFromWorkout } from '../../src/logs/start';
+import { emptyLog, startLogFromWorkout } from '../../src/logs/start';
 import { fixtureWorkout, uuid } from './fixture';
 
 const NOW = '2026-11-05T10:00:00.000Z';
@@ -40,11 +40,11 @@ describe('startLogFromWorkout', () => {
     expect(exercises.map((e) => e.plannedWorkoutExerciseId)).toEqual(workout.blocks.flatMap((b) => b.exercises.map((e) => e.id)));
   });
 
-  it('snapshots targets and prefills actuals', () => {
+  it('snapshots targets and leaves actuals empty', () => {
     const sets = exercises[0]!.sets;
     expect(sets[2]!.target.repsMax).toBe(10);
-    expect(sets[2]!.actualReps).toBe(10);
-    expect(sets[2]!.actualWeightKg).toBe(60);
+    expect(sets[2]!.target.weightKg).toBe(60);
+    for (const e of exercises) for (const x of e.sets) expect([x.actualReps, x.actualWeightKg, x.actualDurationS, x.actualDistanceM]).toEqual([null, null, null, null]);
     const drop = sets[4]!;
     expect(drop.target.toFailure).toBe(true);
     expect(drop.actualReps).toBeNull();
@@ -53,17 +53,6 @@ describe('startLogFromWorkout', () => {
 
   it('produces a valid log', () => {
     expect(WorkoutLogDoc.safeParse(log).success).toBe(true);
-  });
-});
-
-describe('prefillActuals', () => {
-  it('falls back to repsMin and copies time and distance', () => {
-    expect(prefillActuals({ repsMin: 5, repsMax: null, weightKg: null, durationS: 600, distanceM: 1000 })).toEqual({
-      actualReps: 5,
-      actualWeightKg: null,
-      actualDurationS: 600,
-      actualDistanceM: 1000,
-    });
   });
 });
 

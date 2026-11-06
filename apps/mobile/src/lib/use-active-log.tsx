@@ -17,7 +17,16 @@ import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { discardLog, finishLog, reopenLog, toggleSet, type WorkoutDoc, type WorkoutLogDoc } from '@caltracker/shared';
+import {
+  completeSetWith,
+  discardLog,
+  finishLog,
+  reopenLog,
+  toggleSet,
+  type SetValues,
+  type WorkoutDoc,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 import {
   finishedFrom,
   foregroundCheck,
@@ -61,7 +70,8 @@ const UPLOAD_BEFORE_START_MS = 8000;
 const MIN_REST_LEFT_MS = 1000;
 
 /** The rest countdown of the workout in progress. Kept here so it survives leaving the logging screen. */
-export type Rest = { logId: string; endsAt: number };
+/** totalS is the rest length the ring counts against: the start length, plus every +15 s. */
+export type Rest = { logId: string; endsAt: number; totalS: number };
 
 export type ActiveLog = {
   /** The stored log: in progress, or finished and still uploading. Null when there is none. */
@@ -99,6 +109,11 @@ export type ActiveLog = {
    * set is gone. A tick also re-schedules the "Still training?" reminder.
    */
   tick: (setId: string) => Promise<boolean | null>;
+  /**
+   * Done: completes the set with these numbers (only actuals still empty are filled), decided from the stored doc.
+   * Returns the stored log when this call completed the set, else null. Re-schedules the reminder like tick.
+   */
+  done: (setId: string, values: SetValues) => Promise<WorkoutLogDoc | null>;
   /** True when finished (the shared rules refuse a log with no ticked set). */
   finish: () => Promise<boolean>;
   discard: () => Promise<void>;
@@ -391,6 +406,22 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     [op],
   );
 
+  const done = useCallback(
+    async (setId: string, values: SetValues): Promise<WorkoutLogDoc | null> => {
+      const result = { completed: false };
+      await op((l) => {
+        const next = completeSetWith(l, setId, values, nowIso());
+        result.completed = next !== l;
+        return next;
+      });
+      const l = current.current ? (await current.current.store.load())?.log : null;
+      if (!result.completed || !l) return null;
+      if (l.status === 'in_progress') scheduleReminder(l.name, l.id);
+      return l;
+    },
+    [op],
+  );
+
   const end = useCallback(
     async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc, status: 'completed' | 'discarded') => {
       const me = current.current;
@@ -441,7 +472,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
 
   const startRest = useCallback(
     (logId: string, seconds: number) => {
-      setRest({ logId, endsAt: Date.now() + seconds * 1000 });
+      setRest({ logId, endsAt: Date.now() + seconds * 1000, totalS: seconds });
       scheduleRestEnd(seconds);
     },
     [setRest],
@@ -453,7 +484,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       if (!cur) return;
       const now = Date.now();
       const endsAt = Math.max(now + MIN_REST_LEFT_MS, cur.endsAt + deltaSeconds * 1000);
-      setRest({ ...cur, endsAt });
+      setRest({ ...cur, endsAt, totalS: deltaSeconds > 0 ? cur.totalS + deltaSeconds : cur.totalS });
       scheduleRestEnd((endsAt - now) / 1000);
     },
     [setRest],
@@ -489,6 +520,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       resume,
       op,
       tick,
+      done,
       finish,
       discard,
       finishedLog,
@@ -513,6 +545,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       resume,
       op,
       tick,
+      done,
       finish,
       discard,
       finishedLog,

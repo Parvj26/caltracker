@@ -1,0 +1,468 @@
+# Edge cases of the logging screen on "E2E Mixed" (squat W + 2 sets; superset Pullups + Pushups; curls with drops):
+# typing with the keyboard up, fast + taps, double taps on Done, the rest panel's buttons and swiping during a rest,
+# Edit sets menus, the exercise list, closing the app mid-workout, wrapping back to a skipped page, and no
+# "Rest is over" notification after finishing or discarding during a rest.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today-mixed, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Mixed'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+
+# ---- Typing a weight, then Done with the keyboard still up ----
+- tapOn:
+    id: stepper-weight-value-0
+- eraseText
+- inputText: '102.5'
+# The page scrolls Done up above the keypad; let it settle so the tap lands where Done ends up.
+- waitForAnimationToEnd
+- takeScreenshot: log-typing
+# Maestro's view tree can keep Done's position from before that scroll, so tap where Done now is on screen
+# (iPhone 18 Pro, keypad up) rather than by id.
+- assertVisible:
+    id: done-0
+- tapOn:
+    point: 50%,56%
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+# The next set shows its own pre-fill, not the typed warm-up weight.
+- assertVisible:
+    id: rest-next
+    text: 'Next: Barbell Squat · set 1 of 2 · 132 lb × 8'
+
+# ---- Rest panel: +15, −15, swiping keeps it and its Next line follows the page ----
+# The clock is read by its spoken label ("71 seconds of rest left"); it started at 1:00, +15 s takes it past 1:00.
+- tapOn:
+    id: rest-plus
+- assertVisible: '(6[1-9]|7[0-5]) seconds of rest left'
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- assertVisible: '[2-4]\d seconds of rest left'
+- swipe:
+    start: 90%, 85%
+    end: 10%, 85%
+- extendedWaitUntil:
+    visible:
+      id: log-pill
+      text: '.*2 of 3.*'
+    timeout: 5000
+- assertVisible:
+    id: rest-panel
+- assertVisible:
+    id: rest-next
+    text: 'Next: .*Pullups.*'
+- takeScreenshot: log-rest-swiped
+- swipe:
+    start: 10%, 85%
+    end: 90%, 85%
+- extendedWaitUntil:
+    visible:
+      id: log-pill
+      text: '.*1 of 3.*'
+    timeout: 5000
+- assertVisible:
+    id: rest-next
+    text: 'Next: Barbell Squat · set 1 of 2.*'
+- tapOn:
+    id: rest-skip
+- assertNotVisible:
+    id: rest-panel
+
+# ---- + four times fast: four steps of 5 lb ----
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '132'
+- tapOn:
+    id: stepper-weight-plus-0
+    repeat: 4
+    delay: 50
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '152'
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-skip
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '152'
+
+# ---- Edit sets: saved numbers, Note and Swap open after the sheet closes, swipe down closes ----
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 10000
+# Pounds show as whole pounds, except a half pound someone typed (shared units rule), so 102.5 lb reads back as 102.5.
+- assertVisible:
+    id: actual-weight-0-0
+    text: '102\.5'
+- assertVisible:
+    id: actual-weight-0-1
+    text: '152'
+- assertVisible:
+    id: tick-0-1
+    text: 'checkbox, checked'
+- takeScreenshot: log-edit-sets
+- tapOn:
+    id: exercise-menu-0
+- tapOn:
+    id: menu-note
+- extendedWaitUntil:
+    visible:
+      id: note-input
+    timeout: 10000
+- tapOn:
+    id: note-cancel
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: exercise-menu-0
+    timeout: 10000
+- tapOn:
+    id: exercise-menu-0
+- tapOn:
+    id: menu-swap
+- extendedWaitUntil:
+    visible: 'Swap Barbell Squat'
+    timeout: 10000
+- tapOn:
+    id: picker-close
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: edit-sets-sheet
+    timeout: 10000
+- swipe:
+    start: 50%, 12%
+    end: 50%, 95%
+- extendedWaitUntil:
+    notVisible:
+      id: edit-sets-sheet
+    timeout: 10000
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: edit-sets-close
+    timeout: 10000
+- tapOn:
+    id: edit-sets-close
+
+# ---- Last squat set: rests (other pages open) and moves on to the superset ----
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- assertVisible:
+    id: log-pill
+    text: '.*2 of 3.*'
+- tapOn:
+    id: rest-skip
+- extendedWaitUntil:
+    visible:
+      id: done-1
+    timeout: 10000
+
+# ---- Double tap on a superset's A1: only A1 is done ----
+- assertVisible:
+    id: done-1
+    text: 'Done · straight to A2'
+- doubleTapOn:
+    id: done-1
+- assertNotVisible:
+    id: rest-panel
+- assertVisible:
+    id: done-1
+    text: 'Done round 1 · rest 1:00'
+- tapOn:
+    id: done-1
+- tapOn:
+    id: rest-skip
+
+# ---- Exercise list: a row jumps to its page ----
+- tapOn:
+    id: log-pill
+- extendedWaitUntil:
+    visible:
+      id: exercise-list
+    timeout: 10000
+- takeScreenshot: log-exercise-list
+- tapOn:
+    id: exercise-row-2
+- extendedWaitUntil:
+    visible:
+      id: done-2
+    timeout: 10000
+- assertVisible:
+    id: log-pill
+    text: '.*3 of 3.*'
+
+# ---- Double tap on a drop: only that drop is done ----
+- tapOn:
+    id: done-2
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-2
+- assertVisible:
+    id: step-name-2
+    text: 'Drop 1 of 2'
+- doubleTapOn:
+    id: done-2
+- assertVisible:
+    id: step-name-2
+    text: 'Drop 2 of 2'
+
+# ---- Close the app mid-workout: Resume opens on the first open page with every done set kept ----
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: resume-banner
+    timeout: 20000
+- tapOn:
+    id: resume-banner
+- extendedWaitUntil:
+    visible:
+      id: done-1
+    timeout: 20000
+- assertVisible:
+    id: log-pill
+    text: '.*2 of 3.*'
+- assertVisible:
+    id: superset-header-1
+    text: 'SUPERSET · Round 2 of 2.*'
+- tapOn:
+    id: log-pill
+- tapOn:
+    id: exercise-row-0
+- tapOn:
+    id: edit-sets-0
+- extendedWaitUntil:
+    visible:
+      id: tick-0-2
+    timeout: 10000
+- assertVisible:
+    id: tick-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: tick-0-1
+    text: 'checkbox, checked'
+- assertVisible:
+    id: tick-0-2
+    text: 'checkbox, checked'
+- tapOn:
+    id: edit-sets-close
+
+# ---- + Add exercise jumps to the new last page; Remove exercise leaves a sensible page ----
+- tapOn:
+    id: log-pill
+- tapOn:
+    id: list-add-exercise
+- tapOn:
+    id: exercise-search
+- inputText: 'push'
+- extendedWaitUntil:
+    visible:
+      id: exercise-result-0
+    timeout: 20000
+- tapOn:
+    id: exercise-result-0
+- extendedWaitUntil:
+    visible:
+      id: log-pill
+      text: '.*4 of 4.*'
+    timeout: 10000
+- assertVisible:
+    id: done-3
+- tapOn:
+    id: edit-sets-3
+- tapOn:
+    id: exercise-menu-4
+- tapOn:
+    id: menu-remove-exercise
+- tapOn: 'Remove'
+- extendedWaitUntil:
+    visible:
+      id: log-pill
+      text: '.*3 of 3.*'
+    timeout: 10000
+- assertVisible:
+    id: done-2
+- takeScreenshot: log-after-remove
+
+# ---- The last drop finishes the curls: back to the skipped superset round, then all done ----
+- assertVisible:
+    id: step-name-2
+    text: 'Drop 2 of 2'
+- tapOn:
+    id: done-2
+- extendedWaitUntil:
+    visible:
+      id: log-pill
+      text: '.*2 of 3.*'
+    timeout: 10000
+# The curls' set rest (1:00) runs after its last drop.
+- assertVisible:
+    id: rest-next
+    text: 'Next: A1 Pullups · set 2 of 2.*'
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-1
+- assertVisible:
+    id: done-1
+    text: 'Done · last set'
+- tapOn:
+    id: done-1
+- extendedWaitUntil:
+    visible:
+      id: all-done-1
+    timeout: 10000
+- assertVisible: 'All sets done ✓'
+- takeScreenshot: log-all-done
+- tapOn:
+    id: finish-all-1
+- extendedWaitUntil:
+    visible: '.* sets completed'
+    timeout: 10000
+- takeScreenshot: log-summary
+- tapOn:
+    id: summary-done
+
+# ---- A rest that runs out with the app in the background says "Rest is over" ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today-mixed, EMAIL: '${EMAIL}' }
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: 'Start'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- pressKey: Home
+- extendedWaitUntil:
+    visible: 'Rest is over'
+    timeout: 40000
+# launchApp restarts the app: Today offers Resume.
+- launchApp
+# ---- Discard during a rest: no notification later ----
+- extendedWaitUntil:
+    visible:
+      id: resume-banner
+    timeout: 20000
+- tapOn:
+    id: resume-banner
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- assertVisible:
+    id: rest-panel
+- tapOn:
+    id: log-pill
+- tapOn:
+    id: discard-button
+- tapOn: 'Discard'
+- extendedWaitUntil:
+    visible: 'Start'
+    timeout: 20000
+- pressKey: Home
+- extendedWaitUntil:
+    visible: 'Rest is over'
+    timeout: 30000
+    optional: true
+- assertNotVisible: 'Rest is over'
+# ---- Finish during a rest: no notification later ----
+- launchApp
+- extendedWaitUntil:
+    visible: 'Start'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- tapOn:
+    id: rest-minus
+- assertVisible:
+    id: rest-panel
+- tapOn:
+    id: finish-workout
+- tapOn: 'Finish'
+- extendedWaitUntil:
+    visible: '.* set.* completed'
+    timeout: 10000
+- tapOn:
+    id: summary-done
+- pressKey: Home
+- extendedWaitUntil:
+    visible: 'Rest is over'
+    timeout: 30000
+    optional: true
+- assertNotVisible: 'Rest is over'
+- launchApp
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }
