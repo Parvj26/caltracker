@@ -1,7 +1,8 @@
+import { useSurpriseReveal } from '@/lib/use-surprise';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { countExercises, formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
@@ -17,7 +18,7 @@ import {
   type LogForDay,
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
-import { supabase } from '@/lib/supabase';
+import { signOutAndForget } from '@/lib/sign-out';
 import { useActiveLog } from '@/lib/use-active-log';
 import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
@@ -45,7 +46,7 @@ const summaryOf = (d: CachedDetail): WorkoutSummary => ({
   id: d.doc.id,
   name: d.doc.name,
   scheduledOn: d.scheduledOn,
-  exerciseCount: d.doc.blocks.reduce((n, b) => n + b.exercises.length, 0),
+  exerciseCount: countExercises(d.doc.blocks.map((b) => ({ kind: b.kind, exercises: b.exercises.length }))),
   programName: null,
 });
 
@@ -101,6 +102,7 @@ async function workoutToStart(id: string): Promise<WorkoutDoc | null> {
 }
 
 export default function Today() {
+  useSurpriseReveal();
   const { workspace } = useSession();
   const { text, space } = useTheme();
   const router = useRouter();
@@ -287,7 +289,7 @@ export default function Today() {
         </Card>
       ) : null}
 
-      <TextButton testID="sign-out" title="Sign out" onPress={() => void supabase.auth.signOut()} />
+      <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />
     </Screen>
   );
 }

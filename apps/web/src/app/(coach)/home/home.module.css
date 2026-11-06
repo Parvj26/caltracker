@@ -48,10 +48,8 @@
 .tileLink:hover { box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .track { display: block; height: 8px; margin-top: var(--ct-space-2); border-radius: var(--ct-radius-pill); background: var(--ct-bg); overflow: hidden; }
 .fill { display: block; height: 100%; background: var(--ct-ink); border-radius: var(--ct-radius-pill); }
-.soonTile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--ct-space-1); height: 100%; border-radius: var(--ct-radius-card); padding: var(--ct-space-3) var(--ct-space-3-5); }
-.soonValue { font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); line-height: 1.1; }
 
-.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: var(--ct-space-4); align-items: start; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 460px); gap: var(--ct-space-4); align-items: start; }
 .main, .sideCard { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .sectionHeading { margin: 0 0 var(--ct-space-2); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
@@ -124,3 +122,10 @@
 @media (max-width: 700px) {
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Needs attention rows: name over the reason, actions on the right (they drop below on a narrow card). */
+.groupCount { color: var(--ct-ink-muted); font-weight: var(--ct-weight-caption); }
+.attentionRow { flex-wrap: wrap; padding: var(--ct-space-2) 0; }
+.who { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; }
+.why { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.rowActions { flex: none; display: flex; gap: var(--ct-space-2); margin-left: auto; }

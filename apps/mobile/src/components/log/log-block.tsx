@@ -1,5 +1,13 @@
 import { Text, View } from 'react-native';
-import { setLabels, type ActualPatch, type LogBlockDoc, type LogExerciseDoc, type LogSetDoc, type Units } from '@caltracker/shared';
+import {
+  setLabels,
+  type ActualPatch,
+  type LogBlockDoc,
+  type LogExerciseDoc,
+  type LogSetDoc,
+  type SetValues,
+  type Units,
+} from '@caltracker/shared';
 import { Card, TextButton } from '@/components/ui';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { useTheme } from '@/theme/use-theme';
@@ -27,6 +35,7 @@ export function LogBlock({
   lastTime,
   details,
   handlers,
+  suggested,
 }: {
   block: LogBlockDoc;
   /** The superset's letter, null for straight sets. */
@@ -38,6 +47,8 @@ export function LogBlock({
   /** Loaded exercise details by exercise id. */
   details: Record<string, ExerciseDetail>;
   handlers: BlockHandlers;
+  /** What Done would save for an unticked set (grey placeholders); left out, the boxes show "–". */
+  suggested?: (ex: LogExerciseDoc, set: LogSetDoc) => SetValues | undefined;
 }) {
   const { text, space } = useTheme();
   const superset = block.kind === 'superset';
@@ -79,6 +90,7 @@ export function LogBlock({
                 onMenu={() => handlers.onSetMenu(ex, set, labels[si] ?? '')}
                 onDelete={() => handlers.onRemoveSet(ex, set)}
                 canDelete={handlers.canRemoveSet(ex, set)}
+                suggested={suggested?.(ex, set)}
               />
             ))}
             <TextButton testID={`add-set-${ei}`} title="+ Set" onPress={() => handlers.onAddSet(ex)} />

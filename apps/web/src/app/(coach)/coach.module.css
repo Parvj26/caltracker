@@ -1,4 +1,23 @@
 /* Coach dashboard shell: sidebar + content (docs/design/mockups/coach-dashboard.html). Colours only via var(--ct-*). */
+.skipLink {
+  position: fixed;
+  z-index: 100;
+  top: var(--ct-space-2);
+  left: var(--ct-space-2);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-4);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-weight: var(--ct-weight-button);
+  text-decoration: none;
+  transform: translateY(calc(-100% - var(--ct-space-4)));
+}
+.skipLink:focus-visible, .skipLink:focus { transform: none; }
+.content:focus { outline: none; }
+
 .shell {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
@@ -16,6 +35,8 @@
   background: var(--ct-surface-sidebar);
   border-right: 1px solid var(--ct-border);
   overflow-y: auto;
+  /* Above the page, so nothing in main (a sticky save bar, a toast) draws over the menu. */
+  z-index: 15;
 }
 
 .brand { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: 0 var(--ct-space-2-5); }
@@ -74,8 +95,10 @@
   padding: var(--ct-space-6) 32px 48px;
 }
 
-/* Below 900 px the sidebar becomes a 56 px icon rail; the links keep their names via aria-label. */
-@media (max-width: 899.98px) {
+/* Below 1200 px (iPad portrait, small laptops) the sidebar becomes a 56 px icon rail so the calendar, program grid
+   and builder get the width. The links keep their names via aria-label (and a title tooltip for the mouse). The rail
+   still scrolls, so Profile and Sign out stay reachable on short screens (zoom, split view). */
+@media (max-width: 1199.98px) {
   .shell { grid-template-columns: 56px minmax(0, 1fr); }
   .sidebar { padding: var(--ct-space-3-5) 6px; align-items: center; }
   .brand { padding: 0; align-items: center; }
@@ -92,5 +115,7 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
+@media (max-width: 899.98px) {
   .content { padding: var(--ct-space-4-5) var(--ct-space-4) 40px; }
 }

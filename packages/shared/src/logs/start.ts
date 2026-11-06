@@ -1,18 +1,7 @@
 import type { WorkoutDoc, WorkoutSetDoc } from '../workouts/schema';
 import type { LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
 
-export function prefillActuals(
-  target: Pick<LogSetTarget, 'repsMin' | 'repsMax' | 'weightKg' | 'durationS' | 'distanceM'>,
-): Pick<LogSetDoc, 'actualReps' | 'actualWeightKg' | 'actualDurationS' | 'actualDistanceM'> {
-  return {
-    actualReps: target.repsMax ?? target.repsMin,
-    actualWeightKg: target.weightKg,
-    actualDurationS: target.durationS,
-    actualDistanceM: target.distanceM,
-  };
-}
-
-function logSetFromPlan(s: WorkoutSetDoc, makeId: () => string): LogSetDoc {
+function planSnapshot(s: WorkoutSetDoc): { setType: WorkoutSetDoc['setType']; target: LogSetTarget } {
   const target: LogSetTarget = {
     repsMin: s.targetRepsMin,
     repsMax: s.targetRepsMax,
@@ -22,7 +11,11 @@ function logSetFromPlan(s: WorkoutSetDoc, makeId: () => string): LogSetDoc {
     toFailure: s.toFailure,
     restSeconds: s.restSeconds,
   };
-  return { id: makeId(), setType: s.setType, target, ...prefillActuals(target), completedAt: null };
+  return { setType: s.setType, target };
+}
+
+function logSetFromPlan(s: WorkoutSetDoc, makeId: () => string): LogSetDoc {
+  return { id: makeId(), ...planSnapshot(s), actualReps: null, actualWeightKg: null, actualDurationS: null, actualDistanceM: null, completedAt: null };
 }
 
 export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, nowIso: string): WorkoutLogDoc {
@@ -37,8 +30,11 @@ export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, n
     autoFinished: false,
     revision: 0,
     notes: null,
+    sections: workout.sections.map((s) => ({ ...s })),
     blocks: workout.blocks.map((b) => ({
       id: makeId(),
+      sectionId: b.sectionId,
+      pickedExerciseId: null,
       kind: b.kind,
       exercises: b.exercises.map((e) => ({
         id: makeId(),
@@ -49,6 +45,21 @@ export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, n
         swappedFromExerciseId: null,
         note: null,
         sets: e.sets.map((s) => logSetFromPlan(s, makeId)),
+        substituteId: null,
+        substituteOptions:
+          e.substitutes.length === 0
+            ? []
+            : [
+                { substituteId: null, exerciseId: e.exerciseId, exerciseName: e.exerciseName, trackingType: e.trackingType, note: e.note, sets: e.sets },
+                ...e.substitutes.map((sub) => ({
+                  substituteId: sub.id,
+                  exerciseId: sub.exerciseId,
+                  exerciseName: sub.exerciseName,
+                  trackingType: sub.trackingType,
+                  note: sub.note,
+                  sets: sub.sets,
+                })),
+              ].map((o) => ({ ...o, sets: o.sets.map((s) => planSnapshot(s)) })),
       })),
     })),
   };
@@ -66,6 +77,7 @@ export function emptyLog(name: string, makeId: () => string, nowIso: string): Wo
     autoFinished: false,
     revision: 0,
     notes: null,
+    sections: [],
     blocks: [],
   };
 }

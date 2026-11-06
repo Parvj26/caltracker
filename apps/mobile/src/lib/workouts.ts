@@ -1,7 +1,7 @@
 // Pure helpers for the client's calendar screens. No Supabase client here, so they run in unit tests;
 // the fetchers live in ./workouts-api.ts.
 import { demoUrl } from './demo-link';
-import { addDays, groupDropSets, isoWeekday, youtubeFormSearchUrl, type IsoDate, type SetType } from '@caltracker/shared';
+import { addDays, countExercises, groupDropSets, isoWeekday, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
   id: string;
@@ -11,16 +11,16 @@ export type WorkoutSummary = {
   programName: string | null;
 };
 
-/** PostgREST select for a calendar card: name, date, program and exercise count (no sets). */
+/** PostgREST select for a calendar card: name, date, program and exercise count (no sets; a pick-one group counts once). */
 export const WORKOUT_SUMMARY_SELECT =
-  'id, name, scheduled_on, program_assignments(program_name), workout_blocks(workout_exercises(count))';
+  'id, name, scheduled_on, program_assignments(program_name), workout_blocks(kind, workout_exercises(count))';
 
 export type WorkoutSummaryRow = {
   id: string;
   name: string;
   scheduled_on: string | null;
   program_assignments: { program_name: string } | null;
-  workout_blocks: Array<{ workout_exercises: Array<{ count: number }> }>;
+  workout_blocks: Array<{ kind: BlockKind; workout_exercises: Array<{ count: number }> }>;
 };
 
 export function toWorkoutSummary(row: WorkoutSummaryRow): WorkoutSummary {
@@ -28,9 +28,8 @@ export function toWorkoutSummary(row: WorkoutSummaryRow): WorkoutSummary {
     id: row.id,
     name: row.name,
     scheduledOn: row.scheduled_on ?? '',
-    exerciseCount: row.workout_blocks.reduce(
-      (n, b) => n + b.workout_exercises.reduce((m, e) => m + Number(e.count), 0),
-      0,
+    exerciseCount: countExercises(
+      row.workout_blocks.map((b) => ({ kind: b.kind, exercises: b.workout_exercises.reduce((m, e) => m + Number(e.count), 0) })),
     ),
     programName: row.program_assignments?.program_name ?? null,
   };
@@ -94,13 +93,19 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+/** "A or B", "A, B or C": the options of a pick-one group, as the phone writes them. */
+export function orList(names: ReadonlyArray<string>): string {
+  if (names.length < 2) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+}
+
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /**
  * Letter per block for labelling superset exercises (A1, A2…): supersets are lettered in order among
  * supersets only (first A, second B); straight blocks get null. The web builder numbers blocks and has no letters.
  */
-export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' }>): Array<string | null> {
+export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' | 'choice' }>): Array<string | null> {
   let n = 0;
   return blocks.map((b) => {
     if (b.kind !== 'superset') return null;

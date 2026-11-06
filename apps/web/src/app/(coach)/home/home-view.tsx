@@ -4,21 +4,23 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  attentionGroups,
+  checkClients,
   compareByLastName,
-  endingPrograms,
   formatLogDuration,
-  missedClients,
-  quietClients,
+  prsThisWeek,
   todayRows,
   weekProgress,
+  type AttentionGroup,
+  type AttentionKind,
   type HomeClient,
-  type IsoDate,
   type TodayRow,
 } from '@caltracker/shared';
 import { ComingSoon } from '@/components/coming-soon';
 import { Card, Chip, Tile } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
+import { checkInput, GROUP_ID, GROUP_TITLE, reasonText } from '@/lib/daily-check';
 import { useBrowserToday } from '@/lib/local-today';
 import { ClientSearch } from './client-search';
 import { avatarTone, initials } from '../clients/avatar';
@@ -26,13 +28,19 @@ import styles from './home.module.css';
 
 const SHOWN = 5;
 const dayFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** The browser's own calendar date of an instant, as YYYY-MM-DD. */
-function localDateOf(iso: string): IsoDate {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${String(d.getFullYear()).padStart(4, '0')}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** The problems a coach acts on; "new bests" is a celebration and never makes Home say someone needs attention. */
+const PROBLEMS: ReadonlySet<AttentionKind> = new Set(['missed_in_a_row', 'missed', 'program_ending', 'nothing_planned', 'quiet']);
+/** Reasons where the next step is planning: those rows get an Assign action. */
+const NEEDS_PLAN: ReadonlySet<AttentionKind> = new Set(['program_ending', 'nothing_planned']);
+
+/**
+ * Messages are not on main yet. When the messages route ships, return a client's conversation URL here and every
+ * Needs attention row gets a "Message" action beside Open. Until then there is no button at all (never a dead one).
+ */
+function messageHref(clientId: string): string | null {
+  void clientId;
+  return null;
 }
 
 const subscribeMinute = (onChange: () => void) => {
@@ -71,7 +79,9 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   const shown = all ? items : items.slice(0, SHOWN);
   return (
     <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className={styles.group}>
-      <h3 id={headingId} className={styles.groupHeading}>{title}</h3>
+      <h3 id={headingId} className={styles.groupHeading}>
+        {title} <span className={styles.groupCount}>({items.length})</span>
+      </h3>
       <ul className={styles.list}>{shown.map(row)}</ul>
       {items.length > SHOWN && !all ? (
         <button type="button" className={styles.showAll} onClick={() => setAll(true)}>Show all {items.length}</button>
@@ -80,14 +90,25 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   );
 }
 
-function ClientLink({ client, children }: { client: HomeClient; children?: React.ReactNode }) {
+/** One Needs attention row: who, why, and what to do about it. */
+function AttentionRow({ client, why, assign }: { client: HomeClient; why: string; assign: boolean }) {
   const name = fullName(client);
+  const message = messageHref(client.id);
   return (
-    <Link href={`/clients/${client.id}`} className={styles.rowLink}>
+    <li className={cx(styles.row, styles.attentionRow)}>
       <Avatar name={name} toneKey={client.id} />
-      <span className={styles.rowText} title={name}>{name}</span>
-      {children}
-    </Link>
+      <span className={styles.who}>
+        <span className={styles.rowText} title={name}>{name}</span>
+        <span className={styles.why}>{why}</span>
+      </span>
+      <span className={styles.rowActions}>
+        <Link href={`/clients/${client.id}`} className={styles.assign} aria-label={`Open ${name}`}>Open</Link>
+        {assign ? (
+          <Link href={`/clients/${client.id}?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
+        ) : null}
+        {message ? <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link> : null}
+      </span>
+    </li>
   );
 }
 
@@ -116,32 +137,28 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
   const searchable = useMemo(() => [...data.clients].sort(compareByLastName), [data.clients]);
   const view = useMemo(() => {
     if (!today) return null;
-    const clients: HomeClient[] = data.clients.map((c) => ({
-      id: c.id,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      joinedOn: localDateOf(c.joinedAt),
-      lastFinishedOn: c.lastFinishedAt ? localDateOf(c.lastFinishedAt) : null,
-    }));
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // Every count covers current clients only.
-    const current = new Set(clients.map((c) => c.id));
-    const workouts = data.workouts.filter((w) => current.has(w.clientId));
-    const byId = new Map(clients.map((c) => [c.id, c]));
-    const missed = missedClients(workouts, today);
+    const input = checkInput(data, today, timeZone);
+    const byId = new Map(input.clients.map((c) => [c.id, c]));
+    const groups = attentionGroups(checkClients(input));
+    const missedIds = new Set(groups.filter((g) => g.kind === 'missed' || g.kind === 'missed_in_a_row').flatMap((g) => g.items.map((i) => i.clientId)));
     return {
+      today,
+      newPrs: prsThisWeek(input.prs, new Set(byId.keys()), today, timeZone),
       byId,
-      rows: todayRows(workouts, clients, today),
-      progress: weekProgress(workouts, today),
-      missed,
-      quiet: quietClients(clients, today, new Set(missed.map((m) => m.clientId))),
-      ending: endingPrograms(data.assignments.filter((a) => current.has(a.clientId)), today),
+      rows: todayRows(input.workouts, input.clients, today),
+      progress: weekProgress(input.workouts, today),
+      groups,
+      missedCount: missedIds.size,
+      firstMissed: groups.find((g) => g.kind === 'missed_in_a_row' || g.kind === 'missed')?.kind ?? null,
     };
   }, [data, today]);
 
   if (!today || !view) return <Skeleton />;
-  const { byId, rows, progress, missed, quiet, ending } = view;
+  const { byId, rows, progress, groups, missedCount, firstMissed, newPrs } = view;
   const pct = progress.planned === 0 ? 0 : Math.round((progress.done / progress.planned) * 100);
-  const onTrack = missed.length === 0 && quiet.length === 0 && ending.length === 0;
+  const onTrack = !groups.some((g) => PROBLEMS.has(g.kind));
 
   return (
     <div className={styles.page}>
@@ -173,12 +190,14 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
           }
         />
         <a href="#today" className={styles.tileLink}><Tile tone="blue" label="Workouts today" value={rows.length} /></a>
-        {missed.length > 0 ? (
-          <a href="#missed" className={styles.tileLink}><Tile tone="pink" label="Missed 2+" value={missed.length} /></a>
+        {firstMissed ? (
+          <a href={`#${GROUP_ID[firstMissed]}`} className={styles.tileLink}><Tile tone="pink" label="Missed a workout" value={missedCount} /></a>
         ) : (
-          <Tile tone="pink" label="Missed 2+" value={0} />
+          <Tile tone="pink" label="Missed a workout" value={0} />
         )}
-        <ComingSoon label="New PRs this week" className={styles.soonTile}><span className={styles.soonValue}>—</span></ComingSoon>
+        <Link href="/activity" className={styles.tileLink} aria-label={`New PRs this week: ${newPrs}. Open activity`}>
+          <Tile tone="lime" label="New PRs this week" value={newPrs} />
+        </Link>
       </div>
 
       <div className={styles.columns}>
@@ -214,53 +233,20 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
           <Card className={styles.sideCard}>
             <h2 id="attention-heading" className={styles.sectionHeading}>Needs attention</h2>
             {onTrack ? <p className={styles.empty}>Everyone&apos;s on track.</p> : null}
-            {missed.length > 0 ? (
+            {groups.map((g: AttentionGroup) => (
               <Group
-                id="missed"
-                title="Missed 2+"
-                items={missed}
-                row={(m) => {
-                  const c = byId.get(m.clientId);
+                key={g.kind}
+                id={GROUP_ID[g.kind]}
+                title={GROUP_TITLE[g.kind]}
+                items={g.items}
+                row={(item) => {
+                  const c = byId.get(item.clientId);
                   return c ? (
-                    <li key={m.clientId} className={styles.row}>
-                      <ClientLink client={c}><span className={styles.detail}>Missed {m.missed} in the last 7 days</span></ClientLink>
-                    </li>
+                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} assign={NEEDS_PLAN.has(g.kind)} />
                   ) : null;
                 }}
               />
-            ) : null}
-            {quiet.length > 0 ? (
-              <Group
-                title="No workout in 5+ days"
-                items={quiet}
-                row={(q) => {
-                  const c = byId.get(q.clientId);
-                  return c ? (
-                    <li key={q.clientId} className={styles.row}>
-                      <ClientLink client={c}><span className={styles.detail}>{q.days} days</span></ClientLink>
-                      <ComingSoon label="Message" />
-                    </li>
-                  ) : null;
-                }}
-              />
-            ) : null}
-            {ending.length > 0 ? (
-              <Group
-                title="Program ending soon"
-                items={ending}
-                row={(e) => {
-                  const c = byId.get(e.clientId);
-                  return c ? (
-                    <li key={e.assignmentId} className={styles.row}>
-                      <ClientLink client={c}>
-                        <span className={styles.detail}>{e.daysLeft === 0 ? 'Ends today' : `Ends in ${plural(e.daysLeft, 'day', 'days')}`}</span>
-                      </ClientLink>
-                      <Link href={`/clients/${c.id}?assign=1`} className={styles.assign} aria-label={`Assign a program to ${fullName(c)}`}>Assign</Link>
-                    </li>
-                  ) : null;
-                }}
-              />
-            ) : null}
+            ))}
             <ComingSoon label="Body scans 30+ days" className={styles.scans} />
           </Card>
         </aside>

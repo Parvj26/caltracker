@@ -27,6 +27,7 @@ export function NavLink({
     <Link
       href={href}
       aria-label={badge > 0 ? `${label}, ${badge} unread` : label}
+      title={label}
       aria-current={current ? 'page' : undefined}
       className={cx(styles.navItem, current && styles.navItemCurrent)}
     >

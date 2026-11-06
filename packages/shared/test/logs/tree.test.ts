@@ -41,6 +41,9 @@ const row: LogTreeRow = {
       id: id(30),
       position: 1,
       kind: 'superset',
+      section_id: null,
+      section_name: null,
+      picked_exercise_id: null,
       log_exercises: [
         {
           id: id(32),
@@ -71,6 +74,9 @@ const row: LogTreeRow = {
       id: id(10),
       position: 0,
       kind: 'straight',
+      section_id: null,
+      section_name: null,
+      picked_exercise_id: null,
       log_exercises: [
         {
           id: id(11),
@@ -136,6 +142,8 @@ describe('logRowToDoc', () => {
       plannedWorkoutExerciseId: id(801),
       swappedFromExerciseId: id(700),
       note: 'Chest to floor.',
+      substituteId: null,
+      substituteOptions: [],
     });
     expect(sets).toHaveLength(2);
   });
@@ -242,5 +250,34 @@ describe('logRowToDoc', () => {
     ]) {
       expect(LOG_TREE_SELECT).toContain(part);
     }
+  });
+});
+
+describe('logRowToDoc sections and pick', () => {
+  const S1 = id(500);
+  it('round-trips sections and the pick', () => {
+    const [b1, b0] = [row.log_blocks[0]!, row.log_blocks[1]!];
+    const picked = b1.log_exercises[0]!.id;
+    const doc = logRowToDoc({
+      ...row,
+      log_blocks: [
+        { ...b1, kind: 'choice', section_id: S1, section_name: 'Main', picked_exercise_id: picked },
+        { ...b0, id: id(60), position: 0, section_id: S1, section_name: 'Main' },
+      ],
+    });
+    expect(doc.sections).toEqual([{ id: S1, name: 'Main' }]);
+    expect(doc.blocks.map((b) => b.sectionId)).toEqual([S1, S1]);
+    expect(doc.blocks[1]!.pickedExerciseId).toBe(picked);
+    expect(doc.blocks[0]!.pickedExerciseId).toBeNull();
+  });
+
+  it('gives no sections when the section columns are null', () => {
+    const doc = logRowToDoc(row);
+    expect(doc.sections).toEqual([]);
+    expect(doc.blocks.every((b) => b.sectionId === null && b.pickedExerciseId === null)).toBe(true);
+  });
+
+  it('selects the new columns', () => {
+    expect(LOG_TREE_SELECT).toContain('section_id, section_name, picked_exercise_id');
   });
 });

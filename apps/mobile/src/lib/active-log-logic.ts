@@ -3,6 +3,7 @@
 import {
   autoFinish,
   completedSetCount,
+  openSetCount,
   emptyLog,
   finishLog,
   formatLogDuration,
@@ -71,6 +72,11 @@ function autoFinishNote(log: WorkoutLogDoc): string | null {
 /** The one-time note after the coach removed the client and a workout could not be saved. */
 export function goneNote(coach: string | null): string {
   return `You’re no longer with ${coach ?? 'your coach'}, so this workout wasn’t saved.`;
+}
+
+/** The one-time note after a workout could not be saved because one of its exercises was deleted. */
+export function unavailableNote(name: string): string {
+  return `${name} couldn’t be saved because one of its exercises is no longer available. Ask your coach to check it.`;
 }
 
 /** The one-time note after the server's copy of a workout replaced sets ticked on the phone. */
@@ -168,15 +174,13 @@ export function keepEnded(ended: WorkoutLogDoc | null, doc: WorkoutLogDoc | null
 
 export type FinishPrompt = { kind: 'none-done' } | { kind: 'unticked'; count: number } | { kind: 'ready' };
 
-const setCount = (log: WorkoutLogDoc) => log.blocks.reduce((n, b) => n + b.exercises.reduce((m, e) => m + e.sets.length, 0), 0);
-
 /**
  * What tapping Finish does. The shared finishLog decides whether the log can be finished at all (it refuses one
  * with no ticked set: the client may only discard or keep going); otherwise unticked sets are asked about first.
  */
 export function finishPrompt(log: WorkoutLogDoc, nowIso: string): FinishPrompt {
   if (finishLog(log, nowIso) === log) return { kind: 'none-done' };
-  const count = setCount(log) - completedSetCount(log);
+  const count = openSetCount(log);
   return count > 0 ? { kind: 'unticked', count } : { kind: 'ready' };
 }
 

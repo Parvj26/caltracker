@@ -28,7 +28,7 @@ const base = () => startLogFromWorkout(fixtureWorkout(), uuid, T0);
 function withSets(sets: Partial<LogSetDoc>[], extra?: Partial<LogSetDoc>[]): WorkoutLogDoc {
   const log = base();
   const ex = log.blocks[0]!.exercises[0]!;
-  ex.sets = sets.map((s, i) => ({ ...ex.sets[Math.min(i, ex.sets.length - 1)]!, id: uuid(), ...s }));
+  ex.sets = sets.map((s, i) => ({ ...ex.sets[Math.min(i, ex.sets.length - 1)]!, id: uuid(), setType: 'normal' as const, ...s }));
   if (extra) {
     const ex2 = log.blocks[1]!.exercises[0]!;
     ex2.trackingType = 'reps';
@@ -59,11 +59,14 @@ describe('log summary', () => {
     expect(completedSetCount(log)).toBe(4);
   });
 
-  it('volume includes warm-ups and drops', () => {
-    const log = withSets([done(10, 60), { ...done(8, 40), setType: 'drop' }]);
-    expect(logVolumeKg(log)).toBe(920);
-    const warm = withSets([{ ...done(10, 20), setType: 'warmup' }]);
-    expect(logVolumeKg(warm)).toBe(200);
+  it('volume skips warm-ups and counts drops', () => {
+    const log = withSets([
+      { ...done(10, 20), setType: 'warmup' },
+      done(8, 60),
+      { ...done(6, 40), setType: 'drop' },
+    ]);
+    expect(logVolumeKg(log)).toBe(720);
+    expect(logVolumeKg(withSets([{ ...done(10, 20), setType: 'warmup' }]))).toBe(0);
   });
 
   it('volume treats null reps or weight as zero and rounds to 1 decimal', () => {

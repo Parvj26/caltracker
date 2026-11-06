@@ -397,3 +397,9 @@ import_map = "./functions/deno.json"
 [functions.accept-invite]
 verify_jwt = true
 import_map = "./functions/deno.json"
+
+# Called by the phone (client JWT, checked in the function with auth.getUser) and by the pg_cron catch-up job,
+# which has no JWT and sends the x-award-secret header instead. So the gateway check is off here.
+[functions.award-workout]
+verify_jwt = false
+import_map = "./functions/deno.json"

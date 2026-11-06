@@ -112,7 +112,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
         )}
 
         {fields.includes('reps') ? (
-          <div className={styles.reps}>
+          <div className={styles.reps} data-caption="Reps">
             {range ? (
               <>
                 <NumberInput
@@ -170,7 +170,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
         ) : null}
 
         {fields.includes('weight') ? (
-          <label className={styles.unitField}>
+          <label className={styles.unitField} data-caption="Weight">
             <NumberInput
               label={`Weight (${units})`}
               inputMode="decimal"
@@ -186,20 +186,22 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
         ) : null}
 
         {fields.includes('duration') ? (
-          <NumberInput
-            label="Duration (m:ss)"
-            inputMode="numeric"
-            placeholder="m:ss"
-            className={styles.narrow}
-            value={set.targetDurationS}
-            format={formatClock}
-            parse={parseClock}
-            onCommit={(n) => onChange({ targetDurationS: n })}
-          />
+          <label className={styles.unitField} data-caption="Time">
+            <NumberInput
+              label="Duration (m:ss)"
+              inputMode="numeric"
+              placeholder="m:ss"
+              className={styles.narrow}
+              value={set.targetDurationS}
+              format={formatClock}
+              parse={parseClock}
+              onCommit={(n) => onChange({ targetDurationS: n })}
+            />
+          </label>
         ) : null}
 
         {fields.includes('distance') ? (
-          <label className={styles.unitField}>
+          <label className={styles.unitField} data-caption="Distance">
             <NumberInput
               label={`Distance (${distanceUnit})`}
               inputMode="decimal"
@@ -220,7 +222,7 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
             To failure
           </label>
         ) : showRest ? (
-          <label className={styles.unitField}>
+          <label className={styles.unitField} data-caption="Rest">
             <NumberInput
               label="Rest (m:ss)"
               inputMode="numeric"

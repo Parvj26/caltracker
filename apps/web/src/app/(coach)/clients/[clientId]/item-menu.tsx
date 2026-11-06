@@ -12,16 +12,23 @@ import styles from '@/components/calendar/calendar.module.css';
 
 const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 
-/** One item's options. A past day's item gets no `editHref` or `onMove`, so its menu offers only Delete. */
+/**
+ * One item's options. A done workout gets `logHref` ("View log"). A past day's item gets no `editHref`; a missed one
+ * gets `onMove` with the label "Move to another day" (to today or later), a done one no move at all.
+ */
 export function ItemMenu({
   item,
+  logHref,
   editHref,
   onMove,
+  moveLabel = 'Move to…',
   onDelete,
 }: {
   item: CalendarItem;
-  editHref?: string;
-  onMove?: () => void;
+  logHref?: string | undefined;
+  editHref?: string | undefined;
+  onMove?: (() => void) | undefined;
+  moveLabel?: string;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -72,13 +79,27 @@ export function ItemMenu({
       </button>
       {open ? (
         <ul id={menuId} role="menu" aria-label={`Options for ${item.name}`} className={styles.menu} onKeyDown={onMenuKey}>
+          {logHref ? (
+            <li role="none">
+              <Link
+                href={logHref}
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[0] = el;
+                }}
+                className={styles.menuItem}
+              >
+                View log
+              </Link>
+            </li>
+          ) : null}
           {editHref ? (
             <li role="none">
               <Link
                 href={editHref}
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[0] = el;
+                  itemsRef.current[1] = el;
                 }}
                 className={styles.menuItem}
               >
@@ -92,7 +113,7 @@ export function ItemMenu({
                 type="button"
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[1] = el;
+                  itemsRef.current[2] = el;
                 }}
                 className={styles.menuItem}
                 onClick={() => {
@@ -100,7 +121,7 @@ export function ItemMenu({
                   onMove();
                 }}
               >
-                Move to…
+                {moveLabel}
               </button>
             </li>
           ) : null}
@@ -109,7 +130,7 @@ export function ItemMenu({
               type="button"
               role="menuitem"
               ref={(el) => {
-                itemsRef.current[2] = el;
+                itemsRef.current[3] = el;
               }}
               className={styles.menuItem}
               onClick={() => {
@@ -142,7 +163,8 @@ export function MoveDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [date, setDate] = useState(entry.date);
+  // A missed workout from a past day starts on today: its own day can't be picked.
+  const [date, setDate] = useState(entry.date < today ? today : entry.date);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -209,6 +231,7 @@ export function DeleteDialog({
       <h2 id={titleId} className={styles.dialogTitle}>Delete {entry.name}?</h2>
       <p id={bodyId} className={styles.dialogBody}>
         Removes it from {clientName}&apos;s calendar on {formatShortDay(entry.date)}. Your library isn&apos;t changed.
+        {entry.logId ? " The workout they logged stays in Activity." : ''}
       </p>
       <div className={styles.dialogActions}>
         <Button variant="secondary" onClick={() => dialogRef.current?.close()}>

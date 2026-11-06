@@ -31,7 +31,29 @@ function CoachIcon({ color }: { color: ColorValue }) {
   );
 }
 
-// The other tabs in the spec (Progress, Messages, Community, Me) arrive with their phases.
+/** A tiny rising line made of three bars for Progress. */
+function ProgressIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.progressIcon}>
+      {[0.4, 0.7, 1].map((h) => (
+        <View key={h} style={[styles.progressBar, { backgroundColor: color, height: space[4.5] * h }]} />
+      ))}
+    </View>
+  );
+}
+
+/** A small paw-like drawn icon for the Zoo book: a rounded square with a dot inside. */
+function ZooIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={[styles.zooIcon, { borderColor: color }]}>
+      <View style={[styles.zooDot, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
+// tab) starts on Today, not on whichever tab the router would pick.
+// The other tabs in the spec (Community, Me) arrive with their phases.
 export default function TabsLayout() {
   const unread = useUnreadCount();
   return (
@@ -72,6 +94,18 @@ export default function TabsLayout() {
           tabBarBadgeStyle: { backgroundColor: palette.magenta, color: white },
         }}
       />
+      <Tabs.Screen
+        name="zoo"
+        options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
+      />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarButtonTestID: 'tab-progress',
+          tabBarIcon: ({ color }) => <ProgressIcon color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
@@ -87,5 +121,16 @@ const styles = StyleSheet.create({
   },
   bubbleIcon: { width: space[4.5], height: space[3.5] + 2, borderRadius: space[1], borderWidth: borderWidth.card },
   bubbleTail: { position: 'absolute', left: space[2], bottom: -2, width: space[1] + 2, height: space[1] + 2, transform: [{ rotate: '45deg' }] },
+  zooIcon: {
+    width: space[4.5],
+    height: space[4.5],
+    borderRadius: space[2],
+    borderWidth: borderWidth.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressIcon: { width: space[4.5], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', gap: space[1] },
+  progressBar: { flex: 1, borderRadius: 1 },
+  zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
 });

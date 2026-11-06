@@ -34,6 +34,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_catchup_attempts: {
+        Row: {
+          attempts: number
+          last_attempt_at: string
+          log_id: string
+        }
+        Insert: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id: string
+        }
+        Update: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "award_catchup_attempts_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      awards: {
+        Row: {
+          client_id: string
+          created_at: string
+          log_id: string
+          log_revision: number
+          result: Json
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          log_id: string
+          log_revision?: number
+          result: Json
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          log_id?: string
+          log_revision?: number
+          result?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "awards_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "awards_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -83,6 +151,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_stats: {
+        Row: {
+          best_streak: number
+          client_id: string
+          journey_week: number
+          lifetime_volume_kg: number
+          pr_count: number
+          streak: number
+          streak_week: string | null
+          updated_at: string
+          workouts: number
+          workspace_id: string
+        }
+        Insert: {
+          best_streak?: number
+          client_id: string
+          journey_week?: number
+          lifetime_volume_kg?: number
+          pr_count?: number
+          streak?: number
+          streak_week?: string | null
+          updated_at?: string
+          workouts?: number
+          workspace_id: string
+        }
+        Update: {
+          best_streak?: number
+          client_id?: string
+          journey_week?: number
+          lifetime_volume_kg?: number
+          pr_count?: number
+          streak?: number
+          streak_week?: string | null
+          updated_at?: string
+          workouts?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_stats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -144,6 +259,32 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_favorites: {
+        Row: {
+          coach_id: string
+          created_at: string | null
+          exercise_id: string
+        }
+        Insert: {
+          coach_id?: string
+          created_at?: string | null
+          exercise_id: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string | null
+          exercise_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_favorites_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
             referencedColumns: ["id"]
           },
         ]
@@ -256,7 +397,10 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["block_kind"]
           log_id: string
+          picked_exercise_id: string | null
           position: number
+          section_id: string | null
+          section_name: string | null
           updated_at: string
           workspace_id: string
         }
@@ -266,7 +410,10 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           log_id: string
+          picked_exercise_id?: string | null
           position: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -276,7 +423,10 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           log_id?: string
+          picked_exercise_id?: string | null
           position?: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -301,6 +451,8 @@ export type Database = {
           note: string | null
           planned_workout_exercise_id: string | null
           position: number
+          substitute_id: string | null
+          substitute_options: Json
           swapped_from_exercise_id: string | null
           updated_at: string
           workspace_id: string
@@ -315,6 +467,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -329,6 +483,8 @@ export type Database = {
           note?: string | null
           planned_workout_exercise_id?: string | null
           position?: number
+          substitute_id?: string | null
+          substitute_options?: Json
           swapped_from_exercise_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -529,6 +685,64 @@ export type Database = {
           },
         ]
       }
+      personal_records: {
+        Row: {
+          achieved_at: string
+          client_id: string
+          exercise_id: string
+          id: string
+          kind: string
+          log_id: string | null
+          reps: number | null
+          value_kg: number
+          workspace_id: string
+        }
+        Insert: {
+          achieved_at: string
+          client_id: string
+          exercise_id: string
+          id?: string
+          kind: string
+          log_id?: string | null
+          reps?: number | null
+          value_kg: number
+          workspace_id: string
+        }
+        Update: {
+          achieved_at?: string
+          client_id?: string
+          exercise_id?: string
+          id?: string
+          kind?: string
+          log_id?: string | null
+          reps?: number | null
+          value_kg?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_records_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_records_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -538,6 +752,7 @@ export type Database = {
           full_name: string
           id: string
           last_name: string
+          time_zone: string
           units: string
           updated_at: string | null
         }
@@ -549,6 +764,7 @@ export type Database = {
           full_name?: string
           id: string
           last_name?: string
+          time_zone?: string
           units?: string
           updated_at?: string | null
         }
@@ -560,6 +776,7 @@ export type Database = {
           full_name?: string
           id?: string
           last_name?: string
+          time_zone?: string
           units?: string
           updated_at?: string | null
         }
@@ -717,6 +934,54 @@ export type Database = {
           },
         ]
       }
+      sticker_awards: {
+        Row: {
+          client_id: string
+          count: number
+          first_earned_at: string
+          first_log_id: string | null
+          last_earned_at: string
+          shiny: boolean
+          sticker_key: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          count?: number
+          first_earned_at?: string
+          first_log_id?: string | null
+          last_earned_at?: string
+          shiny?: boolean
+          sticker_key: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          count?: number
+          first_earned_at?: string
+          first_log_id?: string | null
+          last_earned_at?: string
+          shiny?: boolean
+          sticker_key?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sticker_awards_first_log_id_fkey"
+            columns: ["first_log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sticker_awards_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_blocks: {
         Row: {
           client_id: string | null
@@ -724,6 +989,8 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["block_kind"]
           position: number
+          section_id: string | null
+          section_name: string | null
           updated_at: string
           workout_id: string
           workspace_id: string
@@ -734,6 +1001,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           position: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workout_id: string
           workspace_id: string
@@ -744,6 +1013,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           position?: number
+          section_id?: string | null
+          section_name?: string | null
           updated_at?: string
           workout_id?: string
           workspace_id?: string
@@ -993,6 +1264,63 @@ export type Database = {
           },
         ]
       }
+      workout_substitutes: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          exercise_id: string
+          id: string
+          note: string | null
+          position: number
+          sets: Json
+          updated_at: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id: string
+          id?: string
+          note?: string | null
+          position: number
+          sets: Json
+          updated_at?: string
+          workout_exercise_id: string
+          workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          note?: string | null
+          position?: number
+          sets?: Json
+          updated_at?: string
+          workout_exercise_id?: string
+          workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_substitutes_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_substitutes_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workouts: {
         Row: {
           assignment_id: string | null
@@ -1116,6 +1444,7 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {
           p_assignment_id: string
@@ -1126,6 +1455,12 @@ export type Database = {
         Returns: string
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
+      award_catchup: { Args: never; Returns: number }
+      award_history_version: {
+        Args: { p_client_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      award_inputs: { Args: { p_log_id: string }; Returns: Json }
       can_access_message_image: {
         Args: { p_name: string; p_write: boolean }
         Returns: boolean
@@ -1145,6 +1480,21 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      copy_program_week: {
+        Args: {
+          p_from: number
+          p_ids: string[]
+          p_program_id: string
+          p_to: number[]
+        }
+        Returns: {
+          day: number
+          id: string
+          position: number
+          week: number
+          workout_id: string
+        }[]
+      }
       copy_workout: {
         Args: {
           p_assignment: string
@@ -1158,6 +1508,10 @@ export type Database = {
       correct_workout_log: {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
+      }
+      duplicate_program: {
+        Args: { p_name: string; p_new_id: string; p_program_id: string }
+        Returns: string
       }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
       get_invite_preview: {
@@ -1207,12 +1561,23 @@ export type Database = {
         }[]
       }
       is_client_in: { Args: { uid: string; ws: string }; Returns: boolean }
+      is_coach_anywhere: { Args: never; Returns: boolean }
       is_coach_of: { Args: { ws: string }; Returns: boolean }
       is_library_workout_of: {
         Args: { w: string; ws: string }
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      json_number_ok: {
+        Args: {
+          hi: number
+          lo: number
+          lo_exclusive?: boolean
+          whole: boolean
+          x: Json
+        }
+        Returns: boolean
+      }
       last_results: {
         Args: { p_exercise_ids: string[] }
         Returns: {
@@ -1247,6 +1612,20 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      recent_exercises_for_client: {
+        Args: { p_limit?: number }
+        Returns: {
+          exercise_id: string
+          last_used: string
+        }[]
+      }
+      recent_exercises_for_coach: {
+        Args: { p_limit?: number }
+        Returns: {
+          exercise_id: string
+          last_used: string
+        }[]
+      }
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
@@ -1276,9 +1655,12 @@ export type Database = {
         Returns: number
       }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
+      uuid_text_ok: { Args: { t: string }; Returns: boolean }
+      valid_substitute_set: { Args: { v: Json }; Returns: boolean }
+      valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
     }
     Enums: {
-      block_kind: "straight" | "superset"
+      block_kind: "straight" | "superset" | "choice"
       log_status: "in_progress" | "completed" | "discarded"
       member_role: "owner" | "staff" | "client"
       set_type: "normal" | "warmup" | "drop"
@@ -1413,7 +1795,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      block_kind: ["straight", "superset"],
+      block_kind: ["straight", "superset", "choice"],
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],
       set_type: ["normal", "warmup", "drop"],

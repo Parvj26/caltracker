@@ -6,8 +6,9 @@ import type { Database } from '@caltracker/shared';
 // Seeds the 20-exercise fixture (idempotent), resets the demo coach to kg, and exposes service-role env to tests.
 export default async function globalSetup() {
   const root = join(__dirname, '..', '..', '..');
-  // The local auth container runs out of ports under a full run; tune it (not needed in CI). A missing docker is a warning only.
-  if (!process.env.GITHUB_ACTIONS) {
+  // The local auth container runs out of ports under a full run; tune it (not needed on GitHub-hosted runners, but needed
+  // on a Mac, including the self-hosted CI runner). It targets this checkout's stack. A missing docker is a warning only.
+  if (process.env.RUNNER_ENVIRONMENT !== 'github-hosted') {
     try {
       execFileSync('bash', [join(root, 'scripts', 'tune-local-auth.sh')], { stdio: 'inherit' });
     } catch (e) {
@@ -17,11 +18,13 @@ export default async function globalSetup() {
   const out = execFileSync('supabase', ['status', '-o', 'env'], { cwd: root, encoding: 'utf8' });
   const env: Record<string, string> = {};
   for (const line of out.split('\n')) {
-    const m = /^(API_URL|SERVICE_ROLE_KEY)="?([^"]*)"?$/.exec(line.trim());
+    const m = /^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)="?([^"]*)"?$/.exec(line.trim());
     if (m) env[m[1]!] = m[2]!;
   }
   process.env.SUPABASE_URL = env.API_URL;
   process.env.SUPABASE_SERVICE_ROLE_KEY = env.SERVICE_ROLE_KEY;
+  // For specs that act as a real user (a phone or a coach outside the browser), as the apps do.
+  process.env.SUPABASE_ANON_KEY = env.ANON_KEY;
   execFileSync('pnpm', ['import:exercises', '--fixture', 'scripts/fixtures/free-exercise-db'], {
     cwd: root,
     stdio: 'inherit',

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { WEB_URL } from './helpers';
 
 // A coach of its own, so renaming the business or changing the password never disturbs the shared demo coach.
 const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -26,7 +27,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
   const out = execFileSync('pnpm', ['--filter', '@caltracker/scripts', 'exec', 'tsx', '--input-type=module', '-e', code, email], {
     cwd: join(__dirname, '..', '..', '..'),
     encoding: 'utf8',
-    env: { ...process.env, PUBLIC_SITE_URL: 'http://localhost:3000' },
+    env: { ...process.env, PUBLIC_SITE_URL: WEB_URL },
   });
   const line = out.split('\n').find((l) => l.startsWith('RESULT:'));
   if (!line) throw new Error(`provisionCoach gave no result:\n${out}`);
@@ -51,7 +52,7 @@ test.describe('coach profile', () => {
     ids = provision(email);
     const set = await admin.auth.admin.updateUserById(ids.userId, { password: START_PASSWORD, email_confirm: true });
     if (set.error) throw set.error;
-    page = await browser.newPage({ baseURL: 'http://localhost:3000' });
+    page = await browser.newPage({ baseURL: WEB_URL });
     await signIn(page, email, START_PASSWORD);
     await page.goto('/profile');
   });
@@ -170,7 +171,7 @@ test.describe('coach profile', () => {
       await expect(page.getByRole('status').filter({ hasText: 'Password changed.' })).toBeVisible();
       await expect(current).toHaveValue('');
 
-      const fresh = await browser.newPage({ baseURL: 'http://localhost:3000' });
+      const fresh = await browser.newPage({ baseURL: WEB_URL });
       await signIn(fresh, email, NEW_PASSWORD);
       await fresh.close();
       // The old password no longer works.

@@ -19,7 +19,14 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -32,6 +39,15 @@
           "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
           "cameraPermission": false,
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
+          "savePhotosPermission": "Save your sticker cards to Photos.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
         }
       ],
       [

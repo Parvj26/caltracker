@@ -1,7 +1,11 @@
 import type { ExercisePick } from '../workouts/doc-ops';
 import { TARGET_FIELDS } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
+import type { SetValues } from './prefill';
+import { stepSetValue, type StepField } from './steppers';
+import { isChoiceLocked, isUnpickedSet } from './flow';
 import { canReopen } from './summary';
+import type { Units } from '../units/units';
 
 const DEFAULT_SETS = 3;
 const MAX_SETS = 30;
@@ -69,8 +73,35 @@ function mapSet(
 }
 
 export function completeSet(log: WorkoutLogDoc, setId: string, nowIso: string): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   const r = mapSet(log, setId, (s) => ({ ...s, completedAt: nowIso }));
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
+}
+
+/** Fills only the actuals that are null from `values`, then completes the set. Same object back if the set is unknown or already completed. Bumps revision and lastActivityAt like completeSet. */
+export function completeSetWith(
+  log: WorkoutLogDoc,
+  setId: string,
+  values: SetValues,
+  nowIso: string,
+): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
+  let skip = false;
+  const r = mapSet(log, setId, (s) => {
+    if (s.completedAt !== null) {
+      skip = true;
+      return s;
+    }
+    return {
+      ...s,
+      actualReps: s.actualReps ?? values.reps,
+      actualWeightKg: s.actualWeightKg ?? values.weightKg,
+      actualDurationS: s.actualDurationS ?? values.durationS,
+      actualDistanceM: s.actualDistanceM ?? values.distanceM,
+      completedAt: nowIso,
+    };
+  });
+  return r.found && !skip ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
 }
 
 export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string): WorkoutLogDoc {
@@ -80,8 +111,46 @@ export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string)
 
 /** Typing into a field is not "activity" for the idle timers, so only the revision moves. */
 export function updateActual(log: WorkoutLogDoc, setId: string, patch: ActualPatch): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
   const r = mapSet(log, setId, (s) => ({ ...s, ...patch }));
   return r.found ? { ...r.log, revision: log.revision + 1 } : log;
+}
+
+const ACTUAL_KEY: Record<StepField, keyof ActualPatch> = {
+  weight: 'actualWeightKg',
+  reps: 'actualReps',
+  duration: 'actualDurationS',
+  distance: 'actualDistanceM',
+};
+
+/**
+ * One − or + press on a set's number, worked out from the value stored at the time the edit runs (or `shown`, the
+ * pre-filled number on screen, when nothing is stored yet). Run inside the queued edit, so fast presses all count.
+ * Returns the same doc when the press changes nothing or the set is gone.
+ */
+export function stepActual(
+  log: WorkoutLogDoc,
+  setId: string,
+  field: StepField,
+  direction: 1 | -1,
+  units: Units,
+  shown: number | null,
+): WorkoutLogDoc {
+  if (isUnpickedSet(log, setId)) return log;
+  const key = ACTUAL_KEY[field];
+  const set = log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets)).find((s) => s.id === setId);
+  if (!set) return log;
+  const from = set[key] ?? shown;
+  const next = stepSetValue(field, from, direction, units);
+  if (next === set[key]) return log;
+  return updateActual(log, setId, { [key]: next });
+}
+
+/** The set a drop hangs from: the set itself, or for a drop the nearest warm-up / working set above it. */
+export function dropParentId(ex: LogExerciseDoc, setIndex: number): string | null {
+  let i = setIndex;
+  while (i > 0 && ex.sets[i]?.setType === 'drop') i -= 1;
+  return ex.sets[i]?.id ?? null;
 }
 
 export function addLogSet(
@@ -100,10 +169,10 @@ export function addLogSet(
         id: makeId(),
         setType: 'normal',
         target: last ? { ...last.target } : emptyTarget(null),
-        actualReps: last?.actualReps ?? null,
-        actualWeightKg: last?.actualWeightKg ?? null,
-        actualDurationS: last?.actualDurationS ?? null,
-        actualDistanceM: last?.actualDistanceM ?? null,
+        actualReps: null,
+        actualWeightKg: null,
+        actualDurationS: null,
+        actualDistanceM: null,
         completedAt: null,
       };
       return { ...ex, sets: [...ex.sets, fresh] };
@@ -165,6 +234,10 @@ export function removeLogSet(
   );
 }
 
+/**
+ * Swaps the exercise for any library exercise (the client's own choice, not a coach-added substitute). Keeps
+ * swappedFromExerciseId pointing at the planned exercise and drops the coach's substitutes for this exercise.
+ */
 export function swapLogExercise(
   log: WorkoutLogDoc,
   logExerciseId: string,
@@ -185,6 +258,9 @@ export function swapLogExercise(
       exerciseId: ex.id,
       exerciseName: ex.name,
       trackingType: ex.trackingType,
+      // A free swap takes the exercise off the plan, so the coach's substitutes no longer apply to it.
+      substituteId: null,
+      substituteOptions: [],
       sets: old.sets.map((s) => ({
         ...s,
         target: {
@@ -214,6 +290,8 @@ export function addLogExercise(
   if (log.blocks.length >= MAX_BLOCKS) return log;
   const block: LogBlockDoc = {
     id: makeId(),
+    sectionId: null,
+    pickedExerciseId: null,
     kind: 'straight',
     exercises: [
       {
@@ -224,6 +302,8 @@ export function addLogExercise(
         plannedWorkoutExerciseId: null,
         swappedFromExerciseId: null,
         note: null,
+        substituteId: null,
+        substituteOptions: [],
         sets: Array.from({ length: DEFAULT_SETS }, () => ({
           id: makeId(),
           setType: 'normal' as const,
@@ -244,6 +324,8 @@ export function removeLogExercise(log: WorkoutLogDoc, logExerciseId: string, now
   if (!log.blocks.some((b) => b.exercises.some((e) => e.id === logExerciseId))) return log;
   const blocks: LogBlockDoc[] = [];
   for (const b of log.blocks) {
+    // Taking one option out of a pick-one group takes the whole group out.
+    if (b.kind === 'choice' && b.exercises.some((e) => e.id === logExerciseId)) continue;
     const exercises = b.exercises.filter((e) => e.id !== logExerciseId);
     if (exercises.length === 0) continue;
     blocks.push(
@@ -253,6 +335,25 @@ export function removeLogExercise(log: WorkoutLogDoc, logExerciseId: string, now
     );
   }
   return touch(log, blocks, nowIso);
+}
+
+/**
+ * Sets (or with null, clears) the pick of a pick-one group; `logExerciseId` is the option's log exercise id.
+ * Refused (same object back) for a block that is not a pick-one group, an id that is not one of its options, or
+ * once the picked option has a done set and the id would change the pick. Values typed into an option that is
+ * later left behind stay in the log, but only the picked option's sets ever count (flow, summary, volume).
+ */
+export function pickChoice(log: WorkoutLogDoc, blockId: string, logExerciseId: string | null, nowIso: string): WorkoutLogDoc {
+  const block = log.blocks.find((b) => b.id === blockId);
+  if (!block || block.kind !== 'choice') return log;
+  if (logExerciseId !== null && !block.exercises.some((e) => e.id === logExerciseId)) return log;
+  if (block.pickedExerciseId === logExerciseId) return log;
+  if (isChoiceLocked(block)) return log;
+  return touch(
+    log,
+    log.blocks.map((b) => (b.id === blockId ? { ...b, pickedExerciseId: logExerciseId } : b)),
+    nowIso,
+  );
 }
 
 export function setExerciseNote(
@@ -321,6 +422,7 @@ export function toggleSet(
     for (const e of b.exercises) {
       const s = e.sets.find((x) => x.id === setId);
       if (!s) continue;
+      if (s.completedAt === null && isUnpickedSet(log, setId)) return { log, completed: null };
       return s.completedAt === null
         ? { log: completeSet(log, setId, nowIso), completed: true }
         : { log: uncompleteSet(log, setId, nowIso), completed: false };

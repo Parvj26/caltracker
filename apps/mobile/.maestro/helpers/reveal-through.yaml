@@ -1,0 +1,28 @@
+# Steps through the sticker reveal after Finish until it closes. How many cards show depends on the workout: the
+# first workout of a fresh streak shows three (the animal, the week-1 landmark and "Workout #1"), so this taps
+# Continue while it is on screen instead of a fixed number of times. It waits for the server's answer first:
+# Continue on the last card while "Checking for surprises…" shows would skip the cards still to come. A workout
+# with nothing to reveal goes straight on to the summary, so waiting for the reveal is optional; the caller then
+# waits for the summary.
+appId: app.caltracker.client
+---
+- extendedWaitUntil:
+    visible:
+      id: reveal-continue
+    timeout: 15000
+    optional: true
+- extendedWaitUntil:
+    notVisible: 'Checking for surprises…'
+    timeout: 10000
+- repeat:
+    times: 8
+    while:
+      visible:
+        id: reveal-continue
+    commands:
+      # Optional: the last tap can race the move to the summary.
+      - tapOn:
+          id: reveal-continue
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000

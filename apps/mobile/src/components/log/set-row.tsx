@@ -13,6 +13,7 @@ import {
   toMeters,
   type ActualPatch,
   type LogSetDoc,
+  type SetValues,
   type TrackingType,
   type Units,
 } from '@caltracker/shared';
@@ -30,6 +31,8 @@ type FieldSpec = {
   keyboard: KeyboardTypeOptions;
   /** The stored value as the box shows it. */
   show: (s: LogSetDoc) => string;
+  /** A suggested value as the box shows it (the grey placeholder). */
+  suggest: (v: SetValues) => string;
   /** A number typed in the box's unit to the stored patch, or null when it can't be stored. */
   patch: (v: number | null) => ActualPatch | null;
 };
@@ -42,6 +45,7 @@ function fieldSpecs(trackingType: TrackingType, units: Units): FieldSpec[] {
       unit: units,
       keyboard: 'decimal-pad',
       show: (s) => (s.actualWeightKg === null ? '' : String(kgToInput(s.actualWeightKg, units))),
+      suggest: (v) => (v.weightKg === null ? '' : String(kgToInput(v.weightKg, units))),
       patch: (v) => {
         if (v === null) return { actualWeightKg: null };
         const kg = toKg(v, units);
@@ -53,6 +57,7 @@ function fieldSpecs(trackingType: TrackingType, units: Units): FieldSpec[] {
       unit: 'reps',
       keyboard: 'number-pad',
       show: (s) => (s.actualReps === null ? '' : String(s.actualReps)),
+      suggest: (v) => (v.reps === null ? '' : String(v.reps)),
       patch: (v) => ({ actualReps: v }),
     },
     duration: {
@@ -60,6 +65,7 @@ function fieldSpecs(trackingType: TrackingType, units: Units): FieldSpec[] {
       unit: 'm:ss',
       keyboard: 'numbers-and-punctuation',
       show: (s) => (s.actualDurationS === null ? '' : formatClock(s.actualDurationS)),
+      suggest: (v) => (v.durationS === null ? '' : formatClock(v.durationS)),
       patch: (v) => ({ actualDurationS: v }),
     },
     distance: {
@@ -67,6 +73,7 @@ function fieldSpecs(trackingType: TrackingType, units: Units): FieldSpec[] {
       unit: dist,
       keyboard: 'decimal-pad',
       show: (s) => (s.actualDistanceM === null ? '' : String(fromMeters(s.actualDistanceM, dist))),
+      suggest: (v) => (v.distanceM === null ? '' : String(fromMeters(v.distanceM, dist))),
       patch: (v) => {
         if (v === null) return { actualDistanceM: null };
         const m = toMeters(v, dist);
@@ -86,12 +93,14 @@ function ActualInput({
   set,
   testID,
   setName,
+  suggested,
   onChange,
 }: {
   spec: FieldSpec;
   set: LogSetDoc;
   testID: string;
   setName: string;
+  suggested?: SetValues;
   onChange: (patch: ActualPatch) => void;
 }) {
   const { text, space, radius } = useTheme();
@@ -111,7 +120,7 @@ function ActualInput({
         returnKeyType="done"
         selectTextOnFocus
         accessibilityLabel={`${setName} ${spec.field === 'reps' ? 'reps' : spec.field}${spec.field === 'reps' ? '' : ` in ${spec.unit}`}`}
-        placeholder="–"
+        placeholder={(suggested && spec.suggest(suggested)) || '–'}
         placeholderTextColor={palette.inkMuted}
         onFocus={() => setFocused(true)}
         onBlur={() => {
@@ -160,6 +169,7 @@ export function SetRow({
   onMenu,
   onDelete,
   canDelete,
+  suggested,
 }: {
   set: LogSetDoc;
   /** "W", "1", "2" or "↳". */
@@ -175,6 +185,8 @@ export function SetRow({
   onDelete: () => void;
   /** False for the only set of an exercise (removing it is refused), so the row doesn't swipe. */
   canDelete: boolean;
+  /** What Done would save for an unticked set; shown as grey placeholders in the empty boxes. */
+  suggested?: SetValues;
 }) {
   const { text, space, radius } = useTheme();
   const drop = set.setType === 'drop';
@@ -231,6 +243,7 @@ export function SetRow({
               spec={spec}
               set={set}
               setName={setName}
+              suggested={done ? undefined : suggested}
               testID={`actual-${spec.field}-${index}`}
               onChange={onChange}
             />

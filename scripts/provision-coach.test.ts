@@ -21,7 +21,7 @@ afterAll(async () => {
 
 async function mailSubjectsTo(email: string): Promise<string[]> {
   const q = encodeURIComponent(`to:"${email}"`);
-  const res = await fetch(`http://127.0.0.1:54324/api/v1/search?query=${q}`);
+  const res = await fetch(`${process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324'}/api/v1/search?query=${q}`);
   const body = (await res.json()) as { messages: { Subject: string; To: { Address: string }[] }[] };
   return body.messages.filter((m) => m.To.some((t) => t.Address.toLowerCase() === email)).map((m) => m.Subject);
 }
