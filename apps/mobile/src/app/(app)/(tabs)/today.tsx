@@ -1,3 +1,4 @@
+import { useSurpriseReveal } from '@/lib/use-surprise';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
@@ -101,6 +102,7 @@ async function workoutToStart(id: string): Promise<WorkoutDoc | null> {
 }
 
 export default function Today() {
+  useSurpriseReveal();
   const { workspace } = useSession();
   const { text, space } = useTheme();
   const router = useRouter();

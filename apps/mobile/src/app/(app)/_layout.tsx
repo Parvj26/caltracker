@@ -20,6 +20,8 @@ export default function AppLayout() {
         <Stack.Screen name="workout/[id]" />
         {/* No swipe back: leaving mid-set by accident is easy, and Today's Resume banner brings it back anyway. */}
         <Stack.Screen name="log/[id]/index" options={{ gestureEnabled: false }} />
+        {/* The reveal replaces the logging screen and then the summary; no swipe back into either. */}
+        <Stack.Screen name="log/[id]/reveal" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="log/[id]/summary" />
       </Stack.Protected>
       <Stack.Protected guard={!hasCoach}>

@@ -1,8 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { canReopen, type WorkoutLogDoc } from '@caltracker/shared';
+import { canReopen, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
+import { Sticker } from '@/components/stickers/sticker';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { fetchAward } from '@/lib/awards';
+import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
 import { REOPEN_OFFLINE, useActiveLog } from '@/lib/use-active-log';
@@ -36,6 +39,7 @@ export default function SummaryScreen() {
 
   const [remote, setRemote] = useState<Remote>({ kind: 'loading' });
   const [comments, setComments] = useState<Comments>({ kind: 'loading' });
+  const [award, setAward] = useState<AwardResult | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [reopening, setReopening] = useState(false);
   const hasLocal = local !== null;
@@ -58,6 +62,16 @@ export default function SummaryScreen() {
     fetchComments(id)
       .then((c) => alive && setComments({ kind: 'ok', comments: c }))
       .catch(() => alive && setComments({ kind: 'offline' }));
+    return () => {
+      alive = false;
+    };
+  }, [id, attempt]);
+
+  // The stickers and personal bests this workout earned. Best effort: with no signal (or before the award is
+  // stored) the row is simply left out.
+  useEffect(() => {
+    let alive = true;
+    void fetchAward(id).then((a) => alive && setAward(a));
     return () => {
       alive = false;
     };
@@ -138,6 +152,32 @@ export default function SummaryScreen() {
         </Text>
       </View>
 
+      {award && summaryStickers(award).length > 0 ? (
+        <View style={{ gap: space[2] }} testID="summary-stickers">
+          <Text style={text('sectionHeading')} accessibilityRole="header">
+            Stickers earned
+          </Text>
+          <View style={[styles.row, { gap: space[3] }]}>
+            {summaryStickers(award).map((s) => (
+              <View key={s.key} style={[styles.sticker, { gap: space[1] }]}>
+                <Sticker stickerKey={s.key} size={72} shiny={s.shiny} variant="sm" />
+                <Text style={text('caption')}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {award && award.prs.length > 0 ? (
+        <View style={[styles.row, { gap: space[2] }]} testID="summary-prs">
+          {prPills(award, log).map((p) => (
+            <View key={p} style={[styles.pill, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}>
+              <Text style={[text('caption'), styles.ink]}>PR · {p}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <Card>
         <Text style={text('sectionHeading')} accessibilityRole="header">
           Coach comments
@@ -181,4 +221,7 @@ const styles = StyleSheet.create({
   stats: { backgroundColor: palette.lime },
   ink: { color: palette.ink },
   comment: { backgroundColor: palette.surface },
+  row: { flexDirection: 'row', flexWrap: 'wrap' },
+  sticker: { alignItems: 'center' },
+  pill: { backgroundColor: palette.pink },
 });

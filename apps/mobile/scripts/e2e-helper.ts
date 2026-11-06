@@ -220,6 +220,11 @@ export async function cleanupLogs(email: string): Promise<void> {
   if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
   const { error } = await admin.from('workout_logs').delete().eq('client_id', id);
   if (error) throw error;
+  // What the logs earned goes too (awards go with their log), so every flow starts with an empty zoo book.
+  for (const table of ['sticker_awards', 'personal_records', 'client_stats'] as const) {
+    const { error: awardError } = await admin.from(table).delete().eq('client_id', id);
+    if (awardError) throw awardError;
+  }
 }
 
 /** Deletes every workout, program and assignment whose name starts with "E2E " (client copies first). */

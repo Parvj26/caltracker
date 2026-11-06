@@ -1,0 +1,81 @@
+# The sticker reveal after Finish: a seeded workout of 3 x 8 at 60 kg is 1,440 kg, which is a giraffe's worth.
+# Finish shows the dark reveal (what was lifted, the animal, "NEW for your zoo book", Continue), then the summary
+# with its sticker row ("Giraffe ×1"). The demo client starts with an empty zoo book (cleanup-logs clears it).
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL; the award-workout Edge
+# Function must be served: `supabase functions serve`).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- tapOn:
+    text: Allow
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 20000
+- tapOn:
+    id: tick-0-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: tick-0-1
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: tick-0-2
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: log-menu
+- tapOn:
+    id: finish-button
+# The reveal: 1,440 kg is 3,175 lb in this client's units, and about 1.x giraffes.
+- extendedWaitUntil:
+    visible:
+      id: reveal-continue
+    timeout: 15000
+- assertVisible: 'You lifted 3,175 lb'
+- assertVisible: 'that’s about'
+- assertVisible:
+    id: reveal-headline
+    text: '.*Giraffe.*'
+# The server's answer lands a moment after the card shows: a first giraffe is NEW for the zoo book.
+- extendedWaitUntil:
+    visible: 'NEW for your zoo book'
+    timeout: 10000
+- tapOn:
+    id: reveal-continue
+# Summary: the sticker row with the count.
+- extendedWaitUntil:
+    visible: '3 sets completed'
+    timeout: 10000
+- assertVisible:
+    id: summary-stickers
+- extendedWaitUntil:
+    visible: 'Giraffe ×1'
+    timeout: 10000
+- tapOn:
+    id: summary-done
+- extendedWaitUntil:
+    visible: 'Done ✓.*'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

@@ -62,7 +62,14 @@ env:
     id: log-menu
 - tapOn:
     id: finish-button
-# Every set was ticked, so there is no "sets not done" question.
+# Every set was ticked, so there is no "sets not done" question. The sticker reveal comes first (sticker-reveal.yaml
+# checks it); Continue moves on to the summary.
+- extendedWaitUntil:
+    visible:
+      id: reveal-continue
+    timeout: 15000
+- tapOn:
+    id: reveal-continue
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 10000
