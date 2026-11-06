@@ -66,13 +66,15 @@ describe('performance (real library)', () => {
     const otherNames = Object.values(EXERCISE_OTHER_NAMES).reduce((n, o) => n + o.length, 0);
     expect(idx.entries.length).toBe(LIBRARY.length + otherNames);
     const queries = ['bench', 'db incline', 'curl', 'deadlft', 'lat pulldown', 'ohp', 'xyzzy plugh', 'seated row', 'tricep', 'barbel squat'];
-    for (const q of queries) searchExercises(idx, q, NO_FILTERS, NO_BOOSTS);
-    // Best of 7 runs: a busy machine (other test suites in parallel) can stall one run, not all of them.
+    // Untimed warm-up passes so JIT compilation is not counted.
+    for (let i = 0; i < 3; i++) for (const q of queries) searchExercises(idx, q, NO_FILTERS, NO_BOOSTS);
+    // Alone, the 10 queries take about 3 ms. `pnpm check` runs every suite and typecheck at once, which can stall a
+    // long timed block, so time many short passes of the 10 and keep the quickest: 50 queries = 5 such passes.
     let best = Infinity;
-    for (let run = 0; run < 7; run++) {
+    for (let run = 0; run < 40; run++) {
       const t0 = performance.now();
-      for (let i = 0; i < 50; i++) searchExercises(idx, queries[i % queries.length] ?? '', NO_FILTERS, NO_BOOSTS);
-      best = Math.min(best, performance.now() - t0);
+      for (const q of queries) searchExercises(idx, q, NO_FILTERS, NO_BOOSTS);
+      best = Math.min(best, (performance.now() - t0) * 5);
     }
     expect(best).toBeLessThan(100);
   });
