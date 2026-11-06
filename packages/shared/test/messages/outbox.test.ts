@@ -31,6 +31,13 @@ describe('mergeOutbox', () => {
     );
     expect(merged.map((x) => x.clientMsgId)).toEqual(['c1', 'c3', 'c2', 'c4']);
   });
+  it('removes duplicate clientMsgIds within each list, keeping the first', () => {
+    const merged = mergeOutbox(
+      [srv('s1', 'c1', '2026-11-01T10:00:00Z'), srv('s1b', 'c1', '2026-11-01T10:00:01Z')],
+      [out('c2', '2026-11-01T11:00:00Z'), { ...out('c2', '2026-11-01T11:00:05Z'), body: 'dup' }],
+    );
+    expect(merged.map((x) => x.body)).toEqual(['s1', 'c2']);
+  });
   it('handles empty inputs', () => {
     expect(mergeOutbox([], [])).toEqual([]);
   });
