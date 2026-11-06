@@ -1,7 +1,7 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
 import { sectionsFromBlocks } from '../workouts/sections';
-import type { LogStatus, WorkoutLogDoc } from './schema';
+import type { LogStatus, LogSubstituteOption, WorkoutLogDoc } from './schema';
 
 /**
  * PostgREST nested select for one workout log with its blocks, exercises (and their names) and sets.
@@ -63,6 +63,10 @@ export type LogTreeRow = {
       planned_workout_exercise_id: string | null;
       swapped_from_exercise_id: string | null;
       note: string | null;
+      /** Missing on rows selected before substitutes existed. */
+      substitute_id?: string | null;
+      /** The jsonb column: LogSubstituteOption[] in the doc's camelCase, as save_workout_log stored it. */
+      substitute_options?: unknown;
       exercises: { name: string; tracking_type: TrackingType } | null;
       log_sets: LogTreeSetRow[];
     }>;
@@ -105,6 +109,9 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
         plannedWorkoutExerciseId: e.planned_workout_exercise_id,
         swappedFromExerciseId: e.swapped_from_exercise_id,
         note: e.note,
+        substituteId: e.substitute_id ?? null,
+        // Stored by save_workout_log from a parsed doc; WorkoutLogDoc.parse checks it again.
+        substituteOptions: Array.isArray(e.substitute_options) ? (e.substitute_options as LogSubstituteOption[]) : [],
         sets: byPosition(e.log_sets).map((s) => ({
           id: s.id,
           setType: s.set_type,
