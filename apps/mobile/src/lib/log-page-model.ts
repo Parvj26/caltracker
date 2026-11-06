@@ -15,8 +15,13 @@ import {
   formatResult,
   fromMeters,
   isBlockDone,
+  isChoiceLocked,
+  liveExercises,
+  needsPick,
   kgToInput,
   nextOpenBlock,
+  sectionPlace,
+  sectionRuns,
   planSummary,
   resolveSetValues,
   roundRestSeconds,
@@ -69,9 +74,24 @@ export type ExerciseCardModel = {
   active: boolean;
 };
 
+export type ChoiceModel = {
+  heading: string;
+  options: Array<{ logExerciseId: string; exerciseId: string; name: string; plan: string | null }>;
+  picked: boolean;
+  /** True until the picked option has a done set (so also true before any pick). */
+  canSwitch: boolean;
+  pickedLine: string | null;
+};
+
+export type SectionPlace = { name: string; at: number; of: number };
+
 export type PageModel = {
   blockIndex: number;
   kind: 'straight' | 'superset' | 'choice';
+  /** Where the page sits in its section ("Core (Activation)", 1 of 2); null when it has no section. */
+  section: SectionPlace | null;
+  /** Set on pick-one pages only. When picked, the rest of the model describes just the picked option. */
+  choice: ChoiceModel | null;
   exercises: ExerciseCardModel[];
   current: null | {
     step: Step;
@@ -174,8 +194,23 @@ function stepRow(ex: LogExerciseDoc, step: Step, units: Units, currentId: string
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
+/** "A or B" (two options) or "A, B or C": the option names of a pick-one group. */
+function optionNames(block: LogBlockDoc): string {
+  const names = block.exercises.map((e) => e.exerciseName);
+  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+}
+
+/** "Core (Activation) · 1 of 2". */
+export function sectionLine(place: SectionPlace): string {
+  return `${place.name} · ${place.at} of ${place.of}`;
+}
+
 /** "Bench press" or "A1 Pull-up + A2 Push-up". */
 function pageTitle(block: LogBlockDoc, letter: string | null): string {
+  if (block.kind === 'choice') {
+    const live = liveExercises(block)[0];
+    return live ? live.exercise.exerciseName : `Pick one: ${optionNames(block)}`;
+  }
   if (block.kind !== 'superset') return block.exercises[0].exerciseName;
   return block.exercises.map((e, i) => `${letter ?? ''}${i + 1} ${e.exerciseName}`).join(' + ');
 }
@@ -197,7 +232,8 @@ export function buildPageModel(i: {
   const cur = currentStep(block, i.preferExerciseIndex);
   const lastSets = (ex: LogExerciseDoc) => last[ex.exerciseId]?.sets ?? [];
 
-  const exercises: ExerciseCardModel[] = block.exercises.map((ex, exerciseIndex) => {
+  const live = liveExercises(block);
+  const exercises: ExerciseCardModel[] = live.map(({ exercise: ex, exerciseIndex }) => {
     const active = cur !== null && cur.exerciseIndex === exerciseIndex;
     // The set the coach line talks about: the current one, else the first working set.
     const refIndex = active ? cur.setIndex : Math.max(0, ex.sets.findIndex((s) => s.setType === 'normal'));
@@ -301,13 +337,38 @@ export function buildPageModel(i: {
   const nextBlock = log.blocks[blockIndex + 1];
   if (nextBlock) {
     const title = pageTitle(nextBlock, letters[blockIndex + 1] ?? null);
-    const plan = nextBlock.kind === 'superset' ? null : planSummary(nextBlock.exercises[0], units);
-    upNext = plan === null ? title : `${title} · ${plan}`;
+    if (needsPick(nextBlock)) {
+      upNext = `Pick one · ${optionNames(nextBlock)}`;
+    } else {
+      const only = nextBlock.kind === 'superset' ? null : liveExercises(nextBlock)[0]?.exercise;
+      const plan = only ? planSummary(only, units) : null;
+      upNext = plan === null ? title : `${title} · ${plan}`;
+    }
+  }
+
+  const section = sectionPlace(log.blocks, log.sections, blockIndex);
+  let choice: ChoiceModel | null = null;
+  if (block.kind === 'choice') {
+    const picked = !needsPick(block);
+    choice = {
+      heading: section ? `${section.name} · pick one` : 'Pick one',
+      options: block.exercises.map((ex) => ({
+        logExerciseId: ex.id,
+        exerciseId: ex.exerciseId,
+        name: ex.exerciseName,
+        plan: planSummary(ex, units),
+      })),
+      picked,
+      canSwitch: !isChoiceLocked(block),
+      pickedLine: picked ? `Picked from ${block.exercises.length} options` : null,
+    };
   }
 
   return {
     blockIndex,
     kind: block.kind,
+    section,
+    choice,
     exercises,
     current,
     round,
@@ -332,18 +393,36 @@ export function progressLabel(states: ReadonlyArray<Progress>): string {
   return `Exercise ${at < 0 ? 0 : at + 1} of ${states.length}. ${done} done.`;
 }
 
-/** The exercise list: one row per page. */
-export function listRows(log: WorkoutLogDoc): Array<{ title: string; detail: string; done: boolean }> {
+/** The progress strip in groups: one array of page states per section run (one group when there are no sections). */
+export function progressGroups(log: WorkoutLogDoc, pageIndex: number): Progress[][] {
+  const states = progressStates(log, pageIndex);
+  return sectionRuns(log.blocks, log.sections).map((run) => run.blockIndexes.map((i) => states[i]));
+}
+
+export type ListRow = { pageIndex: number; title: string; detail: string; done: boolean };
+
+/**
+ * The exercise list: one row per page, grouped under section headings. Pages with no section get a null heading;
+ * a section with no pages left has no run, so it shows no heading.
+ */
+export function listSections(log: WorkoutLogDoc): Array<{ heading: string | null; rows: ListRow[] }> {
   const letters = supersetLetters(log.blocks);
-  return log.blocks.map((b, i) => {
-    const sets = b.exercises.flatMap((e) => e.sets.filter((x) => x.setType === 'normal'));
+  const row = (i: number): ListRow => {
+    const b = log.blocks[i];
+    if (needsPick(b)) return { pageIndex: i, title: pageTitle(b, null), detail: 'Not picked yet', done: false };
+    const sets = liveExercises(b).flatMap(({ exercise }) => exercise.sets.filter((x) => x.setType === 'normal'));
     const ticked = sets.filter((s) => s.completedAt !== null).length;
     return {
+      pageIndex: i,
       title: pageTitle(b, letters[i] ?? null),
       detail: `${ticked} of ${sets.length} ${sets.length === 1 ? 'set' : 'sets'}`,
       done: isBlockDone(b),
     };
-  });
+  };
+  return sectionRuns(log.blocks, log.sections).map((run) => ({
+    heading: run.section?.name ?? null,
+    rows: run.blockIndexes.map(row),
+  }));
 }
 
 /** Keeps the same page on screen after the pages change; if it is gone, stays at the same place (or the last). */
@@ -361,8 +440,8 @@ export function pageAfterDone(log: WorkoutLogDoc, pageIndex: number): number {
   return nextOpenBlock(log, pageIndex) ?? pageIndex;
 }
 
-/** The page shown on opening: the first with an unticked set (0 when none, or no pages). */
+/** The page shown on opening: the first not done (an unpicked pick-one group counts); 0 when none, or no pages. */
 export function firstOpenPage(log: WorkoutLogDoc): number {
-  const i = log.blocks.findIndex((b) => currentStep(b) !== null);
+  const i = log.blocks.findIndex((b) => !isBlockDone(b));
   return i < 0 ? 0 : i;
 }

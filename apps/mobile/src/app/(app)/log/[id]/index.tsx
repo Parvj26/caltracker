@@ -56,7 +56,7 @@ import { restOverHaptic, tapHaptic } from '@/lib/log-notifications';
 import {
   buildPageModel,
   firstOpenPage,
-  listRows,
+  listSections,
   pageAfterDone,
   pageIndexAfterChange,
   progressStates,
@@ -250,7 +250,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       ),
     [log, units, last, prefer],
   );
-  const rows = useMemo(() => listRows(log), [log]);
+  // Flat, in page order: the list sheet and the prev/next names still read one row per page (headings come with the sheet's own task).
+  const rows = useMemo(() => listSections(log).flatMap((s) => s.rows), [log]);
   const states = useMemo(() => progressStates(log, pageIndex), [log, pageIndex]);
   const letters = useMemo(() => supersetLetters(log.blocks), [log.blocks]);
   const data = useMemo(() => models.map((model, i) => ({ key: log.blocks[i]?.id ?? String(i), model })), [models, log.blocks]);
