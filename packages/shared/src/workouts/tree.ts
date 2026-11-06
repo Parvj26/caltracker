@@ -12,6 +12,7 @@ export const WORKOUT_TREE_SELECT =
   'id, name, notes, client_id, scheduled_on, ' +
   'workout_blocks(id, position, kind, section_id, section_name, ' +
   'workout_exercises(id, position, exercise_id, note, exercises(name, tracking_type), ' +
+  'workout_substitutes(id, position, exercise_id, note, sets, exercises(name, tracking_type)), ' +
   'workout_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
   'target_distance_m, to_failure, rest_seconds, note)))';
 

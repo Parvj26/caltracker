@@ -12,6 +12,7 @@ export const LOG_TREE_SELECT =
   'id, workout_id, name, status, started_at, finished_at, last_activity_at, auto_finished, revision, notes, ' +
   'log_blocks(id, position, kind, section_id, section_name, picked_exercise_id, ' +
   'log_exercises(id, position, exercise_id, planned_workout_exercise_id, swapped_from_exercise_id, note, ' +
+  'substitute_id, substitute_options, ' +
   'exercises!log_exercises_exercise_id_fkey(name, tracking_type), ' +
   'log_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
   'target_distance_m, to_failure, rest_seconds, actual_reps, actual_weight_kg, actual_duration_s, ' +

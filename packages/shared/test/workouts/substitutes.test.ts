@@ -18,7 +18,7 @@ import {
 } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
-import { workoutRowToDoc } from '../../src/workouts/tree';
+import { WORKOUT_TREE_SELECT, workoutRowToDoc } from '../../src/workouts/tree';
 import type { WorkoutTreeRow } from '../../src/workouts/tree';
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -241,4 +241,8 @@ describe('workoutRowToDoc with substitutes', () => {
     expect(subs[1]!.sets[0]!.targetWeightKg).toBeNull();
     expect(WorkoutDoc.safeParse(doc).success).toBe(true);
   });
+});
+
+it('the tree select reads substitutes with their exercise', () => {
+  expect(WORKOUT_TREE_SELECT).toContain('workout_substitutes(id, position, exercise_id, note, sets, exercises(name, tracking_type))');
 });

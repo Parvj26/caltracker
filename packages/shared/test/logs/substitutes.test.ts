@@ -17,7 +17,7 @@ import {
   substitutedFrom,
 } from '../../src/logs/substitutes';
 import { completedSetCount, logVolumeKg, openSetCount } from '../../src/logs/summary';
-import { logRowToDoc } from '../../src/logs/tree';
+import { LOG_TREE_SELECT, logRowToDoc } from '../../src/logs/tree';
 import type { LogTreeRow } from '../../src/logs/tree';
 import { addStraightBlock, addSubstitute, addSuperset, emptyWorkout, updateSubstituteSet } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
@@ -307,4 +307,8 @@ describe('every op keeps a log with substitutes valid (the phone drops a log tha
       .filter((name) => !readers.has(name));
     expect([...exercised].sort()).toEqual([...new Set(exported)].sort());
   });
+});
+
+it('the log tree select reads the substitute columns', () => {
+  expect(LOG_TREE_SELECT).toContain('substitute_id, substitute_options');
 });
