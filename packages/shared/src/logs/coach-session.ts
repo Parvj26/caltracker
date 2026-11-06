@@ -20,14 +20,28 @@ export type SessionLog = { id: string; workoutId: string | null; status: LogStat
 export type CoachSessionState =
   | { kind: 'start' }
   | { kind: 'mine'; logId: string }
+  /** The client is logging it on the phone. */
   | { kind: 'client_logging'; logId: string }
+  /** Another coach of the workspace is logging it. */
+  | { kind: 'other_coach_logging'; logId: string; loggedBy: string }
   | { kind: 'done'; logId: string }
   /** The client has a different workout in progress; only one can be in progress at a time. */
   | { kind: 'other_workout'; logId: string; name: string; byCoach: boolean };
 
+/** Who is logging a workout, as the coach's page words it. */
+export type LoggerKind = 'me' | 'client' | 'other_coach';
+
+/** "You", the client, or another coach: from logged_by, the signed-in coach and the log's client. */
+export function loggerKind(loggedBy: string | null, coachId: string, clientId: string): LoggerKind {
+  if (loggedBy === coachId) return 'me';
+  if (loggedBy === null || loggedBy === clientId) return 'client';
+  return 'other_coach';
+}
+
 /**
  * Single active logger, from the client's logs of this workout plus any log they have in progress. An in-progress log
- * of this workout wins (the coach's own: resume it; anyone else's: the client is logging it on the phone), then
+ * of this workout wins (the coach's own: resume it; the client's: they are logging it on the phone; another coach's:
+ * they are logging it), then
  * a finished one (open it), then another workout in progress (it blocks a new start), else a new session.
  */
 export function coachSessionState(input: {
@@ -38,7 +52,10 @@ export function coachSessionState(input: {
 }): CoachSessionState {
   const running = input.logs.find((l) => l.status === 'in_progress');
   if (running && running.workoutId === input.workoutId) {
-    return running.loggedBy === input.coachId ? { kind: 'mine', logId: running.id } : { kind: 'client_logging', logId: running.id };
+    if (running.loggedBy === input.coachId) return { kind: 'mine', logId: running.id };
+    // No logger (a deleted account, an old row) counts as the client's own.
+    if (running.loggedBy === null || running.loggedBy === input.clientId) return { kind: 'client_logging', logId: running.id };
+    return { kind: 'other_coach_logging', logId: running.id, loggedBy: running.loggedBy };
   }
   const done = input.logs.find((l) => l.workoutId === input.workoutId && l.status === 'completed');
   if (done) return { kind: 'done', logId: done.id };

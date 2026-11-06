@@ -356,6 +356,13 @@ export function pickChoice(log: WorkoutLogDoc, blockId: string, logExerciseId: s
   );
 }
 
+/** The workout's own note (a session note when the coach logs it). Blank text clears it. Same doc back when unchanged. */
+export function setLogNotes(log: WorkoutLogDoc, notes: string | null, nowIso: string): WorkoutLogDoc {
+  const next = notes !== null && notes.trim() !== '' ? notes : null;
+  if (next === log.notes) return log;
+  return { ...log, notes: next, lastActivityAt: nowIso, revision: log.revision + 1 };
+}
+
 export function setExerciseNote(
   log: WorkoutLogDoc,
   logExerciseId: string,

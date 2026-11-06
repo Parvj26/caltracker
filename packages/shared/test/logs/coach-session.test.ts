@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { coachSessionState, completeAllSets, isLoggedByCoach } from '../../src/logs/coach-session';
-import { completeSet, pickChoice, updateActual } from '../../src/logs/ops';
+import { coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from '../../src/logs/coach-session';
+import { completeSet, pickChoice, setLogNotes, updateActual } from '../../src/logs/ops';
 import { startLogFromWorkout } from '../../src/logs/start';
 import type { WorkoutLogDoc } from '../../src/logs/schema';
 import { fixtureSectionedWorkout, fixtureWorkout, uuid } from './fixture';
@@ -50,6 +50,14 @@ describe('coachSessionState', () => {
         logId: 'p',
       });
     }
+  });
+
+  it('tells another coach of the workspace apart from the client', () => {
+    expect(coachSessionState({ ...base, logs: [{ id: 'c', workoutId: 'w1', status: 'in_progress', loggedBy: 'coach-2', name: 'A' }] })).toEqual({
+      kind: 'other_coach_logging',
+      logId: 'c',
+      loggedBy: 'coach-2',
+    });
   });
 
   it('says another workout is in progress (one at a time per client)', () => {
@@ -124,5 +132,26 @@ describe('completeAllSets', () => {
     const once = completeAllSets(log, log.blocks[0]!.id, () => [], T1);
     expect(completeAllSets(once, log.blocks[0]!.id, () => [], T1)).toBe(once);
     expect(allSets(once).every((s) => s.completedAt !== null)).toBe(false); // the superset is still open
+  });
+});
+
+describe('loggerKind', () => {
+  it('words me, the client and another coach', () => {
+    expect(loggerKind('coach', 'coach', 'client')).toBe('me');
+    expect(loggerKind('client', 'coach', 'client')).toBe('client');
+    expect(loggerKind(null, 'coach', 'client')).toBe('client');
+    expect(loggerKind('coach-2', 'coach', 'client')).toBe('other_coach');
+  });
+});
+
+describe('setLogNotes', () => {
+  it('sets, clears and leaves an unchanged note alone', () => {
+    const log = start();
+    const noted = setLogNotes(log, 'Great depth', T1);
+    expect(noted.notes).toBe('Great depth');
+    expect(noted.revision).toBe(log.revision + 1);
+    expect(setLogNotes(noted, 'Great depth', T1)).toBe(noted);
+    expect(setLogNotes(noted, '  ', T1).notes).toBeNull();
+    expect(setLogNotes(log, '', T1)).toBe(log);
   });
 });
