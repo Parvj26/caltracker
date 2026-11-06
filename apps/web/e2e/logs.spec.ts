@@ -255,7 +255,7 @@ test.describe('logged workout page', () => {
     const planned = await plan(name, addDays(new Date().toISOString().slice(0, 10), -1));
     const id = await log({
       workspaceId, clientId, name, plannedWorkoutId: planned, startedAt: ago(100), finishedAt: ago(50),
-      notDone: 1, swappedFrom: 'Barbell Bench Press - Medium Grip', addedExercise: 'Barbell Incline Bench Press - Medium Grip',
+      notDone: 1, swappedFrom: 'Barbell Deadlift', addedExercise: 'Cable Crossover',
     });
     await signInAsCoach(page);
     await page.goto(logUrl(clientId, id));
@@ -266,7 +266,7 @@ test.describe('logged workout page', () => {
     await expect(squat.getByRole('row').nth(1)).toContainText('8 reps · 60 kg');
     await expect(squat.getByRole('row').nth(1)).toContainText('60 kg × 8');
     await expect(squat.getByRole('row').nth(3)).toContainText('Not done');
-    await expect(page.getByText('Swapped from Barbell Bench Press - Medium Grip')).toBeVisible();
+    await expect(page.getByText('Swapped from Barbell Deadlift')).toBeVisible();
     await expect(page.getByText('Added', { exact: true })).toBeVisible();
     await expect(page.getByText('3 sets')).toBeVisible();
     // Correct one set and leave a comment, so the screenshot shows the whole page.
