@@ -1,14 +1,7 @@
 import type { Database } from '@caltracker/shared';
 import { createClient } from '@supabase/supabase-js';
-import { expect, test, type Page } from '@playwright/test';
-
-async function signInAsCoach(page: Page) {
-  await page.goto('/sign-in');
-  await page.getByLabel('Email').fill('coach@demo.local');
-  await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/home$/);
-}
+import { expect, test } from '@playwright/test';
+import { signInAsCoach } from './helpers';
 
 // Service-role client: test cleanup only.
 function admin() {
