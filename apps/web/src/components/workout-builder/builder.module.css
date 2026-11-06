@@ -86,7 +86,8 @@
 /* ---------- Set rows ---------- */
 /* Wide enough: the caption row and every set row share one grid template (set inline from set-columns.ts), so the
    captions sit over their inputs. Narrow: the cells wrap and the captions hide; placeholders and names still say
-   what each box is. */
+   what each box is, and each box gets its own small caption above it. The widest row (range reps, weight with its
+   unit, rest, note and both buttons) needs about 966 px. */
 .sets { display: flex; flex-direction: column; gap: var(--ct-space-1); container-type: inline-size; }
 .setRow { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-1) var(--ct-space-2); border-radius: var(--ct-radius-input); }
 .dropRow { background: var(--ct-drop); }
@@ -97,9 +98,18 @@
   font-weight: var(--ct-weight-caption);
   color: var(--ct-ink-muted);
 }
-@container (max-width: 879px) {
-  .setCells { display: flex; flex-wrap: wrap; }
+@container (max-width: 969px) {
+  .setCells { display: flex; flex-wrap: wrap; align-items: flex-end; }
   .columnCaptions { display: none; }
+  .setCells [data-caption] { flex-wrap: wrap; }
+  /* Visual only: each input's accessible name already says what it is. */
+  .setCells [data-caption]::before {
+    content: attr(data-caption) / '';
+    flex: 1 0 100%;
+    font-size: var(--ct-size-caption);
+    font-weight: var(--ct-weight-caption);
+    color: var(--ct-ink-muted);
+  }
   .dropRow { margin-left: var(--ct-space-6); }
 }
 .setLabel { width: 24px; text-align: center; font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }

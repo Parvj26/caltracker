@@ -80,8 +80,11 @@
 /* ---------- Builder: library panel beside the grid ---------- */
 .builder { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .workspace { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); gap: var(--ct-space-4-5); align-items: start; }
-@media (max-width: 900px) {
+/* Below 1200 px (iPad portrait) the library sits above the grid, so all seven days fit side by side. */
+@media (max-width: 1199.98px) {
   .workspace { grid-template-columns: minmax(0, 1fr); }
+  .workspace .library { position: static; }
+  .workspace .libraryList { max-height: 240px; }
 }
 
 .library {
@@ -124,7 +127,7 @@
 
 .gridSection { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .gridScroll { overflow-x: auto; }
-.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 900px; width: 100%; }
+.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 820px; width: 100%; }
 .grid th {
   padding: var(--ct-space-1) var(--ct-space-2);
   font-size: var(--ct-size-caption);
@@ -152,10 +155,13 @@
 .chip {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: stretch;
   border-radius: var(--ct-radius-input);
   background: var(--ct-lime);
   color: var(--ct-ink);
+  container-type: inline-size;
 }
 .chipHandle {
   flex: 1;
@@ -169,10 +175,13 @@
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
-  overflow-wrap: anywhere;
+  flex: 1 1 0%;
+  min-width: min-content;
   cursor: grab;
   touch-action: none;
 }
+/* Same rule as the calendar: wrap between words; break a word only if it alone is wider than the chip. */
+.chipName { display: block; max-width: calc(100cqi - 2 * var(--ct-space-2)); overflow-wrap: break-word; }
 .chipMenuButton {
   flex: none;
   width: var(--ct-tap-min);

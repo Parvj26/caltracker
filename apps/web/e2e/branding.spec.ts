@@ -128,8 +128,8 @@ test('coach shell: sidebar nav marks Clients as the current page and the page us
   expect(cardBorders).toBeGreaterThanOrEqual(3);
 });
 
-test('coach shell collapses to a labelled icon rail below 900 px', async ({ page }) => {
-  await page.setViewportSize({ width: 820, height: 1180 });
+test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait)', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 1366 });
   await signInAsDemoCoach(page);
   const nav = page.getByRole('navigation', { name: 'Main' });
   const sidebar = page.locator('[data-coach-sidebar]');
@@ -142,6 +142,19 @@ test('coach shell collapses to a labelled icon rail below 900 px', async ({ page
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  // A keyboard user still sees each link's name: it shows beside the icon on focus.
+  await nav.getByRole('link', { name: 'Workouts' }).focus();
+  await expect(nav.getByRole('link', { name: 'Workouts' }).getByText('Workouts')).toBeVisible();
+  const label = await nav.getByRole('link', { name: 'Workouts' }).getByText('Workouts').boundingBox();
+  expect(label!.width).toBeGreaterThan(20);
+});
+
+test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({ page }) => {
+  await signInAsDemoCoach(page);
+  for (const [width, height] of [[1366, 1024], [1440, 900]] as const) {
+    await page.setViewportSize({ width, height });
+    expect((await page.locator('[data-coach-sidebar]').boundingBox())!.width).toBeGreaterThan(150);
+  }
 });
 
 test('clients page: clients show round initials avatars', async ({ page }) => {

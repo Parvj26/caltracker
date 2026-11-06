@@ -279,12 +279,15 @@ function DayItem({
             {...attributes}
             {...listeners}
             className={cx(styles.itemHandle, styles.grab)}
+            title={item.name}
           >
-            {item.name}
+            <span className={styles.itemName}>{item.name}</span>
           </button>
         ) : (
           // Read-only calendar: the name is plain text.
-          <span className={styles.itemHandle}>{item.name}</span>
+          <span className={styles.itemHandle} title={item.name}>
+            <span className={styles.itemName}>{item.name}</span>
+          </span>
         )}
         {renderItem(item, date, editable)}
       </div>

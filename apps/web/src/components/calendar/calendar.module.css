@@ -58,10 +58,12 @@
 }
 .items { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 
-.item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); }
+.item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); container-type: inline-size; }
 .programItem { background: var(--ct-lime); }
 .singleItem { background: var(--ct-blue); }
-.itemRow { display: flex; align-items: stretch; }
+/* The name and the "⋯" button share a row while the name's longest word fits beside the button; otherwise the button
+   drops under the name, so names wrap only between words. */
+.itemRow { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: flex-end; }
 /* Finished: a "✓ Done" line under the name that opens the log. Text on a pastel fill is always ink. */
 .doneNote {
   display: flex;
@@ -97,15 +99,18 @@
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
-  overflow-wrap: anywhere;
+  flex: 1 1 0%;
+  min-width: min-content;
 }
+/* Breaks inside a word only when that one word is wider than the whole item. */
+.itemName { display: block; max-width: calc(100cqi - 2 * var(--ct-space-2)); overflow-wrap: break-word; }
 .grab { cursor: grab; touch-action: none; }
 .itemProgram {
   display: block;
   padding: 0 var(--ct-space-2) var(--ct-space-1);
   font-size: var(--ct-size-caption);
   color: var(--ct-ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .dragging { opacity: 0.4; }
 .overlayItem {

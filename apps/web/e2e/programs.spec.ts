@@ -226,3 +226,40 @@ test.describe('a coach with an empty library', () => {
     await expect(page).toHaveURL(/\/workouts\/new$/);
   });
 });
+
+test('on an iPad in portrait all seven days fit and a long workout name wraps only between words', async ({ page }) => {
+  // "Conditioning" is the word that used to break as "Condi/tionin/g" in a narrow cell.
+  // A short suffix: a single "word" wider than the whole chip is the one case allowed to break.
+  const workout = `Full Body Conditioning ${Math.random().toString(36).slice(2, 6)}`;
+  const program = `iPad grid ${unique()}`;
+  created.workouts.push(workout);
+  created.programs.push(program);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  await createProgram(page, program, 1, [{ week: 1, day: 5, workoutName: workout }]);
+
+  const scroller = page.getByRole('table', { name: 'Program weeks' }).locator('xpath=..');
+  expect(await scroller.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  const day7 = (await page.getByRole('columnheader', { name: 'Day 7' }).boundingBox())!;
+  expect(day7.x + day7.width).toBeLessThanOrEqual(1024);
+
+  // Every line of the name starts at a word: the rendered lines, joined with spaces, give back the name.
+  const chip = programCell(page, 1, 5).getByRole('button', { name: workout, exact: true });
+  await expect(chip).toHaveAttribute('title', workout);
+  const lines = await chip.evaluate((el) => {
+    const text = el.firstElementChild!.firstChild!;
+    const range = document.createRange();
+    const tops = new Map<number, string>();
+    for (let i = 0; i < text.textContent!.length; i++) {
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const top = Math.round(range.getBoundingClientRect().top);
+      tops.set(top, (tops.get(top) ?? '') + text.textContent![i]);
+    }
+    return [...tops.values()].map((l) => l.trim());
+  });
+  expect(lines.length).toBeGreaterThan(1);
+  expect(lines.join(' ')).toBe(workout);
+  for (const line of lines) expect(workout.split(' ')).toEqual(expect.arrayContaining(line.split(' ')));
+});
