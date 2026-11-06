@@ -246,6 +246,9 @@ test('the tabs open Training, Body, Documents and Settings, and old links still 
   await page.goto(`/clients/${s.clientId}?assign=1`);
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training`));
   await expect(page.getByRole('dialog')).toBeVisible();
+  // The calendar's own view and starting week are kept too.
+  await page.goto(`/clients/${s.clientId}?view=2w&from=${dayOffset(0)}`);
+  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training\\?view=2w&from=${dayOffset(0)}$`));
   await page.goto(`/clients/${s.clientId}?scan=1`);
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/body`));
   await expect(page.getByRole('dialog', { name: 'Add a scan' })).toBeVisible();
@@ -268,7 +271,13 @@ test('documents: upload a PDF, share it, rename it, delete it; videos are refuse
 
   const list = page.getByRole('list', { name: 'Documents, newest first' });
   const item = list.getByRole('listitem').first();
-  await expect(item.getByRole('link', { name: /^Medical clearance/ })).toHaveAttribute('href', /client-documents/);
+  // The link is made on click and opens in a new tab (the file itself is stubbed: only the signed address matters).
+  await page.context().route('**/storage/v1/object/sign/client-documents/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>file</title>ok' }));
+  const popupOpened = page.waitForEvent('popup');
+  await item.getByRole('button', { name: /^Medical clearance/ }).click();
+  const popup = await popupOpened;
+  await popup.waitForURL(new RegExp(`/storage/v1/object/sign/client-documents/${s.workspaceId}/${s.clientId}/`));
+  await popup.close();
   await expect(item.getByText(/PDF · \d+ B · .* · Shared with Tara/)).toBeVisible();
   const row = await admin.from('client_documents').select('shared_with_client, storage_path, size_bytes').eq('client_id', s.clientId).single();
   expect(row.data?.shared_with_client).toBe(true);
@@ -281,7 +290,7 @@ test('documents: upload a PDF, share it, rename it, delete it; videos are refuse
   await list.getByRole('button', { name: 'Rename Medical clearance' }).click();
   await list.getByLabel('Document name').fill('Clearance 2026');
   await list.getByRole('button', { name: 'Save' }).click();
-  await expect(list.getByRole('link', { name: /^Clearance 2026/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /^Clearance 2026/ })).toBeVisible();
 
   await list.getByRole('button', { name: 'Delete Clearance 2026' }).click();
   await list.getByRole('group', { name: 'Delete Clearance 2026?' }).getByRole('button', { name: 'Delete' }).click();

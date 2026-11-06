@@ -48,6 +48,16 @@ export async function createDocument(input: NewDocument): Promise<DocumentOutcom
   const name = validateDocumentName(String(input.name ?? ''));
   if (!name.ok) return takeBack(name.error);
 
+  // Trust what Storage holds, not what the browser said: the size and type must match the uploaded object.
+  const fileName = path.slice(prefix.length);
+  const listed = await supabase.storage.from(BUCKET).list(`${workspaceId}/${clientId}`, { search: fileName, limit: 1 });
+  if (listed.error) return { ok: false, error: GENERIC };
+  const stored = listed.data.find((o) => o.name === fileName);
+  const meta = (stored?.metadata ?? {}) as { size?: unknown; mimetype?: unknown };
+  if (!stored || meta.size !== sizeBytes || meta.mimetype !== contentType) {
+    return takeBack("The uploaded file doesn't match. Please try again.");
+  }
+
   const { error } = await supabase.from('client_documents').insert({
     id,
     workspace_id: workspaceId,
@@ -61,6 +71,21 @@ export async function createDocument(input: NewDocument): Promise<DocumentOutcom
   if (error) return takeBack(error.code === '42501' ? "This client was removed, so documents can't be added." : GENERIC);
   refresh();
   return { ok: true };
+}
+
+const LINK_FOR_S = 300;
+
+/** A short-lived link (5 minutes) to open one document, made when the coach asks for it. */
+export async function documentLink(id: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(id)) return { ok: false, error: GENERIC };
+  const supabase = await createServerSupabase();
+  const row = await supabase.from('client_documents').select('storage_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+  if (row.error) return { ok: false, error: "Couldn't open the document. Please try again." };
+  if (!row.data) return { ok: false, error: 'That document is gone. Reload the page to see the latest.' };
+  const signed = await supabase.storage.from(BUCKET).createSignedUrl(row.data.storage_path, LINK_FOR_S);
+  if (signed.error) return { ok: false, error: "Couldn't open the document. Please try again." };
+  return { ok: true, url: signed.data.signedUrl };
 }
 
 export async function renameDocument(id: string, name: string): Promise<DocumentOutcome> {
@@ -85,6 +110,8 @@ export async function setDocumentShared(id: string, shared: boolean): Promise<Do
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .select('id');
+  // 42501: a removed client's document can only be unshared, never shared again.
+  if (error?.code === '42501') return { ok: false, error: "This client was removed, so documents can't be shared with them." };
   if (error || data.length === 0) return { ok: false, error: "Couldn't change sharing. Please try again." };
   refresh();
   return { ok: true };

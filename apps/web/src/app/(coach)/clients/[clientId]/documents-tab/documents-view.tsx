@@ -4,13 +4,13 @@ import { useRef, useState, useTransition } from 'react';
 import { DOCUMENT_NAME_MAX_LENGTH, documentKind, formatFileSize } from '@caltracker/shared';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Button, Card, ErrorText, TextField } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { failureMessage, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { createDocument, deleteDocument, renameDocument, setDocumentShared, type DocumentOutcome } from '../documents-actions';
+import { createDocument, deleteDocument, documentLink, renameDocument, setDocumentShared, type DocumentOutcome } from '../documents-actions';
 import { preparePrintout, type Printout } from '../progress/compress';
 import styles from './documents.module.css';
 
-export type DocumentRow = { id: string; name: string; kind: 'PDF' | 'Image'; sizeBytes: number; shared: boolean; createdAt: string; url: string | null };
+export type DocumentRow = { id: string; name: string; kind: 'PDF' | 'Image'; sizeBytes: number; shared: boolean; createdAt: string };
 
 const FILE_ERROR = 'Choose a PDF under 5 MB or an image. Videos and other files can’t be added.';
 const ACCEPT = 'application/pdf,image/*';
@@ -75,6 +75,9 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
         if (input.current) input.current.value = '';
         onMessage(`Added ${name.trim()}.`);
       } catch (e) {
+        // The record may have been saved even though the answer never arrived, so the file stays (a leftover file
+        // beats a document whose file is gone). Only a call that certainly never ran (a stale page) takes it back.
+        if (!isStaleDeployError(e)) uploaded = false;
         setError(failureMessage(e, "Couldn't save the document. Check your connection and try again."));
       } finally {
         if (uploaded) void createBrowserSupabase().storage.from('client-documents').remove([path]);
@@ -141,6 +144,30 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
     });
   }
 
+  const [opening, setOpening] = useState(false);
+  /** Links are made when asked for (and last 5 minutes), so a page left open never hands out a stale or long-lived one. */
+  async function open() {
+    setError(null);
+    setOpening(true);
+    // Open the tab now, while the click still counts as the coach's own action (popup blockers), then point it there.
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    try {
+      const link = await documentLink(doc.id);
+      if (link.ok && tab) tab.location.href = link.url;
+      else if (link.ok) window.location.href = link.url;
+      else {
+        tab?.close();
+        setError(link.error);
+      }
+    } catch (e) {
+      tab?.close();
+      setError(failureMessage(e, "Couldn't open the document. Check your connection and try again."));
+    } finally {
+      setOpening(false);
+    }
+  }
+
   function share(next: boolean) {
     setShared(next);
     run(() => setDocumentShared(doc.id, next), next ? `Shared with ${firstName}.` : 'No longer shared.', undefined, () => setShared(!next));
@@ -163,19 +190,25 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
               <Button variant="secondary" onClick={() => setRenaming(false)} disabled={pending}>Cancel</Button>
             </div>
           </form>
-        ) : doc.url ? (
-          <a href={doc.url} target="_blank" rel="noopener noreferrer" className={styles.name}>
+        ) : (
+          <button type="button" className={styles.nameButton} onClick={() => void open()} disabled={opening}>
             {doc.name}
             <span className={styles.visuallyHidden}> (opens in a new tab)</span>
-          </a>
-        ) : (
-          <span className={styles.name}>{doc.name}</span>
+          </button>
         )}
         <span className={styles.caption}>
           {doc.kind} · {formatFileSize(doc.sizeBytes)} · <LocalDate iso={doc.createdAt} />
           {shared ? ` · Shared with ${firstName}` : ' · Only you'}
         </span>
       </div>
+      {readOnly && shared ? (
+        <div className={styles.actions}>
+          <label className={styles.check}>
+            <input type="checkbox" checked disabled={pending} onChange={() => share(false)} aria-label={`Stop sharing ${doc.name} with ${firstName}`} />
+            <span aria-hidden="true">Shared</span>
+          </label>
+        </div>
+      ) : null}
       {readOnly || renaming ? null : confirming ? (
         <div className={styles.actions} role="group" aria-label={`Delete ${doc.name}?`}>
           <span className={styles.caption}>Delete {doc.name}?</span>
