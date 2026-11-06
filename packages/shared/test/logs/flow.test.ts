@@ -108,7 +108,8 @@ describe('afterDone and doneLabel', () => {
   });
 
   it('end of round with rest', () => {
-    const log = fresh();
+    const base = fresh();
+    const log = tick(base, ids(base, 1, 0)[0]!);
     const a = afterDone(log, 1, ids(log, 1, 1)[0]!);
     expect(a).toEqual({ kind: 'rest', seconds: 90, round: 1 });
     expect(doneLabel(a, 'A')).toBe('Done round 1 · rest 1:30');
@@ -116,7 +117,7 @@ describe('afterDone and doneLabel', () => {
 
   it('end of round without rest', () => {
     let log = fresh();
-    log = withRest(withRest(log, ids(log, 1, 0)[0]!, 0), ids(log, 1, 1)[0]!, 0);
+    log = tick(withRest(withRest(log, ids(log, 1, 0)[0]!, 0), ids(log, 1, 1)[0]!, 0), ids(log, 1, 0)[0]!);
     const a = afterDone(log, 1, ids(log, 1, 1)[0]!);
     expect(a).toEqual({ kind: 'next', round: 1, pageDone: false });
     expect(doneLabel(a, 'A')).toBe('Done round 1');
@@ -158,10 +159,89 @@ describe('afterDone and doneLabel', () => {
   it('superset round uses the longest rest', () => {
     let log = fresh();
     const [a1, b1] = [ids(log, 1, 0)[0]!, ids(log, 1, 1)[0]!];
-    const x = withRest(withRest(log, a1, 0), b1, 60);
+    const x = tick(withRest(withRest(log, a1, 0), b1, 60), a1);
     expect(afterDone(x, 1, b1)).toEqual({ kind: 'rest', seconds: 60, round: 1 });
-    log = withRest(withRest(log, a1, 120), b1, 0);
+    log = tick(withRest(withRest(log, a1, 120), b1, 0), a1);
     expect(afterDone(log, 1, b1)).toEqual({ kind: 'rest', seconds: 120, round: 1 });
+  });
+});
+
+describe('afterDone edge cases', () => {
+  it('goes back to A1 when A2 was ticked first', () => {
+    const log = fresh();
+    const a2 = ids(log, 1, 1)[0]!;
+    const ticked = tick(log, a2);
+    expect(afterDone(ticked, 1, a2)).toEqual({ kind: 'superset-next', exerciseIndex: 0 });
+  });
+
+  it('skips a drop that is already ticked', () => {
+    const log = fresh();
+    const [, , , s3, drop] = ids(log, 0, 0);
+    const ticked = tick(log, drop!);
+    expect(afterDone(ticked, 0, s3!)).toEqual({ kind: 'rest', seconds: 90, round: null });
+  });
+
+  it('extra round on the larger exercise rests alone', () => {
+    let log = fresh();
+    const bId = log.blocks[1]!.exercises[0]!.id;
+    log = {
+      ...log,
+      blocks: log.blocks.map((b, bi) =>
+        bi !== 1
+          ? b
+          : {
+              ...b,
+              exercises: b.exercises.map((e, ei) =>
+                ei !== 0 ? e : { ...e, sets: [...e.sets, { ...e.sets[0]!, id: uuid(), completedAt: null }] },
+              ),
+            },
+      ),
+    };
+    expect(bId).toBe(log.blocks[1]!.exercises[0]!.id);
+    const block = log.blocks[1]!;
+    expect(blockRoundCount(block)).toBe(4);
+    expect(blockSteps(block).map((s) => s.exerciseIndex)).toEqual([0, 1, 0, 1, 0, 1, 0]);
+    expect(afterDone(log, 1, block.exercises[0]!.sets[3]!.id)).toEqual({ kind: 'rest', seconds: 90, round: 4 });
+  });
+
+  it('keeps a warm-up inside a superset as its own round-1 step', () => {
+    let log = fresh();
+    const a1 = ids(log, 1, 0)[0]!;
+    log = {
+      ...log,
+      blocks: log.blocks.map((b, bi) =>
+        bi !== 1
+          ? b
+          : {
+              ...b,
+              exercises: b.exercises.map((e) =>
+                e.id !== b.exercises[0]!.id ? e : { ...e, sets: e.sets.map((s) => (s.id === a1 ? { ...s, setType: 'warmup' as const } : s)) },
+              ),
+            },
+      ),
+    };
+    const steps = blockSteps(log.blocks[1]!);
+    expect(steps[0]).toMatchObject({ kind: 'warmup', exerciseIndex: 0, round: 1 });
+    expect(afterDone(log, 1, a1)).toEqual({ kind: 'superset-next', exerciseIndex: 1 });
+  });
+
+  it('treats a missing rest like 0 in the round mix', () => {
+    let log = fresh();
+    const [a1, b1] = [ids(log, 1, 0)[0]!, ids(log, 1, 1)[0]!];
+    const nullRest = (l: WorkoutLogDoc, id: string): WorkoutLogDoc => ({
+      ...l,
+      blocks: l.blocks.map((b) => ({
+        ...b,
+        exercises: b.exercises.map((e) => ({
+          ...e,
+          sets: e.sets.map((s) => (s.id === id ? { ...s, target: { ...s.target, restSeconds: null } } : s)),
+        })),
+      })),
+    });
+    log = tick(withRest(nullRest(log, a1), b1, 45), a1);
+    expect(afterDone(log, 1, b1)).toEqual({ kind: 'rest', seconds: 45, round: 1 });
+    log = tick(withRest(nullRest(log, a1), b1, 0), a1);
+    expect(afterDone(log, 1, b1)).toEqual({ kind: 'next', round: 1, pageDone: false });
   });
 });
 

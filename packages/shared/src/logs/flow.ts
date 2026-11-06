@@ -104,17 +104,19 @@ export function afterDone(log: WorkoutLogDoc, blockIndex: number, setId: string)
   const step = steps[at];
   if (!step) return { kind: 'next', round: null, pageDone: !openElsewhere(block) };
 
-  const following = steps[at + 1];
-  if (following && following.kind === 'drop' && following.exerciseIndex === step.exerciseIndex) {
-    return { kind: 'drop', dropNumber: following.dropNumber! };
+  const nextOpenInGroup = steps
+    .slice(at + 1)
+    .find((s) => s.exerciseIndex === step.exerciseIndex && s.round === step.round && isOpen(block, s));
+  if (nextOpenInGroup && nextOpenInGroup.kind === 'drop') {
+    return { kind: 'drop', dropNumber: nextOpenInGroup.dropNumber! };
   }
 
   const superset = block.kind === 'superset';
   if (superset) {
-    const later = steps
-      .slice(at + 1)
-      .find((s) => s.round === step.round && s.exerciseIndex !== step.exerciseIndex && s.setId !== setId && isOpen(block, s));
-    if (later) return { kind: 'superset-next', exerciseIndex: later.exerciseIndex };
+    // Another exercise in this round that is still open: prefer one after this step, else one before it.
+    const others = steps.filter((s) => s.round === step.round && s.exerciseIndex !== step.exerciseIndex && isOpen(block, s));
+    const target = others.find((s) => steps.indexOf(s) > at) ?? others[0];
+    if (target) return { kind: 'superset-next', exerciseIndex: target.exerciseIndex };
   }
 
   // A drop chain rests with its main set; a superset round uses the longest rest in the round.
