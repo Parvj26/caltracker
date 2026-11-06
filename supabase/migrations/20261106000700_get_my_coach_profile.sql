@@ -10,6 +10,7 @@ language sql stable security definer set search_path = '' as $$
   join public.profiles p on p.id = owner.user_id
   join public.workspaces w on w.id = me.workspace_id
   where me.user_id = (select auth.uid()) and me.role = 'client'
+  order by owner.created_at
   limit 1;
 $$;
 

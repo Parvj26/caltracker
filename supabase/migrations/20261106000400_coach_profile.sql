@@ -45,11 +45,13 @@ revoke execute on function public.update_workspace_name(text) from public, anon,
 grant execute on function public.update_workspace_name(text) to authenticated;
 
 -- Private avatars bucket. Paths are {user_id}/avatar.webp and {user_id}/avatar-thumb.webp (.jpg instead when the
--- browser cannot make WebP). No type restriction on the bucket, so both work; the policies only look at the folder.
+-- browser cannot make WebP). The bucket accepts only those two image types, up to 3 MB each; the policies only look
+-- at the folder.
 -- A user writes only their own folder; reads cover their own folder and people in their workspace.
-insert into storage.buckets (id, name, public)
-values ('avatars', 'avatars', false)
-on conflict do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', false, 3145728, array['image/webp', 'image/jpeg'])
+on conflict (id) do update
+  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 create policy avatars_insert_own on storage.objects for insert to authenticated
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);

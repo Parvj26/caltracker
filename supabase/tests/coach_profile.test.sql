@@ -1,5 +1,5 @@
 begin;
-select plan(26);
+select plan(29);
 
 select tests.create_user('coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('a1@t.local', 'Client A1') as a1 \gset
@@ -95,6 +95,11 @@ select throws_ok(format($$update public.profiles set avatar_path = %L where id =
   '23514', null, 'avatar_path in another folder rejected');
 select lives_ok($$update public.profiles set avatar_path = null where id = auth.uid()$$, 'avatar_path can be cleared');
 reset role;
+
+select is((select public from storage.buckets where id = 'avatars'), false, 'the avatars bucket is private');
+select is((select file_size_limit from storage.buckets where id = 'avatars'), 3145728::bigint, 'photos are limited to 3 MB');
+select is((select allowed_mime_types from storage.buckets where id = 'avatars'), array['image/webp', 'image/jpeg'],
+  'only WebP and JPEG photos are accepted');
 
 select * from finish();
 rollback;
