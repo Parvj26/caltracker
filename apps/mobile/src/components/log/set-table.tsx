@@ -32,7 +32,11 @@ const MAX_FONT_SCALE = 1.4;
 /** The bar above the number pad (iOS): number pads have no return key, so this is how the keyboard goes away. */
 export const KEYBOARD_BAR_ID = 'log-number-pad';
 
-export function KeyboardBar() {
+/**
+ * Rendered once and never again: redrawing an input accessory view makes iOS reload the keyboard's views, which
+ * can drop the box's focus between two keystrokes (typing 140 saved 1).
+ */
+export const KeyboardBar = memo(function KeyboardBar() {
   const { text, space } = useTheme();
   if (Platform.OS !== 'ios') return null;
   return (
@@ -50,7 +54,7 @@ export function KeyboardBar() {
       </View>
     </InputAccessoryView>
   );
-}
+});
 
 export type TableHandlers = {
   /** A number typed in a box, already checked and turned into the stored patch. Saved on every readable keystroke. */

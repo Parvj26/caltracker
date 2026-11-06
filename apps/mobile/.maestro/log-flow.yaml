@@ -3,7 +3,7 @@
 #   page 2 superset Pullups (A1) + Pushups (A2), 2 rounds, scrolled round by round;
 #   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (F).
 # A weight typed on set 1 carries into set 2; a ticked set's numbers stay editable and it stays ticked; ✓ again
-# unticks; Mark all rounds; dots and swipes move between pages; the F tag explains itself; Done on the last page
+# unticks; Mark all rounds; dots move between pages; the F tag explains itself; Done on the last page
 # opens the finish sheet, which says what isn't ticked; Keep going returns to the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -155,15 +155,13 @@ env:
     visible:
       id: exercise-name-2
     timeout: 5000
-# Swipe right: back to the superset.
-- swipe:
-    from:
-      id: exercise-name-2
-    direction: RIGHT
-- extendedWaitUntil:
-    visible:
+# Back to the superset by its dot (it is still scrolled to where Mark all rounds was).
+- tapOn:
+    id: dot-1
+- scrollUntilVisible:
+    element:
       id: superset-heading-1
-    timeout: 5000
+    direction: UP
 - tapOn:
     id: dot-2
 - extendedWaitUntil:
