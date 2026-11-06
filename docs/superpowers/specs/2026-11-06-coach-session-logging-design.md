@@ -6,6 +6,9 @@ on the iPad or laptop.
 
 ## What the coach sees
 
+- **Home → Today's clients:** every row has its actions, and the whole row opens the first one: not started →
+  **Log session**; training now → **Watch live** (the workout in progress; it updates live once PR #34 merges) and
+  **Take over** (the session page, which offers it); done → **View log**. All at least 44 px.
 - **Entry points:** Home → Today's clients → **Log session** on a row; the client calendar's item menu →
   **Log session** on today's workout or a missed (past, not done) one. Logging an unplanned workout is not built.
 - **Page:** `/clients/[clientId]/log/[workoutId]`. Before anything is saved it shows the workout and
