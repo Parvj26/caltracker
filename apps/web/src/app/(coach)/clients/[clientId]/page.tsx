@@ -6,6 +6,8 @@ import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type PickerProgram } from './client-calendar';
 import { loadClient } from './client';
+import { loadProgress } from './progress/load';
+import { ProgressSection } from './progress/progress-section';
 import styles from '@/components/calendar/calendar.module.css';
 
 // Same cap as the workout library page.
@@ -16,9 +18,9 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ month?: string | string[]; assign?: string | string[] }>;
+  searchParams: Promise<{ month?: string | string[]; assign?: string | string[]; scan?: string | string[] }>;
 }) {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, units } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
   const client = await loadClient(supabase, workspaceId, clientId);
@@ -33,7 +35,7 @@ export default async function ClientPage({
   const rangeStart = monthGrid(firstMonth)[0]![0]!;
   const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
 
-  const [workouts, assignments, library, programs] = await Promise.all([
+  const [workouts, assignments, library, programs, progress] = await Promise.all([
     supabase
       .from('workouts')
       .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
@@ -66,6 +68,7 @@ export default async function ClientPage({
       .select('id, name, weeks, program_workouts(week, day)')
       .eq('workspace_id', workspaceId)
       .order('name'),
+    loadProgress(supabase, workspaceId, client.id),
   ]);
   if (workouts.error) throw new Error(`Could not load the calendar: ${workouts.error.message}`);
   if (assignments.error) throw new Error(`Could not load assignments: ${assignments.error.message}`);
@@ -127,6 +130,14 @@ export default async function ClientPage({
         library={library.data}
         programs={pickerPrograms}
         openAssign={query.assign === '1'}
+      />
+      <ProgressSection
+        workspaceId={workspaceId}
+        client={{ id: client.id, name: client.name }}
+        units={units}
+        data={progress}
+        readOnly={client.removedAt !== null}
+        openScan={query.scan === '1'}
       />
     </div>
   );

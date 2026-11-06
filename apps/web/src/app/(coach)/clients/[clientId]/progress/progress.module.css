@@ -1,0 +1,65 @@
+/* Progress section of the client page. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
+.section { display: flex; flex-direction: column; gap: var(--ct-space-3); margin-top: var(--ct-space-4); }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
+.heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.headActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin-left: auto; }
+
+.ranges { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
+.range {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+/* Text on a pastel fill is always ink. */
+.range[aria-pressed='true'] { background: var(--ct-lime); box-shadow: none; }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+.chartCard { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); background: var(--ct-surface); min-width: 0; }
+.chartTitle { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.chartRead { margin: 0; font-variant-numeric: tabular-nums; min-height: 1.5em; }
+.chartChange { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.svg { width: 100%; height: auto; touch-action: pan-y; }
+.axis { stroke: var(--ct-border); stroke-width: 1; }
+.line { fill: none; stroke: var(--ct-ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.dot { fill: var(--ct-bg); stroke: var(--ct-ink); stroke-width: 2; cursor: pointer; }
+.dot:hover, .dot:focus-visible, .dotActive { fill: var(--ct-lime); }
+.axisText { fill: var(--ct-ink-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.note { margin: 0; color: var(--ct-ink-muted); }
+
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { padding: var(--ct-space-2); text-align: left; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.table td { padding: var(--ct-space-2); vertical-align: top; border-top: 1px solid var(--ct-border); }
+.nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.values { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--ct-space-1) var(--ct-space-3); }
+.rowActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); }
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.form { display: flex; flex-direction: column; gap: var(--ct-space-3); overflow-y: auto; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-2) var(--ct-space-3); }
+.fieldsFull { grid-column: 1 / -1; }
+.fileRow { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.fileLabel { font-weight: var(--ct-weight-section-heading); }
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.listRow { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-3); }
+.tableCaption { padding: var(--ct-space-1) var(--ct-space-2); text-align: left; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }

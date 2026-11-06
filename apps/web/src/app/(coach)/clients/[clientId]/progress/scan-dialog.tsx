@@ -1,0 +1,199 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import { IsoDateSchema } from '@caltracker/shared';
+import type { IsoDate, Units } from '@caltracker/shared';
+import { ReloadButton } from '@/components/reload-button';
+import { Button, ErrorText, TextField } from '@/components/ui';
+import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { createBrowserSupabase } from '@/lib/supabase/client';
+import { saveScan } from './actions';
+import { preparePrintout, type Printout } from './compress';
+import type { ScanRow } from './load';
+import { inputsFor, parseScanForm, scanFields, type CustomMetric } from './scan-form';
+import calendar from '@/components/calendar/calendar.module.css';
+import styles from './progress.module.css';
+
+/**
+ * The scan form: a date, the standard measures, the workspace's custom measures and one printout. `scan` is the
+ * scan being edited, or null for a new one. The scan's id is made once when the form opens, so a retry after a
+ * dropped connection saves the same scan instead of adding a second.
+ */
+export function ScanDialog({
+  workspaceId,
+  clientId,
+  units,
+  customs,
+  scan,
+  today,
+  presetDate,
+  onSaved,
+  onManage,
+  onClose,
+}: {
+  workspaceId: string;
+  clientId: string;
+  units: Units;
+  customs: CustomMetric[];
+  scan: ScanRow | null;
+  today: IsoDate;
+  /** The date a new scan starts with (default today). */
+  presetDate?: IsoDate;
+  onSaved: (message: string) => void;
+  onManage: () => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const [scanId] = useState(() => scan?.id ?? crypto.randomUUID());
+  const [original] = useState(() => (scan ? { values: scan.values, inputs: inputsFor(scan.values, units) } : undefined));
+  const [date, setDate] = useState<string>(scan?.measuredOn ?? presetDate ?? today);
+  const [inputs, setInputs] = useState<Record<string, string>>(() => ({ ...original?.inputs }));
+  const [printout, setPrintout] = useState<Printout | null>(null);
+  const [removePrintout, setRemovePrintout] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const busy = useRef(false);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+
+  const fields = scanFields(customs, units, new Set(Object.keys(scan?.values ?? {})));
+  const parsedDate = IsoDateSchema.safeParse(date);
+  const dateError = !parsedDate.success ? 'Pick a date.' : parsedDate.data > today ? "The date can't be in the future." : null;
+
+  async function onFile(file: File | undefined) {
+    setPrintout(null);
+    setFileError(null);
+    if (!file) return;
+    try {
+      setPrintout(await preparePrintout(file));
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'Printouts must be an image or a PDF under 5 MB.');
+    }
+  }
+
+  async function save() {
+    if (busy.current) return;
+    setFormError(null);
+    const parsed = parseScanForm(inputs, fields, customs, units, original);
+    setErrors(parsed.ok ? {} : parsed.errors);
+    if (!parsed.ok) {
+      if (parsed.form) setFormError(parsed.form);
+      return;
+    }
+    if (dateError || !parsedDate.success || fileError) return;
+
+    busy.current = true;
+    setPending(true);
+    let uploaded: string | null = null;
+    try {
+      let attachment: string | null | undefined;
+      if (printout) {
+        uploaded = `${workspaceId}/${clientId}/${crypto.randomUUID()}.${printout.ext}`;
+        const up = await createBrowserSupabase().storage.from('scan-attachments').upload(uploaded, printout.blob, { contentType: printout.contentType });
+        if (up.error) {
+          uploaded = null;
+          setFormError("Couldn't upload the printout. Check your connection and try again.");
+          return;
+        }
+        attachment = uploaded;
+      } else if (removePrintout) {
+        attachment = null;
+      }
+      const outcome = await saveScan({
+        id: scanId,
+        clientId,
+        measuredOn: parsedDate.data,
+        values: parsed.values,
+        ...(attachment !== undefined ? { attachmentPath: attachment } : {}),
+      });
+      if (outcome.ok) {
+        uploaded = null; // saved: the file stays
+        onSaved(outcome.warning ?? (scan ? 'Scan updated.' : 'Scan added.'));
+        return;
+      }
+      uploaded = null; // the server already took the file back
+      setFormError(outcome.error);
+    } catch (e) {
+      setFormError(failureMessage(e, "Couldn't save the scan. Check your connection and try again."));
+    } finally {
+      // The file of a save that did not reach the server is removed here, best effort.
+      if (uploaded) void createBrowserSupabase().storage.from('scan-attachments').remove([uploaded]);
+      busy.current = false;
+      setPending(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className={calendar.dialog}
+      aria-labelledby={titleId}
+      onCancel={(e) => {
+        if (pending) e.preventDefault();
+      }}
+      onClose={onClose}
+    >
+      <h2 id={titleId} className={calendar.dialogTitle}>{scan ? 'Edit scan' : 'Add a scan'}</h2>
+      <form
+        className={styles.form}
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <TextField
+          label="Date"
+          type="date"
+          max={today}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          {...(dateError ? { error: dateError } : {})}
+        />
+        <div className={styles.fields}>
+          {fields.map((f) => (
+            <TextField
+              key={f.key}
+              label={f.label}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={inputs[f.key] ?? ''}
+              onChange={(e) => setInputs((s) => ({ ...s, [f.key]: e.target.value }))}
+              {...(errors[f.key] ? { error: errors[f.key]! } : {})}
+            />
+          ))}
+        </div>
+        <Button variant="secondary" onClick={onManage}>Manage custom measures</Button>
+
+        <div className={styles.fileRow}>
+          <label className={styles.fileLabel} htmlFor={`${titleId}-file`}>Printout (image or PDF, up to 5 MB)</label>
+          <input id={`${titleId}-file`} type="file" accept="image/*,application/pdf" onChange={(e) => void onFile(e.target.files?.[0])} />
+          {fileError ? <ErrorText>{fileError}</ErrorText> : null}
+          {scan?.hasPrintout && !printout ? (
+            <label>
+              <input type="checkbox" checked={removePrintout} onChange={(e) => setRemovePrintout(e.target.checked)} /> Remove the current printout
+            </label>
+          ) : null}
+        </div>
+
+        {formError ? <ErrorText>{formError}</ErrorText> : null}
+        <div className={calendar.dialogActions}>
+          {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={calendar.smallButton} /> : null}
+          <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>Cancel</Button>
+          <Button type="submit" pending={pending}>{pending ? 'Saving…' : 'Save scan'}</Button>
+        </div>
+      </form>
+    </dialog>
+  );
+}

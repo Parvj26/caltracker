@@ -1,5 +1,5 @@
 begin;
-select plan(77);
+select plan(79);
 
 -- Fixtures (as postgres)
 select tests.create_user('bs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -247,8 +247,16 @@ reset role;
 select tests.act_as(:'coach_b');
 select is((select count(*)::int from storage.objects where bucket_id = 'scan-attachments'), 1, 'coach B sees only workspace B printouts');
 reset role;
+
+-- A JPEG printout (the fallback when a browser cannot encode WebP) is accepted by the bucket and the path rule.
+select is((select allowed_mime_types @> array['image/jpeg'] from storage.buckets where id = 'scan-attachments'), true,
+  'the bucket allows JPEG');
 select tests.act_as(:'coach_a');
-select is((select count(*)::int from storage.objects where bucket_id = 'scan-attachments'), 2, 'coach A sees both printouts of workspace A');
+select lives_ok(format($$insert into storage.objects (bucket_id, name, owner) values ('scan-attachments', %L, %L)$$,
+  :'ws_a' || '/' || :'a1' || '/' || gen_random_uuid() || '.jpg', :'coach_a'), 'coach uploads a .jpg printout');
+reset role;
+select tests.act_as(:'coach_a');
+select is((select count(*)::int from storage.objects where bucket_id = 'scan-attachments'), 3, 'coach A sees all three printouts of workspace A');
 reset role;
 
 -- Storage: update and delete denied to the client and to another workspace's coach
@@ -288,7 +296,7 @@ delete from public.workspaces where id = :'ws_a';
 select is((select count(*)::int from public.body_measurements where workspace_id = :'ws_a')
   + (select count(*)::int from public.custom_metrics where workspace_id = :'ws_a'),
   0, 'deleting a workspace removes its scans and custom measures');
-select is((select count(*)::int from storage.objects where bucket_id = 'scan-attachments' and name like :'ws_a' || '/%'), 2,
+select is((select count(*)::int from storage.objects where bucket_id = 'scan-attachments' and name like :'ws_a' || '/%'), 3,
   'printout metadata stays until the Storage API removes the files');
 
 select * from finish();

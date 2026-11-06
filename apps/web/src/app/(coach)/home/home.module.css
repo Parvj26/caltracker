@@ -111,7 +111,6 @@
 }
 .showAll:hover, .assign:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .assign { flex: none; align-self: center; }
-.scans { align-self: flex-start; }
 
 .skeleton { border-radius: var(--ct-radius-card); background: var(--ct-surface); }
 .skeletonTitle { height: 48px; max-width: 360px; }

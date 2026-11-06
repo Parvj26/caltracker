@@ -11,6 +11,8 @@ export type HomeClientRow = {
   joinedAt: string;
   /** Latest completed log, within the last 31 days; null if none. */
   lastFinishedAt: string | null;
+  /** Date of the latest coach-entered body scan (a client's own weight entries don't count); null if none. */
+  lastScanOn: IsoDate | null;
 };
 /** Planned workouts carry plain calendar dates (scheduled_on), so they need no time zone conversion. */
 export type HomeWorkoutRow = HomeWorkout;
@@ -37,7 +39,7 @@ async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data
 export async function loadHomeData(supabase: SupabaseClient<Database>, workspaceId: string, utcToday: IsoDate): Promise<HomeData> {
   const since = new Date(Date.now() - (LAST_WORKOUT_LOOKBACK_DAYS + 1) * 86_400_000).toISOString();
 
-  const [members, workouts, finished, assignments] = await Promise.all([
+  const [members, workouts, finished, assignments, scans] = await Promise.all([
     // Current clients only: a removed client is no longer a workspace member, which is how the Clients page does it.
     supabase.from('workspace_members').select('user_id, created_at').eq('workspace_id', workspaceId).eq('role', 'client'),
     readAll(
@@ -72,6 +74,18 @@ export async function loadHomeData(supabase: SupabaseClient<Database>, workspace
       .eq('workspace_id', workspaceId)
       .is('cancelled_on', null)
       .gte('end_date', addDays(utcToday, -1)),
+    readAll(
+      (from, to) =>
+        supabase
+          .from('body_measurements')
+          .select('client_id, measured_on')
+          .eq('workspace_id', workspaceId)
+          .eq('source', 'coach')
+          .order('measured_on', { ascending: false })
+          .order('id')
+          .range(from, to),
+      'body scans',
+    ),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (assignments.error) throw new Error(`Could not load programs: ${assignments.error.message}`);
@@ -85,6 +99,9 @@ export async function loadHomeData(supabase: SupabaseClient<Database>, workspace
   const latest = new Map<string, string>();
   for (const l of finished) if (l.finished_at && !latest.has(l.client_id)) latest.set(l.client_id, l.finished_at); // newest first
 
+  const lastScan = new Map<string, IsoDate>();
+  for (const m of scans) if (!lastScan.has(m.client_id)) lastScan.set(m.client_id, m.measured_on); // newest first
+
   return {
     clients: members.data.map((m) => ({
       id: m.user_id,
@@ -92,6 +109,7 @@ export async function loadHomeData(supabase: SupabaseClient<Database>, workspace
       lastName: nameOf.get(m.user_id)?.last_name ?? '',
       joinedAt: m.created_at ?? new Date().toISOString(), // never null in practice (it defaults to now)
       lastFinishedAt: latest.get(m.user_id) ?? null,
+      lastScanOn: lastScan.get(m.user_id) ?? null,
     })),
     // A library workout has no client or date; the filters above only let client calendar entries through.
     workouts: workouts.flatMap((w) =>

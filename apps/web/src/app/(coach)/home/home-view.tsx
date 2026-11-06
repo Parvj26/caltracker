@@ -7,6 +7,8 @@ import {
   compareByLastName,
   endingPrograms,
   formatLogDuration,
+  formatShortDate,
+  isScanDue,
   missedClients,
   quietClients,
   todayRows,
@@ -128,7 +130,14 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
     const workouts = data.workouts.filter((w) => current.has(w.clientId));
     const byId = new Map(clients.map((c) => [c.id, c]));
     const missed = missedClients(workouts, today);
+    // Oldest scan (or oldest join, if never scanned) first.
+    const lastScanOf = new Map(data.clients.map((c) => [c.id, c.lastScanOn]));
+    const scansDue = clients
+      .filter((c) => isScanDue({ joinedOn: c.joinedOn }, lastScanOf.get(c.id) ?? null, today))
+      .map((c) => ({ client: c, lastScanOn: lastScanOf.get(c.id) ?? null }))
+      .sort((a, b) => (a.lastScanOn ?? a.client.joinedOn).localeCompare(b.lastScanOn ?? b.client.joinedOn));
     return {
+      scansDue,
       byId,
       rows: todayRows(workouts, clients, today),
       progress: weekProgress(workouts, today),
@@ -139,9 +148,9 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
   }, [data, today]);
 
   if (!today || !view) return <Skeleton />;
-  const { byId, rows, progress, missed, quiet, ending } = view;
+  const { byId, rows, progress, missed, quiet, ending, scansDue } = view;
   const pct = progress.planned === 0 ? 0 : Math.round((progress.done / progress.planned) * 100);
-  const onTrack = missed.length === 0 && quiet.length === 0 && ending.length === 0;
+  const onTrack = missed.length === 0 && quiet.length === 0 && ending.length === 0 && scansDue.length === 0;
 
   return (
     <div className={styles.page}>
@@ -261,7 +270,20 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                 }}
               />
             ) : null}
-            <ComingSoon label="Body scans 30+ days" className={styles.scans} />
+            {scansDue.length > 0 ? (
+              <Group
+                title="Body scans 30+ days"
+                items={scansDue}
+                row={(d) => (
+                  <li key={d.client.id} className={styles.row}>
+                    <ClientLink client={d.client}>
+                      <span className={styles.detail}>{d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'}</span>
+                    </ClientLink>
+                    <Link href={`/clients/${d.client.id}?scan=1`} className={styles.assign} aria-label={`Add a scan for ${fullName(d.client)}`}>Add scan</Link>
+                  </li>
+                )}
+              />
+            ) : null}
           </Card>
         </aside>
       </div>

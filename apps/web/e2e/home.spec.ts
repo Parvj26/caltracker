@@ -170,7 +170,7 @@ test('the coming-soon parts are visible, disabled, and the console has no hydrat
   await signInAsCoach(page);
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
-  for (const label of ['New PRs this week', 'Message', 'Body scans 30+ days']) {
+  for (const label of ['New PRs this week', 'Message']) {
     await expect(page.locator('[role="note"]').filter({ hasText: label }).first()).toBeVisible();
   }
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
