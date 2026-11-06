@@ -23,6 +23,15 @@ describe('dayLabel', () => {
   it('adds the year for a previous year', () => {
     expect(dayLabel('2025-12-31T10:00:00Z', NOW, 'Europe/London')).toBe('Wed 31 Dec 2025');
   });
+  it('is correct on the London spring-forward day (23-hour day)', () => {
+    const now = '2026-03-29T12:00:00Z'; // BST, 13:00 local
+    expect(dayLabel('2026-03-29T00:30:00Z', now, 'Europe/London')).toBe('Today'); // 00:30 GMT
+    expect(dayLabel('2026-03-28T23:30:00Z', now, 'Europe/London')).toBe('Yesterday');
+    expect(dayLabel('2026-03-27T12:00:00Z', now, 'Europe/London')).toBe('Fri 27 Mar');
+    // 23:30Z on the 29th is 00:30 BST on the 30th, so it is already Today on the 30th
+    expect(dayLabel('2026-03-29T23:30:00Z', '2026-03-30T10:00:00Z', 'Europe/London')).toBe('Today');
+    expect(dayLabel('2026-03-29T12:00:00Z', '2026-03-30T10:00:00Z', 'Europe/London')).toBe('Yesterday');
+  });
   it('handles yesterday across a year boundary', () => {
     expect(dayLabel('2025-12-31T10:00:00Z', '2026-01-01T10:00:00Z', 'Europe/London')).toBe('Yesterday');
   });
