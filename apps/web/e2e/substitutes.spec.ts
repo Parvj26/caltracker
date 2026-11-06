@@ -31,6 +31,17 @@ test('add a substitute to an exercise and to a superset exercise, edit its sets,
   await expect(page.getByRole('dialog', { name: 'Add a substitute for Barbell Squat' })).toBeVisible();
   await pickInDialog(page, 'Barbell Deadlift');
 
+  // The picker no longer offers the planned exercise or a substitute it already has.
+  await page.getByRole('button', { name: 'Add a substitute for Barbell Squat' }).click();
+  const again = page.getByRole('dialog', { name: 'Add a substitute for Barbell Squat' });
+  await again.getByLabel('Search exercises').fill('Squat');
+  await expect(again.getByRole('option', { name: 'Bodyweight Squat', exact: true })).toBeVisible();
+  await expect(again.getByRole('option', { name: 'Barbell Squat', exact: true })).toHaveCount(0);
+  await again.getByLabel('Search exercises').fill('Deadlift');
+  await expect(again.getByRole('option', { name: 'Barbell Deadlift', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(again).toBeHidden();
+
   const sub = page.getByRole('group', { name: 'Substitute: Barbell Deadlift' });
   await expect(sub.getByText('or: Barbell Deadlift')).toBeVisible();
   // Collapsed by default; its sets are a copy of the squat's.

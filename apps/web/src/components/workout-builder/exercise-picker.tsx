@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { DEFAULT_SETS } from '@caltracker/shared';
-import type { ExercisePick } from '@caltracker/shared';
+import type { ExerciseIndexRow, ExercisePick } from '@caltracker/shared';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
 import styles from '@/components/exercise-search/exercise-search.module.css';
 import { SetCountStepper } from './set-count-stepper';
@@ -25,10 +25,18 @@ type Props = {
   /** `sets` is the stepper's value (3 when there is no stepper). */
   onPick: (exercises: ExercisePick[], sets: number) => void;
   onClose: () => void;
+  /** Exercise ids not to offer (a substitute's picker leaves out the planned exercise and its other substitutes). */
+  exclude?: readonly string[];
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, setCount, onPick, onClose }: Props) {
+export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, setCount, onPick, onClose, exclude }: Props) {
+  // SearchPanel needs a stable row filter: it only changes when the excluded ids do.
+  const excludeKey = (exclude ?? []).join(',');
+  const rowFilter = useCallback(
+    (row: ExerciseIndexRow) => !excludeKey.split(',').includes(row.id),
+    [excludeKey],
+  );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [sets, setSets] = useState(DEFAULT_SETS);
@@ -54,6 +62,7 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
         {...(hint !== undefined ? { hint } : {})}
         {...(groupLabel !== undefined ? { groupLabel } : {})}
         {...(setCount ? { footerExtra: <SetCountStepper label={setCount.label} noun={setCount.noun} value={sets} onChange={setSets} /> } : {})}
+        {...(excludeKey ? { rowFilter } : {})}
         onPick={(exs) => onPick(exs, setCount ? sets : DEFAULT_SETS)}
         onCancel={() => dialogRef.current?.close()}
       />

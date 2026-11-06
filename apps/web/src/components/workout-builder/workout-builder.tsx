@@ -72,7 +72,7 @@ type Picker =
   | { kind: 'addOption'; blockId: string }
   | { kind: 'addToSuperset'; blockId: string }
   | { kind: 'swap'; blockId: string; exId: string; name: string }
-  | { kind: 'substitute'; blockId: string; exId: string; name: string };
+  | { kind: 'substitute'; blockId: string; exId: string; name: string; exclude: string[] };
 
 const makeId = () => crypto.randomUUID();
 /** The most exercises "+ Exercise" adds in one go (a workout holds up to 30 blocks). */
@@ -255,8 +255,10 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     onFillDown: (exId, setId) => setDoc((d) => fillDown(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
     onAddSubstitute: (exId) => {
-      const name = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === exId)?.exerciseName ?? '';
-      setPicker({ kind: 'substitute', blockId, exId, name });
+      const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === exId);
+      // The planned exercise and its substitutes can't be picked again (addSubstitute would refuse them).
+      const exclude = ex ? [ex.exerciseId, ...ex.substitutes.map((s) => s.exerciseId)] : [];
+      setPicker({ kind: 'substitute', blockId, exId, name: ex?.exerciseName ?? '', exclude });
     },
     substitute: (exId, subId) => ({
       onRemove: () => setDoc((d) => removeSubstitute(d, blockId, exId, subId)),
@@ -421,6 +423,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         <ExercisePicker
           title={pickerTitle}
           workspaceId={workspaceId}
+          {...(picker.kind === 'substitute' ? { exclude: picker.exclude } : {})}
           multiple={picker.kind === 'straight' || picker.kind === 'superset' || picker.kind === 'choice'}
           {...(picker.kind === 'straight'
             ? {
