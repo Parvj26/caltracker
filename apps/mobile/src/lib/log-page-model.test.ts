@@ -145,6 +145,16 @@ describe('buildPageModel, straight page', () => {
     expect(m.steps[1].text).toBe('132 lb × 8');
   });
 
+  it('workoutDone only once every page is done (the all-done card then offers Finish, not Next exercise)', () => {
+    let log = fixture();
+    log = tick(log, ...sets(log, 0).map((s) => s.id));
+    expect(build(log, 0).workoutDone).toBe(false);
+    const allIds = log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets.map((s) => s.id)));
+    log = tick(log, ...allIds);
+    expect(build(log, 0).workoutDone).toBe(true);
+    expect(build(log, 1).workoutDone).toBe(true);
+  });
+
   it('a plan row for an unticked step', () => {
     const m = build(fixture(), 0);
     expect(m.steps[0].chip).toBe('W');

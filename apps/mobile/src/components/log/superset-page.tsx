@@ -135,7 +135,7 @@ export function SupersetPage({
 
       {model.allDone || !current ? (
         <>
-          <AllDoneCard page={page} hasNext={model.upNext !== null} onNext={handlers.onNext} onFinish={handlers.onFinish} />
+          <AllDoneCard page={page} hasNext={model.upNext !== null && !model.workoutDone} onNext={handlers.onNext} onFinish={handlers.onFinish} />
           <StepList steps={model.steps} page={page} showWarmupNote={model.hasWarmups} labels={labels} />
         </>
       ) : (
@@ -163,7 +163,7 @@ export function SupersetPage({
         onSwap={() => handlers.onSwap(activeIndex)}
       />
       <MoveRow page={page} prevName={prevName} nextName={nextName} onPrev={handlers.onPrev} onNext={handlers.onNext} />
-      <UpNext page={page} text={model.upNext} />
+      <UpNext page={page} text={model.workoutDone ? null : model.upNext} />
     </View>
   );
 }

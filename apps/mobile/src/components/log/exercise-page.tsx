@@ -60,7 +60,7 @@ export function ExercisePage({ model, page, resting, handlers, prevName, nextNam
 
       {model.allDone || !current ? (
         <>
-          <AllDoneCard page={page} hasNext={model.upNext !== null} onNext={handlers.onNext} onFinish={handlers.onFinish} />
+          <AllDoneCard page={page} hasNext={model.upNext !== null && !model.workoutDone} onNext={handlers.onNext} onFinish={handlers.onFinish} />
           <StepList steps={model.steps} page={page} showWarmupNote={model.hasWarmups} />
         </>
       ) : (
@@ -90,7 +90,7 @@ export function ExercisePage({ model, page, resting, handlers, prevName, nextNam
         onSwap={() => handlers.onSwap(0)}
       />
       <MoveRow page={page} prevName={prevName} nextName={nextName} onPrev={handlers.onPrev} onNext={handlers.onNext} />
-      <UpNext page={page} text={model.upNext} />
+      <UpNext page={page} text={model.workoutDone ? null : model.upNext} />
     </View>
   );
 }

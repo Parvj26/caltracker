@@ -94,6 +94,8 @@ export type PageModel = {
   steps: StepRowModel[];
   hasWarmups: boolean;
   allDone: boolean;
+  /** Every set of every page is ticked: the all-done card offers Finish workout, not Next exercise. */
+  workoutDone: boolean;
   nextLine: string | null;
   upNext: string | null;
 };
@@ -312,6 +314,7 @@ export function buildPageModel(i: {
     steps,
     hasWarmups: block.exercises.some((e) => e.sets.some((s) => s.setType === 'warmup')),
     allDone: isBlockDone(block),
+    workoutDone: log.blocks.every(isBlockDone),
     nextLine,
     upNext,
   };
