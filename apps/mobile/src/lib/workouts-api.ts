@@ -102,7 +102,7 @@ export async function fetchWorkoutDetail(
 export async function fetchMyUnits(): Promise<Units> {
   const { data, error } = await supabase.from('profiles').select('units').eq('id', await myId()).single();
   if (error) throw failed('units', error);
-  return data.units === 'lb' ? 'lb' : 'kg';
+  return data.units === 'kg' ? 'kg' : 'lb';
 }
 
 /** Saves the signed-in user's own display units (the database only lets anyone change their own). */
