@@ -19,6 +19,7 @@ import {
   updateSet,
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
+import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { saveWorkout, type SaveIssue } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
@@ -135,6 +136,8 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
         setFormError(failureMessage(e, "Couldn't save. Check your connection and try again."));
         return;
       }
+      // A saved workout changes the coach's "recently used" list.
+      if (outcome.ok) invalidateExerciseIndex();
       if (!outcome.ok) {
         setErrors(issuesByKey(snapshot, outcome.issues ?? []));
         setFormError(outcome.error);

@@ -84,7 +84,7 @@
   padding: var(--ct-space-2) var(--ct-space-3);
   cursor: pointer;
 }
-.thumb, .thumbPlaceholder { flex: none; width: 48px; height: 48px; border-radius: var(--ct-radius-input); object-fit: cover; background: var(--ct-surface); }
+.thumb { flex: none; width: 48px; height: 48px; border-radius: var(--ct-radius-input); object-fit: cover; background: var(--ct-surface); }
 .rowText { display: flex; min-width: 0; flex-direction: column; gap: var(--ct-space-1); }
 .rowName { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
 .mark { background: transparent; color: inherit; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 2px; }

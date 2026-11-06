@@ -34,10 +34,10 @@ export function Preview({ row, detail, imageUrl, action, detailFailed, onBack }:
       <div className={styles.photos}>
         {paths.length > 0 ? (
           paths.slice(0, 2).map((p, i) => (
-            <Photo key={p} src={imageUrl(p)} alt={`${row.name}, ${i === 0 ? 'start' : 'end'} position`} width={240} height={160} className={styles.photo} />
+            <Photo key={p} src={imageUrl(p)} alt={`${row.name}, ${i === 0 ? 'start' : 'end'} position`} width={240} height={160} className={styles.photo ?? ''} />
           ))
         ) : (
-          <Photo src={null} alt={`${row.name}`} width={240} height={160} className={styles.photo} />
+          <Photo src={null} alt={`${row.name}`} width={240} height={160} className={styles.photo ?? ''} />
         )}
       </div>
       <div className={styles.tags} aria-label="Muscles and equipment">

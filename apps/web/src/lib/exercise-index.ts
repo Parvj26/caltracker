@@ -5,14 +5,23 @@ export type LoadedExerciseIndex = { index: ExerciseIndexRow[]; favourites: strin
 
 const PAGE = 1000; // PostgREST returns at most 1,000 rows per request
 
-const CACHE_MS = 5 * 60 * 1000;
-let cache: { at: number; value: Promise<LoadedExerciseIndex> } | null = null;
+// A backstop only: changes the app makes itself call invalidateExerciseIndex().
+export const CACHE_MS = 60 * 1000;
+let cache: { at: number; userId: string | null; value: Promise<LoadedExerciseIndex> } | null = null;
 
-/** Like `fetchExerciseIndex`, but reuses a result younger than 5 minutes so each dialog open doesn't refetch. */
-export function loadExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
+/** Forget the cached index (after a custom exercise or a workout changes). */
+export function invalidateExerciseIndex(): void {
+  cache = null;
+}
+
+/** Like `fetchExerciseIndex`, but reuses a result for the same user younger than a minute so dialogs don't refetch. */
+export async function loadExerciseIndex(supabase: SupabaseClient<Database>): Promise<LoadedExerciseIndex> {
+  // getSession reads the stored session (no network call).
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user.id ?? null;
+  if (cache && cache.userId === userId && Date.now() - cache.at < CACHE_MS) return cache.value;
   const value = fetchExerciseIndex(supabase);
-  const entry = { at: Date.now(), value };
+  const entry = { at: Date.now(), userId, value };
   cache = entry;
   // A failed load must not be remembered.
   value.catch(() => {
