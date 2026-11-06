@@ -1,7 +1,9 @@
-import { Image, Linking, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
+import { demoUrl } from '@/lib/demo-link';
 import { exerciseImageUrl } from '@/lib/exercise-detail-api';
+import { openDemo } from '@/lib/open-demo';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, exercisePhotoHeight, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -26,7 +28,8 @@ export function ExerciseInfoSheet({
 }) {
   const { text, space, radius } = useTheme();
   const muscles = detail ? [...detail.primaryMuscles, ...detail.secondaryMuscles] : [];
-  const videoUrl = detail?.videoUrl ?? null;
+  // Re-checked here as well as when it was loaded: only a real YouTube video link gets a button.
+  const videoUrl = demoUrl(detail?.videoUrl);
 
   return (
     <Modal visible={name !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -101,7 +104,7 @@ export function ExerciseInfoSheet({
               testID="exercise-sheet-demo"
               variant="secondary"
               title="Watch demo"
-              onPress={() => void Linking.openURL(videoUrl).catch(() => undefined)}
+              onPress={() => openDemo(videoUrl)}
             />
           ) : null}
         </ScrollView>

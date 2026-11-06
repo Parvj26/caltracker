@@ -159,6 +159,7 @@ export function SetRow({
   onChange,
   onMenu,
   onDelete,
+  canDelete,
 }: {
   set: LogSetDoc;
   /** "W", "1", "2" or "↳". */
@@ -172,6 +173,8 @@ export function SetRow({
   onMenu: () => void;
   /** The swipe's Delete button: the same removal as "Remove set" in the menu. */
   onDelete: () => void;
+  /** False for the only set of an exercise (removing it is refused), so the row doesn't swipe. */
+  canDelete: boolean;
 }) {
   const { text, space, radius } = useTheme();
   const drop = set.setType === 'drop';
@@ -181,7 +184,7 @@ export function SetRow({
   const target = formatLogSetTarget(set.target, trackingType, units);
 
   return (
-    <SwipeToDelete testID={`set-delete-${index}`} label={`Delete ${setName.toLowerCase()}`} onDelete={onDelete}>
+    <SwipeToDelete testID={`set-delete-${index}`} label={`Delete ${setName.toLowerCase()}`} onDelete={onDelete} enabled={canDelete}>
     <View
       testID={`set-${index}`}
       style={[
@@ -195,6 +198,9 @@ export function SetRow({
         <Pressable
           testID={`set-menu-${index}`}
           onPress={onMenu}
+          // One screen-reader stop per row: the ⋯ button below opens the same menu.
+          accessibilityElementsHidden
+          importantForAccessibility="no"
           accessibilityRole="button"
           accessibilityLabel={`${setName} options`}
           style={({ pressed }) => [styles.label, { borderRadius: radius.input }, pressed && styles.pressed]}

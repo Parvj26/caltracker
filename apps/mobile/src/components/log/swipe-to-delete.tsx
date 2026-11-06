@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
-import { swipeDeleteWidth, white, palette, pressedOpacity } from '@/theme/theme';
+import { Animated, Keyboard, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { palette, pressedOpacity, swipeDeleteWidth, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /** A drag past this many points, or a flick, leaves the row open. */
@@ -9,16 +9,25 @@ const FLICK = 0.5;
 /** Horizontal movement beyond this (and clearly more than vertical) is a swipe, not a scroll or a tap. */
 const SLOP = 10;
 
+/** The one row that is open, if any. Opening a row closes it; scrolling and the keyboard close it too. */
+let openRow: { close: () => void } | null = null;
+
+/** Closes the open row (the list calls this when it starts to scroll). */
+export function closeOpenSwipeRow(): void {
+  openRow?.close();
+}
+
 /**
  * Swipe the row left to reveal a Delete button behind it; swipe right (or tap Delete) to close.
  * Plain React Native (PanResponder + Animated): the project has no gesture-handler. The ⋯ button on the row is
- * the way in for anyone who can't swipe.
+ * the way in for anyone who can't swipe. Only one row is open at a time.
  */
 export function SwipeToDelete({
   children,
   onDelete,
   testID,
   label,
+  enabled = true,
 }: {
   children: ReactNode;
   onDelete: () => void;
@@ -26,32 +35,42 @@ export function SwipeToDelete({
   testID: string;
   /** Accessible name of the button, e.g. "Delete set 2". */
   label: string;
+  /** False when the set can't be removed (the only set of an exercise): the row then doesn't swipe at all. */
+  enabled?: boolean;
 }) {
   const { text, radius } = useTheme();
   const x = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
   const [revealed, setRevealed] = useState(false);
+  // A fast double tap on Delete must remove once.
+  const firedRef = useRef(false);
+  const me = useRef<{ close: () => void }>({ close: () => undefined }).current;
 
   const settle = useMemo(
     () => (open: boolean) => {
       openRef.current = open;
-      if (open) setRevealed(true);
-      Animated.timing(x, {
-        toValue: open ? -swipeDeleteWidth : 0,
-        duration: 160,
-        useNativeDriver: true,
-      }).start(() => {
+      if (open) {
+        if (openRow && openRow !== me) openRow.close();
+        openRow = me;
+        firedRef.current = false;
+        setRevealed(true);
+      } else if (openRow === me) {
+        openRow = null;
+      }
+      Animated.timing(x, { toValue: open ? -swipeDeleteWidth : 0, duration: 160, useNativeDriver: true }).start(() => {
         if (!openRef.current) setRevealed(false);
       });
     },
-    [x],
+    [x, me],
   );
+  me.close = () => settle(false);
 
   const pan = useMemo(
     () =>
       PanResponder.create({
         // Capture, so a Pressable or input under the finger can't keep a sideways drag from reaching the row.
-        onMoveShouldSetPanResponderCapture: (_e, g) => Math.abs(g.dx) > SLOP && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onMoveShouldSetPanResponderCapture: (_e, g) =>
+          enabled && Math.abs(g.dx) > SLOP && Math.abs(g.dx) > Math.abs(g.dy) * 2,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           x.stopAnimation();
@@ -68,11 +87,22 @@ export function SwipeToDelete({
         },
         onPanResponderTerminate: () => settle(openRef.current),
       }),
-    [x, settle],
+    [x, settle, enabled],
   );
 
-  // Never leave the animation running on an unmounted row (a deleted set).
-  useEffect(() => () => x.stopAnimation(), [x]);
+  // The keyboard opening closes an open row; a row that goes away (a deleted set) leaves nothing behind.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardWillShow', () => {
+      if (openRef.current) settle(false);
+    });
+    return () => {
+      sub.remove();
+      x.stopAnimation();
+      if (openRow === me) openRow = null;
+    };
+  }, [settle, x, me]);
+
+  if (!enabled) return <View>{children}</View>;
 
   return (
     <View>
@@ -81,6 +111,8 @@ export function SwipeToDelete({
           <Pressable
             testID={testID}
             onPress={() => {
+              if (firedRef.current) return;
+              firedRef.current = true;
               settle(false);
               onDelete();
             }}

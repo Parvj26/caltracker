@@ -20,6 +20,7 @@ import {
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { ExercisePicker } from '@/components/log/exercise-picker';
+import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { LogBlock, type BlockHandlers } from '@/components/log/log-block';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { NoteSheet } from '@/components/log/note-sheet';
@@ -142,6 +143,8 @@ export default function LogScreen() {
     onExerciseInfo: (ex) => setInfoFor(ex),
     // The swipe's Delete button runs exactly what the set menu's "Remove set" runs.
     onRemoveSet: (ex, set) => removeSet(ex, set),
+    // Asked of the shared rule itself: it returns the same doc when it refuses.
+    canRemoveSet: (ex, set) => removeLogSet(log, ex.id, set.id, nowIso()) !== log,
     onAddSet: (ex) => void op((l) => addLogSet(l, ex.id, randomUUID, nowIso())),
   };
 
@@ -225,7 +228,7 @@ export default function LogScreen() {
 
   return (
     <View style={styles.fill}>
-      <Screen>
+      <Screen onScrollBegin={closeOpenSwipeRow}>
         <View style={[styles.headerRow, { gap: space[2] }]}>
           <TextButton testID="back" title="Today" onPress={back} />
           <SyncPill status={syncStatus} />

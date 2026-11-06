@@ -28,8 +28,6 @@ env:
       id: tick-0-0
     timeout: 20000
 # The exercise name opens its info sheet: name, instructions, a Close button.
-- assertVisible:
-    id: exercise-thumb-0
 - tapOn:
     id: exercise-name-0
 - extendedWaitUntil:

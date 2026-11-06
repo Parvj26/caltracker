@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   formatRest,
   formatSetTarget,
@@ -15,6 +15,8 @@ import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
+import { openableDemoUrl } from '@/lib/demo-link';
+import { openDemo } from '@/lib/open-demo';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { blockRounds, formatDayLabel, supersetLetters } from '@/lib/workouts';
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
@@ -227,11 +229,11 @@ function ExerciseSection({
         );
       })}
 
-      {videoUrl ? (
+      {openableDemoUrl(videoUrl) ? (
         <Button
           variant="secondary"
           title="Watch form on YouTube"
-          onPress={() => void Linking.openURL(videoUrl).catch(() => undefined)}
+          onPress={() => openDemo(videoUrl)}
         />
       ) : null}
     </View>

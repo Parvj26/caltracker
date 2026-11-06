@@ -13,6 +13,8 @@ export type BlockHandlers = {
   onExerciseMenu: (ex: LogExerciseDoc) => void;
   onExerciseInfo: (ex: LogExerciseDoc) => void;
   onRemoveSet: (ex: LogExerciseDoc, set: LogSetDoc) => void;
+  /** Whether removing this set would be allowed (the shared rule refuses the only set of an exercise). */
+  canRemoveSet: (ex: LogExerciseDoc, set: LogSetDoc) => boolean;
   onAddSet: (ex: LogExerciseDoc) => void;
 };
 
@@ -76,6 +78,7 @@ export function LogBlock({
                 onChange={(patch) => handlers.onChange(set, patch)}
                 onMenu={() => handlers.onSetMenu(ex, set, labels[si] ?? '')}
                 onDelete={() => handlers.onRemoveSet(ex, set)}
+                canDelete={handlers.canRemoveSet(ex, set)}
               />
             ))}
             <TextButton testID={`add-set-${ei}`} title="+ Set" onPress={() => handlers.onAddSet(ex)} />

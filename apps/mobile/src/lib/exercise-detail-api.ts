@@ -2,7 +2,8 @@
 // built-in exercises and their own workspace's custom ones, and their own workspace's pinned demo links.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'react-native';
-import { createDetailCache, type ExerciseDetail } from './exercise-detail';
+import { demoUrl } from './demo-link';
+import { createDetailCache, type DetailCache, type ExerciseDetail } from './exercise-detail';
 import { supabase } from './supabase';
 
 const BUCKET = 'exercise-images';
@@ -39,8 +40,18 @@ async function fetchRemote(ids: string[]): Promise<ExerciseDetail[]> {
     secondaryMuscles: e.secondary_muscles,
     equipment: e.equipment,
     instructions: e.instructions,
-    videoUrl: pins.get(e.id) || e.youtube_url || null,
+    // A stored link that isn't a YouTube video is skipped, so the coach's bad pin can't hide a good link.
+    videoUrl: demoUrl(pins.get(e.id)) ?? demoUrl(e.youtube_url),
   }));
 }
 
-export const exerciseDetails = createDetailCache(AsyncStorage, fetchRemote);
+let current: { userId: string; cache: DetailCache } | null = null;
+
+/**
+ * The exercise-detail cache of this signed-in user. A different user (sign out, sign in as someone else) gets a
+ * new, empty one, the same way the log store is made per user, so nothing carries over in memory either.
+ */
+export function exerciseDetailsFor(userId: string): DetailCache {
+  if (current?.userId !== userId) current = { userId, cache: createDetailCache(AsyncStorage, fetchRemote, userId) };
+  return current.cache;
+}

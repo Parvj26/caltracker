@@ -1,5 +1,6 @@
 // Pure helpers for the client's calendar screens. No Supabase client here, so they run in unit tests;
 // the fetchers live in ./workouts-api.ts.
+import { demoUrl } from './demo-link';
 import { addDays, groupDropSets, isoWeekday, youtubeFormSearchUrl, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
@@ -58,7 +59,9 @@ export function resolveVideoUrls(
   const pinned = new Map(overrides.map((o) => [o.exercise_id, o.youtube_url]));
   const urls: Record<string, string> = {};
   for (const ex of exercises) {
-    urls[ex.exerciseId] = pinned.get(ex.exerciseId) || own.get(ex.exerciseId) || youtubeFormSearchUrl(ex.exerciseName);
+    // A stored link that is not a real YouTube video link is skipped, so a bad row can't be opened.
+    urls[ex.exerciseId] =
+      demoUrl(pinned.get(ex.exerciseId)) ?? demoUrl(own.get(ex.exerciseId)) ?? youtubeFormSearchUrl(ex.exerciseName);
   }
   return urls;
 }

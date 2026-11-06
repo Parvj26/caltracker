@@ -36,6 +36,7 @@ export function Screen({
   inTabs = false,
   refreshing,
   onRefresh,
+  onScrollBegin,
 }: {
   children: ReactNode;
   centred?: boolean;
@@ -44,6 +45,8 @@ export function Screen({
   /** Pull to refresh, when both are given. */
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Called when the client starts to drag the content (e.g. to close something left open). */
+  onScrollBegin?: () => void;
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   // The bottom inset is room inside the scrolling content, not a fixed strip under it, so content scrolls under
@@ -93,6 +96,7 @@ export function Screen({
               centred && styles.centred,
             ]}
             keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={onScrollBegin}
             refreshControl={
               onRefresh ? (
                 <RefreshControl refreshing={refreshing ?? false} onRefresh={onRefresh} tintColor={palette.ink} />
