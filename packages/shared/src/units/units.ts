@@ -19,21 +19,35 @@ export function toKg(value: number, unit: Units): number {
   return round(unit === 'lb' ? value * KG_PER_LB : value, 3);
 }
 
-/** Converts stored kilograms to the display unit: whole pounds, or kilograms to 1 decimal. */
+/** How close (in lb) a stored weight must sit to an exact half pound to count as a half pound someone typed. */
+const HALF_LB_TOLERANCE = 0.01;
+
+/**
+ * Stored kilograms as pounds: whole pounds, except a half pound someone typed (102.5 lb, stored 46.493 kg)
+ * reads back as 102.5. Only a value within 0.01 lb of an exact .5 keeps the half, so a converted 60 kg
+ * (132.28 lb) still shows as 132, never 132.5.
+ */
+function kgToLb(kg: number): number {
+  const lb = kg / KG_PER_LB;
+  const half = Math.floor(lb) + 0.5;
+  return Math.abs(lb - half) <= HALF_LB_TOLERANCE ? half : round(lb, 0);
+}
+
+/** Converts stored kilograms to the display unit: whole (or typed half) pounds, or kilograms to 1 decimal. */
 export function fromKg(kg: number, unit: Units): number {
-  return unit === 'lb' ? round(kg / KG_PER_LB, 0) : round(kg, 1);
+  return unit === 'lb' ? kgToLb(kg) : round(kg, 1);
 }
 
 /**
  * The number an editable weight box shows. kg: the stored value to 3 decimals, so 61.25 typed stays 61.25.
- * lb: fromKg to a whole pound, so 135 lb (stored 61.235 kg) reads back as 135.
+ * lb: fromKg, so 135 lb (stored 61.235 kg) reads back as 135 and a typed 102.5 lb as 102.5.
  */
 export function kgToInput(kg: number, unit: Units): number {
   return unit === 'kg' ? round(kg, 3) : fromKg(kg, unit);
 }
 
 export function formatWeight(kg: number, unit: Units): string {
-  return `${trim(fromKg(kg, unit), unit === 'lb' ? 0 : 1)} ${unit}`;
+  return `${trim(fromKg(kg, unit), 1)} ${unit}`;
 }
 
 export function distanceUnitFor(units: Units): DistanceUnit {

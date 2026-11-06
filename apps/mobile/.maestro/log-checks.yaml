@@ -116,10 +116,10 @@ env:
     visible:
       id: tick-0-0
     timeout: 10000
-# Pounds are kept to whole pounds (shared units rule), so the typed 102.5 lb reads back as 102.
+# Pounds show as whole pounds, except a half pound someone typed (shared units rule), so 102.5 lb reads back as 102.5.
 - assertVisible:
     id: actual-weight-0-0
-    text: '102'
+    text: '102\.5'
 - assertVisible:
     id: actual-weight-0-1
     text: '152'

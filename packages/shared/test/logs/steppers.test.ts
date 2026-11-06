@@ -10,6 +10,13 @@ describe('stepSetValue', () => {
     expect(stepSetValue('weight', up, -1, 'lb')).toBe(toKg(137, 'lb'));
   });
 
+  it('lb steps from a typed half pound and keeps the half', () => {
+    const up = stepSetValue('weight', toKg(102.5, 'lb'), 1, 'lb');
+    expect(up).toBe(toKg(107.5, 'lb'));
+    expect(stepSetValue('weight', up, -1, 'lb')).toBe(toKg(102.5, 'lb'));
+    expect(stepSetValue('weight', toKg(2.5, 'lb'), -1, 'lb')).toBe(0);
+  });
+
   it('kg steps by 2.5, floors at 0 and refuses to pass the cap', () => {
     expect(stepSetValue('weight', 61.25, 1, 'kg')).toBe(63.75);
     expect(stepSetValue('weight', 1, -1, 'kg')).toBe(0);
