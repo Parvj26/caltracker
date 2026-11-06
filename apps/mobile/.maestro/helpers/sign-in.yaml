@@ -17,3 +17,8 @@ appId: app.caltracker.client
 - extendedWaitUntil:
     visible: 'Welcome to Demo Coaching'
     timeout: 20000
+# The save-password prompt can also arrive after Today shows.
+- waitForAnimationToEnd
+- tapOn:
+    text: Not Now
+    optional: true

@@ -53,8 +53,8 @@ env:
       id: invalid-actual-reps-0-0-2
       text: 'Whole reps only'
     timeout: 5000
-- tapOn:
-    id: keyboard-done
+# Done typing (Enter ends editing; the simulator has no on-screen keypad, so its Done typing bar can't show).
+- pressKey: Enter
 - assertNotVisible:
     id: invalid-actual-reps-0-0-2
 # A ticked set's box can't be left blank.
@@ -67,8 +67,8 @@ env:
       id: invalid-actual-weight-0-0-0
       text: 'A ticked set needs a number'
     timeout: 5000
-- tapOn:
-    id: keyboard-done
+# Done typing (Enter ends editing; the simulator has no on-screen keypad, so its Done typing bar can't show).
+- pressKey: Enter
 - assertVisible:
     id: actual-weight-0-0-0
     text: '50'

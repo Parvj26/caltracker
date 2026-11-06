@@ -161,9 +161,8 @@ env:
     id: actual-reps-0-0-0
 - waitForAnimationToEnd
 - inputText: '7'
-# Done typing: the bar above the number pad.
-- tapOn:
-    id: keyboard-done
+# Done typing (Enter ends editing; the simulator has no on-screen keypad, so its Done typing bar can't show).
+- pressKey: Enter
 - extendedWaitUntil:
     visible:
       id: option-line-0

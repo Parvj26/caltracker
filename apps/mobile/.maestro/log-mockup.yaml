@@ -176,10 +176,8 @@ env:
     visible:
       id: option-line-0
     timeout: 10000
-- swipe:
-    from:
-      id: option-line-0
-    direction: LEFT
+- tapOn:
+    id: dot-1
 - extendedWaitUntil:
     visible:
       id: exercise-name-1
