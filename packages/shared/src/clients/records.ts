@@ -3,7 +3,7 @@ import type { IsoDate } from '../dates/dates';
 
 /**
  * Rules for what a coach keeps about a client on the client page: notes, limitations (injuries), the goal with its
- * countdown, and documents. The limits match the database checks in 20261106005000_client_overview.sql.
+ * countdown, and documents. The limits match the database checks in 20261106006200_client_overview.sql.
  */
 
 export const NOTE_MAX_LENGTH = 2000;
