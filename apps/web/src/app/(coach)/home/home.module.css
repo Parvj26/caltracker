@@ -48,8 +48,6 @@
 .tileLink:hover { box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .track { display: block; height: 8px; margin-top: var(--ct-space-2); border-radius: var(--ct-radius-pill); background: var(--ct-bg); overflow: hidden; }
 .fill { display: block; height: 100%; background: var(--ct-ink); border-radius: var(--ct-radius-pill); }
-.soonTile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--ct-space-1); height: 100%; border-radius: var(--ct-radius-card); padding: var(--ct-space-3) var(--ct-space-3-5); }
-.soonValue { font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); line-height: 1.1; }
 
 .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: var(--ct-space-4); align-items: start; }
 .main, .sideCard { display: flex; flex-direction: column; gap: var(--ct-space-3); }

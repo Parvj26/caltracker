@@ -8,6 +8,7 @@ import {
   endingPrograms,
   formatLogDuration,
   missedClients,
+  prsThisWeek,
   quietClients,
   todayRows,
   weekProgress,
@@ -128,7 +129,9 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
     const workouts = data.workouts.filter((w) => current.has(w.clientId));
     const byId = new Map(clients.map((c) => [c.id, c]));
     const missed = missedClients(workouts, today);
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return {
+      newPrs: prsThisWeek(data.prs, current, today, timeZone),
       byId,
       rows: todayRows(workouts, clients, today),
       progress: weekProgress(workouts, today),
@@ -139,7 +142,7 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
   }, [data, today]);
 
   if (!today || !view) return <Skeleton />;
-  const { byId, rows, progress, missed, quiet, ending } = view;
+  const { byId, rows, progress, missed, quiet, ending, newPrs } = view;
   const pct = progress.planned === 0 ? 0 : Math.round((progress.done / progress.planned) * 100);
   const onTrack = missed.length === 0 && quiet.length === 0 && ending.length === 0;
 
@@ -178,7 +181,9 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
         ) : (
           <Tile tone="pink" label="Missed 2+" value={0} />
         )}
-        <ComingSoon label="New PRs this week" className={styles.soonTile}><span className={styles.soonValue}>—</span></ComingSoon>
+        <Link href="/activity" className={styles.tileLink} aria-label={`New PRs this week: ${newPrs}. Open activity`}>
+          <Tile tone="lime" label="New PRs this week" value={newPrs} />
+        </Link>
       </div>
 
       <div className={styles.columns}>

@@ -1,0 +1,84 @@
+# The Zoo tab after the sticker-reveal flow: finish a 3 x 8 at 60 kg (a giraffe), then open Zoo. The header, the
+# animal count and a x1 giraffe show; tapping it opens the sheet with its fact. Run via `pnpm --filter mobile e2e`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+# Done on each of the three sets (sets 1 and 2 start a rest, which is skipped; the last set starts none).
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: all-done-0
+    timeout: 10000
+# Finish from the top bar.
+- tapOn:
+    id: finish-workout
+- extendedWaitUntil:
+    visible: 'NEW for your zoo book'
+    timeout: 15000
+- runFlow: helpers/reveal-through.yaml
+- extendedWaitUntil:
+    visible: 'Giraffe ×1'
+    timeout: 10000
+- tapOn:
+    id: summary-done
+- extendedWaitUntil:
+    visible: 'Done ✓.*'
+    timeout: 20000
+- tapOn:
+    id: tab-zoo
+- extendedWaitUntil:
+    visible:
+      id: zoo-streak
+    timeout: 10000
+- assertVisible: '🔥 .*-week streak'
+- assertVisible: '1 of 30 · Shiny .* / 30'
+- scrollUntilVisible:
+    element:
+      id: sticker-giraffe
+# The tile is one element for VoiceOver ("Giraffe, 1 collected"), so its ×1 badge is read from the tile's label.
+- assertVisible:
+    id: sticker-giraffe
+    text: 'Giraffe, 1 collected'
+- tapOn:
+    id: sticker-giraffe
+- assertVisible:
+    id: sheet-fact
+    text: 'Giraffes can sprint.*'
+- assertVisible: 'First earned.*'
+- tapOn:
+    id: sheet-close
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

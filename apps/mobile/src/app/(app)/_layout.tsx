@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { landingHref } from '@/lib/landing';
 import { useSession } from '@/lib/session';
 import { ActiveLogProvider } from '@/lib/use-active-log';
 import { palette } from '@/theme/theme';
@@ -8,21 +9,27 @@ import { palette } from '@/theme/theme';
  * with a coach, the tabs and the workout detail. When a coach removes the client, the next foreground
  * check clears `workspace` and the guards move them back to the "Ask your coach" screen.
  * The active workout (ActiveLogProvider) belongs to the signed-in user, so it wraps every screen here.
+ *
+ * Each guard names where to go when it closes (Today after joining a coach, "Ask your coach" after removal).
+ * Left to itself the router redirects to the bare tab group, which doesn't pick Today.
  */
 export default function AppLayout() {
   const { workspace } = useSession();
   const hasCoach = workspace !== null;
+  const landing = landingHref({ signedIn: true, hasCoach });
   return (
     <ActiveLogProvider>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
-      <Stack.Protected guard={hasCoach}>
+      <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="workout/[id]" />
         {/* No swipe back: leaving mid-set by accident is easy, and Today's Resume banner brings it back anyway. */}
         <Stack.Screen name="log/[id]/index" options={{ gestureEnabled: false }} />
+        {/* The reveal replaces the logging screen and then the summary; no swipe back into either. */}
+        <Stack.Screen name="log/[id]/reveal" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="log/[id]/summary" />
       </Stack.Protected>
-      <Stack.Protected guard={!hasCoach}>
+      <Stack.Protected guard={!hasCoach} redirectTo={landing}>
         <Stack.Screen name="home" />
       </Stack.Protected>
     </Stack>

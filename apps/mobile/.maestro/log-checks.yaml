@@ -351,6 +351,7 @@ env:
 - takeScreenshot: log-all-done
 - tapOn:
     id: finish-all-1
+- runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
     visible: '.* sets completed'
     timeout: 10000
@@ -448,6 +449,7 @@ env:
 - tapOn:
     id: finish-workout
 - tapOn: 'Finish'
+- runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
     visible: '.* set.* completed'
     timeout: 10000

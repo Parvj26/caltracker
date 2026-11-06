@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
+import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Chip } from '@/components/ui';
@@ -23,10 +23,12 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
   const { log, correctedAt } = loaded;
 
   const swappedIds = [...new Set(log.blocks.flatMap((b) => b.exercises.flatMap((e) => (e.swappedFromExerciseId ? [e.swappedFromExerciseId] : []))))];
-  const [comments, swapped] = await Promise.all([
+  const [comments, swapped, award] = await Promise.all([
     supabase.from('workout_log_comments').select('id, body, created_at, author_id').eq('log_id', log.id).order('created_at').order('id'),
     swappedIds.length ? supabase.from('exercises').select('id, name').in('id', swappedIds) : Promise.resolve({ data: [], error: null }),
+    supabase.from('awards').select('result').eq('log_id', log.id).maybeSingle(),
   ]);
+  if (award.error) throw new Error(`Could not load awards: ${award.error.message}`);
   if (comments.error) throw new Error(`Could not load comments: ${comments.error.message}`);
   if (swapped.error) throw new Error(`Could not load exercises: ${swapped.error.message}`);
   const authorIds = [...new Set(comments.data.flatMap((c) => (c.author_id ? [c.author_id] : [])))];
@@ -71,6 +73,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
         </ul>
         <div className={styles.chips}>
           {log.status !== 'completed' ? <Chip>{log.status === 'in_progress' ? 'In progress' : 'Discarded'}</Chip> : null}
+          {awardHasPrs(award.data?.result) ? <Chip tone="lime">PR</Chip> : null}
           {log.autoFinished ? <Chip tone="amber">Auto-finished</Chip> : null}
           {isPlannedLog(log) ? null : <Chip>Unplanned</Chip>}
           {correctedAt ? (

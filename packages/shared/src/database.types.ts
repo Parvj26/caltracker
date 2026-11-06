@@ -34,6 +34,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_catchup_attempts: {
+        Row: {
+          attempts: number
+          last_attempt_at: string
+          log_id: string
+        }
+        Insert: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id: string
+        }
+        Update: {
+          attempts?: number
+          last_attempt_at?: string
+          log_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "award_catchup_attempts_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      awards: {
+        Row: {
+          client_id: string
+          created_at: string
+          log_id: string
+          log_revision: number
+          result: Json
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          log_id: string
+          log_revision?: number
+          result: Json
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          log_id?: string
+          log_revision?: number
+          result?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "awards_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: true
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "awards_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -83,6 +151,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_stats: {
+        Row: {
+          best_streak: number
+          client_id: string
+          journey_week: number
+          lifetime_volume_kg: number
+          pr_count: number
+          streak: number
+          streak_week: string | null
+          updated_at: string
+          workouts: number
+          workspace_id: string
+        }
+        Insert: {
+          best_streak?: number
+          client_id: string
+          journey_week?: number
+          lifetime_volume_kg?: number
+          pr_count?: number
+          streak?: number
+          streak_week?: string | null
+          updated_at?: string
+          workouts?: number
+          workspace_id: string
+        }
+        Update: {
+          best_streak?: number
+          client_id?: string
+          journey_week?: number
+          lifetime_volume_kg?: number
+          pr_count?: number
+          streak?: number
+          streak_week?: string | null
+          updated_at?: string
+          workouts?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_stats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -432,6 +547,64 @@ export type Database = {
           },
         ]
       }
+      personal_records: {
+        Row: {
+          achieved_at: string
+          client_id: string
+          exercise_id: string
+          id: string
+          kind: string
+          log_id: string | null
+          reps: number | null
+          value_kg: number
+          workspace_id: string
+        }
+        Insert: {
+          achieved_at: string
+          client_id: string
+          exercise_id: string
+          id?: string
+          kind: string
+          log_id?: string | null
+          reps?: number | null
+          value_kg: number
+          workspace_id: string
+        }
+        Update: {
+          achieved_at?: string
+          client_id?: string
+          exercise_id?: string
+          id?: string
+          kind?: string
+          log_id?: string | null
+          reps?: number | null
+          value_kg?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_records_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_records_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -441,6 +614,7 @@ export type Database = {
           full_name: string
           id: string
           last_name: string
+          time_zone: string
           units: string
           updated_at: string | null
         }
@@ -452,6 +626,7 @@ export type Database = {
           full_name?: string
           id: string
           last_name?: string
+          time_zone?: string
           units?: string
           updated_at?: string | null
         }
@@ -463,6 +638,7 @@ export type Database = {
           full_name?: string
           id?: string
           last_name?: string
+          time_zone?: string
           units?: string
           updated_at?: string | null
         }
@@ -613,6 +789,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "programs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sticker_awards: {
+        Row: {
+          client_id: string
+          count: number
+          first_earned_at: string
+          first_log_id: string | null
+          last_earned_at: string
+          shiny: boolean
+          sticker_key: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          count?: number
+          first_earned_at?: string
+          first_log_id?: string | null
+          last_earned_at?: string
+          shiny?: boolean
+          sticker_key: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          count?: number
+          first_earned_at?: string
+          first_log_id?: string | null
+          last_earned_at?: string
+          shiny?: boolean
+          sticker_key?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sticker_awards_first_log_id_fkey"
+            columns: ["first_log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sticker_awards_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1025,6 +1249,7 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {
           p_assignment_id: string
@@ -1035,6 +1260,12 @@ export type Database = {
         Returns: string
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
+      award_catchup: { Args: never; Returns: number }
+      award_history_version: {
+        Args: { p_client_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      award_inputs: { Args: { p_log_id: string }; Returns: Json }
       claim_invites: {
         Args: never
         Returns: {

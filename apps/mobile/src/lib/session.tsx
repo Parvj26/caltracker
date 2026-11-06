@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
+import { syncTimeZone } from './awards';
 import { claimWorkspace, currentWorkspace, removedFrom, type ClaimedWorkspace } from './claim';
 import { supabase } from './supabase';
 
@@ -62,20 +63,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Runs once per signed-in user (also after a deep-link sign-in).
   useEffect(() => {
-    if (userId) void runClaim(userId);
-    else setClaimed(null);
+    if (userId) {
+      void runClaim(userId);
+      // The server counts weeks in the client's own time zone: keep the profile's equal to the phone's.
+      void syncTimeZone(userId);
+    } else setClaimed(null);
   }, [userId, runClaim]);
 
   const recheck = useCallback(async () => {
     if (userId) await runClaim(userId);
   }, [userId, runClaim]);
 
-  // Re-read the coach link whenever the app comes back to the foreground, so a client the coach removed sees it
-  // without signing out. Read only: it never joins a coach. Access itself is enforced by the database either way.
+  // Re-read the coach link (and the phone's time zone) whenever the app comes back to the foreground, so a client
+  // the coach removed sees it without signing out. Read only: it never joins a coach. Access itself is enforced by the database either way.
   useEffect(() => {
     if (!userId) return;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void runCheck(userId, 'read');
+      if (state === 'active') {
+        void runCheck(userId, 'read');
+        // The phone may have travelled to another time zone while it was in the background.
+        void syncTimeZone(userId);
+      }
     });
     return () => sub.remove();
   }, [userId, runCheck]);

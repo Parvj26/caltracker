@@ -5,9 +5,12 @@ export const AUTO_FINISH_IDLE_MS = 3 * 60 * 60 * 1000;
 export const REMINDER_DELAY_MS = 20 * 60 * 1000;
 export const REOPEN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** Sets of the exercises being done: a pick-one group's unpicked options never count (see liveExercises). */
 function allSets(log: WorkoutLogDoc): { set: LogSetDoc; weightReps: boolean }[] {
   return log.blocks.flatMap((b) =>
-    b.exercises.flatMap((e) => e.sets.map((set) => ({ set, weightReps: e.trackingType === 'weight_reps' }))),
+    liveExercises(b).flatMap(({ exercise: e }) =>
+      e.sets.map((set) => ({ set, weightReps: e.trackingType === 'weight_reps' })),
+    ),
   );
 }
 
