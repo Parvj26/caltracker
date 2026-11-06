@@ -294,6 +294,7 @@ describe('every op keeps a log with substitutes valid (the phone drops a log tha
         check(ops.pickChoice(log, b.id, null, T1), 'pickChoice');
       }
       check(ops.addLogExercise(log, ROW, uuid, T1), 'addLogExercise');
+      check(ops.setLogNotes(log, 'Session note', T1), 'setLogNotes');
       check(ops.discardLog(log, T1), 'discardLog');
       check(ops.finishLog(log, T1), 'finishLog');
       check(ops.reopenLog({ ...ops.finishLog(locked, T1), autoFinished: true }, T1), 'reopenLog');
