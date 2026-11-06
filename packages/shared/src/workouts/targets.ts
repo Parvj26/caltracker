@@ -52,19 +52,26 @@ export function formatRest(seconds: number): string {
  * One line for an exercise's sets on the workout preview, e.g. "35 lb × 12, 45 lb × 10, ↓ 25 lb × 8", and how many
  * sets it has. A weighted set reads weight first ("35 lb × 12", or "60 kg × 8–10"); every other set is worded as
  * formatSetTarget words it, so units, time, distance and reps-only tracking read the same as the full rows.
- * Warm-ups are marked "W ", drops "↓ ". The count is the warm-up and working sets: a drop continues the set
- * before it, so it is not counted again. No sets: empty text and 0.
+ * Warm-ups are marked "W ", drops "↓ ". `spoken` is the same line for screen readers, with the marks as words
+ * ("warm-up 20 lb × 10, drop to failure") and "no target" for a set with none. The count is the warm-up and
+ * working sets: a drop continues the set before it, so it is not counted again. No sets: empty text and 0.
  */
 export function formatSetsSummary(
   sets: readonly WorkoutSetDoc[],
   trackingType: TrackingType,
   units: Units,
-): { text: string; count: number } {
-  const parts = sets.map((set) => {
-    const prefix = set.setType === 'warmup' ? 'W ' : set.setType === 'drop' ? '↓ ' : '';
-    return prefix + summaryPart(set, trackingType, units);
-  });
-  return { text: parts.join(', '), count: sets.filter((s) => s.setType !== 'drop').length };
+): { text: string; spoken: string; count: number } {
+  const text: string[] = [];
+  const spoken: string[] = [];
+  for (const set of sets) {
+    const part = summaryPart(set, trackingType, units);
+    const mark = set.setType === 'warmup' ? 'W ' : set.setType === 'drop' ? '↓ ' : '';
+    const word = set.setType === 'warmup' ? 'warm-up ' : set.setType === 'drop' ? 'drop ' : '';
+    text.push(mark + part);
+    const said = part === '—' ? 'no target' : part;
+    spoken.push(word ? word + said.replace(/^To failure/, 'to failure') : said);
+  }
+  return { text: text.join(', '), spoken: spoken.join(', '), count: sets.filter((s) => s.setType !== 'drop').length };
 }
 
 function summaryPart(set: WorkoutSetDoc, trackingType: TrackingType, units: Units): string {

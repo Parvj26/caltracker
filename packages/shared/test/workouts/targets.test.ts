@@ -87,7 +87,7 @@ describe('formatSetsSummary', () => {
 
   it('puts the weight first, in the client units, with a count of the sets', () => {
     const sets = [35, 45, 55, 30].map((w, i) => set({ ...reps([12, 12, 10, 5][i]!), targetWeightKg: lb(w) }));
-    expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toEqual({
+    expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toMatchObject({
       text: '35 lb × 12, 45 lb × 12, 55 lb × 10, 30 lb × 5',
       count: 4,
     });
@@ -99,25 +99,25 @@ describe('formatSetsSummary', () => {
   });
   it('shows kilograms and a rep range', () => {
     const sets = [set({ targetRepsMin: 8, targetRepsMax: 10, targetWeightKg: 60 }), set({ ...reps(8), targetWeightKg: 62.5 })];
-    expect(formatSetsSummary(sets, 'weight_reps', 'kg')).toEqual({ text: '60 kg × 8–10, 62.5 kg × 8', count: 2 });
+    expect(formatSetsSummary(sets, 'weight_reps', 'kg')).toMatchObject({ text: '60 kg × 8–10, 62.5 kg × 8', count: 2 });
   });
   it('words a set with no weight, or no reps, as formatSetTarget does', () => {
     const sets = [set(reps(12)), set({ targetWeightKg: 20 }), set({})];
     expect(formatSetsSummary(sets, 'weight_reps', 'kg').text).toBe('12 reps, 20 kg, —');
   });
   it('shows reps-only sets as reps', () => {
-    expect(formatSetsSummary([set(reps(10)), set(reps(8))], 'reps', 'lb')).toEqual({ text: '10 reps, 8 reps', count: 2 });
+    expect(formatSetsSummary([set(reps(10)), set(reps(8))], 'reps', 'lb')).toMatchObject({ text: '10 reps, 8 reps', count: 2 });
   });
   it('shows timed sets as their duration, ignoring a weight', () => {
     const sets = [set({ targetDurationS: 45, targetWeightKg: 10 }), set({ targetDurationS: 90 })];
-    expect(formatSetsSummary(sets, 'time', 'lb')).toEqual({ text: '45 s, 1:30', count: 2 });
+    expect(formatSetsSummary(sets, 'time', 'lb')).toMatchObject({ text: '45 s, 1:30', count: 2 });
   });
   it('shows distance in the client units', () => {
-    expect(formatSetsSummary([set({ targetDistanceM: 5000 })], 'distance', 'kg')).toEqual({ text: '5 km', count: 1 });
+    expect(formatSetsSummary([set({ targetDistanceM: 5000 })], 'distance', 'kg')).toMatchObject({ text: '5 km', count: 1 });
   });
   it('marks warm-ups with W and counts them', () => {
     const sets = [set({ setType: 'warmup', ...reps(10), targetWeightKg: 20 }), set({ ...reps(8), targetWeightKg: 60 })];
-    expect(formatSetsSummary(sets, 'weight_reps', 'kg')).toEqual({ text: 'W 20 kg × 10, 60 kg × 8', count: 2 });
+    expect(formatSetsSummary(sets, 'weight_reps', 'kg')).toMatchObject({ text: 'W 20 kg × 10, 60 kg × 8', count: 2 });
   });
   it('marks drops with an arrow and leaves them out of the count', () => {
     const sets = [
@@ -126,12 +126,32 @@ describe('formatSetsSummary', () => {
       set({ setType: 'drop', toFailure: true }),
       set({ setType: 'drop', toFailure: true, targetWeightKg: lb(15) }),
     ];
-    expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toEqual({
+    expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toMatchObject({
       text: '35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb × to failure',
       count: 1,
     });
   });
   it('is empty with no sets', () => {
-    expect(formatSetsSummary([], 'weight_reps', 'kg')).toEqual({ text: '', count: 0 });
+    expect(formatSetsSummary([], 'weight_reps', 'kg')).toMatchObject({ text: '', count: 0 });
+  });
+  it('words the screen-reader version: warm-up and drop in words, no symbols', () => {
+    const sets = [
+      set({ setType: 'warmup', ...reps(10), targetWeightKg: lb(20) }),
+      set({ ...reps(12), targetWeightKg: lb(35) }),
+      set({ setType: 'drop', ...reps(8), targetWeightKg: lb(25) }),
+      set({ setType: 'drop', toFailure: true }),
+      set({ setType: 'drop', toFailure: true, targetWeightKg: lb(15) }),
+    ];
+    const summary = formatSetsSummary(sets, 'weight_reps', 'lb');
+    expect(summary.text).toBe('W 20 lb × 10, 35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb × to failure');
+    expect(summary.spoken).toBe(
+      'warm-up 20 lb × 10, 35 lb × 12, drop 25 lb × 8, drop to failure, drop 15 lb × to failure',
+    );
+  });
+  it('speaks a set with no target as no target', () => {
+    expect(formatSetsSummary([set({})], 'weight_reps', 'kg').spoken).toBe('no target');
+  });
+  it('speaks an empty list as nothing', () => {
+    expect(formatSetsSummary([], 'reps', 'kg')).toEqual({ text: '', spoken: '', count: 0 });
   });
 });
