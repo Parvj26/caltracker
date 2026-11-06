@@ -163,7 +163,8 @@ export function MoveDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [date, setDate] = useState(entry.date);
+  // A missed workout from a past day starts on today: its own day can't be picked.
+  const [date, setDate] = useState(entry.date < today ? today : entry.date);
 
   useEffect(() => {
     const dialog = dialogRef.current;

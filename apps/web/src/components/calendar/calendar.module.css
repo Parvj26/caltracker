@@ -58,12 +58,14 @@
 }
 .items { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 
-.item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); container-type: inline-size; }
+.item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); }
 .programItem { background: var(--ct-lime); }
 .singleItem { background: var(--ct-blue); }
-/* The name and the "⋯" button share a row while the name's longest word fits beside the button; otherwise the button
-   drops under the name, so names wrap only between words. */
-.itemRow { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: flex-end; }
+/* The "⋯" button sits in the card's top-right corner. The name flows around a spacer the button's size (.menuSpace),
+   so its first lines stop short of the button and later lines use the full width; names wrap only between words. */
+.itemRow { position: relative; }
+.itemControls { position: absolute; top: 0; right: 0; }
+.menuSpace { float: right; width: calc(var(--ct-tap-min) - var(--ct-space-2)); height: calc(var(--ct-tap-min) - var(--ct-space-1)); }
 /* Finished: a "✓ Done" line under the name that opens the log. Text on a pastel fill is always ink. */
 .doneNote {
   display: flex;
@@ -86,10 +88,8 @@
   color: var(--ct-ink);
 }
 .itemHandle {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
+  display: block;
+  width: 100%;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-2);
   border: 0;
@@ -99,11 +99,10 @@
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
-  flex: 1 1 0%;
-  min-width: min-content;
 }
-/* Breaks inside a word only when that one word is wider than the whole item. */
-.itemName { display: block; max-width: calc(100cqi - 2 * var(--ct-space-2)); overflow-wrap: break-word; }
+/* Never breaks inside a word: a word that doesn't fit beside the button goes under it. A single word wider than the
+   whole card is cut with "…" (the full name is in the title). */
+.itemName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
 .grab { cursor: grab; touch-action: none; }
 .itemProgram {
   display: block;

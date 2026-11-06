@@ -224,7 +224,8 @@ function DayCell({
               key={item.id}
               item={item}
               date={date}
-              draggable={draggable}
+              // A done workout stays on the day it was done.
+              draggable={draggable && !item.logId}
               editable={editable}
               renderItem={renderItem}
               logHref={logHref}
@@ -274,6 +275,8 @@ function DayItem({
 }) {
   const data: DragData = { item, from: date };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
+  // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
+  const controls = renderItem(item, date, editable);
   return (
     <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed)}>
       <div className={styles.itemRow}>
@@ -287,15 +290,21 @@ function DayItem({
             className={cx(styles.itemHandle, styles.grab)}
             title={item.name}
           >
-            <span className={styles.itemName}>{item.name}</span>
+            <span className={styles.itemName}>
+              {controls ? <span className={styles.menuSpace} aria-hidden="true" /> : null}
+              {item.name}
+            </span>
           </button>
         ) : (
           // Read-only calendar: the name is plain text.
           <span className={styles.itemHandle} title={item.name}>
-            <span className={styles.itemName}>{item.name}</span>
+            <span className={styles.itemName}>
+              {controls ? <span className={styles.menuSpace} aria-hidden="true" /> : null}
+              {item.name}
+            </span>
           </span>
         )}
-        {renderItem(item, date, editable)}
+        {controls ? <div className={styles.itemControls}>{controls}</div> : null}
       </div>
       {item.logId && logHref ? (
         <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>

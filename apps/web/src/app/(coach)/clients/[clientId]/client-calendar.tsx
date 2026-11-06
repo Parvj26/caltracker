@@ -179,9 +179,12 @@ export function ClientCalendar({
     (days[localDateOf(log.finishedAt, timeZone)] ??= []).push({ id: `log-${log.id}`, name: log.name, programName: null, logId: log.id, addedByClient: true });
   }
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
-  // Empty: nothing in the month on screen and no program still running.
+  // Empty: nothing in the month on screen (planned, or added by the client) and no program still running.
   const empty =
-    !readOnly && !items.some((x) => x.date.startsWith(`${month}-`)) && !assignments.some((a) => a.endDate >= today);
+    !readOnly &&
+    !items.some((x) => x.date.startsWith(`${month}-`)) &&
+    !clientLogs.some((l) => localDateOf(l.finishedAt, timeZone).startsWith(`${month}-`)) &&
+    !assignments.some((a) => a.endDate >= today);
 
   return (
     <>
@@ -237,7 +240,8 @@ export function ClientCalendar({
                 item={item}
                 logHref={item.logId ? logHref(item.logId) : undefined}
                 editHref={`/clients/${client.id}/workouts/${item.id}`}
-                onMove={() => setMoving({ ...item, date })}
+                // Done stays on its day (the server refuses moving it too).
+                onMove={item.logId ? undefined : () => setMoving({ ...item, date })}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             ) : item.logId ? (
