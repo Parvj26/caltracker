@@ -144,3 +144,8 @@ export {
   logVolumeKg,
   shouldAutoFinish,
 } from './logs/summary';
+export { BUILT_IN_METRIC_KEYS, MAX_LB_DISPLAY_DRIFT_KG, METRICS, fromDisplay, toDisplay } from './body/metrics';
+export type { BuiltInMetricKey, MetricDef } from './body/metrics';
+export { CHART_RANGES, CHART_RANGE_LABELS, changeSince, formatShortDate, measurementSeries } from './body/series';
+export type { ChartRange, SeriesPoint } from './body/series';
+export { SCAN_DUE_DAYS, isScanDue } from './body/due';
