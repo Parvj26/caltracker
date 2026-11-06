@@ -112,18 +112,8 @@ export async function loadHomeData(
           .range(from, to),
       'personal records',
     ),
-    readAll(
-      (from, to) =>
-        supabase
-          .from('body_measurements')
-          .select('client_id, measured_on')
-          .eq('workspace_id', workspaceId)
-          .eq('source', 'coach')
-          .order('measured_on', { ascending: false })
-          .order('id')
-          .range(from, to),
-      'body scans',
-    ),
+    // One row per client: their latest coach-entered scan (never every scan).
+    supabase.rpc('latest_coach_scans', { p_workspace_id: workspaceId }),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (assignments.error) throw new Error(`Could not load programs: ${assignments.error.message}`);
@@ -137,8 +127,8 @@ export async function loadHomeData(
   const latest = new Map<string, string>();
   for (const l of finished) if (l.finished_at && !latest.has(l.client_id)) latest.set(l.client_id, l.finished_at); // newest first
 
-  const lastScan = new Map<string, IsoDate>();
-  for (const m of scans) if (!lastScan.has(m.client_id)) lastScan.set(m.client_id, m.measured_on); // newest first
+  if (scans.error) throw new Error(`Could not load body scans: ${scans.error.message}`);
+  const lastScan = new Map<string, IsoDate>(scans.data.map((m) => [m.client_id, m.measured_on]));
 
   return {
     prs: awards.flatMap((a) => awardPrEvents(a.client_id, a.result)),

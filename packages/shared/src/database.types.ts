@@ -1725,6 +1725,13 @@ export type Database = {
           set_type: Database["public"]["Enums"]["set_type"]
         }[]
       }
+      latest_coach_scans: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_id: string
+          measured_on: string
+        }[]
+      }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
