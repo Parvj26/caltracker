@@ -34,6 +34,8 @@ export type CalendarItem = {
    * calendar doesn't track logging. Matched by the planned workout, never by the log's finish date.
    */
   logId?: string | null;
+  /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
+  addedByClient?: boolean;
 };
 
 type Props = {
@@ -214,18 +216,23 @@ function DayCell({
       <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
       {items.length > 0 ? (
         <ul className={styles.items}>
-          {items.map((item) => (
+          {items.map((item) =>
+            item.addedByClient && item.logId && logHref ? (
+              <ClientAddedItem key={item.id} name={item.name} href={logHref(item.logId)} />
+            ) : (
             <DayItem
               key={item.id}
               item={item}
               date={date}
-              draggable={draggable}
+              // A done workout stays on the day it was done.
+              draggable={draggable && !item.logId}
               editable={editable}
               renderItem={renderItem}
               logHref={logHref}
               missed={item.logId === null && today !== null && date < today}
             />
-          ))}
+            ),
+          )}
         </ul>
       ) : null}
       {onAdd ? (
@@ -268,6 +275,8 @@ function DayItem({
 }) {
   const data: DragData = { item, from: date };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
+  // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
+  const controls = renderItem(item, date, editable);
   return (
     <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed)}>
       <div className={styles.itemRow}>
@@ -279,14 +288,23 @@ function DayItem({
             {...attributes}
             {...listeners}
             className={cx(styles.itemHandle, styles.grab)}
+            title={item.name}
           >
-            {item.name}
+            <span className={styles.itemName}>
+              {controls ? <span className={styles.menuSpace} aria-hidden="true" /> : null}
+              {item.name}
+            </span>
           </button>
         ) : (
           // Read-only calendar: the name is plain text.
-          <span className={styles.itemHandle}>{item.name}</span>
+          <span className={styles.itemHandle} title={item.name}>
+            <span className={styles.itemName}>
+              {controls ? <span className={styles.menuSpace} aria-hidden="true" /> : null}
+              {item.name}
+            </span>
+          </span>
         )}
-        {renderItem(item, date, editable)}
+        {controls ? <div className={styles.itemControls}>{controls}</div> : null}
       </div>
       {item.logId && logHref ? (
         <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>
@@ -295,6 +313,20 @@ function DayItem({
       ) : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
       {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+    </li>
+  );
+}
+
+/** A workout the client added on the phone: a different look, "Added by client", and the whole card opens the log. */
+function ClientAddedItem({ name, href }: { name: string; href: string }) {
+  return (
+    <li className={cx(styles.item, styles.clientItem)}>
+      <Link href={href} className={styles.clientLink} title={name} aria-label={`${name}, added by client: view the log`}>
+        <span className={styles.itemName}>{name}</span>
+        <span className={styles.clientTag}>
+          <span aria-hidden="true">✓</span> Added by client
+        </span>
+      </Link>
     </li>
   );
 }

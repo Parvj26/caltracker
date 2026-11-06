@@ -413,8 +413,12 @@ function SlotChip({ slot, onMove, onRemove }: { slot: Slot; onMove: () => void; 
         {...attributes}
         {...listeners}
         className={styles.chipHandle}
+        title={slot.workoutName}
       >
-        {slot.workoutName}
+        <span className={styles.chipName}>
+          <span className={styles.menuSpace} aria-hidden="true" />
+          {slot.workoutName}
+        </span>
       </button>
       <button
         type="button"

@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { logPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
@@ -5,19 +7,24 @@ import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
-import { loadLog } from '@/lib/logs';
+import { getClient, getLog } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { loadClient } from '../../client';
 import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
+import { ClientNote } from './planned-vs-actual';
 import styles from './log.module.css';
+
+export async function generateMetadata({ params }: { params: Promise<{ clientId: string; logId: string }> }): Promise<Metadata> {
+  const { clientId, logId } = await params;
+  return logPageTitle(clientId, logId);
+}
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
 export default async function LogPage({ params }: { params: Promise<{ clientId: string; logId: string }> }) {
-  const { workspaceId, userId, units } = await requireCoach();
+  const { userId, units } = await requireCoach();
   const { clientId, logId } = await params;
   const supabase = await createServerSupabase();
-  const [client, loaded] = await Promise.all([loadClient(supabase, workspaceId, clientId), loadLog(supabase, logId)]);
+  const [client, loaded] = await Promise.all([getClient(clientId), getLog(logId)]);
   // RLS limits the log to this coach's workspace; it must also belong to the client in the URL.
   if (!client || !loaded || loaded.clientId !== client.id) notFound();
   const { log, correctedAt } = loaded;
@@ -82,6 +89,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
             </Chip>
           ) : null}
         </div>
+        <ClientNote text={log.notes} label="Client's note on this workout" />
       </header>
 
       <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />

@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ButtonLink, Card } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import styles from './programs.module.css';
+
+export const metadata: Metadata = { title: 'Programs' };
 
 // Program lists stay small in V1; past this the list says so instead of paging.
 const LIMIT = 200;

@@ -80,8 +80,12 @@
 /* ---------- Builder: library panel beside the grid ---------- */
 .builder { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .workspace { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); gap: var(--ct-space-4-5); align-items: start; }
-@media (max-width: 900px) {
+/* Below 1366 px (iPad portrait, 1280 px laptops) the library sits above the grid, so all seven days fit side by side.
+   From 1366 px (iPad landscape) on, the grid fits beside it. */
+@media (max-width: 1365.98px) {
   .workspace { grid-template-columns: minmax(0, 1fr); }
+  .workspace .library { position: static; }
+  .workspace .libraryList { max-height: 240px; }
 }
 
 .library {
@@ -124,7 +128,7 @@
 
 .gridSection { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .gridScroll { overflow-x: auto; }
-.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 900px; width: 100%; }
+.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 820px; width: 100%; }
 .grid th {
   padding: var(--ct-space-1) var(--ct-space-2);
   font-size: var(--ct-size-caption);
@@ -151,15 +155,13 @@
 /* Text on a pastel fill is always ink. */
 .chip {
   position: relative;
-  display: flex;
-  align-items: stretch;
   border-radius: var(--ct-radius-input);
   background: var(--ct-lime);
   color: var(--ct-ink);
 }
 .chipHandle {
-  flex: 1;
-  min-width: 0;
+  display: block;
+  width: 100%;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-2);
   border: 0;
@@ -169,12 +171,17 @@
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
-  overflow-wrap: anywhere;
   cursor: grab;
   touch-action: none;
 }
+/* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
+   than the whole chip is cut with "…" (the full name is in the title). */
+.chipName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
+.menuSpace { float: right; width: calc(var(--ct-tap-min) - var(--ct-space-2)); height: calc(var(--ct-tap-min) - var(--ct-space-1)); }
 .chipMenuButton {
-  flex: none;
+  position: absolute;
+  top: 0;
+  right: 0;
   width: var(--ct-tap-min);
   min-height: var(--ct-tap-min);
   border: 0;
