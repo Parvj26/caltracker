@@ -458,10 +458,12 @@ export function searchExercises(
   const normQuery = normalizeSearchText(query);
 
   if (normQuery === '') {
+    // Nothing typed: favourites, then recent exercises, then the popular library exercises (COMMON_EXERCISES
+    // order), then everything else A to Z. Each row appears once (other names are left out).
     return candidates
       .filter((e) => e.alias === null)
-      .map((e): SearchHit => ({ row: e.row, tier: 0, highlight: [] }))
-      .sort((a, b) => boostCompare(a.row, b.row) || compareNames(a.row.name, b.row.name));
+      .sort((a, b) => boostCompare(a.row, b.row) || a.popularity - b.popularity || compareNames(a.row.name, b.row.name))
+      .map((e): SearchHit => ({ row: e.row, tier: 0, highlight: [] }));
   }
 
   const tokens = normQuery.split(' ');

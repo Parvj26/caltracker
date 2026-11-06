@@ -20,7 +20,8 @@ The trainer is about to re-create his Everfit programs here, so this has to be f
   - a preview pane on the right for the highlighted result, showing the start and end photos, all muscles,
     equipment, the instructions (collapsed after two lines, with "more") and an **Add to workout** button.
 - **Empty search box:** the coach's **favourites ★** come first, then their **20 most recently used** exercises,
-  then the whole library A to Z.
+  then the popular library exercises (the common-exercises list, most common first, so Bench Press and Squat lead),
+  then the rest of the library A to Z. Each exercise shows once. (Product owner decision, 2026-11-06.)
 - **The same search everywhere:**
   - the workout builder picker;
   - the **Exercises page**, which uses the same list and preview layout;

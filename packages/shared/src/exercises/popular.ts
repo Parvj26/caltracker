@@ -1,7 +1,8 @@
 /**
  * Library exercises most coaches program, most common first. Search uses the position as a tie-break between
  * results that match equally well ("bench" lists Barbell Bench Press before Bench Dips). It never lifts a weaker
- * match above a better one, and favourites and recent exercises still come first.
+ * match above a better one, and favourites and recent exercises still come first. With nothing typed, the pickers
+ * list these first (after favourites and recent exercises), in this order, then the rest A to Z.
  * Plain data: names must match the library exactly (a test checks); reorder or add a line to tune it.
  */
 export const COMMON_EXERCISES: readonly string[] = [

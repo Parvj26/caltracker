@@ -140,7 +140,7 @@ describe('short aliases and muscle-only matches', () => {
 });
 
 describe('empty query, filters, ties', () => {
-  it('orders favourites, then recents, then A to Z', () => {
+  it('orders favourites, then recents, then popular, then A to Z', () => {
     const boosts: SearchBoosts = {
       favourites: new Set(['Hammer Curls']),
       recent: ['Crunches', 'Cable Crossover'],
@@ -149,9 +149,47 @@ describe('empty query, filters, ties', () => {
     expect(h.every((x) => x.tier === 0)).toBe(true);
     const order = h.map((x) => x.row.name);
     expect(order.slice(0, 3)).toEqual(['Hammer Curls', 'Crunches', 'Cable Crossover']);
-    const rest = order.slice(3);
+    // Popular in COMMON_EXERCISES order (Hammer Curls, Crunches and Cable Crossover are already listed above).
+    expect(order.slice(3, 8)).toEqual([
+      'Barbell Bench Press - Medium Grip',
+      'Barbell Squat',
+      'Standing Military Press',
+      'Romanian Deadlift',
+      'Barbell Curl',
+    ]);
+    const rest = order.slice(8);
     expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
     expect(order).toHaveLength(ROWS.length);
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it('a favourite beats a popular exercise', () => {
+    const order = names('', NO_FILTERS, { favourites: new Set(['Glute Bridge']), recent: [] });
+    expect(order.slice(0, 2)).toEqual(['Glute Bridge', 'Barbell Bench Press - Medium Grip']);
+  });
+
+  it('a recent exercise beats a popular one, and a favourite beats both', () => {
+    const order = names('', NO_FILTERS, { favourites: new Set(['T-Bar Row']), recent: ['Bodyweight Squat'] });
+    expect(order.slice(0, 3)).toEqual(['T-Bar Row', 'Bodyweight Squat', 'Barbell Bench Press - Medium Grip']);
+  });
+
+  it('popular exercises come before the rest, even when the rest sort earlier A to Z', () => {
+    const order = names('');
+    expect(order.indexOf('Standing Military Press')).toBeLessThan(order.indexOf('Bodyweight Squat'));
+    expect(order.indexOf('Romanian Deadlift')).toBeLessThan(order.indexOf('Glute Bridge'));
+  });
+
+  it('skips popular names the library does not have', () => {
+    // Barbell Deadlift is third in COMMON_EXERCISES; with it missing the next popular row moves up.
+    const small = buildExerciseIndex([row('Abs Roller'), row('Standing Military Press'), row('Barbell Squat')]);
+    const order = searchExercises(small, '', NO_FILTERS, NO_BOOSTS).map((h) => h.row.name);
+    expect(order).toEqual(['Barbell Squat', 'Standing Military Press', 'Abs Roller']);
+  });
+
+  it('a custom exercise with a popular name is not lifted as popular', () => {
+    const small = buildExerciseIndex([row('Abs Roller'), row('Barbell Squat', { id: 'mine', source: 'custom' })]);
+    const order = searchExercises(small, '', NO_FILTERS, NO_BOOSTS).map((h) => h.row.name);
+    expect(order).toEqual(['Abs Roller', 'Barbell Squat']);
   });
 
   it('filters by muscle chip and equipment chip', () => {

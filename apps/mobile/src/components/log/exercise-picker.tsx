@@ -60,7 +60,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 /**
  * Search the exercise library (built-in plus the coach's own) and pick one. The library is kept on the phone, so
  * this works offline; shorthand like "db incline" finds "Dumbbell Incline Bench Press". With nothing typed it
- * lists the client's recent exercises first.
+ * lists the client's recent exercises first, then the popular ones (Bench Press, Squat...), then the rest A to Z.
  */
 export function ExercisePicker({
   title,
