@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { MAX_CHOICE_OPTIONS, TRACKING_TYPE_LABELS, setLabels } from '@caltracker/shared';
+import { MAX_CHOICE_OPTIONS, TRACKING_TYPE_LABELS, setLabels, setShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { gridTemplate, setColumns } from './set-columns';
@@ -154,9 +154,9 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         const labels = setLabels(ex.sets);
         const names = rowNames(ex.sets);
         const nonDrop = rounds(ex);
-        // In a superset the rest after a round sits on its last exercise; the others go straight on.
-        const showRest = !superset || ei === block.exercises.length - 1;
-        const columns = setColumns(ex.trackingType, showRest);
+        // In a superset the rest after a round sits on the round's last exercise; the others go straight on.
+        const restShown = ex.sets.map((_, si) => setShowsRest(block, ei, si));
+        const columns = setColumns(ex.trackingType, restShown.some(Boolean));
         return (
           <div key={ex.id} className={styles.exercise}>
             {multi ? (
@@ -196,7 +196,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
                   name={`${ex.exerciseName} ${names[si]}`}
                   trackingType={ex.trackingType}
                   units={units}
-                  showRest={showRest}
+                  showRest={restShown[si]!}
                   canRemove={s.setType === 'drop' || nonDrop > 1}
                   errors={errors.get(`set:${s.id}`) ?? []}
                   onChange={(patch) => actions.onUpdateSet(ex.id, s.id, patch)}

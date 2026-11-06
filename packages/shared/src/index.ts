@@ -103,6 +103,7 @@ export {
   removeRound,
   removeSet,
   replaceExercise,
+  setShowsRest,
   updateSet,
 } from './workouts/doc-ops';
 export type { ExercisePick } from './workouts/doc-ops';

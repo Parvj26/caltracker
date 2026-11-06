@@ -242,12 +242,44 @@ export function removeExercise(doc: WorkoutDoc, blockId: string, workoutExercise
   return mapBlock(doc, blockId, (b) => ({ ...b, kind, exercises }));
 }
 
-/** Adds a set to one exercise. Supersets may be uneven, so this never touches the other exercises (use addRound for all). */
+const roundCount = (e: WorkoutExerciseDoc) => e.sets.filter((s) => s.setType !== 'drop').length;
+
+/** True when a later exercise of the block also has a set in this 1-based round. */
+const roundHasLaterExercise = (b: WorkoutBlockDoc, exerciseIndex: number, round: number) =>
+  b.exercises.slice(exerciseIndex + 1).some((e) => roundCount(e) >= round);
+
+/**
+ * Whether a set's rest box means anything (the builder shows it only then). Outside a superset, always. In a
+ * superset the round rest sits on the last exercise of the round, so a set rests only when no later exercise has a
+ * set in its round: every set of the last exercise, plus the extra rounds of a longer one (supersets may be uneven).
+ */
+export function setShowsRest(block: WorkoutBlockDoc, exerciseIndex: number, setIndex: number): boolean {
+  const ex = block.exercises[exerciseIndex];
+  if (!ex || !ex.sets[setIndex]) return false;
+  if (block.kind !== 'superset') return true;
+  const round = Math.max(1, roundCount({ ...ex, sets: ex.sets.slice(0, setIndex + 1) }));
+  return !roundHasLaterExercise(block, exerciseIndex, round);
+}
+
+/**
+ * Adds a set to one exercise. Supersets may be uneven, so this never touches the other exercises (use addRound for
+ * all). On a superset exercise that isn't last, the new set goes straight on (rest 0) when a later exercise has a set
+ * in its round, and otherwise takes the block's round rest (the last exercise's last rest), so the client still rests.
+ */
 export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, makeId: () => string): WorkoutDoc {
-  return mapExercise(doc, blockId, workoutExerciseId, (e) => {
-    if (e.sets.length >= MAX_SETS) return e;
+  return mapBlock(doc, blockId, (b) => {
+    const i = b.exercises.findIndex((e) => e.id === workoutExerciseId);
+    const e = b.exercises[i];
+    if (!e || e.sets.length >= MAX_SETS) return b;
     const from = lastNonDrop(e.sets);
-    return { ...e, sets: [...e.sets, newSet(makeId, from?.restSeconds ?? DEFAULT_REST, from)] };
+    let rest = from?.restSeconds ?? DEFAULT_REST;
+    if (b.kind === 'superset' && i < b.exercises.length - 1) {
+      rest = roundHasLaterExercise(b, i, roundCount(e) + 1)
+        ? 0
+        : (lastNonDrop(b.exercises[b.exercises.length - 1]!.sets)?.restSeconds ?? DEFAULT_REST);
+    }
+    const added = { ...e, sets: [...e.sets, newSet(makeId, rest, from)] };
+    return { ...b, exercises: b.exercises.map((x, xi) => (xi === i ? added : x)) };
   });
 }
 

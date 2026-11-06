@@ -20,6 +20,7 @@ import {
   removeSet,
   renameSection,
   replaceExercise,
+  setShowsRest,
   updateSet,
 } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
@@ -44,7 +45,7 @@ function deepFreeze<T>(o: T): T {
 }
 
 const valid = (d: unknown) => WorkoutDoc.parse(d);
-const nonDrop = (sets: { setType: string }[]) => sets.filter((s) => s.setType !== 'drop');
+const nonDrop = <S extends { setType: string }>(sets: S[]) => sets.filter((s) => s.setType !== 'drop');
 
 function base() {
   let d = emptyWorkout(makeId, 'Upper A');
@@ -301,6 +302,36 @@ describe('supersets may be uneven', () => {
     const [a, b] = out.blocks[1]!.exercises;
     expect(nonDrop(a!.sets)).toHaveLength(4);
     expect(nonDrop(b!.sets)).toHaveLength(3);
+  });
+
+  it('addSet on a non-last superset exercise gives a round no later exercise reaches the block round rest', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a, b] = sb.exercises;
+    d = updateSet(d, sb.id, b!.id, b!.sets[2]!.id, { restSeconds: 75 });
+    d = valid(addSet(d, sb.id, a!.id, makeId));
+    expect(nonDrop(d.blocks[1]!.exercises[0]!.sets).map((s) => s.restSeconds)).toEqual([0, 0, 0, 75]);
+    // Once B catches up, A's next set is partnered again and goes straight on.
+    d = valid(addSet(d, sb.id, b!.id, makeId));
+    d = valid(addSet(d, sb.id, b!.id, makeId));
+    d = valid(addSet(d, sb.id, a!.id, makeId));
+    expect(nonDrop(d.blocks[1]!.exercises[0]!.sets)[4]!.restSeconds).toBe(0);
+    // The last exercise still copies its own rest.
+    expect(nonDrop(d.blocks[1]!.exercises[1]!.sets).map((s) => s.restSeconds)).toEqual([90, 90, 75, 75, 75]);
+  });
+
+  it('setShowsRest: every set outside a superset, and a superset set whose round no later exercise reaches', () => {
+    let d = base();
+    const st = d.blocks[0]!;
+    expect(st.exercises[0]!.sets.every((_, i) => setShowsRest(st, 0, i))).toBe(true);
+    const sb0 = d.blocks[1]!;
+    d = addSet(d, sb0.id, sb0.exercises[0]!.id, makeId);
+    d = addDrop(d, sb0.id, sb0.exercises[0]!.id, d.blocks[1]!.exercises[0]!.sets[3]!.id, makeId);
+    const sb = d.blocks[1]!;
+    // A: [n, n, n, n, drop]; B: [n, n, n].
+    expect([0, 1, 2, 3, 4].map((i) => setShowsRest(sb, 0, i))).toEqual([false, false, false, true, true]);
+    expect([0, 1, 2].map((i) => setShowsRest(sb, 1, i))).toEqual([true, true, true]);
+    expect(setShowsRest(sb, 5, 0)).toBe(false);
   });
 
   it('removeSet in a superset removes that set (and its drops) from that exercise only', () => {
