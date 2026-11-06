@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { formatClock } from '@caltracker/shared';
+import { restLeftLabel } from '@/lib/log-page-model';
 import { ringFraction } from '@/lib/rest-ring';
 import { palette, pressedOpacity, restClock, restRingSize, restRingStroke } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -79,7 +80,7 @@ export function RestPanel({
         <Text
           style={[text('bigNumber'), styles.ink, restClock]}
           accessibilityRole="timer"
-          accessibilityLabel={`${left} seconds of rest left`}
+          accessibilityLabel={restLeftLabel(left)}
           accessibilityLiveRegion="polite"
         >
           {formatClock(left)}

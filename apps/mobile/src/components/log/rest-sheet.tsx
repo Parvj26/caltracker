@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { formatClock } from '@caltracker/shared';
+import { restLeftLabel } from '@/lib/log-page-model';
 import { contentMaxWidth, palette, pressedOpacity, restClock, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -56,7 +57,7 @@ export function RestSheet({
           <Text
             style={[text('bigNumber'), styles.onInk, restClock]}
             accessibilityRole="timer"
-            accessibilityLabel={`${left} seconds of rest left`}
+            accessibilityLabel={restLeftLabel(left)}
             accessibilityLiveRegion="polite"
           >
             {formatClock(left)}
