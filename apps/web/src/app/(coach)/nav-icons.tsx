@@ -44,6 +44,14 @@ export const NAV_ICONS = {
       <path d="M3 12h4l3-7 4 14 3-7h4" />
     </Icon>
   ),
+  community: (
+    <Icon>
+      <circle cx="12" cy="7.5" r="3" />
+      <circle cx="5" cy="10" r="2.2" />
+      <circle cx="19" cy="10" r="2.2" />
+      <path d="M6.5 20c.5-3.4 2.7-5.5 5.5-5.5s5 2.1 5.5 5.5M1.8 18c.3-2 1.5-3.4 3.2-3.6M22.2 18c-.3-2-1.5-3.4-3.2-3.6" />
+    </Icon>
+  ),
   signOut: (
     <Icon>
       <path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16.5 14.5 12 10 7.5M14.5 12H4" />

@@ -51,6 +51,8 @@ test('coach pages have specific tab titles', async ({ page }) => {
     [`/programs/${p.data.id}`, `${programName} · Programs · CalTracker`],
     ['/exercises', 'Exercises · CalTracker'],
     ['/activity', 'Activity · CalTracker'],
+    ['/community', 'Community · CalTracker'],
+    ['/community/reports', 'Reports · Community · CalTracker'],
     ['/profile', 'Profile · CalTracker'],
   ];
   for (const [path, title] of expected) {
