@@ -1,5 +1,5 @@
 begin;
-select plan(138);
+select plan(139);
 
 -- Fixtures (as postgres)
 select tests.create_user('lf-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -712,6 +712,13 @@ select throws_ok(format('select public.save_workout_log(%L::jsonb)',
   '23514', 'Unknown section.', 'a block naming a section the log does not have is refused');
 reset role;
 select is((select count(*)::int from public.workout_logs where id = :'c3'), 0, 'no refused doc left a log behind');
+
+-- Another client cannot take over A1's log by reusing its id, with a pick or without
+select tests.act_as(:'a2');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)',
+    tests.lg_choice_doc(:'c1', 3, :'csec', 'Upper', :'ce1', true, false)),
+  '42501', 'This workout belongs to someone else.', 'client A2 cannot save a log with a pick over A1''s log id');
+reset role;
 
 -- Table checks (as postgres)
 select throws_ok(format($$update public.log_blocks set picked_exercise_id = %L where id = %L$$, :'ce3', :'cb2'),

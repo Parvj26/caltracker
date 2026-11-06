@@ -154,7 +154,7 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
   if (exercise.error) throw exercise.error;
 
   const named = async (name: string) => {
-    const r = await admin.from('exercises').select('id').eq('name', name).is('workspace_id', null).limit(1).single();
+    const r = await admin.from('exercises').select('id').eq('name', name).or(`workspace_id.is.null,workspace_id.eq.${o.workspaceId}`).limit(1).single();
     if (r.error) throw r.error;
     return r.data.id;
   };
@@ -276,7 +276,7 @@ export async function seedSectionedWorkout(
     }).select('id').single();
     if (blk.error) throw blk.error;
     for (const [k, name] of b.exercises.entries()) {
-      const ex = await admin.from('exercises').select('id').eq('name', name).is('workspace_id', null).limit(1).single();
+      const ex = await admin.from('exercises').select('id').eq('name', name).or(`workspace_id.is.null,workspace_id.eq.${o.workspaceId}`).limit(1).single();
       if (ex.error) throw ex.error;
       const we = await admin.from('workout_exercises').insert({
         block_id: blk.data.id, workout_id: w.data.id, workspace_id: o.workspaceId, client_id: o.clientId, position: k, exercise_id: ex.data.id,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 
@@ -281,6 +282,59 @@ test.describe('logged workout page', () => {
     await page.getByRole('button', { name: 'Post comment' }).click();
     await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem')).toContainText('Great depth today');
     await page.screenshot({ path: process.env.SHOT_LOG ?? 'test-results/log-page.png', fullPage: true });
+  });
+
+  test('a sectioned log shows headings, the picked option, and no table for the option not picked', async ({ page }) => {
+    const u = unique();
+    const slam = `Slam ${u}`;
+    const walk = `Walk ${u}`;
+    const custom = await admin.from('exercises').insert([slam, walk].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const })));
+    if (custom.error) throw custom.error;
+    const sections = ['Warm-Up', 'Main', 'Core', 'Finisher'].map((name) => ({ id: randomUUID(), name }));
+    const [warm, main, core, fin] = sections.map((x) => x.id) as [string, string, string, string];
+    const id = await log({
+      workspaceId, clientId, name: `Upper ${u}`, startedAt: ago(100), finishedAt: ago(50), sections,
+      blocks: [
+        { sectionId: warm, exercises: ['Barbell Deadlift'] },
+        { sectionId: main, exercises: ['Barbell Squat'] },
+        { sectionId: core, exercises: ['Cable Crossover'] },
+        { sectionId: fin, choice: true, picked: slam, exercises: [walk, slam] },
+      ],
+    });
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    for (const name of ['Warm-Up', 'Main', 'Core', 'Finisher']) await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+    await expect(page.getByText(`Picked: ${slam}`)).toBeVisible();
+    await expect(page.getByRole('table', { name: slam })).toBeVisible();
+    await expect(page.getByRole('table', { name: walk })).toHaveCount(0);
+    await expect(page.getByText(walk)).toHaveCount(0);
+    await expect(page.getByText('Not done')).toHaveCount(0);
+    // Correcting only offers boxes for the picked option.
+    await page.getByRole('button', { name: 'Correct' }).click();
+    await expect(page.getByRole('table', { name: slam }).getByRole('textbox')).toHaveCount(4);
+    await expect(page.getByText('Pick one · not done')).toHaveCount(0);
+    await admin.from('exercises').delete().in('name', [slam, walk]).eq('workspace_id', workspaceId);
+  });
+
+  test('a pick-one group nobody chose from says so and lists the options', async ({ page }) => {
+    const u = unique();
+    const a = `Slam ${u}`;
+    const b = `Walk ${u}`;
+    const custom = await admin.from('exercises').insert([a, b].map((name) => ({ workspace_id: workspaceId, source: 'custom' as const, name, tracking_type: 'weight_reps' as const })));
+    if (custom.error) throw custom.error;
+    const fin = randomUUID();
+    const id = await log({
+      workspaceId, clientId, name: `Unpicked ${u}`, startedAt: ago(100), finishedAt: ago(50), sections: [{ id: fin, name: 'Finisher' }],
+      blocks: [{ exercises: ['Barbell Squat'] }, { sectionId: fin, choice: true, exercises: [a, b] }],
+    });
+    await signInAsCoach(page);
+    await page.goto(logUrl(clientId, id));
+    await expect(page.getByRole('heading', { level: 2, name: 'Finisher' })).toBeVisible();
+    await expect(page.getByText('Pick one · not done')).toBeVisible();
+    await expect(page.getByText(`${a} · ${b}`)).toBeVisible();
+    await expect(page.getByRole('table', { name: a })).toHaveCount(0);
+    await expect(page.getByText('Not done')).toHaveCount(0);
+    await admin.from('exercises').delete().in('name', [a, b]).eq('workspace_id', workspaceId);
   });
 
   test('comments can be posted, survive a reload and be deleted', async ({ page }) => {

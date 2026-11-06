@@ -1,5 +1,5 @@
 begin;
-select plan(70);
+select plan(73);
 
 -- Fixtures (as postgres)
 select tests.create_user('sw-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -419,6 +419,18 @@ select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', 
   '23514', 'Unknown section.', 'a section id with no sections list is refused');
 reset role;
 select is((select count(*)::int from public.workouts where id = :'gw'), 0, 'no refused section doc left a workout behind');
+
+-- Other people cannot touch or write a section into workspace A's workouts
+select tests.act_as(:'a1');
+select is_empty(format($$update public.workout_blocks set section_name = 'X' where id = %L returning id$$, :'ub1'),
+  'a client cannot rename a section on a workout block (0 rows)');
+reset role;
+select tests.act_as(:'coach_b');
+select is_empty(format($$update public.workout_blocks set section_name = 'X' where id = %L returning id$$, :'ub1'),
+  'a coach from another workspace cannot rename a section on a workout block (0 rows)');
+select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', :'doc_sec'),
+  '42501', null, 'a coach from another workspace cannot save a sectioned workout into workspace A');
+reset role;
 
 -- Table checks (as postgres, so only the constraints can refuse)
 select throws_ok(format($$update public.workout_blocks set section_name = 'Lonely' where id = %L$$, :'ub0'),
