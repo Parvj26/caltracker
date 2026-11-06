@@ -1,0 +1,81 @@
+# The Zoo tab after the sticker-reveal flow: finish a 3 x 8 at 60 kg (a giraffe), then open Zoo. The header, the
+# animal count and a x1 giraffe show; tapping it opens the sheet with its fact. Run via `pnpm --filter mobile e2e`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn: 'Start'
+- tapOn:
+    text: Allow
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0
+    timeout: 20000
+- tapOn:
+    id: tick-0-0
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: tick-0-1
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: tick-0-2
+- tapOn:
+    id: rest-skip
+- tapOn:
+    id: log-menu
+- tapOn:
+    id: finish-button
+- extendedWaitUntil:
+    visible: 'NEW for your zoo book'
+    timeout: 15000
+- tapOn:
+    id: reveal-continue
+- extendedWaitUntil:
+    visible: 'Giraffe ×1'
+    timeout: 10000
+- tapOn:
+    id: summary-done
+- extendedWaitUntil:
+    visible: 'Done ✓.*'
+    timeout: 20000
+- tapOn:
+    id: tab-zoo
+- extendedWaitUntil:
+    visible:
+      id: zoo-streak
+    timeout: 10000
+- assertVisible: '🔥 .*-week streak'
+- assertVisible: '1 of 30 · Shiny .* / 30'
+- scrollUntilVisible:
+    element:
+      id: sticker-giraffe
+- assertVisible: '×1'
+- tapOn:
+    id: sticker-giraffe
+- assertVisible:
+    id: sheet-fact
+    text: 'Giraffes can sprint.*'
+- assertVisible: 'First earned.*'
+- tapOn:
+    id: sheet-close
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

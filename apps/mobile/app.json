@@ -27,6 +27,14 @@
       "./plugins/without-push-entitlement.js",
       "expo-notifications",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Save your sticker cards to Photos.",
+          "savePhotosPermission": "Save your sticker cards to Photos.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "expo-font",
         {
           "fonts": [

@@ -1,10 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { canReopen, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
+import { STICKERS, canReopen, logVolumeKg, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, View, type HostInstance } from 'react-native';
+import { OffScreen, ShareCard } from '@/components/stickers/share-card';
 import { Sticker } from '@/components/stickers/sticker';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
+import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
@@ -42,6 +45,9 @@ export default function SummaryScreen() {
   const [award, setAward] = useState<AwardResult | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [reopening, setReopening] = useState(false);
+  const card = useRef<HostInstance>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveNote, setSaveNote] = useState<string | null>(null);
   const hasLocal = local !== null;
 
   useEffect(() => {
@@ -116,6 +122,15 @@ export default function SummaryScreen() {
   const lines = summaryLines(log, units);
   const mayReopen = canReopen(log, Date.now());
 
+  const ladder = award?.ladder ?? null;
+  const ladderName = ladder ? (STICKERS.find((s) => s.key === ladder.key)?.name ?? ladder.key) : null;
+  const saveImage = async () => {
+    setSaving(true);
+    setSaveNote(null);
+    setSaveNote(SAVE_MESSAGES[await saveCardToPhotos(card)]);
+    setSaving(false);
+  };
+
   const addMissedSets = async () => {
     setReopening(true);
     try {
@@ -165,6 +180,26 @@ export default function SummaryScreen() {
               </View>
             ))}
           </View>
+        </View>
+      ) : null}
+
+      {ladder && ladderName ? (
+        <View style={{ gap: space[2] }}>
+          <Button variant="secondary" title="Save image" testID="summary-save-image" busy={saving} onPress={() => void saveImage()} />
+          {saveNote ? (
+            <Text style={text('caption')} testID="summary-save-note" accessibilityLiveRegion="polite">
+              {saveNote}
+            </Text>
+          ) : null}
+          <OffScreen>
+            <ShareCard
+              ref={card}
+              stickerKey={ladder.key}
+              shiny={ladder.shiny}
+              line={workoutShareLine(logVolumeKg(log), units, ladder.multiple, ladderName)}
+              subline={log.name}
+            />
+          </OffScreen>
         </View>
       ) : null}
 

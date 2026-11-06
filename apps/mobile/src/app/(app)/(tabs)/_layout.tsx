@@ -17,6 +17,15 @@ function WorkoutsIcon({ color }: { color: ColorValue }) {
   );
 }
 
+/** A small paw-like drawn icon for the Zoo book: a rounded square with a dot inside. */
+function ZooIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={[styles.zooIcon, { borderColor: color }]}>
+      <View style={[styles.zooDot, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 // The other tabs in the spec (Progress, Messages, Community, Me) arrive with their phases.
 export default function TabsLayout() {
   return (
@@ -47,6 +56,10 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <WorkoutsIcon color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="zoo"
+        options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
+      />
     </Tabs>
   );
 }
@@ -60,5 +73,14 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.card,
     overflow: 'hidden',
   },
+  zooIcon: {
+    width: space[4.5],
+    height: space[4.5],
+    borderRadius: space[2],
+    borderWidth: borderWidth.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
 });
