@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  MAX_BLOCKS,
   MAX_CHOICE_OPTIONS,
   MIN_CHOICE_OPTIONS,
   WorkoutDoc,
@@ -271,6 +272,11 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     return out;
   }, [doc.blocks, doc.sections]);
 
+  // A workout holds at most 30 blocks, so "+ Exercise" offers only the room that is left (and at most 10 at once).
+  const room = MAX_BLOCKS - doc.blocks.length;
+  const straightMax = Math.max(1, Math.min(STRAIGHT_PICK_MAX, room));
+  const full = room <= 0;
+
   const pickerTitle =
     picker?.kind === 'straight'
       ? 'Add exercises'
@@ -349,15 +355,20 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
       </div>
 
       <div className={styles.addRow}>
-        <Button variant="secondary" onClick={() => setPicker({ kind: 'straight' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })}>
           + Exercise
         </Button>
-        <Button variant="secondary" onClick={() => setPicker({ kind: 'superset' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })}>
           + Superset / circuit
         </Button>
-        <Button variant="secondary" onClick={() => setPicker({ kind: 'choice' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'choice' })}>
           + Pick one
         </Button>
+        {full ? (
+          <p className={styles.caption}>
+            A workout holds at most {MAX_BLOCKS} exercises and groups. Remove one to add another.
+          </p>
+        ) : null}
         <AddSectionMenu full={doc.sections.length >= 10} onAdd={(name) => setDoc((d) => addSection(d, name, makeId))} />
       </div>
 
@@ -381,8 +392,11 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
           {...(picker.kind === 'straight'
             ? {
                 min: 1,
-                max: STRAIGHT_PICK_MAX,
-                hint: 'Tap each exercise you want. Each one is added on its own, in the order you pick them.',
+                max: straightMax,
+                hint:
+                  room < STRAIGHT_PICK_MAX
+                    ? `Tap each exercise you want, in order. This workout has room for ${room} more (${MAX_BLOCKS} at most).`
+                    : 'Tap each exercise you want. Each one is added on its own, in the order you pick them.',
                 groupLabel: 'workout',
                 setCount: { label: 'Sets each', noun: 'sets' },
               }

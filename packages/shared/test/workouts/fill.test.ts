@@ -10,6 +10,7 @@ import {
   copyFirstSetToAll,
   emptyWorkout,
   fillDown,
+  hasTargets,
   updateSet,
 } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
@@ -71,13 +72,24 @@ describe('copyFirstSetToAll', () => {
     expect(after.filter((s) => s.setType === 'normal').slice(1).map((s) => s.note)).toEqual([null, null]);
   });
 
-  it('copies blanks too, so set 1 decides every main set', () => {
+  it('does nothing while set 1 has no targets, so typed sets are never wiped', () => {
     let d = addStraightBlock(emptyWorkout(makeId, 'W'), pick(1), makeId, 3);
     const b = d.blocks[0]!;
     const e = b.exercises[0]!;
     d = updateSet(d, b.id, e.id, e.sets[2]!.id, { targetRepsMin: 5, targetRepsMax: 5 });
-    const out = copyFirstSetToAll(d, b.id, e.id);
-    expect(out.blocks[0]!.exercises[0]!.sets[2]!.targetRepsMin).toBeNull();
+    expect(hasTargets(d.blocks[0]!.exercises[0]!.sets[0]!)).toBe(false);
+    expect(copyFirstSetToAll(d, b.id, e.id)).toBe(d);
+    expect(fillDown(d, b.id, e.id, e.sets[1]!.id)).toBe(d);
+  });
+
+  it('copies a blank field along with the filled ones (set 1 decides every main set)', () => {
+    let d = addStraightBlock(emptyWorkout(makeId, 'W'), pick(1), makeId, 2);
+    const b = d.blocks[0]!;
+    const e = b.exercises[0]!;
+    d = updateSet(d, b.id, e.id, e.sets[0]!.id, { targetRepsMin: 8, targetRepsMax: 8 });
+    d = updateSet(d, b.id, e.id, e.sets[1]!.id, { targetWeightKg: 50 });
+    const out = copyFirstSetToAll(d, b.id, e.id).blocks[0]!.exercises[0]!.sets[1]!;
+    expect([out.targetRepsMin, out.targetWeightKg]).toEqual([8, null]);
   });
 
   it('is a no-op (same object) on an unknown exercise or one with a single main set', () => {

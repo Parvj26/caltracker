@@ -11,7 +11,7 @@ const DEFAULT_ROUNDS = DEFAULT_SETS;
 const DEFAULT_REST = 90;
 export const MAX_SETS = 20;
 const MAX_EXERCISES = 10;
-const MAX_BLOCKS = 30;
+export const MAX_BLOCKS = 30;
 const MAX_SECTIONS = 10;
 const MAX_SECTION_NAME = 40;
 
@@ -398,12 +398,21 @@ export function replaceExercise(
   }));
 }
 
+/** True when a set has any target typed in (reps, weight, time or distance): something worth copying. */
+export const hasTargets = (s: WorkoutSetDoc): boolean =>
+  s.targetRepsMin !== null ||
+  s.targetRepsMax !== null ||
+  s.targetWeightKg !== null ||
+  s.targetDurationS !== null ||
+  s.targetDistanceM !== null;
+
 /**
  * "Fill down": copies one normal set's targets (reps, weight, time, distance) to every normal set below it in the
  * same exercise. Warm-ups and drop sets are left alone, as are notes and set types, and other exercises (a superset's
  * partners, a pick-one group's other options) are never touched. Rest is copied only where both sets show a rest
  * box: in a superset an exercise that goes straight on to the next keeps its 0, and an extra round keeps its rest.
- * Returns the same doc when there is nothing to copy from (unknown ids, a warm-up or a drop).
+ * Returns the same doc when there is nothing to copy from (unknown ids, a warm-up, a drop, or a set with no targets
+ * yet, so an empty set 1 never wipes sets the coach already typed).
  */
 export function fillDown(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, fromSetId: string): WorkoutDoc {
   const block = doc.blocks.find((b) => b.id === blockId);
@@ -411,7 +420,7 @@ export function fillDown(doc: WorkoutDoc, blockId: string, workoutExerciseId: st
   const ex = block?.exercises[ei];
   const from = ex ? ex.sets.findIndex((s) => s.id === fromSetId) : -1;
   const source = ex?.sets[from];
-  if (!block || !ex || !source || source.setType !== 'normal') return doc;
+  if (!block || !ex || !source || source.setType !== 'normal' || !hasTargets(source)) return doc;
   const sourceRests = setShowsRest(block, ei, from);
   const sets = ex.sets.map((s, si) => {
     if (si <= from || s.setType !== 'normal') return s;

@@ -98,6 +98,8 @@ export {
   MAX_SETS,
   emptyWorkout,
   fillDown,
+  hasTargets,
+  MAX_BLOCKS,
   moveBlock,
   moveBlockToSection,
   moveSection,
