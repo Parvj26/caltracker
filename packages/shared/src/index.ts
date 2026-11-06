@@ -131,6 +131,8 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
+export { coachSessionState, completeAllSets, isLoggedByCoach } from './logs/coach-session';
+export type { CoachSessionState, SessionLog } from './logs/coach-session';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
 export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
 export {
