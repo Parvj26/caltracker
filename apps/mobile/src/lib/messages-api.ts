@@ -4,6 +4,7 @@ import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { randomUUID } from 'expo-crypto';
 import { isAlreadyUploaded, photoPaths, type Database, type Message } from '@caltracker/shared';
 import { isNetworkFailure } from './network-failure';
+import { photoUri } from './outbox-files';
 import { OutboxSendError, type OutboxEntry } from './outbox';
 import { supabase } from './supabase';
 
@@ -148,8 +149,8 @@ export async function sendEntry(entry: OutboxEntry, workspaceId: string): Promis
     const target = photoPaths(workspaceId, entry.conversationId, p.id, p.ext);
     const type = p.ext === 'webp' ? 'image/webp' : 'image/jpeg';
     try {
-      await uploadPhoto(target.full, p.fullUri, type);
-      await uploadPhoto(target.thumb, p.thumbUri, type);
+      await uploadPhoto(target.full, photoUri(p.fullUri), type);
+      await uploadPhoto(target.thumb, photoUri(p.thumbUri), type);
     } catch (e) {
       // A dropped connection stays 'network' (still Sending…); only a photo that will not upload becomes Didn't send.
       throw e instanceof OutboxSendError ? e : new OutboxSendError('photo', "Couldn't upload the photo. Please try again.");

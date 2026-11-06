@@ -186,7 +186,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
   /** Catches up on anything Realtime missed (a sleeping laptop, a dropped connection). */
   const refetch = useCallback(() => {
     if (!conversationId) return;
-    Promise.all([loadMessages(supabase, conversationId), loadTheirRead(supabase, conversationId, me)]).then(
+    Promise.all([loadMessages(supabase, conversationId), loadTheirRead(supabase, conversationId, clientId)]).then(
       ([latest, read]) => {
         setMessages((prev) => mergeById(prev, latest.map(toMessage)));
         setTheirReadAt((prev) => (read && (!prev || Date.parse(read) > Date.parse(prev)) ? read : prev));
@@ -196,7 +196,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
         // Offline for now: the next focus or reconnect tries again.
       },
     );
-  }, [supabase, conversationId, me, markIfVisible]);
+  }, [supabase, conversationId, clientId, markIfVisible]);
 
   useChanges(
     supabase,
