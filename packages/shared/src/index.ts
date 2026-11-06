@@ -164,3 +164,4 @@ export type {
   TodayRow,
   WorkoutStatus,
 } from './coach-home/home';
+export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';

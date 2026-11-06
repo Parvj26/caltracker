@@ -38,7 +38,8 @@
 .searchList[hidden] { display: none; }
 .searchOption { display: flex; align-items: center; min-height: var(--ct-tap-min); padding: 0 var(--ct-space-2-5); border-radius: var(--ct-radius-input); cursor: pointer; }
 .searchOption[aria-selected='true'] { background: var(--ct-bg); font-weight: var(--ct-weight-section-heading); }
-.searchEmpty { padding: var(--ct-space-2) var(--ct-space-2-5); color: var(--ct-ink-muted); }
+.searchEmpty:empty { display: none; }
+.searchEmpty { margin: var(--ct-space-1) 0 0; padding: var(--ct-space-2) var(--ct-space-2-5); color: var(--ct-ink-muted); }
 
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ct-space-3); }
 .tileLink { display: block; text-decoration: none; color: inherit; border-radius: var(--ct-radius-card); }

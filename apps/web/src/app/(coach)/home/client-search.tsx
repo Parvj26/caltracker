@@ -1,15 +1,26 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import { searchClients } from '@caltracker/shared';
 import styles from './home.module.css';
 
 type SearchClient = { id: string; firstName: string; lastName: string };
 
-const MAX_RESULTS = 8;
+const noop = () => () => {};
+/** "⌘K" on Apple devices, "Ctrl K" everywhere else (and on the server, until the browser says otherwise). */
+function useShortcutHint(): string {
+  return useSyncExternalStore(
+    noop,
+    () => {
+      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+      const platform = nav.userAgentData?.platform ?? navigator.platform ?? '';
+      return /mac|iphone|ipad/i.test(platform) ? '⌘K' : 'Ctrl K';
+    },
+    () => 'Ctrl K',
+  );
+}
 
-/** Lower case with accents removed, so "jose" finds "José". */
-const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const nameOf = (c: SearchClient) => `${c.firstName} ${c.lastName}`.trim() || 'Client';
 
 /** Jump to any current client: type part of a name, arrow to a result, Enter. ⌘K / Ctrl+K focuses the box. */
@@ -21,17 +32,16 @@ export function ClientSearch({ clients }: { clients: SearchClient[] }) {
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
 
-  const needle = fold(query.trim());
-  const results = needle
-    ? clients.filter((c) => fold(`${c.firstName} ${c.lastName}`).includes(needle)).slice(0, MAX_RESULTS)
-    : [];
-  const expanded = open && needle !== '';
+  const hint = useShortcutHint();
+  const typed = query.trim() !== '';
+  const results = searchClients(clients, query);
+  const expanded = open && typed && results.length > 0;
   const activeIndex = Math.min(active, Math.max(results.length - 1, 0));
   const optionId = (id: string) => `${listId}-${id}`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -80,7 +90,7 @@ export function ClientSearch({ clients }: { clients: SearchClient[] }) {
         aria-autocomplete="list"
         aria-activedescendant={activeClient ? optionId(activeClient.id) : undefined}
         autoComplete="off"
-        placeholder="Find a client  ⌘K"
+        placeholder={`Find a client  ${hint}`}
         className={styles.searchInput}
         value={query}
         onChange={(e) => {
@@ -110,8 +120,8 @@ export function ClientSearch({ clients }: { clients: SearchClient[] }) {
             {nameOf(c)}
           </li>
         ))}
-        {expanded && results.length === 0 ? <li role="presentation" className={styles.searchEmpty}>No clients match.</li> : null}
       </ul>
+      <p role="status" className={styles.searchEmpty}>{open && typed && results.length === 0 ? 'No clients match.' : ''}</p>
     </div>
   );
 }
