@@ -38,6 +38,8 @@ export function mkLog(
           plannedWorkoutExerciseId: null,
           swappedFromExerciseId: null,
           note: null,
+          substituteId: null,
+          substituteOptions: [],
           sets: e.sets.map((s) => ({
             id: uuid(),
             setType: s.type ?? 'normal',

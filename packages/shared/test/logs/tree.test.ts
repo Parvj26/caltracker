@@ -142,6 +142,8 @@ describe('logRowToDoc', () => {
       plannedWorkoutExerciseId: id(801),
       swappedFromExerciseId: id(700),
       note: 'Chest to floor.',
+      substituteId: null,
+      substituteOptions: [],
     });
     expect(sets).toHaveLength(2);
   });

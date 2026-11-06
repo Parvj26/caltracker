@@ -235,6 +235,10 @@ export function removeLogSet(
   );
 }
 
+/**
+ * Swaps the exercise for any library exercise (the client's own choice, not a coach-added substitute). Keeps
+ * swappedFromExerciseId pointing at the planned exercise and drops the coach's substitutes for this exercise.
+ */
 export function swapLogExercise(
   log: WorkoutLogDoc,
   logExerciseId: string,
@@ -255,6 +259,9 @@ export function swapLogExercise(
       exerciseId: ex.id,
       exerciseName: ex.name,
       trackingType: ex.trackingType,
+      // A free swap takes the exercise off the plan, so the coach's substitutes no longer apply to it.
+      substituteId: null,
+      substituteOptions: [],
       sets: old.sets.map((s) => ({
         ...s,
         target: {
@@ -296,6 +303,8 @@ export function addLogExercise(
         plannedWorkoutExerciseId: null,
         swappedFromExerciseId: null,
         note: null,
+        substituteId: null,
+        substituteOptions: [],
         sets: Array.from({ length: DEFAULT_SETS }, () => ({
           id: makeId(),
           setType: 'normal' as const,
