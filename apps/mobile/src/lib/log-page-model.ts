@@ -373,7 +373,7 @@ export function buildPageModel(i: {
     current,
     round,
     steps,
-    hasWarmups: block.exercises.some((e) => e.sets.some((s) => s.setType === 'warmup')),
+    hasWarmups: live.some(({ exercise: e }) => e.sets.some((s) => s.setType === 'warmup')),
     allDone: isBlockDone(block),
     workoutDone: log.blocks.every(isBlockDone),
     nextLine,

@@ -374,6 +374,23 @@ describe('sections and pick-one pages', () => {
     expect(listSections(log)[3].rows[0]).toMatchObject({ title: 'Medicine Ball Slam', detail: '0 of 3 sets' });
   });
 
+  it('shows the warm-up note only for the picked option\'s warm-ups', () => {
+    const base = upperCoreLog();
+    const fin = base.blocks[FINISHER];
+    // Only the option not picked first (Farmer's Walk) has a warm-up.
+    const walk = fin.exercises[1];
+    const withWarmup: WorkoutLogDoc = {
+      ...base,
+      blocks: base.blocks.map((b, i) =>
+        i !== FINISHER
+          ? b
+          : { ...b, exercises: [b.exercises[0], { ...walk, sets: walk.sets.map((s, si) => (si === 0 ? { ...s, setType: 'warmup' as const } : s)) }] },
+      ),
+    };
+    expect(build(pickOpt(withWarmup, 0), FINISHER).hasWarmups).toBe(false);
+    expect(build(pickOpt(withWarmup, 1), FINISHER).hasWarmups).toBe(true);
+  });
+
   it('cannot switch after a done set', () => {
     let log = pickOpt(upperCoreLog(), 0);
     log = tick(log, log.blocks[FINISHER].exercises[0].sets[0].id);
