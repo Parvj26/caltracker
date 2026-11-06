@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PROGRAM_WEEKS_MAX, ProgramInput } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, copyName, copyWeek } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -210,4 +210,85 @@ export async function removeProgramWorkout(id: string): Promise<void> {
   // Removing a slot that's already gone is fine: the coach wanted it gone.
   const { error } = await supabase.from('program_workouts').delete().eq('id', id).eq('workspace_id', workspaceId);
   if (error) throw new Error(`Could not remove the workout: ${error.message}`);
+}
+
+export type DuplicateProgramOutcome = { ok: true; id: string } | { ok: false; error: string };
+
+/**
+ * Copies a program (details and every workout on its weeks) into a new program named "<name> (copy)" in the coach's
+ * workspace. duplicate_program does it in one transaction and refuses a program the caller can't see (another
+ * workspace's), so a half-made copy is never left behind.
+ */
+export async function duplicateProgram(id: string): Promise<DuplicateProgramOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(id)) return { ok: false, error: "Couldn't find that program." };
+  const supabase = await createServerSupabase();
+  const { data: program, error: readError } = await supabase
+    .from('programs')
+    .select('name')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (readError) return { ok: false, error: "Couldn't copy. Please try again." };
+  if (!program) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+
+  const newId = crypto.randomUUID();
+  const { error } = await supabase.rpc('duplicate_program', {
+    p_new_id: newId,
+    p_program_id: id,
+    p_name: copyName(program.name),
+  });
+  if (error) return { ok: false, error: "Couldn't copy. Please try again." };
+  revalidatePath('/programs');
+  return { ok: true, id: newId };
+}
+
+export type CopyWeekOutcome =
+  | { ok: true; slots: Array<{ id: string; week: number; day: number; position: number; workoutId: string }> }
+  | { ok: false; error: string };
+
+/**
+ * Copies week `fromWeek` onto `toWeeks`, replacing what those weeks held (copyWeek in packages/shared decides the
+ * new slots, from the slots as saved). replace_program_weeks swaps them in one transaction. Returns the new slots of
+ * the target weeks, so the grid can show their saved ids.
+ */
+export async function copyProgramWeek(input: { programId: string; fromWeek: number; toWeeks: number[] }): Promise<CopyWeekOutcome> {
+  const { workspaceId } = await requireCoach();
+  const { programId, fromWeek, toWeeks } = input;
+  if (
+    !isUuid(programId) ||
+    !isInt(fromWeek, 1, PROGRAM_WEEKS_MAX) ||
+    !Array.isArray(toWeeks) ||
+    toWeeks.length === 0 ||
+    toWeeks.length > PROGRAM_WEEKS_MAX ||
+    !toWeeks.every((w) => isInt(w, 1, PROGRAM_WEEKS_MAX))
+  ) {
+    return { ok: false, error: "Couldn't copy that week." };
+  }
+  const supabase = await createServerSupabase();
+  const weeks = await programWeeks(supabase, programId, workspaceId);
+  if (weeks === null) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (fromWeek > weeks || toWeeks.some((w) => w > weeks)) {
+    return { ok: false, error: 'That week is past the end of the program. Reload the page and try again.' };
+  }
+
+  const { data: rows, error: readError } = await supabase
+    .from('program_workouts')
+    .select('id, week, day, position, workout_id')
+    .eq('program_id', programId)
+    .eq('workspace_id', workspaceId)
+    .eq('week', fromWeek);
+  if (readError) return { ok: false, error: "Couldn't copy. Please try again." };
+  const source = rows.map((r) => ({ id: r.id, week: r.week, day: r.day, position: r.position, workoutId: r.workout_id }));
+  const plan = copyWeek(source, { from: fromWeek, to: toWeeks, weeks }, () => crypto.randomUUID());
+  if (plan.weeks.length === 0) return { ok: false, error: "Couldn't copy that week." };
+
+  const { error } = await supabase.rpc('replace_program_weeks', {
+    p_program_id: programId,
+    p_weeks: plan.weeks,
+    p_slots: plan.added,
+  });
+  if (error) return { ok: false, error: "Couldn't copy. Please try again." };
+  revalidatePath(`/programs/${programId}`);
+  return { ok: true, slots: plan.added };
 }

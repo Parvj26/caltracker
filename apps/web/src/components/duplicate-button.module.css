@@ -1,0 +1,17 @@
+/* "Duplicate" on the workout and program pages and lists. Colours, sizes only via var(--ct-*); 44 px tall. */
+.wrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-1); }
+.small {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.small:hover:not(:disabled) { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.small:disabled { cursor: progress; color: var(--ct-ink-muted); }

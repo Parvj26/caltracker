@@ -4,6 +4,7 @@ import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadWorkoutDoc } from '@/lib/workouts';
+import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteWorkout } from './delete-workout';
 import styles from '../workouts.module.css';
 
@@ -21,6 +22,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{loaded.doc.name}</h1>
         <div className={styles.titleActions}>
+          <DuplicateButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
           <DeleteWorkout id={loaded.doc.id} name={loaded.doc.name} />
         </div>
       </header>

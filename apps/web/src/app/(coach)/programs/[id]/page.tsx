@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteProgram } from './delete-program';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
@@ -55,6 +56,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{program.data.name}</h1>
         <div className={styles.titleActions}>
+          <DuplicateButton kind="program" id={program.data.id} name={program.data.name} />
           <DeleteProgram id={program.data.id} name={program.data.name} />
         </div>
       </header>

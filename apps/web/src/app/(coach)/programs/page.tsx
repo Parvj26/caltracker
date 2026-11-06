@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DuplicateButton } from '@/components/duplicate-button';
 import { ButtonLink, Card } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -48,6 +49,9 @@ export default async function ProgramsPage() {
                 <th scope="col">Name</th>
                 <th scope="col">Weeks</th>
                 <th scope="col">Workouts</th>
+                <th scope="col">
+                  <span className={styles.visuallyHidden}>Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -60,6 +64,9 @@ export default async function ProgramsPage() {
                   </td>
                   <td className={styles.numeric}>{p.weeks}</td>
                   <td className={styles.numeric}>{p.slots}</td>
+                  <td>
+                    <DuplicateButton kind="program" id={p.id} name={p.name} compact />
+                  </td>
                 </tr>
               ))}
             </tbody>

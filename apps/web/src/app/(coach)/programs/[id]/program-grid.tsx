@@ -17,13 +17,14 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { PROGRAM_WEEKS_MAX } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, copyWeek } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
-import { addProgramWorkout, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
-import { DAYS, cellLabel, chipDomId, focusSoon } from './grid-ids';
+import { addProgramWorkout, copyProgramWeek, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
+import { CopyWeekDialog } from './copy-week-dialog';
+import { DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import { LibraryPanel } from './library-panel';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
@@ -87,6 +88,7 @@ export function ProgramGrid({
   const [weeks, setWeeks] = useState(program.weeks);
   const [picker, setPicker] = useState<DropData | null>(null);
   const [moving, setMoving] = useState<Slot | null>(null);
+  const [copying, setCopying] = useState<number | null>(null);
   const [dragging, setDragging] = useState<DragData | null>(null);
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
@@ -154,6 +156,32 @@ export function ProgramGrid({
       () => removeProgramWorkout(slot.id),
       (s) => (s.some((x) => x.id === slot.id) ? s : [...s, slot]),
     );
+  }
+
+  /** Copy a week onto other weeks (replacing them): shown at once, saved in one call, undone if saving fails. */
+  function copyWeekTo(from: number, toWeeks: number[]) {
+    const plan = copyWeek(slots, { from, to: toWeeks, weeks }, () => crypto.randomUUID());
+    if (plan.weeks.length === 0) return;
+    const addedIds = new Set(plan.added.map((s) => s.id));
+    const names = new Map(plan.added.map((s) => [s.workoutId, s.workoutName]));
+    const without = (s: Slot[]) => s.filter((x) => !addedIds.has(x.id));
+    setSlots((s) => [...s.filter((x) => !plan.weeks.includes(x.week)), ...plan.added]);
+    setInFlight((n) => n + 1);
+    const done = plan.weeks.length === 1 ? `week ${plan.weeks[0]}` : `weeks ${plan.weeks[0]} to ${plan.weeks[plan.weeks.length - 1]}`;
+    copyProgramWeek({ programId: program.id, fromWeek: from, toWeeks: plan.weeks })
+      .then((outcome) => {
+        if (!outcome.ok) throw new Error(outcome.error);
+        // The server made its own ids for the new slots; keep those, so later moves and removals find them.
+        const saved = outcome.slots.map((x) => ({ ...x, workoutName: names.get(x.workoutId) ?? '' }));
+        setSlots((s) => [...without(s).filter((x) => !plan.weeks.includes(x.week)), ...saved]);
+        setSavedOnce(true);
+        setToast(`Copied week ${from} to ${done}.`);
+      })
+      .catch((e: unknown) => {
+        setSlots((s) => [...without(s), ...plan.removed.filter((r) => !s.some((x) => x.id === r.id))]);
+        setToast(failureMessage(e, "Couldn't copy the week, so nothing changed. Please try again."));
+      })
+      .finally(() => setInFlight((n) => n - 1));
   }
 
   function onDragStart(e: DragStartEvent) {
@@ -241,7 +269,20 @@ export function ProgramGrid({
                 <tbody>
                   {weekNumbers.map((w) => (
                     <tr key={w}>
-                      <th scope="row" className={styles.weekHead}>Week {w}</th>
+                      <th scope="row" className={styles.weekHead}>
+                        Week {w}
+                        <div>
+                          <button
+                            type="button"
+                            id={copyWeekButtonDomId(w)}
+                            className={styles.smallButton}
+                            aria-label={`Copy week ${w}`}
+                            onClick={() => setCopying(w)}
+                          >
+                            Copy…
+                          </button>
+                        </div>
+                      </th>
                       {DAYS.map((d) => (
                         <td key={d}>
                           <DayCell
@@ -286,6 +327,20 @@ export function ProgramGrid({
             setPicker(null);
           }}
           onClose={() => setPicker(null)}
+        />
+      ) : null}
+
+      {copying !== null ? (
+        <CopyWeekDialog
+          week={copying}
+          weeks={weeks}
+          slots={slots}
+          saving={inFlight > 0}
+          onCopy={(toWeeks) => {
+            copyWeekTo(copying, toWeeks);
+            setCopying(null);
+          }}
+          onClose={() => setCopying(null)}
         />
       ) : null}
 

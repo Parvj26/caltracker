@@ -1,9 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { WorkoutDoc } from '@caltracker/shared';
+import { WorkoutDoc, duplicateWorkoutDoc } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { loadWorkoutDoc } from '@/lib/workouts';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
@@ -39,6 +40,43 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   // A client's copy shows on their calendar and in its editor.
   revalidatePath('/clients/[clientId]', 'page');
   revalidatePath('/clients/[clientId]/workouts/[workoutId]', 'page');
+  return { ok: true, id: data };
+}
+
+export type DuplicateOutcome = { ok: true; id: string } | { ok: false; error: string };
+
+const NOT_IN_LIBRARY = "Couldn't find that workout in your library. It may have been deleted.";
+
+/**
+ * Copies a library workout (as last saved) into a new library workout named "<name> (copy)", in the coach's own
+ * workspace. Only this workspace's library workouts can be copied: the lookup filters by the coach's workspace on
+ * top of RLS, and save_workout refuses a workspace the caller doesn't coach.
+ */
+export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(id)) return { ok: false, error: NOT_IN_LIBRARY };
+  const supabase = await createServerSupabase();
+  const { data: own, error: ownError } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .is('client_id', null)
+    .maybeSingle();
+  if (ownError) return { ok: false, error: "Couldn't copy. Please try again." };
+  if (!own) return { ok: false, error: NOT_IN_LIBRARY };
+
+  const loaded = await loadWorkoutDoc(supabase, id);
+  if (!loaded) return { ok: false, error: NOT_IN_LIBRARY };
+  const copy = WorkoutDoc.safeParse(duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()));
+  if (!copy.success) return { ok: false, error: 'Open this workout, fix the highlighted fields and save it, then copy it.' };
+
+  const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy.data });
+  if (error) {
+    if (error.code === '23514') return { ok: false, error: error.message };
+    return { ok: false, error: "Couldn't copy. Please try again." };
+  }
+  revalidatePath('/workouts');
   return { ok: true, id: data };
 }
 
