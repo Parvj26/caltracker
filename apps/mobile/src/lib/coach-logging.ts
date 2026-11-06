@@ -5,21 +5,22 @@
 // When the coach logs a workout from the website, workout_logs.logged_by is the coach and the server refuses the
 // phone's saves for it (loggedByOther). The phone learns it two ways:
 //   * instantly, from a save's answer: log-sync adopts the coach's copy and use-active-log sets heldByOther;
-//   * by asking workout_log_logger when the workout opens, when the app comes back to the foreground, and at most
-//     once a minute while it stays open.
+//   * from Realtime: the log's row is published (20261106003000_workout_logs_realtime; RLS lets a client hear only
+//     their own rows), so a take over, hand back or finish elsewhere arrives at once;
+//   * by asking workout_log_logger when the workout opens and when the app comes back to the foreground, and once a
+//     minute while the Realtime channel is not connected.
 // When the server and the phone disagree (needsServerCopy) the phone takes the server's copy (refreshFromServer),
 // so a workout the coach took over, handed back or finished never stays stuck open on the phone.
-// TODO(realtime): once PR #34 publishes workout_logs to Realtime on main, subscribe to this log's row instead of
-// the one-minute check.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import type { LogStatus } from '@caltracker/shared';
 import { needsServerCopy, parseLoggerState, type LoggerState } from './active-log-logic';
 import { supabase } from './supabase';
 import { useActiveLog } from './use-active-log';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** The most often an open workout asks whether the coach took it over. */
+/** How often an open workout asks whether the coach took it over while Realtime is not connected. */
 export const CHECK_EVERY_MS = 60_000;
 
 /** Who holds one of the client's logs, or null when unknown (offline, not uploaded yet, not theirs). */
@@ -72,16 +73,34 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
 
   useEffect(() => {
     void check();
-    if (!watch) return;
-    const timer = setInterval(() => void check(), CHECK_EVERY_MS);
+    if (!watch || !logId) return;
+    let live = false;
+    let me: string | null = null;
+    void supabase.auth.getSession().then(({ data }) => {
+      me = data.session?.user.id ?? null;
+    });
+    // Every save of the log updates its row; only a change of who logs it, or of its status, needs a check.
+    const channel = supabase
+      .channel(`coach-logging-${logId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workout_logs', filter: `id=eq.${logId}` }, (payload) => {
+        const row = payload.new as { logged_by?: string | null; status?: string };
+        if (row.logged_by !== me || row.status !== 'in_progress' || localRef.current?.heldByOther) void check();
+      })
+      .subscribe((status) => {
+        live = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
+      });
+    const timer = setInterval(() => {
+      if (!live) void check();
+    }, CHECK_EVERY_MS);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void check();
     });
     return () => {
       clearInterval(timer);
       sub.remove();
+      void supabase.removeChannel(channel);
     };
-  }, [check, watch]);
+  }, [check, watch, logId]);
 
   const reclaim = useCallback(async () => {
     if (!logId) return false;
