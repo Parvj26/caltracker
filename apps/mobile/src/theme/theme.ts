@@ -57,3 +57,26 @@ export const exercisePhotoHeight = tapTarget.logging * 4;
 
 /** Width of the Delete button a swiped set row reveals. */
 export const swipeDeleteWidth = tapTarget.logging + space[6] + space[2];
+
+/** The rest panel's countdown ring: its square size and how thick the ring is drawn. */
+export const restRingSize = tapTarget.logging * 4;
+export const restRingStroke = space[2.5];
+
+/** The number between a stepper's − and +: the big-number style grown so it reads at arm's length. */
+export const stepperValue = {
+  fontSize: Math.round(typeScale.bigNumber.size.phone * 1.6),
+  lineHeight: Math.round(typeScale.bigNumber.size.phone * 1.9),
+};
+
+/** The stepper's − and + buttons, and the Done button's minimum height. */
+export const stepperButtonSize = tapTarget.logging;
+export const doneButtonHeight = tapTarget.logging;
+
+/** The start/end photo area on the logging page. */
+export const logPhotoHeight = exercisePhotoHeight;
+
+/** Side-by-side steppers (weight + reps) are tighter: 44 pt buttons and a smaller number, as in the mockup. */
+export const stepperButtonSizeCompact = tapTarget.min;
+export const stepperValueCompact = { fontSize: 34, lineHeight: 40 };
+/** A stepper row narrower than this (pt) uses the compact sizes. */
+export const stepperCompactBelow = 240;

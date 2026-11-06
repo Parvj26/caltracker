@@ -96,9 +96,10 @@ describe('pounds are whole numbers', () => {
     expect(fromKg(0, 'lb')).toBe(0);
     expect(fromKg(22.68, 'lb')).toBe(50);
   });
-  it('rounds half a pound up', () => {
-    expect(fromKg(toKg(132.5, 'lb'), 'lb')).toBe(133);
+  it('keeps a typed half pound and rounds anything else to a whole pound', () => {
+    expect(fromKg(toKg(132.5, 'lb'), 'lb')).toBe(132.5);
     expect(fromKg(toKg(132.4, 'lb'), 'lb')).toBe(132);
+    expect(fromKg(toKg(132.6, 'lb'), 'lb')).toBe(133);
   });
   it('formats pounds without decimals', () => {
     expect(formatWeight(60, 'lb')).toBe('132 lb');
@@ -119,5 +120,33 @@ describe('kgToInput', () => {
     expect(kgToInput(61.235, 'lb')).toBe(135);
     expect(kgToInput(60, 'lb')).toBe(132);
     expect(kgToInput(0, 'lb')).toBe(0);
+  });
+});
+
+describe('half pounds', () => {
+  it('round trips a typed half pound', () => {
+    expect(fromKg(toKg(102.5, 'lb'), 'lb')).toBe(102.5);
+    expect(kgToInput(toKg(102.5, 'lb'), 'lb')).toBe(102.5);
+    expect(formatWeight(toKg(102.5, 'lb'), 'lb')).toBe('102.5 lb');
+    expect(kgToInput(46.4927, 'lb')).toBe(102.5);
+    expect(formatWeight(toKg(132.5, 'lb'), 'lb')).toBe('132.5 lb');
+    expect(fromKg(toKg(0.5, 'lb'), 'lb')).toBe(0.5);
+    expect(formatWeight(toKg(0.5, 'lb'), 'lb')).toBe('0.5 lb');
+  });
+  it('round trips every half pound from 0.5 to 999.5', () => {
+    for (let lb = 0.5; lb < 1000; lb += 1) expect(fromKg(toKg(lb, 'lb'), 'lb')).toBe(lb);
+  });
+  it('still hides conversions that only land near a half pound', () => {
+    expect(fromKg(60, 'lb')).toBe(132);
+    expect(formatWeight(60, 'lb')).toBe('132 lb');
+    expect(fromKg(100, 'lb')).toBe(220);
+    expect(kgToInput(100, 'lb')).toBe(220);
+    expect(kgToInput(60.2, 'lb')).toBe(133); // 132.72 lb
+    expect(formatWeight(22.68, 'lb')).toBe('50 lb'); // 50.0007 lb
+  });
+  it('leaves kilograms as they were', () => {
+    expect(fromKg(60.101, 'kg')).toBe(60.1);
+    expect(kgToInput(60.101, 'kg')).toBe(60.101);
+    expect(formatWeight(46.493, 'kg')).toBe('46.5 kg');
   });
 });

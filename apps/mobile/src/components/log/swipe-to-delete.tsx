@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Keyboard, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import {
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { palette, pressedOpacity, swipeDeleteWidth, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-/** A drag past this many points, or a flick, leaves the row open. */
+/** Let go past this many points and the row stays open. */
 const OPEN_AT = swipeDeleteWidth / 2;
-const FLICK = 0.5;
-/** Horizontal movement beyond this (and clearly more than vertical) is a swipe, not a scroll or a tap. */
-const SLOP = 10;
 
 /** The one row that is open, if any. Opening a row closes it; scrolling and the keyboard close it too. */
 let openRow: { close: () => void } | null = null;
@@ -18,9 +24,10 @@ export function closeOpenSwipeRow(): void {
 }
 
 /**
- * Swipe the row left to reveal a Delete button behind it; swipe right (or tap Delete) to close.
- * Plain React Native (PanResponder + Animated): the project has no gesture-handler. The ⋯ button on the row is
- * the way in for anyone who can't swipe. Only one row is open at a time.
+ * Swipe the row left to reveal a Delete button beside it; swipe right (or tap Delete) to close.
+ * The row is a small horizontal native ScrollView that snaps shut or open. (A JS PanResponder never saw the drag
+ * inside the Edit sets sheet: the sheet's own drag took it.) The ⋯ button on the row is the way in for anyone who
+ * can't swipe. Only one row is open at a time.
  */
 export function SwipeToDelete({
   children,
@@ -39,74 +46,64 @@ export function SwipeToDelete({
   enabled?: boolean;
 }) {
   const { text, radius } = useTheme();
-  const x = useRef(new Animated.Value(0)).current;
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [width, setWidth] = useState(0);
   const openRef = useRef(false);
-  const [revealed, setRevealed] = useState(false);
+  // Drawn state: the Delete button is hidden from screen readers (and tests) while the row is shut.
+  const [open, setOpen] = useState(false);
   // A fast double tap on Delete must remove once.
   const firedRef = useRef(false);
   const me = useRef<{ close: () => void }>({ close: () => undefined }).current;
 
-  const settle = useMemo(
-    () => (open: boolean) => {
-      openRef.current = open;
-      if (open) {
-        if (openRow && openRow !== me) openRow.close();
-        openRow = me;
-        firedRef.current = false;
-        setRevealed(true);
-      } else if (openRow === me) {
-        openRow = null;
-      }
-      Animated.timing(x, { toValue: open ? -swipeDeleteWidth : 0, duration: 160, useNativeDriver: true }).start(() => {
-        if (!openRef.current) setRevealed(false);
-      });
-    },
-    [x, me],
-  );
+  const settle = (next: boolean) => {
+    openRef.current = next;
+    setOpen(next);
+    if (next) {
+      if (openRow && openRow !== me) openRow.close();
+      openRow = me;
+      firedRef.current = false;
+    } else if (openRow === me) {
+      openRow = null;
+    }
+    scroll.current?.scrollTo({ x: next ? swipeDeleteWidth : 0, animated: true });
+  };
   me.close = () => settle(false);
 
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        // Capture, so a Pressable or input under the finger can't keep a sideways drag from reaching the row.
-        onMoveShouldSetPanResponderCapture: (_e, g) =>
-          enabled && Math.abs(g.dx) > SLOP && Math.abs(g.dx) > Math.abs(g.dy) * 2,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: () => {
-          x.stopAnimation();
-          setRevealed(true);
-        },
-        onPanResponderMove: (_e, g) => {
-          const start = openRef.current ? -swipeDeleteWidth : 0;
-          x.setValue(Math.max(-swipeDeleteWidth, Math.min(0, start + g.dx)));
-        },
-        onPanResponderRelease: (_e, g) => {
-          const start = openRef.current ? -swipeDeleteWidth : 0;
-          const at = start + g.dx;
-          settle(g.vx < -FLICK ? true : g.vx > FLICK ? false : at < -OPEN_AT);
-        },
-        onPanResponderTerminate: () => settle(openRef.current),
-      }),
-    [x, settle, enabled],
-  );
+  const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = e.nativeEvent.contentOffset.x > OPEN_AT;
+    if (next !== openRef.current || (next && openRow !== me)) settle(next);
+  };
 
   // The keyboard opening closes an open row; a row that goes away (a deleted set) leaves nothing behind.
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardWillShow', () => {
-      if (openRef.current) settle(false);
+      if (openRef.current) me.close();
     });
     return () => {
       sub.remove();
-      x.stopAnimation();
       if (openRow === me) openRow = null;
     };
-  }, [settle, x, me]);
+  }, [me]);
 
   if (!enabled) return <View>{children}</View>;
 
   return (
-    <View>
-      {revealed ? (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <ScrollView
+        ref={scroll}
+        horizontal
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        snapToOffsets={[0, swipeDeleteWidth]}
+        snapToEnd={false}
+        decelerationRate="fast"
+        directionalLockEnabled
+        keyboardShouldPersistTaps="handled"
+        onScrollEndDrag={onEnd}
+        onMomentumScrollEnd={onEnd}
+      >
+        {/* Until the row is measured it takes its natural width, so nothing jumps on first draw. */}
+        <View style={width > 0 ? { width } : undefined}>{children}</View>
         <View style={[styles.behind, { width: swipeDeleteWidth, borderRadius: radius.input }]}>
           <Pressable
             testID={testID}
@@ -118,25 +115,21 @@ export function SwipeToDelete({
             }}
             accessibilityRole="button"
             accessibilityLabel={label}
+            // Off screen until the row is swiped open: screen readers use the ⋯ menu's Remove set instead.
+            accessibilityElementsHidden={!open}
+            importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
             style={({ pressed }) => [styles.delete, pressed && { opacity: pressedOpacity }]}
           >
             <Text style={[text('sectionHeading'), styles.deleteText]}>Delete</Text>
           </Pressable>
         </View>
-      ) : null}
-      <Animated.View style={{ transform: [{ translateX: x }] }} {...pan.panHandlers}>
-        {children}
-      </Animated.View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   behind: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
     backgroundColor: palette.magentaDeep,
     overflow: 'hidden',
   },
