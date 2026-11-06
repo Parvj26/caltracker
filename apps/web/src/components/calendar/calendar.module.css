@@ -381,3 +381,7 @@
   font-weight: var(--ct-weight-section-heading);
   cursor: pointer;
 }
+
+/* The whole card opens its workout (or its log once done); the name and "⋯" keep their own cursors. */
+.clickable { cursor: pointer; }
+.clickable:hover { filter: brightness(0.97); }

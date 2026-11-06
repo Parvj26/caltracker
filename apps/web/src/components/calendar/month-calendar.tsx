@@ -17,8 +17,8 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useId, useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { monthGrid } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
@@ -51,6 +51,11 @@ type Props = {
   renderItem: (item: CalendarItem, date: IsoDate, editable: boolean) => ReactNode;
   /** Where an item's finished log lives, for its "✓" link. */
   logHref?: (logId: string) => string;
+  /**
+   * Where a click anywhere on an item's card goes (its log once done, otherwise the workout), or null for a card that
+   * opens nothing. Mouse and touch only: keyboard users keep the name button (drag) and the "⋯" menu.
+   */
+  itemHref?: (item: CalendarItem, editable: boolean) => string | null;
   /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
@@ -92,7 +97,7 @@ const announcements: Announcements = {
  * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
  * button and the item controls from renderItem are the non-drag path.
  */
-export function MonthCalendar({ month, days, today, renderItem, logHref, onDropItem, onAddToDay, editableFrom }: Props) {
+export function MonthCalendar({ month, days, today, renderItem, logHref, itemHref, onDropItem, onAddToDay, editableFrom }: Props) {
   const pathname = usePathname();
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
@@ -159,6 +164,7 @@ export function MonthCalendar({ month, days, today, renderItem, logHref, onDropI
                           draggable={draggable && editable}
                           renderItem={renderItem}
                           logHref={logHref}
+                          itemHref={itemHref}
                           today={today}
                           editable={editable}
                           {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
@@ -188,12 +194,14 @@ function DayCell({
   editable,
   renderItem,
   logHref,
+  itemHref,
   today,
   onAdd,
 }: {
   date: IsoDate;
   today: IsoDate | null;
   logHref: Props['logHref'];
+  itemHref: Props['itemHref'];
   items: CalendarItem[];
   inMonth: boolean;
   isToday: boolean;
@@ -229,6 +237,7 @@ function DayCell({
               editable={editable}
               renderItem={renderItem}
               logHref={logHref}
+              href={itemHref ? itemHref(item, editable) : null}
               missed={item.logId === null && today !== null && date < today}
             />
             ),
@@ -262,10 +271,13 @@ function DayItem({
   editable,
   renderItem,
   logHref,
+  href,
   missed,
 }: {
   item: CalendarItem;
   logHref: Props['logHref'];
+  /** Where a click anywhere on the card goes, or null. */
+  href: string | null;
   /** Planned, its day has passed (in the viewer's zone) and no finished log. */
   missed: boolean;
   date: IsoDate;
@@ -277,8 +289,28 @@ function DayItem({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
   // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
   const controls = renderItem(item, date, editable);
+  const router = useRouter();
+  // A drag ends with a click on the handle; that click must not also open the card.
+  const dragged = useRef(false);
+  useEffect(() => {
+    if (isDragging) dragged.current = true;
+  }, [isDragging]);
+  const openCard = (event: MouseEvent<HTMLLIElement>) => {
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    // The "⋯" menu, its dialogs and the "✓ Done" link keep their own behaviour.
+    if (!href || (event.target as HTMLElement).closest('a, [data-item-controls]')) return;
+    if (event.metaKey || event.ctrlKey) window.open(href, '_blank', 'noopener');
+    else router.push(href);
+  };
   return (
-    <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed)}>
+    // A mouse and touch shortcut: the name button and the "⋯" menu stay the keyboard and screen-reader way in.
+    <li
+      className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed, href && styles.clickable)}
+      onClick={openCard}
+    >
       <div className={styles.itemRow}>
         {draggable ? (
           <button
@@ -304,7 +336,11 @@ function DayItem({
             </span>
           </span>
         )}
-        {controls ? <div className={styles.itemControls}>{controls}</div> : null}
+        {controls ? (
+          <div className={styles.itemControls} data-item-controls>
+            {controls}
+          </div>
+        ) : null}
       </div>
       {item.logId && logHref ? (
         <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>

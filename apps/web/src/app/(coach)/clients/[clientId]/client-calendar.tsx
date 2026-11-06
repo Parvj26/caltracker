@@ -224,13 +224,15 @@ export function ClientCalendar({
       </p>
 
       {readOnly ? (
-        <MonthCalendar month={month} days={days} today={today} logHref={logHref} renderItem={() => null} />
+        <MonthCalendar month={month} days={days} today={today} logHref={logHref} itemHref={(item) => (item.logId ? logHref(item.logId) : null)} renderItem={() => null} />
       ) : (
         <MonthCalendar
           month={month}
           days={days}
           today={today}
           logHref={logHref}
+          // Clicking a card: a done workout opens its log; one still to do opens it for editing (past ones: the menu).
+          itemHref={(item, editable) => (item.logId ? logHref(item.logId) : editable ? `/clients/${client.id}/workouts/${item.id}` : null)}
           editableFrom={today}
           onDropItem={move}
           onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}

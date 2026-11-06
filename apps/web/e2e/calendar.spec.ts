@@ -902,3 +902,21 @@ test('a month with only workouts the client added is not shown as an empty calen
     await admin.from('workout_logs').delete().eq('id', logId);
   }
 });
+
+test('clicking anywhere on a calendar card opens the workout; dragging it does not', async ({ page }) => {
+  const workout = `Clickable ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  const month = nextMonth(monthOf(await browserToday(page)));
+  const date = `${month}-12`;
+  await page.goto(calendarUrl(month));
+  await addFromLibrary(page, date, workout);
+  await page.reload();
+  await expect(item(page, date, workout)).toHaveCount(1);
+  const card = day(page, date).getByRole('listitem').filter({ hasText: workout });
+  // Click the card's empty lower part, away from the name and the "⋯" menu.
+  const box = (await card.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 6);
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/[0-9a-f-]{36}$`));
+});
