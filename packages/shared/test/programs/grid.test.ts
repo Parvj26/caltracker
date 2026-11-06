@@ -73,6 +73,26 @@ describe('copyWeek', () => {
     expect(out.slots.some((s) => s.week === 2)).toBe(false);
   });
 
+  it('orders the copies by target week, then day, position and id (the order copy_program_week assigns ids in)', () => {
+    const tie = [
+      { ...slot(1, 1, 2, 0), id: 'b0000000-0000-4000-8000-000000000000' },
+      { ...slot(2, 1, 2, 0), id: 'a0000000-0000-4000-8000-000000000000' },
+      slot(3, 1, 1, 1),
+      slot(4, 1, 1, 0),
+    ];
+    const out = copyWeek(tie, { from: 1, to: [3, 2], weeks: 3 }, makeId);
+    expect(out.added.map((s) => [s.week, s.workoutId])).toEqual([
+      [2, ID(104)],
+      [2, ID(103)],
+      [2, ID(102)],
+      [2, ID(101)],
+      [3, ID(104)],
+      [3, ID(103)],
+      [3, ID(102)],
+      [3, ID(101)],
+    ]);
+  });
+
   it('does not change the input', () => {
     const frozen = Object.freeze(plan.map((s) => Object.freeze({ ...s })));
     expect(() => copyWeek(frozen, { from: 1, to: [2], weeks: 4 }, makeId)).not.toThrow();

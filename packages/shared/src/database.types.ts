@@ -1299,6 +1299,21 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      copy_program_week: {
+        Args: {
+          p_from: number
+          p_ids: string[]
+          p_program_id: string
+          p_to: number[]
+        }
+        Returns: {
+          day: number
+          id: string
+          position: number
+          week: number
+          workout_id: string
+        }[]
+      }
       copy_workout: {
         Args: {
           p_assignment: string
@@ -1414,10 +1429,6 @@ export type Database = {
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
-      }
-      replace_program_weeks: {
-        Args: { p_program_id: string; p_slots: Json; p_weeks: number[] }
-        Returns: number
       }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
