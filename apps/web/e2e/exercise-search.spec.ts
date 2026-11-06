@@ -118,6 +118,6 @@ test('open picker with a query, a filter and the preview (screenshot)', async ({
       .every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0),
   );
   await page.screenshot({
-    path: '/private/tmp/claude-501/-Users-parvjain-Desktop-fitness-tracker/531e9d4c-c73a-4f3c-a3bd-f037eea52a9b/scratchpad/exercise-picker.png',
+    path: test.info().outputPath('exercise-picker.png'),
   });
 });

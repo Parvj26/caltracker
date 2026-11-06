@@ -157,6 +157,8 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
     starSeq.current.set(id, seq);
     const before = !want;
     set(want);
+    // Update the shared cache now, so a picker reopened before the save finishes already shows the star.
+    rememberFavourite(id, want);
     setStarError(null);
     let ok = false;
     let message = "Couldn't save favourite. Try again.";
@@ -166,8 +168,8 @@ export function SearchPanel({ mode, workspaceId, onPick, onOpen, onCancel, initi
       message = failureMessage(e, message);
     }
     if (starSeq.current.get(id) !== seq) return;
-    if (ok) rememberFavourite(id, want);
-    else {
+    if (!ok) {
+      rememberFavourite(id, before);
       set(before);
       setStarError(message);
     }
