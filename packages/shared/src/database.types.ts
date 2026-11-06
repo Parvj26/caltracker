@@ -1528,6 +1528,7 @@ export type Database = {
         Returns: number
       }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
+      uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
     }
