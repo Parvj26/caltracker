@@ -112,6 +112,10 @@
 - [ ] **Step 2: Run.** Expected: FAIL. **Step 3: Implement.** **Step 4: Run** `pnpm check && CI=1 pnpm test:e2e`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(web): record InBody scans and chart client progress`
 
+**File removal:**
+- The web delete-scan action removes the printout through the Storage API (`remove([path])`), not by SQL. Deleting rows in `storage.objects` leaves the real file behind.
+- Go-live plan, account and workspace deletion: an Edge Function removes the files in every bucket (including `scan-attachments`) through the Storage API before the rows are deleted. Deleting a workspace does not remove its printouts by itself.
+
 ### Task 4: Client app
 **Files:**
 - `apps/mobile/src/app/(app)/progress.tsx`, which extends the placeholder from stickers Task 8 if it exists.
