@@ -1,10 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
 import { formatClock } from '@caltracker/shared';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-/** ‹ back · "2 of 5" pill (opens the exercise list; hidden with no exercises) · elapsed timer · Finish. */
+const CHEVRON_SIZE = 24;
+
+/** Back chevron · "2 of 5" pill (opens the exercise list; hidden with no exercises) · elapsed timer · Finish. */
 export function LogTopBar({
   pill,
   elapsedS,
@@ -28,7 +31,9 @@ export function LogTopBar({
         accessibilityLabel="Back"
         style={({ pressed }) => [styles.square, pressed && styles.pressed]}
       >
-        <Text style={[text('screenTitle'), styles.ink]}>‹</Text>
+        <Svg width={CHEVRON_SIZE} height={CHEVRON_SIZE} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no">
+          <Path d="M15 5 L8 12 L15 19" fill="none" stroke={palette.ink} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
       </Pressable>
       {pill ? (
         <Pressable
