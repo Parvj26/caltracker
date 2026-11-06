@@ -4,7 +4,8 @@ import { KG_PER_LB, formatDistance, formatDuration, formatWeight } from '../unit
 import type { Units } from '../units/units';
 import { formatSetTarget } from '../workouts/targets';
 import type { SetType } from '../workouts/schema';
-import type { LogSetTarget } from './schema';
+import type { LogExerciseDoc, LogSetTarget } from './schema';
+import type { SetValues } from './prefill';
 
 /** A log set's target snapshot, worded exactly like the planned workout ("8–10 reps · 135 lb"). */
 export function formatLogSetTarget(target: LogSetTarget, trackingType: TrackingType, units: Units): string {
@@ -76,4 +77,60 @@ export function formatLogDuration(seconds: number): string {
 export function formatLogVolume(volumeKg: number, units: Units): string {
   const whole = Math.round(units === 'lb' ? volumeKg / KG_PER_LB : volumeKg);
   return `${String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} ${units} lifted`;
+}
+
+/** One set's numbers as text ("135 lb × 8", "8 reps", "0:45", "1.5 mi"), or null when nothing is filled in. */
+export function formatResult(v: SetValues, trackingType: TrackingType, units: Units): string | null {
+  return resultText(
+    { setType: 'normal', actualReps: v.reps, actualWeightKg: v.weightKg, actualDurationS: v.durationS, actualDistanceM: v.distanceM },
+    trackingType,
+    units,
+  );
+}
+
+type SetsOf = Pick<LogExerciseDoc, 'sets'>;
+type PlanOf = Pick<LogExerciseDoc, 'sets' | 'trackingType'>;
+
+/** "Set 2 of 3", "Warm-up 1 of 2" or "Drop 1 of 2". Sets count working sets only; drops count within their group. */
+export function stepName(ex: SetsOf, setIndex: number): string {
+  const sets = ex.sets;
+  const type = sets[setIndex]?.setType ?? 'normal';
+  if (type === 'drop') {
+    let start = setIndex;
+    while (start > 0 && sets[start - 1]!.setType === 'drop') start -= 1;
+    let end = setIndex;
+    while (end + 1 < sets.length && sets[end + 1]!.setType === 'drop') end += 1;
+    return `Drop ${setIndex - start + 1} of ${end - start + 1}`;
+  }
+  const same = sets.filter((s) => s.setType === type).length;
+  const n = sets.slice(0, setIndex + 1).filter((s) => s.setType === type).length;
+  return `${type === 'warmup' ? 'Warm-up' : 'Set'} ${n} of ${same}`;
+}
+
+/** The working sets' shared target as text, or null when they differ or there is nothing to say. */
+function sharedTarget(ex: PlanOf, units: Units): string | null {
+  const working = ex.sets.filter((s) => s.setType === 'normal');
+  const first = working[0];
+  if (!first) return null;
+  const text = formatLogSetTarget(first.target, ex.trackingType, units);
+  if (text === '—') return null;
+  const same = working.every((s) => formatLogSetTarget(s.target, ex.trackingType, units) === text);
+  return same ? text : null;
+}
+
+/** "3 × 10 reps · 50 lb" when the working sets share one target, else "3 sets" ("1 set"). */
+export function planSummary(ex: PlanOf, units: Units): string {
+  const count = ex.sets.filter((s) => s.setType === 'normal').length;
+  const shared = sharedTarget(ex, units);
+  if (shared !== null) return `${count} × ${shared}`;
+  return `${count} ${count === 1 ? 'set' : 'sets'}`;
+}
+
+/** The coach's line under a set: the whole plan on a working set when it is uniform, else this set's own target. */
+export function coachLine(ex: PlanOf, setIndex: number, units: Units): string | null {
+  const set = ex.sets[setIndex];
+  if (!set) return null;
+  if (set.setType === 'normal' && sharedTarget(ex, units) !== null) return `Coach: ${planSummary(ex, units)}`;
+  const own = formatLogSetTarget(set.target, ex.trackingType, units);
+  return own === '—' ? null : `Coach: ${own}`;
 }

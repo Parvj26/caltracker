@@ -129,7 +129,18 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
-export { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from './logs/format';
+export {
+  coachLine,
+  formatLastResult,
+  formatLogDuration,
+  formatLogSetTarget,
+  formatLogVolume,
+  formatResult,
+  planSummary,
+  stepName,
+} from './logs/format';
+export { stepSetValue } from './logs/steppers';
+export type { StepField } from './logs/steppers';
 export type { ResultSet } from './logs/format';
 export { EMPTY_VALUES, lastTimeFor, resolveSetValues, valuesToPatch } from './logs/prefill';
 export type { SetValues } from './logs/prefill';

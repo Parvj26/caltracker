@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from '../../src/logs/format';
+import {
+  coachLine,
+  formatLastResult,
+  formatLogDuration,
+  formatLogSetTarget,
+  formatLogVolume,
+  formatResult,
+  planSummary,
+  stepName,
+} from '../../src/logs/format';
 import type { LogSetTarget } from '../../src/logs/schema';
 import { toKg } from '../../src/units/units';
 
@@ -87,5 +96,58 @@ describe('formatLogVolume', () => {
 
   it('rounds from the unrounded conversion, not per set', () => {
     expect(formatLogVolume(toKg(135, 'lb') * 24, 'lb')).toBe('3,240 lb lifted');
+  });
+});
+
+const logSet = (setType: 'normal' | 'warmup' | 'drop', over: Partial<LogSetTarget> = {}) => ({
+  setType,
+  target: target({ repsMin: 8, repsMax: 10, weightKg: 60, ...over }),
+});
+// The helpers only read setType and target, so a thin shape is enough here.
+const ex = (sets: ReturnType<typeof logSet>[], trackingType: 'weight_reps' | 'reps' = 'weight_reps') =>
+  ({ sets, trackingType }) as unknown as Parameters<typeof planSummary>[0];
+
+describe('formatResult', () => {
+  it('words a set the way the last-time line does', () => {
+    const v = { reps: 8, weightKg: 61.235, durationS: null, distanceM: null };
+    expect(formatResult(v, 'weight_reps', 'lb')).toBe('135 lb × 8');
+    expect(formatResult({ ...v, weightKg: null }, 'weight_reps', 'lb')).toBe('8 reps');
+    expect(formatResult({ reps: null, weightKg: null, durationS: null, distanceM: null }, 'weight_reps', 'lb')).toBeNull();
+  });
+});
+
+describe('stepName', () => {
+  const e = ex([logSet('warmup'), logSet('warmup'), logSet('normal'), logSet('normal'), logSet('normal'), logSet('drop'), logSet('drop')]);
+  it('counts warm-ups, working sets and drops separately', () => {
+    expect(stepName(e, 1)).toBe('Warm-up 2 of 2');
+    expect(stepName(e, 4)).toBe('Set 3 of 3');
+    expect(stepName(e, 6)).toBe('Drop 2 of 2');
+  });
+  it('counts drops only within their own group', () => {
+    const g = ex([logSet('normal'), logSet('drop'), logSet('normal'), logSet('drop'), logSet('drop')]);
+    expect(stepName(g, 1)).toBe('Drop 1 of 1');
+    expect(stepName(g, 4)).toBe('Drop 2 of 2');
+  });
+});
+
+describe('planSummary and coachLine', () => {
+  it('summarises uniform working sets', () => {
+    expect(planSummary(ex([logSet('warmup'), logSet('normal'), logSet('normal'), logSet('normal')]), 'kg')).toBe('3 × 8–10 reps · 60 kg');
+  });
+  it('falls back to a count when targets differ or are empty', () => {
+    const pyramid = ex([logSet('normal'), logSet('normal', { weightKg: 70, repsMin: 8, repsMax: 8 })]);
+    expect(planSummary(pyramid, 'kg')).toBe('2 sets');
+    expect(planSummary(ex([logSet('normal', { repsMin: null, repsMax: null, weightKg: null })]), 'kg')).toBe('1 set');
+  });
+  it('shows the plan on working sets and the own target otherwise', () => {
+    const uniform = ex([logSet('warmup', { weightKg: 20 }), logSet('normal'), logSet('normal')]);
+    expect(coachLine(uniform, 1, 'kg')).toBe('Coach: 2 × 8–10 reps · 60 kg');
+    expect(coachLine(uniform, 0, 'kg')).toBe('Coach: 8–10 reps · 20 kg');
+    const pyramid = ex([logSet('normal'), logSet('normal', { weightKg: 70, repsMin: 8, repsMax: 8 })]);
+    expect(coachLine(pyramid, 1, 'kg')).toBe('Coach: 8 reps · 70 kg');
+  });
+  it('is null with nothing to show', () => {
+    const empty = { repsMin: null, repsMax: null, weightKg: null };
+    expect(coachLine(ex([logSet('normal', empty), logSet('normal', empty)]), 0, 'kg')).toBeNull();
   });
 });
