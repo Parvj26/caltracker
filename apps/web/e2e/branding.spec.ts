@@ -192,7 +192,7 @@ test('bulk CSV invite is folded under its heading, then explains itself and offe
 test('exercise library: list, detail and new-exercise form use the UI kit', async ({ page }) => {
   await signInAsDemoCoach(page);
   await page.goto('/exercises');
-  await expect(page.getByLabel('Search')).toBeVisible();
+  await expect(page.getByLabel('Search exercises')).toBeVisible();
   const group = page.getByRole('group', { name: 'Tracking type' });
   const chips = group.getByRole('button');
   await expect(chips).toHaveCount(4);
@@ -204,13 +204,12 @@ test('exercise library: list, detail and new-exercise form use the UI kit', asyn
   await expect(page).toHaveURL(/tracking=time/);
   await expect(page.getByRole('group', { name: 'Tracking type' }).getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveCSS('background-color', 'rgb(18, 18, 18)');
-  const firstCard = page.locator('main li a').first();
-  await expect(firstCard).toHaveCSS('border-top-width', '2px');
-  expect((await page.getByLabel('Search').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await page.getByLabel('Search exercises').boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  // Detail page.
+  // Detail page, reached from the preview.
   await page.goto('/exercises?q=Barbell Squat');
-  await page.getByRole('link', { name: /Barbell Squat/ }).first().click();
+  await page.getByRole('option', { name: 'Barbell Squat', exact: true }).click();
+  await page.getByRole('region', { name: 'Exercise preview' }).getByRole('link', { name: 'Details' }).click();
   const link = page.getByRole('link', { name: 'Watch form on YouTube' });
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(link).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

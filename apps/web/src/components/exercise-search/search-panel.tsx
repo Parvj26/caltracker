@@ -26,6 +26,11 @@ type Props = {
   onOpen?: (id: string) => void;
   /** Shows a Cancel button in the footer. */
   onCancel?: () => void;
+  /** Starting search text and chips (the Exercises page fills these from its address). */
+  initialQuery?: string;
+  initialFilters?: Partial<SearchFilters>;
+  /** An extra yes/no test on each row, applied after the search (must be a stable function). */
+  rowFilter?: (row: ExerciseIndexRow) => boolean;
 };
 
 const PAGE_SIZE = 50;
@@ -34,7 +39,7 @@ const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: fals
 const toPick = (r: ExerciseIndexRow): ExercisePick => ({ id: r.id, name: r.name, trackingType: r.trackingType });
 
 /** Layout A: search box and filter chips on top, a results list on the left, a preview pane on the right. */
-export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
+export function SearchPanel({ mode, onPick, onOpen, onCancel, initialQuery = '', initialFilters, rowFilter }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const listId = useId();
   const hintId = useId();
@@ -43,8 +48,8 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
 
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [error, setError] = useState(false);
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  const [query, setQuery] = useState(initialQuery);
+  const [filters, setFilters] = useState<SearchFilters>({ ...NO_FILTERS, ...initialFilters });
   const [shown, setShown] = useState(PAGE_SIZE);
   const [highlightId, setHighlightId] = useState<string | undefined>();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -79,10 +84,11 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
     () => ({ favourites: new Set(data?.favourites ?? []), recent: data?.recent ?? [] }),
     [data],
   );
-  const hits = useMemo(
-    () => (index ? searchExercises(index, query, filters, boosts) : []),
-    [index, query, filters, boosts],
-  );
+  const hits = useMemo(() => {
+    if (!index) return [];
+    const found = searchExercises(index, query, filters, boosts);
+    return rowFilter ? found.filter((h) => rowFilter(h.row)) : found;
+  }, [index, query, filters, boosts, rowFilter]);
 
   const activeId = hits.some((h) => h.row.id === highlightId) ? highlightId : hits[0]?.row.id;
   const active = hits.find((h) => h.row.id === activeId)?.row;
@@ -193,7 +199,8 @@ export function SearchPanel({ mode, onPick, onOpen, onCancel }: Props) {
           ? onOpen
             ? { label: 'Edit', onClick: () => primary(active) }
             : { label: 'Edit', href: `/exercises/${active.id}` }
-          : null;
+          : // Built-ins have no Edit, but their page holds the pinned video and coaching notes.
+            { label: 'Details', href: `/exercises/${active.id}` };
 
   return (
     <div className={styles.panel}>
