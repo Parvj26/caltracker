@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
@@ -44,8 +44,12 @@ export function RestPanel({
     return () => clearInterval(t);
   }, []);
 
+  // Fires once per rest, even if the parent hands in a new onDone every render. A longer rest (+15 s) re-arms it.
+  const firedFor = useRef<number | null>(null);
   useEffect(() => {
-    if (left === 0) onDone(Date.now() - endsAt > LATE_MS);
+    if (left !== 0 || firedFor.current === endsAt) return;
+    firedFor.current = endsAt;
+    onDone(Date.now() - endsAt > LATE_MS);
   }, [left, endsAt, onDone]);
 
   const r = (restRingSize - restRingStroke) / 2;
