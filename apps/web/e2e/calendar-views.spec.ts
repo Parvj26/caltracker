@@ -133,7 +133,8 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
 test('week cards preview their exercises, "+ N more", ✓ done and "Logged by coach"', async ({ page }) => {
   await signInAsCoach(page);
   const today = await browserToday(page);
-  const date = addDays(mondayOf(today), 7); // next week: never missed
+  // Tomorrow: never missed, and on screen with yesterday in a 2-week view from yesterday's week.
+  const date = addDays(today, 1);
   const big = `Preview ${unique()}`;
   await seedWorkout(big, date, ['Barbell Deadlift', 'Barbell Squat', 'Cable Crossover', 'Barbell Squat', 'Barbell Deadlift']);
   // Done and logged by the coach (an in-person session): the log's author is the coach, not the client.
