@@ -14,6 +14,8 @@ import {
   type LogTreeRow,
 } from '@caltracker/shared';
 import { Card, Chip, SelectField } from '@/components/ui';
+import { LiveRefresh } from '@/components/live-refresh';
+import { renderTime } from '@/lib/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { LocalDateTime } from './local-date-time';
@@ -182,6 +184,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           ) : null}
         </nav>
       ) : null}
+      <LiveRefresh on={[{ table: 'workout_logs', filter: `workspace_id=eq.${workspaceId}` }, { table: 'awards', filter: `workspace_id=eq.${workspaceId}` }]} renderedAt={renderTime()} maxWaitMs={8000} />
     </div>
   );
 }

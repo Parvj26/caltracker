@@ -76,8 +76,8 @@ clears `substituteId` and `substituteOptions`: the slot is then off-plan.
   substitutes off pick-one options and different from the planned exercise, however a row is written. `save_workout`
   writes them, `copy_workout` copies them, `WORKOUT_TREE_SELECT` reads them.
 - Logs: `log_exercises.substitute_id` and `log_exercises.substitute_options jsonb`. `save_workout_log` stores
-  them and refuses a `substituteId` that is not one of the options, a malformed option, or an option naming an
-  exercise the workspace can't use. Options are not compared with the current plan: the coach may edit the plan
+  them and refuses a `substituteId` that is not one of the options or a malformed option. An option naming an
+  exercise the workspace can't use (e.g. a custom exercise deleted mid-workout) is left out, not refused. Options are not compared with the current plan: the coach may edit the plan
   while the client is mid-workout, and a save must not fail forever because of that. The exercise row and its sets are the option
   actually done, so `award_inputs` and `recent_exercises_for_client` already use it.
 

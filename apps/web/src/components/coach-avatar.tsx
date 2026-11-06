@@ -1,5 +1,6 @@
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
 import { cx } from '@/components/ui/cx';
+import { StableImg } from './stable-img';
 import styles from './coach-avatar.module.css';
 
 /**
@@ -20,9 +21,8 @@ export function CoachAvatar({
 }) {
   const sizeClass = size === 'large' ? styles.large : styles.small;
   if (url) {
-    // A plain <img>: the signed link is already the right size (256 px) and expires, so next/image can't cache it.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className={cx(styles.avatar, sizeClass)} />;
+    // Keeps the first signed link across re-renders (live updates), so the photo is not downloaded again each time.
+    return <StableImg src={url} className={cx(styles.avatar, sizeClass)} />;
   }
   return (
     <span aria-hidden="true" className={cx(styles.avatar, sizeClass, styles[avatarTone(seed)])}>

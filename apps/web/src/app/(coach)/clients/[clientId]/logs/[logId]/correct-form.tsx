@@ -1,22 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { liveExercises, parseClock, type Units, type WorkoutLogDoc } from '@caltracker/shared';
+import { liveExercises, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
 import { Button, ErrorText } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
-import { correctLog, type SetCorrection } from './actions';
+import { correctLog } from './actions';
+import { CLIENT_UPDATED_MESSAGE, buildCorrections, logVersion } from './corrections';
 import { PlannedVsActual, draftFor, type Drafts } from './planned-vs-actual';
 import styles from './log.module.css';
 
-const LABELS = { reps: 'Reps', weight: 'Weight', time: 'Time', distance: 'Distance' } as const;
-
 const initialDrafts = (log: WorkoutLogDoc, units: Units): Drafts =>
   Object.fromEntries(log.blocks.flatMap((b) => liveExercises(b).flatMap(({ exercise: e }) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
-
-/** A typed number, or null for blank, or NaN for text that isn't one. */
-const num = (text: string): number | null => (text.trim() === '' ? null : /^\d*\.?\d+$/.test(text.trim()) ? Number(text) : NaN);
 
 /** Planned vs. actual, with a Correct button (only for finished workouts) that turns the Actual cells into boxes. */
 export function CorrectForm({
@@ -32,47 +28,33 @@ export function CorrectForm({
 }) {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
+  // The boxes' text and the log's version when Correct was clicked. A live update can replace `log` while the coach
+  // types; corrections are worked out against these, and saving waits until the coach has seen the newer numbers.
+  const [startDrafts, setStartDrafts] = useState<Drafts>({});
+  const [startVersion, setStartVersion] = useState<string | null>(null);
+  const clientUpdated = editing && startVersion !== null && startVersion !== logVersion(log);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
   function start() {
-    setDrafts(initialDrafts(log, units));
+    const fresh = initialDrafts(log, units);
+    setDrafts(fresh);
+    setStartDrafts(fresh);
+    setStartVersion(logVersion(log));
     setError(null);
     setEditing(true);
   }
 
   function save() {
     setError(null);
-    const before = initialDrafts(log, units);
-    const sets: SetCorrection[] = [];
-    for (const [id, draft] of Object.entries(drafts)) {
-      const set: SetCorrection = { id };
-      let changed = false;
-      for (const key of ['reps', 'weight', 'time', 'distance'] as const) {
-        const text = draft[key];
-        if (text === undefined || text.trim() === (before[id]?.[key] ?? '').trim()) continue;
-        const value = key === 'time' ? parseClock(text) : num(text);
-        if (value === null) {
-          setError(`${LABELS[key]} can't be blank.`);
-          return;
-        }
-        if (Number.isNaN(value)) {
-          setError('Check the numbers you typed. Time looks like 1:30.');
-          return;
-        }
-        changed = true;
-        if (key === 'reps') set.actualReps = value;
-        else if (key === 'weight') set.actualWeight = value;
-        else if (key === 'time') set.actualDurationS = value;
-        else set.actualDistance = value;
-      }
-      if (changed) sets.push(set);
-    }
-    if (sets.length === 0) {
-      setError('Nothing to change.');
+    if (clientUpdated) return;
+    const built = buildCorrections(drafts, startDrafts);
+    if ('error' in built) {
+      setError(built.error);
       return;
     }
+    const { sets } = built;
     startTransition(async () => {
       try {
         const outcome = await correctLog({ logId: log.id, sets });
@@ -110,12 +92,21 @@ export function CorrectForm({
       />
       {editing ? (
         <div className={styles.saveBar}>
-          {error ? <ErrorText>{error}</ErrorText> : null}
+          {clientUpdated ? (
+            <>
+              <ErrorText>{CLIENT_UPDATED_MESSAGE}</ErrorText>
+              <Button variant="secondary" onClick={start} disabled={pending}>
+                Use latest numbers
+              </Button>
+            </>
+          ) : error ? (
+            <ErrorText>{error}</ErrorText>
+          ) : null}
           {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
           <Button variant="secondary" onClick={() => setEditing(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button onClick={save} pending={pending}>
+          <Button onClick={save} pending={pending} disabled={clientUpdated}>
             {pending ? 'Saving…' : 'Save corrections'}
           </Button>
         </div>

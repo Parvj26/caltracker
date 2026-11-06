@@ -1,5 +1,5 @@
 begin;
-select plan(53);
+select plan(58);
 
 -- Fixtures (as postgres)
 select tests.create_user('su-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -97,6 +97,15 @@ select public.save_workout(:'ws_a', jsonb_set(:'doc', '{blocks,0,exercises,0,sub
 select is((select count(*)::int from public.workout_substitutes where workout_id = :'w1'), 1,
   'a substitute the doc no longer has is deleted');
 select public.save_workout(:'ws_a', :'doc');
+-- Swapping the exercise for one of its own substitutes: save_workout prunes that substitute, so the deferred
+-- rules pass once checked.
+select public.save_workout(:'ws_a', jsonb_set(jsonb_set(:'doc', '{blocks,0,exercises,0,exerciseId}', to_jsonb(:'ex_assist'::text)),
+  '{blocks,0,exercises,0,substitutes}', jsonb_build_array((:'doc'::jsonb) #> '{blocks,0,exercises,0,substitutes,1}')));
+select lives_ok('set constraints all immediate', 'replacing an exercise with its own substitute passes the substitute rules');
+set constraints all deferred;
+select results_eq(format($$select exercise_id from public.workout_substitutes where workout_exercise_id = %L$$, :'e1'),
+  format($$values (%L::uuid)$$, :'ex_band'), 'and the substitute that became the exercise is gone');
+select public.save_workout(:'ws_a', :'doc');
 -- An older doc (no "substitutes" key) still saves, and has none.
 select is(public.save_workout(:'ws_a', tests.su_doc(gen_random_uuid(), 'straight', jsonb_build_array(
   (tests.su_ex(gen_random_uuid(), :'ex_row', jsonb_build_array(tests.su_set(gen_random_uuid(), 'normal')))) - 'substitutes'
@@ -138,6 +147,13 @@ select tests.act_as(:'coach_a');
 select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
   values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"id": "not-a-uuid"}')), '23514', null,
   'a substitute set needs a uuid id');
+select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+  values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}')), '23514', null,
+  'and an RFC one (version 1-8, variant 8-b), as zod checks');
+select ok(not has_function_privilege('anon', 'public.valid_substitute_sets(jsonb)', 'execute')
+  and not has_function_privilege('anon', 'public.uuid_text_ok(text)', 'execute')
+  and has_function_privilege('authenticated', 'public.valid_substitute_sets(jsonb)', 'execute'),
+  'anon cannot call the substitute validators');
 select throws_ok(format($$insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
   values (%L, 2, %L, %L)$$, :'e1', :'ex_row', tests.su_sets('{"targetRepsMin": 12, "targetRepsMax": 8}')), '23514', null,
   'minimum reps can''t be more than maximum reps');
@@ -278,9 +294,14 @@ select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
 select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
   tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,trackingType}', '"yoga"')))),
   '^23514: A substitute option is not valid', 'a malformed substitute option is refused');
-select matches(tests.su_log_error(tests.su_log(gen_random_uuid(), :'inst',
-  tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,exerciseId}', to_jsonb(:'ex_b'::text))))),
-  '^42501', 'a substitute option cannot name another workspace''s custom exercise');
+-- An option whose exercise the workspace can't use (another workspace's, or deleted since) is left out, not refused:
+-- refusing would make every save of the phone's workout fail for good.
+select gen_random_uuid() as log_strip \gset
+select is(public.save_workout_log(tests.su_log(:'log_strip', :'inst',
+  tests.su_log_ex(:'ex_lat', :'inst_we', null, jsonb_set(:'options', '{1,exerciseId}', to_jsonb(:'ex_b'::text))), 'in_progress')) ->> 'applied',
+  'true', 'a log with an option naming an exercise the workspace can''t use still saves');
+select is((select jsonb_path_query_array(substitute_options, '$[*].exerciseId') from public.log_exercises where log_id = :'log_strip'),
+  jsonb_build_array(:'ex_lat'::text), 'and that option is left out');
 select gen_random_uuid() as log_old \gset
 select is(public.save_workout_log(tests.su_log(:'log_old', null,
   tests.su_log_ex(:'ex_row', null, null, '[]') - 'substituteId' - 'substituteOptions')) ->> 'applied', 'true',
