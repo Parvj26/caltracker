@@ -66,6 +66,25 @@ describe('a coach finds the lift they mean first (real library)', () => {
   });
 });
 
+describe('an empty search (real library)', () => {
+  it('a new user sees the popular exercises first, in COMMON_EXERCISES order', () => {
+    expect(names('').slice(0, COMMON_EXERCISES.length)).toEqual([...COMMON_EXERCISES]);
+  });
+
+  it('then everything else A to Z, each exercise once', () => {
+    const order = names('');
+    const rest = order.slice(COMMON_EXERCISES.length);
+    expect(rest).toEqual([...rest].sort(new Intl.Collator('en', { sensitivity: 'base' }).compare));
+    expect(new Set(order).size).toBe(order.length);
+    expect(order).toHaveLength(LIBRARY.length);
+  });
+
+  it('favourites, then recent exercises, then popular', () => {
+    const boosts: SearchBoosts = { favourites: new Set([idOf('3/4 Sit-Up')]), recent: [idOf('Ab Roller')] };
+    expect(names('', boosts).slice(0, 4)).toEqual(['3/4 Sit-Up', 'Ab Roller', 'Barbell Bench Press - Medium Grip', 'Barbell Squat']);
+  });
+});
+
 describe('performance (real library)', () => {
   it('886 rows plus their other names, 50 queries in within the speed budget', () => {
     const idx = buildExerciseIndex(LIBRARY);
