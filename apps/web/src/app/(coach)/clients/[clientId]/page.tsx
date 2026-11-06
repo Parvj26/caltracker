@@ -14,6 +14,8 @@ import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import { LiveRefresh } from '@/components/live-refresh';
 import { renderTime } from '@/lib/live-refresh';
+import { loadProgress } from './progress/load';
+import { ProgressSection } from './progress/progress-section';
 import styles from '@/components/calendar/calendar.module.css';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
@@ -28,7 +30,7 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ month?: string | string[]; assign?: string | string[] }>;
+  searchParams: Promise<{ month?: string | string[]; assign?: string | string[]; scan?: string | string[] }>;
 }) {
   const { workspaceId, units } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
@@ -45,7 +47,7 @@ export default async function ClientPage({
   const rangeStart = monthGrid(firstMonth)[0]![0]!;
   const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
 
-  const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
+  const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned, progress] = await Promise.all([
     supabase
       .from('workouts')
       .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
@@ -102,6 +104,7 @@ export default async function ClientPage({
       .gte('finished_at', `${addDays(rangeStart, -1)}T00:00:00Z`)
       .lt('finished_at', `${addDays(rangeEnd, 2)}T00:00:00Z`)
       .order('finished_at'),
+    loadProgress(supabase, workspaceId, client.id),
   ]);
   if (workouts.error) throw new Error(`Could not load the calendar: ${workouts.error.message}`);
   if (assignments.error) throw new Error(`Could not load assignments: ${assignments.error.message}`);
@@ -179,6 +182,14 @@ export default async function ClientPage({
       />
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />
+      <ProgressSection
+        workspaceId={workspaceId}
+        client={{ id: client.id, name: client.name }}
+        units={units}
+        data={progress}
+        readOnly={client.removedAt !== null}
+        openScan={query.scan === '1'}
+      />
     </div>
   );
 }

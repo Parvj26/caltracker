@@ -102,6 +102,73 @@ export type Database = {
           },
         ]
       }
+      body_measurement_values: {
+        Row: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Insert: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Update: {
+          measurement_id?: string
+          metric_key?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurement_values_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "body_measurements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      body_measurements: {
+        Row: {
+          attachment_path: string | null
+          client_id: string
+          created_at: string
+          entered_by: string | null
+          id: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          client_id: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Update: {
+          attachment_path?: string | null
+          client_id?: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on?: string
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -198,6 +265,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_stats_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_metrics: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          max: number
+          min: number
+          name: string
+          unit_label: string
+          workspace_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max: number
+          min: number
+          name: string
+          unit_label?: string
+          workspace_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max?: number
+          min?: number
+          name?: string
+          unit_label?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_metrics_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1503,11 +1611,14 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      save_body_measurement: { Args: { p: Json }; Returns: string }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
       }
       save_workout_log: { Args: { p_doc: Json }; Returns: Json }
+      scan_path_client: { Args: { name: string }; Returns: string }
+      scan_path_workspace: { Args: { name: string }; Returns: string }
       schedule_workout: {
         Args: {
           p_client_id: string

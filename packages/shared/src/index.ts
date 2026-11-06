@@ -316,3 +316,8 @@ export {
   substituteChoices,
   substitutedFrom,
 } from './logs/substitutes';
+export { BUILT_IN_METRIC_KEYS, MAX_LB_DISPLAY_DRIFT_KG, METRICS, displayValue, formatMetric, fromDisplay, isInRange, toInputValue } from './body/metrics';
+export type { BuiltInMetricKey, CustomMetricDef, MetricDef } from './body/metrics';
+export { CHART_RANGES, CHART_RANGE_LABELS, changeSince, formatShortDate, measurementSeries } from './body/series';
+export type { ChartRange, SeriesPoint } from './body/series';
+export { SCAN_DUE_DAYS, isScanDue } from './body/due';

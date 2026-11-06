@@ -189,7 +189,6 @@ test('the coming-soon part is visible, Message is not offered yet, and the conso
   await signInAsCoach(page);
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
-  await expect(page.locator('[role="note"]').filter({ hasText: 'Body scans 30+ days' })).toBeVisible();
   // Messages are not built yet, so there is no Message action at all (not even a disabled one).
   await expect(page.getByRole('complementary', { name: 'Needs attention' }).getByText('Message')).toHaveCount(0);
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);

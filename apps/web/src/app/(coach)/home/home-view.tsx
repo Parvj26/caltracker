@@ -8,6 +8,8 @@ import {
   checkClients,
   compareByLastName,
   formatLogDuration,
+  formatShortDate,
+  isScanDue,
   prsThisWeek,
   todayRows,
   weekProgress,
@@ -112,6 +114,23 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
   );
 }
 
+/** A Body scans 30+ days row: who, when they were last scanned, and a shortcut to the scan form. */
+function ScanDueRow({ client, why }: { client: HomeClient; why: string }) {
+  const name = fullName(client);
+  return (
+    <li className={cx(styles.row, styles.attentionRow)}>
+      <Avatar name={name} toneKey={client.id} />
+      <span className={styles.who}>
+        <span className={styles.rowText} title={name}>{name}</span>
+        <span className={styles.why}>{why}</span>
+      </span>
+      <span className={styles.rowActions}>
+        <Link href={`/clients/${client.id}/body?scan=1`} className={styles.assign} aria-label={`Add a scan for ${name}`}>Add scan</Link>
+      </span>
+    </li>
+  );
+}
+
 function Skeleton() {
   return (
     <div className={styles.page} role="status" aria-busy="true" aria-label="Loading">
@@ -143,8 +162,15 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
     const byId = new Map(input.clients.map((c) => [c.id, c]));
     const groups = attentionGroups(checkClients(input));
     const missedIds = new Set(groups.filter((g) => g.kind === 'missed' || g.kind === 'missed_in_a_row').flatMap((g) => g.items.map((i) => i.clientId)));
+    // Body scans 30+ days: oldest scan (or oldest join, if never scanned) first.
+    const lastScanOf = new Map(data.clients.map((c) => [c.id, c.lastScanOn]));
+    const scansDue = input.clients
+      .filter((c) => isScanDue({ joinedOn: c.joinedOn }, lastScanOf.get(c.id) ?? null, today))
+      .map((c) => ({ client: c, lastScanOn: lastScanOf.get(c.id) ?? null }))
+      .sort((x, y) => (x.lastScanOn ?? x.client.joinedOn).localeCompare(y.lastScanOn ?? y.client.joinedOn));
     return {
       today,
+      scansDue,
       newPrs: prsThisWeek(input.prs, new Set(byId.keys()), today, timeZone),
       byId,
       rows: todayRows(input.workouts, input.clients, today),
@@ -156,9 +182,9 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
   }, [data, today]);
 
   if (!today || !view) return <Skeleton />;
-  const { byId, rows, progress, groups, missedCount, firstMissed, newPrs } = view;
+  const { byId, rows, progress, groups, missedCount, firstMissed, newPrs, scansDue } = view;
   const pct = progress.planned === 0 ? 0 : Math.round((progress.done / progress.planned) * 100);
-  const onTrack = !groups.some((g) => PROBLEMS.has(g.kind));
+  const onTrack = !groups.some((g) => PROBLEMS.has(g.kind)) && scansDue.length === 0;
 
   return (
     <div className={styles.page}>
@@ -247,7 +273,14 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
                 }}
               />
             ))}
-            <ComingSoon label="Body scans 30+ days" className={styles.scans} />
+            {scansDue.length > 0 ? (
+              <Group
+                id="scans-due"
+                title="Body scans 30+ days"
+                items={scansDue}
+                row={(d) => <ScanDueRow key={d.client.id} client={d.client} why={d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'} />}
+              />
+            ) : null}
           </Card>
         </aside>
       </div>

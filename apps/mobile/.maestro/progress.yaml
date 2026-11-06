@@ -1,0 +1,70 @@
+# Progress tab: the coach's two seeded scans make a Weight chart; the client logs a weight, it shows in the history
+# and the chart gains a point; deleting it again removes it. Weight is logged in lb (the demo client's default).
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-scans, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-progress
+- extendedWaitUntil:
+    visible:
+      id: chart-weight_kg
+    timeout: 20000
+- assertVisible:
+    id: chart-body_fat_pct
+- takeScreenshot: progress-seeded
+# Log a weight: it appears in the history as "Logged by you".
+- tapOn:
+    id: weight-input
+- inputText: '175.5'
+- hideKeyboard
+- tapOn:
+    id: weight-save
+- extendedWaitUntil:
+    visible: 'Logged by you'
+    timeout: 20000
+- assertVisible: '175.5 lb'
+- takeScreenshot: progress-logged
+# Step the date back a day, then forward again (it stops at today).
+- tapOn:
+    id: date-prev
+- tapOn:
+    id: date-next
+- assertVisible: 'Today.*'
+# A weight that is out of range is refused in plain words.
+- tapOn:
+    id: weight-input
+- inputText: '5'
+- hideKeyboard
+- tapOn:
+    id: weight-save
+- assertVisible:
+    id: weight-error
+# Delete the entry again.
+- tapOn:
+    id: weight-input
+- eraseText: 5
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Logged by you'
+- tapOn:
+    id: 'delete-.*'
+- tapOn: 'Delete entry'
+- extendedWaitUntil:
+    notVisible: 'Logged by you'
+    timeout: 20000
+# Tidy up.
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }
