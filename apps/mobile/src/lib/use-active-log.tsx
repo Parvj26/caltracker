@@ -1,5 +1,4 @@
-// The client's one active workout, for every screen: Today's Start/Resume/Done ✓, the logging screen and its
-// rest timer, and the note about a workout finished automatically.
+// The client's one active workout, for every screen: Today's Start/Resume/Done ✓, the logging screen, and the note about a workout finished automatically.
 //
 // The log store (log-store.ts) is the truth; React state here is only a mirror of it:
 //   * every change goes through applyEdit(store, op), built from the stored doc, then sync.push()
@@ -19,6 +18,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import {
   completeSetWith,
+  completedSetCount,
   discardLog,
   finishLog,
   reopenLog,
@@ -42,15 +42,7 @@ import {
   type FinishedNote,
 } from './active-log-logic';
 import { fetchInProgressLog, fetchLog, saveLog } from './log-api';
-import {
-  cancelReminder,
-  cancelRestEnd,
-  ensurePermission,
-  initNotifications,
-  onReminderTapped,
-  scheduleReminder,
-  scheduleRestEnd,
-} from './log-notifications';
+import { cancelReminder, ensurePermission, initNotifications, onReminderTapped, scheduleReminder } from './log-notifications';
 import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
 import { createLogSync, type LogSync, type SyncStatus } from './log-sync';
 import { useSession } from './session';
@@ -66,12 +58,6 @@ export const finishOtherFirst = (name: string) => `Finish or discard ${name} fir
 /** Wait for the server this long at most before starting without its answer. */
 const REMOTE_CHECK_MS = 4000;
 const UPLOAD_BEFORE_START_MS = 8000;
-/** The rest can never be adjusted to end sooner than this from now. */
-const MIN_REST_LEFT_MS = 1000;
-
-/** The rest countdown of the workout in progress. Kept here so it survives leaving the logging screen. */
-/** totalS is the rest length the ring counts against: the start length, plus every +15 s. */
-export type Rest = { logId: string; endsAt: number; totalS: number };
 
 export type ActiveLog = {
   /** The stored log: in progress, or finished and still uploading. Null when there is none. */
@@ -114,6 +100,11 @@ export type ActiveLog = {
    * Returns the stored log when this call completed the set, else null. Re-schedules the reminder like tick.
    */
   done: (setId: string, values: SetValues) => Promise<WorkoutLogDoc | null>;
+  /**
+   * An edit that ticks sets (Mark all, or a tick that picks a pick-one option first). True when it ticked at
+   * least one more set; re-schedules the reminder like tick.
+   */
+  markDone: (fn: (log: WorkoutLogDoc) => WorkoutLogDoc) => Promise<boolean>;
   /** True when finished (the shared rules refuse a log with no ticked set). */
   finish: () => Promise<boolean>;
   discard: () => Promise<void>;
@@ -122,13 +113,6 @@ export type ActiveLog = {
    * returns it. Throws an Error whose message is for the client (REOPEN_OFFLINE, REOPEN_REFUSED, ...).
    */
   reopen: (logId: string) => Promise<WorkoutLogDoc>;
-  rest: Rest | null;
-  startRest: (logId: string, seconds: number) => void;
-  adjustRest: (deltaSeconds: number) => void;
-  /** Stops the countdown and its notification. */
-  skipRest: () => void;
-  /** The countdown reached zero (its notification has fired). */
-  endRest: () => void;
 };
 
 type Instance = { store: LogStore; sync: LogSync; reload: () => Promise<void> };
@@ -148,7 +132,6 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   coachName.current = session.removedFromWorkspace ?? session.workspace?.workspaceName ?? coachName.current;
   const current = useRef<Instance | null>(null);
   const starting = useRef<Promise<WorkoutLogDoc> | null>(null);
-  const restRef = useRef<Rest | null>(null);
   // What the screens were last shown, so a change made by the sync can be told apart (logChange).
   const shown = useRef<WorkoutLogDoc | null>(null);
   const [log, setLogState] = useState<WorkoutLogDoc | null>(null);
@@ -158,12 +141,6 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
   const [banner, setBanner] = useState<string | null>(null);
   const [finished, setFinished] = useState<FinishedNote | null>(null);
   const [finishedLog, setFinishedLog] = useState<WorkoutLogDoc | null>(null);
-  const [rest, setRestState] = useState<Rest | null>(null);
-
-  const setRest = useCallback((next: Rest | null) => {
-    restRef.current = next;
-    setRestState(next);
-  }, []);
   const setLog = useCallback((next: WorkoutLogDoc | null) => {
     shown.current = next;
     setLogState(next);
@@ -171,9 +148,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
 
   const clearNotifications = useCallback(() => {
     cancelReminder();
-    cancelRestEnd();
-    setRest(null);
-  }, [setRest]);
+  }, []);
 
   /** A log just stopped being in progress: forget its timers and remember a finished planned one for Today. */
   const ended = useCallback(
@@ -217,7 +192,6 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     setBanner(null);
     setFinished(null);
     setFinishedLog(null);
-    setRest(null);
     if (!userId) return;
 
     const store = createLogStore(AsyncStorage, userId);
@@ -298,13 +272,12 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     return () => {
       sub.remove();
       sync.stop();
-      // Signed out or another user: this user's reminder and rest alarm must not fire.
+      // Signed out or another user: this user's reminder must not fire.
       cancelReminder();
-      cancelRestEnd();
       if (current.current === me) current.current = null;
       starting.current = null;
     };
-  }, [userId, checkStale, setRest, setLog, ended, clearNotifications]);
+  }, [userId, checkStale, setLog, ended, clearNotifications]);
 
   // The coach link changed (removed, or another coach): send the log once to learn whether it can still be saved.
   const sessionLoading = session.loading;
@@ -406,6 +379,21 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     [op],
   );
 
+  const markDone = useCallback(
+    async (fn: (l: WorkoutLogDoc) => WorkoutLogDoc): Promise<boolean> => {
+      const result = { more: false };
+      await op((l) => {
+        const next = fn(l);
+        result.more = completedSetCount(next) > completedSetCount(l);
+        return next;
+      });
+      const l = current.current ? (await current.current.store.load())?.log : null;
+      if (result.more && l?.status === 'in_progress') scheduleReminder(l.name, l.id);
+      return result.more;
+    },
+    [op],
+  );
+
   const done = useCallback(
     async (setId: string, values: SetValues): Promise<WorkoutLogDoc | null> => {
       const result = { completed: false };
@@ -470,32 +458,6 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     return s.log;
   }, [setLog]);
 
-  const startRest = useCallback(
-    (logId: string, seconds: number) => {
-      setRest({ logId, endsAt: Date.now() + seconds * 1000, totalS: seconds });
-      scheduleRestEnd(seconds);
-    },
-    [setRest],
-  );
-
-  const adjustRest = useCallback(
-    (deltaSeconds: number) => {
-      const cur = restRef.current;
-      if (!cur) return;
-      const now = Date.now();
-      const endsAt = Math.max(now + MIN_REST_LEFT_MS, cur.endsAt + deltaSeconds * 1000);
-      setRest({ ...cur, endsAt, totalS: deltaSeconds > 0 ? cur.totalS + deltaSeconds : cur.totalS });
-      scheduleRestEnd((endsAt - now) / 1000);
-    },
-    [setRest],
-  );
-
-  const skipRest = useCallback(() => {
-    cancelRestEnd();
-    setRest(null);
-  }, [setRest]);
-  const endRest = useCallback(() => setRest(null), [setRest]);
-
   const finish = useCallback(() => end((l) => finishLog(l, nowIso()), 'completed'), [end]);
   const discard = useCallback(async () => {
     await end((l) => discardLog(l, nowIso()), 'discarded');
@@ -521,15 +483,11 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       op,
       tick,
       done,
+      markDone,
       finish,
       discard,
       finishedLog,
       reopen,
-      rest,
-      startRest,
-      adjustRest,
-      skipRest,
-      endRest,
     }),
     [
       log,
@@ -546,15 +504,11 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       op,
       tick,
       done,
+      markDone,
       finish,
       discard,
       finishedLog,
       reopen,
-      rest,
-      startRest,
-      adjustRest,
-      skipRest,
-      endRest,
     ],
   );
   return <ActiveLogContext.Provider value={value}>{children}</ActiveLogContext.Provider>;

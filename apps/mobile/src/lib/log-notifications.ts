@@ -1,18 +1,16 @@
 // Local notifications and haptics for logging. Local only: no push tokens, no server.
-//   * Rest end: fires when the rest countdown reaches zero. In the app it only plays the sound (the screen
-//     vibrates itself); in the background it shows as a normal notification.
 //   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick.
 // Fixed identifiers, so scheduling again replaces the earlier one and cancelling needs no stored id.
 // Every call swallows errors: a notification is never worth breaking the workout over.
 import { REMINDER_DELAY_MS } from '@caltracker/shared';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { Vibration } from 'react-native';
 
-const REST_ID = 'caltracker.rest-end';
+/** The rest alarm of earlier versions (there is no rest timer any more): cancelled at start-up, never scheduled. */
+const OLD_REST_ID = 'caltracker.rest-end';
 const REMINDER_ID = 'caltracker.reminder';
 
-export type NotificationData = { kind: 'rest' } | { kind: 'reminder'; logId: string };
+export type NotificationData = { kind: 'reminder'; logId: string };
 
 const warn = (what: string) => (e: unknown) =>
   console.warn(`[log-notifications] ${what}: ${e instanceof Error ? e.message : String(e)}`);
@@ -23,17 +21,10 @@ let handlerSet = false;
 export function initNotifications(): void {
   if (handlerSet) return;
   handlerSet = true;
+  cancel(OLD_REST_ID);
   Notifications.setNotificationHandler({
-    handleNotification: (n) => {
-      const rest = (n.request.content.data as Partial<NotificationData> | undefined)?.kind === 'rest';
-      return Promise.resolve({
-        // The rest sheet is already on screen, so only the sound plays.
-        shouldShowBanner: !rest,
-        shouldShowList: !rest,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      });
-    },
+    handleNotification: () =>
+      Promise.resolve({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
   });
 }
 
@@ -65,15 +56,6 @@ function cancel(identifier: string): void {
   Notifications.cancelScheduledNotificationAsync(identifier).catch(warn(`cancel ${identifier}`));
 }
 
-export function scheduleRestEnd(seconds: number): void {
-  const data: NotificationData = { kind: 'rest' };
-  schedule(REST_ID, seconds, { title: 'Rest is over', body: 'Time for your next set.', sound: true, data });
-}
-
-export function cancelRestEnd(): void {
-  cancel(REST_ID);
-}
-
 export function scheduleReminder(name: string, logId: string): void {
   const data: NotificationData = { kind: 'reminder', logId };
   schedule(REMINDER_ID, REMINDER_DELAY_MS / 1000, {
@@ -90,12 +72,6 @@ export function cancelReminder(): void {
 /** Light tap when a set is ticked. */
 export function tapHaptic(): void {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(warn('haptic'));
-}
-
-/** Rest over, with the app open: a buzz the client feels in a pocket or on a bench. */
-export function restOverHaptic(): void {
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(warn('haptic'));
-  Vibration.vibrate();
 }
 
 function reminderLogId(r: Notifications.NotificationResponse): string | null {
