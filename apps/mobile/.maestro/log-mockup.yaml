@@ -91,9 +91,14 @@ env:
     id: mark-all
 - extendedWaitUntil:
     visible:
+      id: superset-heading-0
+      text: 'Superset 1 · Round 4 of 4'
+    timeout: 5000
+- scrollUntilVisible:
+    element:
       id: tick-0-0-3
       text: 'checkbox, checked'
-    timeout: 5000
+    direction: DOWN
 - tapOn:
     id: page-done
 

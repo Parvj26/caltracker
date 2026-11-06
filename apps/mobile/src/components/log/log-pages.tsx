@@ -193,7 +193,6 @@ export function SupersetPage({ model, page, details, handlers }: Common & { mode
                 {round.restLine}
               </Text>
             ) : null}
-            {current ? <View style={[styles.rule, { borderRadius: radius.pill }]} /> : null}
           </View>
         );
       })}
@@ -217,7 +216,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   exHead: { flexDirection: 'row', alignItems: 'center' },
   roundHead: { borderTopWidth: 1, borderTopColor: palette.border },
-  rule: { height: 1, backgroundColor: palette.border },
   strip: { backgroundColor: palette.tape, color: palette.ink, overflow: 'hidden' },
   doing: { flexDirection: 'row', alignItems: 'center' },
   ink: { color: palette.ink },
