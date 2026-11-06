@@ -3,19 +3,29 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  MAX_CHOICE_OPTIONS,
+  MIN_CHOICE_OPTIONS,
   WorkoutDoc,
+  addChoice,
+  addChoiceOption,
   addDrop,
   addExerciseToSuperset,
   addRound,
+  addSection,
   addSet,
   addStraightBlock,
   addSuperset,
   moveBlock,
+  moveBlockToSection,
+  moveSection,
   removeBlock,
   removeExercise,
   removeRound,
+  removeSection,
+  renameSection,
   removeSet,
   replaceExercise,
+  sectionRuns,
   updateSet,
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
@@ -24,6 +34,8 @@ import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
 import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { AddSectionMenu } from './add-section-menu';
+import { SectionHeader } from './section-header';
 import { BlockEditor, type BlockActions } from './block-editor';
 import { ExercisePicker } from './exercise-picker';
 import styles from './builder.module.css';
@@ -43,6 +55,8 @@ type Props = {
 type Picker =
   | { kind: 'straight' }
   | { kind: 'superset' }
+  | { kind: 'choice' }
+  | { kind: 'addOption'; blockId: string }
   | { kind: 'addToSuperset'; blockId: string }
   | { kind: 'swap'; blockId: string; exId: string; name: string };
 
@@ -68,6 +82,11 @@ function issuesByKey(doc: WorkoutDoc, issues: readonly SaveIssue[]): Map<string,
     const [top, bi, , ei, , si] = path;
     if (top === 'name' || top === 'notes') {
       add(top, message);
+      continue;
+    }
+    if (top === 'sections') {
+      const section = typeof bi === 'number' ? doc.sections[bi] : undefined;
+      add(section ? `section:${section.id}` : 'general', message);
       continue;
     }
     const block = typeof bi === 'number' ? doc.blocks[bi] : undefined;
@@ -166,6 +185,10 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
           return addStraightBlock(d, ex, makeId);
         case 'superset':
           return exs.length >= 2 ? addSuperset(d, exs, makeId) : d;
+        case 'choice':
+          return exs.length >= MIN_CHOICE_OPTIONS ? addChoice(d, exs, makeId) : d;
+        case 'addOption':
+          return addChoiceOption(d, p.blockId, ex, makeId);
         case 'addToSuperset':
           return addExerciseToSuperset(d, p.blockId, ex, makeId);
         case 'swap':
@@ -175,6 +198,8 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
   }
 
   const actionsFor = (blockId: string, index: number): BlockActions => ({
+    onAddOption: () => setPicker({ kind: 'addOption', blockId }),
+    onMoveToSection: (sectionId) => setDoc((d) => moveBlockToSection(d, blockId, sectionId)),
     onMove: (delta) => setDoc((d) => moveBlock(d, blockId, index + delta)),
     onRemoveBlock: () => setDoc((d) => removeBlock(d, blockId)),
     onAddRound: () => setDoc((d) => addRound(d, blockId, makeId)),
@@ -199,6 +224,41 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
   });
 
+  // Headings and blocks in order. A section with no exercises yet still shows its heading, where it belongs.
+  const items = useMemo(() => {
+    type Item =
+      | { kind: 'section'; section: { id: string; name: string }; empty: boolean }
+      | { kind: 'block'; block: WorkoutDoc['blocks'][number]; index: number; canMoveUp: boolean; canMoveDown: boolean };
+    const out: Item[] = [];
+    const shown = new Set<string>();
+    const showEmptyThrough = (upTo: number) => {
+      doc.sections.forEach((sec, i) => {
+        if (i < upTo && !shown.has(sec.id) && !doc.blocks.some((b) => b.sectionId === sec.id)) {
+          shown.add(sec.id);
+          out.push({ kind: 'section', section: sec, empty: true });
+        }
+      });
+    };
+    for (const run of sectionRuns(doc.blocks, doc.sections)) {
+      if (run.section) {
+        showEmptyThrough(doc.sections.findIndex((x) => x.id === run.section!.id));
+        shown.add(run.section.id);
+        out.push({ kind: 'section', section: run.section, empty: false });
+      }
+      run.blockIndexes.forEach((bi, k) =>
+        out.push({
+          kind: 'block',
+          block: doc.blocks[bi]!,
+          index: bi,
+          canMoveUp: k > 0,
+          canMoveDown: k < run.blockIndexes.length - 1,
+        }),
+      );
+    }
+    showEmptyThrough(doc.sections.length);
+    return out;
+  }, [doc.blocks, doc.sections]);
+
   const pickerTitle =
     picker?.kind === 'straight'
       ? 'Add an exercise'
@@ -208,7 +268,11 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
           ? 'Add an exercise to the superset'
           : picker?.kind === 'swap'
             ? `Swap ${picker.name}`
-            : '';
+            : picker?.kind === 'choice'
+              ? 'Add a pick-one group'
+              : picker?.kind === 'addOption'
+                ? 'Add an option to the pick-one group'
+                : '';
 
   return (
     <div className={styles.builder}>
@@ -239,17 +303,33 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       </div>
 
       <div className={styles.blocks}>
-        {doc.blocks.map((b, i) => (
-          <BlockEditor
-            key={b.id}
-            block={b}
-            index={i}
-            count={doc.blocks.length}
-            units={units}
-            errors={errors}
-            actions={actionsFor(b.id, i)}
-          />
-        ))}
+        {items.map((item) =>
+          item.kind === 'section' ? (
+            <SectionHeader
+              key={`section-${item.section.id}`}
+              section={item.section}
+              index={doc.sections.findIndex((x) => x.id === item.section.id)}
+              count={doc.sections.length}
+              empty={item.empty}
+              errors={errors.get(`section:${item.section.id}`) ?? []}
+              onRename={(name) => setDoc((d) => renameSection(d, item.section.id, name))}
+              onMove={(delta) => setDoc((d) => moveSection(d, item.section.id, delta))}
+              onRemove={() => setDoc((d) => removeSection(d, item.section.id))}
+            />
+          ) : (
+            <BlockEditor
+              key={item.block.id}
+              block={item.block}
+              index={item.index}
+              canMoveUp={item.canMoveUp}
+              canMoveDown={item.canMoveDown}
+              sections={doc.sections}
+              units={units}
+              errors={errors}
+              actions={actionsFor(item.block.id, item.index)}
+            />
+          ),
+        )}
         {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
         {(errors.get('blocks') ?? []).map((m) => (
           <ErrorText key={m}>{m}</ErrorText>
@@ -263,6 +343,10 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
         <Button variant="secondary" onClick={() => setPicker({ kind: 'superset' })}>
           + Superset / circuit
         </Button>
+        <Button variant="secondary" onClick={() => setPicker({ kind: 'choice' })}>
+          + Pick one
+        </Button>
+        <AddSectionMenu full={doc.sections.length >= 10} onAdd={(name) => setDoc((d) => addSection(d, name, makeId))} />
       </div>
 
       <div className={styles.saveBar}>
@@ -280,7 +364,10 @@ export function WorkoutBuilder({ initial, units, mode, onSaved, isNew = false }:
       {picker ? (
         <ExercisePicker
           title={pickerTitle}
-          multiple={picker.kind === 'superset'}
+          multiple={picker.kind === 'superset' || picker.kind === 'choice'}
+          {...(picker.kind === 'choice'
+            ? { min: MIN_CHOICE_OPTIONS, max: MAX_CHOICE_OPTIONS, hint: 'Pick 2 to 5 exercises. The client does just one of them.' }
+            : {})}
           onPick={onPick}
           onClose={() => setPicker(null)}
         />

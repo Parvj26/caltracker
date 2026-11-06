@@ -11,12 +11,25 @@ type Props = {
   title: string;
   /** Pick several (a superset needs at least two) and confirm, instead of picking one. */
   multiple: boolean;
+  /** With `multiple`: how many must be picked (default 2) and the most that can be (default 10). */
+  min?: number;
+  max?: number;
+  /** With `multiple`: the line under the search box. */
+  hint?: string;
   onPick: (exercises: ExercisePick[]) => void;
   onClose: () => void;
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
+export function ExercisePicker({
+  title,
+  multiple,
+  min = 2,
+  max = 10,
+  hint = 'A superset needs 2 or more exercises. Search and tap each one.',
+  onPick,
+  onClose,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const resultsId = useId();
@@ -61,7 +74,9 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
       onPick([ex]);
       return;
     }
-    setSelected((cur) => (cur.some((s) => s.id === ex.id) ? cur.filter((s) => s.id !== ex.id) : [...cur, ex]));
+    setSelected((cur) =>
+      cur.some((s) => s.id === ex.id) ? cur.filter((s) => s.id !== ex.id) : cur.length >= max ? cur : [...cur, ex],
+    );
   }
 
   return (
@@ -80,7 +95,8 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
       </label>
       {multiple ? (
         <p id={hintId} className={styles.caption}>
-          A superset needs 2 or more exercises. Search and tap each one.
+          {hint}
+          {selected.length >= max ? ` You can pick at most ${max}.` : ''}
         </p>
       ) : null}
 
@@ -135,8 +151,8 @@ export function ExercisePicker({ title, multiple, onPick, onClose }: Props) {
           Cancel
         </Button>
         {multiple ? (
-          <Button disabled={selected.length < 2} onClick={() => onPick(selected)}>
-            {selected.length < 2 ? 'Pick at least 2 exercises' : `Add ${selected.length} exercises`}
+          <Button disabled={selected.length < min} onClick={() => onPick(selected)}>
+            {selected.length < min ? `Pick at least ${min} exercises` : `Add ${selected.length} exercises`}
           </Button>
         ) : null}
       </div>

@@ -43,6 +43,23 @@ export async function pickExercise(page: Page, buttonName: string, exercise: str
   await expect(dialog).toBeHidden();
 }
 
+const SECTION_PRESETS = ['Warm-Up', 'Core', 'Main', 'Finisher', 'Cool-down'];
+
+/** Adds a section at the end of the builder: a preset by its name, anything else through "Custom…". */
+export async function addSection(page: Page, name: string) {
+  await page.getByRole('button', { name: '+ Section', exact: true }).click();
+  const menu = page.getByRole('group', { name: 'Add a section', exact: true });
+  if (SECTION_PRESETS.includes(name)) {
+    await menu.getByRole('button', { name, exact: true }).click();
+  } else {
+    await menu.getByRole('button', { name: 'Custom…', exact: true }).click();
+    await menu.getByLabel('Custom section name').fill(name);
+    await menu.getByRole('button', { name: 'Add section', exact: true }).click();
+  }
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole('group', { name: `Section ${name}`, exact: true })).toBeVisible();
+}
+
 /** Builds and saves a 1-block workout through the UI: Barbell Squat, 3 sets of 8 at 60 (coach's units, kg by default). */
 export async function createWorkout(page: Page, name: string): Promise<void> {
   await page.goto('/workouts/new');
