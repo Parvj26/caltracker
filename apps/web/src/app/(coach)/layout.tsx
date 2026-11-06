@@ -6,6 +6,7 @@ import styles from './coach.module.css';
 
 // Programs arrives with the program builder (phase 2 Task 15); until then it 404s.
 const NAV = [
+  { href: '/home', label: 'Home', icon: 'home' },
   { href: '/clients', label: 'Clients', icon: 'clients' },
   { href: '/workouts', label: 'Workouts', icon: 'workouts' },
   { href: '/programs', label: 'Programs', icon: 'programs' },

@@ -167,7 +167,7 @@ test.describe('pounds round trip', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/clients$/);
+    await expect(page).toHaveURL(/\/home$/);
     await page.goto('/workouts/new');
     await page.getByLabel('Workout name').fill(name);
     await pickExercise(page, '+ Exercise', 'Barbell Squat');
