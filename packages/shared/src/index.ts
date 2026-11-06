@@ -108,7 +108,7 @@ export {
   WorkoutLogDoc,
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
-export { emptyLog, prefillActuals, startLogFromWorkout } from './logs/start';
+export { emptyLog, startLogFromWorkout } from './logs/start';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
 export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
 export {
@@ -116,20 +116,36 @@ export {
   addLogExercise,
   addLogSet,
   completeSet,
+  completeSetWith,
+  dropParentId,
   discardLog,
   finishLog,
   removeLogExercise,
   reopenLog,
   removeLogSet,
   setExerciseNote,
+  stepActual,
   swapLogExercise,
   toggleSet,
   uncompleteSet,
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
-export { formatLastResult, formatLogDuration, formatLogSetTarget, formatLogVolume } from './logs/format';
+export {
+  coachLine,
+  formatLastResult,
+  formatLogDuration,
+  formatLogSetTarget,
+  formatLogVolume,
+  formatResult,
+  planSummary,
+  stepName,
+} from './logs/format';
+export { stepSetValue } from './logs/steppers';
+export type { StepField } from './logs/steppers';
 export type { ResultSet } from './logs/format';
+export { EMPTY_VALUES, lastTimeFor, resolveSetValues, valuesToPatch } from './logs/prefill';
+export type { SetValues } from './logs/prefill';
 export {
   AUTO_FINISH_IDLE_MS,
   REMINDER_DELAY_MS,
@@ -165,6 +181,8 @@ export type {
   WorkoutStatus,
 } from './coach-home/home';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
+export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from './logs/flow';
+export type { AfterDone, Step, StepKind } from './logs/flow';
 export {
   BIO_MAX_LENGTH,
   BUSINESS_NAME_MAX_LENGTH,

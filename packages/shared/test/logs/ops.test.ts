@@ -4,9 +4,12 @@ import {
   addLogExercise,
   addLogSet,
   completeSet,
+  completeSetWith,
+  dropParentId,
   removeLogExercise,
   removeLogSet,
   setExerciseNote,
+  stepActual,
   swapLogExercise,
   uncompleteSet,
   updateActual,
@@ -61,7 +64,7 @@ describe('log ops', () => {
     expect(out.lastActivityAt).toBe(log.lastActivityAt);
   });
 
-  it('addLogSet appends a normal set copying the last non-drop target and actuals', () => {
+  it('addLogSet copies the target, not the actuals', () => {
     const log = fresh();
     const out = addLogSet(log, straight(log).id, makeId, T1);
     const sets = straight(out).sets;
@@ -71,11 +74,41 @@ describe('log ops', () => {
     expect(added).toMatchObject({
       setType: 'normal',
       target: lastNormal.target,
-      actualReps: lastNormal.actualReps,
-      actualWeightKg: lastNormal.actualWeightKg,
+      actualReps: null,
+      actualWeightKg: null,
+      actualDurationS: null,
+      actualDistanceM: null,
       completedAt: null,
     });
     expect(added.id).not.toBe(lastNormal.id);
+  });
+
+  it('completeSetWith fills empty actuals and completes', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const out = completeSetWith(log, id, { reps: 10, weightKg: 60, durationS: null, distanceM: null }, T1);
+    const s = straight(out).sets[1]!;
+    expect([s.actualReps, s.actualWeightKg, s.completedAt]).toEqual([10, 60, T1]);
+    expect(out.revision).toBe(log.revision + 1);
+    expect(out.lastActivityAt).toBe(T1);
+  });
+
+  it('completeSetWith keeps a typed value', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const typed = updateActual(log, id, { actualWeightKg: 55 });
+    const out = completeSetWith(typed, id, { reps: 10, weightKg: 60, durationS: null, distanceM: null }, T1);
+    const s = straight(out).sets[1]!;
+    expect([s.actualReps, s.actualWeightKg]).toEqual([10, 55]);
+  });
+
+  it('completeSetWith refuses an already completed set and an unknown set', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const done = completeSet(log, id, T1);
+    const v = { reps: 1, weightKg: 1, durationS: null, distanceM: null };
+    expect(completeSetWith(done, id, v, T2)).toBe(done);
+    expect(completeSetWith(log, uuid(), v, T1)).toBe(log);
   });
 
   it('addLogDrop twice after set 2 orders [n1, n2, d, d, n3]', () => {
@@ -199,5 +232,52 @@ describe('log ops', () => {
       setExerciseNote(log, ex.id, 'n', T1),
     ];
     for (const o of outputs) expect(WorkoutLogDoc.safeParse(o).success).toBe(true);
+  });
+});
+
+describe('dropParentId', () => {
+  it('is the set itself for a warm-up or working set', () => {
+    const ex = straight(fresh());
+    expect(dropParentId(ex, 0)).toBe(ex.sets[0]!.id);
+    expect(dropParentId(ex, 3)).toBe(ex.sets[3]!.id);
+  });
+
+  it('walks up from a drop (or a later drop) to its main set', () => {
+    const log = fresh();
+    const ex = straight(log);
+    expect(dropParentId(ex, 4)).toBe(ex.sets[3]!.id);
+    const twice = straight(addLogDrop(log, ex.id, ex.sets[3]!.id, makeId, T1));
+    expect(dropParentId(twice, 5)).toBe(twice.sets[3]!.id);
+  });
+
+  it('is null for an index that is not there', () => {
+    expect(dropParentId(straight(fresh()), 9)).toBeNull();
+  });
+});
+
+describe('stepActual', () => {
+  it('steps from the stored value, so fast presses all count', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    // Two presses queued from the same screen (both saw 8 reps shown, nothing stored yet).
+    const once = stepActual(log, id, 'reps', 1, 'kg', 8);
+    const twice = stepActual(once, id, 'reps', 1, 'kg', 8);
+    expect(straight(once).sets[1]!.actualReps).toBe(9);
+    expect(straight(twice).sets[1]!.actualReps).toBe(10);
+  });
+
+  it('starts from the shown pre-fill when nothing is stored', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    const out = stepActual(log, id, 'weight', -1, 'kg', 60);
+    expect(straight(out).sets[1]!.actualWeightKg).toBe(57.5);
+    expect(out.revision).toBe(log.revision + 1);
+  });
+
+  it('leaves the log alone when the press changes nothing or the set is gone', () => {
+    const log = fresh();
+    const id = straight(log).sets[1]!.id;
+    expect(stepActual(log, id, 'reps', -1, 'kg', null)).toBe(log);
+    expect(stepActual(log, 'missing', 'reps', 1, 'kg', 8)).toBe(log);
   });
 });

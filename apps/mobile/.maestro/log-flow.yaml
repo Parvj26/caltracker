@@ -1,0 +1,185 @@
+# The one-exercise-at-a-time logging screen on a mixed workout ("E2E Mixed"):
+#   page 1 Barbell Squat: a warm-up (20 kg × 10) then 2 × 8 @ 60 kg; + on the weight carries to the next set;
+#   page 2 superset Pullups (A1, no rest) + Pushups (A2, 1:00 rest);
+#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second with drops of 7.5 kg and 5 kg.
+# Done's label says what comes next; the rest panel shows after Done and is skipped; finishing pages auto-advance.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today-mixed, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Mixed'
+    timeout: 20000
+- tapOn: 'Start'
+- extendedWaitUntil:
+    visible:
+      id: done-0
+    timeout: 20000
+
+# ---- Page 1: warm-up, then a + that carries forward ----
+- assertVisible:
+    id: log-pill
+    text: '.*1 of 3.*'
+- assertVisible:
+    id: step-name-0
+    text: 'Warm-up 1 of 1'
+# 20 kg in this client's pounds.
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '44'
+- assertVisible:
+    id: done-0
+    text: 'Done · start rest 1:00'
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- tapOn:
+    id: rest-skip
+- assertVisible:
+    id: step-name-0
+    text: 'Set 1 of 2'
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '132'
+- tapOn:
+    id: stepper-weight-plus-0
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '137'
+- takeScreenshot: log-set
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- takeScreenshot: log-rest
+- tapOn:
+    id: rest-skip
+# Set 2 starts from what set 1 actually lifted.
+- assertVisible:
+    id: step-name-0
+    text: 'Set 2 of 2'
+- assertVisible:
+    id: stepper-weight-value-0
+    text: '137'
+# Other pages are still open, so the last set still rests; finishing the page moves on to the superset.
+- assertVisible:
+    id: done-0
+    text: 'Done · start rest 1:30'
+- tapOn:
+    id: done-0
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- tapOn:
+    id: rest-skip
+
+# ---- Page 2: superset ----
+- extendedWaitUntil:
+    visible:
+      id: done-1
+    timeout: 10000
+- assertVisible:
+    id: log-pill
+    text: '.*2 of 3.*'
+- assertVisible:
+    id: superset-header-1
+    text: 'SUPERSET · Round 1 of 2.*'
+- assertVisible:
+    id: done-1
+    text: 'Done · straight to A2'
+- takeScreenshot: log-superset
+- tapOn:
+    id: done-1
+- assertNotVisible:
+    id: rest-panel
+- assertVisible:
+    id: done-1
+    text: 'Done round 1 · rest 1:00'
+- tapOn:
+    id: done-1
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- tapOn:
+    id: rest-skip
+# Round 2 can wait: swipe on to the curls.
+- swipe:
+    direction: LEFT
+- extendedWaitUntil:
+    visible:
+      id: done-2
+    timeout: 10000
+- assertVisible:
+    id: log-pill
+    text: '.*3 of 3.*'
+
+# ---- Page 3: a set with drops ----
+- tapOn:
+    id: done-2
+- extendedWaitUntil:
+    visible:
+      id: rest-panel
+    timeout: 10000
+- tapOn:
+    id: rest-skip
+- assertVisible:
+    id: done-2
+    text: 'Done · straight to drop 1'
+- tapOn:
+    id: done-2
+- assertNotVisible:
+    id: rest-panel
+- assertVisible:
+    id: step-name-2
+    text: 'Drop 1 of 2'
+# 7.5 kg in pounds.
+- assertVisible:
+    id: stepper-weight-value-2
+    text: '17'
+- takeScreenshot: log-drop
+- tapOn:
+    id: add-drop-2
+- extendedWaitUntil:
+    visible:
+      id: step-name-2
+      text: 'Drop 1 of 3'
+    timeout: 10000
+
+# ---- Finish with sets left: asked, then the summary ----
+- tapOn:
+    id: finish-workout
+- extendedWaitUntil:
+    visible: 'Finish with .* sets not done\? They won’t count\.'
+    timeout: 10000
+- tapOn: 'Finish'
+- extendedWaitUntil:
+    visible: '.* sets completed'
+    timeout: 10000
+- assertVisible: 'E2E Mixed'
+- tapOn:
+    id: summary-done
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

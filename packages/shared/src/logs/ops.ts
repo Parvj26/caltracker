@@ -1,7 +1,10 @@
 import type { ExercisePick } from '../workouts/doc-ops';
 import { TARGET_FIELDS } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
+import type { SetValues } from './prefill';
+import { stepSetValue, type StepField } from './steppers';
 import { canReopen } from './summary';
+import type { Units } from '../units/units';
 
 const DEFAULT_SETS = 3;
 const MAX_SETS = 30;
@@ -73,6 +76,31 @@ export function completeSet(log: WorkoutLogDoc, setId: string, nowIso: string): 
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
 }
 
+/** Fills only the actuals that are null from `values`, then completes the set. Same object back if the set is unknown or already completed. Bumps revision and lastActivityAt like completeSet. */
+export function completeSetWith(
+  log: WorkoutLogDoc,
+  setId: string,
+  values: SetValues,
+  nowIso: string,
+): WorkoutLogDoc {
+  let skip = false;
+  const r = mapSet(log, setId, (s) => {
+    if (s.completedAt !== null) {
+      skip = true;
+      return s;
+    }
+    return {
+      ...s,
+      actualReps: s.actualReps ?? values.reps,
+      actualWeightKg: s.actualWeightKg ?? values.weightKg,
+      actualDurationS: s.actualDurationS ?? values.durationS,
+      actualDistanceM: s.actualDistanceM ?? values.distanceM,
+      completedAt: nowIso,
+    };
+  });
+  return r.found && !skip ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
+}
+
 export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string): WorkoutLogDoc {
   const r = mapSet(log, setId, (s) => ({ ...s, completedAt: null }));
   return r.found ? { ...r.log, lastActivityAt: nowIso, revision: log.revision + 1 } : log;
@@ -82,6 +110,42 @@ export function uncompleteSet(log: WorkoutLogDoc, setId: string, nowIso: string)
 export function updateActual(log: WorkoutLogDoc, setId: string, patch: ActualPatch): WorkoutLogDoc {
   const r = mapSet(log, setId, (s) => ({ ...s, ...patch }));
   return r.found ? { ...r.log, revision: log.revision + 1 } : log;
+}
+
+const ACTUAL_KEY: Record<StepField, keyof ActualPatch> = {
+  weight: 'actualWeightKg',
+  reps: 'actualReps',
+  duration: 'actualDurationS',
+  distance: 'actualDistanceM',
+};
+
+/**
+ * One − or + press on a set's number, worked out from the value stored at the time the edit runs (or `shown`, the
+ * pre-filled number on screen, when nothing is stored yet). Run inside the queued edit, so fast presses all count.
+ * Returns the same doc when the press changes nothing or the set is gone.
+ */
+export function stepActual(
+  log: WorkoutLogDoc,
+  setId: string,
+  field: StepField,
+  direction: 1 | -1,
+  units: Units,
+  shown: number | null,
+): WorkoutLogDoc {
+  const key = ACTUAL_KEY[field];
+  const set = log.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets)).find((s) => s.id === setId);
+  if (!set) return log;
+  const from = set[key] ?? shown;
+  const next = stepSetValue(field, from, direction, units);
+  if (next === set[key]) return log;
+  return updateActual(log, setId, { [key]: next });
+}
+
+/** The set a drop hangs from: the set itself, or for a drop the nearest warm-up / working set above it. */
+export function dropParentId(ex: LogExerciseDoc, setIndex: number): string | null {
+  let i = setIndex;
+  while (i > 0 && ex.sets[i]?.setType === 'drop') i -= 1;
+  return ex.sets[i]?.id ?? null;
 }
 
 export function addLogSet(
@@ -100,10 +164,10 @@ export function addLogSet(
         id: makeId(),
         setType: 'normal',
         target: last ? { ...last.target } : emptyTarget(null),
-        actualReps: last?.actualReps ?? null,
-        actualWeightKg: last?.actualWeightKg ?? null,
-        actualDurationS: last?.actualDurationS ?? null,
-        actualDistanceM: last?.actualDistanceM ?? null,
+        actualReps: null,
+        actualWeightKg: null,
+        actualDurationS: null,
+        actualDistanceM: null,
         completedAt: null,
       };
       return { ...ex, sets: [...ex.sets, fresh] };

@@ -7,7 +7,7 @@ import { exerciseThumbSize, palette, pressedOpacity, space } from '@/theme/theme
 import { useTheme } from '@/theme/use-theme';
 
 /** A neutral dumbbell for exercises with no photo (custom exercises). */
-function PlaceholderIcon() {
+export function PlaceholderIcon() {
   return (
     <View style={styles.dumbbell} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={[styles.plate, styles.plateSmall]} />
