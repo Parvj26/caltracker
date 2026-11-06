@@ -736,6 +736,18 @@ export type Database = {
           },
         ]
       }
+      program_live_sync_queue: {
+        Row: {
+          program_id: string
+        }
+        Insert: {
+          program_id: string
+        }
+        Update: {
+          program_id?: string
+        }
+        Relationships: []
+      }
       program_workouts: {
         Row: {
           created_at: string
@@ -793,6 +805,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          live_sync: boolean
+          live_sync_skipped: number
+          live_synced_at: string | null
           name: string
           updated_at: string
           weeks: number
@@ -803,6 +818,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name: string
           updated_at?: string
           weeks?: number
@@ -813,6 +831,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name?: string
           updated_at?: string
           weeks?: number
@@ -1221,10 +1242,13 @@ export type Database = {
           client_id: string | null
           created_at: string
           created_by: string | null
+          customised_at: string | null
           id: string
           name: string
           notes: string | null
+          revision: number
           scheduled_on: string | null
+          source_revision: number | null
           source_workout_id: string | null
           updated_at: string
           workspace_id: string
@@ -1234,10 +1258,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name: string
           notes?: string | null
+          revision?: number
           scheduled_on?: string | null
+          source_revision?: number | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -1247,10 +1274,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name?: string
           notes?: string | null
+          revision?: number
           scheduled_on?: string | null
+          source_revision?: number | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1362,6 +1392,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      client_today: { Args: { p_client: string }; Returns: string }
       copy_program_week: {
         Args: {
           p_from: number
@@ -1469,6 +1500,7 @@ export type Database = {
           set_type: Database["public"]["Enums"]["set_type"]
         }[]
       }
+      live_sync_program: { Args: { p_program_id: string }; Returns: number }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
@@ -1485,6 +1517,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
       recent_exercises_for_client: {
         Args: { p_limit?: number }
         Returns: {
