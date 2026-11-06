@@ -84,10 +84,20 @@ export function blockSteps(block: LogBlockDoc): Step[] {
   return steps;
 }
 
-/** The longest planned rest among a superset round's main sets (0 when none): what Done waits after the round. */
+/**
+ * What Done waits after a superset round: the longest planned rest among the round's main sets. Supersets may be
+ * uneven, and the builder puts the round rest only on the last exercise, so a round the last exercise doesn't reach
+ * (e.g. A has 4 sets, B has 3) would have no rest at all. When such a round has no rest of its own, it uses the
+ * block's round rest: the last exercise's rest for its last round. 0 when the round doesn't exist.
+ */
 export function roundRestSeconds(block: LogBlockDoc, round: number): number {
-  const mains = liveExercises(block).flatMap(({ exerciseIndex }) => exerciseGroups(block, exerciseIndex)[round - 1]?.slice(0, 1) ?? []);
-  return Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+  const groups = liveExercises(block).map(({ exerciseIndex }) => exerciseGroups(block, exerciseIndex));
+  const mains = groups.flatMap((g) => g[round - 1]?.slice(0, 1) ?? []);
+  const own = Math.max(0, ...mains.map((m) => setOf(block, m).target.restSeconds ?? 0));
+  const lastGroups = groups[groups.length - 1] ?? [];
+  if (own > 0 || mains.length === 0 || lastGroups[round - 1]) return own;
+  const blockRest = lastGroups[lastGroups.length - 1]?.[0];
+  return blockRest ? (setOf(block, blockRest).target.restSeconds ?? 0) : 0;
 }
 
 export function blockRoundCount(block: LogBlockDoc): number {
