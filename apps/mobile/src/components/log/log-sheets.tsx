@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { FEELINGS, type Feeling } from '@caltracker/shared';
 import { Button, TextButton, TextField } from '@/components/ui';
-import type { FinishModel } from '@/lib/log-flow-model';
+import type { FinishModel, SubstituteCard } from '@/lib/log-flow-model';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -39,6 +39,58 @@ export function InfoSheet({
             </Text>
           ))}
           <Button testID={`${testID}-ok`} title="OK" variant="secondary" onPress={onClose} />
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+/** "Which one are you doing?": the planned exercise or the coach's substitute. Tapping a card chooses it. */
+export function SubstituteSheet({
+  context,
+  cards,
+  onChoose,
+  onClose,
+}: {
+  /** "Resistance Training · Superset 3"; null hides the sheet. */
+  context: string | null;
+  cards: SubstituteCard[];
+  onChoose: (substituteId: string | null) => void;
+  onClose: () => void;
+}) {
+  const { text, space, radius } = useTheme();
+  return (
+    <Modal visible={context !== null} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+      <SafeAreaView edges={['bottom']} style={[styles.sheet, { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }]}>
+        <View testID="substitute-sheet" accessibilityViewIsModal style={[styles.column, { gap: space[3], padding: space[4.5] }]}>
+          <Text style={text('caption')}>{context ?? ''}</Text>
+          <Text style={text('screenTitle')} accessibilityRole="header">
+            Which one are you doing?
+          </Text>
+          <Text style={text('body')}>Your coach added a substitute for when the machine is taken.</Text>
+          {cards.map((c, i) => (
+            <Pressable
+              key={c.substituteId ?? 'planned'}
+              testID={c.substituteId === null ? 'sub-option-planned' : `sub-option-${i}`}
+              onPress={() => (c.chosen ? onClose() : onChoose(c.substituteId))}
+              accessibilityRole="button"
+              accessibilityState={{ selected: c.chosen }}
+              accessibilityLabel={`${c.kind}: ${c.name}, ${c.summary}${c.chosen ? '. Doing this one' : ''}`}
+              style={({ pressed }) => [
+                styles.card,
+                { borderRadius: radius.card, padding: space[3], gap: space[1] / 2 },
+                c.chosen && styles.cardChosen,
+                pressed && { opacity: pressedOpacity },
+              ]}
+            >
+              <Text style={[text('caption'), styles.ink]}>{c.chosen ? `${c.kind} · doing this one` : c.kind}</Text>
+              <Text style={[text('sectionHeading'), styles.ink]}>{`${c.name}${c.chosen ? '' : '  ›'}`}</Text>
+              <Text style={[text('caption'), styles.ink]}>{c.summary}</Text>
+            </Pressable>
+          ))}
+          <Text style={text('caption')}>Your coach will see which one you did.</Text>
+          <TextButton testID="substitute-cancel" title="Cancel" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>
@@ -158,5 +210,7 @@ const styles = StyleSheet.create({
   ink: { color: palette.ink },
   onInk: { color: palette.bg },
   actions: { flexDirection: 'row' },
+  card: { minHeight: tapTarget.logging, backgroundColor: palette.surface },
+  cardChosen: { backgroundColor: palette.lime },
   flex: { flex: 1 },
 });

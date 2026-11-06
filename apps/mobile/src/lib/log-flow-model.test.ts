@@ -1,5 +1,7 @@
 import {
   WorkoutDoc,
+  addSubstitute,
+  chooseSubstitute,
   completeSet,
   completeSetWith,
   emptyLog,
@@ -27,6 +29,8 @@ import {
   resumePlace,
   setRows,
   startGroups,
+  substituteCards,
+  substituteOf,
   supersetRounds,
   typedPatch,
 } from './log-flow-model';
@@ -63,7 +67,7 @@ const exercise = (name: string, sets: unknown[], trackingType = 'weight_reps') =
  * + Curl 3 sets (uneven), straight Pushdown with a warm-up, a drop and a to-failure set]; Finisher [pick one of Slam /
  * Farmers Walk / Throw].
  */
-function mockLog(): WorkoutLogDoc {
+function mockWorkout(): WorkoutDoc {
   const warm = uuid();
   const main = uuid();
   const fin = uuid();
@@ -113,7 +117,17 @@ function mockLog(): WorkoutLogDoc {
       },
     ],
   });
-  return startLogFromWorkout(workout, uuid, NOW);
+  return workout;
+}
+
+const mockLog = (): WorkoutLogDoc => startLogFromWorkout(mockWorkout(), uuid, NOW);
+
+/** The mock-up's Lat Pulldown with its coach-added substitute, as the second exercise of the superset. */
+function substituteLog(): WorkoutLogDoc {
+  const w = mockWorkout();
+  const block = w.blocks[1];
+  const withSub = addSubstitute(w, block.id, block.exercises[0].id, { id: uuid(), name: 'Machine Assisted Pull Up', trackingType: 'weight_reps' }, uuid);
+  return startLogFromWorkout(withSub, uuid, NOW);
 }
 
 const values = { reps: 10, weightKg: 20, durationS: null, distanceM: null };
@@ -376,5 +390,37 @@ describe('typedPatch', () => {
     expect(typedPatch('reps', null, 'kg')).toEqual({ actualReps: null });
     expect(typedPatch('distance', 2, 'kg')).toEqual({ actualDistanceM: 2000 });
     expect(typedPatch('duration', 45, 'kg')).toEqual({ actualDurationS: 45 });
+  });
+});
+
+describe('coach-added substitutes', () => {
+  it('shows "or: X" on the start page and the switch strip until a set is ticked', () => {
+    let log = substituteLog();
+    const sections = buildSections(log);
+    const groups = startGroups(log, sections[1], 'lb');
+    expect(groups[0].kind === 'superset' && groups[0].items[0].substitute).toBe('or: Machine Assisted Pull Up');
+    const bench = log.blocks[1].exercises[0];
+    expect(substituteOf(bench)).toEqual({ otherNames: 'Machine Assisted Pull Up', doingInsteadOf: null, locked: false });
+    const page = buildPage(log, sections[1].pages[0], 'lb', {});
+    expect(page.kind === 'superset' && page.exercises[0].substitute?.locked).toBe(false);
+    log = completeSet(log, bench.sets[0].id, NOW);
+    expect(substituteOf(log.blocks[1].exercises[0])!.locked).toBe(true);
+  });
+
+  it('lists Planned and Substitute cards, and after choosing shows the substitute with its planned name', () => {
+    let log = substituteLog();
+    const ex = () => log.blocks[1].exercises[0];
+    const cards = substituteCards(ex(), 'lb');
+    expect(cards.map((c) => [c.kind, c.name, c.chosen])).toEqual([
+      ['Planned', 'Dumbbell Bench Press', true],
+      ['Substitute', 'Machine Assisted Pull Up', false],
+    ]);
+    expect(cards[1].summary).toBe('35 lb × 12, 45 lb × 12, 35 lb × 12, 35 lb × 12');
+    log = chooseSubstitute(log, ex().id, cards[1].substituteId, uuid, NOW);
+    expect(ex().exerciseName).toBe('Machine Assisted Pull Up');
+    expect(substituteOf(ex())).toEqual({ otherNames: 'Dumbbell Bench Press', doingInsteadOf: 'Dumbbell Bench Press', locked: false });
+    log = completeSet(log, ex().sets[0].id, NOW);
+    expect(planChanges(log, () => null)).toEqual(['⇄ Did Machine Assisted Pull Up instead of Dumbbell Bench Press']);
+    expect(LogSchema.safeParse(log).success).toBe(true);
   });
 });

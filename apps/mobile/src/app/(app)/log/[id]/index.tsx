@@ -21,6 +21,7 @@ import {
   addLogDrop,
   addLogExercise,
   addLogSet,
+  chooseSubstitute,
   completeSetWith,
   completedSetCount,
   composeFinishNotes,
@@ -43,7 +44,7 @@ import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExercisePicker } from '@/components/log/exercise-picker';
 import { OptionPage, StraightPage, SupersetPage, type PageHandlers } from '@/components/log/log-pages';
-import { FinishSheet, InfoSheet } from '@/components/log/log-sheets';
+import { FinishSheet, InfoSheet, SubstituteSheet } from '@/components/log/log-sheets';
 import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
@@ -64,6 +65,8 @@ import {
   placeAfterChange,
   resumePlace,
   startGroups,
+  substituteCards,
+  substituteOf,
   typedPatch,
   type ExerciseModel,
   type FlowPage,
@@ -175,6 +178,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const [infoFor, setInfoFor] = useState<{ name: string; exerciseId: string } | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
   const [menuFor, setMenuFor] = useState<LogExerciseDoc | null>(null);
+  const [subFor, setSubFor] = useState<LogExerciseDoc | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [last, setLast] = useState<LastResults>({});
@@ -305,9 +309,17 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       const doc = exerciseDoc(ex.logExerciseId);
       if (doc) setNoteFor(doc);
     },
+    // ⇄: the coach's substitute when there is one still to choose, else any exercise from the library.
     onSwap: (ex) => {
       const doc = exerciseDoc(ex.logExerciseId);
-      if (doc) setPicker({ mode: 'swap', ex: doc });
+      if (!doc) return;
+      const sub = substituteOf(doc);
+      if (sub && !sub.locked) setSubFor(doc);
+      else setPicker({ mode: 'swap', ex: doc });
+    },
+    onSubstitute: (ex) => {
+      const doc = exerciseDoc(ex.logExerciseId);
+      if (doc && substituteOf(doc)?.locked === false) setSubFor(doc);
     },
     onMore: (ex) => {
       const doc = exerciseDoc(ex.logExerciseId);
@@ -357,6 +369,15 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     });
   };
 
+  /** "Resistance Training · Superset 3" over the substitute sheet. */
+  const subContext = (ex: LogExerciseDoc): string => {
+    for (const s of sections) {
+      const page = s.pages.find((p) => log.blocks[p.blockIndex]?.exercises.some((e) => e.id === ex.id));
+      if (page) return page.kind === 'superset' ? `${s.title} · Superset ${page.number}` : s.title;
+    }
+    return log.name;
+  };
+
   // ---- Finish and discard ----
   const discardNow = () => void discard().then(back);
   const confirmDiscard = () =>
@@ -402,6 +423,16 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onClose={() => setNoteFor(null)}
       />
       <InfoSheet title={info?.title ?? null} lines={info?.lines ?? []} testID={info?.testID ?? 'info-sheet'} onClose={() => setInfo(null)} />
+      <SubstituteSheet
+        context={subFor ? subContext(subFor) : null}
+        cards={subFor ? substituteCards(subFor, units) : []}
+        onChoose={(substituteId) => {
+          const ex = subFor;
+          setSubFor(null);
+          if (ex) void op((l) => chooseSubstitute(l, ex.id, substituteId, randomUUID, nowIso()));
+        }}
+        onClose={() => setSubFor(null)}
+      />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
       <FinishSheet
         visible={finishOpen}

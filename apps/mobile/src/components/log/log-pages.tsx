@@ -1,6 +1,7 @@
 // The pages inside a section: a straight exercise, a superset (round by round) and a pick-one option.
 // They only draw the page model (log-flow-model.ts); every edit goes back to the screen through the handlers.
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { tapTarget } from '@caltracker/design-tokens';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import type { ExerciseModel, OptionPageModel, RowModel, StraightPageModel, SupersetPageModel } from '@/lib/log-flow-model';
 import { palette } from '@/theme/theme';
@@ -15,6 +16,8 @@ export type PageHandlers = {
   onHistory: (ex: ExerciseModel) => void;
   onMessage: (ex: ExerciseModel) => void;
   onSwap: (ex: ExerciseModel) => void;
+  /** "Which one are you doing?": the planned exercise or the coach's substitute. */
+  onSubstitute: (ex: ExerciseModel) => void;
   onMore: (ex: ExerciseModel) => void;
 };
 
@@ -22,19 +25,37 @@ type Common = { page: number; details: Record<string, ExerciseDetail>; handlers:
 
 const keyOf = (page: number, ex: ExerciseModel) => `${page}-${ex.exerciseIndex}`;
 
-/** "Machine taken? Switch to X": shown on an exercise the coach added a substitute for. */
+/**
+ * The coach's substitute: "Machine taken? Switch to X" before choosing; "Doing the substitute (planned: Y) · Switch"
+ * after. Switching stays possible until a set is ticked.
+ */
 function SubstituteStrip({ ex, idKey, onPress }: { ex: ExerciseModel; idKey: string; onPress: () => void }) {
   const { text, space, radius } = useTheme();
-  if (!ex.substitute) return null;
+  const sub = ex.substitute;
+  if (!sub || (sub.locked && sub.doingInsteadOf === null)) return null;
+  const box = [text('body'), styles.strip, { borderRadius: radius.input, padding: space[3] }];
+  if (sub.doingInsteadOf !== null) {
+    return (
+      <View testID={`substitute-doing-${idKey}`} style={[styles.doing, box]}>
+        <Text style={[text('body'), styles.ink, styles.flex]}>{`Doing the substitute (planned: ${sub.doingInsteadOf})`}</Text>
+        {sub.locked ? null : (
+          <Pressable
+            testID={`substitute-switch-${idKey}`}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel="Switch exercise"
+            style={styles.switch}
+          >
+            <Text style={[text('sectionHeading'), styles.link]}>Switch</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
   return (
-    <Text
-      testID={`substitute-strip-${idKey}`}
-      onPress={onPress}
-      accessibilityRole="button"
-      style={[text('body'), styles.strip, { borderRadius: radius.input, padding: space[3] }]}
-    >
+    <Text testID={`substitute-strip-${idKey}`} onPress={onPress} accessibilityRole="button" style={box}>
       <Text style={styles.bold}>Machine taken?</Text>
-      {` Switch to ${ex.substitute.name} ›`}
+      {` Switch to ${sub.otherNames} ›`}
     </Text>
   );
 }
@@ -78,13 +99,13 @@ function SingleExercise({
       <ExerciseTools
         idKey={idKey}
         name={ex.name}
-        hasSubstitute={ex.substitute !== null}
+        hasSubstitute={ex.substitute !== null && !ex.substitute.locked}
         onHistory={() => handlers.onHistory(ex)}
         onMessage={() => handlers.onMessage(ex)}
         onSwap={() => handlers.onSwap(ex)}
         onMore={() => handlers.onMore(ex)}
       />
-      <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSwap(ex)} />
+      <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} />
       <SetTable rows={rows} idKey={idKey} disabled={disabled} handlers={handlers.table(ex)} onAddSet={disabled ? null : () => handlers.onAddSet(ex)} />
     </View>
   );
@@ -148,7 +169,7 @@ export function SupersetPage({ model, page, details, handlers }: Common & { mode
                         <ExerciseTools
                           idKey={idKey}
                           name={ex.name}
-                          hasSubstitute={ex.substitute !== null}
+                          hasSubstitute={ex.substitute !== null && !ex.substitute.locked}
                           onHistory={() => handlers.onHistory(ex)}
                           onMessage={null}
                           onSwap={() => handlers.onSwap(ex)}
@@ -160,7 +181,7 @@ export function SupersetPage({ model, page, details, handlers }: Common & { mode
                     <Text style={text('body')}>{`${ex.label} · ${ex.name}`}</Text>
                   )}
                   {current ? <Notes ex={{ ...ex, restLine: null }} idKey={idKey} /> : null}
-                  {current ? <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSwap(ex)} /> : null}
+                  {current ? <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} /> : null}
                   {entry.rows.map((row) => (
                     <SetRowLine key={row.setId} row={row} idKey={idKey} unitBelow handlers={handlers.table(ex)} />
                   ))}
@@ -198,5 +219,9 @@ const styles = StyleSheet.create({
   roundHead: { borderTopWidth: 1, borderTopColor: palette.border },
   rule: { height: 1, backgroundColor: palette.border },
   strip: { backgroundColor: palette.tape, color: palette.ink, overflow: 'hidden' },
+  doing: { flexDirection: 'row', alignItems: 'center' },
+  ink: { color: palette.ink },
+  link: { color: palette.ink, textDecorationLine: 'underline' },
+  switch: { minWidth: tapTarget.min, minHeight: tapTarget.min, alignItems: 'flex-end', justifyContent: 'center' },
   pickedLine: { alignSelf: 'flex-start', backgroundColor: palette.lime, color: palette.ink, overflow: 'hidden' },
 });

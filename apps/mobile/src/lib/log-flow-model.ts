@@ -18,6 +18,10 @@ import {
   formatSetsSummary,
   fromMeters,
   groupDropSets,
+  isSubstituteLocked,
+  otherSubstituteOptions,
+  substituteChoices,
+  substitutedFrom,
   isBlockDone,
   isChoiceLocked,
   kgToInput,
@@ -40,7 +44,7 @@ import {
   type WorkoutLogDoc,
 } from '@caltracker/shared';
 import type { LastResultSet, LastResults } from './log-api';
-import { supersetLetters } from './workouts';
+import { orList, supersetLetters } from './workouts';
 
 // ---------------------------------------------------------------------------------------------------------------
 // Sections and pages
@@ -202,8 +206,8 @@ export type StartGroup =
   | { kind: 'choice'; key: string; items: StartItem[] };
 
 /** A log set as the plan's set, so the preview's one-line summary words it exactly the same. */
-const asPlanSet = (s: LogSetDoc) => ({
-  id: s.id,
+const asPlanSet = (s: Pick<LogSetDoc, 'setType' | 'target'>, i: number) => ({
+  id: String(i),
   setType: s.setType,
   targetRepsMin: s.target.repsMin,
   targetRepsMax: s.target.repsMax,
@@ -215,13 +219,48 @@ const asPlanSet = (s: LogSetDoc) => ({
   note: null,
 });
 
-/**
- * The substitute the coach added for an exercise, if any. The seam for substitutes: until the workout carries
- * them, there is none.
- */
-export function substituteOf(ex: LogExerciseDoc): { name: string } | null {
-  void ex;
-  return null;
+export type SubstituteModel = {
+  /** "Machine Assisted Pull Up" (or "A or B"): the options not being done now. */
+  otherNames: string;
+  /** The planned exercise's name while a substitute is being done, else null. */
+  doingInsteadOf: string | null;
+  /** A set is ticked: the choice can no longer change. */
+  locked: boolean;
+};
+
+/** The coach-added substitutes of an exercise, or null when it has none. */
+export function substituteOf(ex: LogExerciseDoc): SubstituteModel | null {
+  const others = otherSubstituteOptions(ex);
+  if (others.length === 0) return null;
+  return {
+    otherNames: orList(others.map((o) => o.exerciseName)),
+    doingInsteadOf: substitutedFrom(ex)?.exerciseName ?? null,
+    locked: isSubstituteLocked(ex),
+  };
+}
+
+export type SubstituteCard = {
+  substituteId: string | null;
+  /** "Planned" or "Substitute". */
+  kind: string;
+  name: string;
+  /** The option's planned sets in one line ("85 lb × 12, 115 lb × 12"). */
+  summary: string;
+  chosen: boolean;
+};
+
+/** The cards of the "Which one are you doing?" sheet: the planned exercise first, then the coach's substitutes. */
+export function substituteCards(ex: LogExerciseDoc, units: Units): SubstituteCard[] {
+  return substituteChoices(ex).map((c) => {
+    const option = ex.substituteOptions.find((o) => o.substituteId === c.substituteId)!;
+    return {
+      substituteId: c.substituteId,
+      kind: c.planned ? 'Planned' : 'Substitute',
+      name: c.exerciseName,
+      summary: formatSetsSummary(option.sets.map(asPlanSet), option.trackingType, units).text,
+      chosen: c.chosen,
+    };
+  });
 }
 
 function startItem(ex: LogExerciseDoc, units: Units): StartItem {
@@ -233,7 +272,7 @@ function startItem(ex: LogExerciseDoc, units: Units): StartItem {
     name: ex.exerciseName,
     summary: summary.text,
     count: `×${summary.count}`,
-    substitute: sub ? `or: ${sub.name}` : null,
+    substitute: sub ? `or: ${sub.otherNames}` : null,
     done: ex.sets.every((s) => s.completedAt !== null),
   };
 }
@@ -355,8 +394,8 @@ export type ExerciseModel = {
   label: string | null;
   note: string | null;
   restLine: string | null;
-  /** The coach's substitute for this exercise (see substituteOf). */
-  substitute: { name: string } | null;
+  /** The coach's substitutes for this exercise (see substituteOf). */
+  substitute: SubstituteModel | null;
   swappedFromExerciseId: string | null;
   lastTime: readonly LastResultSet[];
 };
@@ -574,7 +613,7 @@ export function planChanges(log: WorkoutLogDoc, nameOf: (exerciseId: string) => 
     }
     for (const { exercise: ex } of liveExercises(b)) {
       if (ex.swappedFromExerciseId === null) continue;
-      const planned = nameOf(ex.swappedFromExerciseId);
+      const planned = substitutedFrom(ex)?.exerciseName ?? nameOf(ex.swappedFromExerciseId);
       out.push(planned ? `⇄ Did ${ex.exerciseName} instead of ${planned}` : `⇄ Did ${ex.exerciseName} instead of the planned exercise`);
     }
   }
