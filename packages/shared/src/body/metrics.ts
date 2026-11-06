@@ -32,12 +32,23 @@ export const METRICS: Record<BuiltInMetricKey, MetricDef> = {
   bmr_kcal: { label: 'BMR', unit: 'kcal', mass: false, min: 500, max: 5000 },
 };
 
-function isMass(key: string): boolean {
-  return key in METRICS && METRICS[key as BuiltInMetricKey].mass;
+export interface CustomMetricDef {
+  unit_label: string;
+  min: number;
+  max: number;
 }
 
-/** Stored value to the viewer's unit. kg is shown as stored (no rounding). Mass is shown to 1 decimal in lb (body metrics need that, unlike lifting weights). */
-export function toDisplay(key: string, value: number, units: Units): number {
+function isMass(key: string): boolean {
+  return Object.hasOwn(METRICS, key) && METRICS[key as BuiltInMetricKey].mass;
+}
+
+function r(value: number, decimals: number): number {
+  const f = 10 ** decimals;
+  return Math.round((value + Number.EPSILON * Math.sign(value)) * f) / f;
+}
+
+/** The number an input box shows: stored kg as is, or lb to 1 decimal. Not for read-only text; use formatMetric. */
+export function toInputValue(key: string, value: number, units: Units): number {
   return isMass(key) && units === 'lb' ? fromKg(value, 'lb') : value;
 }
 
@@ -46,5 +57,30 @@ export function fromDisplay(key: string, value: number, units: Units): number {
   return isMass(key) ? toKg(value, units) : value;
 }
 
-/** Largest error, in kg, from showing a stored kg value to 1 decimal in lb. */
+/** The stored value rounded the way it is shown: mass to 1 decimal in kg or lb, whole numbers for visceral fat and BMR. */
+export function displayValue(key: string, value: number, units: Units): number {
+  if (isMass(key)) return r(units === 'lb' ? fromKg(value, 'lb') : value, 1);
+  if (key === 'visceral_fat' || key === 'bmr_kcal') return r(value, 0);
+  if (key === 'body_fat_pct' || key === 'bmi') return r(value, 1);
+  return r(value, 2);
+}
+
+/** Read-only text for a stored value, e.g. "72.3 kg", "18.2%", "1650 kcal". */
+export function formatMetric(key: string, value: number, units: Units, customDef?: CustomMetricDef): string {
+  const v = displayValue(key, value, units);
+  if (isMass(key)) return `${v} ${units}`;
+  if (key === 'body_fat_pct') return `${v.toFixed(1)}%`;
+  if (key === 'bmi') return v.toFixed(1);
+  if (key === 'visceral_fat') return String(v);
+  if (key === 'bmr_kcal') return `${v} kcal`;
+  return customDef?.unit_label ? `${v} ${customDef.unit_label}` : String(v);
+}
+
+/** Inclusive range check for a built-in or custom metric. Unknown keys are out of range. */
+export function isInRange(key: string, value: number, customDef?: { min: number; max: number }): boolean {
+  const def = Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey] : customDef;
+  return def !== undefined && Number.isFinite(value) && value >= def.min && value <= def.max;
+}
+
+/** Largest error, in kg, from showing a stored kg value to 1 decimal in lb (plus up to 0.0005 from storing kg to 3 decimals). */
 export const MAX_LB_DISPLAY_DRIFT_KG = 0.05 * KG_PER_LB;
