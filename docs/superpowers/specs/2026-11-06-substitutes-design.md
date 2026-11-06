@@ -63,7 +63,7 @@ clears `substituteId` and `substituteOptions`: the slot is then off-plan.
    set, show the choice read-only (`substitutedFrom(ex)` → "Doing X instead of Y").
 3. Summary "Changes from the plan": an exercise with `substitutedFrom(ex)` reads "⇄ Did X instead of Y".
 
-## Database (migration `20261106001200_substitutes.sql`)
+## Database (migration `20261106002100_substitutes.sql`)
 
 - Plans: new table `workout_substitutes` (one row per substitute: `workout_exercise_id`, `position`,
   `exercise_id`, `note`, `sets jsonb` = the `WorkoutSetDoc[]`), owner columns inherited like the other workout

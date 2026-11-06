@@ -4,8 +4,6 @@ import type { LogStatus } from '../logs/schema';
 import { logDurationS } from '../logs/summary';
 import { compareByLastName } from '../names';
 
-export const QUIET_DAYS = 5;
-export const MISSED_WINDOW_DAYS = 7;
 export const ENDING_WITHIN_DAYS = 7;
 export const LAST_WORKOUT_LOOKBACK_DAYS = 30;
 
@@ -77,38 +75,6 @@ export function weekProgress(workouts: HomeWorkout[], today: IsoDate): { done: n
     if (workoutStatus(w).kind === 'done') done += 1;
   }
   return { done, planned };
-}
-
-export function missedClients(workouts: HomeWorkout[], today: IsoDate): Array<{ clientId: string; missed: number }> {
-  const from = addDays(today, -MISSED_WINDOW_DAYS);
-  const to = addDays(today, -1);
-  const counts = new Map<string, number>();
-  for (const w of workouts) {
-    if (w.scheduledOn < from || w.scheduledOn > to) continue;
-    if (workoutStatus(w).kind === 'done') continue;
-    counts.set(w.clientId, (counts.get(w.clientId) ?? 0) + 1);
-  }
-  return [...counts]
-    .filter(([, missed]) => missed >= 2)
-    .map(([clientId, missed]) => ({ clientId, missed }))
-    .sort((a, b) => b.missed - a.missed || (a.clientId < b.clientId ? -1 : a.clientId > b.clientId ? 1 : 0));
-}
-
-export function quietClients(
-  clients: HomeClient[],
-  today: IsoDate,
-  exclude: ReadonlySet<string>,
-): Array<{ clientId: string; days: number | '30+' }> {
-  const out: Array<{ clientId: string; days: number | '30+'; sort: number }> = [];
-  for (const c of clients) {
-    if (exclude.has(c.id)) continue;
-    if (diffDays(c.joinedOn, today) < QUIET_DAYS) continue;
-    const raw = diffDays(c.lastFinishedOn ?? c.joinedOn, today);
-    if (raw < QUIET_DAYS) continue;
-    const days = raw >= LAST_WORKOUT_LOOKBACK_DAYS ? ('30+' as const) : raw;
-    out.push({ clientId: c.id, days, sort: raw });
-  }
-  return out.sort((a, b) => b.sort - a.sort).map(({ clientId, days }) => ({ clientId, days }));
 }
 
 export function endingPrograms(

@@ -39,7 +39,7 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/auth', () => ({ requireCoach: () => Promise.resolve({ workspaceId: WS }) }));
 vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => Promise.resolve(supabase) }));
 
-import { addProgramWorkout, updateProgram } from './actions';
+import { addProgramWorkout, copyProgramWeek, duplicateProgram, updateProgram } from './actions';
 
 const WS = '00000000-0000-4000-8000-000000000001';
 const PROGRAM = '00000000-0000-4000-8000-000000000002';
@@ -94,5 +94,88 @@ describe('updateProgram', () => {
     const result = await updateProgram(PROGRAM, input);
     expect(result.ok).toBe(false);
     expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  });
+});
+
+describe('duplicateProgram', () => {
+  it('copies only a program of the coach\'s workspace, as "<name> (copy)"', async () => {
+    respond = (call) => (call.table === 'programs' ? { data: { name: 'Strength' } } : {});
+    const result = await duplicateProgram(PROGRAM);
+    expect(result.ok).toBe(true);
+    const read = calls.find((c) => c.table === 'programs');
+    expect(read?.filters).toEqual({ id: PROGRAM, workspace_id: WS });
+    const rpc = calls.find((c) => c.op === 'rpc');
+    expect(rpc?.rpc).toBe('duplicate_program');
+    expect(rpc?.payload).toMatchObject({ p_program_id: PROGRAM, p_name: 'Strength (copy)' });
+    expect(result.ok && (rpc?.payload as { p_new_id: string }).p_new_id).toBe(result.ok && result.id);
+  });
+
+  it('refuses a program it cannot find in this workspace, without calling the database function', async () => {
+    respond = () => ({ data: null });
+    expect(await duplicateProgram(PROGRAM)).toEqual({ ok: false, error: "Couldn't find that program. It may have been deleted." });
+    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  });
+
+  it('refuses an id that is not a uuid', async () => {
+    expect((await duplicateProgram('nope')).ok).toBe(false);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('copyProgramWeek', () => {
+  const ids = ['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012'];
+
+  it('sends the browser\'s ids to copy_program_week in one call and returns the saved slots', async () => {
+    respond = (call) =>
+      call.op === 'rpc'
+        ? {
+            data: [
+              { id: ids[0], week: 2, day: 1, position: 0, workout_id: WORKOUT },
+              { id: ids[1], week: 3, day: 1, position: 0, workout_id: WORKOUT },
+            ],
+          }
+        : {};
+    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2, 3], ids });
+    expect(calls).toEqual([
+      { table: '', op: 'rpc', rpc: 'copy_program_week', payload: { p_program_id: PROGRAM, p_from: 1, p_to: [2, 3], p_ids: ids }, filters: {} },
+    ]);
+    expect(result).toEqual({
+      ok: true,
+      slots: [
+        { id: ids[0], week: 2, day: 1, position: 0, workoutId: WORKOUT },
+        { id: ids[1], week: 3, day: 1, position: 0, workoutId: WORKOUT },
+      ],
+    });
+  });
+
+  it('passes on the database\'s coach-worded refusal (a week changed since the page loaded)', async () => {
+    respond = () => ({ error: { code: '23514', message: 'That week changed since the page loaded. Reload the page and try again.' } });
+    expect(await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids })).toEqual({
+      ok: false,
+      error: 'That week changed since the page loaded. Reload the page and try again.',
+    });
+  });
+
+  it('says the program is gone when the database refuses it (another workspace\'s program)', async () => {
+    respond = () => ({ error: { code: '42501', message: 'Program not found.' } });
+    const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids });
+    expect(result).toEqual({ ok: false, error: "Couldn't find that program. It may have been deleted." });
+  });
+
+  it('refuses bad input before touching the database', async () => {
+    for (const input of [
+      { programId: 'nope', fromWeek: 1, toWeeks: [2], ids },
+      { programId: PROGRAM, fromWeek: 0, toWeeks: [2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2.5], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [3, 2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2, 2], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [1], ids },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids: [] },
+      { programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids: ['nope'] },
+    ]) {
+      expect((await copyProgramWeek(input)).ok).toBe(false);
+    }
+    expect(calls).toEqual([]);
   });
 });
