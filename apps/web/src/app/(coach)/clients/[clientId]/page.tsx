@@ -16,7 +16,7 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ month?: string | string[] }>;
+  searchParams: Promise<{ month?: string | string[]; assign?: string | string[] }>;
 }) {
   const { workspaceId } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
@@ -126,6 +126,7 @@ export default async function ClientPage({
         assignments={summaries}
         library={library.data}
         programs={pickerPrograms}
+        openAssign={query.assign === '1'}
       />
     </div>
   );
