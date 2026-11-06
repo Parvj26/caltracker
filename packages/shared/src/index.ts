@@ -144,3 +144,7 @@ export {
   logVolumeKg,
   shouldAutoFinish,
 } from './logs/summary';
+export type { Message, OutboxItem } from './messages/types';
+export { seenMessageId, unreadCount } from './messages/state';
+export { dayLabel, messageYoutubeIds } from './messages/format';
+export { mergeOutbox } from './messages/outbox';
