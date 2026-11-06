@@ -1,4 +1,4 @@
-/* global http, HELPER_URL, ACTION, EMAIL, NAME */
+/* global http, HELPER_URL, ACTION, EMAIL, NAME, output */
 // Calls the local e2e helper bridge (scripts/e2e-helper.ts serve), started by scripts/run-e2e.sh.
 // Maestro scripts cannot run shell commands, so the bridge wraps the service-role helpers.
 // Inputs (env): ACTION, EMAIL, NAME (invite only), HELPER_URL. Actions:
