@@ -333,6 +333,8 @@ export { dayLabel, messageYoutubeIds } from './messages/format';
 export { mergeOutbox } from './messages/outbox';
 export { FULL_MAX_EDGE, THUMB_MAX_EDGE, MAX_PHOTOS, fitWithin, photoPaths, thumbPathOf, isAlreadyUploaded, mergeById } from './messages/photos';
 export type { PhotoExt } from './messages/photos';
+export { photoDisplaySize, photoSourceFor } from './media/display';
+export type { PhotoSize } from './media/display';
 export {
   chooseSubstitute,
   clearSubstitute,
