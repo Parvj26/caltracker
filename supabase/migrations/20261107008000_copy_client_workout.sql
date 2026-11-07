@@ -10,7 +10,7 @@
 -- The done-workout lock (20261106009000) is unaffected: the copy is a new workout with no log of its own.
 
 -- p_new_id is made by the app, so a double click or a retry sends the same id: an existing copy with that id for the
--- same client and day returns it without copying again; the id used for anything else raises 23505.
+-- same client, day and library source returns it without copying again; the id used for anything else raises 23505.
 -- Raises 42501 unless the caller coaches the source workout's workspace and p_client_id is a current client of it.
 create function public.copy_client_workout(p_source uuid, p_new_id uuid, p_client_id uuid, p_date date)
 returns uuid
@@ -42,7 +42,8 @@ begin
     perform set_config('caltracker.system_write', v_prev, true);
     select * into v_existing from public.workouts w where w.id = p_new_id;
     if v_existing.workspace_id = v_source.workspace_id and v_existing.client_id = p_client_id
-       and v_existing.scheduled_on = p_date and v_existing.assignment_id is null then
+       and v_existing.scheduled_on = p_date and v_existing.assignment_id is null
+       and v_existing.source_workout_id is not distinct from v_source.source_workout_id then
       return p_new_id;
     end if;
     raise exception 'This workout id is already used for a different workout' using errcode = '23505';

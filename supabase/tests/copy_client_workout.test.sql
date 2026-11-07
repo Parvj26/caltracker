@@ -1,5 +1,5 @@
 begin;
-select plan(25);
+select plan(27);
 
 -- copy_client_workout: "Copy to…" on a client's calendar workout. It copies the workout as it is (the coach's changes
 -- for that client included) onto another day, for the same or other current clients of the same workspace. The copy
@@ -29,6 +29,8 @@ select tests.create_workspace('CC Workspace B', :'coach_b') as ws_b \gset
 select tests.add_client(:'ws_a', :'a1');
 select tests.add_client(:'ws_a', :'a2');
 select tests.add_client(:'ws_b', :'b1');
+select tests.create_user('cc-gone@t.local', 'Removed Client') as gone \gset
+select tests.add_client(:'ws_a', :'gone');
 select tests.create_exercise(null, 'CC Builtin') as ex \gset
 
 -- A1's program copy that the coach customised (a third set added by hand), and a done single workout.
@@ -96,6 +98,12 @@ select tests.act_as(:'coach_a');
 select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'orig', :'c1', :'a2', :'d25'),
   '23505', null, 'the same id for a different day is refused');
 
+reset role;
+select tests.create_workout(:'ws_a', 'CC Other source', :'a2', :'d20', :'ex') as other \gset
+select tests.act_as(:'coach_a');
+select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'other', :'c1', :'a2', :'d20'),
+  '23505', null, 'the same id for a copy of a different workout (same client and day) is refused');
+
 -- ---------- Refusals ----------
 select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'orig', :'c4', :'b1', :'d20'),
   '42501', null, 'coach A can''t copy to another workspace''s client');
@@ -103,6 +111,12 @@ select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :
   '42501', null, 'coach A can''t copy another workspace''s workout');
 select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'lib', :'c4', :'a1', :'d20'),
   '42501', null, 'a library workout is not a client''s workout (Assign is for those)');
+-- A client removed from the workspace is no longer a target.
+reset role;
+delete from public.workspace_members where workspace_id = :'ws_a' and user_id = :'gone';
+select tests.act_as(:'coach_a');
+select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'orig', :'c4', :'gone', :'d20'),
+  '42501', null, 'coach A can''t copy to a client who was removed');
 select tests.act_as(:'coach_b');
 select throws_ok(format($$select public.copy_client_workout(%L, %L, %L, %L)$$, :'orig', :'c4', :'b1', :'d20'),
   '42501', null, 'coach B can''t copy workspace A''s workout to their own client');
