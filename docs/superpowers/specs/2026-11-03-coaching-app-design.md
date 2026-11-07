@@ -257,12 +257,12 @@ Three tiers of animal stickers, plus shiny variants. Full list and rules: `docs/
 ### Community
 - One community per workspace containing all its clients and the coach. Schema supports multiple groups for later.
 - Posts: text, images (≤ 4), links, badge cards.
-- Likes and comments on posts.
+- Comments on posts, and reactions (❤️ 💪 🔥 👏 😂 🎉, any number of the six) on posts and comments. Reactions replaced the single Like.
 - **Coach:** pin posts, delete any post/comment, remove a member.
-- **Client:** create posts, comment, like, delete own content.
+- **Client:** create posts, comment, react, delete own content.
 - **Report and block** (App Store requirement for user-generated content). Reports go to the coach.
 - **Privacy:** members see only another member's name and profile photo. Measurements, InBody data and workout details appear only if the client explicitly shares a card.
-- **Notifications:** comments on my post, new coach posts; likes grouped ("Sam and 4 others liked your post").
+- **Notifications:** comments on my post, new coach posts; reactions grouped ("Sam and 4 others reacted to your post").
 
 ---
 
