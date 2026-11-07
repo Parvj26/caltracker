@@ -33,8 +33,8 @@ the old version. The coach has to fix every client by hand.
 - **Past days**, and **today's existing workouts** (only additions happen today).
 - **A workout the client has started or finished** (an in-progress or completed log; a discarded log doesn't count).
   Before Live Sync changes or removes a copy it locks it and checks for a log again, so a log saved at the same moment
-  wins. If a day's old workout was started or done and the program now has a different workout that day, the new one
-  is not added on that day.
+  wins. No workout is added on a day the client already worked out: a started or done copy on that day (by its
+  program day or the day it is on), or any started or done log of theirs dated that day, planned or not.
 - **A workout the coach edited for that one client** ("customised"): its name, notes or day changed, or one of its
   blocks, exercises, sets or substitutes written by hand. A save that changes nothing, and updates that only change
   links (for example the library workout being deleted), don't count. Moved copies stay customised and are never
@@ -52,8 +52,11 @@ The delete dialog says so.
 ## "Today"
 
 Live Sync uses **each client's own today**, from the time zone on their profile (`profiles.time_zone`, the same zone
-streaks and stickers use; unknown zones count as UTC). The server can't use the coach's browser here: syncs also run
-when nobody is looking at a calendar (a library workout saved from another page).
+streaks and stickers use). `UTC` is that column's default, so it counts as "not set": then the workspace coach's zone
+is used (owner first), and with no known zone at all, today is taken as **the day after UTC's today**, the latest date
+that can be today anywhere, so Live Sync never changes a day that might be the client's today. The server can't use
+the coach's browser here: syncs also run when nobody is looking at a calendar (a library workout saved from another
+page). The web "Live" tag uses the browser's today.
 
 ## How it works (database)
 
@@ -65,10 +68,16 @@ Migration `supabase/migrations/20261106007000_live_sync.sql`.
 | --- | --- | --- |
 | `programs` | `live_sync` | The switch (existing rows false, default true for new rows). Coaches can insert and update it. |
 | `programs` | `live_synced_at`, `live_sync_skipped` | When the last sync ran and how many customised copies it skipped. Written only by the sync. |
-| `workouts` | `planned_on` | On a program copy: the program day it was made for. Moving the copy never changes it; Live Sync pairs by it. Existing copies get their current day. |
+| `workouts` | `planned_on` | On a program copy: the program day it was made for. Moving the copy never changes it; Live Sync pairs by it. |
 | `workouts` | `source_hash` | On a program copy: `workout_content_hash` of the library workout when it was copied (name, notes and ordered blocks, exercises, sets, substitutes). Null for copies made before Live Sync, so the catch-up refreshes untouched ones. |
 | `workouts` | `customised_at` | When the coach last edited this copy by hand. |
 | `live_sync_tombstones` | `(assignment_id, planned_on, source_workout_id)` | A program day the coach deleted from a client's calendar. RLS: coaches of the workspace read; nobody signed in writes. |
+
+**Copies made before Live Sync** (`live_sync_backfill_copies`, run by the migration): their history isn't known, so
+a copy counts as untouched only if its content equals its library workout's content now **and** it is on a slot day
+of that workout in the assigned program; it then gets that `source_hash`. Anything else is marked customised and left
+alone. `planned_on` is the copy's day, or for a copy moved off its slot day, the nearest slot day of its workout with no
+copy of it (the day it most likely left), so that day isn't filled twice.
 
 The three workout columns are kept by triggers (`mark_workout_changed` on the workout row, `mark_parent_customised`
 on blocks, exercises, sets and substitutes) and by definer functions; nobody signed in can write them. System writes
@@ -88,10 +97,12 @@ as the edit: if it fails, the edit fails and the coach sees the usual "couldn't 
    - a program's `weeks`, `name` or `live_sync` changed while on (`programs_live_sync`: turning it on is the catch-up);
    - a library workout row updated (`workouts_live_sync`): every live program using it is queued.
 2. A **deferred constraint trigger** on the queue (`program_live_sync_queue_run`) runs at commit, after every write of
-   the transaction (so `save_workout`'s new blocks and sets are all in place), and syncs every queued program in
-   program id order.
+   the transaction (so `save_workout`'s new blocks and sets are all in place), and syncs every program this
+   transaction queued, in program id order.
 
-The queue never holds a committed row. It has RLS on with no policies and no grants.
+The queue is keyed by (transaction, program), so two transactions queueing the same programs never wait on each other
+there (no deadlock between queue inserts); they meet only in the sync, which locks programs' assignments in program,
+then assignment id order. The queue never holds a committed row. It has RLS on with no policies and no grants.
 
 ### What one sync does (`live_sync_program`, security definer, internal)
 
@@ -104,8 +115,7 @@ client's today and isn't cancelled from today or earlier:
   as assigning); only those inside the window count.
 - **Copies**: the assignment's workouts whose `planned_on` is inside the window.
 - Pair them by (program day, library workout, n-th of that pair), protected copies (logged or customised) first. Then:
-  - wanted with no copy → copy the library workout in, unless tombstoned or the day has a started or done copy the
-    program no longer has;
+  - wanted with no copy → copy the library workout in, unless tombstoned or the client already worked out that day;
   - copy with nothing wanted → delete it, if unprotected and both its days are after today;
   - paired copy whose `source_hash` differs from the library's hash now → refresh it **in place** (same row and id:
     its blocks are deleted and copied in again; name, notes and hash updated), if unprotected and after today.
@@ -119,7 +129,7 @@ with unit tests, plus `isLiveWorkout` (the Live tag rule) and `liveSyncStatus` (
 ### Cost
 
 Rough local benchmark (`scratchpad/live-sync-bench`): 30 clients on a 12-week program using one 6-exercise library
-workout twice a week (720 copies). Editing that workout makes the save's commit take about 1.6-1.9 s on a loaded
+workout twice a week (720 copies). Editing that workout makes the save's commit take about 1.3-1.9 s on a loaded
 laptop (every copy refreshed); a save that changes nothing takes about 10 ms. If big programs make saves slow, the
 next step is running the sync in the background (not built).
 
@@ -151,7 +161,9 @@ next step is running the sync in the background (not built).
   deleting a library workout; what customises a copy and what doesn't; longer and shorter programs; copying a week; a
   cancelled assignment respects its cancel date; removed clients are left alone; new and duplicated programs default
   to on; another workspace's coach and a client can't switch, edit, run, read or write anything that syncs (queue and
-  tombstones included), and B's syncs don't reach A's clients. Tests fire the commit-time trigger with
+  tombstones included), and B's syncs don't reach A's clients; copies made before Live Sync (identical, edited,
+  moved); no adds on days already worked out (moved done copy, unplanned log); the per-transaction queue key; the
+  time-zone fallbacks. Tests fire the commit-time trigger with
   `SET CONSTRAINTS ... IMMEDIATE`.
 - Unit tests for the shared functions.
 - e2e `apps/web/e2e/live-sync.spec.ts`: switch off, assign, edit (no change), switch on (catch-up, Live tag, status
