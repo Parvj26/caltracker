@@ -213,6 +213,27 @@ describe('createLogSync', () => {
     expect(await store.load()).toEqual({ log: coach, lastSyncedRevision: 6 });
   });
 
+  it('uploads the sets ticked just before a take over (the final save), then shows the coach\'s copy', async () => {
+    // The phone ticked a set (revision 9) the server never saw; the coach took over at 5 and has not saved yet, so
+    // the server applies this one final save and says the coach logs it now.
+    const local = sampleLog({ revision: 9 });
+    const store = await storeWith(local, 5);
+    const server = sampleLog({ revision: 9, name: 'Server copy' });
+    const save = vi.fn((doc: WorkoutLogDoc): Promise<SaveLogResult> =>
+      Promise.resolve({ applied: true, revision: doc.revision, status: 'in_progress', loggedByOther: true }),
+    );
+    const held: WorkoutLogDoc[] = [];
+    const rejected = vi.fn();
+    const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onHeldByOther: (d) => held.push(d), onRejected: rejected });
+    expect(await sync.recheck()).toEqual({ status: 'synced', adopted: server });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(local);
+    expect(held).toEqual([server]);
+    // Nothing was lost, so no "sets replaced" note.
+    expect(rejected).not.toHaveBeenCalled();
+    expect(await store.load()).toEqual({ log: server, lastSyncedRevision: 9 });
+  });
+
   it('after a reclaim (or hand back) adopts the server copy over its own older queued edits', async () => {
     // The phone queued revision 9 before the coach took over; the reclaim put the server at 1009 with the coach's sets.
     const store = await storeWith(sampleLog({ revision: 9 }), 4);

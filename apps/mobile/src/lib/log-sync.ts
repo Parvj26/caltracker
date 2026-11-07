@@ -9,6 +9,9 @@
 // Server contract (global-constraints "SYNC SEMANTICS"): save returns { applied, revision, status }, and
 // revision is the phone's own counter that the server never changes.
 //   * applied=true: the sent revision is now on the server. If the phone changed the log meanwhile, send again.
+//   * applied=true with loggedByOther: the final save after a take over (the server applies the previous logger's
+//     next save once, until the coach saves; 20261107001000_coach_logging_polish). What the phone ticked is saved;
+//     it then adopts the server's doc and tells the screen (onHeldByOther), as below.
 //   * applied=false with loggedByOther: the coach logs this workout now (single active logger). Adopt the server's
 //     doc, never push, and tell the screen (onHeldByOther) so it shows "Your coach is logging this session".
 //   * applied=false: the server refused (stale or locked). Fetch its doc and let resolveRefusal decide. When the
@@ -324,7 +327,11 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
           await store.update((s) =>
             s && s.log.id === sent.id ? { ...s, lastSyncedRevision: Math.max(s.lastSyncedRevision, sent.revision) } : s,
           );
-          continue; // sends again if the log changed during the save; clears it if finished
+          // Not the final save after a take over: sends again if the log changed during the save; clears it if
+          // finished.
+          if (result.loggedByOther !== true) continue;
+          // The final save after a take over: the sets ticked here are on the server now, and the coach logs it from
+          // here on. Fall through to take the server's copy and show "Your coach is logging this session".
         }
 
         const server = await fetchLog(sent.id);
