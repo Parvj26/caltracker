@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   IsoDateSchema,
   assignSummary,
+  copyDefaultDate,
   earliestProgramStart,
   filterClients,
   nextFreeDay,
@@ -29,8 +30,9 @@ import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
 import styles from './assign.module.css';
 
-export type AssignKind = 'workout' | 'program';
-type Source = { kind: AssignKind; id: string; name: string };
+export type AssignKind = 'workout' | 'program' | 'copy';
+/** For a copy (Copy to… on a calendar workout), `date` is the workout's own day. */
+type Source = { kind: AssignKind; id: string; name: string; date?: IsoDate };
 
 const nameOf = (c: AssignClient) => `${c.firstName} ${c.lastName}`.trim() || 'Client';
 const MAYBE_SENT = 'Check the calendars before assigning again: the first try may have gone through.';
@@ -39,7 +41,7 @@ const MAYBE_SENT = 'Check the calendars before assigning again: the first try ma
  * "Assign" on a library workout or program: opens the dialog, and after a full success closes it and says so in a
  * toast (a partial one keeps the dialog open with each client's answer).
  */
-export function AssignButton({ kind, id, name, compact = false }: Source & { compact?: boolean }) {
+export function AssignButton({ kind, id, name, compact = false }: { kind: 'workout' | 'program'; id: string; name: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -83,7 +85,7 @@ export function AssignButton({ kind, id, name, compact = false }: Source & { com
 }
 
 /**
- * Pick clients (current ones, searchable) and a day, then one "Assign". A workout goes on today by default, or on
+ * Pick clients (current ones, searchable) and a day, then one "Assign" (or, for Copy to…, one "Copy"). A workout goes on today by default, or on
  * each client's next free day; a program starts next Monday by default (up to 7 days back is allowed, as on the
  * calendar). Days that already have workouts are listed first, and the button says "Add alongside": nothing already
  * there is replaced. Each client gets its own id per day, kept while the dialog is open, so a retry after a lost
@@ -91,10 +93,13 @@ export function AssignButton({ kind, id, name, compact = false }: Source & { com
  */
 export function AssignToClientsDialog({
   source,
+  preselect = [],
   onDone,
   onClose,
 }: {
   source: Source;
+  /** Clients ticked to start with (Copy to… ticks the workout's own client). */
+  preselect?: readonly string[];
   /** Every selected client got it: the summary to show. */
   onDone: (message: string) => void;
   onClose: () => void;
@@ -105,13 +110,18 @@ export function AssignToClientsDialog({
   const listId = useId();
   const dateInputId = useId();
   const clashTitleId = useId();
-  const isWorkout = source.kind === 'workout';
+  // A copy is placed like a single workout: one day per client.
+  const isWorkout = source.kind !== 'program';
+  const isCopy = source.kind === 'copy';
+  const verb = isCopy ? 'Copied' : 'Assigned';
   const [targets, setTargets] = useState<AssignTargets | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(preselect));
   const [freeDay, setFreeDay] = useState(false);
-  const [date, setDate] = useState<string>(() => (isWorkout ? today : nextMonday(today)));
+  const [date, setDate] = useState<string>(() =>
+    isCopy && source.date ? copyDefaultDate(source.date, today) : isWorkout ? today : nextMonday(today),
+  );
   const [results, setResults] = useState<ReadonlyMap<string, ClientResult>>(new Map());
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState(false);
@@ -218,14 +228,14 @@ export function AssignToClientsDialog({
       // Earlier successes count too, so the summary covers the whole dialog.
       const all = [...next.values()];
       if (outcome.results.every((r) => r.ok)) {
-        onDone(assignSummary(source.name, all));
+        onDone(assignSummary(source.name, all, verb));
         return;
       }
       setResults(next);
-      setError(assignSummary(source.name, all));
+      setError(assignSummary(source.name, all, verb));
     } catch (e) {
       // The same clients and days keep their ids, so trying again can't copy twice.
-      setError(failureMessage(e, "Couldn't assign. Check your connection and try again."));
+      setError(failureMessage(e, `Couldn't ${isCopy ? 'copy' : 'assign'}. Check your connection and try again.`));
       if (!isStaleDeployError(e)) setUncertain(true);
     } finally {
       busy.current = false;
@@ -234,13 +244,14 @@ export function AssignToClientsDialog({
   }
 
   const n = chosen.length;
+  const action = isCopy ? 'Copy' : 'Assign';
   const label = pending
-    ? 'Assigning…'
+    ? `${isCopy ? 'Copying' : 'Assigning'}…`
     : clashing.length > 0
       ? 'Add alongside'
       : n > 1
-        ? `Assign to ${n} clients`
-        : 'Assign';
+        ? `${action} to ${n} clients`
+        : action;
 
   return (
     <dialog
@@ -252,7 +263,15 @@ export function AssignToClientsDialog({
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={calendar.dialogTitle}>Assign {source.name}</h2>
+      <h2 id={titleId} className={calendar.dialogTitle}>
+        {isCopy ? `Copy ${source.name} to…` : `Assign ${source.name}`}
+      </h2>
+      {isCopy ? (
+        <p className={calendar.dialogBody}>
+          Copies it as it is now, with your changes, as a separate workout: later program or library edits won&apos;t
+          change the copy.
+        </p>
+      ) : null}
       {loadError ? (
         <ErrorText>{loadError}</ErrorText>
       ) : targets === null ? (
@@ -300,7 +319,7 @@ export function AssignToClientsDialog({
                     <span>{nameOf(c)}</span>
                   </label>
                   {result?.ok ? (
-                    <span className={styles.done}>Assigned ✓</span>
+                    <span className={styles.done}>{verb} ✓</span>
                   ) : result && !result.ok && on ? (
                     <span className={styles.failed}>{result.error}</span>
                   ) : on && useFreeDay ? (

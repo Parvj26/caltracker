@@ -76,3 +76,29 @@ export async function assignOne(
     .eq('assignment_id', id);
   return { ok: true, count: countError ? 0 : (count ?? 0) };
 }
+
+/**
+ * copy_client_workout: a client's calendar workout as it is (with the coach's changes) onto one client's day (today
+ * or later). The copy is a single customised workout, so Live Sync never touches it.
+ */
+export async function copyOne(
+  supabase: SupabaseClient<Database>,
+  i: { newId: string; sourceId: string; clientId: string; date: IsoDate; today: IsoDate },
+): Promise<Outcome> {
+  const dateError = scheduleDateError(i.date, i.today);
+  if (dateError) return { ok: false, error: dateError };
+  const { error } = await supabase.rpc('copy_client_workout', {
+    p_source: i.sourceId,
+    p_new_id: i.newId,
+    p_client_id: i.clientId,
+    p_date: i.date,
+  });
+  if (error) {
+    if (error.code === '42501') return { ok: false, error: "You can't copy to this client. They may no longer be your client." };
+    if (error.code === '23505') {
+      return { ok: false, error: 'This copy was already sent for a different day. Close this, check the calendar, then copy again if needed.' };
+    }
+    return { ok: false, error: GENERIC };
+  }
+  return { ok: true };
+}

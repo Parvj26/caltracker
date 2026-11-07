@@ -44,23 +44,34 @@ export function filterClients<T extends { firstName: string; lastName: string }>
   return clients.filter((c) => foldForSearch(`${c.firstName} ${c.lastName}`).includes(needle));
 }
 
-/** "Assigned Legs to 3 clients." or "Assigned Legs to 2 of 3 clients. 1 couldn't be assigned." */
-export function assignSummary(name: string, results: readonly { ok: boolean }[]): string {
+/**
+ * "Assigned Legs to 3 clients." or "Assigned Legs to 2 of 3 clients. 1 couldn't be assigned." ("Copied …" for
+ * Copy to…).
+ */
+export function assignSummary(name: string, results: readonly { ok: boolean }[], verb: 'Assigned' | 'Copied' = 'Assigned'): string {
   const done = results.filter((r) => r.ok).length;
   const failed = results.length - done;
+  const base = verb === 'Assigned' ? 'assign' : 'copy';
   const clients = (n: number) => `${n} ${n === 1 ? 'client' : 'clients'}`;
-  if (done === 0) return `Couldn't assign ${name}.`;
-  if (failed === 0) return `Assigned ${name} to ${clients(done)}.`;
-  return `Assigned ${name} to ${done} of ${clients(results.length)}. ${failed} couldn't be assigned.`;
+  if (done === 0) return `Couldn't ${base} ${name}.`;
+  if (failed === 0) return `${verb} ${name} to ${clients(done)}.`;
+  return `${verb} ${name} to ${done} of ${clients(results.length)}. ${failed} couldn't be ${verb.toLowerCase()}.`;
+}
+
+/** Copy to…'s starting day: a week after the workout (so it repeats), but never before today. */
+export function copyDefaultDate(workoutDate: IsoDate, today: IsoDate): IsoDate {
+  const next = addDays(workoutDate, 7);
+  return next < today ? today : next;
 }
 
 /**
- * One "Assign" to several clients: a library workout (one day each) or a program (a start date each). Each client
+ * One "Assign" to several clients: a library workout (one day each), a program (a start date each) or, for Copy to…,
+ * a client's calendar workout as it is (one day each). Each client
  * has its own new id, made in the browser once per client and day, so a retry repeats the same id and the database
  * copies only once.
  */
 export const AssignToClientsInput = z.object({
-  kind: z.enum(['workout', 'program']),
+  kind: z.enum(['workout', 'program', 'copy']),
   sourceId: z.string().uuid(),
   /** The coach's today, from their browser (see date-rules). */
   today: IsoDateSchema,

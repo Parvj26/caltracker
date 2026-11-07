@@ -78,6 +78,24 @@ describe('assignToClients', () => {
     expect(rpcs.every((r) => r.name === 'assign_program' && r.args.p_start_date === '2026-11-09')).toBe(true);
   });
 
+  it('copies a client workout per client with copy_client_workout (Copy to…)', async () => {
+    const out = await assignToClients({ kind: 'copy', sourceId: SOURCE, today: '2026-11-07', targets: targets('2026-11-14') });
+    expect(out.ok && out.results.every((r) => r.ok)).toBe(true);
+    expect(rpcs.map((r) => r.name)).toEqual(['copy_client_workout', 'copy_client_workout', 'copy_client_workout']);
+    expect(rpcs.find((r) => r.args.p_client_id === C)?.args).toEqual({
+      p_source: SOURCE,
+      p_new_id: ID(22),
+      p_client_id: C,
+      p_date: '2026-11-14',
+    });
+  });
+
+  it('refuses a copy onto a past day without calling the database', async () => {
+    const out = await assignToClients({ kind: 'copy', sourceId: SOURCE, today: '2026-11-07', targets: targets('2026-11-06') });
+    expect(out.ok && out.results.every((r) => !r.ok)).toBe(true);
+    expect(rpcs).toHaveLength(0);
+  });
+
   it('reports a client the coach can no longer assign to, and still assigns the rest', async () => {
     failFor = new Map([[B, '42501']]);
     const out = await assignToClients({ kind: 'workout', sourceId: SOURCE, today: '2026-11-07', targets: targets('2026-11-08') });
