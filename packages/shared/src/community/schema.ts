@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Limits and input checks for the community. The database enforces the same limits (20261106008000_community.sql);
+// Limits and input checks for the community. The database enforces the same limits (20261106013000_community.sql);
 // these give the apps friendly messages before a round trip.
 
 export const POST_BODY_MAX = 2000;
