@@ -518,6 +518,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           setFinishOpen(false);
           void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
         }}
+        onSaveDraft={(feel, note) => void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()))}
         onFinish={(feel, note) => void finishNow(feel, note)}
         onDiscard={() => {
           setFinishOpen(false);

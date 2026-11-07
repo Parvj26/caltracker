@@ -44,6 +44,7 @@ import {
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import type { Feeling } from '@caltracker/shared';
 import { parseActualInput } from './active-log-logic';
 import type { LastResultSet, LastResults } from './log-api';
 import { orList, supersetLetters } from './workouts';
@@ -639,6 +640,17 @@ export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], l
  */
 export function invalidAnnouncement(previous: string | null, next: string | null): string | null {
   return next !== null && next !== previous ? next : null;
+}
+
+export type FinishDraft = { feel: Feeling | null; note: string };
+
+/**
+ * The finish sheet's feeling and note: taken from the saved workout note only as the sheet opens. While it is open
+ * the client's own typing wins, even when the saved note changes underneath (a save on blur, a sync), so nothing
+ * typed is overwritten.
+ */
+export function sheetDraft(o: { wasVisible: boolean; visible: boolean; draft: FinishDraft; saved: FinishDraft }): FinishDraft {
+  return o.visible && !o.wasVisible ? o.saved : o.draft;
 }
 
 export type TypedResult = { kind: 'ok'; patch: ActualPatch } | { kind: 'invalid'; message: string };

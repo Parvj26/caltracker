@@ -27,6 +27,7 @@ import {
   markAllQuestion,
   readTyped,
   invalidAnnouncement,
+  sheetDraft,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -509,5 +510,21 @@ describe('invalidAnnouncement', () => {
     expect(invalidAnnouncement('Whole reps only', 'Whole reps only')).toBeNull(); // still invalid: said already
     expect(invalidAnnouncement('Whole reps only', 'That’s more than a set can hold')).toBe('That’s more than a set can hold');
     expect(invalidAnnouncement('Whole reps only', null)).toBeNull(); // valid again: nothing to say
+  });
+});
+
+describe('sheetDraft', () => {
+  const saved = { feel: 'Good' as const, note: 'Saved note' };
+  it('starts from the saved feeling and note when the sheet opens', () => {
+    expect(sheetDraft({ wasVisible: false, visible: true, draft: { feel: null, note: 'old' }, saved })).toEqual(saved);
+  });
+  it('keeps what the client is typing when the saved note changes underneath', () => {
+    const typing = { feel: null, note: 'Half a sent' };
+    expect(sheetDraft({ wasVisible: true, visible: true, draft: typing, saved: { feel: 'Hard', note: 'From elsewhere' } })).toBe(typing);
+  });
+  it('leaves a closed sheet alone', () => {
+    const draft = { feel: null, note: '' };
+    expect(sheetDraft({ wasVisible: true, visible: false, draft, saved })).toBe(draft);
+    expect(sheetDraft({ wasVisible: false, visible: false, draft, saved })).toBe(draft);
   });
 });
