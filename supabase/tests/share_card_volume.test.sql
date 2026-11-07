@@ -1,7 +1,7 @@
 begin;
 select plan(23);
 
--- Shared workout cards carry the workout's volume (20261107003000): award-workout stores it in awards.result as
+-- Shared workout cards carry the workout's volume (20261107006000): award-workout stores it in awards.result as
 -- volumeKg (worked out with the shared logVolumeKg) and build_community_card copies it from there. The phone can't
 -- send it, other people's workouts and other workspaces stay refused, and preview_community_card writes nothing.
 select tests.create_user('scv-coach-a@t.local', 'Coach A') as coach_a \gset
