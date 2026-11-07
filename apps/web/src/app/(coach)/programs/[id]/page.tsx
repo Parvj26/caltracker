@@ -9,6 +9,7 @@ import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteProgram } from './delete-program';
 import { loadLiveSync } from '@/lib/live-sync';
+import { loadPickerHints } from '@/lib/picker-hints';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -27,7 +28,7 @@ export default async function ProgramPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, userId } = await requireCoach();
   const { id } = await params;
   const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
@@ -65,6 +66,7 @@ export default async function ProgramPage({
     workoutName: s.workouts?.name ?? '',
   }));
   const workouts: LibraryWorkout[] = library.data;
+  const hints = await loadPickerHints(supabase, workspaceId, userId, workouts);
 
   return (
     <div className={styles.page}>
@@ -78,7 +80,7 @@ export default async function ProgramPage({
         </div>
       </header>
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} />
     </div>
   );
 }

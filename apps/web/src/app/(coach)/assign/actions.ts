@@ -6,6 +6,7 @@ import type { IsoDate } from '@caltracker/shared';
 import { assignOne, scheduleOne, todayError, GENERIC } from '@/lib/assign';
 import { requireCoach } from '@/lib/auth';
 import { readAll } from '@/lib/coach-home';
+import { loadPickerHints, type PickerHints } from '@/lib/picker-hints';
 import { createServerSupabase } from '@/lib/supabase/server';
 
 // "Assign" from the library (and Home): one workout or program onto several clients' calendars at once. The workspace
@@ -144,6 +145,8 @@ export type QuickAssignData = {
   programs: AssignProgramShape[];
   /** What is already on this client's calendar from 8 days back on. */
   scheduled: { date: IsoDate; name: string }[];
+  /** The coach's Recent and Most used workouts, and last-assigned program. */
+  hints: PickerHints;
 };
 
 // Same cap as the workout library page.
@@ -151,7 +154,7 @@ const LIBRARY_LIMIT = 200;
 
 /** What Home's quick Assign needs for one client, loaded when it opens. Throws if they are not a current client. */
 export async function loadQuickAssign(input: { clientId: string }): Promise<QuickAssignData> {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, userId } = await requireCoach();
   if (!UUID.test(input.clientId)) throw new Error('Invalid client');
   const supabase = await createServerSupabase();
   const [member, library, programs, scheduled] = await Promise.all([
@@ -178,6 +181,7 @@ export async function loadQuickAssign(input: { clientId: string }): Promise<Quic
   if (programs.error) throw new Error(`Could not load programs: ${programs.error.message}`);
   if (scheduled.error) throw new Error(`Could not load the calendar: ${scheduled.error.message}`);
   return {
+    hints: await loadPickerHints(supabase, workspaceId, userId, library.data),
     library: library.data,
     programs: programs.data.map((p) => ({
       id: p.id,

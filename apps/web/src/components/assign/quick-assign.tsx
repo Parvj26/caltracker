@@ -101,7 +101,8 @@ export function QuickAssignDialog({
   const dayClashes = dayError ? [] : workoutClashes(day, scheduled);
 
   const programs = data?.programs ?? [];
-  const program = programs.find((p) => p.id === programId) ?? programs[0] ?? null;
+  // Until the coach picks one: the program they assigned most recently, else the first.
+  const program = programs.find((p) => p.id === (programId ?? data?.hints.lastProgramId)) ?? programs[0] ?? null;
   const startValid = IsoDateSchema.safeParse(startDate).success;
   const startError = !startValid ? 'Pick a start date.' : programStartError(startDate, today);
   const clashes = program && !startError ? programClashes(program, startDate, scheduled) : [];
@@ -194,7 +195,7 @@ export function QuickAssignDialog({
               </span>
             </p>
           ) : null}
-          <WorkoutChoices library={data.library} onPick={pickWorkout} disabled={pending || dayError !== null} />
+          <WorkoutChoices library={data.library} hints={data.hints} onPick={pickWorkout} disabled={pending || dayError !== null} />
         </div>
       ) : (
         <div role="tabpanel" id={`${titleId}-program-panel`} aria-labelledby={`${titleId}-program`} className={styles.panel}>

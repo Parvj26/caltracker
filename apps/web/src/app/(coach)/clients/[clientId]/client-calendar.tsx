@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
 import type { CalendarView, IsoDate } from '@caltracker/shared';
 import { CalendarToolbar } from '@/components/calendar/calendar-toolbar';
@@ -12,6 +12,7 @@ import { ReloadButton } from '@/components/reload-button';
 import { Button, ButtonLink } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
+import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
 import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
@@ -68,6 +69,7 @@ export function ClientCalendar({
   programs,
   upcomingWorkouts,
   openAssign = false,
+  hints = NO_HINTS,
 }: {
   client: ClientRef;
   /** The signed-in coach: the remembered view is theirs. */
@@ -86,6 +88,8 @@ export function ClientCalendar({
   upcomingWorkouts: readonly ExistingWorkout[];
   /** Open the assign dialog on load (the Assign shortcut on Home, ?assign=1). */
   openAssign?: boolean;
+  /** The coach's Recent and Most used workouts (pickers show them first) and last-assigned program (the default). */
+  hints?: PickerHints;
 }) {
   const today = useLocalToday();
   const timeZone = useTimeZone();
@@ -119,6 +123,14 @@ export function ClientCalendar({
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // The workout the toast can take back ("Added Legs to Mon 9 Nov. Undo"): null for any other message.
+  const [undoable, setUndoable] = useState<CalendarEntry | null>(null);
+  // Each add's save, by its new id, so Undo waits for the add to land before removing it.
+  const saves = useRef(new Map<string, Promise<void>>());
+  const say = (message: string | null, undo: CalendarEntry | null = null) => {
+    setToast(message);
+    setUndoable(undo);
+  };
 
   // Leaving while a move or delete is still saving would drop it: ask first.
   useEffect(() => {
@@ -134,7 +146,10 @@ export function ClientCalendar({
   useEffect(() => {
     // The reload prompt stays until the coach acts on it.
     if (!toast || toast === STALE_DEPLOY_MESSAGE) return;
-    const timer = setTimeout(() => setToast(null), 8000);
+    const timer = setTimeout(() => {
+      setToast(null);
+      setUndoable(null);
+    }, 8000);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -149,8 +164,8 @@ export function ClientCalendar({
       .then(() => setSavedOnce(true))
       .catch((e: unknown) => {
         setItems(undo);
-        if (isStaleDeployError(e)) setToast(STALE_DEPLOY_MESSAGE);
-        else setToast(e instanceof Error && forCoach(e.message) ? e.message : SAVE_ERROR);
+        if (isStaleDeployError(e)) say(STALE_DEPLOY_MESSAGE);
+        else say(e instanceof Error && forCoach(e.message) ? e.message : SAVE_ERROR);
       })
       .finally(() => setInFlight((n) => n - 1));
   }
@@ -170,23 +185,30 @@ export function ClientCalendar({
   }
 
   function remove(entry: CalendarEntry) {
+    // An add still saving is removed once it has landed (a failed add has nothing to remove).
+    const added = saves.current.get(entry.id) ?? Promise.resolve();
     optimistic(
       (s) => s.filter((x) => x.id !== entry.id),
-      () => deleteClientWorkout(entry.id),
+      () => added.catch(() => undefined).then(() => deleteClientWorkout(entry.id)),
       (s) => (s.some((x) => x.id === entry.id) ? s : [...s, entry]),
     );
   }
 
+  /** Adds a library workout on a day at once (saved in the background), with Undo in the toast. */
   function schedule(workout: LibraryWorkout, date: IsoDate, newId: string) {
     const entry: CalendarEntry = { id: newId, name: workout.name, programName: null, logId: null, date };
     optimistic(
       (s) => (s.some((x) => x.id === newId) ? s : [...s, entry]),
-      async () => {
-        const outcome = await scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date, today });
-        if (!outcome.ok) throw new Error(outcome.error);
+      () => {
+        const save = scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date, today }).then((outcome) => {
+          if (!outcome.ok) throw new Error(outcome.error);
+        });
+        saves.current.set(newId, save);
+        return save;
       },
       (s) => s.filter((x) => x.id !== newId),
     );
+    say(`Added ${workout.name} to ${formatShortDay(date)}.`, entry);
   }
 
   const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
@@ -261,7 +283,7 @@ export function ClientCalendar({
         />
       ) : null}
 
-      <AssignmentsPanel assignments={assignments} today={today} readOnly={readOnly} onMessage={setToast} />
+      <AssignmentsPanel assignments={assignments} today={today} readOnly={readOnly} onMessage={(m) => say(m)} />
 
       <p role="status" className={styles.status}>
         {status}
@@ -309,11 +331,12 @@ export function ClientCalendar({
           clientId={client.id}
           clientName={client.name}
           programs={programs}
+          defaultProgramId={hints.lastProgramId}
           existing={upcomingWorkouts}
           today={today}
           onAssigned={(programName, count) => {
             setAssigning(false);
-            setToast(`Assigned ${programName}: ${workoutsText(count)} added.`);
+            say(`Assigned ${programName}: ${workoutsText(count)} added.`);
           }}
           onClose={() => setAssigning(false)}
         />
@@ -321,12 +344,12 @@ export function ClientCalendar({
 
       {adding ? (
         <AddWorkoutDialog
-          clientId={client.id}
           library={library}
+          hints={hints}
           today={today}
-          onAdded={(workout, date) => {
+          onPick={(workout, date) => {
             setAdding(false);
-            setToast(`Added ${workout.name} to ${formatShortDay(date)}.`);
+            schedule(workout, date, crypto.randomUUID());
           }}
           onClose={() => setAdding(false)}
         />
@@ -336,6 +359,7 @@ export function ClientCalendar({
         <WorkoutPicker
           cellLabel={formatShortDay(picker.date)}
           library={library}
+          hints={hints}
           onPick={(w) => {
             schedule(w, picker.date, picker.newId);
             setPicker(null);
@@ -373,7 +397,19 @@ export function ClientCalendar({
           <div className={styles.toast}>
             <span>{toast}</span>
             {toast === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
-            <button type="button" className={styles.smallButton} onClick={() => setToast(null)}>
+            {undoable ? (
+              <button
+                type="button"
+                className={styles.smallButton}
+                onClick={() => {
+                  remove(undoable);
+                  say(`Removed ${undoable.name}.`);
+                }}
+              >
+                Undo
+              </button>
+            ) : null}
+            <button type="button" className={styles.smallButton} onClick={() => say(null)}>
               Dismiss
             </button>
           </div>

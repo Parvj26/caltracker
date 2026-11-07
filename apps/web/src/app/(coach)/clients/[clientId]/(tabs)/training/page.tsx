@@ -30,6 +30,7 @@ import { StrengthPanel } from '../../strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import { LiveRefresh } from '@/components/live-refresh';
+import { loadPickerHints } from '@/lib/picker-hints';
 import { renderTime } from '@/lib/live-refresh';
 import styles from '@/components/calendar/calendar.module.css';
 
@@ -219,6 +220,9 @@ export default async function ClientPage({
     slots: p.program_workouts.map((s) => ({ week: s.week, day: s.day })),
   }));
 
+  // The pickers' Recent and Most used, and the program picker's default (only needed while they can assign).
+  const hints = client.removedAt === null ? await loadPickerHints(supabase, workspaceId, userId, library.data) : undefined;
+
   // A past client's chat history stays readable here (read-only).
   const history = client.removedAt !== null ? await loadThread(supabase, workspaceId, userId, client) : null;
 
@@ -238,6 +242,7 @@ export default async function ClientPage({
         programs={pickerPrograms}
         upcomingWorkouts={scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : []))}
         openAssign={query.assign === '1'}
+        {...(hints ? { hints } : {})}
       />
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />

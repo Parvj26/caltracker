@@ -508,7 +508,7 @@ test('the header has Assign program and + Add workout, with a hint', async ({ pa
   await expect(page.getByText('Assign a program to plan weeks at once, or add a single workout to any day.')).toBeVisible();
 });
 
-test('+ Add workout: pick a workout and a date; a double click adds it once', async ({ page }) => {
+test('+ Add workout: set the date, then one tap on a workout adds it (no confirm step)', async ({ page }) => {
   const workout = `Header add ${unique()}`;
   created.workouts.push(workout);
   await signInAsCoach(page);
@@ -520,23 +520,21 @@ test('+ Add workout: pick a workout and a date; a double click adds it once', as
   const dialog = await openAddWorkout(page);
   await expect(dialog.getByLabel('Date')).toHaveValue(today);
   await expect(dialog.getByLabel('Date')).toHaveAttribute('min', today);
-  const add = dialog.getByRole('button', { name: 'Add', exact: true });
-  // Nothing picked yet.
-  await expect(add).toBeDisabled();
+  // There is no separate Add button any more.
+  await expect(dialog.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
 
-  // Yesterday is refused.
+  // Yesterday is refused, and the workouts can't be picked meanwhile.
   await dialog.getByLabel('Date').fill(addDays(today, -1));
   await expect(dialog.getByText('Pick today or a later date.')).toBeVisible();
-
   await dialog.getByLabel('Search workouts').fill(workout);
-  await dialog.getByRole('button', { name: workout, exact: true }).click();
-  await expect(dialog.getByRole('button', { name: workout, exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(add).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: workout, exact: true })).toBeDisabled();
+
   await dialog.getByLabel('Date').fill(date);
   await expect(dialog.getByText('Pick today or a later date.')).toHaveCount(0);
-  await add.dblclick();
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(`Added ${workout} to ${fmt(date, true)}.`)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
   await page.goto(calendarUrl(monthOf(date)));
   await expect(item(page, date, workout)).toHaveCount(1);
@@ -680,44 +678,29 @@ test('a missed past workout can be edited, moved to another day or deleted, but 
   expect(left.data).toEqual([]);
 });
 
-test('+ Add workout: after an unclear failure, a different day gets a fresh id and a warning to check first', async ({ page }) => {
+test('+ Add workout: a failed save is undone on the calendar with a message', async ({ page }) => {
   const workout = `Unclear ${unique()}`;
   created.workouts.push(workout);
   await signInAsCoach(page);
   await createWorkout(page, workout);
-  await page.goto(calendarUrl());
-  const month = nextMonth(monthOf(await browserToday(page)));
-  const first = `${month}-10`;
-  const second = `${month}-17`;
+  const today = await browserToday(page);
+  await page.goto(calendarUrl(monthOf(today)));
 
-  // The first Add reaches the server (which adds it), but the browser gets an error back.
+  // The save never reaches the server.
   const pageUrl = new RegExp(`/clients/${clientId}/training(\\?.*)?$`);
-  let lost = false;
   await page.route(pageUrl, async (route) => {
-    if (route.request().method() !== 'POST' || lost) return route.continue();
-    lost = true;
-    await route.fetch();
+    if (route.request().method() !== 'POST') return route.continue();
     await route.fulfill({ status: 500, body: 'lost' });
   });
   const dialog = await openAddWorkout(page);
   await dialog.getByLabel('Search workouts').fill(workout);
   await dialog.getByRole('button', { name: workout, exact: true }).click();
-  await dialog.getByLabel('Date').fill(first);
-  await dialog.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(dialog.getByText("Couldn't add the workout. Check your connection and try again.")).toBeVisible();
-  const note = dialog.getByText('Check the calendar before adding again: the first try may have gone through.');
-  await expect(note).toBeVisible();
-  await page.unroute(pageUrl);
-
-  // A different day: the note goes, and the add lands on that day (not silently on the first one).
-  await dialog.getByLabel('Date').fill(second);
-  await expect(note).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText(`Added ${workout} to ${fmt(second, true)}.`)).toBeVisible();
-
-  const { data } = await admin.from('workouts').select('scheduled_on').eq('name', workout).eq('client_id', clientId).order('scheduled_on');
-  expect(data).toEqual([{ scheduled_on: first }, { scheduled_on: second }]);
+  await expect(page.getByText("Couldn't save that change, so it was undone. Please try again.")).toBeVisible();
+  await expect(item(page, today, workout)).toHaveCount(0);
+  await page.unroute(pageUrl);
+  const { data } = await admin.from('workouts').select('id').eq('name', workout).eq('client_id', clientId);
+  expect(data).toEqual([]);
 });
 
 const seededIds: string[] = [];
