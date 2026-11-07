@@ -71,23 +71,15 @@ create trigger community_reactions_before_insert before insert on public.communi
   for each row execute function public.community_reaction_before_insert();
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Every like becomes a heart (same id and time), before the notification trigger exists: the like notifications are
--- carried over below instead of being written again.
--- ---------------------------------------------------------------------------------------------------------------
-
-insert into public.community_reactions (id, post_id, community_id, workspace_id, user_id, reaction, created_at)
-select l.id, l.post_id, l.community_id, l.workspace_id, l.user_id, 'heart', l.created_at
-from public.community_likes l;
-
--- ---------------------------------------------------------------------------------------------------------------
--- Notifications: kind 'like' becomes 'reaction' (with comment_id set for a comment). One row per person per post or
--- comment, however many of the six they add; it goes when they take the last one back.
+-- Notifications: kind 'like' becomes 'reaction' (with comment_id set for a comment). One row per recipient, person and
+-- post or comment, however many of the six they add (a unique index, so it holds under concurrent taps too); it goes
+-- when they take the last one back.
 -- ---------------------------------------------------------------------------------------------------------------
 
 alter table public.community_notifications drop constraint community_notifications_kind_check;
-update public.community_notifications set kind = 'reaction' where kind = 'like';
-alter table public.community_notifications add constraint community_notifications_kind_check
-  check (kind in ('comment', 'reaction', 'coach_post', 'report'));
+create unique index community_notifications_reaction_unique
+  on public.community_notifications (recipient_id, actor_id, post_id, comment_id) nulls not distinct
+  where kind = 'reaction';
 
 create function public.community_notify_reaction() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -103,12 +95,8 @@ begin
     return new;
   end if;
   insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, comment_id, actor_id)
-  select new.workspace_id, new.community_id, v_recipient, 'reaction', new.post_id, new.comment_id, new.user_id
-  where not exists (
-    select 1 from public.community_notifications n
-    where n.kind = 'reaction' and n.recipient_id = v_recipient and n.actor_id = new.user_id
-      and n.post_id = new.post_id and n.comment_id is not distinct from new.comment_id
-  );
+  values (new.workspace_id, new.community_id, v_recipient, 'reaction', new.post_id, new.comment_id, new.user_id)
+  on conflict (recipient_id, actor_id, post_id, comment_id) where kind = 'reaction' do nothing;
   return new;
 end;
 $$;
@@ -148,6 +136,36 @@ create trigger community_reactions_touch_activity after delete on public.communi
   for each row execute function public.community_touch_activity_reaction();
 
 -- ---------------------------------------------------------------------------------------------------------------
+-- Every like becomes a heart (same id, person and time), and every 'like' notification the one reaction notification
+-- for it. The notifications are converted first, so the hearts' own notification trigger finds them and writes nothing.
+-- Safe to run twice. Kept as a function (no app may call it) so pgTAP can run it on likes seeded the old way.
+-- ---------------------------------------------------------------------------------------------------------------
+
+create function public.community_likes_to_reactions() returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  -- A 'like' row that would duplicate a reaction notification (or an earlier 'like' row) is dropped, not converted.
+  delete from public.community_notifications n
+  where n.kind = 'like' and exists (
+    select 1 from public.community_notifications o
+    where o.recipient_id = n.recipient_id and o.actor_id is not distinct from n.actor_id and o.post_id is not distinct from n.post_id
+      and o.comment_id is not distinct from n.comment_id and o.id <> n.id
+      and (o.kind = 'reaction' or (o.kind = 'like' and (o.created_at, o.id) < (n.created_at, n.id)))
+  );
+  update public.community_notifications set kind = 'reaction' where kind = 'like';
+
+  insert into public.community_reactions (id, post_id, community_id, workspace_id, user_id, reaction, created_at)
+  select l.id, l.post_id, l.community_id, l.workspace_id, l.user_id, 'heart', l.created_at
+  from public.community_likes l
+  on conflict do nothing;
+end;
+$$;
+
+select public.community_likes_to_reactions();
+alter table public.community_notifications add constraint community_notifications_kind_check
+  check (kind in ('comment', 'reaction', 'coach_post', 'report'));
+
+-- ---------------------------------------------------------------------------------------------------------------
 -- Retire likes (their triggers go with the table; Realtime drops it from the publication)
 -- ---------------------------------------------------------------------------------------------------------------
 
@@ -161,7 +179,7 @@ drop function public.community_unnotify_like();
 -- ---------------------------------------------------------------------------------------------------------------
 
 revoke execute on function public.community_reaction_before_insert(), public.community_notify_reaction(),
-  public.community_unnotify_reaction(), public.community_touch_activity_reaction()
+  public.community_unnotify_reaction(), public.community_touch_activity_reaction(), public.community_likes_to_reactions()
   from public, anon, authenticated;
 
 revoke all on table public.community_reactions from anon, authenticated, service_role;

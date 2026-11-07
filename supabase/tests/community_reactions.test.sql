@@ -1,5 +1,5 @@
 begin;
-select plan(69);
+select plan(80);
 
 -- Community reactions (❤️ 💪 🔥 👏 😂 🎉, stored as keys) on posts and comments: they replace the single Like.
 -- Workspace isolation, cross-client denial, blocks, removed members, notifications (collapsed per person and target)
@@ -42,6 +42,46 @@ select tests.act_as(:'b1');
 insert into public.community_comments (post_id, body) values (:'p_b', 'me again');
 reset role;
 select id as c_b from public.community_comments where post_id = :'p_b' \gset
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- Data migration: the copy the migration ran, run again on a like and a 'like' notification seeded the old way
+-- ---------------------------------------------------------------------------------------------------------------
+select gen_random_uuid() as like1 \gset
+select set_config('request.jwt.claims', '', true);
+create table public.community_likes (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null,
+  community_id uuid not null,
+  workspace_id uuid not null,
+  user_id uuid not null,
+  created_at timestamptz not null default now()
+);
+alter table public.community_notifications drop constraint community_notifications_kind_check;
+insert into public.community_likes (id, post_id, community_id, workspace_id, user_id, created_at)
+values (:'like1', :'p_coach', :'comm_a', :'ws_a', :'a1', '2026-11-01T10:00:00Z');
+insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, actor_id, created_at)
+values (:'ws_a', :'comm_a', :'coach_a', 'like', :'p_coach', :'a1', '2026-11-01T10:00:00Z');
+select lives_ok('select public.community_likes_to_reactions()', 'the like copy runs');
+select results_eq(format($$select reaction, user_id, post_id, comment_id, community_id, workspace_id, created_at
+  from public.community_reactions where id = %L$$, :'like1'),
+  format($$values ('heart'::text, %L::uuid, %L::uuid, null::uuid, %L::uuid, %L::uuid, '2026-11-01T10:00:00Z'::timestamptz)$$,
+    :'a1', :'p_coach', :'comm_a', :'ws_a'),
+  'an existing like becomes a heart, with the same id, person, post and time');
+select is((select count(*)::int from public.community_notifications where kind = 'like'), 0, 'no ''like'' notifications are left');
+select results_eq(format($$select kind, created_at from public.community_notifications where recipient_id = %L and actor_id = %L$$,
+  :'coach_a', :'a1'), $$values ('reaction'::text, '2026-11-01T10:00:00Z'::timestamptz)$$,
+  'the like notification becomes the one reaction notification (not written twice)');
+select lives_ok('select public.community_likes_to_reactions()', 'running the copy again ...');
+select is((select count(*)::int from public.community_reactions where post_id = :'p_coach' and user_id = :'a1'), 1, '... adds nothing');
+select ok(not has_function_privilege('authenticated', 'public.community_likes_to_reactions()', 'execute'),
+  'the apps cannot run the copy');
+drop table public.community_likes;
+alter table public.community_notifications add constraint community_notifications_kind_check
+  check (kind in ('comment', 'reaction', 'coach_post', 'report'));
+-- Out of the way for the tests below (its notification goes with it).
+delete from public.community_reactions where id = :'like1';
+select is((select count(*)::int from public.community_notifications where actor_id = :'a1' and kind = 'reaction'), 0,
+  'removing the copied heart removes its notification');
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Schema and privileges
@@ -118,6 +158,15 @@ select is((select post_id from public.community_notifications where kind = 'reac
   'the comment notification links to its post');
 select is((select count(*)::int from public.community_notifications where kind = 'reaction' and post_id = :'p_coach'), 0,
   'no notification for reacting to your own post');
+select throws_ok(format($$insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, actor_id)
+  values (%L, %L, %L, 'reaction', %L, %L)$$, :'ws_a', :'comm_a', :'a1', :'p1', :'a3'), '23505', null,
+  'the database keeps one reaction notification per recipient, actor and post');
+select throws_ok(format($$insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, comment_id, actor_id)
+  values (%L, %L, %L, 'reaction', %L, %L, %L)$$, :'ws_a', :'comm_a', :'a3', :'p1', :'c_a3', :'a2'), '23505', null,
+  '... and per recipient, actor and comment');
+select lives_ok(format($$insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, actor_id)
+  values (%L, %L, %L, 'comment', %L, %L)$$, :'ws_a', :'comm_a', :'a1', :'p1', :'a3'), 'other kinds are not limited by it');
+delete from public.community_notifications where kind = 'comment' and recipient_id = :'a1' and actor_id = :'a3';
 
 select tests.act_as(:'a2');
 delete from public.community_reactions where post_id = :'p1' and comment_id is null and reaction = 'fire';

@@ -2341,6 +2341,7 @@ export type Database = {
         Args: { p_client_id: string; p_doc: Json }
         Returns: Json
       }
+      community_likes_to_reactions: { Args: never; Returns: undefined }
       copy_program_week: {
         Args: {
           p_from: number
