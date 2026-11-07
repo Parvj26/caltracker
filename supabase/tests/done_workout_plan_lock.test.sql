@@ -1,5 +1,5 @@
 begin;
-select plan(27);
+select plan(28);
 
 -- A client's workout that has a completed log keeps its plan, so planned vs. actual on the log still matches what
 -- the client was given: the database refuses changing its name, notes, day, blocks, exercises, sets or substitutes,
@@ -31,7 +31,6 @@ select id as done_we from public.workout_exercises where workout_id = :'done' \g
 select id as done_set from public.workout_sets where workout_id = :'done' and position = 0 \gset
 select id as inprog_set from public.workout_sets where workout_id = :'inprog' and position = 0 \gset
 select id as discarded_set from public.workout_sets where workout_id = :'discarded' and position = 0 \gset
-select id as missed_set from public.workout_sets where workout_id = :'missed' and position = 0 \gset
 
 -- A one-exercise doc with fresh row ids (save_workout replaces the old rows with these).
 create function tests.dl_doc(id uuid, name text, ex uuid) returns jsonb
@@ -100,11 +99,16 @@ select is((select target_reps_min from public.workout_sets where id = :'discarde
 select tests.act_as(:'coach_b');
 select throws_ok(format($$select public.save_workout(%L, %L::jsonb)$$, :'ws_a', tests.dl_doc(:'missed', 'Hijack', :'ex')),
   '42501', null, 'a coach of another workspace can''t save into this one');
-select is_empty(format($$update public.workout_sets set target_reps_min = 1 where id = %L returning id$$, :'missed_set'),
+select is_empty(format($$update public.workout_sets set target_reps_min = 1 where id = %L returning id$$, :'discarded_set'),
   'a coach of another workspace changes no set here');
 select tests.act_as(:'a2');
-select is_empty(format($$update public.workout_sets set target_reps_min = 1 where id = %L returning id$$, :'missed_set'),
+select is_empty(format($$update public.workout_sets set target_reps_min = 1 where id = %L returning id$$, :'done_set'),
   'another client changes no set of this client');
+
+-- ---------- Repointing a row into a done workout is refused, even past RLS ----------
+reset role;
+select throws_ok(format($$update public.workout_sets set workout_id = %L where id = %L$$, :'done', :'discarded_set'),
+  '23514', :'msg', 'a set of another workout can''t be moved into a done workout, even as postgres');
 
 -- ---------- Deleting a done workout still works ----------
 select tests.act_as(:'coach_a');

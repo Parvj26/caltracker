@@ -32,6 +32,11 @@ begin
     v_workout_id := new.workout_id;
   elsif tg_op = 'UPDATE' then
     v_workout_id := old.workout_id;
+    -- A row can't be repointed into a done workout either (not even by a role that skips RLS).
+    if new.workout_id is distinct from old.workout_id and public.workout_is_done(new.workout_id) then
+      raise exception 'This workout is already done, so its plan can''t change. Edit the logged results instead.'
+        using errcode = '23514';
+    end if;
   else
     v_workout_id := old.workout_id;
     -- Removed because its workout (or its parent row) is being deleted: let the cascade through.
