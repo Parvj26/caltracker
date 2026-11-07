@@ -9,7 +9,7 @@ import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteProgram } from './delete-program';
 import { loadLiveSync } from '@/lib/live-sync';
-import { loadPickerHints } from '@/lib/picker-hints';
+import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -34,7 +34,7 @@ export default async function ProgramPage({
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
-  const [program, slots, library, live] = await Promise.all([
+  const [program, slots, library, live, history] = await Promise.all([
     getProgram(id),
     supabase
       .from('program_workouts')
@@ -52,6 +52,7 @@ export default async function ProgramPage({
       .order('name')
       .limit(LIBRARY_LIMIT),
     loadLiveSync(supabase, workspaceId, id),
+    loadPickerHistory(supabase, workspaceId, userId),
   ]);
   if (slots.error) throw new Error(`Could not load the program's workouts: ${slots.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
@@ -66,7 +67,7 @@ export default async function ProgramPage({
     workoutName: s.workouts?.name ?? '',
   }));
   const workouts: LibraryWorkout[] = library.data;
-  const hints = await loadPickerHints(supabase, workspaceId, userId, workouts);
+  const hints = pickerHints(history, workouts);
 
   return (
     <div className={styles.page}>

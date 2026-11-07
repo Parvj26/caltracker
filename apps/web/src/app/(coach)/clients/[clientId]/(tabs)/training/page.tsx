@@ -30,7 +30,7 @@ import { StrengthPanel } from '../../strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import { LiveRefresh } from '@/components/live-refresh';
-import { loadPickerHints } from '@/lib/picker-hints';
+import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
 import { renderTime } from '@/lib/live-refresh';
 import styles from '@/components/calendar/calendar.module.css';
 
@@ -87,7 +87,7 @@ export default async function ClientPage({
     from ? [from] : [addDays(utcToday, -1), addDays(utcToday, 1)],
   );
 
-  const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
+  const [workouts, assignments, library, programs, stickers, strength, pickerHistory, scheduled, unplanned] = await Promise.all([
     supabase
       .from('workouts')
       .select(CALENDAR_SELECT)
@@ -125,6 +125,8 @@ export default async function ClientPage({
       .order('name'),
     loadClientStickers(supabase, workspaceId, client.id),
     loadClientStrength(supabase, workspaceId, client.id),
+    // The pickers' Recent and Most used, and the program picker's default (only needed while they can assign).
+    client.removedAt === null ? loadPickerHistory(supabase, workspaceId, userId) : Promise.resolve(null),
     // Everything from the earliest day a program may start (7 days back, a day more for time zones) on, so the
     // assign dialog can warn about days that already have a workout, however far ahead the program runs.
     supabase
@@ -219,8 +221,7 @@ export default async function ClientPage({
     slots: p.program_workouts.map((s) => ({ week: s.week, day: s.day })),
   }));
 
-  // The pickers' Recent and Most used, and the program picker's default (only needed while they can assign).
-  const hints = client.removedAt === null ? await loadPickerHints(supabase, workspaceId, userId, library.data) : undefined;
+  const hints = pickerHistory ? pickerHints(pickerHistory, library.data) : undefined;
 
   // A past client's chat history stays readable here (read-only).
   const history = client.removedAt !== null ? await loadThread(supabase, workspaceId, userId, client) : null;
