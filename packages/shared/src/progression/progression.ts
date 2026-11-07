@@ -4,7 +4,7 @@
 import type { TrackingType } from '../exercises/tracking';
 import type { ResultSet } from '../logs/format';
 import type { LogExerciseDoc, WorkoutLogDoc } from '../logs/schema';
-import { fromKg, toKg, type Units } from '../units/units';
+import { kgToInput, toKg, type Units } from '../units/units';
 import type { SetType, WorkoutDoc, WorkoutExerciseDoc } from '../workouts/schema';
 
 export type BodyRegion = 'upper' | 'lower';
@@ -64,6 +64,24 @@ function allAtTop(s: ProgressionSession, r: Range[]): boolean {
   return sets.length > 0 && sets.every((x, n) => x.completed && x.reps !== null && x.reps >= rangeAt(r, n).top);
 }
 
+/** The heaviest working weight done in a session (above 0), or null. */
+function heaviest(s: ProgressionSession): number | null {
+  const lifted = working(s.sets).filter((x) => x.completed && x.weightKg !== null && x.weightKg > 0);
+  return lifted.length > 0 ? Math.max(...lifted.map((x) => x.weightKg!)) : null;
+}
+
+/**
+ * The last session's weight in the client's units, on the plate grid: an exact kg value (kgToInput, so 61.25 stays
+ * 61.25) or whole pounds, kept when it is on a half plate (61.25 kg, 102.5 lb: typed on purpose), otherwise snapped
+ * to the nearest plate step (a converted 45 kg = 99 lb becomes 100 lb).
+ */
+function onPlates(kg: number, units: Units): number {
+  const shown = kgToInput(kg, units);
+  const half = PLATE[units] / 2;
+  const onHalf = Math.abs(shown / half - Math.round(shown / half)) < 1e-6;
+  return onHalf ? shown : Math.round(shown / PLATE[units]) * PLATE[units];
+}
+
 function missedBottom(s: ProgressionSession, r: Range[]): boolean {
   return working(s.sets).some((x, n) => x.completed && x.reps !== null && x.reps < rangeAt(r, n).bottom);
 }
@@ -72,8 +90,9 @@ function missedBottom(s: ProgressionSession, r: Range[]): boolean {
  * The next suggested weight for one exercise, or null to keep today's pre-fill (hold, or nothing to go on).
  * - Up: every working set of the last session done at (or above) the top of its range: +5 lb upper / +10 lb lower
  *   (+2.5 kg / +5 kg), on the last session's heaviest working weight.
- * - Down: the last two sessions each had a done working set below the bottom of its range: −10%, rounded to the
- *   nearest 5 lb / 2.5 kg.
+ * - Down: the last two sessions, both at the same heaviest weight, each had a done working set below the bottom of its
+ *   range: −10%, rounded to the nearest 5 lb / 2.5 kg.
+ * The last weight is first put on the plate grid (onPlates), so a weight logged in other units snaps to plates.
  * Only weight-and-reps exercises with a rep range on every working set and a weight lifted last time qualify, and a
  * weight the coach typed on any working set always wins (no suggestion).
  */
@@ -88,21 +107,21 @@ export function nextSuggestion(
   const r = ranges(prescription);
   const last = history[0];
   if (!r || !last) return null;
-  const lifted = working(last.sets).filter((s) => s.completed && s.weightKg !== null && s.weightKg > 0);
-  if (lifted.length === 0) return null;
-  const fromWeightKg = Math.max(...lifted.map((s) => s.weightKg!));
-  const from = fromKg(fromWeightKg, units);
+  const fromWeightKg = heaviest(last);
+  if (fromWeightKg === null) return null;
+  const from = onPlates(fromWeightKg, units);
 
   if (allAtTop(last, r)) {
     const delta = STEP[units][region];
     return { change: 'up', fromWeightKg, weightKg: toKg(from + delta, units), delta };
   }
   const before = history[1];
-  if (before && missedBottom(last, r) && missedBottom(before, r)) {
+  // Two misses in a row at the same weight: a miss just after a drop (at the new weight) doesn't count twice.
+  if (before && heaviest(before) === fromWeightKg && missedBottom(last, r) && missedBottom(before, r)) {
     const plate = PLATE[units];
     const to = Math.round((from * DELOAD) / plate) * plate;
     if (to <= 0 || to >= from) return null;
-    return { change: 'down', fromWeightKg, weightKg: toKg(to, units), delta: Math.round((to - from) * 10) / 10 };
+    return { change: 'down', fromWeightKg, weightKg: toKg(to, units), delta: Math.round((to - from) * 100) / 100 };
   }
   return null;
 }

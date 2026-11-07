@@ -126,6 +126,27 @@ describe('nextSuggestion: going up', () => {
   });
 });
 
+describe('nextSuggestion: plate steps', () => {
+  it('keeps an exact kg weight someone typed on a half plate (61.25 kg → 63.75 kg)', () => {
+    expect(nextSuggestion([session([10, 61.25], [10, 61.25])], plan(2), 'upper', 'kg')).toEqual({
+      change: 'up',
+      fromWeightKg: 61.25,
+      weightKg: 63.75,
+      delta: 2.5,
+    });
+  });
+
+  it('snaps a weight logged in kg to the plate step for a client now in lb (45 kg = 99 lb → 100 + 5 lb)', () => {
+    const s = nextSuggestion([session([10, 45], [10, 45])], plan(2), 'upper', 'lb');
+    expect(s?.weightKg).toBe(lb(105));
+    expect(s?.delta).toBe(5);
+  });
+
+  it('snaps a converted 60 kg (132 lb) to 130 before adding 10 lb', () => {
+    expect(nextSuggestion([session([10, 60])], plan(1), 'lower', 'lb')?.weightKg).toBe(lb(140));
+  });
+});
+
 describe('nextSuggestion: coming down', () => {
   it('drops 10% after two sessions in a row below the bottom of the range, to the nearest 5 lb', () => {
     const history = [session([7, lb(135)], [6, lb(135)], [8, lb(135)]), session([8, lb(135)], [7, lb(135)], [8, lb(135)])];
@@ -136,6 +157,16 @@ describe('nextSuggestion: coming down', () => {
       weightKg: lb(120),
       delta: -15,
     });
+  });
+
+  it('needs both misses at the same weight, so one miss after a drop does not drop again', () => {
+    const s1 = session([6, 100], [6, 100]);
+    const s2 = session([7, 100], [6, 100]);
+    expect(nextSuggestion([s2, s1], plan(2), 'upper', 'kg')?.weightKg).toBe(90);
+    const s3 = session([7, 90], [6, 90]);
+    expect(nextSuggestion([s3, s2, s1], plan(2), 'upper', 'kg')).toBeNull();
+    // A second miss at 90 drops again.
+    expect(nextSuggestion([session([6, 90], [6, 90]), s3, s2], plan(2), 'upper', 'kg')?.weightKg).toBe(80);
   });
 
   it('rounds to the nearest 2.5 kg for kg users', () => {
