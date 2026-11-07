@@ -12,7 +12,18 @@ The source of truth for the collection. The product spec (Section 6) defines the
 | Shiny | any ladder animal | 1-in-20 roll each time a workout earns its ladder animal | Animated holographic foil overlay |
 
 ## 1. Weight ladder (Common + Exotic) — 30 animals
-After each workout, the badge shows the heaviest animal whose weight ≤ workout volume, with the multiple ("You lifted 2.1 rhinos!").
+After each workout, the badge shows one ladder animal and how many of it the workout volume equals ("You lifted 2.1 rhinos!", "≈ 1,500 rabbits"). Which animal (product owner decision, 2026-11-06: new animals first, so clients collect the light ones too):
+
+1. **Eligible:** every ladder animal whose weight ≤ the workout's volume.
+2. **New first:** among the eligible animals the client hasn't been awarded yet, one at random.
+3. **Repeats:** if the client already has every eligible animal, the one they were awarded longest ago (lighter first on a tie).
+4. **The card** shows that animal and the volume ÷ its weight: one decimal under 10, whole numbers from 10 up, thousands grouped.
+
+How it stays fair and stable:
+- "Already awarded" means the animals of the client's awards (with that coach) for workouts finished **before** this one, by finish time and then log id. Later workouts never change an earlier one's animal.
+- The random choice is seeded by the workout's log id, never `Math.random`, so working the same workout out again gives the same animal. The phone's instant preview uses the same rule, log id and history, so it shows what the server will award.
+- A coach correction (or a reopened and re-finished workout) keeps the animal already awarded while the corrected volume still reaches it; only its multiple changes. If the volume drops below it, a new one is picked by the same rule and swapped in: the old sticker's count goes down by one, but a sticker is never taken away (the last one stays), and the new one is never shiny (corrections never roll).
+- The rule lives in `packages/shared` (`pickLadderAnimal`). Rare finds, drops, landmarks, shiny rolls and the qualifying rule are unchanged.
 
 | # | Animal | Weight (kg) | Tier |
 |---|---|---|---|
