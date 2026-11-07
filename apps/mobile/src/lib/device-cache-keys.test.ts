@@ -27,6 +27,11 @@ describe('keysToForget', () => {
     ]);
   });
 
+  it('forgets this user’s food log copies but not the queue of meals still to send', () => {
+    const food = ['caltracker.food.u1.w1', 'caltracker.food.u2.w1', 'caltracker.foodQueue.u1.w1'];
+    expect(keysToForget(food, 'u1')).toEqual(['caltracker.food.u1.w1']);
+  });
+
   it('still forgets the Today copies when the user is unknown', () => {
     expect(keysToForget(keys, null)).toEqual(keys.filter((k) => k.startsWith('caltracker.today.')));
   });

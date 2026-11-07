@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { LineChart } from '@/components/charts/line-chart';
@@ -7,13 +7,15 @@ import { Card, Screen } from '@/components/ui';
 import { fetchStrength, readCachedStrength } from '@/lib/strength-api';
 import { chartModel, type StrengthData } from '@/lib/strength-logic';
 import { useSession } from '@/lib/session';
+import { zooHref } from '@/lib/zoo-href';
 import { useUnits } from '@/lib/use-units';
-import { palette } from '@/theme/theme';
+import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /** Progress: each lift's estimated one-rep max over time, then body scans and the client's own weight log. */
 export default function ProgressScreen() {
   const { text, space, radius } = useTheme();
+  const router = useRouter();
   const { session } = useSession();
   const userId = session?.user.id ?? null;
   const units = useUnits();
@@ -61,6 +63,21 @@ export default function ProgressScreen() {
         Progress
       </Text>
       {offline ? <Text style={text('caption')}>Showing your saved progress. It updates when you’re online.</Text> : null}
+
+      <Pressable
+        onPress={() => router.push(zooHref())}
+        accessibilityRole="button"
+        accessibilityLabel="Zoo book"
+        accessibilityHint="Opens your sticker book: your streak, animals and rare finds"
+        testID="progress-zoo"
+        style={({ pressed }) => [
+          { backgroundColor: palette.celebrateBg, borderRadius: radius.card, padding: space[4.5], gap: space[1] },
+          pressed && { opacity: pressedOpacity },
+        ]}
+      >
+        <Text style={text('sectionHeading')}>Zoo book ›</Text>
+        <Text style={text('caption')}>Your streak, animals, rare finds and surprise drops.</Text>
+      </Pressable>
 
       <Card>
         <Text style={text('sectionHeading')} accessibilityRole="header">

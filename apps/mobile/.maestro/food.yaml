@@ -1,0 +1,114 @@
+# Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank), log a meal by macros (Lunch,
+# 650 kcal, 42 g protein), see it in today's list and the totals against the targets, see the kcal hint for a meal
+# without calories, edit the meal, then delete it. Photos need the camera or the library, so they are not covered.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-food-targets, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-food
+- assertVisible:
+    id: food-day
+    text: Today
+- extendedWaitUntil:
+    visible: 'No meals yet today.'
+    timeout: 10000
+- assertVisible:
+    id: food-total-calories
+    text: '0 of 2,000 kcal'
+
+# Log by macros.
+- tapOn:
+    id: food-log-meal
+- tapOn:
+    id: log-meal-macros
+- tapOn:
+    id: meal-name-Lunch
+- tapOn:
+    id: meal-protein
+- inputText: '42'
+# No calories yet: the hint works them out from the protein (42 x 4).
+- scrollUntilVisible:
+    element:
+      id: meal-kcal-hint
+- assertVisible: '≈ 168 kcal from macros'
+- tapOn:
+    id: meal-calories
+- inputText: '650'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: meal-save
+- tapOn:
+    id: meal-save
+- extendedWaitUntil:
+    visible: 'Lunch.*'
+    timeout: 10000
+- assertVisible: 'Lunch, .*, 650 kcal · P 42 g'
+- assertVisible:
+    id: food-total-calories
+    text: '650 of 2,000 kcal'
+- assertVisible:
+    id: food-total-protein
+    text: '42 of 150 g'
+- extendedWaitUntil:
+    notVisible: 'Saving…'
+    timeout: 20000
+
+# Edit it.
+- tapOn: 'Lunch.*'
+- assertVisible: 'Edit meal'
+- tapOn:
+    id: meal-calories
+- eraseText: 5
+- inputText: '700'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: meal-save
+- tapOn:
+    id: meal-save
+- extendedWaitUntil:
+    visible:
+      id: food-total-calories
+      text: '700 of 2,000 kcal'
+    timeout: 10000
+
+# Yesterday is empty, and there is no day after today.
+- tapOn:
+    id: food-prev-day
+- assertVisible:
+    id: food-day
+    text: Yesterday
+- assertVisible: 'No meals logged this day.'
+- tapOn:
+    id: food-next-day
+- assertVisible:
+    id: food-day
+    text: Today
+
+# Delete it.
+- tapOn: 'Lunch.*'
+- scrollUntilVisible:
+    element:
+      id: meal-delete
+- tapOn:
+    id: meal-delete
+- tapOn: Delete
+- extendedWaitUntil:
+    visible: 'No meals yet today.'
+    timeout: 10000
+- takeScreenshot: food-phone
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-food, EMAIL: '${EMAIL}' }

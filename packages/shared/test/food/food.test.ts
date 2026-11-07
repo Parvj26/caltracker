@@ -17,6 +17,7 @@ import {
   mealReference,
   mealsByDay,
   parseMacroInput,
+  todayFoodSummary,
   weekDays,
   type MealMacros,
 } from '../../src/food/food';
@@ -205,5 +206,25 @@ describe('mealReference', () => {
     expect(mealReference({ name: null, eatenOn: '2026-11-07', eatenAt: '2026-11-07T19:00:00Z' }, '2026-11-07', 'UTC')).toBe(
       'About your meal today (7:00 pm): ',
     );
+  });
+});
+
+describe('todayFoodSummary', () => {
+  const totals = (calories: number, protein: number) => ({ ...dailyTotals([]), calories, protein });
+  it('shows kcal and protein against their targets', () => {
+    expect(todayFoodSummary(totals(650, 42), { ...none, calories: 2000, protein: 150 })).toEqual({
+      calories: '650 of 2,000 kcal',
+      protein: '42 of 150 g protein',
+    });
+  });
+  it('shows plain totals where there is no target', () => {
+    expect(todayFoodSummary(totals(650, 42), { ...none, calories: 2000 })).toEqual({ calories: '650 of 2,000 kcal', protein: '42 g protein' });
+  });
+  it('is null with no targets and nothing logged', () => {
+    expect(todayFoodSummary(totals(0, 0), null)).toBeNull();
+    expect(todayFoodSummary(totals(0, 0), none)).toBeNull();
+  });
+  it('shows today’s food even before targets are set', () => {
+    expect(todayFoodSummary({ ...totals(300, 0), mealCount: 1 }, null)).toEqual({ calories: '300 kcal', protein: '0 g protein' });
   });
 });

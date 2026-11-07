@@ -9,11 +9,8 @@ import type { ProgressModel } from './progress';
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
 
-/**
- * Where the Today tab's sticker card goes. The Zoo book is its own tab for now; when it moves inside Progress this is
- * the one place to change.
- */
-export const zooHref = () => '/zoo' as const;
+/** Where the Today tab's sticker card goes: the Zoo book screen. One helper for every Zoo link (see zoo-href.ts). */
+export { zooHref } from './zoo-href';
 
 /** "Saturday 7 November", from the phone's own date (no locale data needed). */
 export function headerDate(today: IsoDate): string {

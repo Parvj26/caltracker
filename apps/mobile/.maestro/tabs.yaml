@@ -1,4 +1,5 @@
-# The phone's tab bar has exactly five tabs: Today, Workouts, Coach, Zoo and Progress.
+# The phone's tab bar has exactly five tabs: Today, Workouts, Coach, Food and Progress. The Zoo book is no longer a
+# tab: it opens from the card at the top of Progress.
 appId: app.caltracker.client
 env:
   EMAIL: client@demo.local
@@ -16,11 +17,24 @@ env:
 - assertVisible:
     id: tab-coach
 - assertVisible:
-    id: tab-zoo
+    id: tab-food
 - assertVisible:
     id: tab-progress
+- assertNotVisible:
+    id: tab-zoo
 - assertNotVisible:
     id: tab-community
 - assertNotVisible:
     id: tab-me
+- tapOn:
+    id: tab-progress
+- tapOn:
+    id: progress-zoo
+- extendedWaitUntil:
+    visible: 'Zoo book'
+    timeout: 10000
+- tapOn:
+    id: zoo-back
+- assertVisible:
+    id: progress-zoo
 - takeScreenshot: tabs-phone

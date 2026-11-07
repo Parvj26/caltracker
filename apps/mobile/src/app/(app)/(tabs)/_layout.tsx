@@ -42,17 +42,18 @@ function ProgressIcon({ color }: { color: ColorValue }) {
   );
 }
 
-/** A small paw-like drawn icon for the Zoo book: a rounded square with a dot inside. */
-function ZooIcon({ color }: { color: ColorValue }) {
+/** A plate seen from above for Food: a ring with a smaller ring inside. */
+function FoodIcon({ color }: { color: ColorValue }) {
   return (
-    <View style={[styles.zooIcon, { borderColor: color }]}>
-      <View style={[styles.zooDot, { backgroundColor: color }]} />
+    <View style={[styles.plateIcon, { borderColor: color }]}>
+      <View style={[styles.plateInner, { borderColor: color }]} />
     </View>
   );
 }
 
 // Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
 // tab) starts on Today, not on whichever tab the router would pick.
+// Food took the Zoo's place (2026-11-07); the Zoo book is now a screen opened from Progress (zooHref()).
 // The other tabs in the spec (Community, Me) arrive with their phases.
 export default function TabsLayout() {
   const unread = useUnreadCount();
@@ -95,8 +96,8 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="zoo"
-        options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
+        name="food"
+        options={{ title: 'Food', tabBarButtonTestID: 'tab-food', tabBarIcon: ({ color }) => <FoodIcon color={color} /> }}
       />
       <Tabs.Screen
         name="progress"
@@ -121,16 +122,16 @@ const styles = StyleSheet.create({
   },
   bubbleIcon: { width: space[4.5], height: space[3.5] + 2, borderRadius: space[1], borderWidth: borderWidth.card },
   bubbleTail: { position: 'absolute', left: space[2], bottom: -2, width: space[1] + 2, height: space[1] + 2, transform: [{ rotate: '45deg' }] },
-  zooIcon: {
+  plateIcon: {
     width: space[4.5],
     height: space[4.5],
-    borderRadius: space[2],
+    borderRadius: radius.pill,
     borderWidth: borderWidth.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  plateInner: { width: space[2], height: space[2], borderRadius: radius.pill, borderWidth: 1 },
   progressIcon: { width: space[4.5], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', gap: space[1] },
   progressBar: { flex: 1, borderRadius: 1 },
-  zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
 });

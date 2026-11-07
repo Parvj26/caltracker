@@ -121,7 +121,7 @@ function PrsTile({ units, refreshKey, half }: { units: Units; refreshKey: number
 /**
  * "Your goal": the coach's goal and its countdown, and the latest weight, body fat and muscle with their 3-month
  * change (the same model as the Progress tab). Hidden with no goal and no scans. Opens Progress.
- * `foodSlot` is where the Food tab's macros will go; nothing fills it yet.
+ * `foodSlot` shows today's food (kcal and protein against target, from the Food tab).
  */
 export function GoalCard({ units, refreshKey, foodSlot = null }: { units: Units; refreshKey: number; foodSlot?: ReactNode }) {
   const { text, space } = useTheme();
@@ -178,7 +178,7 @@ export function GoalCard({ units, refreshKey, foodSlot = null }: { units: Units;
           ))}
         </View>
       ) : null}
-      {/* Food macros slot: the Food tab will pass its daily summary here. Nothing is shown until then. */}
+      {/* Today's food from the Food tab (TodayFood). */}
       {foodSlot}
     </Tile>
   );

@@ -1,10 +1,10 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { AlbumGrid } from '@/components/stickers/album-grid';
 import { Journey } from '@/components/stickers/journey';
 import { StickerSheet } from '@/components/stickers/sticker-sheet';
-import { Screen } from '@/components/ui';
+import { Screen, TextButton } from '@/components/ui';
 import { weekKey } from '@caltracker/shared';
 import { fetchAlbum, readCachedAlbum } from '@/lib/album-api';
 import { albumModel, type AlbumData, type AlbumItem } from '@/lib/album-logic';
@@ -13,8 +13,12 @@ import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
 import { useTheme } from '@/theme/use-theme';
 
-/** The zoo book: one scrolling album (streak journey, animals, rare finds, surprise drops). */
+/**
+ * The zoo book: one scrolling album (streak journey, animals, rare finds, surprise drops). Its own screen (not a tab
+ * since the Food tab), opened from Progress and Today through zooHref().
+ */
 export default function ZooScreen() {
+  const router = useRouter();
   const { text, space } = useTheme();
   const { session, workspace } = useSession();
   const userId = session?.user.id ?? null;
@@ -63,13 +67,15 @@ export default function ZooScreen() {
 
   return (
     <Screen
-      inTabs
       refreshing={refreshing}
       onRefresh={() => {
         setRefreshing(true);
         void load().finally(() => setRefreshing(false));
       }}
     >
+      <View style={{ flexDirection: 'row' }}>
+        <TextButton title="Back" testID="zoo-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/progress'))} />
+      </View>
       <Text style={text('screenTitle')} accessibilityRole="header">
         Zoo book
       </Text>

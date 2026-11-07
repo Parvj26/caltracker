@@ -502,6 +502,7 @@ export {
   mealsByDay,
   parseMacroInput,
   shortDayLabel,
+  todayFoodSummary,
   weekDays,
 } from './food/food';
 export type { DailyTotals, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt } from './food/food';

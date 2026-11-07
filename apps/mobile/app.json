@@ -36,8 +36,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CalTracker uses your photos so you can send them to your coach and share them in your community.",
-          "cameraPermission": false,
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach, share them in your community and log your meals.",
+          "cameraPermission": "CalTracker uses your camera so you can photograph your meals for your coach.",
           "microphonePermission": false
         }
       ],
