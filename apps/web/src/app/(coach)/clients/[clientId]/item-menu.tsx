@@ -25,6 +25,7 @@ export function ItemMenu({
   editHref,
   onMove,
   moveLabel = 'Move to…',
+  onCopy,
   onDelete,
 }: {
   item: CalendarItem;
@@ -36,6 +37,8 @@ export function ItemMenu({
   editHref?: string | undefined;
   onMove?: (() => void) | undefined;
   moveLabel?: string;
+  /** "Copy to…": the workout as it is, onto another day and/or other clients. */
+  onCopy?: (() => void) | undefined;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -160,12 +163,30 @@ export function ItemMenu({
               </button>
             </li>
           ) : null}
+          {onCopy ? (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[5] = el;
+                }}
+                className={styles.menuItem}
+                onClick={() => {
+                  setOpen(false);
+                  onCopy();
+                }}
+              >
+                Copy to…
+              </button>
+            </li>
+          ) : null}
           <li role="none">
             <button
               type="button"
               role="menuitem"
               ref={(el) => {
-                itemsRef.current[5] = el;
+                itemsRef.current[6] = el;
               }}
               className={styles.menuItem}
               onClick={() => {
