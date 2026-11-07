@@ -40,155 +40,160 @@ describe('liveSyncWindow', () => {
 
 describe('planLiveSync', () => {
   const assignment = { startDate: '2026-11-04', endDate: '2026-11-17', cancelledOn: null };
-  const revisions = { A: 1, B: 1 };
-  const copy = (over: Partial<LiveSyncCopy> & Pick<LiveSyncCopy, 'id' | 'date' | 'workoutId'>): LiveSyncCopy => ({
-    revision: 1,
+  const hashes = { A: 'a1', B: 'b1' };
+  const copy = (over: Partial<LiveSyncCopy> & Pick<LiveSyncCopy, 'id' | 'plannedOn' | 'workoutId'>): LiveSyncCopy => ({
+    date: over.plannedOn,
+    hash: over.workoutId === 'B' ? 'b1' : 'a1',
     customised: false,
     logged: false,
     ...over,
   });
+  const plan = (over: Partial<Parameters<typeof planLiveSync>[0]>) =>
+    planLiveSync({ assignment, weeks: 2, slots: [], hashes, copies: [], today, ...over });
 
   it('adds wanted days with no copy, from today on only', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
+    const p = plan({
       slots: [
         { week: 1, day: 1, position: 0, workoutId: 'A' }, // 2026-11-04, past
         { week: 1, day: 3, position: 0, workoutId: 'B' }, // 2026-11-06, today
         { week: 2, day: 1, position: 0, workoutId: 'A' }, // 2026-11-11
       ],
-      revisions,
-      copies: [],
-      today,
     });
-    expect(plan.add).toEqual([
+    expect(p.add).toEqual([
       { date: '2026-11-06', workoutId: 'B' },
       { date: '2026-11-11', workoutId: 'A' },
     ]);
-    expect(plan.remove).toEqual([]);
+    expect(p.remove).toEqual([]);
   });
 
-  it('removes untouched copies the program no longer has, never past ones', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
-      slots: [],
-      revisions,
-      copies: [copy({ id: 'past', date: '2026-11-04', workoutId: 'A' }), copy({ id: 'f', date: '2026-11-08', workoutId: 'A' })],
-      today,
+  it('removes untouched copies the program no longer has, only after today', () => {
+    const p = plan({
+      copies: [
+        copy({ id: 'past', plannedOn: '2026-11-04', workoutId: 'A' }),
+        copy({ id: 'today', plannedOn: '2026-11-06', workoutId: 'A' }),
+        copy({ id: 'f', plannedOn: '2026-11-08', workoutId: 'A' }),
+      ],
     });
-    expect(plan.remove).toEqual(['f']);
+    expect(p.remove).toEqual(['f']);
   });
 
   it('moves a copy when its slot moves (remove old day, add new day)', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
+    const p = plan({
       slots: [{ week: 2, day: 2, position: 0, workoutId: 'A' }],
-      revisions,
-      copies: [copy({ id: 'c', date: '2026-11-11', workoutId: 'A' })],
-      today,
+      copies: [copy({ id: 'c', plannedOn: '2026-11-11', workoutId: 'A' })],
     });
-    expect(plan).toMatchObject({ add: [{ date: '2026-11-12', workoutId: 'A' }], remove: ['c'], replace: [] });
+    expect(p).toMatchObject({ add: [{ date: '2026-11-12', workoutId: 'A' }], remove: ['c'], replace: [] });
   });
 
-  it('replaces an out-of-date untouched copy, keeping a logged one and reporting a customised one', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
+  it('pairs a copy the coach moved by its program day: no duplicate, nothing skipped', () => {
+    const p = plan({
+      slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
+      copies: [copy({ id: 'moved', plannedOn: '2026-11-11', date: '2026-11-13', workoutId: 'A', customised: true })],
+    });
+    expect(p).toEqual({ add: [], remove: [], replace: [], skipped: 0 });
+  });
+
+  it('refreshes an out-of-date untouched copy, keeps a logged one and reports a customised one', () => {
+    const p = plan({
       slots: [
         { week: 2, day: 1, position: 0, workoutId: 'A' },
         { week: 2, day: 2, position: 0, workoutId: 'A' },
         { week: 2, day: 3, position: 0, workoutId: 'A' },
       ],
-      revisions: { A: 2 },
+      hashes: { A: 'a2' },
       copies: [
-        copy({ id: 'old', date: '2026-11-11', workoutId: 'A' }),
-        copy({ id: 'done', date: '2026-11-12', workoutId: 'A', logged: true }),
-        copy({ id: 'mine', date: '2026-11-13', workoutId: 'A', customised: true }),
+        copy({ id: 'old', plannedOn: '2026-11-11', workoutId: 'A' }),
+        copy({ id: 'done', plannedOn: '2026-11-12', workoutId: 'A', logged: true }),
+        copy({ id: 'mine', plannedOn: '2026-11-13', workoutId: 'A', customised: true }),
       ],
-      today,
     });
-    expect(plan).toEqual({ add: [], remove: [], replace: ['old'], skipped: 1 });
+    expect(p).toEqual({ add: [], remove: [], replace: ['old'], skipped: 1 });
   });
 
-  it('treats a copy without a revision (made before Live Sync) as out of date', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
-      slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
-      revisions,
-      copies: [copy({ id: 'legacy', date: '2026-11-11', workoutId: 'A', revision: null })],
-      today,
+  it("never refreshes today's copy", () => {
+    const p = plan({
+      slots: [{ week: 1, day: 3, position: 0, workoutId: 'A' }],
+      hashes: { A: 'a2' },
+      copies: [copy({ id: 'today', plannedOn: '2026-11-06', workoutId: 'A' })],
     });
-    expect(plan.replace).toEqual(['legacy']);
+    expect(p.replace).toEqual([]);
+  });
+
+  it('treats a copy without a hash (made before Live Sync) as out of date', () => {
+    const p = plan({
+      slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
+      copies: [copy({ id: 'legacy', plannedOn: '2026-11-11', workoutId: 'A', hash: null })],
+    });
+    expect(p.replace).toEqual(['legacy']);
   });
 
   it('keeps protected copies of removed slots and counts only customised ones as skipped', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
-      slots: [],
-      revisions,
+    const p = plan({
       copies: [
-        copy({ id: 'done', date: '2026-11-08', workoutId: 'A', logged: true }),
-        copy({ id: 'mine', date: '2026-11-09', workoutId: 'A', customised: true }),
+        copy({ id: 'done', plannedOn: '2026-11-08', workoutId: 'A', logged: true }),
+        copy({ id: 'mine', plannedOn: '2026-11-09', workoutId: 'A', customised: true }),
       ],
-      today,
     });
-    expect(plan).toEqual({ add: [], remove: [], replace: [], skipped: 1 });
+    expect(p).toEqual({ add: [], remove: [], replace: [], skipped: 1 });
+  });
+
+  it('does not add a swapped-in workout on a day whose earlier copy was started or done', () => {
+    const p = plan({
+      slots: [{ week: 2, day: 1, position: 0, workoutId: 'B' }],
+      copies: [copy({ id: 'done', plannedOn: '2026-11-11', workoutId: 'A', logged: true })],
+    });
+    expect(p).toEqual({ add: [], remove: [], replace: [], skipped: 0 });
+  });
+
+  it('does not add back a program day the coach deleted', () => {
+    const p = plan({
+      slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
+      tombstones: new Set(['2026-11-11|A']),
+    });
+    expect(p.add).toEqual([]);
   });
 
   it('pairs the same workout twice on a day one by one, protected copies first', () => {
-    const plan = planLiveSync({
-      assignment,
-      weeks: 2,
+    const p = plan({
       slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
-      revisions,
-      copies: [copy({ id: 'plain', date: '2026-11-11', workoutId: 'A' }), copy({ id: 'mine', date: '2026-11-11', workoutId: 'A', customised: true })],
-      today,
+      copies: [
+        copy({ id: 'plain', plannedOn: '2026-11-11', workoutId: 'A' }),
+        copy({ id: 'mine', plannedOn: '2026-11-11', workoutId: 'A', customised: true }),
+      ],
     });
-    expect(plan).toEqual({ add: [], remove: ['plain'], replace: [], skipped: 0 });
+    expect(p).toEqual({ add: [], remove: ['plain'], replace: [], skipped: 0 });
   });
 
   it('ignores slots past the program length and days on or after the cancel date', () => {
-    const plan = planLiveSync({
+    const p = plan({
       assignment: { ...assignment, cancelledOn: '2026-11-12' },
-      weeks: 2,
       slots: [
         { week: 2, day: 1, position: 0, workoutId: 'A' }, // 11-11: kept
         { week: 2, day: 2, position: 0, workoutId: 'A' }, // 11-12: cancelled
         { week: 3, day: 1, position: 0, workoutId: 'A' }, // past the length
       ],
-      revisions,
-      copies: [],
-      today,
     });
-    expect(plan.add).toEqual([{ date: '2026-11-11', workoutId: 'A' }]);
+    expect(p.add).toEqual([{ date: '2026-11-11', workoutId: 'A' }]);
   });
 
   it('does nothing for an assignment that has ended', () => {
-    const plan = planLiveSync({
+    const p = plan({
       assignment: { startDate: '2026-10-01', endDate: '2026-10-14', cancelledOn: null },
-      weeks: 2,
       slots: [{ week: 1, day: 1, position: 0, workoutId: 'A' }],
-      revisions,
-      copies: [],
-      today,
     });
-    expect(plan).toEqual({ add: [], remove: [], replace: [], skipped: 0 });
+    expect(p).toEqual({ add: [], remove: [], replace: [], skipped: 0 });
   });
 });
 
 describe('isLiveWorkout', () => {
-  const base = { programLive: true, customised: false, done: false, date: '2026-11-08' };
-  it('is true for an untouched, not-done workout of a live program from today on', () => {
+  const base = { programLive: true, customised: false, started: false, date: '2026-11-08' };
+  it('is true for an untouched, not-started workout of a live program after today', () => {
     expect(isLiveWorkout(base, today)).toBe(true);
-    expect(isLiveWorkout({ ...base, date: today }, today)).toBe(true);
   });
-  it('is false for a past, done, customised, or not-live workout', () => {
+  it("is false for today's, a past, started or done, customised, or not-live workout", () => {
+    expect(isLiveWorkout({ ...base, date: today }, today)).toBe(false);
     expect(isLiveWorkout({ ...base, date: '2026-11-05' }, today)).toBe(false);
-    expect(isLiveWorkout({ ...base, done: true }, today)).toBe(false);
+    expect(isLiveWorkout({ ...base, started: true }, today)).toBe(false);
     expect(isLiveWorkout({ ...base, customised: true }, today)).toBe(false);
     expect(isLiveWorkout({ ...base, programLive: false }, today)).toBe(false);
   });
