@@ -2,7 +2,11 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 import { borderWidth, radius, space, typeScale } from '@caltracker/design-tokens';
 import { fontFamilyFor } from '@/theme/fonts';
-import { palette } from '@/theme/theme';
+import { useUnreadCount } from '@/lib/use-messages';
+import { palette, white } from '@/theme/theme';
+
+// Files are discovered alphabetically (coach.tsx first), so a bare navigation into the tabs would open Coach. Today is home.
+export const unstable_settings = { initialRouteName: 'today' };
 
 /** Simple drawn icons (no icon font yet): a sun-like dot for Today, a small calendar for Workouts. */
 function TodayIcon({ color }: { color: ColorValue }) {
@@ -13,6 +17,16 @@ function WorkoutsIcon({ color }: { color: ColorValue }) {
   return (
     <View style={[styles.calendarIcon, { borderColor: color }]}>
       <View style={[styles.calendarBar, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+/** A speech bubble: a rounded box with a small tail. */
+function CoachIcon({ color }: { color: ColorValue }) {
+  return (
+    <View>
+      <View style={[styles.bubbleIcon, { borderColor: color }]} />
+      <View style={[styles.bubbleTail, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -39,10 +53,9 @@ function ZooIcon({ color }: { color: ColorValue }) {
 
 // Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
 // tab) starts on Today, not on whichever tab the router would pick.
-export const unstable_settings = { initialRouteName: 'today' };
-
-// The other tabs in the spec (Messages, Community, Me) arrive with their phases.
+// The other tabs in the spec (Community, Me) arrive with their phases.
 export default function TabsLayout() {
+  const unread = useUnreadCount();
   return (
     <Tabs
       screenOptions={{
@@ -72,6 +85,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="coach"
+        options={{
+          title: 'Coach',
+          tabBarButtonTestID: 'tab-coach',
+          tabBarIcon: ({ color }) => <CoachIcon color={color} />,
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
+          tabBarBadgeStyle: { backgroundColor: palette.magenta, color: white },
+        }}
+      />
+      <Tabs.Screen
         name="zoo"
         options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
       />
@@ -96,6 +119,8 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.card,
     overflow: 'hidden',
   },
+  bubbleIcon: { width: space[4.5], height: space[3.5] + 2, borderRadius: space[1], borderWidth: borderWidth.card },
+  bubbleTail: { position: 'absolute', left: space[2], bottom: -2, width: space[1] + 2, height: space[1] + 2, transform: [{ rotate: '45deg' }] },
   zooIcon: {
     width: space[4.5],
     height: space[4.5],

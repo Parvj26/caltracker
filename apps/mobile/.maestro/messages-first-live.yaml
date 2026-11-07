@@ -1,0 +1,32 @@
+# On a fresh launch with no chat yet, the coach's very first message shows up live on the open Coach tab, without
+# leaving the tab or reopening the app.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-coach
+- extendedWaitUntil:
+    visible: 'No messages yet.*'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-message, EMAIL: '${EMAIL}', NAME: 'Welcome aboard, first message' }
+- extendedWaitUntil:
+    visible: 'Welcome aboard, first message'
+    timeout: 20000
+- assertNotVisible: 'No messages yet.*'
+- takeScreenshot: messages-first-live
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }

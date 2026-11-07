@@ -418,6 +418,64 @@ export type Database = {
           },
         ]
       }
+      conversation_reads: {
+        Row: {
+          conversation_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_message_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_metrics: {
         Row: {
           archived_at: string | null
@@ -824,6 +882,54 @@ export type Database = {
             columns: ["log_exercise_id"]
             isOneToOne: false
             referencedRelation: "log_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          client_msg_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          image_paths: string[]
+          sender_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          client_msg_id?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          sender_id?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_msg_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          sender_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -1681,6 +1787,18 @@ export type Database = {
         Returns: string
       }
       award_inputs: { Args: { p_log_id: string }; Returns: Json }
+      can_access_message_image: {
+        Args: { p_name: string; p_write: boolean }
+        Returns: boolean
+      }
+      can_post_to_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      can_read_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       claim_invites: {
         Args: never
         Returns: {
@@ -1780,6 +1898,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_or_create_conversation: {
+        Args: { p_client_id: string }
+        Returns: string
+      }
       hand_back_workout_log: { Args: { p_log_id: string }; Returns: Json }
       invite_for_join: {
         Args: { token: string }
@@ -1846,6 +1968,11 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      message_image_conversation: { Args: { p_name: string }; Returns: string }
       my_removal: {
         Args: never
         Returns: {

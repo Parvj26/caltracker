@@ -34,9 +34,17 @@
       "./plugins/without-push-entitlement.js",
       "expo-notifications",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-media-library",
         {
-          "photosPermission": false,
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
           "savePhotosPermission": "Save your sticker cards to Photos.",
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": []

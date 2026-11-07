@@ -18,6 +18,10 @@
 //   log-notes          the workout note of EMAIL's latest log, lines joined with " | " (returned as output.call)
 //   cleanup-logs       deletes every workout log of client@demo.local, and the stickers, personal bests and stats
 //                      they earned (refuses any other EMAIL)
+//   coach-message      the seed coach sends the client NAME as a chat message (client@demo.local only)
+//   assert-reply       fails unless the client has sent exactly one message whose text is NAME
+//   assert-read        fails unless the client has read every coach message
+//   cleanup-messages   deletes the demo client's conversation
 //   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
 //   coach-take-over    the seed coach takes over client@demo.local's workout in progress (waits up to 20 s for it)
 //   coach-log-set      the coach ticks its second set: 10 reps @ 60 kg (coach_save_workout_log)

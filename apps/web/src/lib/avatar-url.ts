@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { thumbPathOf } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -15,8 +16,7 @@ export const coachAvatarUrl = cache(async (): Promise<string | null> => {
   const coach = await requireCoach();
   if (!coach.avatarPath) return null;
   const supabase = await createServerSupabase();
-  const thumbPath = coach.avatarPath.replace(/avatar\.(webp|jpg)$/, 'avatar-thumb.$1');
-  const { data, error } = await supabase.storage.from('avatars').createSignedUrl(thumbPath, SIGNED_URL_SECONDS);
+  const { data, error } = await supabase.storage.from('avatars').createSignedUrl(thumbPathOf(coach.avatarPath), SIGNED_URL_SECONDS);
   if (error || !data) return null; // a missing file just means initials
   const version = coach.profileUpdatedAt ? Date.parse(coach.profileUpdatedAt) : 0;
   return `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}v=${version}`;
