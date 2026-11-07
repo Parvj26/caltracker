@@ -1,4 +1,4 @@
--- Automatic progression (20261107001000_auto_progression.sql): the programs.auto_progression switch and
+-- Automatic progression (20261107004000_auto_progression.sql): the programs.auto_progression switch and
 -- progression_history, which serves a client's last two completed sessions of each exercise for one planned workout.
 begin;
 select plan(30);

@@ -49,7 +49,7 @@ Approved by the product owner for Wave 2 (it was on the spec's "not in Version 1
   (last time with the suggested weight, fed into the existing `resolveSetValues` rule 6, so the coach's number and the
   client's own carried-forward change still come first), `prefillLastTime`, `suggestionForLogExercise`,
   `suggestionsForLog`, `suggestionsForWorkout`, `progressionHistoryFromRows`.
-- Migration `20261107001000_auto_progression.sql`:
+- Migration `20261107004000_auto_progression.sql`:
   - `programs.auto_progression` (existing rows false, default true); coaches may insert and update it (RLS decides
     whose programs).
   - `progression_history(p_workout_id, p_exercise_ids)`: security definer (clients can't read programs). Returns rows
