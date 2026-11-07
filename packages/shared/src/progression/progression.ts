@@ -167,12 +167,29 @@ export function progressionHistoryFromRows(rows: unknown): ProgressionHistory {
   return out;
 }
 
+type LogExerciseLike = Pick<LogExerciseDoc, 'exerciseId' | 'trackingType' | 'sets'>;
+
+/** The suggestion for one log exercise (the exercise actually being done), or null. */
+export function suggestionForLogExercise(ex: LogExerciseLike, history: ProgressionHistory, units: Units): Suggestion | null {
+  const h = history[ex.exerciseId];
+  return h ? nextSuggestion(h.sessions, prescriptionOfLogExercise(ex), h.region, units) : null;
+}
+
+/** Last time as the pre-fill should read it for this log exercise: withSuggestion of its suggestion. */
+export function prefillLastTime(
+  ex: LogExerciseLike,
+  lastTime: readonly ResultSet[],
+  history: ProgressionHistory,
+  units: Units,
+): readonly ResultSet[] {
+  return withSuggestion(lastTime, suggestionForLogExercise(ex, history, units));
+}
+
 /** Suggestions for every exercise of a log (pick-one options included), keyed by log exercise id. */
 export function suggestionsForLog(log: Pick<WorkoutLogDoc, 'blocks'>, history: ProgressionHistory, units: Units): Record<string, Suggestion> {
   const out: Record<string, Suggestion> = {};
   for (const ex of log.blocks.flatMap((b) => b.exercises)) {
-    const h = history[ex.exerciseId];
-    const s = h ? nextSuggestion(h.sessions, prescriptionOfLogExercise(ex), h.region, units) : null;
+    const s = suggestionForLogExercise(ex, history, units);
     if (s) out[ex.id] = s;
   }
   return out;

@@ -404,10 +404,12 @@ export type { CommunityPhotoExt } from './community/photos';
 export {
   exerciseRegion,
   nextSuggestion,
+  prefillLastTime,
   prescriptionOfLogExercise,
   prescriptionOfWorkoutExercise,
   progressionHint,
   progressionHistoryFromRows,
+  suggestionForLogExercise,
   suggestionsForLog,
   suggestionsForWorkout,
   withSuggestion,

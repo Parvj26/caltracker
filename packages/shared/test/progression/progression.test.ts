@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   exerciseRegion,
   nextSuggestion,
+  prefillLastTime,
   prescriptionOfLogExercise,
   prescriptionOfWorkoutExercise,
   progressionHint,
   progressionHistoryFromRows,
+  suggestionForLogExercise,
   suggestionsForLog,
   suggestionsForWorkout,
   withSuggestion,
@@ -174,8 +176,8 @@ describe('nextSuggestion: when there is nothing to suggest', () => {
   const good = [session([10, 60], [10, 60], [10, 60])];
 
   it('lets the coach win when they typed a weight on any working set', () => {
-    const p = plan();
-    p.sets[1] = { ...p.sets[1]!, weightKg: 70 };
+    const base = plan();
+    const p: Prescription = { ...base, sets: base.sets.map((x, i) => (i === 1 ? { ...x, weightKg: 70 } : x)) };
     expect(nextSuggestion(good, p, 'upper', 'kg')).toBeNull();
   });
 
@@ -376,6 +378,26 @@ describe('suggestionsForLog and the pre-fill', () => {
     // A weight the client changed on set 1 still carries forward.
     const changed = { ...ex, sets: [logSet(10, { actualWeightKg: lb(145) }), logSet(11)] };
     expect(resolveSetValues(changed, uuid(11), adjusted).weightKg).toBe(lb(145));
+  });
+});
+
+describe('suggestionForLogExercise and prefillLastTime', () => {
+  const bench = uuid(100);
+  const history = { [bench]: { region: 'upper' as const, sessions: [session([10, 60], [10, 60])] } };
+  const lastTime = [{ setType: 'normal' as const, actualReps: 10, actualWeightKg: 60, actualDurationS: null, actualDistanceM: null }];
+
+  it('suggests for the exercise actually being done', () => {
+    const ex = logExercise(1, bench, [logSet(10), logSet(11)]);
+    expect(suggestionForLogExercise(ex, history, 'kg')?.weightKg).toBe(62.5);
+    expect(prefillLastTime(ex, lastTime, history, 'kg')[0]?.actualWeightKg).toBe(62.5);
+  });
+
+  it('leaves last time alone without history (Auto progression off) or with a coach weight', () => {
+    const ex = logExercise(1, bench, [logSet(10)]);
+    expect(prefillLastTime(ex, lastTime, {}, 'kg')).toBe(lastTime);
+    const coach = logExercise(1, bench, [logSet(10, { target: { ...target, weightKg: 70 } })]);
+    expect(suggestionForLogExercise(coach, history, 'kg')).toBeNull();
+    expect(prefillLastTime(coach, lastTime, history, 'kg')).toBe(lastTime);
   });
 });
 
