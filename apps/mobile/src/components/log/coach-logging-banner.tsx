@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen } from '@/components/ui';
-import { idleMinutes } from '@/lib/active-log-logic';
+import { coachBannerHeading, idleMinutes } from '@/lib/active-log-logic';
 import type { CoachLogging } from '@/lib/coach-logging';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -31,7 +31,7 @@ export function CoachLoggingBanner({ coach, onBack }: { coach: CoachLogging; onB
         <View testID="coach-logging-banner" style={{ gap: space[2] }}>
           <LoggedByCoachPill />
           <Text style={text('sectionHeading')} accessibilityRole="header">
-            {finished ? 'Your coach logged this session' : 'Your coach is logging this session'}
+            {coachBannerHeading(coach)}
           </Text>
           <Text style={text('body')}>
             {finished

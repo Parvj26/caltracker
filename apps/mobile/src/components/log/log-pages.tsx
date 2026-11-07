@@ -1,10 +1,12 @@
 // The pages inside a section: a straight exercise, a superset (round by round) and a pick-one option.
 // They only draw the page model (log-flow-model.ts); every edit goes back to the screen through the handlers.
+// readOnly (the coach logs the workout): the same pages with the coach's numbers, and no control that edits.
 import type { Ref } from 'react';
 import { Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
 import type { Units } from '@caltracker/shared';
 import { Button } from '@/components/ui';
 import { tapTarget } from '@caltracker/design-tokens';
+import { logControls } from '@/lib/coach-watch';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import type { ExerciseModel, OptionPageModel, RowModel, StraightPageModel, SupersetPageModel } from '@/lib/log-flow-model';
 import { palette } from '@/theme/theme';
@@ -33,6 +35,10 @@ type Common = {
   headingRef: Ref<HostInstance>;
   /** Mark all (or Mark all rounds); null hides it (everything ticked, or an option locked out). */
   onMarkAll: (() => void) | null;
+  /** The coach logs this workout: nothing on the page edits it; photos, info and history still open. */
+  readOnly: boolean;
+  /** Read only: the set the coach ticked last, outlined. */
+  recentSetId: string | null;
 };
 
 /** Mark all sits at the end of the page, well away from Done. */
@@ -52,16 +58,17 @@ const keyOf = (page: number, ex: ExerciseModel) => `${page}-${ex.exerciseIndex}`
  * The coach's substitute: "Machine taken? Switch to X" before choosing; "Doing the substitute (planned: Y) · Switch"
  * after. Switching stays possible until a set is ticked.
  */
-function SubstituteStrip({ ex, idKey, onPress }: { ex: ExerciseModel; idKey: string; onPress: () => void }) {
+function SubstituteStrip({ ex, idKey, readOnly, onPress }: { ex: ExerciseModel; idKey: string; readOnly: boolean; onPress: () => void }) {
   const { text, space, radius } = useTheme();
   const sub = ex.substitute;
-  if (!sub || (sub.locked && sub.doingInsteadOf === null)) return null;
+  const canSwitch = logControls(readOnly).substituteSwitch;
+  if (!sub || ((sub.locked || !canSwitch) && sub.doingInsteadOf === null)) return null;
   const box = [text('body'), styles.strip, { borderRadius: radius.input, padding: space[3] }];
   if (sub.doingInsteadOf !== null) {
     return (
       <View testID={`substitute-doing-${idKey}`} style={[styles.doing, box]}>
         <Text style={[text('body'), styles.ink, styles.flex]}>{`Doing the substitute (planned: ${sub.doingInsteadOf})`}</Text>
-        {sub.locked ? null : (
+        {sub.locked || !canSwitch ? null : (
           <Pressable
             testID={`substitute-switch-${idKey}`}
             onPress={onPress}
@@ -92,6 +99,11 @@ function Notes({ ex, idKey }: { ex: ExerciseModel; idKey: string }) {
           {ex.restLine}
         </Text>
       ) : null}
+      {ex.progression ? (
+        <Text testID={`progression-${idKey}`} style={text('caption')} accessibilityLabel={`Auto progression: ${ex.progression}`}>
+          {ex.progression}
+        </Text>
+      ) : null}
       {ex.note ? (
         <Text testID={`exercise-note-${idKey}`} style={text('body')}>
           {`Note: ${ex.note}`}
@@ -112,9 +124,12 @@ function SingleExercise({
   handlers,
   headingRef,
   onMarkAll,
+  readOnly,
+  recentSetId,
 }: Common & { ex: ExerciseModel; rows: RowModel[]; disabled: boolean }) {
   const { text, space } = useTheme();
   const idKey = keyOf(page, ex);
+  const can = logControls(readOnly);
   return (
     <View style={{ gap: space[3] }}>
       <ExerciseDemo name={ex.name} detail={details[ex.exerciseId]} size="big" testID={`demo-${idKey}`} onPress={() => handlers.onInfo(ex)} />
@@ -127,20 +142,22 @@ function SingleExercise({
         name={ex.name}
         hasSubstitute={ex.substitute !== null && !ex.substitute.locked}
         onHistory={() => handlers.onHistory(ex)}
-        onMessage={() => handlers.onMessage(ex)}
-        onSwap={() => handlers.onSwap(ex)}
-        onMore={() => handlers.onMore(ex)}
+        onMessage={can.message ? () => handlers.onMessage(ex) : null}
+        onSwap={can.swap ? () => handlers.onSwap(ex) : null}
+        onMore={can.more ? () => handlers.onMore(ex) : null}
       />
-      <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} />
+      <SubstituteStrip ex={ex} idKey={idKey} readOnly={readOnly} onPress={() => handlers.onSubstitute(ex)} />
       <SetTable
         rows={rows}
         idKey={idKey}
         units={units}
         disabled={disabled}
+        readOnly={readOnly}
+        recentSetId={recentSetId}
         handlers={handlers.table(ex)}
-        onAddSet={disabled ? null : () => handlers.onAddSet(ex)}
+        onAddSet={disabled || !can.addSet ? null : () => handlers.onAddSet(ex)}
       />
-      <MarkAll page={page} title="Mark all" onPress={onMarkAll} />
+      <MarkAll page={page} title="Mark all" onPress={can.markAll ? onMarkAll : null} />
     </View>
   );
 }
@@ -173,8 +190,19 @@ export function OptionPage({ model, ...common }: Common & { model: OptionPageMod
 }
 
 /** A superset: every round stacked, the current round with each exercise's photo and tools. */
-export function SupersetPage({ model, page, units, details, handlers, headingRef, onMarkAll }: Common & { model: SupersetPageModel }) {
+export function SupersetPage({
+  model,
+  page,
+  units,
+  details,
+  handlers,
+  headingRef,
+  onMarkAll,
+  readOnly,
+  recentSetId,
+}: Common & { model: SupersetPageModel }) {
   const { text, space } = useTheme();
+  const can = logControls(readOnly);
   return (
     <View style={{ gap: space[4] }}>
       <Text ref={headingRef} testID={`superset-heading-${page}`} style={[text('screenTitle'), styles.centre]} accessibilityRole="header">
@@ -213,8 +241,8 @@ export function SupersetPage({ model, page, units, details, handlers, headingRef
                           hasSubstitute={ex.substitute !== null && !ex.substitute.locked}
                           onHistory={() => handlers.onHistory(ex)}
                           onMessage={null}
-                          onSwap={() => handlers.onSwap(ex)}
-                          onMore={() => handlers.onMore(ex)}
+                          onSwap={can.swap ? () => handlers.onSwap(ex) : null}
+                          onMore={can.more ? () => handlers.onMore(ex) : null}
                         />
                       </View>
                     </View>
@@ -222,7 +250,7 @@ export function SupersetPage({ model, page, units, details, handlers, headingRef
                     <Text style={text('body')}>{`${ex.label} · ${ex.name}`}</Text>
                   )}
                   {current ? <Notes ex={{ ...ex, restLine: null }} idKey={idKey} /> : null}
-                  {current ? <SubstituteStrip ex={ex} idKey={idKey} onPress={() => handlers.onSubstitute(ex)} /> : null}
+                  {current ? <SubstituteStrip ex={ex} idKey={idKey} readOnly={readOnly} onPress={() => handlers.onSubstitute(ex)} /> : null}
                   {entry.rows.map((row) => (
                     <SetRowLine
                       key={row.setId}
@@ -231,6 +259,8 @@ export function SupersetPage({ model, page, units, details, handlers, headingRef
                       unitBelow
                       exerciseLabel={`${ex.label ?? ''} ${ex.name}`.trim()}
                       units={units}
+                      readOnly={readOnly}
+                      recent={row.setId === recentSetId}
                       handlers={handlers.table(ex)}
                     />
                   ))}
@@ -245,17 +275,19 @@ export function SupersetPage({ model, page, units, details, handlers, headingRef
           </View>
         );
       })}
-      <View style={{ gap: space[1] }}>
-        {model.exercises.map((ex) => (
-          <AddSetButton
-            key={ex.logExerciseId}
-            testID={`add-set-${keyOf(page, ex)}`}
-            title={`+ Add set to ${ex.label ?? ex.name}`}
-            onPress={() => handlers.onAddSet(ex)}
-          />
-        ))}
-      </View>
-      <MarkAll page={page} title="Mark all rounds" onPress={onMarkAll} />
+      {can.addSet ? (
+        <View style={{ gap: space[1] }}>
+          {model.exercises.map((ex) => (
+            <AddSetButton
+              key={ex.logExerciseId}
+              testID={`add-set-${keyOf(page, ex)}`}
+              title={`+ Add set to ${ex.label ?? ex.name}`}
+              onPress={() => handlers.onAddSet(ex)}
+            />
+          ))}
+        </View>
+      ) : null}
+      <MarkAll page={page} title="Mark all rounds" onPress={can.markAll ? onMarkAll : null} />
     </View>
   );
 }

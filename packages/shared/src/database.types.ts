@@ -1689,6 +1689,7 @@ export type Database = {
       }
       programs: {
         Row: {
+          auto_progression: boolean
           created_at: string
           created_by: string | null
           description: string | null
@@ -1702,6 +1703,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          auto_progression?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1715,6 +1717,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          auto_progression?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1940,6 +1943,7 @@ export type Database = {
           revision: number
           started_at: string
           status: Database["public"]["Enums"]["log_status"]
+          taken_over_from: string | null
           updated_at: string
           workout_id: string | null
           workspace_id: string
@@ -1959,6 +1963,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id: string
@@ -1978,6 +1983,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id?: string
@@ -2495,6 +2501,18 @@ export type Database = {
       preview_community_card: {
         Args: { p_card: Json; p_community_id: string }
         Returns: Json
+      }
+      progression_history: {
+        Args: { p_exercise_ids: string[]; p_workout_id: string }
+        Returns: {
+          actual_reps: number
+          actual_weight_kg: number
+          completed: boolean
+          exercise_id: string
+          primary_muscles: string[]
+          session: number
+          set_type: Database["public"]["Enums"]["set_type"]
+        }[]
       }
       queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
       recent_exercises_for_client: {

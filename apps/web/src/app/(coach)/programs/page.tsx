@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { ButtonLink, Card } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import styles from './programs.module.css';
+import assignStyles from '@/components/assign/assign.module.css';
 
 export const metadata: Metadata = { title: 'Programs' };
 
@@ -68,7 +70,10 @@ export default async function ProgramsPage() {
                   <td className={styles.numeric}>{p.weeks}</td>
                   <td className={styles.numeric}>{p.slots}</td>
                   <td>
-                    <DuplicateButton kind="program" id={p.id} name={p.name} compact />
+                    <div className={assignStyles.actions}>
+                      <AssignButton kind="program" id={p.id} name={p.name} compact />
+                      <DuplicateButton kind="program" id={p.id} name={p.name} compact />
+                    </div>
                   </td>
                 </tr>
               ))}

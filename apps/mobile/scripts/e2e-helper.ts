@@ -11,6 +11,7 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-mixed <email>   "E2E Mixed" (warm-up, superset, drops) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-sections <email> "E2E Sections" (sections, uneven superset, pick-one) today
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assign-today-progression client@demo.local   "E2E Progress" (squat 3 × 8–10, no weight) today, after a finished 3 × 10 @ 60 kg yesterday
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile "<business>" "<bio>"   set the demo coach's business name and bio
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile-reset -   put them back (Demo Coaching, no bio)
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-message client@demo.local "text"   the coach sends a chat message
@@ -273,6 +274,62 @@ export function assign(email: string): Promise<void> {
 export async function assignToday(email: string): Promise<void> {
   await cleanupLogs(email);
   await assignWorkout(email, 'E2E Log', squat([squatSet(90), squatSet(90), squatSet(90)]));
+}
+
+/**
+ * "E2E Progress" today, for auto-progression: Barbell Squat 3 × 8–10 with no weight (its new program has Auto
+ * progression on), after a finished log yesterday of 3 × 10 @ 60 kg, so the phone suggests 60 kg + 5 kg (lower body).
+ */
+export async function assignTodayProgression(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const range = (): PlanSet => ({ ...plan('normal', 8, null, 90), targetRepsMax: 10 });
+  await assignWorkout(email, 'E2E Progress', squat([range(), range(), range()]));
+  const clientId = (await findUserId(email))!;
+  const { data: m, error: mErr } = await admin.from('workspace_members').select('workspace_id').eq('user_id', clientId).eq('role', 'client').single();
+  if (mErr) throw mErr;
+  const { data: ex, error: exErr } = await admin.from('exercises').select('id').eq('source', 'builtin').eq('name', 'Barbell Squat').single();
+  if (exErr) throw exErr;
+  const finished = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const logId = randomUUID();
+  const { error: logErr } = await admin.from('workout_logs').insert({
+    id: logId,
+    workspace_id: m.workspace_id,
+    client_id: clientId,
+    name: 'E2E Yesterday',
+    status: 'completed',
+    started_at: finished,
+    finished_at: finished,
+    last_activity_at: finished,
+  });
+  if (logErr) throw logErr;
+  // workspace_id and client_id of the children are filled from the log by triggers.
+  type BlockInsert = Database['public']['Tables']['log_blocks']['Insert'];
+  type ExerciseInsert = Database['public']['Tables']['log_exercises']['Insert'];
+  type SetInsert = Database['public']['Tables']['log_sets']['Insert'];
+  const blockId = randomUUID();
+  const { error: bErr } = await admin.from('log_blocks').insert({ id: blockId, log_id: logId, position: 0, kind: 'straight' } as BlockInsert);
+  if (bErr) throw bErr;
+  const leId = randomUUID();
+  const { error: eErr } = await admin
+    .from('log_exercises')
+    .insert({ id: leId, block_id: blockId, log_id: logId, position: 0, exercise_id: ex.id } as ExerciseInsert);
+  if (eErr) throw eErr;
+  const sets = [0, 1, 2].map(
+    (position) =>
+      ({
+        log_exercise_id: leId,
+        log_id: logId,
+        position,
+        set_type: 'normal',
+        target_reps_min: 8,
+        target_reps_max: 10,
+        actual_reps: 10,
+        actual_weight_kg: 60,
+        completed_at: finished,
+      }) as SetInsert,
+  );
+  const { error: sErr } = await admin.from('log_sets').insert(sets);
+  if (sErr) throw sErr;
 }
 
 /**
@@ -736,6 +793,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'assign-today-sections') await assignTodaySections(email);
   else if (action === 'assign-today-mockup') await assignTodayMockup(email);
+  else if (action === 'assign-today-progression') await assignTodayProgression(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   // For these two the "email" is the business name and the "name" is the bio.
   else if (action === 'coach-profile') await setCoachProfile(email, name);

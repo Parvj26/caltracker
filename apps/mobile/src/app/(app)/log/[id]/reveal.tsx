@@ -8,10 +8,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { logVolumeKg, type AwardResult, type LadderAward } from '@caltracker/shared';
+import { logVolumeKg, type AwardResult, type LadderAward, type WorkoutLogDoc } from '@caltracker/shared';
 import { RevealCard } from '@/components/stickers/reveal-card';
 import { loadLadderAwards, pendingQueue, rememberLadderPick, requestAward } from '@/lib/awards';
 import { buildRevealCards, surpriseCards } from '@/lib/awards-logic';
+import { markCoachRevealed } from '@/lib/coach-reveal';
+import { fetchLog } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
@@ -28,13 +30,18 @@ import { useTheme } from '@/theme/use-theme';
  *   * the server's answer is waited for up to 4 s; after that the extras are queued and shown as "Surprise!" the
  *     next time the app opens (?surprise=1 is that second showing, read from the queue)
  *   * a workout with nothing to show (cardio only, nothing new) goes straight on to the summary
+ *   * ?coach=1: a workout the coach finished (single active logger). Says "Your coach logged this session"; the log
+ *     comes from the server when it isn't on this phone; once shown it is remembered as revealed here
+ *     (coach-reveal.ts), so Today doesn't show it again
  */
 export default function RevealScreen() {
-  const { id, surprise } = useLocalSearchParams<{
+  const { id, surprise, coach } = useLocalSearchParams<{
     id: string;
     surprise?: string;
+    coach?: string;
   }>();
   const isSurprise = surprise === '1';
+  const byCoach = coach === '1' && !isSurprise;
   const router = useRouter();
   const units = useUnits();
   const { text, space, radius, device } = useTheme();
@@ -43,13 +50,26 @@ export default function RevealScreen() {
   const workspaceId = workspace?.workspaceId ?? null;
   const { finishedLog, log: active, pending, ready } = useActiveLog();
 
-  const log =
+  const local =
     finishedLog?.id === id
       ? finishedLog
       : active?.id === id && active.status === 'completed'
         ? active
         : (pending.find((p) => p.id === id && p.status === 'completed') ??
           null);
+  // Coach-finished: the server's copy when this phone has none (the client never opened it, or it has left).
+  const [fetched, setFetched] = useState<WorkoutLogDoc | 'none' | null>(null);
+  useEffect(() => {
+    if (!byCoach || local || !ready) return;
+    let alive = true;
+    fetchLog(id)
+      .then((l) => alive && setFetched(l?.status === 'completed' ? l : 'none'))
+      .catch(() => alive && setFetched('none'));
+    return () => {
+      alive = false;
+    };
+  }, [byCoach, local, ready, id]);
+  const log = local ?? (fetched && fetched !== 'none' ? fetched : null);
 
   const [award, setAward] = useState<AwardResult | null>(null);
   const [settled, setSettled] = useState(false);
@@ -150,7 +170,7 @@ export default function RevealScreen() {
   const nothing = isSurprise
     ? queued === 'none' || (queued !== null && cards.length === 0)
     : settled && units !== null && ladderAwards !== null && cards.length === 0;
-  const missing = !isSurprise && ready && !log;
+  const missing = !isSurprise && ready && !log && (!byCoach || fetched === 'none');
   useEffect(() => {
     if (nothing) void finish();
     else if (missing) toSummary();
@@ -163,8 +183,23 @@ export default function RevealScreen() {
   const card = cards[Math.min(index, cards.length - 1)];
   const last = index >= cards.length - 1;
 
+  // Coach-finished: shown (or nothing to show) once is enough; Today won't open it again. Not when it couldn't load.
+  const shown = card !== undefined || nothing;
+  useEffect(() => {
+    if (byCoach && shown && userId) void markCoachRevealed(userId, id);
+  }, [byCoach, shown, userId, id]);
+
   return (
     <SafeAreaView style={styles.screen} testID="reveal-screen">
+      {byCoach ? (
+        <Text
+          testID="reveal-coach-line"
+          style={[text('sectionHeading'), styles.coachLine, { marginTop: space[4], paddingHorizontal: space[6] }]}
+          accessibilityRole="header"
+        >
+          Your coach logged this session
+        </Text>
+      ) : null}
       {card ? (
         <RevealCard
           key={card.id}
@@ -221,6 +256,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.ink },
   wait: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   waitText: { color: white, textAlign: 'center' },
+  coachLine: { color: palette.lime, textAlign: 'center' },
   waitButton: {
     backgroundColor: palette.lime,
     alignItems: 'center',

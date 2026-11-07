@@ -47,6 +47,16 @@ describe('setLogNotes', () => {
     expect(setLogNotes(out, null, T1).notes).toBeNull();
   });
 
+  it('clears a whitespace-only note to null', () => {
+    const out = setLogNotes(fresh(), 'Felt: Good', T1);
+    const cleared = setLogNotes(out, '  \n\t ', T1);
+    expect(cleared.notes).toBeNull();
+    expect(cleared.revision).toBe(out.revision + 1);
+    // Nothing to clear on a log without a note: the same doc back.
+    const log = fresh();
+    expect(setLogNotes(log, '   ', T1)).toBe(log);
+  });
+
   it('returns the same doc when nothing changes, and keeps the doc valid when too long', () => {
     const log = fresh();
     expect(setLogNotes(log, null, T1)).toBe(log);

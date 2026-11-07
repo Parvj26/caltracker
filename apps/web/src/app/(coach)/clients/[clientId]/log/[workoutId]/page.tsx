@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { completedSetCount } from '@caltracker/shared';
+import { addDays, canStartSessionOn, completedSetCount, localToday } from '@caltracker/shared';
 import { LiveRefresh } from '@/components/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
-import { loadLastTimes, loadSessionState } from '@/lib/coach-session';
+import { laterDayNotice, loadLastTimes, loadSessionState } from '@/lib/coach-session';
+import { loadProgression } from '@/lib/progression';
 import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -64,10 +65,27 @@ export default async function SessionPage({ params }: { params: Promise<{ client
     );
   }
 
+  // Only today's and missed workouts are logged. The server can't know the coach's time zone, so it refuses only
+  // what is a later day everywhere (after UTC's tomorrow); the browser and the database refuse the rest.
+  if (state.kind === 'start' && !canStartSessionOn(workout.scheduledOn, addDays(localToday('UTC'), 1))) {
+    return (
+      <div className={styles.page}>
+        {back}
+        <h1 className={styles.title}>{workout.doc.name}</h1>
+        <p className={styles.notice} role="status">
+          {laterDayNotice(client.firstName)}
+        </p>
+      </div>
+    );
+  }
+
   const existing = state.kind === 'start' ? null : await getLog(state.logId);
   const log = existing?.log ?? null;
   const exerciseIds = (log ? log.blocks : workout.doc.blocks).flatMap((b) => b.exercises.map((e) => e.exerciseId));
-  const lastTimes = await loadLastTimes(supabase, client.id, exerciseIds);
+  const [lastTimes, progression] = await Promise.all([
+    loadLastTimes(supabase, client.id, exerciseIds),
+    loadProgression(supabase, workoutId, exerciseIds),
+  ]);
 
   if ((state.kind === 'client_logging' || state.kind === 'other_coach_logging') && log) {
     // Another coach's name, from their profile (coaches of one workspace can read each other's).
@@ -94,8 +112,10 @@ export default async function SessionPage({ params }: { params: Promise<{ client
         client={{ id: client.id, firstName: client.firstName, name: client.name }}
         workout={workout.doc}
         initialLog={log}
+        scheduledOn={workout.scheduledOn}
         units={units}
         lastTimes={lastTimes}
+        progression={progression}
       />
     </div>
   );

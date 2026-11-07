@@ -1,11 +1,11 @@
 // Small sheets of the logging flow: Finish workout?, last time's numbers, and what a set tag means.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { FEELINGS, type Feeling } from '@caltracker/shared';
 import { Button, TextButton, TextField } from '@/components/ui';
-import type { FinishModel, SubstituteCard } from '@/lib/log-flow-model';
+import { sheetDraft, type FinishModel, type SubstituteCard } from '@/lib/log-flow-model';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -109,6 +109,7 @@ export function FinishSheet({
   initialNote,
   busy,
   onKeepGoing,
+  onSaveDraft,
   onFinish,
   onDiscard,
 }: {
@@ -119,17 +120,24 @@ export function FinishSheet({
   busy: boolean;
   /** Keep going, or the sheet closed: the feeling and note so far, to keep as a draft. */
   onKeepGoing: (feel: Feeling | null, note: string) => void;
+  /** The note box was left: save the feeling and note so far, keeping the sheet open. */
+  onSaveDraft: (feel: Feeling | null, note: string) => void;
   onFinish: (feel: Feeling | null, note: string) => void;
   onDiscard: () => void;
 }) {
   const { text, space, radius } = useTheme();
   const [feel, setFeel] = useState<Feeling | null>(initialFeel);
   const [note, setNote] = useState(initialNote);
+  // Start from the saved note only as the sheet opens: a change of the saved note while it is open (the save on
+  // blur, a sync) must not overwrite what the client is typing.
+  const wasVisible = useRef(false);
   useEffect(() => {
-    if (!visible) return;
-    setFeel(initialFeel);
-    setNote(initialNote);
-  }, [visible, initialFeel, initialNote]);
+    const next = sheetDraft({ wasVisible: wasVisible.current, visible, draft: { feel, note }, saved: { feel: initialFeel, note: initialNote } });
+    wasVisible.current = visible;
+    if (next.feel !== feel) setFeel(next.feel);
+    if (next.note !== note) setNote(next.note);
+    // Only the opening matters; feel and note are read, not watched.
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => onKeepGoing(feel, note)}>
@@ -181,6 +189,7 @@ export function FinishSheet({
                 testID="finish-note"
                 value={note}
                 onChangeText={setNote}
+                onBlur={() => onSaveDraft(feel, note)}
                 multiline
                 maxLength={NOTE_MAX}
               />

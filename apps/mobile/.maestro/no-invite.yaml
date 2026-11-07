@@ -51,7 +51,8 @@ env:
     file: helpers/call.js
     env: { ACTION: invite, EMAIL: '${EMAIL}', NAME: 'Nobody Here' }
 - tapOn: 'Check again'
-- assertVisible: 'Welcome to Demo Coaching'
+- assertVisible:
+    id: today-greeting
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup, EMAIL: '${EMAIL}' }

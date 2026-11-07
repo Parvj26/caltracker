@@ -29,6 +29,8 @@ import {
   markAllPlan,
   markAllQuestion,
   readTyped,
+  invalidAnnouncement,
+  sheetDraft,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -520,13 +522,141 @@ describe('markAllPlan', () => {
     const ex = log.blocks[0].exercises[0];
     log = updateActual(log, ex.sets[0].id, { actualReps: 10 });
     // 10 typed on set 1; sets 2 and 3 take the client's own reps from the set before.
-    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0 });
+    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0, noWeight: 0 });
     const blank = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
     const bex = blank.blocks[0].exercises[0];
-    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3 });
+    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3, noWeight: 0 });
     expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
-    expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
-    expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+    expect(markAllQuestion({ tick: 4, skip: 0, noWeight: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 0 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+  });
+
+  it('still ticks weight and reps sets with reps but no weight (bodyweight), and says how many have no weight', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Pull-up', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    // Reps typed on set 1 only; no weight, no coach target, no last time.
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8 });
+    const plan = markAllPlan(log, [ex.id], {});
+    expect(plan).toEqual({ tick: 3, skip: 0, noWeight: 3 });
+    const ticked = markAll(log, [ex.id], {}, NOW).blocks[0].exercises[0].sets;
+    expect(ticked.every((x) => x.completedAt !== null && x.actualWeightKg === null && x.actualReps === 8)).toBe(true);
+    expect(markAllQuestion(plan)).toEqual({ title: 'Tick 3 sets with these numbers?', message: '3 sets have no weight.' });
+    expect(markAllQuestion({ tick: 1, skip: 0, noWeight: 1 }).message).toBe('1 set has no weight.');
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 1 }).message).toBe(
+      '1 set has no weight. 1 set has no numbers yet, so it stays unticked.',
+    );
+  });
+
+  it('counts no weight only for weight and reps exercises', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8, actualWeightKg: 40 });
+    expect(markAllPlan(log, [ex.id], {}).noWeight).toBe(0);
+  });
+});
+
+describe('invalidAnnouncement', () => {
+  it('speaks a box\'s reason once, when it becomes invalid or the reason changes', () => {
+    expect(invalidAnnouncement(null, 'Whole reps only')).toBe('Whole reps only');
+    expect(invalidAnnouncement('Whole reps only', 'Whole reps only')).toBeNull(); // still invalid: said already
+    expect(invalidAnnouncement('Whole reps only', 'That’s more than a set can hold')).toBe('That’s more than a set can hold');
+    expect(invalidAnnouncement('Whole reps only', null)).toBeNull(); // valid again: nothing to say
+  });
+});
+
+describe('sheetDraft', () => {
+  const saved = { feel: 'Good' as const, note: 'Saved note' };
+  it('starts from the saved feeling and note when the sheet opens', () => {
+    expect(sheetDraft({ wasVisible: false, visible: true, draft: { feel: null, note: 'old' }, saved })).toEqual(saved);
+  });
+  it('keeps what the client is typing when the saved note changes underneath', () => {
+    const typing = { feel: null, note: 'Half a sent' };
+    expect(sheetDraft({ wasVisible: true, visible: true, draft: typing, saved: { feel: 'Hard', note: 'From elsewhere' } })).toBe(typing);
+  });
+  it('leaves a closed sheet alone', () => {
+    const draft = { feel: null, note: '' };
+    expect(sheetDraft({ wasVisible: true, visible: false, draft, saved })).toBe(draft);
+    expect(sheetDraft({ wasVisible: false, visible: false, draft, saved })).toBe(draft);
+  });
+});
+
+describe('Auto progression on the phone', () => {
+  /** One straight exercise, 3 × 8–10, with or without a weight typed by the coach. */
+  const progressionLog = (targetWeightKg: number | null) =>
+    startLogFromWorkout(
+      WorkoutDoc.parse({
+        id: uuid(),
+        name: 'Push',
+        notes: null,
+        blocks: [
+          {
+            id: uuid(),
+            kind: 'straight',
+            exercises: [exercise('Bench Press', [1, 2, 3].map(() => set('normal', { targetRepsMin: 8, targetRepsMax: 10, targetWeightKg })))],
+          },
+        ],
+      }),
+      uuid,
+      NOW,
+    );
+  const page = { kind: 'straight' as const, key: 'p', blockIndex: 0 };
+  const lastFor = (log: WorkoutLogDoc): LastResults => ({
+    [log.blocks[0].exercises[0].exerciseId]: {
+      finishedAt: NOW,
+      sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, actualReps: 10, actualWeightKg: 135 * LB, actualDurationS: null, actualDistanceM: null })),
+    },
+  });
+  const historyFor = (log: WorkoutLogDoc) => ({
+    [log.blocks[0].exercises[0].exerciseId]: {
+      region: 'upper' as const,
+      sessions: [{ sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, completed: true, reps: 10, weightKg: 135 * LB })) }],
+    },
+  });
+
+  it('pre-fills the suggested weight and shows the hint', () => {
+    const log = progressionLog(null);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBe('Suggested 140 lb · ↑ +5 lb');
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([140, 140, 140]);
+    // "Last time" still shows what was actually lifted.
+    expect(model.exercise.lastTime[0]?.actualWeightKg).toBeCloseTo(135 * LB);
+  });
+
+  it('changes nothing without history (Auto progression off)', () => {
+    const log = progressionLog(null);
+    const model = buildPage(log, page, 'lb', lastFor(log), {});
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([135, 135, 135]);
+  });
+
+  it('lets a weight the coach typed win', () => {
+    const log = progressionLog(150 * LB);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([150, 150, 150]);
+  });
+
+  it('hides the suggestion when a set was ticked with another weight before the history loaded', () => {
+    let log = progressionLog(null);
+    const ex = log.blocks[0].exercises[0];
+    // Ticked offline with last time's 135 lb; then the history arrives.
+    log = completeSetWith(log, ex.sets[0].id, { reps: 10, weightKg: 135 * LB, durationS: null, distanceM: null }, NOW);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    // The open sets carry the ticked weight forward, matching what the line (not) says.
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([135, 135, 135]);
+  });
+
+  it('Mark all ticks with the suggested weight', () => {
+    const log = progressionLog(null);
+    const ex = log.blocks[0].exercises[0];
+    const done = markAll(log, [ex.id], lastFor(log), NOW, { history: historyFor(log), units: 'lb' });
+    expect(done.blocks[0].exercises[0].sets.map((s) => Math.round((s.actualWeightKg ?? 0) / LB))).toEqual([140, 140, 140]);
+    expect(markAllPlan(log, [ex.id], lastFor(log), { history: historyFor(log), units: 'lb' })).toEqual({ tick: 3, skip: 0, noWeight: 0 });
   });
 });
 

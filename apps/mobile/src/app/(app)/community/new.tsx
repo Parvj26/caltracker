@@ -6,6 +6,7 @@ import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardR
 import { CardView } from '@/components/community/parts';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { createPost, previewCard } from '@/lib/community-api';
+import { markWorkoutShared } from '@/lib/shared-workouts';
 import { PhotoError, pickPhotos, preparePhoto, type PreparedPhoto } from '@/lib/community-photo';
 import { useCommunity } from '@/lib/use-community';
 import { useUnits } from '@/lib/use-units';
@@ -78,6 +79,7 @@ export default function NewPostScreen() {
     setPosting(true);
     try {
       await createPost({ postId, community, body: body.trim(), card, photos });
+      if (card?.kind === 'workout') markWorkoutShared(card.logId);
       router.back();
     } catch (e) {
       setFailed(true);
