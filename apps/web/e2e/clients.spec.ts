@@ -177,6 +177,35 @@ test('invite with a single workout: pick it, choose the day, and it lands on tha
   expect(copies.data).toEqual([{ scheduled_on: day, name: workout.name, assignment_id: null }]);
 });
 
+test('re-inviting with "Nothing yet" clears a plan chosen earlier, so it is not applied when they join', async ({ page }) => {
+  const tag = unique();
+  const { workout } = await seedLibrary(tag);
+  const email = `clear-${tag}@example.com`;
+  await page.reload();
+  let dialog = await openInvite(page);
+  await fillPerson(page, 'Cleo', `Clear${tag}`, email);
+  await dialog.getByRole('button', { name: 'Single workout', exact: true }).click();
+  await dialog.getByLabel('Search workouts').fill(workout.name);
+  await dialog.getByRole('button', { name: workout.name, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Send invite' }).click();
+  await page.getByRole('dialog', { name: 'Invite sent to Cleo' }).getByRole('button', { name: 'Done' }).click();
+  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: `Cleo Clear${tag}` });
+  await expect(row).toContainText(`Single workout: ${workout.name}`);
+
+  // The same email again, with Nothing yet (the default).
+  dialog = await openInvite(page);
+  await fillPerson(page, 'Cleo', `Clear${tag}`, email);
+  await expect(dialog.getByRole('button', { name: 'Nothing yet', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await dialog.getByRole('button', { name: 'Send invite' }).click();
+  await page.getByRole('dialog', { name: 'Invite sent to Cleo' }).getByRole('button', { name: 'Done' }).click();
+  await expect(row).not.toContainText('Single workout');
+  await expect(row).toContainText(email);
+
+  const clientId = await joinAs(email, 'Cleo', `Clear${tag}`);
+  const copies = await admin.from('workouts').select('id').eq('client_id', clientId);
+  expect(copies.data).toEqual([]);
+});
+
 test('the chosen single workout is marked in the picker', async ({ page }) => {
   const tag = unique();
   const { workout } = await seedLibrary(tag);
