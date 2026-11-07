@@ -7,6 +7,7 @@ import {
   isReactionKey,
   reactionButtonLabel,
   reactionTap,
+  topReactionsLine,
   summarizeReactions,
   toggleReaction,
   whoReactedLabel,
@@ -127,6 +128,25 @@ describe('per-tap changes (for undoing one failed tap)', () => {
     rows = applyReactionChange(rows, invertReactionChange(tap));
     expect(rows).toContainEqual(original);
     expect(summarizeReactions(rows, 'me').map((r) => r.key)).toEqual(['heart', 'muscle']);
+  });
+});
+
+describe('topReactionsLine', () => {
+  it('lists the most used reactions with counts, ties in the fixed order', () => {
+    const rows = [
+      row('a', 'fire', '2026-11-06T10:00:00Z'),
+      row('b', 'heart', '2026-11-06T10:00:00Z'),
+      row('c', 'heart', '2026-11-06T10:00:00Z'),
+      row('d', 'party', '2026-11-06T10:00:00Z'),
+      row('e', 'muscle', '2026-11-06T10:00:00Z'),
+    ];
+    expect(topReactionsLine(rows)).toBe('❤️ 2 · 💪 1 · 🔥 1');
+    expect(topReactionsLine(rows, 1)).toBe('❤️ 2');
+    expect(topReactionsLine(rows, 6)).toBe('❤️ 2 · 💪 1 · 🔥 1 · 🎉 1');
+  });
+
+  it('is empty with no reactions', () => {
+    expect(topReactionsLine([])).toBe('');
   });
 });
 

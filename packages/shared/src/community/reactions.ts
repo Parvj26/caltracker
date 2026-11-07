@@ -50,6 +50,19 @@ export function summarizeReactions(rows: readonly ReactionRow[], viewerId: strin
   return out;
 }
 
+/**
+ * A short line of the most used reactions for a preview, e.g. "❤️ 2 · 🔥 1" (most first; ties in the fixed order).
+ * '' with none. Counts people per reaction (summarizeReactions), so the viewer doesn't matter.
+ */
+export function topReactionsLine(rows: readonly ReactionRow[], max = 3): string {
+  return summarizeReactions(rows, '')
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => b.s.count - a.s.count || a.i - b.i)
+    .slice(0, max)
+    .map(({ s }) => `${s.emoji} ${s.count}`)
+    .join(' · ');
+}
+
 /** One tap as a change to one row, so a failed tap can be undone on its own (see invertReactionChange). */
 export type ReactionChange = { op: 'add' | 'remove'; row: ReactionRow };
 

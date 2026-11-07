@@ -420,6 +420,7 @@ export {
   reactionTap,
   summarizeReactions,
   toggleReaction,
+  topReactionsLine,
   whoReactedLabel,
 } from './community/reactions';
 export type { ReactionChange, ReactionInfo, ReactionKey, ReactionRow, ReactionSummary } from './community/reactions';
