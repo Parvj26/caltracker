@@ -235,7 +235,7 @@ select is(public.take_over_workout_log(:'l3'), '{"revision": 5, "status": "in_pr
   'taking over again changes nothing');
 select is((select logged_by from public.workout_logs where id = :'l3'), :'coach_a'::uuid, 'the coach logs it now');
 select tests.act_as(:'a2');
--- The phone's final save (sets ticked before it heard of the take over) is applied once (20261107001000), and says
+-- The phone's final save (sets ticked before it heard of the take over) is applied once (20261107003000), and says
 -- someone else logs it now; after that its saves are refused, even with a higher revision.
 select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 9, true)),
   '{"applied": true, "revision": 1005, "status": "in_progress", "loggedByOther": true}'::jsonb,

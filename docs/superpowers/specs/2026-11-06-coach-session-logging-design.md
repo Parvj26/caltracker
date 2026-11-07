@@ -116,7 +116,7 @@ Another branch (`feature/simple-logging`) is rewriting the phone's logging scree
 Whoever rewrites the logging screens: keep calling `useCoachLogging(id)` before the screen's early returns and render
 `CoachLoggingBanner` when `byCoach` is true.
 
-## Sets ticked just before a take over (20261107001000_coach_logging_polish)
+## Sets ticked just before a take over (20261107003000_coach_logging_polish)
 
 The client ticks a set; before the phone has uploaded it (a second's debounce, or a weak signal) the coach taps
 **Take over**. Without help the phone's upload would be refused (`loggedByOther`) and the set lost (kept only as a

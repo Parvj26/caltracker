@@ -1,4 +1,4 @@
--- Coach session logging follow-ups (20261107001000_coach_logging_polish.sql):
+-- Coach session logging follow-ups (20261107003000_coach_logging_polish.sql):
 --   * the phone's final save after a take over (sets ticked but not uploaded yet) is applied once, and only until
 --     the coach saves anything; a finish, another client, another workspace's coach can't use it;
 --   * a coach can't start a session for a later day's workout; the client's phone still can.

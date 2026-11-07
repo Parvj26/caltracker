@@ -10,7 +10,7 @@
 // revision is the phone's own counter that the server never changes.
 //   * applied=true: the sent revision is now on the server. If the phone changed the log meanwhile, send again.
 //   * applied=true with loggedByOther: the final save after a take over (the server applies the previous logger's
-//     next save once, until the coach saves; 20261107001000_coach_logging_polish). What the phone ticked is saved;
+//     next save once, until the coach saves; 20261107003000_coach_logging_polish). What the phone ticked is saved;
 //     it then adopts the server's doc and tells the screen (onHeldByOther), as below.
 //   * applied=false with loggedByOther: the coach logs this workout now (single active logger). Adopt the server's
 //     doc, never push, and tell the screen (onHeldByOther) so it shows "Your coach is logging this session".
