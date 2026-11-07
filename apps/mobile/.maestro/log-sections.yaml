@@ -112,18 +112,24 @@ env:
 - extendedWaitUntil:
     visible:
       id: superset-heading-0
-      text: 'Superset 1 · Round 1 of 3'
+      text: 'Superset 1'
     timeout: 10000
+- assertVisible:
+    id: round-heading-0-1
+    text: 'Round 1 of 3, current round'
 - assertVisible:
     id: pages-title
     text: 'Upper'
+- assertVisible:
+    id: pages-sections
+    text: 'Section 1 of 2 · All sections ▾'
 - runFlow:
     file: helpers/mark-all.yaml
     env: { PAGE: '0' }
 - scrollUntilVisible:
     element:
-      id: superset-heading-0
-      text: 'Superset 1 · Round 3 of 3'
+      id: round-heading-0-3
+      text: 'Round 3 of 3 ✓'
     direction: UP
 # Round 3 is Pullups alone: Pushups has only two sets.
 - scrollUntilVisible:
@@ -146,6 +152,64 @@ env:
 - assertVisible:
     id: section-count
     text: 'Pick one of 2 · swipe to choose'
+- tapOn:
+    id: start-section
+- extendedWaitUntil:
+    visible:
+      id: option-line-0
+      text: 'Option 1 of 2 · log a set to pick it'
+    timeout: 10000
+
+# ---- Moving freely: back to Upper and forward again without Done, nothing logged ----
+# ‹ from the section's first page goes to the previous section's last page.
+- tapOn:
+    id: page-prev
+- extendedWaitUntil:
+    visible:
+      id: pages-title
+      text: 'Upper'
+    timeout: 5000
+- assertVisible:
+    id: superset-heading-0
+    text: 'Superset 1'
+- takeScreenshot: sections-04b-back-to-upper
+# › goes on into the next section's first page (not its start page).
+- tapOn:
+    id: page-next
+- extendedWaitUntil:
+    visible:
+      id: option-line-0
+      text: 'Option 1 of 2 · log a set to pick it'
+    timeout: 5000
+# A swipe past the first page goes back into Upper too (rows have no swipe of their own).
+- swipe:
+    direction: RIGHT
+- extendedWaitUntil:
+    visible:
+      id: pages-title
+      text: 'Upper'
+    timeout: 5000
+- swipe:
+    direction: LEFT
+- extendedWaitUntil:
+    visible:
+      id: pages-title
+      text: 'Finisher'
+    timeout: 5000
+# The title opens the overview, which lists every section: jump to Finisher from there.
+- tapOn:
+    id: pages-title
+- extendedWaitUntil:
+    visible:
+      id: workout-overview
+    timeout: 5000
+- tapOn:
+    id: overview-section-1
+- extendedWaitUntil:
+    visible:
+      id: section-title
+      text: 'Finisher'
+    timeout: 5000
 - tapOn:
     id: start-section
 - extendedWaitUntil:

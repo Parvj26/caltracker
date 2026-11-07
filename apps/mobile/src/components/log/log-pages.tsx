@@ -189,13 +189,17 @@ export function SupersetPage({ model, page, units, details, handlers, headingRef
         const current = round.round === model.currentRound;
         return (
           <View key={round.round} testID={`round-${page}-${round.round}`} style={{ gap: space[3] }}>
-            {current ? null : (
-              <View style={[styles.roundHead, { paddingTop: space[3] }]}>
-                <Text style={[text('sectionHeading'), styles.centre]} accessibilityRole="header">
-                  {`Round ${round.round} of ${model.totalRounds}${round.done ? ' ✓' : ''}`}
-                </Text>
-              </View>
-            )}
+            {/* Every round, the current one too, has the same heading under the superset's title. */}
+            <View style={round.round > 1 && [styles.roundHead, { paddingTop: space[3] }]}>
+              <Text
+                testID={`round-heading-${page}-${round.round}`}
+                style={[text('sectionHeading'), styles.centre]}
+                accessibilityRole="header"
+                accessibilityLabel={`${round.heading}${current && !round.done ? ', current round' : ''}`}
+              >
+                {round.heading}
+              </Text>
+            </View>
             {round.entries.map((entry) => {
               const ex = model.exercises[entry.exerciseIndex];
               const idKey = keyOf(page, ex);

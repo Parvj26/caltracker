@@ -150,6 +150,16 @@ describe('awardContext', () => {
     expect(award.milestone).toBe(1);
     expect(award.landmarks).toEqual(['chichen-itza']);
   });
+  it('hands over the ladder animals of the logs finished before this one, oldest first', () => {
+    const awards = [
+      { logId: l3.id, finishedAt: l3.finishedAt!, key: 'goat' },
+      { logId: l1.id, finishedAt: l1.finishedAt!, key: 'cat' },
+      { logId: l2.id, finishedAt: l2.finishedAt!, key: 'pig' },
+    ];
+    expect(awardContext([l1, l2, l3], l3.id, 'UTC', '2026-11-05T00:00:00Z', awards).ladderHistory).toEqual(['cat', 'pig']);
+    expect(awardContext([l1, l2, l3], l1.id, 'UTC', '2026-11-05T00:00:00Z', awards).ladderHistory).toEqual([]);
+    expect(awardContext([l1, l2, l3], l2.id, 'UTC', '2026-11-05T00:00:00Z').ladderHistory).toEqual([]);
+  });
   it('refuses a log that is not among the completed logs', () => {
     expect(() => awardContext([l1], l2.id, 'UTC', '2026-11-05T00:00:00Z')).toThrow();
   });

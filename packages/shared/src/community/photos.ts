@@ -1,5 +1,5 @@
 // Community photo rules (spec §8): shrunk on the device to at most 1600 px on the long edge, plus a small thumbnail
-// the feed loads; WebP, or JPEG where WebP can't be written.
+// (the feed's placeholder while the full photo loads); WebP, or JPEG where WebP can't be written.
 
 export const COMMUNITY_PHOTO_MAX_EDGE = 1600;
 export const COMMUNITY_THUMB_MAX_EDGE = 320;

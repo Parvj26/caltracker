@@ -1,5 +1,7 @@
-# Progress tab: the coach's two seeded scans make a Weight chart; the client logs a weight, it shows in the history
-# and the chart gains a point; deleting it again removes it. Weight is logged in lb (the demo client's default).
+# Progress tab: the coach's goal shows with its countdown; the latest weight, body fat and muscle from the coach's two
+# seeded scans show in lb (the demo client's units), with the 3-month change; the scans make Weight and Body fat
+# charts; the client logs a weight, it shows in the history; deleting it again removes it.
+# The Body section sits below Strength, so every check scrolls to its element first.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -16,26 +18,59 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-progress
-- extendedWaitUntil:
-    visible:
-      id: chart-weight_kg
+# The goal the coach set, with its countdown.
+- scrollUntilVisible:
+    element:
+      id: goal-text
     timeout: 20000
+- assertVisible: 'Run a 5K under 30 minutes'
 - assertVisible:
-    id: chart-body_fat_pct
+    id: goal-countdown
+    text: '[0-9]+ days to go · .*'
+# Latest numbers, in lb: 80 kg = 176.4 lb (−4.4 lb from 82 kg), 19% body fat, 36 kg = 79.4 lb of muscle.
+- scrollUntilVisible:
+    element:
+      id: latest-smm_kg
+- assertVisible:
+    id: latest-weight_kg
+    text: 'Weight, 176.4 lb on .*−4.4 lb since .*'
+- assertVisible:
+    id: latest-body_fat_pct
+    text: 'Body fat, 19.0% on .*'
+- assertVisible:
+    id: latest-smm_kg
+    text: 'Skeletal muscle mass, 79.4 lb on .*'
+- takeScreenshot: progress-goal-latest
+# The trend: a chart per measure.
+- scrollUntilVisible:
+    element:
+      id: chart-weight_kg
+- scrollUntilVisible:
+    element:
+      id: chart-body_fat_pct
 - takeScreenshot: progress-seeded
 # Log a weight: it appears in the history as "Logged by you".
+- scrollUntilVisible:
+    element:
+      id: weight-input
+    direction: UP
 - tapOn:
     id: weight-input
 - inputText: '175.5'
 - hideKeyboard
 - tapOn:
     id: weight-save
-- extendedWaitUntil:
-    visible: 'Logged by you'
+- scrollUntilVisible:
+    element:
+      text: 'Logged by you'
     timeout: 20000
-- assertVisible: '175.5 lb'
+- assertVisible: '.*175.5 lb.*'
 - takeScreenshot: progress-logged
 # Step the date back a day, then forward again (it stops at today).
+- scrollUntilVisible:
+    element:
+      id: date-prev
+    direction: UP
 - tapOn:
     id: date-prev
 - tapOn:

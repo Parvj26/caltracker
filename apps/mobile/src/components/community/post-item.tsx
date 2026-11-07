@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   REPORT_REASONS,
   REPORT_REASON_LABELS,
@@ -7,10 +7,12 @@ import {
   canDelete,
   canReport,
   likersLine,
+  photoDisplaySize,
   postAge,
   type Units,
 } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { SharpPhoto } from '@/components/photo/sharp-photo';
 import { block, deletePost, report, setLiked, type FeedPost } from '@/lib/community-api';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -110,14 +112,15 @@ export function PostItem({
   post,
   ctx,
   avatarUrl,
-  thumbUrls,
+  photoUrls,
   fullUrls,
   onOpenComments,
 }: {
   post: FeedPost;
   ctx: PostContext;
   avatarUrl: string | null;
-  thumbUrls: Record<string, string>;
+  /** Signed links by storage path, for both the full photos and their thumbnails. */
+  photoUrls: Record<string, string>;
   fullUrls: (path: string) => Promise<string | null>;
   onOpenComments?: () => void;
 }) {
@@ -126,6 +129,10 @@ export function PostItem({
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const menu = useContentMenu(ctx);
+  // Photos fill the card's width (measured; estimated from the window until then), at most 70% of the screen tall.
+  const screen = useWindowDimensions();
+  const [photosWidth, setPhotosWidth] = useState<number | null>(null);
+  const photoBox = { maxWidth: photosWidth ?? Math.max(1, screen.width - 4 * space[4]), maxHeight: Math.round(screen.height * 0.7) };
   // The server's answer wins once the feed reloads.
   const [seen, setSeen] = useState(post.likerIds);
   if (seen !== post.likerIds) {
@@ -183,24 +190,26 @@ export function PostItem({
       {post.body ? <LinkedText text={post.body} testID="post-body" /> : null}
       {post.card ? <CardView card={post.card} units={ctx.units} /> : null}
       {post.images.length > 0 ? (
-        <View style={[styles.grid, { gap: space[2] }]}>
-          {post.images.map((img, i) => {
-            const uri = thumbUrls[img.thumbPath];
-            return (
-              <Pressable
-                key={img.id}
-                accessibilityRole="imagebutton"
-                accessibilityLabel={`Photo ${i + 1} of ${post.images.length}. Opens full size.`}
-                testID={`post-photo-${i}`}
-                onPress={() => void fullUrls(img.path).then((u) => u && setViewing(u))}
-                style={[post.images.length === 1 ? styles.single : styles.half, { borderRadius: radius.input, aspectRatio: post.images.length === 1 ? img.width / img.height : 1 }]}
-              >
-                {uri ? (
-                  <Image source={{ uri }} style={[styles.fill, { borderRadius: radius.input }]} resizeMode="cover" accessibilityIgnoresInvertColors />
-                ) : null}
-              </Pressable>
-            );
-          })}
+        <View style={{ gap: space[2] }} onLayout={(e) => setPhotosWidth(Math.round(e.nativeEvent.layout.width))} testID="post-photos">
+          {post.images.map((img, i) => (
+            // Each photo whole, at its own shape, one under the other: nothing is cropped.
+            <Pressable
+              key={img.id}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={`Photo ${i + 1} of ${post.images.length}. Opens full size.`}
+              testID={`post-photo-${i}`}
+              onPress={() => void fullUrls(img.path).then((u) => u && setViewing(u))}
+              style={({ pressed }) => [styles.photo, pressed && { opacity: pressedOpacity }]}
+            >
+              <SharpPhoto
+                full={photoUrls[img.path]}
+                thumb={photoUrls[img.thumbPath]}
+                size={photoDisplaySize(img, photoBox)}
+                radius={radius.input}
+                testID={`post-photo-${i}-image`}
+              />
+            </Pressable>
+          ))}
         </View>
       ) : null}
 
@@ -245,10 +254,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1 },
   menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  single: { width: '100%', overflow: 'hidden', backgroundColor: palette.bg, maxHeight: 420 },
-  half: { width: '48.5%', overflow: 'hidden', backgroundColor: palette.bg },
-  fill: { width: '100%', height: '100%' },
+  photo: { alignSelf: 'center' },
   action: { minHeight: 44, justifyContent: 'center', backgroundColor: palette.bg },
   liked: { backgroundColor: palette.pink },
 });

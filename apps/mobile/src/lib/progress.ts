@@ -4,14 +4,17 @@
 import {
   BUILT_IN_METRIC_KEYS,
   METRICS,
+  bodyOverview,
   changeSince,
+  countdownLabel,
+  formatMetricChange,
   displayValue,
   formatMetric,
   formatShortDate,
   measurementSeries,
 } from '@caltracker/shared';
 import { addDays } from '@caltracker/shared';
-import type { BuiltInMetricKey, ChartRange, IsoDate, Units } from '@caltracker/shared';
+import type { BuiltInMetricKey, ChartRange, IsoDate, OverviewMetric, Units } from '@caltracker/shared';
 
 export type CustomMetricRow = { id: string; name: string; unit_label: string; min: number; max: number };
 
@@ -26,7 +29,16 @@ export type ScanRow = {
   values: Record<string, number>;
 };
 
-export type ProgressRows = { scans: ScanRow[]; customs: CustomMetricRow[] };
+/** The goal the coach set on the client's Overview (one per client), or null when there is none. */
+export type GoalRow = { goal: string; targetDate: IsoDate | null };
+
+export type ProgressRows = { scans: ScanRow[]; customs: CustomMetricRow[]; goal: GoalRow | null };
+
+/** The goal as shown: its words, and, with a date, the countdown ("49 days to go") and the day ("24 Dec"). */
+export type GoalModel = { text: string; countdown: string | null; date: string | null };
+
+/** One of the headline numbers (weight, body fat, muscle): its newest value and how it moved over 3 months. */
+export type LatestModel = { key: OverviewMetric; label: string; value: string; date: string; change: string | null };
 
 export type ChartModel = {
   key: string;
@@ -50,7 +62,13 @@ export type HistoryItem = {
   weightKg: number | null;
 };
 
-export type ProgressModel = { charts: ChartModel[]; hiddenByRange: number; history: HistoryItem[] };
+export type ProgressModel = {
+  goal: GoalModel | null;
+  latest: LatestModel[];
+  charts: ChartModel[];
+  hiddenByRange: number;
+  history: HistoryItem[];
+};
 
 export const customKey = (id: string) => `custom:${id}`;
 
@@ -104,7 +122,31 @@ export function buildProgress(data: ProgressRows, range: ChartRange, units: Unit
       weightKg: s.values.weight_kg ?? null,
     }));
 
-  return { charts, hiddenByRange, history };
+  const goal = data.goal
+    ? {
+        text: data.goal.goal,
+        countdown: data.goal.targetDate ? countdownLabel(data.goal.targetDate, today) : null,
+        date: data.goal.targetDate ? formatShortDate(data.goal.targetDate, today) : null,
+      }
+    : null;
+
+  // The same numbers and 3-month change the coach sees on the client's Overview (shared bodyOverview).
+  const latest = bodyOverview(data.scans, '3m', today).flatMap((m): LatestModel[] =>
+    m.latest
+      ? [
+          {
+            key: m.key,
+            label: METRICS[m.key].label,
+            value: format(m.key, m.latest.value),
+            date: formatShortDate(m.latest.date, today),
+            change:
+              m.change === null ? null : `${formatMetricChange(m.key, m.change, units)} since ${formatShortDate(m.points[0].date, today)}`,
+          },
+        ]
+      : [],
+  );
+
+  return { goal, latest, charts, hiddenByRange, history };
 }
 
 /** Saved on the phone so Progress still shows with no signal. */
@@ -124,6 +166,13 @@ export function parseCachedProgress(raw: string | null): ProgressRows | null {
     return null;
   }
   if (!isObj(v) || !Array.isArray(v.scans) || !Array.isArray(v.customs)) return null;
+  // A copy saved before the goal was kept has no goal field: read it as no goal.
+  const goal = v.goal ?? null;
+  if (
+    goal !== null &&
+    !(isObj(goal) && typeof goal.goal === 'string' && (goal.targetDate === null || typeof goal.targetDate === 'string'))
+  )
+    return null;
   for (const s of v.scans) {
     if (
       !isObj(s) ||
@@ -148,7 +197,7 @@ export function parseCachedProgress(raw: string | null): ProgressRows | null {
     )
       return null;
   }
-  return v as unknown as ProgressRows;
+  return { ...(v as unknown as ProgressRows), goal: goal as GoalRow | null };
 }
 
 
