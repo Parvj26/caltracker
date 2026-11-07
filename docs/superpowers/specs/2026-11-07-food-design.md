@@ -46,7 +46,8 @@ client's local day, set by the phone, within a day of `eaten_at`), `name` (1–4
 `calories` (0–10000), `protein_g`, `carbs_g`, `fat_g` (0–1000 each, one decimal), `photo_path`,
 `photo_thumb_path`, `photo_width`, `photo_height`, `created_at`, `updated_at`.
 A meal needs a photo or at least one macro. The photo paths must be
-`{workspace_id}/{client_id}/{meal_id}.{webp|jpg}` and `…-thumb.{ext}` (checked in the table).
+`{workspace_id}/{client_id}/{meal_id}-{photo_id}.{webp|jpg}` and `…-thumb.{ext}` (checked in the table). The photo's
+own id means a replaced photo gets new files (uploads never overwrite); the old files are deleted after the save.
 
 `nutrition_targets` (one row per client): `workspace_id`, `client_id`, `calories`, `protein_g`, `carbs_g`, `fat_g`,
 `updated_at`, `updated_by`. Written through `set_nutrition_targets` (runs as the caller, so RLS applies).
