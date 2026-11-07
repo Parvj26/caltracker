@@ -2,10 +2,9 @@ import { expect, test } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 import { browserToday, clickCounter, deleteCoach, demoWorkspace, freshClient, newCoachWithClient, signInAs, unique } from './assign-helpers';
 
-// Home's Assign: every client row has Assign, a plain link to the client's Training calendar (no dialog opens by
-// itself there). Before, only Program ending / Nothing planned rows had it, and it opened "Assign a program" (a dead
-// end with no programs). Home search lands on Training too.
-// Clicks from Home to a client's calendar: before 2 (Open, then the Training tab); now 1 (Assign), from every row.
+// Home's Assign: a plain link to the client's Training calendar (no dialog opens by itself there). A Today row keeps it
+// in its "⋯" menu (2 clicks: ⋯, then Assign); a Needs attention row whose plan runs out has it as its one button
+// (1 click). Home search lands on Training too.
 const admin = serviceClient();
 const users: string[] = [];
 const coaches: Awaited<ReturnType<typeof newCoachWithClient>>[] = [];
@@ -20,7 +19,7 @@ test.afterAll(async () => {
   for (const c of coaches) await deleteCoach(admin, c);
 });
 
-test("Assign on a Today's clients row opens the client's Training, with nothing popping up", async ({ page }) => {
+test("Assign in a Today row's ⋯ menu opens the client's Training, with nothing popping up", async ({ page }) => {
   const last = `Quick${unique()}`;
   const clientId = await freshClient(admin, workspaceId, 'Quinn', last);
   users.push(clientId);
@@ -31,15 +30,16 @@ test("Assign on a Today's clients row opens the client's Training, with nothing 
   expect(ins.error).toBeNull();
 
   await page.goto('/home');
-  const row = page.locator('#today li').filter({ hasText: `Quinn ${last}` });
-  const assign = row.getByRole('link', { name: `Assign to Quinn ${last}`, exact: true });
-  await expect(assign).toHaveAttribute('href', `/clients/${clientId}/training`);
+  const row = page.locator('#today li[data-today-row]').filter({ hasText: `Quinn ${last}` });
   const clicks = clickCounter();
+  await clicks.on(row.getByRole('button', { name: `More for Quinn ${last}` }));
+  const assign = page.getByRole('menu', { name: `More for Quinn ${last}` }).getByRole('menuitem', { name: 'Assign' });
+  await expect(assign).toHaveAttribute('href', `/clients/${clientId}/training`);
   await clicks.on(assign);
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training$`));
   await expect(page.getByRole('heading', { name: 'Training' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  expect(clicks.count).toBe(1);
+  expect(clicks.count).toBe(2);
   await admin.from('workouts').delete().eq('client_id', clientId);
 });
 

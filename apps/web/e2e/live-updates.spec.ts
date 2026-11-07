@@ -159,7 +159,7 @@ test('the log page fills in sets as the client ticks them off, and shows when th
   await expectNoReload(page);
 });
 
-test('Home shows Training now when a client starts, then Done once they finish', async ({ page }) => {
+test('Home shows the client Live (and under Training now) when they start, then Done once they finish', async ({ page }) => {
   const last = `Home${unique()}`;
   const client = await newClient(last);
   const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: client.id, scheduled_on: isoDay(new Date()), name: 'Live push' }).select('id').single();
@@ -168,15 +168,18 @@ test('Home shows Training now when a client starts, then Done once they finish',
 
   await signInAsCoach(page);
   await page.goto('/home');
-  const row = page.locator('#today li').filter({ hasText: last });
+  const row = page.locator('#today li[data-today-row]').filter({ hasText: last });
   await expect(row).toContainText('Not started');
   await waitUntilLive(page);
 
   const log = makeLog(w.data.id, 'Live push', 2);
   await log.save(client.phone, 0);
-  await expect(row).toContainText('Training now', LIVE_BUSY);
+  await expect(row).toContainText('● Live', LIVE_BUSY);
+  const card = page.getByRole('region', { name: 'Training now' }).getByRole('link', { name: new RegExp(`${last} live`) });
+  await expect(card).toContainText('0 of 2 sets');
   await log.save(client.phone, 2, 'completed');
-  await expect(row).toContainText('Done ✓', LIVE_BUSY);
+  await expect(row).toContainText('✓ Done', LIVE_BUSY);
+  await expect(card).toHaveCount(0);
   await expectNoReload(page);
 });
 

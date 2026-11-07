@@ -48,14 +48,24 @@ async function plan(clientId: string, name: string, date: string): Promise<strin
   return r.data.id;
 }
 
-/** A row of Today's clients. */
-const rowFor = (page: Page, lastName: string) => page.locator('#today li').filter({ hasText: lastName });
+/** A row of Today (only the rows themselves, not the items of their "⋯" menus). */
+const rowFor = (page: Page, lastName: string) => page.locator('#today li[data-today-row]').filter({ hasText: lastName });
 
-/** Opens a Needs attention group in full (each shows 5 rows first), so a test never loses its client behind the cap. */
-async function expandGroup(group: Locator) {
-  await expect(group).toBeVisible();
-  const showAll = group.getByRole('button', { name: /^Show all \d+$/ });
+/**
+ * Needs attention, narrowed by a filter chip (when given) and opened in full (it shows 6 rows first), so a test never
+ * loses its client behind the cap in the shared demo workspace.
+ */
+async function attentionList(page: Page, chip?: 'Missed' | 'Plan ending' | 'Scan due'): Promise<Locator> {
+  const region = page.getByRole('region', { name: 'Needs attention' });
+  await expect(region).toBeVisible();
+  if (chip) {
+    const button = region.getByRole('button', { name: new RegExp(`^${chip} \\d+$`) });
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  }
+  const showAll = region.getByRole('button', { name: /^Show all \d+$/ });
   if (await showAll.count()) await showAll.click();
+  return region;
 }
 
 test('signing in lands on /home and Home is the current nav item', async ({ page }) => {
@@ -66,10 +76,11 @@ test('signing in lands on /home and Home is the current nav item', async ({ page
   await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { level: 1, name: /Good (morning|afternoon|evening)/ })).toBeVisible();
-  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuemax', /\d+/);
+  // One quiet line of week stats replaces the old tiles.
+  await expect(page.getByText(/^This week: \d+ of \d+ workouts done · \d+ new PRs? · \d+ clients?$/)).toBeVisible();
 });
 
-test('a workout today is Not started, then Done once a log completes, linking to the log', async ({ page }) => {
+test('a workout today is Not started with Log session, then Done with View, linking to the log', async ({ page }) => {
   const last = `Tday${unique()}`;
   const clientId = await newClient(last);
   const workoutId = await plan(clientId, 'Leg day', dayOffset(0));
@@ -77,8 +88,7 @@ test('a workout today is Not started, then Done once a log completes, linking to
   await page.goto('/home');
   let row = rowFor(page, last);
   await expect(row).toContainText('Not started');
-  // The row and its "Log session" button both open the coach's session logging page.
-  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
+  // "Log session" opens the coach's session logging page.
   await expect(row.getByRole('link', { name: /^Log session: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
 
   const start = new Date(Date.now() - 52 * 60_000).toISOString();
@@ -86,13 +96,13 @@ test('a workout today is Not started, then Done once a log completes, linking to
   created.logs.push(logId);
   await page.reload();
   row = rowFor(page, last);
-  await expect(row).toContainText('Done ✓');
-  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
-  await expect(row.getByRole('link', { name: /^View log: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(row).toContainText('✓ Done');
+  await expect(row).toContainText('Leg day · 52 min');
+  await expect(row.getByRole('link', { name: /^View: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
   await expect(row.getByRole('link', { name: /^Log session: / })).toHaveCount(0);
 });
 
-test('an in-progress log shows Training now', async ({ page }) => {
+test('an in-progress log shows a Training now card and a Live row with Watch', async ({ page }) => {
   const last = `Train${unique()}`;
   const clientId = await newClient(last);
   const workoutId = await plan(clientId, 'Push', dayOffset(0));
@@ -101,16 +111,19 @@ test('an in-progress log shows Training now', async ({ page }) => {
   await signInAsCoach(page);
   await page.goto('/home');
   const row = rowFor(page, last);
-  await expect(row).toContainText('Training now');
-  // Watch live opens the workout in progress (the row too); Take over opens the session page, which offers it.
-  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
-  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
-  await row.getByRole('link', { name: /^Take over: / }).click();
-  await expect(page).toHaveURL(`/clients/${clientId}/log/${workoutId}`);
-  await expect(page.getByRole('button', { name: 'Take over' })).toBeVisible();
+  await expect(row).toContainText('● Live');
+  await expect(row.getByRole('link', { name: /^Watch: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  // The dark card under "Training now" opens the live view too.
+  const now = page.getByRole('region', { name: 'Training now' });
+  const card = now.getByRole('link', { name: new RegExp(`^Watch Home ${last} live: Push, \\d+ of \\d+ sets$`) });
+  await expect(card).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(card).toContainText(/Push · \d+ min/);
+  await expect(card).toContainText(/\d+ of \d+ sets · Watch live →/);
+  await card.click();
+  await expect(page).toHaveURL(`/clients/${clientId}/logs/${logId}`);
 });
 
-test('the coach\'s own session in progress offers Continue session', async ({ page }) => {
+test('the coach\'s own session in progress offers Continue', async ({ page }) => {
   const last = `Mine${unique()}`;
   const clientId = await newClient(last);
   const workoutId = await plan(clientId, 'Pull', dayOffset(0));
@@ -119,20 +132,42 @@ test('the coach\'s own session in progress offers Continue session', async ({ pa
   await signInAsCoach(page);
   await page.goto('/home');
   const row = rowFor(page, last);
-  await expect(row.getByRole('link', { name: /^Continue session: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
-  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveCount(0);
+  await expect(row.getByRole('link', { name: /^Continue: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
+  await expect(row.getByRole('link', { name: /^Watch: / })).toHaveCount(0);
 });
 
-test('the four tiles are the same height, linked or not', async ({ page }) => {
+test('every Today row has exactly one primary button, and ⋯ holds Message, Assign and Open client', async ({ page }) => {
+  const last = `One${unique()}`;
+  const clientId = await newClient(last);
+  await plan(clientId, 'Upper', dayOffset(0));
   await signInAsCoach(page);
   await page.goto('/home');
-  const tiles = page.locator('[class*="tiles"] > *');
-  await expect(tiles).toHaveCount(4);
-  const heights = await tiles.evaluateAll((els) => els.map((el) => Math.round(el.firstElementChild && el.tagName === 'A' ? el.firstElementChild.getBoundingClientRect().height : el.getBoundingClientRect().height)));
-  expect(new Set(heights).size, `tile heights ${heights.join(', ')}`).toBe(1);
+  await expect(rowFor(page, last)).toBeVisible();
+  const rows = page.locator('#today li[data-today-row]');
+  const perRow = await rows.evaluateAll((els) => els.map((el) => el.querySelectorAll('[data-primary]').length));
+  expect(perRow.length).toBeGreaterThan(0);
+  expect(perRow.every((n) => n === 1), `primary buttons per row: ${perRow.join(', ')}`).toBe(true);
+  await expect(page.getByText('⋯ has Message, Assign and Open client.')).toBeVisible();
+
+  const more = rowFor(page, last).getByRole('button', { name: `More for Home ${last}` });
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const menu = page.getByRole('menu', { name: `More for Home ${last}` });
+  await expect(menu.getByRole('menuitem')).toHaveText(['Message', 'Assign', 'Open client']);
+  await expect(menu.getByRole('menuitem', { name: 'Message' })).toHaveAttribute('href', `/messages/${clientId}`);
+  await expect(menu.getByRole('menuitem', { name: 'Assign' })).toHaveAttribute('href', `/clients/${clientId}/training`);
+  await expect(menu.getByRole('menuitem', { name: 'Open client' })).toHaveAttribute('href', `/clients/${clientId}`);
+  // Focus starts on the first item; arrows move, Escape closes and returns to the button.
+  await expect(menu.getByRole('menuitem', { name: 'Message' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Assign' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
 });
 
-test('two undone workouts in the last 2 days list the client under Missed 2+ in a row', async ({ page }) => {
+test('two undone workouts in the last 2 days list the client under Missed, with Message', async ({ page }) => {
   const last = `Miss${unique()}`;
   // Joined before the missed days: workouts planned before joining never count as missed.
   const clientId = await newClient(last, 10);
@@ -140,16 +175,12 @@ test('two undone workouts in the last 2 days list the client under Missed 2+ in 
   await plan(clientId, 'Pull B', dayOffset(-2));
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.locator('#missed-in-a-row');
-  await expandGroup(group);
-  await expect(group.getByRole('heading', { name: /^Missed 2\+ in a row \(\d+\)$/ })).toBeVisible();
-  const row = group.locator('li').filter({ hasText: last });
-  await expect(row).toContainText('Missed 2 in a row · latest yesterday');
-  await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.getByRole('link', { name: /^Message / })).toHaveAttribute('href', `/messages/${clientId}`);
-  const tile = page.getByRole('link', { name: /Missed a workout/ });
-  await expect(tile).toHaveAttribute('href', /^#missed/);
-  expect(Number((await tile.innerText()).match(/\d+/g)?.at(-1))).toBeGreaterThanOrEqual(1);
+  const list = await attentionList(page, 'Missed');
+  const row = list.locator('li').filter({ hasText: last });
+  await expect(row).toContainText('Missed 2 workouts in a row');
+  // One fix button per row.
+  await expect(row.getByRole('link')).toHaveCount(1);
+  await expect(row.getByRole('link', { name: `Message Home ${last}` })).toHaveAttribute('href', `/messages/${clientId}`);
 });
 
 test('one missed workout this week is listed with its day; a workout today is not missed yet', async ({ page }) => {
@@ -159,26 +190,24 @@ test('one missed workout this week is listed with its day; a workout today is no
   await plan(clientId, 'Arms', dayOffset(0));
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.locator('#missed');
-  await expandGroup(group);
-  await expect(group.locator('li').filter({ hasText: last })).toContainText('Missed 1 · yesterday');
-  await expect(page.locator('#missed-in-a-row li').filter({ hasText: last })).toHaveCount(0);
+  const list = await attentionList(page, 'Missed');
+  await expect(list.locator('li').filter({ hasText: last })).toContainText('Missed yesterday');
+  await expect(list.locator('li').filter({ hasText: last })).not.toContainText('in a row');
 });
 
-test('a client with nothing planned is under Nothing planned, with Open and Assign', async ({ page }) => {
+test('a client with nothing planned is listed with Assign', async ({ page }) => {
   const last = `Empty${unique()}`;
   const clientId = await newClient(last, 29);
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: /^Nothing planned/ });
-  await expandGroup(group);
-  const row = group.locator('li').filter({ hasText: last });
-  await expect(row).toContainText('Nothing in the next 7 days');
-  await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
+  const list = await attentionList(page);
+  const row = list.locator('li').filter({ hasText: last });
+  await expect(row).toContainText('Nothing planned in the next 7 days');
+  await expect(row.getByRole('link')).toHaveCount(1);
   await expect(row.getByRole('link', { name: /^Assign to / })).toHaveAttribute('href', `/clients/${clientId}/training`);
 });
 
-test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
+test('a program ending in 3 days says which day it ends, with nothing after', async ({ page }) => {
   const last = `Ends${unique()}`;
   const clientId = await newClient(last);
   const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: `Ending ${unique()}`, weeks: 1, start_date: dayOffset(-3) }).select('id').single();
@@ -186,11 +215,13 @@ test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
   created.assignments.push(a.data.id);
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: /^Program ending soon/ });
-  await expandGroup(group);
-  await expect(group.locator('li').filter({ hasText: last })).toContainText('Ends in 3 days');
+  const list = await attentionList(page, 'Plan ending');
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(new Date(Date.now() + 3 * MS_DAY));
+  const row = list.locator('li').filter({ hasText: last });
+  await expect(row).toContainText(`Program ends ${weekday} · nothing after`);
+  await expect(row.getByRole('link', { name: `Assign to Home ${last}` })).toHaveAttribute('href', `/clients/${clientId}/training`);
   // Ending replaces Nothing planned, so the client is listed once.
-  await expect(page.getByRole('region', { name: /^Nothing planned/ }).locator('li').filter({ hasText: last })).toHaveCount(0);
+  await expect(list.locator('li').filter({ hasText: last })).toHaveCount(1);
 });
 
 test('past clients are not counted', async ({ page }) => {
@@ -203,7 +234,7 @@ test('past clients are not counted', async ({ page }) => {
   await expect(page.getByText(last)).toHaveCount(0);
 });
 
-test('today\'s row offers Message and the console has no hydration errors', async ({ page }) => {
+test('today\'s ⋯ menu offers Message and the console has no hydration errors', async ({ page }) => {
   const messages: string[] = [];
   page.on('console', (m) => messages.push(m.text()));
   // A production build reports hydration mismatches as minified React errors (#418, #423, #425) on pageerror.
@@ -214,18 +245,20 @@ test('today\'s row offers Message and the console has no hydration errors', asyn
   await signInAsCoach(page);
   await page.goto('/home');
   await expect(rowFor(page, last)).toBeVisible();
-  // Today's row offers a Message action that opens the client's conversation.
-  await expect(rowFor(page, last).getByRole('link', { name: /^Message / })).toHaveAttribute('href', `/messages/${clientId}`);
+  // Today's row keeps Message in its "⋯" menu; it opens the client's conversation.
+  await rowFor(page, last).getByRole('button', { name: `More for Home ${last}` }).click();
+  await page.getByRole('menuitem', { name: 'Message' }).click();
+  await expect(page).toHaveURL(`/messages/${clientId}`);
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 });
 
-test('New PRs this week counts this week\'s personal records of current clients and links to Activity', async ({ page }) => {
-  const prTile = page.getByRole('link', { name: /^New PRs this week/ });
-  const read = async () => Number((await prTile.getByText(/^\d+$/).textContent()) ?? '0');
+test('the week line counts this week\'s new PRs of current clients', async ({ page }) => {
+  const stats = page.getByText(/^This week: /);
+  const read = async () => Number((await stats.textContent())?.match(/(\d+) new PR/)?.[1] ?? 'NaN');
   await signInAsCoach(page);
   await page.goto('/home');
-  await expect(prTile).toHaveAttribute('href', '/activity');
   const before = await read();
+  expect(before).not.toBeNaN();
 
   const clientId = await newClient(`Prs${unique()}`);
   const squat = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
@@ -252,8 +285,6 @@ test('New PRs this week counts this week\'s personal records of current clients 
   await page.reload();
   // Other tests share the demo workspace, so only the rise is checked. Near Monday 00:00 the "now" PR is this week too.
   await expect.poll(read).toBeGreaterThanOrEqual(before + 2);
-  await prTile.click();
-  await expect(page).toHaveURL(/\/activity$/);
 });
 
 test('typing part of a name in any case finds the client, and Enter opens their page', async ({ page }) => {
