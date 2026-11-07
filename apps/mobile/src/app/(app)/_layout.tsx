@@ -4,6 +4,7 @@ import { useSession } from '@/lib/session';
 import { MessagesProvider } from '@/lib/use-messages';
 import { ActiveLogProvider } from '@/lib/use-active-log';
 import { CommunityProvider } from '@/lib/use-community';
+import { FoodProvider } from '@/lib/use-food';
 import { palette } from '@/theme/theme';
 
 /**
@@ -23,6 +24,7 @@ export default function AppLayout() {
     <ActiveLogProvider>
     <MessagesProvider>
     <CommunityProvider>
+    <FoodProvider>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
@@ -36,11 +38,14 @@ export default function AppLayout() {
         <Stack.Screen name="community/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="community/[id]" />
         <Stack.Screen name="community/notifications" />
+        <Stack.Screen name="zoo" />
+        <Stack.Screen name="food/meal" options={{ presentation: 'modal' }} />
       </Stack.Protected>
       <Stack.Protected guard={!hasCoach} redirectTo={landing}>
         <Stack.Screen name="home" />
       </Stack.Protected>
     </Stack>
+    </FoodProvider>
     </CommunityProvider>
     </MessagesProvider>
     </ActiveLogProvider>

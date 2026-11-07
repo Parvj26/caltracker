@@ -19,6 +19,8 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg) and a goal
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans and goal
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-food-targets client@demo.local   targets 2,000 kcal and 150 g protein
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-food client@demo.local   delete the demo client's meals and targets
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-coach-post "<text>"   the demo coach posts in the community
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-buddy-post "<text>"   a second demo client (buddy) posts
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-cleanup -   delete "E2E " posts, reports, blocks and the buddy
@@ -722,6 +724,34 @@ async function communityCleanup(): Promise<void> {
   if (buddy) await admin.auth.admin.deleteUser(buddy);
 }
 
+/** Deletes every meal (and meal photo) and the targets of the seed demo client. Nobody else's. */
+export async function cleanupFood(email: string): Promise<void> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-food only clears ${DEMO_CLIENT}`);
+  const id = await findUserId(DEMO_CLIENT);
+  if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
+  const { data: meals, error } = await admin.from('meals').select('photo_path, photo_thumb_path').eq('client_id', id);
+  if (error) throw error;
+  const paths = meals.flatMap((m) => [m.photo_path, m.photo_thumb_path].filter((p): p is string => p !== null));
+  if (paths.length > 0) await admin.storage.from('meal-photos').remove(paths);
+  const del = await admin.from('meals').delete().eq('client_id', id);
+  if (del.error) throw del.error;
+  const targets = await admin.from('nutrition_targets').delete().eq('client_id', id);
+  if (targets.error) throw targets.error;
+}
+
+/** Starts clean, then the demo coach's daily targets for the demo client: 2,000 kcal, 150 g protein, carbs and fat blank. */
+export async function seedFoodTargets(email: string): Promise<void> {
+  await cleanupFood(email);
+  const clientId = await findUserId(email);
+  if (!clientId) throw new Error(`User ${email} not found`);
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  const { error } = await admin
+    .from('nutrition_targets')
+    .insert({ workspace_id: ws.id, client_id: clientId, calories: 2000, protein_g: 150 });
+  if (error) throw error;
+}
+
 async function run(action: string, email: string, name: string): Promise<string | void> {
   if (action === 'confirmlink') return confirmLink(email);
   if (action === 'invitelink') return inviteLink(email, name);
@@ -746,6 +776,8 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-messages') await cleanupMessages(email);
   else if (action === 'seed-scans') await seedScans(email);
   else if (action === 'cleanup-scans') await cleanupScans(email);
+  else if (action === 'seed-food-targets') await seedFoodTargets(email);
+  else if (action === 'cleanup-food') await cleanupFood(email);
   else if (action === 'community-coach-post') await communityPost((await demoCommunity()).coachId, email);
   else if (action === 'community-buddy-post') await communityPost(await buddyId(), email);
   else if (action === 'community-cleanup') await communityCleanup();

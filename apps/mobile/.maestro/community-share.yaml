@@ -75,8 +75,11 @@ env:
     id: summary-done
 
 # The sticker card, from the zoo book.
+# The Zoo book is opened from Progress (it is no longer a tab).
 - tapOn:
-    id: tab-zoo
+    id: tab-progress
+- tapOn:
+    id: progress-zoo
 - scrollUntilVisible:
     element:
       id: 'sticker-.*'

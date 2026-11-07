@@ -1,4 +1,4 @@
-# The Zoo tab after the sticker-reveal flow: finish a 3 x 8 at 60 kg (one animal up to a giraffe, picked at random
+# The Zoo book (opened from Progress) after the sticker-reveal flow: finish a 3 x 8 at 60 kg (one animal up to a giraffe, picked at random
 # for a new client), then open Zoo. The header, the animal count and that animal x1 show (the only owned tile, so
 # `sticker-.*` finds it); tapping it opens the sheet with its fact. Run via `pnpm --filter mobile e2e`.
 appId: app.caltracker.client
@@ -32,8 +32,11 @@ env:
 - extendedWaitUntil:
     visible: 'Done ✓.*'
     timeout: 20000
+# The Zoo book is opened from Progress (it is no longer a tab).
 - tapOn:
-    id: tab-zoo
+    id: tab-progress
+- tapOn:
+    id: progress-zoo
 - extendedWaitUntil:
     visible:
       id: zoo-streak
