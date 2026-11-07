@@ -1,5 +1,5 @@
 import type { ExercisePick } from '../workouts/doc-ops';
-import { TARGET_FIELDS } from '../workouts/targets';
+import { targetFieldsFor } from '../workouts/targets';
 import type { LogBlockDoc, LogExerciseDoc, LogSetDoc, LogSetTarget, WorkoutLogDoc } from './schema';
 import type { SetValues } from './prefill';
 import { stepSetValue, type StepField } from './steppers';
@@ -245,7 +245,7 @@ export function swapLogExercise(
   ex: ExercisePick,
   nowIso: string,
 ): WorkoutLogDoc {
-  const keep = TARGET_FIELDS[ex.trackingType];
+  const keep = targetFieldsFor(ex.trackingType);
   const reps = keep.includes('reps');
   const weight = keep.includes('weight');
   const duration = keep.includes('duration');

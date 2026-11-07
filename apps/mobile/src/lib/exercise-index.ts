@@ -2,7 +2,7 @@
 // and refreshed in the background each time the picker opens. Storage and the server call are injected, so tests
 // need neither.
 // One copy per signed-in user (custom exercises belong to a workspace), keyed `caltracker.exerciseIndex.v1.<user id>`.
-import { buildExerciseIndex, type ExerciseIndex, type ExerciseIndexRow } from '@caltracker/shared';
+import { buildExerciseIndex, toTrackingType, type ExerciseIndex, type ExerciseIndexRow } from '@caltracker/shared';
 import type { KeyValueStorage } from './log-store';
 
 export const EXERCISE_INDEX_KEY = 'caltracker.exerciseIndex.v1';
@@ -43,7 +43,8 @@ async function readStored(storage: KeyValueStorage, key: string): Promise<{ save
     if (raw === null) return null;
     const p = JSON.parse(raw) as { savedAt?: unknown; rows?: unknown };
     if (typeof p.savedAt !== 'number' || !Array.isArray(p.rows) || !p.rows.every(isRow)) return null;
-    return { savedAt: p.savedAt, rows: p.rows };
+    // A tracking type this build doesn't know (saved by a newer build) reads as the fallback.
+    return { savedAt: p.savedAt, rows: p.rows.map((r) => ({ ...r, trackingType: toTrackingType(r.trackingType) })) };
   } catch {
     return null; // unreadable storage is the same as nothing stored
   }

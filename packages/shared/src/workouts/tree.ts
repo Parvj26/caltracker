@@ -1,8 +1,9 @@
+import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { MAX_SUBSTITUTES, SET_TYPES, WorkoutSetDoc, WorkoutSubstituteDoc, substituteSetProblems } from './schema';
 import type { BlockKind, SetType, WorkoutDoc } from './schema';
 import { sectionsFromBlocks } from './sections';
-import { TARGET_FIELDS } from './targets';
+import { fitSetTargets } from './targets';
 
 /**
  * PostgREST nested select for one workout with its blocks, exercises (and their names) and sets.
@@ -76,20 +77,9 @@ const num = (v: Numeric): number | null => (v === null ? null : Number(v));
 /**
  * The tracking type is read live from the exercise, but the sets were written for whatever type it had then.
  * Drop targets the current type doesn't use, so the doc stays valid and the coach can still open and save the
- * workout after changing an exercise's type.
+ * workout after changing an exercise's type. A type this build doesn't know reads as the fallback (toTrackingType).
  */
-function fitSet(trackingType: TrackingType, s: WorkoutSetDoc): WorkoutSetDoc {
-  const allowed = TARGET_FIELDS[trackingType];
-  const keep = <T>(field: (typeof allowed)[number], v: T | null): T | null => (allowed.includes(field) ? v : null);
-  return {
-    ...s,
-    targetRepsMin: keep('reps', s.targetRepsMin),
-    targetRepsMax: keep('reps', s.targetRepsMax),
-    targetWeightKg: keep('weight', s.targetWeightKg),
-    targetDurationS: keep('duration', s.targetDurationS),
-    targetDistanceM: keep('distance', s.targetDistanceM),
-  };
-}
+const fitSet = (trackingType: TrackingType, s: WorkoutSetDoc): WorkoutSetDoc => fitSetTargets(trackingType, s);
 
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : null);
 
@@ -123,7 +113,7 @@ function readSubstitutes(plannedExerciseId: string, rows: readonly WorkoutTreeSu
   const used = new Set([plannedExerciseId]);
   const out: WorkoutSubstituteDoc[] = [];
   for (const sub of byPosition(rows)) {
-    const trackingType = sub.exercises?.tracking_type ?? 'weight_reps';
+    const trackingType = toTrackingType(sub.exercises?.tracking_type ?? 'weight_reps');
     const sets = jsonSets(sub.sets)
       .map((s) => fitSet(trackingType, s))
       .filter((s) => WorkoutSetDoc.safeParse(s).success);
@@ -149,7 +139,7 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
       sectionId: b.section_id,
       kind: b.kind,
       exercises: byPosition(b.workout_exercises).map((e) => {
-        const trackingType = e.exercises?.tracking_type ?? 'weight_reps';
+        const trackingType = toTrackingType(e.exercises?.tracking_type ?? 'weight_reps');
         return {
           id: e.id,
           exerciseId: e.exercise_id,

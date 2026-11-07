@@ -9,6 +9,7 @@ export const TRACKING_LABELS = {
   reps: 'Reps only',
   time: 'Time',
   distance: 'Distance',
+  weight_time: 'Weight and time',
 } as const;
 
 /** Escapes LIKE wildcards so user input matches literally. */

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { exercisePageTitle } from '@/lib/page-titles';
 import { getExercise } from '@/lib/page-data';
 import { notFound } from 'next/navigation';
-import { parseYoutubeUrl, youtubeFormSearchUrl } from '@caltracker/shared';
+import { parseYoutubeUrl, toTrackingType, youtubeFormSearchUrl } from '@caltracker/shared';
 import { ButtonLink, Card, Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -45,13 +45,13 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
     <div className={styles.page}>
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{ex.name}</h1>
-        <Chip tone="lime">{TRACKING_LABELS[ex.tracking_type]}</Chip>
+        <Chip tone="lime">{TRACKING_LABELS[toTrackingType(ex.tracking_type)]}</Chip>
       </header>
 
       <Card>
         <dl className={styles.meta}>
           <dt>Tracking type</dt>
-          <dd>{TRACKING_LABELS[ex.tracking_type]}</dd>
+          <dd>{TRACKING_LABELS[toTrackingType(ex.tracking_type)]}</dd>
           <dt>Primary muscles</dt>
           <dd>{ex.primary_muscles.join(', ') || 'None listed'}</dd>
           <dt>Equipment</dt>

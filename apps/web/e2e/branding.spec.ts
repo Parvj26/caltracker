@@ -217,14 +217,14 @@ test('exercise library: list, detail and new-exercise form use the UI kit', asyn
   await expect(page.getByLabel('Search exercises')).toBeVisible();
   const group = page.getByRole('group', { name: 'Tracking type' });
   const chips = group.getByRole('button');
-  await expect(chips).toHaveCount(4);
+  await expect(chips).toHaveCount(5); // weight and reps, reps only, time, distance, weight and time
   for (const chip of await chips.all()) {
     await expect(chip).toHaveAttribute('aria-pressed', 'false');
     expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
-  await group.getByRole('button', { name: 'Time' }).click();
+  await group.getByRole('button', { name: 'Time', exact: true }).click();
   await expect(page).toHaveURL(/tracking=time/);
-  await expect(page.getByRole('group', { name: 'Tracking type' }).getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: 'Tracking type' }).getByRole('button', { name: 'Time', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveCSS('background-color', 'rgb(18, 18, 18)');
   expect((await page.getByLabel('Search exercises').boundingBox())!.height).toBeGreaterThanOrEqual(44);
 

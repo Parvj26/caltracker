@@ -1,7 +1,9 @@
+import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
 import { sectionsFromBlocks } from '../workouts/sections';
-import { LogSubstituteOption } from './schema';
+import { parseLogSubstituteOptionLenient } from './schema';
+import type { LogSubstituteOption } from './schema';
 import type { LogStatus, WorkoutLogDoc } from './schema';
 
 /**
@@ -90,7 +92,7 @@ function readSubstituteOptions(
 ): { substituteId: string | null; substituteOptions: LogSubstituteOption[] } {
   const options: LogSubstituteOption[] = [];
   for (const o of Array.isArray(raw) ? raw : []) {
-    const parsed = LogSubstituteOption.safeParse(o);
+    const parsed = parseLogSubstituteOptionLenient(o);
     if (parsed.success && !options.some((x) => x.substituteId === parsed.data.substituteId) && options.length < 4) {
       options.push(parsed.data);
     }
@@ -128,7 +130,7 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
         id: e.id,
         exerciseId: e.exercise_id,
         exerciseName: e.exercises?.name ?? '',
-        trackingType: e.exercises?.tracking_type ?? 'weight_reps',
+        trackingType: toTrackingType(e.exercises?.tracking_type ?? 'weight_reps'),
         plannedWorkoutExerciseId: e.planned_workout_exercise_id,
         swappedFromExerciseId: e.swapped_from_exercise_id,
         note: e.note,
