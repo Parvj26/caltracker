@@ -370,6 +370,7 @@ export function SessionLogger({
   units,
   lastTimes,
   progression,
+  onProgress,
 }: {
   client: { id: string; firstName: string; name: string };
   workout: WorkoutDoc;
@@ -380,6 +381,8 @@ export function SessionLogger({
   lastTimes: LastTimes;
   /** Auto progression history (empty when the program has it off). */
   progression: ProgressionHistory;
+  /** Told the sets done and in all whenever they change (the Training now tab shows them). */
+  onProgress?: ((done: number, total: number) => void) | undefined;
 }) {
   const router = useRouter();
   const [log, setLog] = useState<WorkoutLogDoc | null>(initialLog);
@@ -490,8 +493,14 @@ export function SessionLogger({
   useEffect(() => {
     flushRef.current = flush;
   }, [flush]);
+  // Leaving the screen (another page, or this one replaced after a take over) sends what is still waiting to be
+  // saved instead of dropping it.
   useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+      void flushRef.current();
+    }
   }, []);
 
   /** Applies one operation to this page's copy and remembers it until saved. False when it changed nothing. */
@@ -517,6 +526,12 @@ export function SessionLogger({
     },
     [flush, applyLocal],
   );
+
+  const progressDone = log ? completedSetCount(log) : 0;
+  const progressTotal = log ? progressDone + openSetCount(log) : 0;
+  useEffect(() => {
+    onProgress?.(progressDone, progressTotal);
+  }, [onProgress, progressDone, progressTotal]);
 
   function start() {
     // The server needs revision 1 or more; this is the session's first version.
