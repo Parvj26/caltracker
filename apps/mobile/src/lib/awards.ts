@@ -4,9 +4,20 @@
 // The rules and the words are in awards-logic.ts and @caltracker/shared; the function is the only writer.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
-import type { AwardResult } from '@caltracker/shared';
+import type { AwardResult, LadderAward } from '@caltracker/shared';
 import { within } from './active-log-logic';
-import { classifyAwardFailure, createRevealQueue, expired, type PendingReveal } from './awards-logic';
+import {
+  classifyAwardFailure,
+  createRevealQueue,
+  expired,
+  ladderAwardsFrom,
+  ladderCacheKey,
+  parseLadderCache,
+  withLocalPick,
+  withServerAwards,
+  type LadderCache,
+  type PendingReveal,
+} from './awards-logic';
 import { supabase } from './supabase';
 
 /** The reveal waits this long for the server before moving on (the award is queued instead). */
@@ -138,6 +149,62 @@ export async function syncTimeZone(userId: string): Promise<void> {
   } catch {
     // retried at the next sign-in
   }
+}
+
+/** How long the reveal waits for the client's ladder history before using the copy on the phone. */
+export const LADDER_HISTORY_WAIT_MS = 1500;
+
+async function readLadderCache(key: string): Promise<LadderCache> {
+  try {
+    return parseLadderCache(await AsyncStorage.getItem(key));
+  } catch {
+    return parseLadderCache(null);
+  }
+}
+
+async function writeLadderCache(key: string, cache: LadderCache): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(cache));
+  } catch {
+    // the copy on the phone is a convenience
+  }
+}
+
+/** The ladder animal of each of the client's awards with this coach, with its log's finish time. Throws offline. */
+async function fetchLadderAwards(userId: string, workspaceId: string): Promise<LadderAward[]> {
+  const { data, error } = await supabase
+    .from('awards')
+    .select('log_id, ladder_key:result->ladder->>key, workout_logs!inner(finished_at)')
+    .eq('client_id', userId)
+    .eq('workspace_id', workspaceId);
+  if (error) throw new Error(`awards: ${error.message}`);
+  return data.flatMap((row) => {
+    const finishedAt = row.workout_logs?.finished_at;
+    return typeof row.ladder_key === 'string' && finishedAt ? [{ logId: row.log_id, finishedAt, key: row.ladder_key }] : [];
+  });
+}
+
+/**
+ * The client's ladder awards for the reveal's preview, so it picks the same animal as the server: read from the
+ * server (waiting up to LADDER_HISTORY_WAIT_MS) and saved, else the copy on the phone, plus this phone's own
+ * previews the server hasn't awarded yet. Never throws.
+ */
+export async function loadLadderAwards(userId: string, workspaceId: string): Promise<LadderAward[]> {
+  const key = ladderCacheKey(userId, workspaceId);
+  // A slow answer still refreshes the copy for next time.
+  const refreshed = fetchLadderAwards(userId, workspaceId).then(async (server) => {
+    const cache = withServerAwards(await readLadderCache(key), server);
+    await writeLadderCache(key, cache);
+    return cache;
+  });
+  const cache = (await within(refreshed, LADDER_HISTORY_WAIT_MS)) ?? (await readLadderCache(key));
+  return ladderAwardsFrom(cache, Date.now());
+}
+
+/** Remembers the animal shown for a finished log until the server's list includes it. Never throws. */
+export async function rememberLadderPick(userId: string, workspaceId: string, pick: LadderAward): Promise<void> {
+  const key = ladderCacheKey(userId, workspaceId);
+  await writeLadderCache(key, withLocalPick(await readLadderCache(key), pick));
 }
 
 /** The award stored for a finished log (the summary's sticker row), or null: not awarded yet, or offline. */
