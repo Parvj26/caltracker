@@ -633,6 +633,14 @@ export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], l
   return next;
 }
 
+/**
+ * What VoiceOver should say when a number box's reason changes (AccessibilityInfo.announceForAccessibility): the new
+ * reason when the box becomes invalid or the reason changes, else null, so it is never repeated on every key.
+ */
+export function invalidAnnouncement(previous: string | null, next: string | null): string | null {
+  return next !== null && next !== previous ? next : null;
+}
+
 export type TypedResult = { kind: 'ok'; patch: ActualPatch } | { kind: 'invalid'; message: string };
 
 const FIELD_HINT: Record<StepField, string> = {

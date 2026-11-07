@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   InputAccessoryView,
   Keyboard,
   Platform,
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import type { ActualPatch, StepField, Units } from '@caltracker/shared';
-import { readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
+import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { SwipeToDelete } from './swipe-to-delete';
@@ -123,6 +124,9 @@ function Cell({
           setDraft(t);
           const read = readTyped(cell.field, t, units, row.done);
           if (read.kind === 'invalid') {
+            // accessibilityLiveRegion below is Android only: on iOS, VoiceOver is told the reason here, once.
+            const say = invalidAnnouncement(invalid, read.message);
+            if (say) AccessibilityInfo.announceForAccessibility(say);
             setInvalid(read.message);
             return;
           }

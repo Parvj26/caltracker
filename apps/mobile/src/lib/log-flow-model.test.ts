@@ -26,6 +26,7 @@ import {
   markAllPlan,
   markAllQuestion,
   readTyped,
+  invalidAnnouncement,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -499,5 +500,14 @@ describe('markAllPlan', () => {
     const ex = log.blocks[0].exercises[0];
     log = updateActual(log, ex.sets[0].id, { actualReps: 8, actualWeightKg: 40 });
     expect(markAllPlan(log, [ex.id], {}).noWeight).toBe(0);
+  });
+});
+
+describe('invalidAnnouncement', () => {
+  it('speaks a box\'s reason once, when it becomes invalid or the reason changes', () => {
+    expect(invalidAnnouncement(null, 'Whole reps only')).toBe('Whole reps only');
+    expect(invalidAnnouncement('Whole reps only', 'Whole reps only')).toBeNull(); // still invalid: said already
+    expect(invalidAnnouncement('Whole reps only', 'That’s more than a set can hold')).toBe('That’s more than a set can hold');
+    expect(invalidAnnouncement('Whole reps only', null)).toBeNull(); // valid again: nothing to say
   });
 });
