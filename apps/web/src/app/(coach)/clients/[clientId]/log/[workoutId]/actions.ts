@@ -29,6 +29,8 @@ function refusal(error: { code?: string; hint?: string; message: string }): Save
       error: error.hint === 'not_a_client' ? 'This person is no longer your client.' : "You can't log this workout.",
     };
   }
+  // A later day's workout (the database's own check of the client's today).
+  if (error.hint === 'future_workout') return { ok: false, final: true, error: 'This workout is on a later day. You can log it on the day, or afterwards if it is missed.' };
   // one_active_log_per_client: the client started another workout on the phone a moment ago.
   if (error.code === '23505') return { ok: false, final: true, error: 'They just started a workout on their phone. Reload the page.' };
   if (error.code === '23514' || error.code === '22023') return { ok: false, final: true, error: 'Those numbers are not allowed. Check them and try again.' };

@@ -9,7 +9,7 @@ import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-ca
 import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
 import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/stored-view';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
@@ -67,7 +67,6 @@ export function ClientCalendar({
   library,
   programs,
   upcomingWorkouts,
-  openAssign = false,
 }: {
   client: ClientRef;
   /** The signed-in coach: the remembered view is theirs. */
@@ -84,8 +83,6 @@ export function ClientCalendar({
   programs: PickerProgram[];
   /** Every workout on the client's calendar from about a week back on (assign warns about days already taken). */
   upcomingWorkouts: readonly ExistingWorkout[];
-  /** Open the assign dialog on load (the Assign shortcut on Home, ?assign=1). */
-  openAssign?: boolean;
 }) {
   const today = useLocalToday();
   const timeZone = useTimeZone();
@@ -103,15 +100,7 @@ export function ClientCalendar({
     setShown(entries);
     setItems(entries);
   }
-  const [assigning, setAssigning] = useState(openAssign && !readOnly);
-  // Drop ?assign=1 once it has opened the dialog, so a reload doesn't open it again.
-  useEffect(() => {
-    if (!openAssign) return;
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has('assign')) return;
-    url.searchParams.delete('assign');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-  }, [openAssign]);
+  const [assigning, setAssigning] = useState(false);
   const [adding, setAdding] = useState(false);
   const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
@@ -242,9 +231,6 @@ export function ClientCalendar({
         </div>
         {readOnly ? null : (
           <div className={styles.titleActions}>
-            <ButtonLink variant="secondary" href={`/messages/${client.id}`}>
-              Message
-            </ButtonLink>
             <Button variant="secondary" onClick={() => setAssigning(true)}>
               Assign program
             </Button>
@@ -314,6 +300,10 @@ export function ClientCalendar({
           onAssigned={(programName, count) => {
             setAssigning(false);
             setToast(`Assigned ${programName}: ${workoutsText(count)} added.`);
+          }}
+          onAddWorkout={() => {
+            setAssigning(false);
+            setAdding(true);
           }}
           onClose={() => setAssigning(false)}
         />

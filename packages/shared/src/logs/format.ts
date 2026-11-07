@@ -1,7 +1,7 @@
 // Display text for logs, in the viewer's units. Pure, shared by the phone and the dashboard.
 import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
-import { KG_PER_LB, formatDistance, formatDuration, formatWeight } from '../units/units';
+import { formatDistance, formatDuration, formatTotalWeight, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
 import { formatSetTarget } from '../workouts/targets';
 import type { SetType } from '../workouts/schema';
@@ -83,8 +83,7 @@ export function formatLogDuration(seconds: number): string {
  * toLocaleString, so the phone (Hermes) and the dashboard (Workers) always print the same text.
  */
 export function formatLogVolume(volumeKg: number, units: Units): string {
-  const whole = Math.round(units === 'lb' ? volumeKg / KG_PER_LB : volumeKg);
-  return `${String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} ${units} lifted`;
+  return `${formatTotalWeight(volumeKg, units)} lifted`;
 }
 
 /** One set's numbers as text ("135 lb × 8", "8 reps", "0:45", "1.5 mi"), or null when nothing is filled in. */

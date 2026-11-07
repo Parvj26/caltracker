@@ -63,7 +63,6 @@ export default async function ClientPage({
     view?: string | string[];
     from?: string | string[];
     month?: string | string[];
-    assign?: string | string[];
   }>;
 }) {
   const { workspaceId, units, userId } = await requireCoach();
@@ -237,12 +236,12 @@ export default async function ClientPage({
         library={library.data}
         programs={pickerPrograms}
         upcomingWorkouts={scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : []))}
-        openAssign={query.assign === '1'}
       />
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />
       {history ? (
-        <section aria-labelledby="history-heading">
+        // The client header's "Message history" link lands here.
+        <section id="message-history" aria-labelledby="history-heading">
           <h2 id="history-heading" className={styles.historyHeading}>Messages</h2>
           <div className={cx(messageStyles.pane, messageStyles.embedded)}>
             <Conversation

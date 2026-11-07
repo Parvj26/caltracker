@@ -42,9 +42,11 @@ import {
   type LogExerciseDoc,
   type Units,
   type WorkoutLogDoc,
+  type ProgressionHistory,
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
+import { CoachWatchFrame, WindowInsets } from '@/components/log/coach-watch-bar';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExercisePicker } from '@/components/log/exercise-picker';
 import { OptionPage, StraightPage, SupersetPage, type PageHandlers } from '@/components/log/log-pages';
@@ -56,8 +58,9 @@ import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { useCoachLogging } from '@/lib/coach-logging';
+import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
-import { fetchLastResults, type LastResults } from '@/lib/log-api';
+import { fetchLastResults, fetchProgression, type LastResults } from '@/lib/log-api';
 import {
   afterDone,
   buildPage,
@@ -68,6 +71,8 @@ import {
   historyLines,
   markAll,
   markAllPlan,
+  prefillSets,
+  type Progression,
   markAllQuestion,
   pageDots,
   pickingFirst,
@@ -128,8 +133,9 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
 /** The workout being logged: overview, each section's start page, and the section's pages. */
 export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  // Single active logger: while the coach logs this workout from the website, the client sees a read-only banner
-  // (with "Continue on my phone" once the coach has stopped for 20 minutes) instead of the logging pages.
+  // Single active logger: while the coach logs this workout from the website, the client sees the same pages read
+  // only, following the coach's saves live, under a slim bar (with "Continue on my phone" once the coach has stopped
+  // for 20 minutes). Without an open copy on this phone (or once finished) the full banner shows instead.
   const coach = useCoachLogging(id);
   const router = useRouter();
   const { text } = useTheme();
@@ -138,7 +144,21 @@ export default function LogScreen() {
   const log = active && active.id === id ? active : null;
 
   const back = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
-  if (coach.byCoach) return <CoachLoggingBanner coach={coach} onBack={back} />;
+  const view = coachWatchView(coach.byCoach, log, id);
+  // Watching when the coach finishes: straight to the sticker reveal, then the summary ("Logged by coach").
+  const watched = useRef(false);
+  useEffect(() => {
+    // Handed back or reclaimed: the client logs again, so a later finish is theirs (their own reveal).
+    if (view === 'watch') watched.current = true;
+    else if (view === 'own') watched.current = false;
+  }, [view]);
+  const revealNow = revealAfterCoachFinish(watched.current || view === 'watch', coach);
+  useEffect(() => {
+    if (!revealNow || !id) return;
+    watched.current = false;
+    router.replace({ pathname: '/log/[id]/reveal', params: { id, coach: '1' } });
+  }, [revealNow, id, router]);
+  if (view === 'banner') return <CoachLoggingBanner coach={coach} onBack={back} />;
 
   if (!ready || units === null) {
     return (
@@ -161,7 +181,12 @@ export default function LogScreen() {
     );
   }
 
-  return <OpenLog log={log} units={units} back={back} />;
+  const watching = view === 'watch';
+  return (
+    <CoachWatchFrame coach={watching ? coach : null}>
+      <OpenLog log={log} units={units} back={back} readOnly={watching} />
+    </CoachWatchFrame>
+  );
 }
 
 /** Where a fresh open lands: the overview before anything is ticked, else the first open page. */
@@ -173,9 +198,21 @@ function firstScreen(log: WorkoutLogDoc, sections: FlowSection[]): Screen {
   return at ? { mode: 'pages', ...at } : { mode: 'overview' };
 }
 
-function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back: () => void }) {
+function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Units; back: () => void; readOnly: boolean }) {
   const router = useRouter();
-  const { syncStatus, op, tick, markDone, finish, discard } = useActiveLog();
+  const { syncStatus, op: edit, tick: toggle, markDone: tickAll, finish, discard } = useActiveLog();
+  // Read only (the coach logs it): every edit stops here too, not only in the hidden controls. The store refuses
+  // them anyway (heldRef); this keeps a tap that lands mid-take-over from doing anything.
+  const can = logControls(readOnly);
+  const canRef = useRef(can);
+  canRef.current = can;
+  const op = useCallback((fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => (canRef.current.type ? edit(fn) : Promise.resolve()), [edit]);
+  const tick = useCallback((setId: string) => (canRef.current.tick ? toggle(setId) : Promise.resolve(null)), [toggle]);
+  const markDone = useCallback(
+    (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => (canRef.current.tick ? tickAll(fn) : Promise.resolve(false)),
+    [tickAll],
+  );
+  const recentSetId = useMemo(() => (readOnly ? latestTickedSetId(log) : null), [readOnly, log]);
   const sections = useMemo(() => buildSections(log), [log]);
   const [screen, setScreenState] = useState<Screen>(() => firstScreen(log, sections));
   const setScreen = useCallback(
@@ -198,7 +235,19 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [last, setLast] = useState<LastResults>({});
+  const [history, setHistory] = useState<ProgressionHistory>({});
   const lastTick = useRef<LastDone>(null);
+  // The coach took over while something was open: close what edits (photos, info and history may stay open).
+  useEffect(() => {
+    if (!readOnly) return;
+    Keyboard.dismiss();
+    setPicker(null);
+    setNoteFor(null);
+    setMenuFor(null);
+    setSetMenu(null);
+    setSubFor(null);
+    setFinishOpen(false);
+  }, [readOnly]);
   /** A block just added: open its page once the sections include it. */
   const jumpTo = useRef<string | null>(null);
 
@@ -261,6 +310,18 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       alive = false;
     };
   }, [exerciseKey]);
+  // Auto progression (only for a planned workout whose program has it on): the suggested weight becomes the pre-fill.
+  const workoutId = log.workoutId;
+  useEffect(() => {
+    if (!exerciseKey || !workoutId) return;
+    let alive = true;
+    fetchProgression(workoutId, exerciseKey.split(','))
+      .then((h) => alive && setHistory(h))
+      .catch(() => undefined); // only a hint, like last time
+    return () => {
+      alive = false;
+    };
+  }, [exerciseKey, workoutId]);
   const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
 
   const blockOf = useCallback((logExerciseId: string) => log.blocks.find((b) => b.exercises.some((e) => e.id === logExerciseId)) ?? null, [log.blocks]);
@@ -281,6 +342,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   logRef.current = log;
   const lastRef = useRef(last);
   lastRef.current = last;
+  const progressionRef = useRef<Progression>({ history, units });
+  progressionRef.current = { history, units };
   const docOf = useCallback(
     (logExerciseId: string) => logRef.current.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId) ?? null,
     [],
@@ -309,7 +372,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
             const picked = pickFirst(l);
             const doc = picked.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
             if (!doc) return l;
-            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, lastRef.current[doc.exerciseId]?.sets ?? []), nowIso());
+            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, prefillSets(doc, lastRef.current, progressionRef.current)), nowIso());
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
@@ -374,13 +437,13 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     [tableFor, op, withPick, docOf, units],
   );
 
-  /** Mark all: asks first when it ticks more than one set, and says which sets it leaves (nothing to save yet). */
+  /** Mark all: asks first when it ticks more than one set, and says which get no weight and which it leaves. */
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
     Keyboard.dismiss();
     const picked = pickOf ? withPick(pickOf)(log) : log;
-    const plan = markAllPlan(picked, logExerciseIds, last);
+    const plan = markAllPlan(picked, logExerciseIds, last, { history, units });
     const run = () =>
-      void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, logExerciseIds, lastRef.current, nowIso())).then(
+      void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, logExerciseIds, lastRef.current, nowIso(), progressionRef.current)).then(
         (ticked) => ticked && tapHaptic(),
       );
     if (plan.tick === 0) {
@@ -391,7 +454,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       });
       return;
     }
-    if (plan.tick === 1 && plan.skip === 0) return run();
+    // One set with its numbers: no need to ask. A set with no weight (maybe bodyweight) is ticked, but said first.
+    if (plan.tick === 1 && plan.skip === 0 && plan.noWeight === 0) return run();
     const q = markAllQuestion(plan);
     Alert.alert(q.title, q.message ?? undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -467,7 +531,11 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   };
 
   // ---- Finish and discard ----
-  const discardNow = () => void discard().then(back);
+  // Read only: the coach may have taken over while the alert was open. iOS can't close an open Alert from code, so
+  // its buttons do nothing then (the edits below are gated too).
+  const discardNow = () => {
+    if (canRef.current.discard) void discard().then(back);
+  };
   const confirmDiscard = () =>
     Alert.alert('Discard this workout?', 'Your ticked sets won’t be saved.', [
       { text: 'Keep going', style: 'cancel' },
@@ -475,6 +543,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     ]);
   const saved = readFinishNotes(log.notes);
   const finishNow = async (feel: Feeling | null, note: string) => {
+    if (!canRef.current.finish) return;
     setFinishing(true);
     try {
       await op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
@@ -492,7 +561,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const syncLate = useDelayedFlag(syncStatus !== 'synced', SYNC_PILL_AFTER_MS);
 
   const sheets = (
-    <>
+    <WindowInsets>
       <ExercisePicker
         title={picker?.mode === 'swap' ? `Swap ${picker.ex.exerciseName}` : 'Add an exercise'}
         visible={picker !== null}
@@ -547,13 +616,14 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           setFinishOpen(false);
           void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
         }}
+        onSaveDraft={(feel, note) => void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()))}
         onFinish={(feel, note) => void finishNow(feel, note)}
         onDiscard={() => {
           setFinishOpen(false);
           confirmDiscard();
         }}
       />
-    </>
+    </WindowInsets>
   );
 
   const pill = syncLate ? (
@@ -581,6 +651,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           onAddExercise={() => setPicker({ mode: 'add' })}
           onFinish={() => setFinishOpen(true)}
           onDiscard={confirmDiscard}
+          readOnly={readOnly}
         />
         {pill}
         {sheets}
@@ -609,6 +680,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           onBack={() => setScreen({ mode: 'overview' })}
           onInfo={(item) => setInfoFor({ name: item.name, exerciseId: item.exerciseId })}
           onAddExercise={() => setPicker({ mode: 'add' })}
+          readOnly={readOnly}
         />
         {pill}
         {sheets}
@@ -634,8 +706,11 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         page={pageIndex}
         units={units}
         last={last}
+        history={history}
         details={details}
         handlers={handlers}
+        readOnly={readOnly}
+        recentSetId={recentSetId}
         steps={{ prev: stepLabel(sections, here, -1), next: stepLabel(sections, here, 1) }}
         edges={{
           prev: prevSection ? sections[prevSection.section].title : null,
@@ -669,8 +744,11 @@ function SectionPages({
   page,
   units,
   last,
+  history,
   details,
   handlers,
+  readOnly,
+  recentSetId,
   steps,
   edges,
   onPage,
@@ -688,8 +766,13 @@ function SectionPages({
   page: number;
   units: Units;
   last: LastResults;
+  /** Auto progression history (empty when off). */
+  history: ProgressionHistory;
   details: Parameters<typeof StraightPage>[0]['details'];
   handlers: PageHandlers;
+  /** The coach logs this workout: the pages only show it (no Mark all or Done); moving around still works. */
+  readOnly: boolean;
+  recentSetId: string | null;
   /** What ‹ and › say ("Next page", "Previous section: Warm-Up"); null at either end of the workout. */
   steps: { prev: string | null; next: string | null };
   /** The section a swipe past the first or last page goes on to (its title), or null. */
@@ -713,7 +796,7 @@ function SectionPages({
   /** A swipe-through page before the first page when there is a section before this one (and one after the last). */
   const lead = edges.prev ? 1 : 0;
 
-  const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last)), [log, section, units, last]);
+  const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last, history)), [log, section, units, last, history]);
 
   // A page chosen from outside (a dot, Done, a change to the log): scroll there.
   useEffect(() => {
@@ -762,7 +845,7 @@ function SectionPages({
   const dots = pageDots(log, section, page);
   /** Mark all for a page, or null when there is nothing to mark (all ticked, or an option locked out). */
   const markFor = (m: PageModel): (() => void) | null => {
-    if (m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
+    if (readOnly || m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
     const ids = m.kind === 'superset' ? m.exercises.map((e) => e.logExerciseId) : [m.exercise.logExerciseId];
     return () => onMarkAll(ids, m.kind === 'option' ? m.exercise.logExerciseId : null);
   };
@@ -817,7 +900,7 @@ function SectionPages({
           onMomentumScrollEnd={onMomentumScrollEnd}
           onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: (info.index + lead) * width, animated: false })}
           renderItem={({ item, index }) => {
-            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null });
+            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null, readOnly, recentSetId });
             const m = models[index];
             return (
               <ScrollView
@@ -842,14 +925,16 @@ function SectionPages({
           }}
         />
         <View style={[styles.footer, { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: insets.bottom + space[2], gap: space[2] }]}>
-          <Pressable
-            testID="page-done"
-            onPress={() => onDone(page)}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
-          >
-            <Text style={[text('button'), styles.onInk]}>Done</Text>
-          </Pressable>
+          {readOnly ? null : (
+            <Pressable
+              testID="page-done"
+              onPress={() => onDone(page)}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
+            >
+              <Text style={[text('button'), styles.onInk]}>Done</Text>
+            </Pressable>
+          )}
           <View style={styles.stepRow}>
             <StepButton testID="page-prev" glyph="‹" label={steps.prev} onPress={() => onStep(-1)} />
             {dots.length > MAX_DOTS ? (

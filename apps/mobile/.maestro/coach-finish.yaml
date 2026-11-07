@@ -1,6 +1,7 @@
-# Single active logger: the coach takes over the client's workout and finishes the session from the website. The
-# phone, showing "Your coach is logging this session", updates live to "Your coach logged this session"; Today
-# shows it done, and its summary carries the "Logged by coach" pill.
+# Single active logger: the coach takes over the client's workout, ticks a set and finishes the session from the
+# website. The phone keeps the workout on screen read only under "Your coach is logging this session" and shows the
+# coach's set live. When the coach finishes, the phone goes straight to the sticker reveal, which says "Your coach
+# logged this session", then to the summary with the "Logged by coach" pill; Today shows it done, revealed once.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -27,22 +28,42 @@ env:
 - extendedWaitUntil:
     visible: 'Your coach is logging this session'
     timeout: 20000
-# ---- The coach finishes: the phone updates without any tap ----
+# The pages stay, read only.
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertNotVisible:
+    id: page-done
+# ---- The coach ticks set 2: it shows on the phone live ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0-1
+      text: 'checkbox, checked'
+    timeout: 5000
+- assertVisible:
+    id: actual-reps-0-0-1
+    text: '10'
+# ---- The coach finishes: the phone goes straight to the sticker reveal, without any tap ----
 - runScript:
     file: helpers/call.js
     env: { ACTION: coach-finish, EMAIL: '${EMAIL}' }
 - extendedWaitUntil:
-    visible: 'Your coach logged this session'
+    visible:
+      id: reveal-coach-line
     timeout: 20000
 - assertVisible:
-    id: logged-by-coach
-- takeScreenshot: coach-logging-finished
-- tapOn:
-    id: coach-logging-back
+    id: reveal-coach-line
+    text: 'Your coach logged this session'
 - extendedWaitUntil:
-    visible: 'Done ✓.*'
-    timeout: 20000
-- tapOn: 'View'
+    visible:
+      id: reveal-card
+    timeout: 15000
+- takeScreenshot: coach-logging-reveal
+- runFlow: helpers/reveal-through.yaml
+# Then the summary, with the "Logged by coach" pill.
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 20000
@@ -52,6 +73,12 @@ env:
 - takeScreenshot: coach-logging-summary
 - tapOn:
     id: summary-done
+# Today shows it done, and doesn't reveal it a second time.
+- extendedWaitUntil:
+    visible: 'Done ✓.*'
+    timeout: 20000
+- assertNotVisible:
+    id: reveal-screen
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

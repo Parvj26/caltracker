@@ -9,6 +9,7 @@
   letter-spacing: var(--ct-tracking-screen-title);
   overflow-wrap: anywhere;
 }
+.headerActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin-left: auto; }
 .flag { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); text-decoration: none; }
 .flag:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-radius: var(--ct-radius-pill); }
 

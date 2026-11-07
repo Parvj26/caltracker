@@ -25,25 +25,31 @@ import {
   substitutedFrom,
   isBlockDone,
   isChoiceLocked,
+  formatWeight,
   kgToInput,
   liveExercises,
   needsPick,
   openSetCount,
   pickChoice,
+  prefillLastTime,
+  progressionHint,
   resolveSetValues,
   roundRestSeconds,
   sectionRuns,
+  suggestionForLogExercise,
   toKg,
   toMeters,
   type ActualPatch,
   type LogBlockDoc,
   type LogExerciseDoc,
   type LogSetDoc,
+  type ProgressionHistory,
   type SetValues,
   type StepField,
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import type { Feeling } from '@caltracker/shared';
 import { parseActualInput } from './active-log-logic';
 import type { LastResultSet, LastResults } from './log-api';
 import { orList, supersetLetters } from './workouts';
@@ -474,7 +480,32 @@ export type ExerciseModel = {
   substitute: SubstituteModel | null;
   swappedFromExerciseId: string | null;
   lastTime: readonly LastResultSet[];
+  /** Auto progression's suggestion, "Suggested 140 lb · ↑ +5 lb", or null. */
+  progression: string | null;
 };
+
+/** Auto progression for the pre-fill: the client's recent sessions (empty when off) and their units. */
+export type Progression = { history: ProgressionHistory; units: Units };
+
+/** Last time as the pre-fill reads it for this exercise: with Auto progression's suggested weight, if any. */
+export function prefillSets(ex: LogExerciseDoc, last: LastResults, progression?: Progression): readonly LastResultSet[] {
+  const sets = last[ex.exerciseId]?.sets ?? [];
+  return progression ? prefillLastTime(ex, sets, progression.history, progression.units) : sets;
+}
+
+/**
+ * "Suggested 140 lb · ↑ +5 lb" for an exercise Auto progression moves, else null. Only while the first working set
+ * actually shows that weight: a set ticked before the history loaded (offline, slow signal) carries its own weight
+ * forward, and then the line would name a number the boxes don't use.
+ */
+export function progressionLine(ex: LogExerciseDoc, last: LastResults, progression?: Progression): string | null {
+  if (!progression) return null;
+  const s = suggestionForLogExercise(ex, progression.history, progression.units);
+  const first = ex.sets.find((x) => x.setType === 'normal');
+  if (!s || !first) return null;
+  if (resolveSetValues(ex, first.id, prefillSets(ex, last, progression)).weightKg !== s.weightKg) return null;
+  return `Suggested ${formatWeight(s.weightKg, progression.units)} · ${progressionHint(s, progression.units)}`;
+}
 
 export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; rows: RowModel[]; allDone: boolean };
 
@@ -515,7 +546,13 @@ export type OptionPageModel = {
 
 export type PageModel = StraightPageModel | SupersetPageModel | OptionPageModel;
 
-function exerciseModel(ex: LogExerciseDoc, exerciseIndex: number, label: string | null, last: LastResults): ExerciseModel {
+function exerciseModel(
+  ex: LogExerciseDoc,
+  exerciseIndex: number,
+  label: string | null,
+  last: LastResults,
+  progression?: Progression,
+): ExerciseModel {
   return {
     exerciseIndex,
     logExerciseId: ex.id,
@@ -527,6 +564,7 @@ function exerciseModel(ex: LogExerciseDoc, exerciseIndex: number, label: string 
     substitute: substituteOf(ex),
     swappedFromExerciseId: ex.swappedFromExerciseId,
     lastTime: last[ex.exerciseId]?.sets ?? [],
+    progression: progressionLine(ex, last, progression),
   };
 }
 
@@ -546,13 +584,14 @@ export function supersetRounds(block: LogBlockDoc): Array<{ round: number; entri
   }));
 }
 
-export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last: LastResults): PageModel {
+export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last: LastResults, history?: ProgressionHistory): PageModel {
   const block = log.blocks[page.blockIndex];
-  const lastOf = (ex: LogExerciseDoc) => last[ex.exerciseId]?.sets ?? [];
+  const progression: Progression | undefined = history ? { history, units } : undefined;
+  const lastOf = (ex: LogExerciseDoc) => prefillSets(ex, last, progression);
 
   if (page.kind === 'superset') {
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
-    const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last));
+    const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last, progression));
     const plan = supersetRounds(block);
     const roundCount = plan.length;
     const rounds: RoundModel[] = plan.map(({ round, entries }) => {
@@ -594,14 +633,14 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
       line: picked ? `${where} · you’re doing this one` : lockedOut ? where : `${where} · log a set to pick it`,
       picked,
       lockedOut,
-      exercise: exerciseModel(ex, page.optionIndex, null, last),
+      exercise: exerciseModel(ex, page.optionIndex, null, last, progression),
       rows: setRows(ex, units, lastOf(ex)),
       allDone: picked && isBlockDone(block),
     };
   }
 
   const ex = block.exercises[0];
-  return { kind: 'straight', exercise: exerciseModel(ex, 0, null, last), rows: setRows(ex, units, lastOf(ex)), allDone: isBlockDone(block) };
+  return { kind: 'straight', exercise: exerciseModel(ex, 0, null, last, progression), rows: setRows(ex, units, lastOf(ex)), allDone: isBlockDone(block) };
 }
 
 /** Dots under the pages: done, current or to do. */
@@ -624,26 +663,43 @@ export function pickingFirst(log: WorkoutLogDoc, blockId: string, logExerciseId:
 
 const isEmpty = (v: SetValues) => v.reps === null && v.weightKg === null && v.durationS === null && v.distanceM === null;
 
-/**
- * What "Mark all" would do: the open sets it ticks, and the open sets it leaves because there are no numbers to
- * save for them yet (nothing typed, no coach target, no last time).
- */
-export function markAllPlan(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults): { tick: number; skip: number } {
-  const done = markAll(log, logExerciseIds, last, DELETABLE_AT);
-  const open = (l: WorkoutLogDoc) =>
-    l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)).flatMap((e) => e.sets)).filter((x) => x.completedAt === null).length;
+export type MarkAllPlan = {
+  /** Open sets it ticks. */
+  tick: number;
+  /** Open sets it leaves: no numbers to save yet (nothing typed, no coach target, no last time). */
+  skip: number;
+  /** Of the sets it ticks, weight and reps ones that get no weight (reps only: could be bodyweight, so allowed). */
+  noWeight: number;
+};
+
+/** What "Mark all" would do, for its question (markAllQuestion). Auto progression's suggestion counts as a number. */
+export function markAllPlan(
+  log: WorkoutLogDoc,
+  logExerciseIds: readonly string[],
+  last: LastResults,
+  progression?: Progression,
+): MarkAllPlan {
+  const done = markAll(log, logExerciseIds, last, DELETABLE_AT, progression);
+  const exercises = (l: WorkoutLogDoc) => l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)));
+  const open = (l: WorkoutLogDoc) => exercises(l).flatMap((e) => e.sets).filter((x) => x.completedAt === null).length;
+  const wasOpen = new Set(exercises(log).flatMap((e) => e.sets.filter((x) => x.completedAt === null).map((x) => x.id)));
+  const noWeight = exercises(done)
+    .filter((e) => e.trackingType === 'weight_reps')
+    .flatMap((e) => e.sets)
+    .filter((x) => wasOpen.has(x.id) && x.completedAt !== null && x.actualWeightKg === null).length;
   const tick = open(log) - open(done);
-  return { tick, skip: open(done) };
+  return { tick, skip: open(done), noWeight };
 }
 
-/** "Tick 4 sets with these numbers?" and, when some are left, why. */
-export function markAllQuestion(plan: { tick: number; skip: number }): { title: string; message: string | null } {
+/** "Tick 4 sets with these numbers?" and, when some get no weight or are left, says so. */
+export function markAllQuestion(plan: MarkAllPlan): { title: string; message: string | null } {
   const title = `Tick ${plural(plan.tick, 'set')} with these numbers?`;
-  const message =
-    plan.skip > 0
-      ? `${plural(plan.skip, 'set')} ${plan.skip === 1 ? 'has' : 'have'} no numbers yet, so ${plan.skip === 1 ? 'it stays' : 'they stay'} unticked.`
-      : null;
-  return { title, message };
+  const lines: string[] = [];
+  if (plan.noWeight > 0) lines.push(`${plural(plan.noWeight, 'set')} ${plan.noWeight === 1 ? 'has' : 'have'} no weight.`);
+  if (plan.skip > 0) {
+    lines.push(`${plural(plan.skip, 'set')} ${plan.skip === 1 ? 'has' : 'have'} no numbers yet, so ${plan.skip === 1 ? 'it stays' : 'they stay'} unticked.`);
+  }
+  return { title, message: lines.length > 0 ? lines.join(' ') : null };
 }
 
 /**
@@ -651,7 +707,13 @@ export function markAllQuestion(plan: { tick: number; skip: number }): { title: 
  * it stands then, so a weight typed on set 1 carries into the sets after it. A set with nothing to save (no typed
  * number, no coach target, no last time) is left open.
  */
-export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults, nowIso: string): WorkoutLogDoc {
+export function markAll(
+  log: WorkoutLogDoc,
+  logExerciseIds: readonly string[],
+  last: LastResults,
+  nowIso: string,
+  progression?: Progression,
+): WorkoutLogDoc {
   let next = log;
   for (const exId of logExerciseIds) {
     const setIds = next.blocks.flatMap((b) => b.exercises.filter((e) => e.id === exId).flatMap((e) => e.sets.map((s) => s.id)));
@@ -659,12 +721,31 @@ export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], l
       const ex = next.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
       const set = ex?.sets.find((s) => s.id === setId);
       if (!ex || !set || set.completedAt !== null) continue;
-      const values = resolveSetValues(ex, setId, last[ex.exerciseId]?.sets ?? []);
+      const values = resolveSetValues(ex, setId, prefillSets(ex, last, progression));
       if (isEmpty(values)) continue;
       next = completeSetWith(next, setId, values, nowIso);
     }
   }
   return next;
+}
+
+/**
+ * What VoiceOver should say when a number box's reason changes (AccessibilityInfo.announceForAccessibility): the new
+ * reason when the box becomes invalid or the reason changes, else null, so it is never repeated on every key.
+ */
+export function invalidAnnouncement(previous: string | null, next: string | null): string | null {
+  return next !== null && next !== previous ? next : null;
+}
+
+export type FinishDraft = { feel: Feeling | null; note: string };
+
+/**
+ * The finish sheet's feeling and note: taken from the saved workout note only as the sheet opens. While it is open
+ * the client's own typing wins, even when the saved note changes underneath (a save on blur, a sync), so nothing
+ * typed is overwritten.
+ */
+export function sheetDraft(o: { wasVisible: boolean; visible: boolean; draft: FinishDraft; saved: FinishDraft }): FinishDraft {
+  return o.visible && !o.wasVisible ? o.saved : o.draft;
 }
 
 export type TypedResult = { kind: 'ok'; patch: ActualPatch } | { kind: 'invalid'; message: string };
