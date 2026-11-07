@@ -226,16 +226,16 @@ function ExerciseTable({
                     className={cx(styles.tick, done && styles.tickDone)}
                     aria-pressed={done}
                     aria-label={`Done: ${setName}`}
-                    onClick={() =>
+                    onClick={() => {
+                      // Tick or untick is decided now, from what the coach sees: if this edit is re-applied on a newer
+                      // copy (rebaseEdits), a set the client ticked meanwhile stays ticked instead of being toggled off.
+                      const at = nowIso();
                       edit((l) => {
                         const ex = l.blocks.flatMap((b) => b.exercises).find((e) => e.id === exercise.id);
-                        const set = ex?.sets.find((x) => x.id === s.id);
-                        if (!ex || !set) return l;
-                        return set.completedAt === null
-                          ? completeSetWith(l, s.id, resolveSetValues(ex, s.id, lastTime ?? []), nowIso())
-                          : uncompleteSet(l, s.id, nowIso());
-                      })
-                    }
+                        if (!ex || !ex.sets.some((x) => x.id === s.id)) return l;
+                        return done ? uncompleteSet(l, s.id, at) : completeSetWith(l, s.id, resolveSetValues(ex, s.id, lastTime ?? []), at);
+                      });
+                    }}
                   >
                     ✓
                   </button>
