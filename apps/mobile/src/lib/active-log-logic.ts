@@ -3,9 +3,7 @@
 import {
   autoFinish,
   completedSetCount,
-  openSetCount,
   emptyLog,
-  finishLog,
   formatLogDuration,
   formatLogVolume,
   logDurationS,
@@ -170,25 +168,6 @@ export function keepFinished(note: FinishedNote | null, doc: WorkoutLogDoc | nul
 export function keepEnded(ended: WorkoutLogDoc | null, doc: WorkoutLogDoc | null): WorkoutLogDoc | null {
   if (!ended || !doc || doc.id !== ended.id) return ended;
   return doc.status === 'completed' ? doc : null;
-}
-
-export type FinishPrompt = { kind: 'none-done' } | { kind: 'unticked'; count: number } | { kind: 'ready' };
-
-/**
- * What tapping Finish does. The shared finishLog decides whether the log can be finished at all (it refuses one
- * with no ticked set: the client may only discard or keep going); otherwise unticked sets are asked about first.
- */
-export function finishPrompt(log: WorkoutLogDoc, nowIso: string): FinishPrompt {
-  if (finishLog(log, nowIso) === log) return { kind: 'none-done' };
-  const count = openSetCount(log);
-  return count > 0 ? { kind: 'unticked', count } : { kind: 'ready' };
-}
-
-/** "Finish with 3 sets not done? They won’t count." */
-export function finishQuestion(count: number): string {
-  return count === 1
-    ? 'Finish with 1 set not done? It won’t count.'
-    : `Finish with ${count} sets not done? They won’t count.`;
 }
 
 export type SummaryLines = { duration: string; volume: string | null; sets: string };

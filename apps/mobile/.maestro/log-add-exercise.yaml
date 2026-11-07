@@ -47,11 +47,14 @@ env:
     text: '(Incline Dumbbell|Dumbbell Incline).*'
 - tapOn:
     id: exercise-result-0
+# The new exercise's page opens straight away.
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: page-done
     timeout: 10000
-- assertVisible: '(Incline Dumbbell|Dumbbell Incline).*'
+- assertVisible:
+    id: exercise-name-0
+    text: '(Incline Dumbbell|Dumbbell Incline).*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

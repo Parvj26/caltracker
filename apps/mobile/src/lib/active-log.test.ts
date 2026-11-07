@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc, completeSet, pickChoice } from '@caltracker/shared';
+import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
 import {
-  finishPrompt,
   formatCommentTime,
-  finishQuestion,
   finishedFrom,
   finishedIsLoaded,
   keepEnded,
@@ -21,7 +19,7 @@ import {
   within,
   workoutStatuses,
 } from './active-log-logic';
-import { sampleLog, upperCoreLog } from './log-fixtures';
+import { sampleLog } from './log-fixtures';
 
 let n = 100;
 const makeId = () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
@@ -245,61 +243,6 @@ describe('after the server replaces the phone copy (adopt or reload)', () => {
     expect(keepEnded(done, sampleLog({ id: 'other' }))).toBe(done);
     expect(keepEnded(done, null)).toBe(done);
     expect(keepEnded(null, done)).toBeNull();
-  });
-});
-
-describe('finishPrompt', () => {
-  const twoSets = (firstDone: boolean, secondDone: boolean) => {
-    const base = sampleLog();
-    const ex = base.blocks[0].exercises[0];
-    const set = ex.sets[0];
-    const sets = [
-      { ...set, completedAt: firstDone ? NOW : null },
-      { ...set, id: '00000000-0000-4000-8000-000000000099', completedAt: secondDone ? NOW : null },
-    ];
-    return { ...base, blocks: [{ ...base.blocks[0], exercises: [{ ...ex, sets }] }] };
-  };
-
-  it('refuses with no ticked set (the shared finish rule), so the client can only discard or keep going', () => {
-    expect(finishPrompt(twoSets(false, false), NOW)).toEqual({ kind: 'none-done' });
-  });
-
-  it('asks first when some sets are not ticked, and finishes straight away when all are', () => {
-    expect(finishPrompt(twoSets(true, false), NOW)).toEqual({ kind: 'unticked', count: 1 });
-    expect(finishPrompt(twoSets(true, true), NOW)).toEqual({ kind: 'ready' });
-  });
-
-  it('counts an unpicked pick-one group as its first option, and only the picked option once picked', () => {
-    let log = upperCoreLog();
-    const ids = (bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((x) => x.id));
-    const tickAll = (l: WorkoutLogDoc, bi: number) =>
-      ids(bi).reduce((acc, sid) => completeSet(acc, sid, NOW), l);
-    for (const bi of [0, 1, 2, 3, 4]) log = tickAll(log, bi);
-    expect(finishPrompt(log, NOW)).toEqual({ kind: 'unticked', count: 3 });
-    const picked = pickChoice(log, log.blocks[5].id, log.blocks[5].exercises[1].id, NOW);
-    expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 3 });
-  });
-
-  it('counts the first option before the pick and the picked option after, when their set counts differ', () => {
-    let log = upperCoreLog();
-    // Option 2 (Farmer's Walk) has 2 sets; option 1 keeps its 3.
-    log = {
-      ...log,
-      blocks: log.blocks.map((b, bi) =>
-        bi === 5 ? { ...b, exercises: b.exercises.map((e, ei) => (ei === 1 ? { ...e, sets: e.sets.slice(0, 2) } : e)) } : b,
-      ),
-    };
-    const ids = (bi: number) => log.blocks[bi].exercises.flatMap((e) => e.sets.map((x) => x.id));
-    for (const bi of [0, 1, 2, 3, 4]) log = ids(bi).reduce((acc, sid) => completeSet(acc, sid, NOW), log);
-    expect(log.blocks[5].exercises.map((e) => e.sets.length)).toEqual([3, 2]);
-    expect(finishPrompt(log, NOW)).toEqual({ kind: 'unticked', count: 3 });
-    const picked = pickChoice(log, log.blocks[5].id, log.blocks[5].exercises[1].id, NOW);
-    expect(finishPrompt(picked, NOW)).toEqual({ kind: 'unticked', count: 2 });
-  });
-
-  it('words the question with the exact copy', () => {
-    expect(finishQuestion(3)).toBe('Finish with 3 sets not done? They won’t count.');
-    expect(finishQuestion(1)).toBe('Finish with 1 set not done? It won’t count.');
   });
 });
 

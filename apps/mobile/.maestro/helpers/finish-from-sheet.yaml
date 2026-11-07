@@ -1,0 +1,14 @@
+# The Finish workout? sheet is open: tap Finish, then step through the sticker reveal to the summary.
+appId: app.caltracker.client
+---
+- extendedWaitUntil:
+    visible:
+      id: finish-confirm
+    timeout: 10000
+- tapOn:
+    id: finish-confirm
+- runFlow: reveal-through.yaml
+- extendedWaitUntil:
+    visible:
+      id: summary-done
+    timeout: 20000

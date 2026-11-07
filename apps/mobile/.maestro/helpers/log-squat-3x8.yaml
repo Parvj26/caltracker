@@ -1,0 +1,31 @@
+# "E2E Log" (Barbell Squat 3 × 8 @ 60 kg) from Today: start it, tick the three sets and tap Done: the
+# Finish workout? sheet opens (the caller taps Finish).
+appId: app.caltracker.client
+---
+- runFlow:
+    file: start-first-section.yaml
+    env: { NAME: 'E2E Log' }
+- tapOn:
+    id: tick-0-0-0
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- tapOn:
+    id: tick-0-0-1
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, checked'
+- tapOn:
+    id: tick-0-0-2
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+- tapOn:
+    id: page-done
+- extendedWaitUntil:
+    visible:
+      id: finish-sheet
+    timeout: 10000
+- assertVisible:
+    id: finish-count
+    text: '3 of 3 sets done.'

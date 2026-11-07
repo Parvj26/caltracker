@@ -1,0 +1,13 @@
+# Mark all (or Mark all rounds) on page PAGE: it sits at the end of the page, so scroll to it first, then confirm
+# "Tick N sets with these numbers?" when it asks (it does for more than one set). Inputs (env): PAGE.
+appId: app.caltracker.client
+---
+- scrollUntilVisible:
+    element:
+      id: mark-all-${PAGE}
+    direction: DOWN
+- tapOn:
+    id: mark-all-${PAGE}
+- tapOn:
+    text: 'Tick them'
+    optional: true

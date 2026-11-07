@@ -182,6 +182,7 @@ export {
   reopenLog,
   removeLogSet,
   setExerciseNote,
+  setLogNotes,
   stepActual,
   swapLogExercise,
   toggleSet,
@@ -189,6 +190,8 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
+export { FEELINGS, LOG_NOTES_MAX, composeFinishNotes, readFinishNotes } from './logs/finish-note';
+export type { Feeling } from './logs/finish-note';
 export {
   coachLine,
   formatLastResult,
