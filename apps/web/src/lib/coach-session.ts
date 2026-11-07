@@ -31,6 +31,11 @@ export async function loadLastTimes(supabase: SupabaseClient<Database>, clientId
   return out;
 }
 
+/** Shown instead of Start session for a workout on a later day. */
+export function laterDayNotice(firstName: string): string {
+  return `This workout is on a later day. You can log it with ${firstName || 'your client'} on the day, or afterwards if it is missed.`;
+}
+
 /** Who is logging this planned workout, if anyone (single active logger). */
 export async function loadSessionState(
   supabase: SupabaseClient<Database>,

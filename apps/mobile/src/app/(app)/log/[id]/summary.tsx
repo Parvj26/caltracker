@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View, type HostInstance } from 'react-native';
 import { OffScreen, ShareCard } from '@/components/stickers/share-card';
 import { Sticker } from '@/components/stickers/sticker';
-import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { Button, Card, ErrorText, Screen, Toast } from '@/components/ui';
 import { workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
 import { SHARE_NOT_READY, prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
-import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
+import { useSaveCard } from '@/lib/use-save-card';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
 import { LoggedByCoachPill } from '@/components/log/coach-logging-banner';
@@ -51,8 +51,7 @@ export default function SummaryScreen() {
   const [attempt, setAttempt] = useState(0);
   const [reopening, setReopening] = useState(false);
   const card = useRef<HostInstance>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveNote, setSaveNote] = useState<string | null>(null);
+  const { saving, save: saveImage, toast: saveToast, clearToast } = useSaveCard(card);
   const hasLocal = local !== null;
   const coach = useCoachLogging(id, false);
 
@@ -141,12 +140,6 @@ export default function SummaryScreen() {
 
   const ladder = award?.ladder ?? null;
   const ladderName = ladder ? (STICKERS.find((s) => s.key === ladder.key)?.name ?? ladder.key) : null;
-  const saveImage = async () => {
-    setSaving(true);
-    setSaveNote(null);
-    setSaveNote(SAVE_MESSAGES[await saveCardToPhotos(card)]);
-    setSaving(false);
-  };
 
   const addMissedSets = async () => {
     setReopening(true);
@@ -218,11 +211,7 @@ export default function SummaryScreen() {
       {ladder && ladderName ? (
         <View style={{ gap: space[2] }}>
           <Button variant="secondary" title="Save image" testID="summary-save-image" busy={saving} onPress={() => void saveImage()} />
-          {saveNote ? (
-            <Text style={text('caption')} testID="summary-save-note" accessibilityLiveRegion="polite">
-              {saveNote}
-            </Text>
-          ) : null}
+          <Toast message={saveToast} onHide={clearToast} testID="summary-save-toast" />
           <OffScreen>
             <ShareCard
               ref={card}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   addLogSet,
   blockRoundCount,
+  canStartSessionOn,
   completeAllSets,
   completeSetWith,
   completedSetCount,
@@ -13,6 +14,7 @@ import {
   finishLog,
   formatClock,
   formatLastResult,
+  formatWeight,
   fromMeters,
   isBlockDone,
   isChoiceLocked,
@@ -22,21 +24,29 @@ import {
   openSetCount,
   parseClock,
   pickChoice,
+  rebaseEdits,
   planSummary,
+  prefillLastTime,
+  progressionHint,
   resolveSetValues,
   sectionRuns,
   setExerciseNote,
   setLogNotes,
   startLogFromWorkout,
+  suggestionForLogExercise,
   stepName,
   toKg,
   toMeters,
   uncompleteSet,
   updateActual,
+  withSuggestion,
   type ActualPatch,
+  type IsoDate,
   type LogBlockDoc,
+  type LogEdit,
   type LogExerciseDoc,
   type LogSetDoc,
+  type ProgressionHistory,
   type TrackingType,
   type Units,
   type WorkoutDoc,
@@ -45,12 +55,14 @@ import {
 import { Button, Card, ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
-import type { LastTimes } from '@/lib/coach-session';
+import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
+import { useBrowserToday } from '@/lib/local-today';
 import { handBackSession, loadSession, saveSession } from './actions';
 import styles from './session.module.css';
 
 type Field = 'weight' | 'reps' | 'time' | 'distance';
 type SaveState = { kind: 'idle' | 'saving' | 'saved' } | { kind: 'error' | 'final'; message: string };
+type Op = LogEdit;
 
 const SAVE_DELAY_MS = 400;
 const RETRY_MS = 3000;
@@ -157,18 +169,23 @@ function ExerciseTable({
   letter,
   units,
   lastTime,
+  progression,
   edit,
 }: {
   exercise: LogExerciseDoc;
   letter: string | null;
   units: Units;
   lastTime: LastTimes[string];
+  progression: ProgressionHistory;
   edit: (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => void;
 }) {
   const fields = FIELDS[exercise.trackingType];
   const header: Record<Field, string> = { weight: units.toUpperCase(), reps: 'REPS', time: 'TIME', distance: distanceUnitFor(units).toUpperCase() };
   const plan = planSummary(exercise, units);
   const last = formatLastResult(lastTime ?? [], exercise.trackingType, units);
+  // Auto progression: the suggested weight becomes the pre-fill (a weight the coach typed in the plan wins).
+  const suggestion = suggestionForLogExercise(exercise, progression, units);
+  const prefillLast = withSuggestion(lastTime ?? [], suggestion);
   const name = `${letter ? `${letter}. ` : ''}${exercise.exerciseName}`;
   const [note, setNote] = useState(exercise.note ?? '');
 
@@ -178,6 +195,11 @@ function ExerciseTable({
         <h3 className={styles.exerciseName}>{name}</h3>
         {plan ? <p className={styles.caption}>Coach: {plan}</p> : null}
         <p className={styles.caption}>{last ?? 'Last time: first time'}</p>
+        {suggestion ? (
+          <p className={styles.caption} data-testid="progression-suggestion">
+            Suggested: {formatWeight(suggestion.weightKg, units)} · {progressionHint(suggestion, units)} (Auto progression)
+          </p>
+        ) : null}
       </header>
       <table className={styles.table}>
         <thead>
@@ -196,7 +218,7 @@ function ExerciseTable({
         </thead>
         <tbody>
           {exercise.sets.map((s, i) => {
-            const prefill = resolveSetValues(exercise, s.id, lastTime ?? []);
+            const prefill = resolveSetValues(exercise, s.id, prefillLast);
             const done = s.completedAt !== null;
             const setName = `${exercise.exerciseName} ${stepName(exercise, i)}`;
             return (
@@ -220,16 +242,16 @@ function ExerciseTable({
                     className={cx(styles.tick, done && styles.tickDone)}
                     aria-pressed={done}
                     aria-label={`Done: ${setName}`}
-                    onClick={() =>
+                    onClick={() => {
+                      // Tick or untick is decided now, from what the coach sees: if this edit is re-applied on a newer
+                      // copy (rebaseEdits), a set the client ticked meanwhile stays ticked instead of being toggled off.
+                      const at = nowIso();
                       edit((l) => {
                         const ex = l.blocks.flatMap((b) => b.exercises).find((e) => e.id === exercise.id);
-                        const set = ex?.sets.find((x) => x.id === s.id);
-                        if (!ex || !set) return l;
-                        return set.completedAt === null
-                          ? completeSetWith(l, s.id, resolveSetValues(ex, s.id, lastTime ?? []), nowIso())
-                          : uncompleteSet(l, s.id, nowIso());
-                      })
-                    }
+                        if (!ex || !ex.sets.some((x) => x.id === s.id)) return l;
+                        return done ? uncompleteSet(l, s.id, at) : completeSetWith(l, s.id, resolveSetValues(ex, s.id, prefillLast), at);
+                      });
+                    }}
                   >
                     ✓
                   </button>
@@ -273,15 +295,23 @@ function BlockPage({
   block,
   units,
   lastTimes,
+  progression,
   edit,
 }: {
   block: LogBlockDoc;
   units: Units;
   lastTimes: LastTimes;
+  progression: ProgressionHistory;
   edit: (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => void;
 }) {
   const superset = block.kind === 'superset';
   const rounds = blockRoundCount(block);
+  /** Last time with Auto progression's suggestion applied, for Mark all. */
+  const prefillOfExercise = (l: WorkoutLogDoc, blockId: string, exerciseId: string) => {
+    const ex = l.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.exerciseId === exerciseId);
+    const last = lastTimes[exerciseId] ?? [];
+    return ex ? prefillLastTime(ex, last, progression, units) : last;
+  };
   return (
     <div className={styles.pageBody}>
       <div className={styles.pageHead}>
@@ -289,7 +319,7 @@ function BlockPage({
           {superset ? `Superset · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}` : block.kind === 'choice' ? 'Pick one' : pageName(block)}
         </h2>
         {needsPick(block) ? null : (
-          <Button variant="secondary" className={styles.big} onClick={() => edit((l) => completeAllSets(l, block.id, (id) => lastTimes[id] ?? [], nowIso()))}>
+          <Button variant="secondary" className={styles.big} onClick={() => edit((l) => completeAllSets(l, block.id, (id) => prefillOfExercise(l, block.id, id), nowIso()))}>
             Mark all
           </Button>
         )}
@@ -316,6 +346,7 @@ function BlockPage({
           letter={superset ? String.fromCharCode(65 + exerciseIndex) : null}
           units={units}
           lastTime={lastTimes[exercise.exerciseId] ?? []}
+          progression={progression}
           edit={edit}
         />
       ))}
@@ -333,14 +364,20 @@ export function SessionLogger({
   client,
   workout,
   initialLog,
+  scheduledOn,
   units,
   lastTimes,
+  progression,
 }: {
   client: { id: string; firstName: string; name: string };
   workout: WorkoutDoc;
   initialLog: WorkoutLogDoc | null;
+  /** The workout's calendar day: a later day's can't be started (the page and the database refuse it too). */
+  scheduledOn: IsoDate | null;
   units: Units;
   lastTimes: LastTimes;
+  /** Auto progression history (empty when the program has it off). */
+  progression: ProgressionHistory;
 }) {
   const router = useRouter();
   const [log, setLog] = useState<WorkoutLogDoc | null>(initialLog);
@@ -351,7 +388,16 @@ export function SessionLogger({
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const [notice, setNotice] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const [notes, setNotes] = useState(initialLog?.notes ?? '');
+  const [notes, setNotesState] = useState(initialLog?.notes ?? '');
+  // What the session note box shows, for the save loop (state would be stale in its closure).
+  const notesRef = useRef(initialLog?.notes ?? '');
+  const setNotes = (v: string) => {
+    notesRef.current = v;
+    setNotesState(v);
+  };
+  // Bumped when the server's copy replaces this page's, so the exercise note boxes start again from it.
+  const [reloads, setReloads] = useState(0);
+  const today = useBrowserToday();
   const [handingBack, setHandingBack] = useState(false);
   // Set before the last save of a hand back, so nothing typed meanwhile is lost or sent after the hand back.
   const handingBackRef = useRef(false);
@@ -359,6 +405,8 @@ export function SessionLogger({
   const [earlierSets] = useState(() => (initialLog ? completedSetCount(initialLog) : 0));
 
   const logRef = useRef<WorkoutLogDoc | null>(initialLog);
+  // The edits since the last saved revision, so a refused (stale) save can re-apply them on the server's copy.
+  const unsaved = useRef<{ edit: Op; revision: number }[]>([]);
   const savedRevision = useRef(initialLog?.revision ?? 0);
   const chain = useRef<Promise<boolean>>(Promise.resolve(true));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -387,6 +435,7 @@ export function SessionLogger({
         }
         if (outcome.applied) {
           savedRevision.current = Math.max(savedRevision.current, doc.revision);
+          unsaved.current = unsaved.current.filter((u) => u.revision > savedRevision.current);
           setSave({ kind: 'saved' });
           continue;
         }
@@ -396,16 +445,31 @@ export function SessionLogger({
           router.refresh();
           return false;
         }
-        // Stale (this session is open in another tab too) or already finished: show the server's copy.
+        // Stale: the server has a newer copy. Usually the client's last sets from their phone, uploaded just after
+        // the take over (the server accepts that one final save until the coach's first), or this session open in
+        // another tab. Take the server's copy and re-apply this page's unsaved edits on top, so neither is lost.
         const server = await loadSession(doc.id);
-        if (server) {
-          logRef.current = server;
-          savedRevision.current = server.revision;
-          setLog(server);
-          setNotice('This session was changed somewhere else, so you now see the latest saved copy.');
+        if (!server) {
+          setSave({ kind: 'saved' });
+          return false;
         }
+        // A session note typed but not yet saved (the box not left) is kept; otherwise the box shows the server's.
+        const typing = notesRef.current !== (logRef.current?.notes ?? '');
+        const rebased = rebaseEdits(server, unsaved.current.map((u) => u.edit));
+        unsaved.current = rebased.unsaved;
+        logRef.current = rebased.doc;
+        savedRevision.current = server.revision;
+        setLog(rebased.doc);
+        if (!typing) setNotes(rebased.doc.notes ?? '');
+        setReloads((n) => n + 1);
+        setNotice(
+          rebased.doc.status === 'in_progress'
+            ? `This session changed somewhere else (for example sets ${client.firstName || 'your client'} ticked on their phone just before you took over). You now see the latest copy, with your own changes kept.`
+            : 'This session was changed somewhere else, so you now see the latest saved copy.',
+        );
+        if (rebased.doc !== server) continue; // send the re-applied edits
         setSave({ kind: 'saved' });
-        return server?.status === doc.status;
+        return server.status === doc.status;
       } catch (e) {
         setSave({ kind: 'error', message: failureMessage(e, "Couldn't save. Check your connection; it will try again.") });
         timer.current = setTimeout(() => void flushRef.current(), RETRY_MS);
@@ -428,25 +492,35 @@ export function SessionLogger({
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
+  /** Applies one operation to this page's copy and remembers it until saved. False when it changed nothing. */
+  const applyLocal = useCallback((fn: Op): boolean => {
+    const current = logRef.current;
+    if (!current) return false;
+    const next = fn(current);
+    if (next === current) return false;
+    logRef.current = next;
+    unsaved.current.push({ edit: fn, revision: next.revision });
+    setLog(next);
+    return true;
+  }, []);
+
   /** Every edit goes through a shared log operation; a refused edit (the same doc back) saves nothing. */
   const edit = useCallback(
     (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => {
       const current = logRef.current;
       if (!current || current.status !== 'in_progress' || stopped.current || handingBackRef.current) return;
-      const next = fn(current);
-      if (next === current) return;
-      logRef.current = next;
-      setLog(next);
+      if (!applyLocal(fn)) return;
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), SAVE_DELAY_MS);
     },
-    [flush],
+    [flush, applyLocal],
   );
 
   function start() {
     // The server needs revision 1 or more; this is the session's first version.
     const doc = { ...startLogFromWorkout(workout, uuid, nowIso()), revision: 1 };
     logRef.current = doc;
+    unsaved.current = [];
     setLog(doc);
     setPage(0);
     void flush();
@@ -455,16 +529,22 @@ export function SessionLogger({
   async function finish() {
     const current = logRef.current;
     if (!current) return;
-    // A note typed but not yet left (no blur) still goes with the finish.
-    const withNotes = setLogNotes(current, notes, nowIso());
-    const finished = finishLog(withNotes, nowIso());
-    if (finished === withNotes) {
+    // A note typed but not yet left (no blur) still goes with the finish. One operation, so a stale save re-applies
+    // the finish on the server's copy too.
+    const at = nowIso();
+    const typed = notes;
+    const finishOp: Op = (l) => {
+      const withNotes = setLogNotes(l, typed, at);
+      const finished = finishLog(withNotes, at);
+      return finished === withNotes ? l : finished;
+    };
+    if (finishOp(current) === current) {
       setNotice('Tick at least one set to finish the session.');
       return;
     }
     setFinishing(true);
-    logRef.current = finished;
-    setLog(finished);
+    applyLocal(finishOp);
+    const finished = logRef.current!;
     const saved = await flush();
     if (!saved || logRef.current?.status !== 'completed') {
       setFinishing(false);
@@ -483,9 +563,8 @@ export function SessionLogger({
         ? `Cancel this session? This throws away the whole workout, including the ${earlierSets} ${earlierSets === 1 ? 'set' : 'sets'} already logged before you opened it (after a take over, those are the ones ${who} logged on their phone). Nothing is saved to ${who}'s history.`
         : `Cancel this session? Nothing is saved to ${who}'s history.`;
     if (!current || !window.confirm(warning)) return;
-    const discarded = discardLog(current, nowIso());
-    logRef.current = discarded;
-    setLog(discarded);
+    const at = nowIso();
+    applyLocal((l) => discardLog(l, at));
     if (await flush()) router.push(`/clients/${client.id}/training`);
   }
 
@@ -524,6 +603,9 @@ export function SessionLogger({
   const status =
     save.kind === 'saving' ? 'Saving…' : save.kind === 'saved' ? 'All changes saved' : save.kind === 'error' ? save.message : '';
 
+  // The coach's own today (null until the browser knows it): a later day's workout can't be started.
+  const laterDay = today !== null && !canStartSessionOn(scheduledOn, today);
+
   if (!log) {
     return (
       <div className={styles.page}>
@@ -540,11 +622,17 @@ export function SessionLogger({
               <li key={b.id}>{b.kind === 'choice' ? `Pick one: ${b.exercises.map((e) => e.exerciseName).join(' / ')}` : b.exercises.map((e) => e.exerciseName).join(' + ')}</li>
             ))}
           </ul>
-          <div className={styles.actions}>
-            <Button className={styles.big} onClick={start} disabled={workout.blocks.length === 0}>
-              Start session
-            </Button>
-          </div>
+          {laterDay ? (
+            <p className={styles.notice} role="status">
+              {laterDayNotice(client.firstName)}
+            </p>
+          ) : (
+            <div className={styles.actions}>
+              <Button className={styles.big} onClick={start} disabled={workout.blocks.length === 0}>
+                Start session
+              </Button>
+            </div>
+          )}
           {workout.blocks.length === 0 ? <p className={styles.caption}>This workout has no exercises yet. Add some first.</p> : null}
         </Card>
       </div>
@@ -614,7 +702,7 @@ export function SessionLogger({
         <div className={styles.current} aria-label="Current exercise">
           {/* While locked the boxes and buttons stay visible but cannot change anything. */}
           <fieldset disabled={locked} className={styles.fieldset}>
-            {block ? <BlockPage key={block.id} block={block} units={units} lastTimes={lastTimes} edit={edit} /> : null}
+            {block ? <BlockPage key={`${block.id}:${reloads}`} block={block} units={units} lastTimes={lastTimes} progression={progression} edit={edit} /> : null}
             <div className={styles.pager}>
               <Button variant="secondary" className={styles.big} disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
                 ← Previous

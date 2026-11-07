@@ -104,22 +104,25 @@ export function ExerciseTools({
   hasSubstitute: boolean;
   onHistory: () => void;
   onMessage: (() => void) | null;
-  onSwap: () => void;
-  onMore: () => void;
+  /** Null hides ⇄ and ••• (read only, while the coach logs). */
+  onSwap: (() => void) | null;
+  onMore: (() => void) | null;
 }) {
   const { space } = useTheme();
   return (
     <View style={[styles.tools, { gap: space[2] }]}>
       <Tool glyph="↺" label={`History for ${name}`} testID={`history-${idKey}`} onPress={onHistory} />
       {onMessage ? <Tool glyph="✉" label={`Note for your coach about ${name}`} testID={`message-${idKey}`} onPress={onMessage} /> : null}
-      <Tool
-        glyph="⇄"
-        label={hasSubstitute ? `Substitute available for ${name}` : `Swap ${name}`}
-        testID={`swap-${idKey}`}
-        dotted={hasSubstitute}
-        onPress={onSwap}
-      />
-      <Tool glyph="•••" label={`More for ${name}`} testID={`more-${idKey}`} onPress={onMore} />
+      {onSwap ? (
+        <Tool
+          glyph="⇄"
+          label={hasSubstitute ? `Substitute available for ${name}` : `Swap ${name}`}
+          testID={`swap-${idKey}`}
+          dotted={hasSubstitute}
+          onPress={onSwap}
+        />
+      ) : null}
+      {onMore ? <Tool glyph="•••" label={`More for ${name}`} testID={`more-${idKey}`} onPress={onMore} /> : null}
     </View>
   );
 }

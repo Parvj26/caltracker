@@ -45,7 +45,8 @@ env:
     text: Not Now
     optional: true
 - extendedWaitUntil:
-    visible: 'Welcome to ${BUSINESS}'
+    visible:
+      id: today-greeting
     timeout: 20000
 - extendedWaitUntil:
     visible: ${BIO}

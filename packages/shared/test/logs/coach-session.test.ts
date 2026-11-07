@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from '../../src/logs/coach-session';
+import { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from '../../src/logs/coach-session';
 import { completeSet, pickChoice, updateActual } from '../../src/logs/ops';
 import { startLogFromWorkout } from '../../src/logs/start';
 import type { WorkoutLogDoc } from '../../src/logs/schema';
@@ -141,5 +141,18 @@ describe('loggerKind', () => {
     expect(loggerKind('client', 'coach', 'client')).toBe('client');
     expect(loggerKind(null, 'coach', 'client')).toBe('client');
     expect(loggerKind('coach-2', 'coach', 'client')).toBe('other_coach');
+  });
+});
+
+describe('canStartSessionOn', () => {
+  it('allows today\'s and missed workouts, never a later day\'s', () => {
+    expect(canStartSessionOn('2026-11-06', '2026-11-06')).toBe(true);
+    expect(canStartSessionOn('2026-11-01', '2026-11-06')).toBe(true);
+    expect(canStartSessionOn('2026-11-07', '2026-11-06')).toBe(false);
+    expect(canStartSessionOn('2026-12-01', '2026-11-06')).toBe(false);
+  });
+
+  it('allows a workout with no date (not on a calendar)', () => {
+    expect(canStartSessionOn(null, '2026-11-06')).toBe(true);
   });
 });

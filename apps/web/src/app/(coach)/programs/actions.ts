@@ -329,3 +329,25 @@ export async function getLiveSyncStatus(id: string): Promise<LiveSyncState | nul
   const supabase = await createServerSupabase();
   return loadLiveSync(supabase, workspaceId, id);
 }
+
+export type AutoProgressionOutcome = { ok: true; on: boolean } | { ok: false; error: string };
+
+/**
+ * Turns the program's Auto progression on or off. It never changes any workout: it only decides whether the phone
+ * (and the coach's views) suggest the next weight from the client's last sessions (shared nextSuggestion).
+ */
+export async function setProgramAutoProgression(id: string, on: boolean): Promise<AutoProgressionOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(id) || typeof on !== 'boolean') return { ok: false, error: "Couldn't find that program." };
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase
+    .from('programs')
+    .update({ auto_progression: on })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('auto_progression');
+  if (error) return { ok: false, error: "Couldn't change Auto progression. Please try again." };
+  const row = data[0];
+  if (!row) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  return { ok: true, on: row.auto_progression };
+}
