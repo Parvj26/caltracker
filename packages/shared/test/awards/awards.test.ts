@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeAward, revealCards } from '../../src/awards/award';
 import { LANDMARK_JOURNEY, STICKERS } from '../../src/awards/catalogue';
-import { formatMultiple, isQualifying, ladderAnimal } from '../../src/awards/ladder';
+import { formatMultiple, isQualifying, pickLadderAnimal } from '../../src/awards/ladder';
 import { detectPrs, epley1rm } from '../../src/awards/prs';
 import type { PersonalRecord } from '../../src/awards/prs';
 import { milestoneFor, newRareFinds } from '../../src/awards/rare';
@@ -31,12 +31,11 @@ describe('STICKERS', () => {
 });
 
 describe('ladder', () => {
-  it('picks the heaviest animal at or under the volume', () => {
-    expect(ladderAnimal(1470)?.sticker.name).toBe('Giraffe');
-    expect(ladderAnimal(1470)?.multiple).toBeCloseTo(1.225);
-    expect(ladderAnimal(1500)?.sticker.name).toBe('Hippo');
-    expect(ladderAnimal(1.9)).toBeNull();
-    expect(ladderAnimal(150000)?.sticker.name).toBe('Blue whale');
+  it('keeps a stored animal at or under the volume, with its multiple (more in ladder-pick.test.ts)', () => {
+    expect(pickLadderAnimal(1470, [], 'x', 'giraffe')?.sticker.name).toBe('Giraffe');
+    expect(pickLadderAnimal(1470, [], 'x', 'giraffe')?.multiple).toBeCloseTo(1.225);
+    expect(pickLadderAnimal(1.9, [], 'x')).toBeNull();
+    expect(pickLadderAnimal(150000, [], 'x', 'blue-whale')?.sticker.name).toBe('Blue whale');
   });
   it('formats the multiple', () => {
     expect(formatMultiple(1.225, 'Giraffe')).toBe('≈ 1.2 Giraffes');
@@ -207,13 +206,15 @@ describe('rare finds and milestones', () => {
 describe('computeAward', () => {
   const sets = (n: number, w = 100, r = 10) => Array.from({ length: n }, () => ({ w, r })); // 1000 kg each set
   const base = (over: Partial<Parameters<typeof computeAward>[0]> = {}) => ({
-    log: mkLog([{ sets: sets(5, 60, 10) }]), // 3000 kg -> Elephant? no: 3000 >= 2300 Rhino
+    log: mkLog([{ sets: sets(5, 60, 10) }]), // 3000 kg; the stored rhino (2,300 kg) fits, so it is kept
     owned: new Map<string, { count: number; shiny: boolean }>(),
     prHistory: [],
     firstLogOfExercise: new Set<string>(),
     statsBefore: stats(),
     statsAfter: stats(),
     rng: () => 0.5,
+    ladderHistory: [] as string[],
+    keepLadder: 'rhino' as string | null,
     ...over,
   });
 
@@ -237,6 +238,13 @@ describe('computeAward', () => {
     let calls = 0;
     computeAward(base({ owned, rng: () => (calls++, 0.99) }));
     expect(calls).toBe(1); // only the drop roll
+  });
+  it('with nothing stored, picks by the rule from the history and the log id, without using the rolls', () => {
+    const log = mkLog([{ sets: sets(1, 10, 1) }]); // 10 kg: rabbit, cat, red panda, koala
+    let calls = 0;
+    const a = computeAward(base({ log, keepLadder: null, ladderHistory: ['rabbit', 'cat', 'koala'], rng: () => (calls++, 0.5) }));
+    expect(a.ladder).toMatchObject({ key: 'red-panda', multiple: 2, isNew: true, count: 1 });
+    expect(calls).toBe(0); // under 5 sets: no rolls, and the pick has its own seeded source
   });
   it('drops only from those not owned', () => {
     const owned = new Map([['pink-river-dolphin', { count: 1, shiny: false }]]);
