@@ -1,5 +1,5 @@
 import { addDays } from '@caltracker/shared';
-import type { AttentionKind, AttentionReason, ClientStatus, DailyCheckInput, HomeClient, IsoDate } from '@caltracker/shared';
+import type { AttentionReason, ClientStatus, DailyCheckInput, HomeClient, IsoDate } from '@caltracker/shared';
 import type { ChipTone } from '@/components/ui';
 import type { HomeData } from './coach-home';
 
@@ -50,26 +50,6 @@ export function shortDay(date: IsoDate, today: IsoDate): string {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** Group headings on Home, in plain words. */
-export const GROUP_TITLE: Record<AttentionKind, string> = {
-  missed_in_a_row: 'Missed 2+ in a row',
-  missed: 'Missed a workout (last 7 days)',
-  program_ending: 'Program ending soon',
-  nothing_planned: 'Nothing planned',
-  quiet: 'No workout in 5+ days',
-  new_bests: 'New personal bests this week',
-};
-
-/** Anchor ids for the groups (the Home tiles link to some of them). */
-export const GROUP_ID: Record<AttentionKind, string> = {
-  missed_in_a_row: 'missed-in-a-row',
-  missed: 'missed',
-  program_ending: 'ending',
-  nothing_planned: 'nothing-planned',
-  quiet: 'quiet',
-  new_bests: 'new-bests',
-};
 
 /** The one line a row says about why the client is listed. */
 export function reasonText(r: AttentionReason, today: IsoDate): string {

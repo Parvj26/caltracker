@@ -45,7 +45,7 @@ async function newCoach(): Promise<Coach> {
   return coach;
 }
 
-// Joined 20 days ago by default: under 30, so "Body scans 30+ days" (covered in body-scans.spec) stays out of these groups.
+// Joined 20 days ago by default: under 30, so "Body scans 30+ days" (covered in body-scans.spec) stays out of this list.
 async function addClient(coach: Coach, firstName: string, lastName: string, joinedDaysAgo = 20): Promise<string> {
   const id = await newUser(`daily-${unique()}@example.com`, firstName, lastName);
   coach.userIds.push(id);
@@ -161,62 +161,56 @@ test('a coach with only on-track clients sees "Everyone\'s on track"', async ({ 
   await finish(coach, c, await plan(coach, c, -1), 1);
   await plan(coach, c, 1);
   await signIn(page, coach);
-  const attention = page.getByRole('complementary', { name: 'Needs attention' });
+  const attention = page.getByRole('region', { name: 'Needs attention' });
   await expect(attention.getByText("Everyone's on track.")).toBeVisible();
-  await expect(attention.getByRole('heading', { level: 3 })).toHaveCount(0);
-  await expect(page.getByRole('main').getByRole('link', { name: /^Message/ })).toHaveCount(0);
+  await expect(attention.getByRole('listitem')).toHaveCount(0);
+  await expect(attention.getByRole('button')).toHaveCount(0);
 });
 
-test('Home groups every client under its reason, with counts, a reason line and actions', async ({ page }) => {
+test('Home lists every client who needs something once, most urgent first, with a reason line and one fix', async ({ page }) => {
   const coach = await newCoach();
   const ids = await seedFive(coach);
   await signIn(page, coach);
-  const attention = page.getByRole('complementary', { name: 'Needs attention' });
+  const attention = page.getByRole('region', { name: 'Needs attention' });
   await expect(attention.getByText("Everyone's on track.")).toHaveCount(0);
+  await expect(attention.getByRole('heading', { name: 'Needs attention 5' })).toBeVisible();
 
-  // Groups appear in a fixed order, each heading with its count.
-  await expect(attention.getByRole('heading', { level: 3 })).toHaveText([
-    'Missed 2+ in a row (1)',
-    'Missed a workout (last 7 days) (1)',
-    'Program ending soon (1)',
-    'Nothing planned (1)',
-    'No workout in 5+ days (1)',
-    'New personal bests this week (1)',
-  ]);
+  // One combined list: misses first, then plans running out, then quiet. New bests are a celebration, not listed.
+  const rows = attention.getByRole('listitem');
+  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveText([/^Rowan Run/, /^Olive Once/, /^Enid Ending/, /^Nell Nothing/, /^Quinn Quiet/]);
+  await expect(attention.getByText('Sami Steady')).toHaveCount(0);
 
-  const row = (group: string, name: string) => attention.getByRole('region', { name: new RegExp(`^${group.replace(/[()+]/g, '\\$&')}`) }).locator('li').filter({ hasText: name });
+  const row = (name: string) => rows.filter({ hasText: name });
+  const twoDaysAgo = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(new Date(Date.now() - 2 * MS_DAY));
+  const inThree = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(new Date(Date.now() + 3 * MS_DAY));
+  await expect(row('Rowan Run')).toContainText('Missed 2 workouts in a row');
+  await expect(row('Olive Once')).toContainText(`Missed ${twoDaysAgo}`);
+  await expect(row('Enid Ending')).toContainText(`Program ends ${inThree} · nothing after`);
+  await expect(row('Nell Nothing')).toContainText('Nothing planned in the next 7 days');
+  await expect(row('Quinn Quiet')).toContainText('No workout in 8 days');
 
-  const run = row('Missed 2+ in a row', 'Rowan Run');
-  await expect(run).toContainText('Missed 2 in a row · latest yesterday');
-  await expect(run.getByRole('link', { name: 'Open Rowan Run' })).toHaveAttribute('href', `/clients/${ids.run}`);
-  // Every row has Assign, which opens the client's Training calendar.
-  await expect(run.getByRole('link', { name: 'Assign to Rowan Run' })).toHaveAttribute('href', `/clients/${ids.run}/training`);
+  // Each row has exactly one fix: Message for a miss or a quiet client, Assign when the plan runs out.
+  for (const r of await rows.all()) await expect(r.getByRole('link')).toHaveCount(1);
+  await expect(row('Rowan Run').getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
+  await expect(row('Quinn Quiet').getByRole('link', { name: 'Message Quinn Quiet' })).toHaveAttribute('href', `/messages/${ids.quiet}`);
+  await expect(row('Enid Ending').getByRole('link', { name: 'Assign to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}/training`);
 
-  await expect(row('Missed a workout', 'Olive Once')).toContainText(/Missed 1 · \w{3} \d{1,2} \w{3}/);
+  // Filter chips are real toggle buttons; only chips with something in them show.
+  const chips = attention.getByRole('group', { name: 'Filter Needs attention' }).getByRole('button');
+  await expect(chips).toHaveText(['All 5', 'Missed 2', 'Plan ending 1']);
+  await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+  await chips.filter({ hasText: 'Missed' }).click();
+  await expect(chips.filter({ hasText: 'Missed' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips.first()).toHaveAttribute('aria-pressed', 'false');
+  await expect(rows).toHaveText([/^Rowan Run/, /^Olive Once/]);
+  await chips.filter({ hasText: 'Plan ending' }).click();
+  await expect(rows).toHaveText([/^Enid Ending/]);
+  await chips.first().click();
+  await expect(rows).toHaveCount(5);
 
-  const ending = row('Program ending soon', 'Enid Ending');
-  await expect(ending).toContainText(/Ends in 3 days · \w{3} \d{1,2} \w{3}/);
-  await expect(ending.getByRole('link', { name: 'Assign to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}/training`);
-
-  const nothing = row('Nothing planned', 'Nell Nothing');
-  await expect(nothing).toContainText('Nothing in the next 7 days');
-  await expect(nothing.getByRole('link', { name: 'Assign to Nell Nothing' })).toHaveAttribute('href', `/clients/${ids.nothing}/training`);
-
-  await expect(row('No workout in 5+ days', 'Quinn Quiet')).toContainText('No workout in 8 days');
-  await expect(row('New personal bests', 'Sami Steady')).toContainText('1 lift improved');
-  // Sami's workout today is not done yet, and that is not a miss.
-  await expect(attention.getByText('Sami Steady')).toHaveCount(1);
-
-  // The Missed tile counts both missed groups and jumps to the first one.
-  const tile = page.getByRole('link', { name: /Missed a workout/ });
-  await expect(tile).toHaveAttribute('href', '#missed-in-a-row');
-  await expect(tile.getByText(/^\d+$/)).toHaveText('2');
-
-  // Every row offers Message, which opens that client's conversation.
-  await expect(run.getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
-
-  // It opens Training, and nothing pops up by itself.
-  await nothing.getByRole('link', { name: 'Assign to Nell Nothing' }).click();
+  // Assign opens Training, and nothing pops up by itself.
+  await row('Nell Nothing').getByRole('link', { name: 'Assign to Nell Nothing' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.nothing}/training$`));
   await expect(page.getByRole('heading', { name: 'Training' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);

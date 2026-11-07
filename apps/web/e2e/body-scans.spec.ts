@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 
-// Body scans on the client page, and the coach home "Body scans 30+ days" group. Every test seeds its own uniquely
+// Body scans on the client page, and the coach home's Needs attention "Scan due" rows. Every test seeds its own uniquely
 // named client in the demo workspace and only looks at its own rows, so tests can run side by side.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -235,14 +235,16 @@ test('coach home lists an overdue client, and Add scan opens the form', async ({
   if (gone.error) throw gone.error;
   await signInAsCoach(page);
   await page.goto('/home');
-  const group = page.getByRole('region', { name: 'Body scans 30+ days' });
+  const group = page.getByRole('region', { name: 'Needs attention' });
   await expect(group).toBeVisible();
+  // "Scan due" narrows the list to clients due a scan, with that as the reason (other reasons count as "+n more").
+  await group.getByRole('button', { name: /^Scan due \d+$/ }).click();
   const showAll = group.getByRole('button', { name: /^Show all \d+$/ });
   if (await showAll.count()) await showAll.click();
-  await expect(group.locator('li').filter({ hasText: due.last })).toContainText('Never scanned');
-  await expect(group.locator('li').filter({ hasText: old.last })).toContainText('Last scan');
+  await expect(group.locator('li').filter({ hasText: due.last })).toContainText('No body scan yet');
+  await expect(group.locator('li').filter({ hasText: old.last })).toContainText(/Last body scan 4\d days ago/);
   await expect(group.locator('li').filter({ hasText: fresh.last })).toHaveCount(0);
-  await expect(group.locator('li').filter({ hasText: selfLogged.last })).toContainText('Never scanned');
+  await expect(group.locator('li').filter({ hasText: selfLogged.last })).toContainText('No body scan yet');
   await expect(group.locator('li').filter({ hasText: removed.last })).toHaveCount(0);
 
   await group.locator('li').filter({ hasText: due.last }).getByRole('link', { name: /^Add a scan for/ }).click();
