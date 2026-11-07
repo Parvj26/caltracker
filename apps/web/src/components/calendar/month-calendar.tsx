@@ -314,26 +314,43 @@ function DayItem({
   // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
   const controls = renderItem(item, date, editable);
   const router = useRouter();
-  // A drag ends with a click on the handle; that click must not also open the card.
+  // A drag ends with a click on the handle; that click must not also open the card. dnd-kit already swallows it; this
+  // is a guard for the moment the drag ends. The flag clears just after every drag ends (dropped on another day, its
+  // own day, a past day, or cancelled with Esc), so the next real click always opens the card.
   const dragged = useRef(false);
   useEffect(() => {
-    if (isDragging) dragged.current = true;
-  }, [isDragging]);
-  const openCard = (event: MouseEvent<HTMLLIElement>) => {
-    if (dragged.current) {
-      dragged.current = false;
+    if (isDragging) {
+      dragged.current = true;
       return;
     }
+    if (!dragged.current) return;
+    const timer = setTimeout(() => {
+      dragged.current = false;
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isDragging]);
+  const target = (event: MouseEvent<HTMLLIElement>) =>
     // The "⋯" menu, its dialogs and the "✓ Done" link keep their own behaviour.
-    if (!href || (event.target as HTMLElement).closest('a, [data-item-controls]')) return;
-    if (event.metaKey || event.ctrlKey) window.open(href, '_blank', 'noopener');
-    else router.push(href);
+    !dragged.current && href && !(event.target as HTMLElement).closest('a, [data-item-controls]') ? href : null;
+  const openCard = (event: MouseEvent<HTMLLIElement>) => {
+    const to = target(event);
+    if (!to) return;
+    if (event.metaKey || event.ctrlKey) window.open(to, '_blank', 'noopener');
+    else router.push(to);
+  };
+  // Middle-click opens the card in a new tab, like a link.
+  const openCardInTab = (event: MouseEvent<HTMLLIElement>) => {
+    const to = event.button === 1 ? target(event) : null;
+    if (!to) return;
+    event.preventDefault();
+    window.open(to, '_blank', 'noopener');
   };
   return (
     // A mouse and touch shortcut: the name button and the "⋯" menu stay the keyboard and screen-reader way in.
     <li
       className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed, href && styles.clickable)}
       onClick={openCard}
+      onAuxClick={openCardInTab}
     >
       <div className={styles.itemRow}>
         {draggable ? (
