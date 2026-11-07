@@ -9,9 +9,12 @@ select tests.create_user('lp-1@t.local', 'Client 1') as c1 \gset
 select tests.create_user('lp-2@t.local', 'Client 2') as c2 \gset
 select tests.create_workspace('LP Workspace', :'coach') as ws \gset
 select tests.create_workspace('LP Workspace B', :'coach_b') as ws_b \gset
+-- c1 trained with coach B first (one coach at a time), then moved to this workspace.
+select tests.add_client(:'ws_b', :'c1');
+select tests.create_log(:'ws_b', :'c1') as l_other_ws \gset
+delete from public.workspace_members where workspace_id = :'ws_b' and user_id = :'c1';
 select tests.add_client(:'ws', :'c1');
 select tests.add_client(:'ws', :'c2');
-select tests.add_client(:'ws_b', :'c1');
 
 -- c1 in ws: la finished 30 minutes ago, lb 20, lc 15 (its award has no animal), ld 5 (no award yet).
 select tests.create_log(:'ws', :'c1') as la \gset
@@ -22,8 +25,7 @@ update public.workout_logs set finished_at = now() - interval '30 minutes' where
 update public.workout_logs set finished_at = now() - interval '20 minutes' where id = :'lb';
 update public.workout_logs set finished_at = now() - interval '15 minutes' where id = :'lc';
 update public.workout_logs set finished_at = now() - interval '5 minutes' where id = :'ld';
--- Logs whose animals must not show: c1's in the other workspace, and c2's.
-select tests.create_log(:'ws_b', :'c1') as l_other_ws \gset
+-- A log whose animal must not show: c2's (c1's coach-B log is above).
 select tests.create_log(:'ws', :'c2') as l_other_client \gset
 
 insert into public.awards (log_id, client_id, workspace_id, result) values
