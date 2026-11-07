@@ -18,7 +18,11 @@ import {
   type HomeClient,
   type TodayRow,
 } from '@caltracker/shared';
+import { QuickAssignDialog } from '@/components/assign/quick-assign';
 import { Card, Chip, Tile } from '@/components/ui';
+import { failureMessage } from '@/lib/action-errors';
+import { deleteClientWorkout } from '../clients/[clientId]/actions';
+import calendar from '@/components/calendar/calendar.module.css';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { checkInput, GROUP_ID, GROUP_TITLE, reasonText } from '@/lib/daily-check';
@@ -32,8 +36,6 @@ const dayFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'nume
 
 /** The problems a coach acts on; "new bests" is a celebration and never makes Home say someone needs attention. */
 const PROBLEMS: ReadonlySet<AttentionKind> = new Set(['missed_in_a_row', 'missed', 'program_ending', 'nothing_planned', 'quiet']);
-/** Reasons where the next step is planning: those rows get an Assign action. */
-const NEEDS_PLAN: ReadonlySet<AttentionKind> = new Set(['program_ending', 'nothing_planned']);
 
 /** A client's conversation, so Today's clients and Needs attention rows can offer "Message". */
 function messageHref(clientId: string): string {
@@ -110,8 +112,19 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   );
 }
 
+type OnAssign = (client: { id: string; name: string }) => void;
+
+/** Every client row's quick Assign: opens the Workout / Program dialog on Home, with no page load. */
+function AssignButton({ id, name, onAssign }: { id: string; name: string; onAssign: OnAssign }) {
+  return (
+    <button type="button" className={styles.assign} aria-label={`Assign to ${name}`} onClick={() => onAssign({ id, name })}>
+      Assign
+    </button>
+  );
+}
+
 /** One Needs attention row: who, why, and what to do about it. */
-function AttentionRow({ client, why, assign }: { client: HomeClient; why: string; assign: boolean }) {
+function AttentionRow({ client, why, onAssign }: { client: HomeClient; why: string; onAssign: OnAssign }) {
   const name = fullName(client);
   const message = messageHref(client.id);
   return (
@@ -123,9 +136,7 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}`} className={styles.assign} aria-label={`Open ${name}`}>Open</Link>
-        {assign ? (
-          <Link href={`/clients/${client.id}/training?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
-        ) : null}
+        <AssignButton id={client.id} name={name} onAssign={onAssign} />
         <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
       </span>
     </li>
@@ -133,7 +144,7 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
 }
 
 /** A Body scans 30+ days row: who, when they were last scanned, and a shortcut to the scan form. */
-function ScanDueRow({ client, why }: { client: HomeClient; why: string }) {
+function ScanDueRow({ client, why, onAssign }: { client: HomeClient; why: string; onAssign: OnAssign }) {
   const name = fullName(client);
   return (
     <li className={cx(styles.row, styles.attentionRow)}>
@@ -144,6 +155,7 @@ function ScanDueRow({ client, why }: { client: HomeClient; why: string }) {
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}/body?scan=1`} className={styles.assign} aria-label={`Add a scan for ${name}`}>Add scan</Link>
+        <AssignButton id={client.id} name={name} onAssign={onAssign} />
       </span>
     </li>
   );
@@ -171,6 +183,23 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
     if (today && lastToday.current && today !== lastToday.current) router.refresh();
     if (today) lastToday.current = today;
   }, [today, router]);
+  const [assigning, setAssigning] = useState<{ id: string; name: string } | null>(null);
+  const [toast, setToast] = useState<{ message: string; undoId?: string } | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+  async function undo(workoutId: string) {
+    setToast(null);
+    try {
+      await deleteClientWorkout(workoutId);
+      setToast({ message: 'Removed it again.' });
+    } catch (e) {
+      setToast({ message: failureMessage(e, "Couldn't undo. Remove it from the client's calendar.") });
+    }
+    router.refresh();
+  }
   const searchable = useMemo(() => [...data.clients].sort(compareByLastName), [data.clients]);
   const view = useMemo(() => {
     if (!today) return null;
@@ -276,7 +305,8 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                             {a.label}
                           </Link>
                         ))}
-                          <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
+                        <AssignButton id={r.client.id} name={name} onAssign={setAssigning} />
+                        <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
                       </span>
                     </li>
                   );
@@ -299,7 +329,7 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                 row={(item) => {
                   const c = byId.get(item.clientId);
                   return c ? (
-                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} assign={NEEDS_PLAN.has(g.kind)} />
+                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} onAssign={setAssigning} />
                   ) : null;
                 }}
               />
@@ -309,11 +339,38 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                 id="scans-due"
                 title="Body scans 30+ days"
                 items={scansDue}
-                row={(d) => <ScanDueRow key={d.client.id} client={d.client} why={d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'} />}
+                row={(d) => <ScanDueRow key={d.client.id} client={d.client} why={d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'} onAssign={setAssigning} />}
               />
             ) : null}
           </Card>
         </aside>
+      </div>
+
+      {assigning ? (
+        <QuickAssignDialog
+          client={assigning}
+          onDone={(done) => {
+            setAssigning(null);
+            setToast(done.kind === 'workout' ? { message: done.message, undoId: done.workoutId } : { message: done.message });
+            router.refresh();
+          }}
+          onClose={() => setAssigning(null)}
+        />
+      ) : null}
+      <div className={calendar.toastRegion} aria-live="polite">
+        {toast ? (
+          <div className={calendar.toast}>
+            <span>{toast.message}</span>
+            {toast.undoId ? (
+              <button type="button" className={calendar.smallButton} onClick={() => void undo(toast.undoId!)}>
+                Undo
+              </button>
+            ) : null}
+            <button type="button" className={calendar.smallButton} onClick={() => setToast(null)}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -136,3 +136,55 @@ export async function assignToClients(
   }
   return { ok: true, results };
 }
+
+export type QuickAssignData = {
+  /** The workout library, by name. */
+  library: { id: string; name: string }[];
+  /** The programs, by name, with their slots (for the clash warning). */
+  programs: AssignProgramShape[];
+  /** What is already on this client's calendar from 8 days back on. */
+  scheduled: { date: IsoDate; name: string }[];
+};
+
+// Same cap as the workout library page.
+const LIBRARY_LIMIT = 200;
+
+/** What Home's quick Assign needs for one client, loaded when it opens. Throws if they are not a current client. */
+export async function loadQuickAssign(input: { clientId: string }): Promise<QuickAssignData> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(input.clientId)) throw new Error('Invalid client');
+  const supabase = await createServerSupabase();
+  const [member, library, programs, scheduled] = await Promise.all([
+    supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', input.clientId)
+      .eq('role', 'client')
+      .maybeSingle(),
+    supabase.from('workouts').select('id, name').eq('workspace_id', workspaceId).is('client_id', null).order('name').limit(LIBRARY_LIMIT),
+    supabase.from('programs').select('id, name, weeks, program_workouts(week, day)').eq('workspace_id', workspaceId).order('name'),
+    supabase
+      .from('workouts')
+      .select('name, scheduled_on')
+      .eq('workspace_id', workspaceId)
+      .eq('client_id', input.clientId)
+      .gte('scheduled_on', addDays(localToday('UTC'), -8))
+      .order('scheduled_on'),
+  ]);
+  if (member.error) throw new Error(`Could not load the client: ${member.error.message}`);
+  if (!member.data) throw new Error('Not a current client');
+  if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
+  if (programs.error) throw new Error(`Could not load programs: ${programs.error.message}`);
+  if (scheduled.error) throw new Error(`Could not load the calendar: ${scheduled.error.message}`);
+  return {
+    library: library.data,
+    programs: programs.data.map((p) => ({
+      id: p.id,
+      name: p.name,
+      weeks: p.weeks,
+      slots: p.program_workouts.map((s) => ({ week: s.week, day: s.day })),
+    })),
+    scheduled: scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : [])),
+  };
+}
