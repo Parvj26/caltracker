@@ -45,6 +45,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 12. One private community per coach workspace (text + images + links)
 13. Push notifications
 14. In-app account deletion, privacy policy
+15. Food logging (meal photos and macros) and coach-set daily macro targets (product owner, 2026-11-07; see `2026-11-07-food-design.md`)
 
 ### Explicitly not in Version 1
 - Coach self-sign-up and subscription billing (launch coach's workspace is created manually). **Planned before the second coach** (product owner, 2026-11-05):
@@ -65,7 +66,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - Progress photos
 - Automatic InBody sync and InBody file import
 - Importing Everfit history
-- Meal plans / nutrition
+- Meal plans, food databases and calorie estimates (food logging and daily targets moved into Version 1 on 2026-11-07)
 - Habits, tasks, check-ins
 - Coach-themed badge packs
 - Session booking / appointment scheduling (planned for a later version)
