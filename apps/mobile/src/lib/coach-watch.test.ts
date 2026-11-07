@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkoutLogDoc } from '@caltracker/shared';
-import { adoptCoachCopy, coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish, shouldPullCoachCopy } from './coach-watch';
+import {
+  adoptCoachCopy,
+  coachWatchView,
+  latestTickedSetId,
+  logControls,
+  retryDelayMs,
+  revealAfterCoachFinish,
+  rowChangeAction,
+  shouldPullCoachCopy,
+  watchLine,
+} from './coach-watch';
 import { sampleLog, upperCoreLog } from './log-fixtures';
 
 const held = { status: 'in_progress' as const, heldByOther: true, canReclaim: false, lastActivityAt: '2026-11-05T09:10:00.000Z' };
@@ -133,5 +143,39 @@ describe('revealAfterCoachFinish', () => {
     expect(revealAfterCoachFinish(true, { byCoach: true, status: 'discarded' })).toBe(false);
     // Opened a coach-finished workout from history: the full banner, no reveal (Today handles that one).
     expect(revealAfterCoachFinish(false, { byCoach: true, status: 'completed' })).toBe(false);
+  });
+});
+
+describe('retryDelayMs', () => {
+  it('backs off from 2 s, doubling, up to a minute', () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map(retryDelayMs)).toEqual([2000, 4000, 8000, 16_000, 32_000, 60_000, 60_000]);
+    expect(retryDelayMs(1000)).toBe(60_000);
+    expect(retryDelayMs(0)).toBe(2000);
+  });
+});
+
+describe('rowChangeAction', () => {
+  const me = 'client';
+  it('a coach save while the coach holds it: pull once, and check without pulling again', () => {
+    expect(rowChangeAction({ logged_by: 'coach', status: 'in_progress' }, me, true)).toEqual({ pull: true, check: true });
+  });
+  it('a take over the phone doesn’t know yet: only check (refreshFromServer adopts)', () => {
+    expect(rowChangeAction({ logged_by: 'coach', status: 'in_progress' }, me, false)).toEqual({ pull: false, check: true });
+  });
+  it('hand back or reclaim while held: check, never pull', () => {
+    expect(rowChangeAction({ logged_by: me, status: 'in_progress' }, me, true)).toEqual({ pull: false, check: true });
+  });
+  it('finished by the coach: check, never pull', () => {
+    expect(rowChangeAction({ logged_by: 'coach', status: 'completed' }, me, true)).toEqual({ pull: false, check: true });
+  });
+  it('the client’s own saves: nothing', () => {
+    expect(rowChangeAction({ logged_by: me, status: 'in_progress' }, me, false)).toEqual({ pull: false, check: false });
+  });
+});
+
+describe('watchLine', () => {
+  it('says live or reconnecting', () => {
+    expect(watchLine(true)).toBe('Read only · updates live');
+    expect(watchLine(false)).toBe('Read only · Reconnecting…');
   });
 });

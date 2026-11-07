@@ -43,3 +43,19 @@ export function withRevealed(ids: readonly string[], logId: string): string[] {
   if (ids.includes(logId)) return [...ids];
   return [...ids, logId].slice(-KEEP_REVEALED);
 }
+
+/**
+ * Whether Today may open a coach-finished reveal now: never while the client has a workout in progress (their own,
+ * or one they are watching the coach log), and only while Today is on screen. It waits for the next time. Pure.
+ */
+export function canShowCoachReveal(active: { status: LogStatus } | null, todayFocused: boolean): boolean {
+  return todayFocused && active?.status !== 'in_progress';
+}
+
+/** A log whose award wasn't there is asked again after this long (within one app session). */
+export const AWARD_RECHECK_MS = 2 * 60_000;
+
+/** Whether to ask the server for this log's award: never asked, or the last "not yet" is old enough. Pure. */
+export function awardCheckDue(lastMissAt: number | undefined, nowMs: number): boolean {
+  return lastMissAt === undefined || nowMs - lastMissAt >= AWARD_RECHECK_MS;
+}

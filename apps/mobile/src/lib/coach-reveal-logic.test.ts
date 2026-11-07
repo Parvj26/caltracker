@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { COACH_REVEAL_DAYS, coachRevealCandidates, parseRevealedIds, withRevealed, type CoachLoggedLog } from './coach-reveal-logic';
+import {
+  AWARD_RECHECK_MS,
+  COACH_REVEAL_DAYS,
+  awardCheckDue,
+  canShowCoachReveal,
+  coachRevealCandidates,
+  parseRevealedIds,
+  withRevealed,
+  type CoachLoggedLog,
+} from './coach-reveal-logic';
 
 const me = 'client-1';
 const now = Date.parse('2026-11-07T12:00:00.000Z');
@@ -55,5 +64,27 @@ describe('revealed ids on this phone', () => {
     expect(next).toHaveLength(200);
     expect(next[next.length - 1]).toBe('new');
     expect(next).not.toContain('id-0');
+  });
+});
+
+describe('canShowCoachReveal', () => {
+  it('waits while a workout is in progress, the client’s own or a watched one', () => {
+    expect(canShowCoachReveal({ status: 'in_progress' }, true)).toBe(false);
+  });
+  it('waits while Today isn’t on screen', () => {
+    expect(canShowCoachReveal(null, false)).toBe(false);
+  });
+  it('shows on Today with nothing open (none, or only a finished one still uploading)', () => {
+    expect(canShowCoachReveal(null, true)).toBe(true);
+    expect(canShowCoachReveal({ status: 'completed' }, true)).toBe(true);
+    expect(canShowCoachReveal({ status: 'discarded' }, true)).toBe(true);
+  });
+});
+
+describe('awardCheckDue', () => {
+  it('asks a log never asked, and again only once the last "not yet" is old enough', () => {
+    expect(awardCheckDue(undefined, now)).toBe(true);
+    expect(awardCheckDue(now - 1000, now)).toBe(false);
+    expect(awardCheckDue(now - AWARD_RECHECK_MS, now)).toBe(true);
   });
 });

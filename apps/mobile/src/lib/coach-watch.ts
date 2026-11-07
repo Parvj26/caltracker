@@ -109,3 +109,33 @@ export function adoptCoachCopy(stored: StoredLog | null, server: WorkoutLogDoc, 
 export function revealAfterCoachFinish(watched: boolean, coach: { byCoach: boolean; status: LogStatus | null }): boolean {
   return watched && coach.byCoach && coach.status === 'completed';
 }
+
+/** First retry of a failed pull (offline) after this long, doubling each time up to RETRY_MAX_MS. */
+export const RETRY_FIRST_MS = 2000;
+export const RETRY_MAX_MS = 60_000;
+
+/** How long to wait before the retry after `failures` failed pulls in a row (1 = the first failure). Pure. */
+export function retryDelayMs(failures: number): number {
+  const n = Math.max(1, Math.floor(failures));
+  return Math.min(RETRY_MAX_MS, RETRY_FIRST_MS * 2 ** Math.min(n - 1, 16));
+}
+
+/**
+ * What a Realtime change of the log's row asks for. `pull`: a coach save while the coach holds the open workout, so
+ * fetch the coach's copy now. `check`: ask who holds it (take over, hand back, finish, the coach going idle). When
+ * both, the check must not pull again: one fetch per coach save. Pure.
+ */
+export function rowChangeAction(
+  row: { logged_by?: string | null; status?: string },
+  me: string | null,
+  localHeld: boolean,
+): { pull: boolean; check: boolean } {
+  const byOther = row.logged_by !== me;
+  const pull = byOther && row.status === 'in_progress' && localHeld;
+  return { pull, check: byOther || row.status !== 'in_progress' || localHeld };
+}
+
+/** The bar's second line: live, or catching up after the connection dropped or a pull failed. */
+export function watchLine(live: boolean): string {
+  return live ? 'Read only · updates live' : 'Read only · Reconnecting…';
+}

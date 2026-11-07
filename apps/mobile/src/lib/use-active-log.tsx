@@ -130,8 +130,9 @@ export type ActiveLog = {
   /**
    * While the coach holds the active workout: fetches the server's copy and takes it when newer (marked synced, so
    * it is never sent back). Sends nothing. Calls that arrive while one runs are folded into one more fetch.
+   * False when the server couldn't be reached (offline): the caller retries.
    */
-  pullCoachCopy: () => Promise<void>;
+  pullCoachCopy: () => Promise<boolean>;
 };
 
 type Instance = { store: LogStore; sync: LogSync; reload: () => Promise<void> };
@@ -520,21 +521,22 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   // One fetch at a time; a coach typing fast triggers many row changes, so later calls wait for one more round.
-  const pulling = useRef<Promise<void> | null>(null);
+  const pulling = useRef<Promise<boolean> | null>(null);
   const pullAgain = useRef(false);
-  const pullCoachCopy = useCallback((): Promise<void> => {
+  const pullCoachCopy = useCallback((): Promise<boolean> => {
     if (pulling.current) {
       pullAgain.current = true;
       return pulling.current;
     }
-    const round = async () => {
+    const round = async (): Promise<boolean> => {
       do {
         pullAgain.current = false;
         const me = current.current;
         const id = heldRef.current;
-        if (!me || !id) return;
-        const server = await fetchLog(id).catch(() => null);
-        if (!server || current.current !== me) return;
+        if (!me || !id) return true; // nothing held: nothing to catch up on
+        const server = await fetchLog(id).catch(() => undefined);
+        if (server === undefined) return false; // offline or the server failed: retried by the caller
+        if (!server || current.current !== me) return true;
         const r = { changed: false };
         await me.store.update((s) => {
           const next = adoptCoachCopy(s, server, heldRef.current);
@@ -543,9 +545,10 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
         });
         if (r.changed && current.current === me) await me.reload();
       } while (pullAgain.current);
+      return true;
     };
     const p = round()
-      .catch(() => undefined)
+      .catch(() => false)
       .finally(() => {
         pulling.current = null;
       });

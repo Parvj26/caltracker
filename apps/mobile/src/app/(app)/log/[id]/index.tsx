@@ -45,7 +45,7 @@ import {
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
-import { CoachWatchFrame } from '@/components/log/coach-watch-bar';
+import { CoachWatchFrame, WindowInsets } from '@/components/log/coach-watch-bar';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExercisePicker } from '@/components/log/exercise-picker';
 import { OptionPage, StraightPage, SupersetPage, type PageHandlers } from '@/components/log/log-pages';
@@ -145,7 +145,9 @@ export default function LogScreen() {
   // Watching when the coach finishes: straight to the sticker reveal, then the summary ("Logged by coach").
   const watched = useRef(false);
   useEffect(() => {
+    // Handed back or reclaimed: the client logs again, so a later finish is theirs (their own reveal).
     if (view === 'watch') watched.current = true;
+    else if (view === 'own') watched.current = false;
   }, [view]);
   const revealNow = revealAfterCoachFinish(watched.current || view === 'watch', coach);
   useEffect(() => {
@@ -510,7 +512,11 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   };
 
   // ---- Finish and discard ----
-  const discardNow = () => void discard().then(back);
+  // Read only: the coach may have taken over while the alert was open. iOS can't close an open Alert from code, so
+  // its buttons do nothing then (the edits below are gated too).
+  const discardNow = () => {
+    if (canRef.current.discard) void discard().then(back);
+  };
   const confirmDiscard = () =>
     Alert.alert('Discard this workout?', 'Your ticked sets won’t be saved.', [
       { text: 'Keep going', style: 'cancel' },
@@ -518,6 +524,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     ]);
   const saved = readFinishNotes(log.notes);
   const finishNow = async (feel: Feeling | null, note: string) => {
+    if (!canRef.current.finish) return;
     setFinishing(true);
     try {
       await op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
@@ -535,7 +542,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const syncLate = useDelayedFlag(syncStatus !== 'synced', SYNC_PILL_AFTER_MS);
 
   const sheets = (
-    <>
+    <WindowInsets>
       <ExercisePicker
         title={picker?.mode === 'swap' ? `Swap ${picker.ex.exerciseName}` : 'Add an exercise'}
         visible={picker !== null}
@@ -596,7 +603,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           confirmDiscard();
         }}
       />
-    </>
+    </WindowInsets>
   );
 
   const pill = syncLate ? (

@@ -2,10 +2,27 @@
 // ids of the logs it has revealed, so each shows once on this phone. Never throws: without signal it tries next time.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAward } from './awards';
-import { COACH_REVEAL_DAYS, coachRevealCandidates, parseRevealedIds, withRevealed, type CoachLoggedLog } from './coach-reveal-logic';
+import { COACH_REVEAL_DAYS, awardCheckDue, coachRevealCandidates, parseRevealedIds, withRevealed, type CoachLoggedLog } from './coach-reveal-logic';
 import { supabase } from './supabase';
 
 const revealedKey = (userId: string) => `caltracker.coachRevealed.${userId}`;
+
+// For this app session: logs whose award exists (it never goes away), and when a log last had none yet, so Today
+// coming into view doesn't ask the server again each time (awardCheckDue).
+const hasAward = new Set<string>();
+const noAwardAt = new Map<string, number>();
+
+async function awardExists(logId: string): Promise<boolean> {
+  if (hasAward.has(logId)) return true;
+  if (!awardCheckDue(noAwardAt.get(logId), Date.now())) return false;
+  if (await fetchAward(logId)) {
+    hasAward.add(logId);
+    noAwardAt.delete(logId);
+    return true;
+  }
+  noAwardAt.set(logId, Date.now());
+  return false;
+}
 
 async function revealedIds(userId: string): Promise<string[]> {
   try {
@@ -42,7 +59,7 @@ export async function nextCoachReveal(userId: string): Promise<string | null> {
     const logs: CoachLoggedLog[] = data.map((r) => ({ id: r.id, status: r.status, loggedBy: r.logged_by, finishedAt: r.finished_at }));
     const revealed = new Set(await revealedIds(userId));
     for (const id of coachRevealCandidates(logs, userId, revealed, Date.now())) {
-      if (await fetchAward(id)) return id;
+      if (await awardExists(id)) return id;
     }
     return null;
   } catch {
