@@ -299,7 +299,9 @@ test('after dragging a card back onto its own day, the next click still opens it
   const moved = await admin.from('workouts').select('scheduled_on').eq('id', id).single();
   expect(moved.data?.scheduled_on).toBe(date);
 
-  // A real click on the card now opens the editor.
+  // A real click on the card now opens the editor. (dnd-kit ignores clicks for 50 ms after a drag ends, and a
+  // person can't click that fast; before the fix, every later click was ignored too.)
+  await page.waitForTimeout(300);
   await card(page, date, name).locator('[title^="2× Barbell Squat · "]').click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
 });
