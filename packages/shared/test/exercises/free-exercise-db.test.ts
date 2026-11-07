@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapFreeExercise, type FreeExercise } from '../../src/exercises/free-exercise-db';
+import { exerciseImageObjectPath, mapFreeExercise, type FreeExercise } from '../../src/exercises/free-exercise-db';
 
 const squat: FreeExercise = {
   id: 'Barbell_Squat',
@@ -43,13 +43,27 @@ describe('mapFreeExercise', () => {
     expect(row.category).toBe('strength');
     expect(row.image_paths?.[0]).toMatch(/^free-exercise-db\/Barbell_Squat\//);
     expect(row.image_paths).toEqual([
-      'free-exercise-db/Barbell_Squat/0.jpg',
-      'free-exercise-db/Barbell_Squat/1.jpg',
+      'free-exercise-db/Barbell_Squat/0.webp',
+      'free-exercise-db/Barbell_Squat/1.webp',
     ]);
   });
 
   it('lets an override win over inference', () => {
     expect(mapFreeExercise(plank, {}).tracking_type).toBe('reps');
     expect(mapFreeExercise(plank, { Plank: 'time' }).tracking_type).toBe('time');
+  });
+});
+
+describe('exerciseImageObjectPath', () => {
+  it('puts the processed WebP under the free-exercise-db prefix', () => {
+    expect(exerciseImageObjectPath('Barbell_Squat/0.jpg')).toBe('free-exercise-db/Barbell_Squat/0.webp');
+    expect(exerciseImageObjectPath('Some_Exercise/1.JPEG')).toBe('free-exercise-db/Some_Exercise/1.webp');
+    expect(exerciseImageObjectPath('X/0.png')).toBe('free-exercise-db/X/0.webp');
+  });
+
+  it('rejects paths that could escape the prefix', () => {
+    expect(() => exerciseImageObjectPath('../evil/0.jpg')).toThrow();
+    expect(() => exerciseImageObjectPath('/abs/0.jpg')).toThrow();
+    expect(() => exerciseImageObjectPath('noext')).toThrow();
   });
 });
