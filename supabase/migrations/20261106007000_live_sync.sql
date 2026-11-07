@@ -159,17 +159,19 @@ create trigger workout_substitutes_mark_customised after insert or update or del
 
 -- A program day the coach deleted from a client's calendar: Live Sync doesn't add that workout back on that day.
 -- Written by a trigger when a program copy is deleted outside a system write (the coach's "Delete", or "Remove from
--- calendar"). Removed with the assignment or the library workout.
+-- calendar"). Removed with the assignment.
+-- source_workout_id has no foreign key on purpose: with keys to both program_assignments and workouts, the API would
+-- see this table as a link between them and could no longer tell which way workouts embed program_assignments. A
+-- tombstone of a deleted library workout is never matched again, and goes with its assignment.
 create table public.live_sync_tombstones (
   assignment_id uuid not null references public.program_assignments on delete cascade,
   planned_on date not null,
-  source_workout_id uuid not null references public.workouts on delete cascade,
+  source_workout_id uuid not null,
   workspace_id uuid not null references public.workspaces on delete cascade,
   created_at timestamptz not null default now(),
   primary key (assignment_id, planned_on, source_workout_id)
 );
 create index live_sync_tombstones_workspace_idx on public.live_sync_tombstones (workspace_id);
-create index live_sync_tombstones_source_idx on public.live_sync_tombstones (source_workout_id);
 
 revoke all on table public.live_sync_tombstones from public, anon, authenticated, service_role;
 grant select on public.live_sync_tombstones to authenticated;

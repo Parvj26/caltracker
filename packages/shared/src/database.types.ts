@@ -363,13 +363,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "live_sync_tombstones_source_workout_id_fkey"
-            columns: ["source_workout_id"]
-            isOneToOne: false
-            referencedRelation: "workouts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "live_sync_tombstones_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
