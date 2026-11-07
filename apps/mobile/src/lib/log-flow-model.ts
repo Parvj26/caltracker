@@ -578,26 +578,38 @@ export function pickingFirst(log: WorkoutLogDoc, blockId: string, logExerciseId:
 
 const isEmpty = (v: SetValues) => v.reps === null && v.weightKg === null && v.durationS === null && v.distanceM === null;
 
-/**
- * What "Mark all" would do: the open sets it ticks, and the open sets it leaves because there are no numbers to
- * save for them yet (nothing typed, no coach target, no last time).
- */
-export function markAllPlan(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults): { tick: number; skip: number } {
+export type MarkAllPlan = {
+  /** Open sets it ticks. */
+  tick: number;
+  /** Open sets it leaves: no numbers to save yet (nothing typed, no coach target, no last time). */
+  skip: number;
+  /** Of the sets it ticks, weight and reps ones that get no weight (reps only: could be bodyweight, so allowed). */
+  noWeight: number;
+};
+
+/** What "Mark all" would do, for its question (markAllQuestion). */
+export function markAllPlan(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults): MarkAllPlan {
   const done = markAll(log, logExerciseIds, last, DELETABLE_AT);
-  const open = (l: WorkoutLogDoc) =>
-    l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)).flatMap((e) => e.sets)).filter((x) => x.completedAt === null).length;
+  const exercises = (l: WorkoutLogDoc) => l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)));
+  const open = (l: WorkoutLogDoc) => exercises(l).flatMap((e) => e.sets).filter((x) => x.completedAt === null).length;
+  const wasOpen = new Set(exercises(log).flatMap((e) => e.sets.filter((x) => x.completedAt === null).map((x) => x.id)));
+  const noWeight = exercises(done)
+    .filter((e) => e.trackingType === 'weight_reps')
+    .flatMap((e) => e.sets)
+    .filter((x) => wasOpen.has(x.id) && x.completedAt !== null && x.actualWeightKg === null).length;
   const tick = open(log) - open(done);
-  return { tick, skip: open(done) };
+  return { tick, skip: open(done), noWeight };
 }
 
-/** "Tick 4 sets with these numbers?" and, when some are left, why. */
-export function markAllQuestion(plan: { tick: number; skip: number }): { title: string; message: string | null } {
+/** "Tick 4 sets with these numbers?" and, when some get no weight or are left, says so. */
+export function markAllQuestion(plan: MarkAllPlan): { title: string; message: string | null } {
   const title = `Tick ${plural(plan.tick, 'set')} with these numbers?`;
-  const message =
-    plan.skip > 0
-      ? `${plural(plan.skip, 'set')} ${plan.skip === 1 ? 'has' : 'have'} no numbers yet, so ${plan.skip === 1 ? 'it stays' : 'they stay'} unticked.`
-      : null;
-  return { title, message };
+  const lines: string[] = [];
+  if (plan.noWeight > 0) lines.push(`${plural(plan.noWeight, 'set')} ${plan.noWeight === 1 ? 'has' : 'have'} no weight.`);
+  if (plan.skip > 0) {
+    lines.push(`${plural(plan.skip, 'set')} ${plan.skip === 1 ? 'has' : 'have'} no numbers yet, so ${plan.skip === 1 ? 'it stays' : 'they stay'} unticked.`);
+  }
+  return { title, message: lines.length > 0 ? lines.join(' ') : null };
 }
 
 /**

@@ -361,7 +361,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     [tableFor, op, withPick, docOf, units],
   );
 
-  /** Mark all: asks first when it ticks more than one set, and says which sets it leaves (nothing to save yet). */
+  /** Mark all: asks first when it ticks more than one set, and says which get no weight and which it leaves. */
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
     Keyboard.dismiss();
     const picked = pickOf ? withPick(pickOf)(log) : log;
@@ -378,7 +378,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       });
       return;
     }
-    if (plan.tick === 1 && plan.skip === 0) return run();
+    // One set with its numbers: no need to ask. A set with no weight (maybe bodyweight) is ticked, but said first.
+    if (plan.tick === 1 && plan.skip === 0 && plan.noWeight === 0) return run();
     const q = markAllQuestion(plan);
     Alert.alert(q.title, q.message ?? undefined, [
       { text: 'Cancel', style: 'cancel' },
