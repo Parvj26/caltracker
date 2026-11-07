@@ -73,10 +73,14 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /** One row in the Today community card. */
 export function postPreview(post: FeedPost, ctx: { me: string; coaches: ReadonlySet<string>; units: Units }): PostPreview {
-  const card = post.card ? cardText(post.card, ctx.units) : null;
+  const mine = post.authorId === ctx.me;
+  // A card's headline is a sentence about the poster ("You lifted 1,540 lb — …"); older workout cards have the
+  // workout's name instead, so their label goes first.
+  const card = post.card ? cardText(post.card, ctx.units, mine ? 'You' : post.authorName) : null;
   const body = post.body.trim().replace(/\s+/g, ' ');
-  const snippet = body || (card ? `${card.badge} · ${card.title}` : post.images.length > 0 ? 'Shared a photo' : '');
-  const author = post.authorId === ctx.me ? 'You' : ctx.coaches.has(post.authorId) ? `${post.authorName} · Coach` : post.authorName;
+  const cardLine = card ? (card.badge && post.card?.kind === 'workout' ? `${card.badge} · ${card.title}` : card.title) : null;
+  const snippet = body || (cardLine ?? (post.images.length > 0 ? 'Shared a photo' : ''));
+  const author = mine ? 'You' : ctx.coaches.has(post.authorId) ? `${post.authorName} · Coach` : post.authorName;
   const likes = post.likerIds.length;
   const stats = [likes > 0 ? `❤️ ${likes}` : null, post.commentCount > 0 ? plural(post.commentCount, 'comment') : null]
     .filter(Boolean)

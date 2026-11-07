@@ -222,6 +222,15 @@ export async function createPost(input: {
   if (error) fail(error, postErrorMessage(error.code, input.card !== null));
 }
 
+/**
+ * The card a share would post, built by the database the same way (preview_community_card), so the composer can show
+ * it before posting. Null when it can't be built right now (no signal, or a refusal the Post button will explain).
+ */
+export async function previewCard(communityId: string, card: CardRequest): Promise<CommunityCard | null> {
+  const { data, error } = await supabase.rpc('preview_community_card', { p_community_id: communityId, p_card: card });
+  return error ? null : parseCard(data);
+}
+
 export async function deletePost(post: FeedPost): Promise<void> {
   const { error, count } = await supabase.from('community_posts').delete({ count: 'exact' }).eq('id', post.id);
   if (error || count === 0) fail(error, 'Couldn’t delete the post.');

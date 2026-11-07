@@ -2498,6 +2498,10 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      preview_community_card: {
+        Args: { p_card: Json; p_community_id: string }
+        Returns: Json
+      }
       progression_history: {
         Args: { p_exercise_ids: string[]; p_workout_id: string }
         Returns: {
