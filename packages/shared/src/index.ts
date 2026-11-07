@@ -424,3 +424,26 @@ export {
   fitLongEdge,
 } from './community/photos';
 export type { CommunityPhotoExt } from './community/photos';
+export {
+  exerciseRegion,
+  nextSuggestion,
+  prefillLastTime,
+  prescriptionOfLogExercise,
+  prescriptionOfWorkoutExercise,
+  progressionHint,
+  progressionHistoryFromRows,
+  suggestionForLogExercise,
+  suggestionsForLog,
+  suggestionsForWorkout,
+  withSuggestion,
+} from './progression/progression';
+export type {
+  BodyRegion,
+  ExerciseHistory,
+  PrescribedSet,
+  Prescription,
+  ProgressionHistory,
+  ProgressionSession,
+  ProgressionSet,
+  Suggestion,
+} from './progression/progression';

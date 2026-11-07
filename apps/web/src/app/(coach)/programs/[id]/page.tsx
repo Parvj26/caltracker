@@ -7,6 +7,7 @@ import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
+import { AutoProgressionPanel } from './auto-progression-panel';
 import { DeleteProgram } from './delete-program';
 import { loadLiveSync } from '@/lib/live-sync';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
@@ -77,6 +78,7 @@ export default async function ProgramPage({
           <DeleteProgram id={program.id} name={program.name} />
         </div>
       </header>
+      <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={program.auto_progression} />
       {/* key: opening a different program starts a fresh grid. */}
       <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} />
     </div>

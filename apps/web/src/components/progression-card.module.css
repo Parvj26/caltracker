@@ -1,0 +1,5 @@
+.card { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.heading { margin: 0; font-size: var(--ct-size-body); font-weight: 700; }
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.list { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
+.hint { font-weight: 700; white-space: nowrap; }
