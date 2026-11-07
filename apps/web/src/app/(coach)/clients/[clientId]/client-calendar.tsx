@@ -190,6 +190,7 @@ export function ClientCalendar({
   }
 
   const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
+  const sessionHref = (workoutId: string) => `/clients/${client.id}/log/${workoutId}`;
   const days: Record<IsoDate, CalendarItem[]> = {};
   for (const { date, ...item } of items) (days[date] ??= []).push(item);
   for (const log of clientLogs) {
@@ -291,6 +292,8 @@ export function ClientCalendar({
               // rescheduled to today or later.
               <ItemMenu
                 item={item}
+                // Today's or a missed one: the coach can log it with the client now (not a future day's).
+                sessionHref={date <= today ? sessionHref(item.id) : undefined}
                 editHref={`/clients/${client.id}/workouts/${item.id}`}
                 onMove={() => setMoving({ ...item, date })}
                 {...(editable ? {} : { moveLabel: 'Move to another day' })}

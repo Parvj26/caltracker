@@ -13,11 +13,13 @@ import styles from '@/components/calendar/calendar.module.css';
 const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 
 /**
- * One item's options. A done workout gets `logHref` ("View log") and `resultsHref` ("Edit results"), but no
- * `editHref` and no move. A missed one gets `onMove` with the label "Move to another day" (to today or later).
+ * One item's options. Today's or a missed workout gets `sessionHref` ("Log session"). A done workout gets `logHref`
+ * ("View log") and `resultsHref` ("Edit results"), but no `editHref` and no move. A missed one gets `onMove` with the
+ * label "Move to another day" (to today or later).
  */
 export function ItemMenu({
   item,
+  sessionHref,
   logHref,
   resultsHref,
   editHref,
@@ -26,6 +28,8 @@ export function ItemMenu({
   onDelete,
 }: {
   item: CalendarItem;
+  /** "Log session": the coach logs this workout with the client (today's, or a missed one). */
+  sessionHref?: string | undefined;
   logHref?: string | undefined;
   /** The log with its correction form open. */
   resultsHref?: string | undefined;
@@ -82,13 +86,27 @@ export function ItemMenu({
       </button>
       {open ? (
         <ul id={menuId} role="menu" aria-label={`Options for ${item.name}`} className={styles.menu} onKeyDown={onMenuKey}>
+          {sessionHref ? (
+            <li role="none">
+              <Link
+                href={sessionHref}
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[0] = el;
+                }}
+                className={styles.menuItem}
+              >
+                Log session
+              </Link>
+            </li>
+          ) : null}
           {logHref ? (
             <li role="none">
               <Link
                 href={logHref}
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[0] = el;
+                  itemsRef.current[1] = el;
                 }}
                 className={styles.menuItem}
               >
@@ -102,7 +120,7 @@ export function ItemMenu({
                 href={resultsHref}
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[1] = el;
+                  itemsRef.current[2] = el;
                 }}
                 className={styles.menuItem}
               >
@@ -116,7 +134,7 @@ export function ItemMenu({
                 href={editHref}
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[2] = el;
+                  itemsRef.current[3] = el;
                 }}
                 className={styles.menuItem}
               >
@@ -130,7 +148,7 @@ export function ItemMenu({
                 type="button"
                 role="menuitem"
                 ref={(el) => {
-                  itemsRef.current[3] = el;
+                  itemsRef.current[4] = el;
                 }}
                 className={styles.menuItem}
                 onClick={() => {
@@ -147,7 +165,7 @@ export function ItemMenu({
               type="button"
               role="menuitem"
               ref={(el) => {
-                itemsRef.current[4] = el;
+                itemsRef.current[5] = el;
               }}
               className={styles.menuItem}
               onClick={() => {

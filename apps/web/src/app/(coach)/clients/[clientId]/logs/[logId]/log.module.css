@@ -80,3 +80,4 @@
 .comment { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-1); padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .commentMeta { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .commentBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.openSession { align-self: flex-start; }

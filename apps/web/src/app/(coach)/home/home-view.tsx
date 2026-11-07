@@ -18,7 +18,6 @@ import {
   type HomeClient,
   type TodayRow,
 } from '@caltracker/shared';
-import { ComingSoon } from '@/components/coming-soon';
 import { Card, Chip, Tile } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
@@ -69,6 +68,29 @@ function statusChip(row: TodayRow) {
   if (s.kind === 'done') return <Chip tone="lime">Done ✓ · {formatLogDuration(s.durationS)}</Chip>;
   if (s.kind === 'training') return <Chip tone="blue">Training now</Chip>;
   return <Chip tone="grey">Not started</Chip>;
+}
+
+/**
+ * What a Today's clients row offers, most useful first (the row itself opens the first): log the session when
+ * nobody has started, continue the coach's own session, watch live (or take over) while the client trains, the log
+ * once done.
+ */
+function rowActions(row: TodayRow, coachId: string): { label: string; href: string }[] {
+  const client = row.client.id;
+  const session = `/clients/${client}/log/${row.workout.id}`;
+  switch (row.status.kind) {
+    case 'not_started':
+      return [{ label: 'Log session', href: session }];
+    case 'training':
+      // The coach's own session: carry on logging it.
+      if (row.status.loggedBy === coachId) return [{ label: 'Continue session', href: session }];
+      return [
+        { label: 'Watch live', href: `/clients/${client}/logs/${row.status.logId}` },
+        { label: 'Take over', href: session },
+      ];
+    case 'done':
+      return [{ label: 'View log', href: `/clients/${client}/logs/${row.status.logId}` }];
+  }
 }
 
 function Group<T>({ id, title, items, row }: { id?: string; title: string; items: T[]; row: (item: T) => React.ReactNode }) {
@@ -139,7 +161,7 @@ function Skeleton() {
   );
 }
 
-export function HomeView({ coachFirstName, data }: { coachFirstName: string; data: HomeData }) {
+export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: string; coachId: string; data: HomeData }) {
   const today = useBrowserToday();
   const greeting = useGreeting();
   const router = useRouter();
@@ -233,17 +255,29 @@ export function HomeView({ coachFirstName, data }: { coachFirstName: string; dat
             ) : (
               <ul className={styles.list}>
                 {rows.map((r) => {
-                  const href = r.status.kind === 'done' ? `/clients/${r.client.id}/logs/${r.status.logId}` : `/clients/${r.client.id}`;
                   const name = fullName(r.client);
+                  const actions = rowActions(r, coachId);
                   return (
-                    <li key={r.workout.id} className={styles.row}>
-                      <Link href={href} className={styles.rowLink}>
+                    <li key={r.workout.id} className={cx(styles.row, styles.todayRow)}>
+                      {/* The whole row opens the most useful action: log, watch live, or the finished log. */}
+                      <Link href={actions[0]!.href} className={styles.rowLink} aria-label={`${name} · ${r.workout.name}: ${actions[0]!.label}`}>
                         <Avatar name={name} toneKey={r.client.id} />
                         <span className={styles.rowText} title={`${name} · ${r.workout.name}`}>{name} · {r.workout.name}</span>
                         {statusChip(r)}
                       </Link>
-                      {r.status.kind === 'not_started' ? <ComingSoon label="Log session" /> : null}
-                      <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
+                      <span className={styles.rowActions}>
+                        {actions.map((a, i) => (
+                          <Link
+                            key={a.label}
+                            href={a.href}
+                            className={i === 0 ? styles.primaryAction : styles.assign}
+                            aria-label={`${a.label}: ${name}, ${r.workout.name}`}
+                          >
+                            {a.label}
+                          </Link>
+                        ))}
+                          <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
+                      </span>
                     </li>
                   );
                 })}

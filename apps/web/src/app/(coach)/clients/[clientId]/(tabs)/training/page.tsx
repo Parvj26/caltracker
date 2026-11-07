@@ -9,6 +9,7 @@ import {
   addDays,
   coveringRange,
   isCalendarView,
+  isLoggedByCoach,
   localToday,
   workoutPreview,
   workoutRowToDoc,
@@ -183,7 +184,7 @@ export default async function ClientPage({
         date: w.scheduled_on,
         programName: w.program_assignments?.program_name ?? null,
         logId: log?.id ?? null,
-        loggedByCoach: Boolean(log?.logged_by && log.logged_by !== client.id),
+        loggedByCoach: log ? isLoggedByCoach({ loggedBy: log.logged_by, clientId: client.id }) : false,
         preview: workoutPreview(workoutRowToDoc(w), units),
         ...(w.program_assignments
           ? {

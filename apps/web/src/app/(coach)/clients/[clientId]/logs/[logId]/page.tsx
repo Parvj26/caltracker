@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import { logPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
+import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isLoggedByCoach, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
-import { Chip } from '@/components/ui';
+import { ButtonLink, Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { getClient, getLog } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { AwardKickoff } from './award-kickoff';
 import { Comments, type CommentView } from './comments';
 import { CorrectForm } from './correct-form';
 import { ClientNote } from './planned-vs-actual';
@@ -27,15 +28,17 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string; logId: string }>;
-  searchParams: Promise<{ edit?: string | string[] }>;
+  searchParams: Promise<{ edit?: string | string[]; award?: string | string[] }>;
 }) {
   const { userId, units } = await requireCoach();
   const [{ clientId, logId }, query] = await Promise.all([params, searchParams]);
+  const awardNow = query.award === '1';
   const supabase = await createServerSupabase();
   const [client, loaded] = await Promise.all([getClient(clientId), getLog(logId)]);
   // RLS limits the log to this coach's workspace; it must also belong to the client in the URL.
   if (!client || !loaded || loaded.clientId !== client.id) notFound();
   const { log, correctedAt } = loaded;
+  const byCoach = isLoggedByCoach({ loggedBy: loaded.loggedBy, clientId: loaded.clientId });
 
   const swappedIds = [...new Set(log.blocks.flatMap((b) => b.exercises.flatMap((e) => (e.swappedFromExerciseId ? [e.swappedFromExerciseId] : []))))];
   const [comments, swapped, award] = await Promise.all([
@@ -64,6 +67,8 @@ export default async function LogPage({
 
   return (
     <div className={styles.page}>
+      {/* Just finished here as a session: award it (only a finished log, and only once). */}
+      {awardNow && log.status === 'completed' ? <AwardKickoff logId={log.id} /> : null}
       <Link href={`/clients/${client.id}/training`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
@@ -90,6 +95,7 @@ export default async function LogPage({
           {log.status !== 'completed' ? <Chip>{log.status === 'in_progress' ? 'In progress' : 'Discarded'}</Chip> : null}
           {awardHasPrs(award.data?.result) ? <Chip tone="lime">PR</Chip> : null}
           {log.autoFinished ? <Chip tone="amber">Auto-finished</Chip> : null}
+          {byCoach ? <Chip tone="blue">Logged by coach</Chip> : null}
           {isPlannedLog(log) ? null : <Chip>Unplanned</Chip>}
           {correctedAt ? (
             <Chip tone="blue">
@@ -97,7 +103,12 @@ export default async function LogPage({
             </Chip>
           ) : null}
         </div>
-        <ClientNote text={log.notes} label="Client's note on this workout" />
+        {log.status === 'in_progress' && loaded.plannedWorkoutId ? (
+          <ButtonLink href={`/clients/${client.id}/log/${loaded.plannedWorkoutId}`} variant="secondary" className={styles.openSession}>
+            {byCoach ? 'Continue the session' : 'Watch or take over'}
+          </ButtonLink>
+        ) : null}
+        <ClientNote text={log.notes} label={byCoach ? 'Session note' : "Client's note on this workout"} />
       </header>
 
       <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} startEditing={query.edit === '1'} />

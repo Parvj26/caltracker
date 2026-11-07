@@ -164,6 +164,8 @@ export type SeedLogOptions = {
   addedExercise?: string;
   /** Sections the blocks can point at. */
   sections?: { id: string; name: string }[];
+  /** Who logged it (workout_logs.logged_by): the client on the phone, or a coach in a session. Default none. */
+  loggedBy?: string;
   /**
    * Replaces the default single squat block. Each exercise gets `sets` sets (default 2); the exercises being done
    * (all of a straight block, only the picked one of a pick-one group) have them ticked. `picked` is the name of
@@ -206,6 +208,7 @@ export async function seedLog(admin: SupabaseClient<Database>, o: SeedLogOptions
       finished_at: finishedAt,
       last_activity_at: finishedAt ?? o.startedAt,
       auto_finished: o.autoFinished ?? false,
+      logged_by: o.loggedBy ?? null,
     })
     .select('id')
     .single();

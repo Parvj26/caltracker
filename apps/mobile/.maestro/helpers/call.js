@@ -26,6 +26,11 @@
 //   assert-read        fails unless the client has read every coach message
 //   cleanup-messages   deletes the demo client's conversation
 //   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
+//   coach-take-over    the seed coach takes over client@demo.local's workout in progress (waits up to 20 s for it)
+//   coach-log-set      the coach ticks its second set: 10 reps @ 60 kg (coach_save_workout_log)
+//   coach-hand-back    the coach hands it back to the phone
+//   coach-idle         backdates the coach's last activity by 21 minutes, so the client may take it back
+//   coach-finish       the coach ticks every open set with its planned numbers and finishes the session
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);

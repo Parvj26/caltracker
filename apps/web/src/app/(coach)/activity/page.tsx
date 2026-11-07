@@ -6,6 +6,7 @@ import {
   completedSetCount,
   formatLogDuration,
   formatLogVolume,
+  isLoggedByCoach,
   isPlannedLog,
   logDurationS,
   logRowToDoc,
@@ -38,7 +39,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const supabase = await createServerSupabase();
   let logsQuery = supabase
     .from('workout_logs')
-    .select(`client_id, ${LOG_TREE_SELECT}`)
+    .select(`client_id, logged_by, ${LOG_TREE_SELECT}`)
     .eq('workspace_id', workspaceId)
     .eq('status', 'completed')
     .order('finished_at', { ascending: false })
@@ -76,7 +77,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const options = [...names].sort((a, b) => a[1].localeCompare(b[1]));
 
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
-  const rows = (logs.data as unknown as (LogTreeRow & { client_id: string })[]).slice(0, PAGE_SIZE).map((row) => {
+  const rows = (logs.data as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[]).slice(0, PAGE_SIZE).map((row) => {
     const log = logRowToDoc(row);
     return {
       row,
@@ -87,6 +88,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       seconds: logDurationS(log),
       planned: isPlannedLog(log),
       hasPr: prLogs.has(row.id),
+      byCoach: isLoggedByCoach({ loggedBy: row.logged_by, clientId: row.client_id }),
     };
   });
   const hasNext = logs.data.length > PAGE_SIZE;
@@ -142,7 +144,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned, hasPr }) => (
+              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned, hasPr, byCoach }) => (
                 <tr key={row.id}>
                   <td>{clientName}</td>
                   <td>
@@ -152,6 +154,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                       </Link>
                       {hasPr ? <Chip tone="lime">PR</Chip> : null}
                       {row.auto_finished ? <Chip tone="amber">Auto-finished</Chip> : null}
+                      {byCoach ? <Chip tone="blue">Logged by coach</Chip> : null}
                       {planned ? null : <Chip>Unplanned</Chip>}
                     </div>
                   </td>
