@@ -110,11 +110,13 @@ describe('community', () => {
     expect(seeAllLabel(120)).toBe('See all · 99+ new');
   });
 
-  it('names the workout to share by the day it was finished', () => {
+  it('offers sharing only for today’s or yesterday’s workout, named by its day', () => {
     expect(shareWorkoutTitle('2026-11-07T09:00:00Z', '2026-11-07', 'UTC')).toBe('Share today’s workout');
     expect(shareWorkoutTitle('2026-11-06T09:00:00Z', '2026-11-07', 'UTC')).toBe('Share yesterday’s workout');
-    expect(shareWorkoutTitle('2026-11-01T09:00:00Z', '2026-11-07', 'UTC')).toBe('Share your workout');
-    expect(shareWorkoutTitle(null, '2026-11-07', 'UTC')).toBe('Share your workout');
+    // Only for two days: older (or undated) workouts get no button.
+    expect(shareWorkoutTitle('2026-11-05T23:59:00Z', '2026-11-07', 'UTC')).toBeNull();
+    expect(shareWorkoutTitle('2026-11-01T09:00:00Z', '2026-11-07', 'UTC')).toBeNull();
+    expect(shareWorkoutTitle(null, '2026-11-07', 'UTC')).toBeNull();
   });
 });
 

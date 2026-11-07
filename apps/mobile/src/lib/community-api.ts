@@ -122,7 +122,7 @@ export async function loadFeed(communityId: string): Promise<FeedPost[]> {
   return [...rows.values()].map(toFeedPost);
 }
 
-/** The newest few posts (not the pinned ones), for the Today tab's community card. */
+/** The newest few posts by time (pinned ones included, in their place), for the Today tab's community card. */
 export async function loadLatestPosts(communityId: string, limit: number): Promise<FeedPost[]> {
   const { data, error } = await supabase
     .from('community_posts')

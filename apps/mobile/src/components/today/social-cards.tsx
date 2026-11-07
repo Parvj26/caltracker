@@ -14,6 +14,7 @@ import { useCachedLoad } from '@/lib/use-cached-load';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useCommunity } from '@/lib/use-community';
 import { useMessages } from '@/lib/use-messages';
+import { useSharedWorkouts } from '@/lib/shared-workouts';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { CountBadge, Note, Row, Tile } from './parts';
@@ -58,8 +59,9 @@ export function CoachRow() {
 }
 
 /**
- * The community card: the two newest posts, the new notifications, and "Share <day>'s workout" when my last
- * finished workout has its award on the server and isn't shared yet (the same composer as the summary's Share).
+ * The community card: the two newest posts (by time, pinned or not), the new notifications, and "Share <day>'s
+ * workout" when my last finished workout is from today or yesterday, has its award on the server and isn't shared yet
+ * (the same composer as the summary's Share).
  */
 export function CommunityCard({ units, refreshKey }: { units: Units; refreshKey: number }) {
   const { text, space } = useTheme();
@@ -83,6 +85,7 @@ export function CommunityCard({ units, refreshKey }: { units: Units; refreshKey:
     refreshKey,
   );
 
+  const sharedHere = useSharedWorkouts();
   const rows = useMemo(
     () => (posts.data && me ? posts.data.filter((p) => !blocked.has(p.authorId)).map((p) => postPreview(p, { me, coaches, units })) : []),
     [posts.data, me, blocked, coaches, units],
@@ -94,6 +97,11 @@ export function CommunityCard({ units, refreshKey }: { units: Units; refreshKey:
 
   // Taken out of the community by the coach: nothing to show here (the Community screen explains).
   if (ready && removed) return null;
+  // Posts (even the copy saved on the phone) show only once membership is confirmed.
+  const member = ready && !removed && community !== null;
+  // Hidden for good once shared from this phone, even before (or without) the server saying so.
+  const shareTitle =
+    member && share.data && !sharedHere.has(share.data.logId) ? shareWorkoutTitle(share.data.finishedAt, localToday()) : null;
 
   return (
     <Tile testID="today-community">
@@ -108,13 +116,13 @@ export function CommunityCard({ units, refreshKey }: { units: Units; refreshKey:
 
       {!ready ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading the community" /> : null}
       {ready && !community && offline ? <Note>The community shows when you’re online.</Note> : null}
-      {community && posts.data === null && posts.status === 'loading' ? (
+      {member && posts.data === null && posts.status === 'loading' ? (
         <ActivityIndicator color={palette.ink} accessibilityLabel="Loading posts" />
       ) : null}
-      {community && posts.data === null && posts.status === 'offline' ? <Note>Posts show when you’re online.</Note> : null}
-      {community && posts.data !== null && rows.length === 0 ? <Note testID="today-community-empty">No posts yet. Say hello!</Note> : null}
+      {member && posts.data === null && posts.status === 'offline' ? <Note>Posts show when you’re online.</Note> : null}
+      {member && posts.data !== null && rows.length === 0 ? <Note testID="today-community-empty">No posts yet. Say hello!</Note> : null}
 
-      {rows.map((r) => (
+      {(member ? rows : []).map((r) => (
         <PostRow
           key={r.id}
           row={r}
@@ -123,10 +131,10 @@ export function CommunityCard({ units, refreshKey }: { units: Units; refreshKey:
         />
       ))}
 
-      {community && share.data ? (
+      {shareTitle && share.data ? (
         <Button
           variant="secondary"
-          title={shareWorkoutTitle(share.data.finishedAt, localToday())}
+          title={shareTitle}
           testID="today-share-workout"
           onPress={() => share.data && router.push(shareHref({ kind: 'workout', logId: share.data.logId }))}
         />

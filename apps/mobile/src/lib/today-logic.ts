@@ -89,13 +89,16 @@ export function seeAllLabel(unread: number): string {
   return unread > 0 ? `See all · ${unread > 99 ? '99+' : unread} new` : 'See all';
 }
 
-/** "Share today's workout", "Share yesterday's workout", or "Share your workout" for an older one. */
-export function shareWorkoutTitle(finishedAt: string | null, today: IsoDate, timeZone?: string): string {
-  if (!finishedAt || Number.isNaN(Date.parse(finishedAt))) return 'Share your workout';
+/**
+ * "Share today's workout" or "Share yesterday's workout". Null (no button) for a workout finished before yesterday,
+ * or without a finish time: sharing is offered for two days only.
+ */
+export function shareWorkoutTitle(finishedAt: string | null, today: IsoDate, timeZone?: string): string | null {
+  if (!finishedAt || Number.isNaN(Date.parse(finishedAt))) return null;
   const day = localDateOf(finishedAt, timeZone);
   if (day === today) return 'Share today’s workout';
   if (day === addDays(today, -1)) return 'Share yesterday’s workout';
-  return 'Share your workout';
+  return null;
 }
 
 // ---- Stickers ----------------------------------------------------------------------------------------------

@@ -2,8 +2,9 @@
 // newest posts, my last finished workout (to offer sharing it) and my recent personal bests. Each keeps a copy on the
 // phone so Today works without signal. Reads go through RLS (a client sees only their own rows).
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RECENT_PR_DAYS, awardRecords, recentPrs, sortFeed, withoutBlocked, type AwardResult, type PrKind } from '@caltracker/shared';
+import { RECENT_PR_DAYS, awardRecords, recentPrs, withoutBlocked, type AwardResult, type PrKind } from '@caltracker/shared';
 import { fetchAward } from './awards';
+import { todayCacheKey } from './device-cache-keys';
 import { loadLatestPosts, sharedWorkout, type FeedPost } from './community-api';
 import { workoutShareCard } from './community-share';
 import { supabase } from './supabase';
@@ -13,7 +14,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const POSTS_READ = 6;
 export const POSTS_SHOWN = 2;
 
-const key = (what: string, userId: string) => `caltracker.today.${what}.${userId}`;
+const key = todayCacheKey;
 
 async function readJson(k: string): Promise<unknown> {
   try {
@@ -54,12 +55,13 @@ export async function readCachedPosts(userId: string, communityId: string): Prom
   return Array.isArray(v) && v.every(isPost) ? v : null;
 }
 
-/** The newest posts, without anyone I blocked. Throws when the server can't be reached. */
+/**
+ * The newest posts by time, pinned or not, without anyone I blocked. A pinned post is not moved to the top here (Today
+ * shows what is new; the Community screen shows pins first). Throws when the server can't be reached.
+ */
 export async function fetchLatestPosts(userId: string, communityId: string, blocked: ReadonlySet<string>): Promise<FeedPost[]> {
-  const posts = sortFeed(withoutBlocked(await loadLatestPosts(communityId, POSTS_READ), blocked).map((p) => ({ ...p, pinnedAt: null }))).slice(
-    0,
-    POSTS_SHOWN,
-  );
+  // Already newest first (loadLatestPosts orders by time only).
+  const posts = withoutBlocked(await loadLatestPosts(communityId, POSTS_READ), blocked).slice(0, POSTS_SHOWN);
   writeJson(key(`posts.${communityId}`, userId), posts);
   return posts;
 }

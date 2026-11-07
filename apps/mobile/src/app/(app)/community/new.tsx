@@ -5,6 +5,7 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest } from '@caltracker/shared';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { createPost } from '@/lib/community-api';
+import { markWorkoutShared } from '@/lib/shared-workouts';
 import { PhotoError, pickPhotos, preparePhoto, type PreparedPhoto } from '@/lib/community-photo';
 import { useCommunity } from '@/lib/use-community';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -64,6 +65,7 @@ export default function NewPostScreen() {
     setPosting(true);
     try {
       await createPost({ postId, community, body: body.trim(), card, photos });
+      if (card?.kind === 'workout') markWorkoutShared(card.logId);
       router.back();
     } catch (e) {
       setFailed(true);
