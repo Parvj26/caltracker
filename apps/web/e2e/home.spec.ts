@@ -175,7 +175,7 @@ test('a client with nothing planned is under Nothing planned, with Open and Assi
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Nothing in the next 7 days');
   await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.getByRole('link', { name: /^Assign a program to / })).toHaveAttribute('href', `/clients/${clientId}/training?assign=1`);
+  await expect(row.getByRole('button', { name: /^Assign to / })).toBeVisible();
 });
 
 test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
@@ -272,7 +272,8 @@ test('typing part of a name in any case finds the client, and Enter opens their 
   await box.fill(last.toLowerCase());
   await box.press('ArrowDown');
   await box.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}$`));
+  // Search lands on the client's Training (their calendar), where most visits from Home are headed.
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training$`));
 });
 
 test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
@@ -284,18 +285,15 @@ test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
   await expect(box).toBeFocused();
 });
 
-test('Assign on an ending program opens the assign dialog, and a reload does not reopen it', async ({ page }) => {
+test('?assign=1 on the Training tab opens the assign dialog, and a reload does not reopen it', async ({ page }) => {
   const last = `Assn${unique()}`;
   const clientId = await newClient(last);
   const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: `Ending ${unique()}`, weeks: 1, start_date: dayOffset(-3) }).select('id').single();
   if (a.error) throw a.error;
   created.assignments.push(a.data.id);
   await signInAsCoach(page);
-  await page.goto('/home');
-  const group = page.getByRole('region', { name: /^Program ending soon/ });
-  await expandGroup(group);
-  await group.locator('li').filter({ hasText: last }).getByRole('link', { name: /^Assign/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}`));
+  // Old links (and bookmarks) to ?assign=1 still open the dialog; Home's Assign now opens its own dialog in place.
+  await page.goto(`/clients/${clientId}/training?assign=1`);
   await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
   await expect(page).not.toHaveURL(/assign=1/);
   await page.reload();

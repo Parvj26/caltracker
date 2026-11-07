@@ -189,17 +189,18 @@ test('Home groups every client under its reason, with counts, a reason line and 
   const run = row('Missed 2+ in a row', 'Rowan Run');
   await expect(run).toContainText('Missed 2 in a row · latest yesterday');
   await expect(run.getByRole('link', { name: 'Open Rowan Run' })).toHaveAttribute('href', `/clients/${ids.run}`);
-  await expect(run.getByRole('link', { name: /^Assign/ })).toHaveCount(0);
+  // Every row has Assign (a quick dialog on Home).
+  await expect(run.getByRole('button', { name: 'Assign to Rowan Run' })).toBeVisible();
 
   await expect(row('Missed a workout', 'Olive Once')).toContainText(/Missed 1 · \w{3} \d{1,2} \w{3}/);
 
   const ending = row('Program ending soon', 'Enid Ending');
   await expect(ending).toContainText(/Ends in 3 days · \w{3} \d{1,2} \w{3}/);
-  await expect(ending.getByRole('link', { name: 'Assign a program to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}/training?assign=1`);
+  await expect(ending.getByRole('button', { name: 'Assign to Enid Ending' })).toBeVisible();
 
   const nothing = row('Nothing planned', 'Nell Nothing');
   await expect(nothing).toContainText('Nothing in the next 7 days');
-  await expect(nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' })).toHaveAttribute('href', `/clients/${ids.nothing}/training?assign=1`);
+  await expect(nothing.getByRole('button', { name: 'Assign to Nell Nothing' })).toBeVisible();
 
   await expect(row('No workout in 5+ days', 'Quinn Quiet')).toContainText('No workout in 8 days');
   await expect(row('New personal bests', 'Sami Steady')).toContainText('1 lift improved');
@@ -214,8 +215,8 @@ test('Home groups every client under its reason, with counts, a reason line and 
   // Every row offers Message, which opens that client's conversation.
   await expect(run.getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
 
-  await nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' }).click();
-  await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
+  await nothing.getByRole('button', { name: 'Assign to Nell Nothing' }).click();
+  await expect(page.getByRole('dialog', { name: 'Assign to Nell Nothing' })).toBeVisible();
 });
 
 test('the Clients list shows status, last workout, this week and program for each client, with no hydration errors', async ({ page }) => {
