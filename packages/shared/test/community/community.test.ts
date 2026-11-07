@@ -14,9 +14,7 @@ import {
   firstYoutubeId,
   fitLongEdge,
   groupNotifications,
-  groupedLikeText,
   initialsOf,
-  likersLine,
   memberName,
   notificationText,
   parseCard,
@@ -31,26 +29,6 @@ import {
 
 const LOG = '11111111-1111-4111-8111-111111111111';
 
-describe('likes', () => {
-  it('groups likes the way the spec words it', () => {
-    expect(groupedLikeText(['Sam'])).toBe('Sam liked your post');
-    expect(groupedLikeText(['Sam', 'Kim'])).toBe('Sam and Kim liked your post');
-    expect(groupedLikeText(['Sam', 'Kim', 'Lee', 'Max', 'Ana'])).toBe('Sam and 4 others liked your post');
-    expect(groupedLikeText(['Sam'], 2)).toBe('Sam and 1 other liked your post');
-    expect(groupedLikeText([], 0)).toBe('Someone liked your post');
-  });
-
-  it('words the line under a post', () => {
-    expect(likersLine([], false)).toBe('');
-    expect(likersLine([], true)).toBe('You like this');
-    expect(likersLine(['Sam'], true)).toBe('You and Sam like this');
-    expect(likersLine(['Sam', 'Kim', 'Lee'], true)).toBe('You and 3 others like this');
-    expect(likersLine(['Sam'], false)).toBe('Sam likes this');
-    expect(likersLine(['Sam', 'Kim'], false)).toBe('Sam and Kim like this');
-    expect(likersLine(['Sam', 'Kim', 'Lee'], false)).toBe('Sam and 2 others like this');
-  });
-});
-
 describe('notifications', () => {
   const row = (id: string, kind: NotificationRow['kind'], actorId: string, createdAt: string, extra: Partial<NotificationRow> = {}): NotificationRow => ({
     id,
@@ -64,24 +42,38 @@ describe('notifications', () => {
   });
 
   const rows: NotificationRow[] = [
-    row('n1', 'like', 'kim', '2026-11-06T10:00:00Z', { readAt: '2026-11-06T10:05:00Z' }),
-    row('n2', 'like', 'sam', '2026-11-06T11:00:00Z'),
+    row('n1', 'reaction', 'kim', '2026-11-06T10:00:00Z', { readAt: '2026-11-06T10:05:00Z' }),
+    row('n2', 'reaction', 'sam', '2026-11-06T11:00:00Z'),
     row('n3', 'comment', 'kim', '2026-11-06T10:30:00Z'),
-    row('n4', 'like', 'lee', '2026-11-06T09:00:00Z', { postId: 'p2', readAt: '2026-11-06T09:30:00Z' }),
+    row('n4', 'reaction', 'lee', '2026-11-06T09:00:00Z', { postId: 'p2', readAt: '2026-11-06T09:30:00Z' }),
     row('n5', 'coach_post', 'coach', '2026-11-06T12:00:00Z', { postId: 'p3' }),
-    row('n6', 'like', 'max', '2026-11-06T08:00:00Z'),
+    row('n6', 'reaction', 'max', '2026-11-06T08:00:00Z'),
   ];
   const names: Record<string, string> = { kim: 'Kim', sam: 'Sam', lee: 'Lee', coach: 'Coach Jo', max: 'Max' };
 
-  it('groups likes per post, newest first, and keeps other kinds separate', () => {
+  it('groups reactions per post, newest first, and keeps other kinds separate', () => {
     const items = groupNotifications(rows);
     expect(items.map((i) => i.key)).toEqual(['n5', 'n2', 'n3', 'n4']);
     const likes = items[1]!;
     expect(likes.actorIds).toEqual(['sam', 'kim', 'max']);
     expect(likes.ids.sort()).toEqual(['n1', 'n2', 'n6']);
     expect(likes.unread).toBe(true);
-    expect(notificationText(likes, (id) => names[id] ?? '?')).toBe('Sam and 2 others liked your post');
+    expect(notificationText(likes, (id) => names[id] ?? '?')).toBe('Sam and 2 others reacted to your post');
     expect(items[3]!.unread).toBe(false);
+  });
+
+  it('groups reactions on a comment apart from reactions on its post', () => {
+    const items = groupNotifications([
+      row('c1', 'reaction', 'kim', '2026-11-06T10:00:00Z', { commentId: 'c' }),
+      row('c2', 'reaction', 'sam', '2026-11-06T11:00:00Z', { commentId: 'c' }),
+      row('c3', 'reaction', 'sam', '2026-11-06T12:00:00Z'),
+    ]);
+    expect(items.map((i) => [i.key, i.commentId, i.actorIds])).toEqual([
+      ['c3', null, ['sam']],
+      ['c2', 'c', ['sam', 'kim']],
+    ]);
+    expect(notificationText(items[1]!, (id) => names[id] ?? '?')).toBe('Sam and Kim reacted to your comment');
+    expect(notificationText(items[0]!, (id) => names[id] ?? '?')).toBe('Sam reacted to your post');
   });
 
   it('counts unread items after grouping', () => {
@@ -94,7 +86,7 @@ describe('notifications', () => {
   it('drops anyone the reader blocked', () => {
     const items = groupNotifications(rows, new Set(['sam', 'kim']));
     expect(items.map((i) => i.key)).toEqual(['n5', 'n4', 'n6']);
-    expect(notificationText(items[2]!, (id) => names[id] ?? '?')).toBe('Max liked your post');
+    expect(notificationText(items[2]!, (id) => names[id] ?? '?')).toBe('Max reacted to your post');
   });
 
   it('words comments, coach posts and reports', () => {
