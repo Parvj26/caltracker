@@ -26,8 +26,9 @@ export function LinkedText({ text }: { text: string }) {
   );
 }
 
-function CardView({ card, units }: { card: CommunityCard; units: Units }) {
-  const t = cardText(card, units);
+/** The sentence about the poster is the headline; the workout's name and counts are small text under it. */
+function CardView({ card, units, authorName }: { card: CommunityCard; units: Units; authorName: string }) {
+  const t = cardText(card, units, authorName);
   return (
     <div className={styles.shareCard} data-testid="share-card">
       {t.stickerKey ? (
@@ -35,10 +36,12 @@ function CardView({ card, units }: { card: CommunityCard; units: Units }) {
         <img src={`/stickers/${t.stickerKey}-sm.webp`} alt="" width={72} height={72} className={t.shiny ? styles.shiny : undefined} />
       ) : null}
       <div className={styles.shareCardText}>
-        <p className={styles.shareBadge}>{t.badge}</p>
-        <p className={styles.shareTitle}>{t.title}</p>
-        {t.lines.map((l) => (
-          <p key={l} className={styles.caption}>
+        {t.badge ? <p className={styles.shareBadge}>{t.badge}</p> : null}
+        <p className={styles.shareTitle} data-testid="share-card-headline">
+          {t.title}
+        </p>
+        {t.lines.map((l, i) => (
+          <p key={`${i}-${l}`} className={styles.shareLine}>
             {l}
           </p>
         ))}
@@ -97,7 +100,7 @@ export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewe
           <LinkedText text={post.body} />
         </p>
       ) : null}
-      {post.card ? <CardView card={post.card} units={units} /> : null}
+      {post.card ? <CardView card={post.card} units={units} authorName={post.authorName} /> : null}
       {post.images.length > 0 ? (
         // Each photo whole, at its own shape, one under the other (no crop); very tall ones are capped at 80% of the window.
         <ul className={styles.photoStack} aria-label="Photos">

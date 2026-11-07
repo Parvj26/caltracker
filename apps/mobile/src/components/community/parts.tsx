@@ -73,18 +73,23 @@ export function LinkedText({ text, testID }: { text: string; testID?: string }) 
   );
 }
 
-/** A shared sticker / workout / PR card, in the reader's own units. */
-export function CardView({ card, units }: { card: CommunityCard; units: Units }) {
+/**
+ * A shared sticker / workout / PR card, in the reader's own units: the sentence about the poster is the headline
+ * ("Vaishali lifted 1,540 lb — about as much as 1 cow 🐄"), the workout's name and counts are small text under it.
+ */
+export function CardView({ card, units, authorName }: { card: CommunityCard; units: Units; authorName: string }) {
   const { text, space, radius } = useTheme();
-  const c = cardText(card, units);
+  const c = cardText(card, units, authorName);
   return (
     <View style={[styles.card, { borderRadius: radius.card, padding: space[4], gap: space[3] }]} testID="community-card">
       {c.stickerKey ? <Sticker stickerKey={c.stickerKey} size={72} shiny={c.shiny} variant="sm" /> : null}
       <View style={[styles.cardText, { gap: space[1] }]}>
-        <Text style={[text('caption'), styles.ink]}>{c.badge}</Text>
-        <Text style={[text('sectionHeading'), styles.ink]}>{c.title}</Text>
-        {c.lines.map((l) => (
-          <Text key={l} style={[text('caption'), styles.ink]}>
+        {c.badge ? <Text style={[text('caption'), styles.ink]}>{c.badge}</Text> : null}
+        <Text style={[text('sectionHeading'), styles.ink]} testID="community-card-headline">
+          {c.title}
+        </Text>
+        {c.lines.map((l, i) => (
+          <Text key={`${i}-${l}`} style={[text('caption'), styles.ink]}>
             {l}
           </Text>
         ))}

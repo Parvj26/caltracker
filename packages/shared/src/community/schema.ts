@@ -40,7 +40,11 @@ export const CardRequest = z.discriminatedUnion('kind', [
 ]);
 export type CardRequest = z.infer<typeof CardRequest>;
 
-/** A stored card, as the database built it. Workout cards show counts, not volume (that sum lives only here). */
+/**
+ * A stored card, as the database built it. A workout card's volumeKg is copied from the workout's stored award (worked
+ * out by award-workout with logVolumeKg); the database never adds it up and the phone can't send it. Cards built
+ * before 2026-11-07, or from an award stored before then, have none.
+ */
 export const CommunityCard = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('sticker'), stickerKey: z.string().min(1), shiny: z.boolean(), count: z.number().int().positive() }),
   z.object({
@@ -53,6 +57,7 @@ export const CommunityCard = z.discriminatedUnion('kind', [
     stickerKey: z.string().nullable(),
     multiple: z.number().positive().nullable(),
     shiny: z.boolean(),
+    volumeKg: z.number().nonnegative().nullable().optional(),
   }),
   z.object({
     kind: z.literal('pr'),
