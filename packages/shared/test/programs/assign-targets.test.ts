@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AssignToClientsInput,
   assignSummary,
+  copyDefaultDate,
   filterClients,
   nextFreeDay,
   nextMonday,
@@ -82,7 +83,36 @@ describe('assignSummary', () => {
   });
 });
 
+describe('assignSummary for copies', () => {
+  it('says Copied', () => {
+    expect(assignSummary('Legs', [{ ok: true }, { ok: true }], 'Copied')).toBe('Copied Legs to 2 clients.');
+    expect(assignSummary('Legs', [{ ok: false }], 'Copied')).toBe("Couldn't copy Legs.");
+    expect(assignSummary('Legs', [{ ok: true }, { ok: false }], 'Copied')).toBe("Copied Legs to 1 of 2 clients. 1 couldn't be copied.");
+  });
+});
+
+describe('copyDefaultDate', () => {
+  it('is a week after the workout, so the copy repeats it', () => {
+    expect(copyDefaultDate('2026-11-09', '2026-11-07')).toBe('2026-11-16');
+  });
+
+  it('is never before today (a copy of an old workout lands today)', () => {
+    expect(copyDefaultDate('2026-10-01', '2026-11-07')).toBe('2026-11-07');
+    expect(copyDefaultDate('2026-10-31', '2026-11-07')).toBe('2026-11-07');
+  });
+});
+
 describe('AssignToClientsInput', () => {
+  it('takes a copy of a client workout too', () => {
+    const r = AssignToClientsInput.safeParse({
+      kind: 'copy',
+      sourceId: ID(1),
+      today: '2026-11-07',
+      targets: [{ clientId: ID(2), id: ID(3), date: '2026-11-08' }],
+    });
+    expect(r.success).toBe(true);
+  });
+
   const base = { kind: 'workout' as const, sourceId: ID(1), today: '2026-11-07' };
 
   it('takes one id and day per client', () => {

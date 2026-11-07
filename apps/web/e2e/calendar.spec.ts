@@ -663,7 +663,7 @@ test('a missed past workout can be edited, moved to another day or deleted, but 
   await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
   const menu = cell.getByRole('menu', { name: `Options for ${workout}` });
   // A missed workout can still be logged with the client (coach session logging), or edited.
-  await expect(menu.getByRole('menuitem')).toHaveText(['Log session', 'Edit', 'Move to another day', 'Delete']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Log session', 'Edit', 'Move to another day', 'Copy to…', 'Delete']);
   await expect(menu.getByRole('menuitem', { name: 'View log' })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: 'Log session' })).toBeFocused();
 
@@ -940,7 +940,7 @@ test('a missed workout is rescheduled with "Move to another day"; a done one off
     await page.goto(calendarUrl(monthOf(pastDate)));
     await day(page, pastDate).getByRole('button', { name: `Options for ${done}`, exact: true }).click();
     const menu = day(page, pastDate).getByRole('menu', { name: `Options for ${done}` });
-    await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Delete']);
+    await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Copy to…', 'Delete']);
     await menu.getByRole('menuitem', { name: 'View log' }).click();
     await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/logs/${logId}$`));
   } finally {
@@ -966,7 +966,7 @@ test('a done workout on today or later has no Move and is not draggable; the ser
     // its plan isn't edited (the log was done against it).
     await expect(item(page, today, name)).toHaveCount(0);
     await cell.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
-    await expect(cell.getByRole('menu', { name: `Options for ${name}` }).getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Delete']);
+    await expect(cell.getByRole('menu', { name: `Options for ${name}` }).getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Copy to…', 'Delete']);
   } finally {
     await admin.from('workout_logs').delete().eq('id', logId);
   }
