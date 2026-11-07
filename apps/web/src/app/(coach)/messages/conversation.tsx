@@ -366,7 +366,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
             <h2 className={styles.threadTitle}>{clientName}</h2>
             {readOnly ? <p className={styles.threadSub}>Past client · read-only history</p> : null}
           </div>
-          <Link href={`/clients/${clientId}`} className={styles.threadLink}>{readOnly ? 'Client page' : 'Calendar'}</Link>
+          <Link href={readOnly ? `/clients/${clientId}` : `/clients/${clientId}/training`} className={styles.threadLink}>{readOnly ? 'Client page' : 'Calendar'}</Link>
         </header>
       )}
       <div

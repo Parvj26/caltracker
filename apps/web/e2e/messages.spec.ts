@@ -164,13 +164,15 @@ test('"Seen" appears once the client has read the coach\'s message', async ({ pa
   await expect(bubble.getByText('Seen')).toBeVisible();
 });
 
-test('the Message button on the client page opens that conversation', async ({ page }) => {
+test('the Message button on the client\'s Training tab opens that conversation', async ({ page }) => {
   const client = await makeClient('Deepa');
   await signInAsCoach(page);
-  await page.goto(`/clients/${client.id}`);
+  await page.goto(`/clients/${client.id}/training`);
   await page.getByRole('link', { name: 'Message', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
   await expect(page.getByRole('heading', { name: client.name })).toBeVisible();
+  // The thread's Calendar link goes back to the client's Training tab, where the calendar lives.
+  await expect(page.getByRole('link', { name: 'Calendar', exact: true })).toHaveAttribute('href', `/clients/${client.id}/training`);
 });
 
 test('a message sent while Realtime was not delivering shows up when the window is focused again', async ({ page }) => {
@@ -205,7 +207,7 @@ test('a long message and a burst of emoji wrap inside the bubble', async ({ page
   expect(b!.x + b!.width).toBeLessThanOrEqual(l!.x + l!.width);
 });
 
-test('a past client\'s page shows their history read-only', async ({ page }) => {
+test('a past client\'s Training tab shows their history read-only', async ({ page }) => {
   const client = await makeClient('Pasta');
   await clientSays(client.id, 'Thanks for everything, coach');
   const pc = await admin.from('past_clients').insert({
@@ -222,7 +224,7 @@ test('a past client\'s page shows their history read-only', async ({ page }) => 
   if (gone.error) throw gone.error;
 
   await signInAsCoach(page);
-  await page.goto(`/clients/${client.id}`);
+  await page.goto(`/clients/${client.id}/training`);
   await expect(page.getByRole('log').getByText('Thanks for everything, coach')).toBeVisible();
   await expect(page.getByText("you can read the history but can't send new messages")).toBeVisible();
   await expect(page.getByLabel('Message', { exact: true })).toHaveCount(0);
