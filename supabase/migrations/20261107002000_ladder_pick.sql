@@ -1,16 +1,19 @@
 -- How a workout's ladder animal is chosen (docs/design/collection.md §1): new animals first, at random seeded by the
 -- log id, then the one awarded longest ago. The rule lives in @caltracker/shared (pickLadderAnimal); award-workout
--- runs it. Two functions change for it:
+-- runs it. Two functions and the awards table change for it:
 --
 -- award_inputs (from 20261106001100) also hands over 'ladder_awards': the ladder animal of every award of the
 -- client in that workspace, with its log's finish time, so the pick knows which animals came before this log.
 -- Everything else is unchanged.
 --
 -- apply_award (from 20261106000300): a recompute (a coach correction, or a re-finished log) keeps the stored animal
--- while the corrected volume still reaches it, and only refreshes its multiple. When the volume no longer reaches
--- it, award-workout sends a re-picked animal and it is swapped in: the old sticker's count goes down by one but
--- never below one (a sticker is never taken away), the new one is added (never shiny: a correction never rolls).
--- Everything else is unchanged.
+-- forever (product owner, 2026-11-07) and only refreshes its multiple, which may fall under 1. A workout that had
+-- no animal and now reaches one gets the one award-workout picked, added once, never shiny (a correction never
+-- rolls). Everything else is unchanged.
+--
+-- One animal per workout, enforced: awards.ladder_sticker_key is the ladder animal granted for that log (one row per
+-- log). A trigger fills it from result.ladder.key and refuses to change or clear it once set, so no path (a retry,
+-- a re-finish, a correction) can grant a second ladder sticker for the same log.
 
 create or replace function public.award_inputs(p_log_id uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
@@ -146,54 +149,38 @@ begin
     values (v_log.id, v_log.client_id, v_log.workspace_id, v_result, v_log.revision);
     v_status := 'awarded';
   else
-    -- A correction or a re-finish never rolls again and never takes a sticker away. The PRs this log set are
-    -- replaced. The ladder animal stays while the corrected volume still reaches it (only its multiple follows the
-    -- volume); otherwise award-workout re-picked one under the same rule, and it is swapped in here.
+    -- A correction or a re-finish never rolls again and never adds a second animal: a workout keeps its animal
+    -- forever (only its multiple follows the corrected volume, and may fall under 1). The PRs this log set are
+    -- replaced. Only a workout that had no animal and now reaches one gets one, once.
     v_result := jsonb_set(v_existing, '{prs}', coalesce(p_result -> 'award' -> 'prs', '[]'::jsonb));
     v_old_key := v_existing #>> '{ladder,key}';
     v_new_key := p_result #>> '{award,ladder,key}';
     v_multiple := p_result #> '{award,ladder,multiple}';
 
-    if v_new_key is not distinct from v_old_key then
-      if v_new_key is not null and jsonb_typeof(v_multiple) = 'number' then
+    if v_old_key is not null then
+      -- award-workout always sends the stored animal back; anything else is ignored.
+      if v_new_key = v_old_key and jsonb_typeof(v_multiple) = 'number' then
         v_result := jsonb_set(v_result, '{ladder,multiple}', v_multiple);
       end if;
-    else
-      -- The pick was made from the stickers read with the inputs: refuse if they changed meanwhile.
-      if (select coalesce(sum(s.count), 0) from public.sticker_awards s
-          where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id)
-          is distinct from (p_result ->> 'owned_total')::bigint then
-        return jsonb_build_object('status', 'conflict');
-      end if;
-
-      -- The old animal stays in the zoo book: one fewer of it, but never below one.
-      if v_old_key is not null then
-        update public.sticker_awards s set count = s.count - 1
-        where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id and s.sticker_key = v_old_key
-          and s.count > 1;
-      end if;
-
-      if v_new_key is null then
-        v_result := jsonb_set(v_result, '{ladder}', 'null'::jsonb);
+    elsif v_new_key is not null then
+      -- Counts and shiny come from the rows, read under the client lock above, so no stale count can be written.
+      select * into v_row from public.sticker_awards s
+      where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id and s.sticker_key = v_new_key
+      for update;
+      v_is_new := not found;
+      if v_is_new then
+        -- No roll on a correction, so a new animal is never shiny.
+        insert into public.sticker_awards (client_id, workspace_id, sticker_key, shiny, first_log_id)
+        values (v_log.client_id, v_log.workspace_id, v_new_key, false, v_log.id)
+        returning * into v_row;
       else
-        select * into v_row from public.sticker_awards s
+        update public.sticker_awards s set count = s.count + 1, last_earned_at = now()
         where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id and s.sticker_key = v_new_key
-        for update;
-        v_is_new := not found;
-        if v_is_new then
-          -- No roll on a correction, so a new animal is never shiny.
-          insert into public.sticker_awards (client_id, workspace_id, sticker_key, shiny, first_log_id)
-          values (v_log.client_id, v_log.workspace_id, v_new_key, false, v_log.id)
-          returning * into v_row;
-        else
-          update public.sticker_awards s set count = s.count + 1, last_earned_at = now()
-          where s.client_id = v_log.client_id and s.workspace_id = v_log.workspace_id and s.sticker_key = v_new_key
-          returning * into v_row;
-        end if;
-        v_result := jsonb_set(v_result, '{ladder}', jsonb_build_object('key', v_new_key,
-          'multiple', coalesce(v_multiple, 'null'::jsonb), 'isNew', v_is_new, 'count', v_row.count,
-          'shiny', v_row.shiny));
+        returning * into v_row;
       end if;
+      v_result := jsonb_set(v_result, '{ladder}', jsonb_build_object('key', v_new_key,
+        'multiple', coalesce(v_multiple, 'null'::jsonb), 'isNew', v_is_new, 'count', v_row.count,
+        'shiny', v_row.shiny));
     end if;
 
     update public.awards a set result = v_result, log_revision = v_log.revision where a.log_id = p_log_id;
@@ -247,3 +234,24 @@ $$;
 
 revoke execute on function public.apply_award(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.apply_award(uuid, jsonb) to service_role;
+
+-- One ladder animal per workout.
+alter table public.awards add column ladder_sticker_key text;
+update public.awards set ladder_sticker_key = result #>> '{ladder,key}';
+
+create function public.awards_one_animal() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.ladder_sticker_key := new.result #>> '{ladder,key}';
+  if tg_op = 'UPDATE' and old.ladder_sticker_key is not null
+    and new.ladder_sticker_key is distinct from old.ladder_sticker_key then
+    raise exception 'A workout keeps its animal: % stays on log %.', old.ladder_sticker_key, old.log_id
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.awards_one_animal() from public, anon, authenticated;
+
+create trigger awards_one_animal before insert or update on public.awards
+  for each row execute function public.awards_one_animal();

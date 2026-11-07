@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(23);
 
 -- The ladder pick (20261107002000): award_inputs hands over the ladder history, and a recompute keeps or swaps
 -- the stored animal. Fixtures as postgres.
@@ -53,65 +53,84 @@ select is(jsonb_array_length(public.award_inputs(:'ld') -> 'ladder_awards'), 1,
   'a reopened log (no finish time) is left out until it is finished again');
 update public.workout_logs set status = 'completed', finished_at = now() - interval '30 minutes' where id = :'la';
 
--- A recompute payload for lb, as award-workout sends it.
-create function pg_temp.recompute(p_log uuid, p_ladder jsonb, p_owned_total bigint) returns jsonb
+-- Payloads as award-workout sends them.
+create function pg_temp.payload(p_mode text, p_log uuid, p_ladder jsonb, p_stickers jsonb) returns jsonb
 language sql as $$
-  select jsonb_build_object('mode', 'recompute', 'owned_total', p_owned_total,
+  select jsonb_build_object('mode', p_mode,
+    'owned_total', (select coalesce(sum(s.count), 0) from public.sticker_awards s
+      where s.client_id = l.client_id and s.workspace_id = l.workspace_id),
     'history_version', public.award_history_version(l.client_id, l.workspace_id),
     'award', jsonb_build_object('ladder', p_ladder, 'drop', 'kakapo', 'rare', '[]'::jsonb, 'landmarks', '[]'::jsonb,
       'milestone', null, 'prs', '[]'::jsonb),
-    'stickers', '[]'::jsonb, 'records', '[]'::jsonb,
+    'stickers', p_stickers, 'records', '[]'::jsonb,
     'stats', jsonb_build_object('workouts', 4, 'streak', 1, 'best_streak', 1, 'journey_week', 1, 'pr_count', 0,
       'lifetime_volume_kg', 100))
   from public.workout_logs l where l.id = p_log;
 $$;
-create function pg_temp.owned(p_client uuid, p_ws uuid) returns bigint language sql as $$
-  select coalesce(sum(count), 0) from public.sticker_awards where client_id = p_client and workspace_id = p_ws;
+create function pg_temp.recompute(p_log uuid, p_ladder jsonb) returns jsonb language sql as $$
+  select pg_temp.payload('recompute', p_log, p_ladder, '[]'::jsonb);
+$$;
+create function pg_temp.stickers(p_client uuid) returns table (sticker_key text, count int, shiny boolean)
+language sql as $$
+  select s.sticker_key, s.count, s.shiny from public.sticker_awards s where s.client_id = p_client order by 1;
 $$;
 
--- The same animal comes back: only its multiple follows the corrected volume.
+-- A workout keeps its animal forever: a recompute only refreshes the multiple, which may fall under 1.
 select is(public.apply_award(:'lb', pg_temp.recompute(:'lb',
-    '{"key": "goat", "multiple": 5.5, "isNew": false, "count": 3, "shiny": true}', 99)) #> '{result,ladder}',
+    '{"key": "goat", "multiple": 5.5, "isNew": false, "count": 3, "shiny": true}')) #> '{result,ladder}',
   '{"key": "goat", "multiple": 5.5, "isNew": true, "count": 1, "shiny": false}'::jsonb,
   'a kept animal keeps its card and takes the new multiple');
-select results_eq(format($q$select sticker_key, count, shiny from public.sticker_awards where client_id = %L and workspace_id = %L order by 1$q$, :'c1', :'ws'),
+select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', '{"key": "goat", "multiple": 0.4}')) #> '{result,ladder,multiple}',
+  '0.4'::jsonb, 'a correction below the animal keeps it, with a multiple under 1');
+select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', '{"key": "rabbit", "multiple": 20}')) #> '{result,ladder}',
+  '{"key": "goat", "multiple": 0.4, "isNew": true, "count": 1, "shiny": false}'::jsonb,
+  'a different animal sent on a recompute is ignored');
+select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', 'null')) #>> '{result,ladder,key}', 'goat',
+  'so is no animal');
+select results_eq(format($q$select * from pg_temp.stickers(%L)$q$, :'c1'),
   $q$values ('cat', 1, false), ('goat', 2, false), ('koala', 1, true)$q$, 'and the stickers are untouched');
-
--- A different animal from a stale sticker count is refused.
-select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', '{"key": "rabbit", "multiple": 20}', 99)) ->> 'status',
-  'conflict', 'a swap worked out from an old sticker count is refused');
-select is((select result #>> '{ladder,key}' from public.awards where log_id = :'lb'), 'goat', 'and changes nothing');
-
--- Swap to a new animal: the old one loses one (goat 2 -> 1), the new one is added, not shiny.
-select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', '{"key": "rabbit", "multiple": 20, "shiny": true}',
-    pg_temp.owned(:'c1', :'ws'))) -> 'result',
-  '{"ladder": {"key": "rabbit", "multiple": 20, "isNew": true, "count": 1, "shiny": false}, "drop": null, "rare": [], "landmarks": [], "milestone": null, "prs": []}'::jsonb,
-  'a swap stores the re-picked animal as new, with no roll');
-select results_eq(format($q$select sticker_key, count, shiny, first_log_id from public.sticker_awards where client_id = %L and workspace_id = %L order by 1$q$, :'c1', :'ws'),
-  format($q$values ('cat', 1, false, %1$L::uuid), ('goat', 1, false, %2$L::uuid), ('koala', 1, true, %1$L::uuid), ('rabbit', 1, false, %2$L::uuid)$q$, :'la', :'lb'),
-  'the old animal loses one, the new one is added');
-
--- Swap to an animal already owned (shiny): its count goes up and the card shows it shiny. Rabbit at 1 stays.
-select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', '{"key": "koala", "multiple": 4.4}',
-    pg_temp.owned(:'c1', :'ws'))) #> '{result,ladder}',
-  '{"key": "koala", "multiple": 4.4, "isNew": false, "count": 2, "shiny": true}'::jsonb,
-  'a swap to an owned animal counts it again');
-select is((select count from public.sticker_awards where client_id = :'c1' and workspace_id = :'ws' and sticker_key = 'rabbit'),
-  1, 'a sticker is never taken away: the last one stays');
-
--- Swap to nothing (the volume fell below a rabbit): no animal on the card, the zoo book keeps koala x1.
-select is(public.apply_award(:'lb', pg_temp.recompute(:'lb', 'null', pg_temp.owned(:'c1', :'ws'))) #> '{result,ladder}',
-  'null'::jsonb, 'a volume below every animal leaves the card without one');
-select is((select count from public.sticker_awards where client_id = :'c1' and workspace_id = :'ws' and sticker_key = 'koala'),
-  1, 'and the old animal loses one');
 select is((select result -> 'drop' from public.awards where log_id = :'lb'), 'null'::jsonb,
   'a recompute never rolls a drop');
 
--- From no animal to one (a log corrected up from nothing): the animal is added.
-select is(public.apply_award(:'lc', pg_temp.recompute(:'lc', '{"key": "corgi", "multiple": 1.5}',
-    pg_temp.owned(:'c1', :'ws'))) #>> '{result,ladder,key}', 'corgi', 'a log corrected up earns an animal');
+-- A log with no animal that is corrected up gets one, once.
+select is(public.apply_award(:'lc', pg_temp.recompute(:'lc', '{"key": "corgi", "multiple": 1.5, "shiny": true}')) #> '{result,ladder}',
+  '{"key": "corgi", "multiple": 1.5, "isNew": true, "count": 1, "shiny": false}'::jsonb,
+  'a log corrected up from nothing earns an animal, with no roll');
+select is(public.apply_award(:'lc', pg_temp.recompute(:'lc', '{"key": "rabbit", "multiple": 9}')) #>> '{result,ladder,key}',
+  'corgi', 'and keeps it after that');
 select is((select count from public.sticker_awards where client_id = :'c1' and workspace_id = :'ws' and sticker_key = 'corgi'),
-  1, 'added to the zoo book');
+  1, 'added to the zoo book once');
+
+-- The database holds one animal per log and never lets it change.
+select results_eq(format($q$select log_id, ladder_sticker_key from public.awards where log_id in (%L, %L, %L) order by 2$q$,
+    :'la', :'lb', :'lc'),
+  format($q$values (%L::uuid, 'cat'), (%L::uuid, 'corgi'), (%L::uuid, 'goat')$q$, :'la', :'lc', :'lb'),
+  'awards record the one animal granted per log');
+select throws_ok(format($q$update public.awards set result = jsonb_set(result, '{ladder,key}', '"hippo"') where log_id = %L$q$, :'lb'),
+  '23514', null, 'a log''s animal cannot be changed');
+select throws_ok(format($q$update public.awards set result = jsonb_set(result, '{ladder}', 'null') where log_id = %L$q$, :'lb'),
+  '23514', null, 'or taken away');
+
+-- The whole life of one workout: finish (and a retry), reopen and finish again, then a coach correction.
+-- Exactly one ladder sticker in total.
+select tests.create_user('lp-3@t.local', 'Client 3') as c3 \gset
+select tests.add_client(:'ws', :'c3');
+select tests.create_log(:'ws', :'c3') as le \gset
+select is(public.apply_award(:'le', pg_temp.payload('award', :'le', '{"key": "rabbit", "multiple": 240, "isNew": true, "count": 1, "shiny": false}',
+    '[{"key": "rabbit", "shiny": false}, {"key": "chichen-itza", "shiny": false}]')) ->> 'status', 'awarded', 'finish: awarded');
+select is(public.apply_award(:'le', pg_temp.payload('award', :'le', '{"key": "rabbit", "multiple": 240}',
+    '[{"key": "rabbit", "shiny": false}]')) ->> 'status', 'existing', 'the retry returns the same award');
+update public.workout_logs set status = 'in_progress', finished_at = null where id = :'le';
+update public.workout_logs set status = 'completed', finished_at = now(), revision = revision + 1 where id = :'le';
+select is(public.apply_award(:'le', pg_temp.payload('award', :'le', '{"key": "cat", "multiple": 130}',
+    '[{"key": "cat", "shiny": true}]')) #> '{result,ladder}',
+  '{"key": "rabbit", "multiple": 240, "isNew": true, "count": 1, "shiny": false}'::jsonb,
+  're-finished: the animal stays');
+select is(public.apply_award(:'le', pg_temp.recompute(:'le', '{"key": "horse", "multiple": 1.1}')) #>> '{result,ladder,key}',
+  'rabbit', 'corrected: the animal stays');
+select results_eq(format($q$select * from pg_temp.stickers(%L)$q$, :'c3'),
+  $q$values ('chichen-itza', 1, false), ('rabbit', 1, false)$q$,
+  'one ladder sticker in total for the workout, whatever happened to it');
 
 -- The other workspace and the other client are untouched.
 select is((select count(*)::int from public.sticker_awards where client_id = :'c1' and workspace_id = :'ws_b'), 0,
