@@ -128,11 +128,17 @@ rejected copy). Chosen approach, the safest of "wait", "merge on the server" and
   now) and with a higher revision, as any save. The answer is `{ applied: true, ..., loggedByOther: true }`, the
   coach's 20 minutes still count from the take over, and `taken_over_from` is cleared by any applied save. So the
   final save can never overwrite anything the coach did: once the coach has saved, the phone is refused as before.
+- The final save is stored 1000 above the take over's revision (like hand back and reclaim). The coach's page counts
+  its own revisions up from the take over's, so without the jump two coach edits could outrank one phone edit and
+  the coach's save would replace the whole log, dropping the client's set. With it the coach's save is always stale.
+- A second take over before anyone saved (coach B from coach A, who changed nothing) keeps `taken_over_from` on the
+  first holder, so the client's unsent sets keep their final save.
 - The phone already uploads before it adopts: when it hears of the take over (Realtime, the open/foreground check, or
   a save's answer) `refreshFromServer` sends its copy first (`sync.recheck`). On `applied` + `loggedByOther`, log-sync
   marks it saved, then adopts the server copy and shows the banner (no "sets replaced" note: nothing was lost).
 - The coach's page: its next save is then stale. It loads the server copy (with the client's sets) and re-applies its
   own unsaved edits on top (`rebaseEdits` in `packages/shared`, the same shared operations by set id), then saves.
+  A tick or untick is decided when the coach clicks, so a set the client ticked meanwhile is never toggled off.
   The session note and exercise notes are refreshed from the server copy too, unless the coach is typing a session
   note, so an old note never overwrites a newer one.
 - Left over: if the coach saves before the phone's upload arrives (the phone offline for a while), the phone's sets
