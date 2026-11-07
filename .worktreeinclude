@@ -1,0 +1,6 @@
+# Git-ignored files Claude Code copies into each new worktree it creates (.gitignore syntax).
+# Only local, non-secret config belongs here. Never list a file that can hold a real key: no apps/*/.env.local (the
+# mobile one can point at staging), no .env, no service-role or API keys. Regenerate those per worktree instead:
+#   pnpm --filter web env:local   and   pnpm --filter mobile env:local
+# Edge Function settings for local Supabase (site URL, sender, local mail catcher; see .env.example).
+supabase/functions/.env
