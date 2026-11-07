@@ -9,17 +9,25 @@ export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
-  // Two workers, as on the GitHub runner. More than that exhausts the local auth container's outgoing ports (each auth
-  // request opens a new database connection, which then sits in TIME_WAIT), and sign-ins fail with "Database error".
-  workers: 2,
+  // Locally: two workers. More than that exhausts the local auth container's outgoing ports on a Mac (each auth request
+  // opens a new database connection, which then sits in TIME_WAIT), and sign-ins fail with "Database error". CI runs
+  // on GitHub-hosted Linux, shards the suite over 4 jobs (each with its own Supabase) and signs in once per run, so it
+  // can use E2E_WORKERS (set in .github/workflows/ci.yml).
+  workers: Number(process.env.E2E_WORKERS ?? 2),
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
-  reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // CI writes a blob report per shard; the e2e-report job merges them into one HTML report.
+  reporter: isCI ? [['list'], ['blob']] : 'list',
   use: { baseURL, trace: 'retain-on-failure' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Signs the demo coach in once and saves the session for signInAsCoach() (e2e/helpers.ts).
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'] },
+  ],
   webServer: [
     {
-      command: isCI ? `pnpm exec next build && pnpm exec next start -p ${port}` : `pnpm exec next dev -p ${port}`,
+      // CI builds the app in its own step first (cached), so here it only starts it.
+      command: isCI ? `pnpm exec next start -p ${port}` : `pnpm exec next dev -p ${port}`,
       url: `${baseURL}/sign-in`,
       reuseExistingServer: !isCI,
       timeout: 180_000,

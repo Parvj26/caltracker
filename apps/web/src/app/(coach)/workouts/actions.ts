@@ -38,7 +38,7 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   revalidatePath('/workouts');
   revalidatePath(`/workouts/${data}`);
   // A client's copy shows on their calendar and in its editor.
-  revalidatePath('/clients/[clientId]', 'page');
+  revalidatePath('/clients/[clientId]', 'layout');
   revalidatePath('/clients/[clientId]/workouts/[workoutId]', 'page');
   return { ok: true, id: data };
 }
@@ -99,7 +99,7 @@ export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: 
 
   revalidatePath('/workouts');
   revalidatePath('/programs', 'layout');
-  revalidatePath('/clients/[clientId]', 'page');
+  revalidatePath('/clients/[clientId]', 'layout');
   return { ok: true };
 }
 

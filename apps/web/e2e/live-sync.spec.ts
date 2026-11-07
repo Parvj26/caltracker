@@ -56,7 +56,7 @@ async function addSlot(page: Page, week: number, day: number, workoutName: strin
 
 /** The calendar item for `name` on `date` (opening that date's month). */
 async function calendarItem(page: Page, client: string, date: string, name: string) {
-  await page.goto(`/clients/${client}?month=${date.slice(0, 7)}`);
+  await page.goto(`/clients/${client}/training?month=${date.slice(0, 7)}`);
   return page.locator(`[data-date="${date}"]`).locator('li').filter({ hasText: name });
 }
 
@@ -82,7 +82,7 @@ test('Live Sync on: program edits reach the client calendar, tagged Live; off: t
   await expect(status(page)).toHaveText('Live Sync off');
 
   // Assign it from next Monday.
-  await page.goto(`/clients/${client}`);
+  await page.goto(`/clients/${client}/training`);
   const today = await browserToday(page);
   const monday = addDays(today, 8 - weekday(today));
   await page.getByRole('button', { name: 'Assign program' }).click();
