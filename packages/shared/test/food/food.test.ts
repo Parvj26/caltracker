@@ -145,9 +145,12 @@ describe('mealProblems', () => {
 });
 
 describe('mealPhotoPaths', () => {
-  it('puts the photo in the client folder of the workspace, named by the meal', () => {
-    expect(mealPhotoPaths('ws', 'me', 'meal', 'webp')).toEqual({ path: 'ws/me/meal.webp', thumbPath: 'ws/me/meal-thumb.webp' });
-    expect(mealPhotoPaths('ws', 'me', 'meal', 'jpg').thumbPath).toBe('ws/me/meal-thumb.jpg');
+  it('puts the photo in the client folder of the workspace, named by the meal and the photo', () => {
+    expect(mealPhotoPaths('ws', 'me', 'meal', 'p1', 'webp')).toEqual({ path: 'ws/me/meal-p1.webp', thumbPath: 'ws/me/meal-p1-thumb.webp' });
+    expect(mealPhotoPaths('ws', 'me', 'meal', 'p1', 'jpg').thumbPath).toBe('ws/me/meal-p1-thumb.jpg');
+  });
+  it('gives a replacement photo different files from the one it replaces', () => {
+    expect(mealPhotoPaths('ws', 'me', 'meal', 'p2', 'webp').path).not.toBe(mealPhotoPaths('ws', 'me', 'meal', 'p1', 'webp').path);
   });
 });
 

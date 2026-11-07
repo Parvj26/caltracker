@@ -77,6 +77,25 @@ export async function moveClientWorkout(input: { workoutId: string; date: IsoDat
   return { ok: true };
 }
 
+/**
+ * Whether a calendar workout with this id exists (under RLS, in the coach's workspace). The calendar asks after an add
+ * that got no clear answer, so a save that did land is kept instead of being added again.
+ */
+export async function clientWorkoutExists(workoutId: string): Promise<boolean> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(workoutId)) return false;
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('id', workoutId)
+    .eq('workspace_id', workspaceId)
+    .not('client_id', 'is', null)
+    .maybeSingle();
+  if (error) throw new Error(`Could not check the workout: ${error.message}`);
+  return data !== null;
+}
+
 /** Deletes one calendar workout (never a library workout). Throws on failure; one that is already gone is fine. */
 export async function deleteClientWorkout(workoutId: string): Promise<void> {
   const { workspaceId } = await requireCoach();

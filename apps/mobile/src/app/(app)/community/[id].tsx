@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { COMMENT_BODY_MAX, CommentInput, postAge, withoutBlocked } from '@caltracker/shared';
 import { LinkedText } from '@/components/community/parts';
 import { PostItem, useContentMenu, type PostContext } from '@/components/community/post-item';
+import { useReactions } from '@/components/community/reactions';
 import { usePostMedia } from '@/components/community/use-post-media';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { addComment, deleteComment, loadComments, loadPost, type FeedComment, type FeedPost } from '@/lib/community-api';
@@ -54,7 +55,7 @@ export default function PostScreen() {
           // Deletes arrive as an update of the community row.
           { table: 'communities', filter: `id=eq.${community.id}` },
           { table: 'community_comments', filter: `post_id=eq.${id}` },
-          { table: 'community_likes', filter: `post_id=eq.${id}` },
+          { table: 'community_reactions', filter: `post_id=eq.${id}` },
           { table: 'community_posts', filter: `id=eq.${id}` },
         ]
       : [],
@@ -119,26 +120,15 @@ export default function PostScreen() {
           </Text>
           {visibleComments.length === 0 ? <Text style={text('caption')}>No comments yet.</Text> : null}
           {visibleComments.map((c) => (
-            <View key={c.id} style={[styles.comment, { borderRadius: radius.input, padding: space[3], gap: space[1] }]} testID={`comment-${c.id}`}>
-              <View style={styles.row}>
-                <Text style={[text('sectionHeading'), styles.flex]}>
-                  {c.authorName}
-                  {coaches.has(c.authorId) ? ' · Coach' : ''}
-                </Text>
-                <Pressable
-                  testID="comment-menu"
-                  accessibilityRole="button"
-                  accessibilityLabel={`More options for ${c.authorName}’s comment`}
-                  hitSlop={8}
-                  onPress={() => menu.open({ kind: 'comment', id: c.id, authorId: c.authorId, authorName: c.authorName, onDelete: () => deleteComment(c.id) })}
-                  style={({ pressed }) => [styles.menuButton, pressed && { opacity: pressedOpacity }]}
-                >
-                  <Text style={text('body')}>•••</Text>
-                </Pressable>
-              </View>
-              <LinkedText text={c.body} />
-              <Text style={text('caption')}>{postAge(c.createdAt, now)}</Text>
-            </View>
+            <CommentItem
+              key={c.id}
+              comment={c}
+              me={me}
+              isCoach={coaches.has(c.authorId)}
+              now={now}
+              onChanged={() => void load()}
+              onMenu={() => menu.open({ kind: 'comment', id: c.id, authorId: c.authorId, authorName: c.authorName, onDelete: () => deleteComment(c.id) })}
+            />
           ))}
           <TextInput
             testID="comment-input"
@@ -157,6 +147,55 @@ export default function PostScreen() {
       ) : null}
       {menu.element}
     </Screen>
+  );
+}
+
+/** One comment: press and hold (or "+") to react. */
+function CommentItem({
+  comment: c,
+  me,
+  isCoach,
+  now,
+  onChanged,
+  onMenu,
+}: {
+  comment: FeedComment;
+  me: string;
+  isCoach: boolean;
+  now: number;
+  onChanged: () => void;
+  onMenu: () => void;
+}) {
+  const { text, space, radius } = useTheme();
+  const reactions = useReactions({ target: { commentId: c.id }, rows: c.reactions, me, onChanged });
+  return (
+    <Pressable
+      accessible={false}
+      onLongPress={reactions.openPicker}
+      style={[styles.comment, { borderRadius: radius.input, padding: space[3], gap: space[1] }]}
+      testID={`comment-${c.id}`}
+    >
+      <View style={styles.row}>
+        <Text style={[text('sectionHeading'), styles.flex]}>
+          {c.authorName}
+          {isCoach ? ' · Coach' : ''}
+        </Text>
+        <Pressable
+          testID="comment-menu"
+          accessibilityRole="button"
+          accessibilityLabel={`More options for ${c.authorName}’s comment`}
+          hitSlop={8}
+          onPress={onMenu}
+          style={({ pressed }) => [styles.menuButton, pressed && { opacity: pressedOpacity }]}
+        >
+          <Text style={text('body')}>•••</Text>
+        </Pressable>
+      </View>
+      <LinkedText text={c.body} />
+      <Text style={text('caption')}>{postAge(c.createdAt, now)}</Text>
+      {reactions.bar}
+      {reactions.picker}
+    </Pressable>
   );
 }
 

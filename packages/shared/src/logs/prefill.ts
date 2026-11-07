@@ -1,4 +1,4 @@
-import { TARGET_FIELDS } from '../workouts/targets';
+import { targetFieldsFor } from '../workouts/targets';
 import type { ResultSet } from './format';
 import type { ActualPatch } from './ops';
 import type { LogExerciseDoc, LogSetDoc } from './schema';
@@ -119,7 +119,7 @@ export function resolveSetValues(
 ): SetValues {
   const index = ex.sets.findIndex((s) => s.id === setId);
   if (index < 0) return { ...EMPTY_VALUES };
-  const tracked = TARGET_FIELDS[ex.trackingType];
+  const tracked = targetFieldsFor(ex.trackingType);
   const out: SetValues = { ...EMPTY_VALUES };
   for (const f of FIELDS) {
     if (tracked.includes(TRACK_KEY[f])) out[f] = resolveField(ex.sets, index, f, lastTime);

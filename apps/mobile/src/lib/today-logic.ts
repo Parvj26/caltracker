@@ -1,6 +1,6 @@
 // What the cards on the Today tab say, worked out from data other screens already load. Pure (no network, no React),
 // so it is unit tested. PR, unit, sticker and body rules come from @caltracker/shared; this file only arranges them.
-import { STICKERS, addDays, cardText, dayLabel, isoWeekday, localDateOf, type IsoDate, type Units } from '@caltracker/shared';
+import { STICKERS, addDays, cardText, dayLabel, isoWeekday, localDateOf, topReactionsLine, type IsoDate, type Units } from '@caltracker/shared';
 import type { AlbumAward } from './album-logic';
 import { clockTime } from './chat-format';
 import type { FeedPost } from './community-api';
@@ -58,7 +58,7 @@ export type PostPreview = {
   id: string;
   author: string;
   snippet: string;
-  /** "❤️ 1 · 1 comment", or '' with neither. */
+  /** The top reactions and the comment count, e.g. "❤️ 2 · 🔥 1 · 1 comment"; '' with neither. */
   stats: string;
   /** The first photo's thumbnail path, if any. */
   thumbPath: string | null;
@@ -78,8 +78,7 @@ export function postPreview(post: FeedPost, ctx: { me: string; coaches: Readonly
   const cardLine = card ? (card.badge && post.card?.kind === 'workout' ? `${card.badge} · ${card.title}` : card.title) : null;
   const snippet = body || (cardLine ?? (post.images.length > 0 ? 'Shared a photo' : ''));
   const author = mine ? 'You' : ctx.coaches.has(post.authorId) ? `${post.authorName} · Coach` : post.authorName;
-  const likes = post.likerIds.length;
-  const stats = [likes > 0 ? `❤️ ${likes}` : null, post.commentCount > 0 ? plural(post.commentCount, 'comment') : null]
+  const stats = [topReactionsLine(post.reactions) || null, post.commentCount > 0 ? plural(post.commentCount, 'comment') : null]
     .filter(Boolean)
     .join(' · ');
   return { id: post.id, author, snippet, stats, thumbPath: post.images[0]?.thumbPath ?? null, stickerKey: card?.stickerKey ?? null };

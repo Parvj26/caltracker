@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, TRACKING_TYPE_LABELS, hasTargets, setLabels, setShowsRest } from '@caltracker/shared';
+import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, trackingTypeLabel, hasTargets, setLabels, setShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { gridTemplate, setColumns } from './set-columns';
@@ -108,7 +108,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
       <header className={styles.blockHeader}>
         <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
         <TitleTag id={headingId} className={styles.blockTitle}>{title}</TitleTag>
-        {!multi ? <span className={styles.caption}>{TRACKING_TYPE_LABELS[first.trackingType]}</span> : null}
+        {!multi ? <span className={styles.caption}>{trackingTypeLabel(first.trackingType)}</span> : null}
         <div className={styles.blockTools}>
           {!multi ? (
             <button type="button" className={styles.smallButton} onClick={() => actions.onSwap(first.id)}>
@@ -187,7 +187,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
             {multi ? (
               <div className={styles.exerciseHeader}>
                 <ExerciseTag className={styles.exerciseName}>{ex.exerciseName}</ExerciseTag>
-                <span className={styles.caption}>{TRACKING_TYPE_LABELS[ex.trackingType]}</span>
+                <span className={styles.caption}>{trackingTypeLabel(ex.trackingType)}</span>
                 <div className={styles.blockTools}>
                   <button type="button" className={styles.smallButton} onClick={() => actions.onSwap(ex.id)}>
                     Swap exercise

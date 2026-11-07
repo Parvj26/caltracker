@@ -19,7 +19,8 @@ create table public.meals (
   protein_g numeric(5, 1) check (protein_g between 0 and 1000),
   carbs_g numeric(5, 1) check (carbs_g between 0 and 1000),
   fat_g numeric(5, 1) check (fat_g between 0 and 1000),
-  -- {workspace_id}/{client_id}/{id}.{webp|jpg} and {…}-thumb.{same ext} in the meal-photos bucket.
+  -- {workspace_id}/{client_id}/{id}-{photo id}.{webp|jpg} and {…}-thumb.{same ext} in the meal-photos bucket. Each photo
+  -- has its own id, so a replaced photo gets new files (uploads never overwrite) and the old ones are deleted.
   photo_path text,
   photo_thumb_path text,
   -- The stored photo's size (at most 1600 px on the long edge), so the coach page reserves its shape.
@@ -31,7 +32,8 @@ create table public.meals (
   check ((photo_path is null) = (photo_thumb_path is null)),
   check ((photo_width is null) = (photo_height is null)),
   check (photo_path is null
-    or photo_path ~ ('^' || workspace_id::text || '/' || client_id::text || '/' || id::text || '\.(webp|jpg)$')),
+    or photo_path ~ ('^' || workspace_id::text || '/' || client_id::text || '/' || id::text
+      || '-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(webp|jpg)$')),
   check (photo_thumb_path is null
     or photo_thumb_path = regexp_replace(photo_path, '\.(webp|jpg)$', '-thumb.\1')),
   -- A meal is a photo, macros, or both (a note alone is not a meal).
@@ -147,14 +149,14 @@ create policy nutrition_targets_update on public.nutrition_targets for update to
   with check (public.is_coach_of(workspace_id) and public.is_client_in(workspace_id, client_id));
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Storage: meal-photos, {workspace}/{client}/{meal}.{webp|jpg} and {meal}-thumb.{ext}. The client uploads and
+-- Storage: meal-photos, {workspace}/{client}/{meal}-{photo}.{webp|jpg} and {meal}-{photo}-thumb.{ext}. The client uploads and
 -- deletes in their own folder while a client of the workspace; the coach of the workspace and the client read.
 -- False (never an error) for anything malformed.
 -- ---------------------------------------------------------------------------------------------------------------
 create function public.can_access_meal_photo(p_name text, p_write boolean) returns boolean
 language sql stable security definer set search_path = '' as $$
   select case
-    when p_name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(-thumb)?\.(webp|jpg)$'
+    when p_name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(-thumb)?\.(webp|jpg)$'
     then
       (split_part(p_name, '/', 2) = (select auth.uid())::text
         and public.is_client_in(split_part(p_name, '/', 1)::uuid, (select auth.uid())))
