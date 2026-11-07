@@ -1,15 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-
-async function signInAsCoach(page: Page) {
-  await page.goto('/sign-in');
-  await page.getByLabel('Email').fill('coach@demo.local');
-  await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/home$/);
-  await page.goto('/clients');
-}
+import { signInAsCoach } from './helpers';
 
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
