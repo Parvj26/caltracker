@@ -153,6 +153,8 @@ export {
   nextMonday,
   workoutClashes,
 } from './programs/assign-targets';
+export { PICKER_HINT_SIZE, pickerSections, workoutHints } from './programs/picker-hints';
+export type { WorkoutHints } from './programs/picker-hints';
 export { isLiveWorkout, liveSyncStatus, liveSyncWindow, planLiveSync } from './programs/live-sync';
 export type { LiveSyncAssignment, LiveSyncCopy, LiveSyncPlan, LiveSyncSlot } from './programs/live-sync';
 export type { ProgramClash } from './programs/clashes';
