@@ -18,6 +18,7 @@
 //   log-notes          the workout note of EMAIL's latest log, lines joined with " | " (returned as output.call)
 //   cleanup-logs       deletes every workout log of client@demo.local, and the stickers, personal bests and stats
 //                      they earned (refuses any other EMAIL)
+//   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);

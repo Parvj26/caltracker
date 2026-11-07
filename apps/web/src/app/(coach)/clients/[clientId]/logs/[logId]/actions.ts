@@ -107,7 +107,7 @@ export async function correctLog(input: { logId: string; sets: SetCorrection[] }
   }
   // The correction is saved. Recompute the client's bests and totals from the corrected sets (stickers stay as they were).
   await recomputeAward(supabase, input.logId);
-  revalidatePath('/clients/[clientId]', 'page');
+  revalidatePath('/clients/[clientId]', 'layout');
   revalidatePath('/activity');
   refresh();
   return { ok: true };

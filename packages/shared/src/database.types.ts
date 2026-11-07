@@ -102,6 +102,152 @@ export type Database = {
           },
         ]
       }
+      body_measurement_values: {
+        Row: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Insert: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Update: {
+          measurement_id?: string
+          metric_key?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurement_values_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "body_measurements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      body_measurements: {
+        Row: {
+          attachment_path: string | null
+          client_id: string
+          created_at: string
+          entered_by: string | null
+          id: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          client_id: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Update: {
+          attachment_path?: string | null
+          client_id?: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on?: string
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_documents: {
+        Row: {
+          client_id: string
+          content_type: string
+          created_at: string
+          id: string
+          name: string
+          shared_with_client: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          name: string
+          shared_with_client?: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          name?: string
+          shared_with_client?: boolean
+          size_bytes?: number
+          storage_path?: string
+          uploaded_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_goals: {
+        Row: {
+          client_id: string
+          goal: string
+          target_date: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          goal: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          goal?: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_goals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -158,6 +304,73 @@ export type Database = {
           },
         ]
       }
+      client_limitations: {
+        Row: {
+          body: string
+          client_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          client_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_limitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_stats: {
         Row: {
           best_streak: number
@@ -198,6 +411,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_stats_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_metrics: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          max: number
+          min: number
+          name: string
+          unit_label: string
+          workspace_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max: number
+          min: number
+          name: string
+          unit_label?: string
+          workspace_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max?: number
+          min?: number
+          name?: string
+          unit_label?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_metrics_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1391,6 +1645,8 @@ export type Database = {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
       }
+      document_path_client: { Args: { name: string }; Returns: string }
+      document_path_workspace: { Args: { name: string }; Returns: string }
       duplicate_program: {
         Args: { p_name: string; p_new_id: string; p_program_id: string }
         Returns: string
@@ -1469,6 +1725,13 @@ export type Database = {
           set_type: Database["public"]["Enums"]["set_type"]
         }[]
       }
+      latest_coach_scans: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_id: string
+          measured_on: string
+        }[]
+      }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
@@ -1503,11 +1766,14 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      save_body_measurement: { Args: { p: Json }; Returns: string }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
       }
       save_workout_log: { Args: { p_doc: Json }; Returns: Json }
+      scan_path_client: { Args: { name: string }; Returns: string }
+      scan_path_workspace: { Args: { name: string }; Returns: string }
       schedule_workout: {
         Args: {
           p_client_id: string
