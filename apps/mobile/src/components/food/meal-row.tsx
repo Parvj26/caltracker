@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MACRO_KEYS, MACRO_SHORT, formatMacro, formatMealTime, photoDisplaySize } from '@caltracker/shared';
+import { formatMealTime, mealMacroLine, photoDisplaySize } from '@caltracker/shared';
 import { SharpPhoto } from '@/components/photo/sharp-photo';
 import type { ShownMeal } from '@/lib/food-logic';
 import { photoUri } from '@/lib/outbox-files';
@@ -7,13 +7,6 @@ import { palette, pressedOpacity, radius, space } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const THUMB = 72;
-
-/** "650 kcal · P 42 g · C 80 g" (only what was entered). */
-export function macroLine(meal: ShownMeal): string {
-  return MACRO_KEYS.filter((k) => meal.macros[k] !== null)
-    .map((k) => (k === 'calories' ? formatMacro(k, meal.macros[k]!) : `${MACRO_SHORT[k]} ${formatMacro(k, meal.macros[k]!)}`))
-    .join(' · ');
-}
 
 /** One meal in the day's list: its photo (whole, never cropped), name and time, macros and note. Tap to edit. */
 export function MealRow({ meal, urls, onPress }: { meal: ShownMeal; urls: Record<string, string>; onPress: () => void }) {
@@ -24,7 +17,7 @@ export function MealRow({ meal, urls, onPress }: { meal: ShownMeal; urls: Record
   const size = photoDisplaySize(meal.photo ? { width: meal.photo.width, height: meal.photo.height } : null, { maxWidth: THUMB, maxHeight: THUMB });
   const title = meal.name ?? 'Meal';
   const time = formatMealTime(meal.eatenAt);
-  const macros = macroLine(meal);
+  const macros = mealMacroLine(meal.macros);
   const status = meal.pending === 'failed' ? "Didn't save" : meal.pending === 'sending' ? 'Saving…' : null;
   return (
     <Pressable

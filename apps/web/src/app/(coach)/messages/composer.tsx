@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { MAX_PHOTOS } from '@caltracker/shared';
+import { canSendDraft } from './model';
 import styles from './messages.module.css';
 
 export type Draft = { body: string; files: File[] };
@@ -10,9 +11,12 @@ type Photo = { file: File; url: string };
 
 const BODY_MAX = 4000;
 
-/** The reply box: Enter sends, Shift+Enter adds a line, 📎 adds up to 4 photos shown as removable thumbnails. */
-export function Composer({ onSend }: { onSend: (draft: Draft) => void }) {
-  const [body, setBody] = useState('');
+/**
+ * The reply box: Enter sends, Shift+Enter adds a line, 📎 adds up to 4 photos shown as removable thumbnails.
+ * `initialBody` starts the box with text (and focuses it at the end), e.g. "Reply about this meal" from the Food tab.
+ */
+export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) => void; initialBody?: string | undefined }) {
+  const [body, setBody] = useState(initialBody.slice(0, BODY_MAX));
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -23,8 +27,16 @@ export function Composer({ onSend }: { onSend: (draft: Draft) => void }) {
   });
   // Object URLs are released when the box goes away.
   useEffect(() => () => latestPhotos.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
+  // A pre-filled reply is ready to type into: focus it with the caret after the text.
+  const startsFilled = useRef(initialBody !== '');
+  useEffect(() => {
+    const el = area.current;
+    if (!startsFilled.current || !el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
-  const canSend = body.trim() !== '' || photos.length > 0;
+  const canSend = canSendDraft(body, photos.length, initialBody);
 
   function grow() {
     const el = area.current;

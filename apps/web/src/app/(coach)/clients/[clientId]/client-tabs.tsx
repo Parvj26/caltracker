@@ -9,6 +9,7 @@ export const CLIENT_TABS = [
   { segment: null, path: '', label: 'Overview' },
   { segment: 'training', path: '/training', label: 'Training' },
   { segment: 'body', path: '/body', label: 'Body' },
+  { segment: 'food', path: '/food', label: 'Food' },
   { segment: 'documents', path: '/documents', label: 'Documents' },
   { segment: 'settings', path: '/settings', label: 'Settings' },
 ] as const;

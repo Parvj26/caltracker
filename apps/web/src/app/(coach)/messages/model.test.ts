@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeText, buildInbox, filterInbox, previewOf } from './model';
+import { badgeText, buildInbox, canSendDraft, filterInbox, previewOf } from './model';
 
 const ME = 'coach';
 
@@ -77,5 +77,20 @@ describe('badgeText', () => {
   it('caps at 99+', () => {
     expect(badgeText(5)).toBe('5');
     expect(badgeText(100)).toBe('99+');
+  });
+});
+
+describe('canSendDraft', () => {
+  const start = 'About your Lunch today (12:15 pm): ';
+  it('needs text or a photo', () => {
+    expect(canSendDraft('  ', 0)).toBe(false);
+    expect(canSendDraft('hi', 0)).toBe(true);
+    expect(canSendDraft('', 1)).toBe(true);
+  });
+  it('refuses only the text the box was started with', () => {
+    expect(canSendDraft(start, 0, start)).toBe(false);
+    expect(canSendDraft(start.trim(), 0, start)).toBe(false);
+    expect(canSendDraft(`${start}nice!`, 0, start)).toBe(true);
+    expect(canSendDraft(start, 1, start)).toBe(true);
   });
 });

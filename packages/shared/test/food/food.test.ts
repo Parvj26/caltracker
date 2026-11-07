@@ -14,6 +14,7 @@ import {
   macroProgress,
   mealPhotoPaths,
   mealProblems,
+  mealMacroLine,
   mealReference,
   mealsByDay,
   parseMacroInput,
@@ -226,5 +227,13 @@ describe('todayFoodSummary', () => {
   });
   it('shows today’s food even before targets are set', () => {
     expect(todayFoodSummary({ ...totals(300, 0), mealCount: 1 }, null)).toEqual({ calories: '300 kcal', protein: '0 g protein' });
+  });
+});
+
+describe('mealMacroLine', () => {
+  it('lists only the entered macros, calories first', () => {
+    expect(mealMacroLine({ calories: 650, protein: 42, carbs: null, fat: 12.5 })).toBe('650 kcal · P 42 g · F 12.5 g');
+    expect(mealMacroLine({ calories: null, protein: null, carbs: 80, fat: null })).toBe('C 80 g');
+    expect(mealMacroLine({ calories: null, protein: null, carbs: null, fat: null })).toBe('');
   });
 });

@@ -72,3 +72,13 @@ export function filterInbox(rows: InboxRow[], opts: { unreadOnly: boolean; query
 
 /** "3", or "99+" past 99. */
 export const badgeText = (n: number): string => (n > 99 ? '99+' : String(n));
+
+/**
+ * Whether the reply box holds something to send: text or photos, and not only the text it was started with (a bare
+ * "About your Lunch today (12:15 pm): " from the Food tab says nothing yet).
+ */
+export function canSendDraft(body: string, photoCount: number, startedWith = ''): boolean {
+  if (photoCount > 0) return true;
+  const text = body.trim();
+  return text !== '' && text !== startedWith.trim();
+}

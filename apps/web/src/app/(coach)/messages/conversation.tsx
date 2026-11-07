@@ -39,6 +39,8 @@ type Props = {
   readOnly: boolean;
   /** Shown inside another page (no header, fixed height). */
   embedded?: boolean;
+  /** Text to start the reply box with (e.g. "About your Lunch on Tue 3 Nov (12:15 pm): " from the Food tab). */
+  initialBody?: string | undefined;
 };
 
 /** Short-lived signed URLs for private photos, renewed before they run out and when the window wakes up. */
@@ -139,7 +141,7 @@ function Bubble({
   );
 }
 
-export function Conversation({ conversationId, workspaceId, me, clientId, clientName, rows, theirReadAt: initialRead, readOnly, embedded = false }: Props) {
+export function Conversation({ conversationId, workspaceId, me, clientId, clientName, rows, theirReadAt: initialRead, readOnly, embedded = false, initialBody }: Props) {
   const supabase = useBrowserSupabase();
   const timeZone = useTimeZone();
   const [now, refreshNow] = useNow();
@@ -397,7 +399,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
           {readOnly ? "This client has been removed, so you can read the history but can't send new messages." : 'This conversation is not available.'}
         </p>
       ) : (
-        <Composer onSend={send} />
+        <Composer onSend={send} initialBody={initialBody} />
       )}
     </>
   );
