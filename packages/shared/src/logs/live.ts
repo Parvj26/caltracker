@@ -26,7 +26,7 @@ type Entry = { blockIndex: number; exercise: LogExerciseDoc | null };
 
 /** Every exercise being done, in log order; a pick-one group not yet picked is one entry with no exercise. */
 function entries(log: WorkoutLogDoc): Entry[] {
-  return log.blocks.flatMap((block, blockIndex) =>
+  return log.blocks.flatMap((block, blockIndex): Entry[] =>
     needsPick(block) ? [{ blockIndex, exercise: null }] : liveExercises(block).map(({ exercise }) => ({ blockIndex, exercise })),
   );
 }
