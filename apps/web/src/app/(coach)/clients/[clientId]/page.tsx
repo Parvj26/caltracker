@@ -49,7 +49,7 @@ export default async function ClientPage({
     supabase
       .from('workouts')
       .select(
-        'id, name, scheduled_on, assignment_id, customised_at, program_assignments(program_name, programs(live_sync)), workout_logs(id, finished_at)',
+        'id, name, scheduled_on, assignment_id, customised_at, program_assignments(program_name, programs(live_sync)), workout_logs(id, finished_at), started_logs:workout_logs(id)',
       )
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
@@ -57,6 +57,8 @@ export default async function ClientPage({
       .lte('scheduled_on', rangeEnd)
       // Completed logs of each planned workout (a discarded or in-progress one is left out), latest first.
       .eq('workout_logs.status', 'completed')
+      // Started or done (a discarded log doesn't count): Live Sync no longer changes it, so no "Live" tag.
+      .in('started_logs.status', ['in_progress', 'completed'])
       .order('finished_at', { ascending: false, referencedTable: 'workout_logs' })
       .order('scheduled_on')
       .order('created_at'),
@@ -143,6 +145,7 @@ export default async function ClientPage({
                   liveSync: {
                     programLive: w.program_assignments.programs?.live_sync ?? false,
                     customised: w.customised_at !== null,
+                    started: w.started_logs.length > 0,
                   },
                 }
               : {}),

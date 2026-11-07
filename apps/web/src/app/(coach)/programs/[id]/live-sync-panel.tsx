@@ -101,8 +101,9 @@ export function LiveSyncPanel({
         </button>
       </div>
       <p id={helpId} className={styles.caption}>
-        When on, changes to this program update the calendars of clients on it, from today on. Past days, workouts a
-        client has started or done, and workouts you edited for one client stay as they are.
+        When on, changes to this program update the calendars of clients on it: new workouts from today, changed or
+        removed ones from tomorrow. Past days, workouts a client has started or done, and workouts you edited or
+        deleted for one client stay as they are.
       </p>
       <p className={styles.liveSyncStatus} data-testid="live-sync-status">
         {liveSyncStatus(state, now ?? new Date(state.syncedAt ?? 0))}

@@ -36,8 +36,8 @@ export type CalendarItem = {
   logId?: string | null;
   /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
   addedByClient?: boolean;
-  /** From a program assignment: whether that program has Live Sync on and this copy was edited for the client. */
-  liveSync?: { programLive: boolean; customised: boolean };
+  /** From a program assignment: whether its program has Live Sync on, and this copy was edited or started. */
+  liveSync?: { programLive: boolean; customised: boolean; started: boolean };
 };
 
 type Props = {
@@ -235,7 +235,7 @@ function DayCell({
               live={
                 item.liveSync !== undefined &&
                 today !== null &&
-                isLiveWorkout({ ...item.liveSync, done: Boolean(item.logId), date }, today)
+                isLiveWorkout({ ...item.liveSync, date }, today)
               }
             />
             ),
