@@ -1,20 +1,32 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { COMMUNITY_BUCKET } from '@caltracker/shared';
 import { signedUrls, type FeedPost } from '@/lib/community-api';
 import { useSignedUrls } from './parts';
 
 const avatarThumb = (path: string) => path.replace(/avatar\.(webp|jpg)$/, 'avatar-thumb.$1');
 
-/** Signed links for the posts' thumbnails and authors' photos; the full photo is signed on tap. */
+/**
+ * Signed links for the posts' photos (full size, which the feed shows, and thumbnails, the placeholders) and the
+ * authors' photos. Links are kept and renewed only before they expire, so a re-render never reloads a photo.
+ */
 export function usePostMedia(posts: FeedPost[]) {
-  const thumbPaths = useMemo(() => posts.flatMap((p) => p.images.map((i) => i.thumbPath)), [posts]);
+  const photoPaths = useMemo(() => posts.flatMap((p) => p.images.flatMap((i) => [i.path, i.thumbPath])), [posts]);
   const avatarPaths = useMemo(
     () => [...new Set(posts.map((p) => p.authorAvatarPath).filter((x): x is string => Boolean(x)).map(avatarThumb))],
     [posts],
   );
-  const thumbs = useSignedUrls(COMMUNITY_BUCKET, thumbPaths);
+  const photos = useSignedUrls(COMMUNITY_BUCKET, photoPaths);
   const avatars = useSignedUrls('avatars', avatarPaths);
   const avatarUrl = useCallback((p: FeedPost) => (p.authorAvatarPath ? (avatars[avatarThumb(p.authorAvatarPath)] ?? null) : null), [avatars]);
-  const fullUrl = useCallback(async (path: string) => (await signedUrls(COMMUNITY_BUCKET, [path]).catch((): Record<string, string> => ({})))[path] ?? null, []);
-  return { thumbs, avatarUrl, fullUrl };
+  // Tapping a photo opens the link already made, or signs one if it isn't there yet.
+  const photosRef = useRef(photos);
+  useEffect(() => {
+    photosRef.current = photos;
+  });
+  const fullUrl = useCallback(
+    async (path: string) =>
+      photosRef.current[path] ?? (await signedUrls(COMMUNITY_BUCKET, [path]).catch((): Record<string, string> => ({})))[path] ?? null,
+    [],
+  );
+  return { photos, avatarUrl, fullUrl };
 }

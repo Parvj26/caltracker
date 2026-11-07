@@ -1,7 +1,7 @@
 import type { WorkoutLogDoc } from '../logs/schema';
 import { logVolumeKg } from '../logs/summary';
 import { journeyStep } from './streak';
-import { isQualifying, ladderAnimal } from './ladder';
+import { isQualifying, pickLadderAnimal } from './ladder';
 import { detectPrs } from './prs';
 import type { PersonalRecord } from './prs';
 import { milestoneFor, newRareFinds } from './rare';
@@ -17,6 +17,10 @@ export type AwardInput = {
   statsBefore: ClientStats;
   statsAfter: ClientStats;
   rng: Rng;
+  /** The ladder animals awarded for logs finished before this one, oldest first (ladderHistoryBefore). */
+  ladderHistory: readonly string[];
+  /** The animal already stored for this log: a workout keeps it forever, whatever the volume becomes. */
+  keepLadder?: string | null;
 };
 
 export type AwardResult = {
@@ -33,7 +37,7 @@ export function computeAward(i: AwardInput): AwardResult {
   const ownedKeys = new Set(i.owned.keys());
 
   let ladder: AwardResult['ladder'] = null;
-  const animal = ladderAnimal(logVolumeKg(i.log));
+  const animal = pickLadderAnimal(logVolumeKg(i.log), i.ladderHistory, i.log.id, i.keepLadder);
   if (animal) {
     const prev = i.owned.get(animal.sticker.key);
     const shiny = (prev?.shiny ?? false) || (qualifying && rollShiny(i.rng));

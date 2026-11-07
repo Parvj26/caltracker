@@ -9,7 +9,7 @@ import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-ca
 import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
 import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/stored-view';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
@@ -231,9 +231,6 @@ export function ClientCalendar({
         </div>
         {readOnly ? null : (
           <div className={styles.titleActions}>
-            <ButtonLink variant="secondary" href={`/messages/${client.id}`}>
-              Message
-            </ButtonLink>
             <Button variant="secondary" onClick={() => setAssigning(true)}>
               Assign program
             </Button>

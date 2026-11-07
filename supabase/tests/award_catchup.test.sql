@@ -120,10 +120,11 @@ select is(public.apply_award(:'l_recent', jsonb_set(:'award1'::jsonb, '{owned_to
   'an award worked out from an old sticker count is refused');
 select is((select count(*)::int from public.awards where log_id = :'l_recent'), 0, 'and writes nothing');
 
--- A recompute keeps stickers and rolls, replaces the PRs, the bests and the stats.
+-- A recompute keeps stickers and rolls, replaces the PRs, the bests and the stats. (The same animal comes back:
+-- a different one is a swap, tested in ladder_pick.test.sql.)
 select is(public.apply_award(:'l1', format($j${
   "mode": "recompute", "owned_total": 99, "history_version": "%3$s",
-  "award": {"ladder": {"key": "hippo"}, "drop": "kakapo", "rare": [], "landmarks": [], "milestone": null, "prs": [{"kind": "e1rm"}]},
+  "award": {"ladder": {"key": "goat"}, "drop": "kakapo", "rare": [], "landmarks": [], "milestone": null, "prs": [{"kind": "e1rm"}]},
   "stickers": [{"key": "hippo", "shiny": true}],
   "records": [{"exercise_id": "%1$s", "kind": "heaviest", "value_kg": 55, "reps": 8, "log_id": "%2$s", "achieved_at": "2026-11-05T10:00:00Z"}],
   "stats": {"workouts": 1, "streak": 1, "best_streak": 1, "journey_week": 1, "pr_count": 1, "lifetime_volume_kg": 440}

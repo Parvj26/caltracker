@@ -1,0 +1,27 @@
+{
+  "aliases": {
+    "caltracker:dumbbell-walking-lunge": "Dumbbell_Lunges",
+    "caltracker:dumbbell-romanian-deadlift": "Stiff-Legged_Dumbbell_Deadlift",
+    "caltracker:medicine-ball-sit-up-and-overhead-throw": "Supine_Two-Arm_Overhead_Throw"
+  },
+  "aliasNotes": {
+    "caltracker:dumbbell-walking-lunge": "Photos show a forward lunge holding a dumbbell at each side: standing, then both knees at 90 degrees. Each step of a walking lunge looks exactly like this.",
+    "caltracker:dumbbell-romanian-deadlift": "Photos show standing with dumbbells in front of the thighs, then a flat-back hip hinge with soft knees and the dumbbells at the shins: what our instructions describe.",
+    "caltracker:medicine-ball-sit-up-and-overhead-throw": "Same exercise: lying on the back, knees bent, ball overhead, throwing it forward while sitting up."
+  },
+  "rejected": [
+    { "library": "caltracker:dumbbell-walking-lunge", "source": "Barbell_Walking_Lunge", "reason": "Barbell on the back, not dumbbells." },
+    { "library": "caltracker:dumbbell-romanian-deadlift", "source": "Romanian_Deadlift", "reason": "Barbell, not dumbbells." },
+    { "library": "caltracker:medicine-ball-russian-twist", "source": "Russian_Twist", "reason": "No medicine ball." },
+    { "library": "caltracker:medicine-ball-russian-twist", "source": "Medicine_Ball_Full_Twist", "reason": "Standing back to back with a partner, not seated." },
+    { "library": "caltracker:side-plank-single-leg-crunch", "source": "Side_Bridge", "reason": "Static side plank, no knee-to-elbow crunch." },
+    { "library": "caltracker:side-plank-single-leg-crunch", "source": "Push_Up_to_Side_Plank", "reason": "Push-up into a side plank; different movement." },
+    { "library": "caltracker:hip-thrust-machine", "source": "Barbell_Hip_Thrust", "reason": "Barbell on a bench, not a hip thrust machine." },
+    { "library": "caltracker:crunch-clap", "source": "Crunches", "reason": "Hands behind the head, no arm swing or clap." },
+    { "library": "caltracker:kettlebell-upright-row", "source": "Standing_Dumbbell_Upright_Row", "reason": "Two dumbbells, not one kettlebell." },
+    { "library": "caltracker:kettlebell-upright-row", "source": "Upright_Barbell_Row", "reason": "Barbell, not a kettlebell." },
+    { "library": "caltracker:kettlebell-sumo-squat", "source": "Kettlebell_Sumo_High_Pull", "reason": "Pulls the kettlebell to the chin; a different exercise." },
+    { "library": "caltracker:machine-assisted-pull-up", "source": "Band_Assisted_Pull-Up", "reason": "Band assistance, not a machine." },
+    { "library": "Kettlebell_Overhead_Triceps_Extension", "source": "Standing_Dumbbell_Triceps_Extension", "reason": "Dumbbell, not a kettlebell." }
+  ]
+}
