@@ -2492,6 +2492,10 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      preview_community_card: {
+        Args: { p_card: Json; p_community_id: string }
+        Returns: Json
+      }
       queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
       recent_exercises_for_client: {
         Args: { p_limit?: number }
