@@ -56,6 +56,9 @@ export const KeyboardBar = memo(function KeyboardBar() {
   );
 });
 
+/** Said after a box or ✓ while the coach logs the workout (read only). */
+const READ_ONLY_HINT = 'Read only. Your coach is logging this session.';
+
 const DELETE_ACTIONS = [{ name: 'delete', label: 'Delete set' }];
 
 export type TableHandlers = {
@@ -84,6 +87,7 @@ function Cell({
   testID,
   unitBelow,
   disabled,
+  readOnly,
   onType,
 }: {
   cell: CellModel;
@@ -93,6 +97,7 @@ function Cell({
   testID: string;
   unitBelow: boolean;
   disabled: boolean;
+  readOnly: boolean;
   onType: (patch: ActualPatch) => void;
 }) {
   const { text, space, radius } = useTheme();
@@ -108,15 +113,16 @@ function Cell({
       <TextInput
         testID={testID}
         value={draft}
-        editable={!disabled}
+        editable={!disabled && !readOnly}
+        accessibilityState={{ disabled: disabled || readOnly }}
         keyboardType={KEYBOARD[cell.field]}
         returnKeyType="done"
         inputAccessoryViewID={KEYBOARD_BAR_ID}
         selectTextOnFocus
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
-        accessibilityHint={invalid ?? undefined}
-        placeholder={row.done ? '' : cell.placeholder || '–'}
+        accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : undefined)}
+        placeholder={row.done || readOnly ? '' : cell.placeholder || '–'}
         placeholderTextColor={palette.inkMuted}
         onFocus={() => setFocused(true)}
         onBlur={() => {
@@ -139,6 +145,7 @@ function Cell({
           styles.input,
           { borderRadius: radius.input, paddingHorizontal: space[1] },
           row.done && styles.inputDone,
+          readOnly && styles.inputReadOnly,
           focused && styles.inputFocused,
           invalid !== null && styles.inputInvalid,
         ]}
@@ -166,6 +173,10 @@ type RowProps = {
   exerciseLabel: string | null;
   units: Units;
   disabled?: boolean;
+  /** The coach logs this workout: the row shows the coach's numbers and can't be changed. */
+  readOnly?: boolean;
+  /** The set the coach ticked last (read only): outlined so the client sees where the coach is. */
+  recent?: boolean;
   handlers: TableHandlers;
 };
 
@@ -173,12 +184,13 @@ type RowProps = {
  * One set: tag, number boxes, ✓. Long-press the row (its tag or the space around the boxes) for "Delete set". There
  * is no swipe on a row: a sideways swipe always changes the page.
  */
-function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, handlers }: RowProps) {
+function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, readOnly = false, recent = false, handlers }: RowProps) {
   const { text, space, radius } = useTheme();
   const indented = row.tagKind === 'drop' || row.tagKind === 'failure';
   const tagged = row.tagKind !== 'normal';
   const id = `${idKey}-${row.setIndex}`;
-  const deletable = !disabled && row.deletable;
+  const deletable = !disabled && !readOnly && row.deletable;
+  const locked = disabled || readOnly;
   const setWords = row.name.charAt(0).toLowerCase() + row.name.slice(1);
   const who = `${exerciseLabel ? `${exerciseLabel}, ` : ''}${row.name}, `;
   const onAction = (e: AccessibilityActionEvent) => {
@@ -196,6 +208,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
           { gap: space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
           indented && { marginLeft: space[4] },
           row.done && styles.rowDone,
+          recent && styles.rowRecent,
         ]}
       >
         <Pressable
@@ -223,18 +236,30 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
             testID={`actual-${cell.field}-${id}`}
             unitBelow={unitBelow}
             disabled={disabled}
+            readOnly={readOnly}
             onType={(patch) => handlers.onType(row, patch)}
           />
         ))}
         <Pressable
           testID={`tick-${id}`}
-          disabled={disabled}
+          disabled={locked}
           onPress={() => handlers.onTick(row)}
           hitSlop={4}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: row.done, disabled }}
-          accessibilityLabel={`${row.done ? 'Untick' : 'Tick'} ${exerciseLabel ? `${exerciseLabel}, ` : ''}${setWords}`}
-          style={({ pressed }) => [styles.tick, row.done ? styles.tickDone : styles.tickOpen, pressed && styles.pressed, disabled && styles.disabled]}
+          accessibilityState={{ checked: row.done, disabled: locked }}
+          accessibilityLabel={
+            readOnly
+              ? `${exerciseLabel ? `${exerciseLabel}, ` : ''}${setWords}${recent ? ', just ticked by your coach' : ''}`
+              : `${row.done ? 'Untick' : 'Tick'} ${exerciseLabel ? `${exerciseLabel}, ` : ''}${setWords}`
+          }
+          accessibilityHint={readOnly ? READ_ONLY_HINT : undefined}
+          style={({ pressed }) => [
+            styles.tick,
+            row.done ? styles.tickDone : styles.tickOpen,
+            pressed && styles.pressed,
+            // Read only keeps full colour (the coach's ticks must stay easy to read); an open one is dashed instead.
+            readOnly ? !row.done && styles.tickReadOnly : disabled && styles.disabled,
+          ]}
         >
           <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), row.done ? styles.tickMarkDone : styles.tickMarkOpen]}>
             ✓
@@ -256,6 +281,8 @@ export const SetRowLine = memo(
     a.idKey === b.idKey &&
     a.units === b.units &&
     a.disabled === b.disabled &&
+    a.readOnly === b.readOnly &&
+    a.recent === b.recent &&
     a.unitBelow === b.unitBelow &&
     a.exerciseLabel === b.exerciseLabel &&
     a.row.setId === b.row.setId &&
@@ -273,6 +300,8 @@ export function SetTable({
   idKey,
   units,
   disabled,
+  readOnly = false,
+  recentSetId = null,
   handlers,
   onAddSet,
 }: {
@@ -280,6 +309,8 @@ export function SetTable({
   idKey: string;
   units: Units;
   disabled?: boolean;
+  readOnly?: boolean;
+  recentSetId?: string | null;
   handlers: TableHandlers;
   onAddSet: (() => void) | null;
 }) {
@@ -299,7 +330,18 @@ export function SetTable({
         <View style={styles.tickSpace} />
       </View>
       {rows.map((row) => (
-        <SetRowLine key={row.setId} row={row} idKey={idKey} unitBelow={false} exerciseLabel={null} units={units} disabled={disabled} handlers={handlers} />
+        <SetRowLine
+          key={row.setId}
+          row={row}
+          idKey={idKey}
+          unitBelow={false}
+          exerciseLabel={null}
+          units={units}
+          disabled={disabled}
+          readOnly={readOnly}
+          recent={row.setId === recentSetId}
+          handlers={handlers}
+        />
       ))}
       {onAddSet ? <AddSetButton testID={`add-set-${idKey}`} onPress={onAddSet} /> : null}
     </View>
@@ -325,6 +367,7 @@ const styles = StyleSheet.create({
   table: { backgroundColor: palette.surface },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowDone: { backgroundColor: palette.lime },
+  rowRecent: { borderWidth: borderWidth.card * 2, borderColor: palette.ink },
   tag: { width: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
   tagChip: { backgroundColor: palette.drop },
   headingText: { minHeight: 0, letterSpacing: 0.6 },
@@ -338,6 +381,8 @@ const styles = StyleSheet.create({
   },
   inputDone: { borderColor: palette.lime },
   inputFocused: { borderColor: palette.ink },
+  // Read only: no box to type in, just the number on the row (dashed, so it doesn't look tappable).
+  inputReadOnly: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: palette.inkMuted },
   inputInvalid: { borderColor: palette.magentaDeep },
   invalidText: { color: palette.magentaDeep, textAlign: 'center' },
   centre: { textAlign: 'center' },
@@ -353,6 +398,7 @@ const styles = StyleSheet.create({
   tickSpace: { width: tapTarget.min },
   tickOpen: { backgroundColor: palette.bg, borderColor: palette.ink },
   tickDone: { backgroundColor: palette.ink, borderColor: palette.ink },
+  tickReadOnly: { borderStyle: 'dashed', borderColor: palette.inkMuted },
   tickMarkOpen: { color: palette.border },
   tickMarkDone: { color: palette.lime },
   pressed: { opacity: pressedOpacity },

@@ -42,7 +42,7 @@ on the iPad or laptop.
 | --- | --- | --- |
 | Nobody logging | Start session | Start as usual |
 | Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), live over Realtime; **Take over**, **View only**, Refresh | Logs as usual |
-| Coach logging (started or took over) | The logging page | Opening the workout shows "Your coach is logging this session" (read only); saves from the phone are refused and the phone takes the coach's copy |
+| Coach logging (started or took over) | The logging page | The normal logging pages, read only, under a slim "Your coach is logging this session" bar: no typing, ticking, Mark all, Done, delete or switching; swiping, ‹ ›, photos and exercise info still work. Each coach save changes the log's row, which Realtime delivers; the phone fetches the coach's copy and shows it within a second or two (the set the coach ticked last is outlined). Saves from the phone are refused and the phone takes the coach's copy; without an open copy on the phone the full banner shows |
 | Coach handed back | Back to the calendar | Logs as usual from the server copy |
 | Coach stopped (20 min without activity) or is no longer a coach | — | "Your coach stopped logging N min ago" · **Continue on my phone** |
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
