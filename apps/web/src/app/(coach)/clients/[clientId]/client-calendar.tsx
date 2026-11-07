@@ -70,6 +70,7 @@ export function ClientCalendar({
   programs,
   upcomingWorkouts,
   hints = NO_HINTS,
+  openOnLoad = null,
 }: {
   client: ClientRef;
   /** The signed-in coach: the remembered view is theirs. */
@@ -88,6 +89,8 @@ export function ClientCalendar({
   upcomingWorkouts: readonly ExistingWorkout[];
   /** The coach's Recent and Most used workouts (pickers show them first) and last-assigned program (the default). */
   hints?: PickerHints;
+  /** From ?add= (the Clients list's "+ Workout" and "+ Program"): open that dialog straight away. */
+  openOnLoad?: 'workout' | 'program' | null;
 }) {
   const today = useLocalToday();
   const timeZone = useTimeZone();
@@ -105,8 +108,15 @@ export function ClientCalendar({
     setShown(entries);
     setItems(entries);
   }
-  const [assigning, setAssigning] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [assigning, setAssigning] = useState(openOnLoad === 'program' && !readOnly);
+  const [adding, setAdding] = useState(openOnLoad === 'workout' && !readOnly);
+  // Once opened, drop ?add= from the address, so a reload or Back doesn't open the dialog again.
+  useEffect(() => {
+    if (!openOnLoad) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('add');
+    window.history.replaceState(window.history.state, '', url);
+  }, [openOnLoad]);
   const [picker, setPicker] = useState<{ date: IsoDate } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);

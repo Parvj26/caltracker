@@ -125,7 +125,8 @@ test('coach shell: sidebar nav marks Clients as the current page and the page us
       return s.borderTopStyle === 'solid' && s.borderTopWidth === '2px' && s.borderTopColor === tokenRgb;
     }).length;
   });
-  expect(cardBorders).toBeGreaterThanOrEqual(3);
+  // The Clients table is the page's card (Past clients adds another when there are any).
+  expect(cardBorders).toBeGreaterThanOrEqual(1);
 });
 
 test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait)', async ({ page }) => {
@@ -168,26 +169,27 @@ test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({
 
 test('clients page: clients show round initials avatars', async ({ page }) => {
   await signInAsDemoCoach(page);
-  const clients = page.getByRole('table', { name: 'Clients' });
+  const clients = page.getByRole('table', { name: 'Clients', exact: true });
   const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
-  // The add-client form comes before the lists, so it is above the fold on a laptop.
-  const addHeading = page.getByRole('heading', { name: 'Add client' });
-  const clientsBox = (await clients.boundingBox())!;
-  expect((await addHeading.boundingBox())!.y).toBeLessThan(clientsBox.y);
-  await expect(page.getByRole('button', { name: 'Send invite' })).toBeInViewport();
+  // "+ Invite client" sits in the page header, above the list, so it is always in view on a laptop.
+  const invite = page.getByRole('button', { name: '+ Invite client' });
+  expect((await invite.boundingBox())!.y).toBeLessThan((await clients.boundingBox())!.y);
+  await expect(invite).toBeInViewport();
 });
 
-test('bulk CSV invite is folded under its heading, then explains itself and offers an example file', async ({ page }) => {
+test('bulk CSV invite is its own tab of the invite window, explains itself and offers an example file', async ({ page }) => {
   await signInAsDemoCoach(page);
-  // Folded by default: only the heading shows, and clicking it opens the section.
-  const toggle = page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' }).getByRole('button');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' })).toBeVisible();
+  // The invite window opens on One client; the CSV upload is the second tab.
+  await page.getByRole('button', { name: '+ Invite client' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Invite a client' });
+  const tab = dialog.getByRole('tab', { name: 'Many (CSV)' });
+  await expect(tab).toHaveAttribute('aria-selected', 'false');
   await expect(page.locator('input[type="file"][aria-labelledby="csv-heading"]')).toBeHidden();
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Invite many clients from a spreadsheet (CSV)' })).toBeVisible();
   await expect(page.locator('input[type="file"][aria-labelledby="csv-heading"]')).toBeVisible();
   await expect(
     page.getByText('Bring your client list from Everfit or Excel: one row per client with first name, last name and email.'),

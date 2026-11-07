@@ -21,6 +21,7 @@ export function WorkoutChoices({
   onPick,
   disabled = false,
   forProgram = false,
+  chosenIds,
 }: {
   library: readonly ChoiceWorkout[];
   hints?: WorkoutHints;
@@ -28,6 +29,8 @@ export function WorkoutChoices({
   disabled?: boolean;
   /** On a program the empty library also explains that programs are built from it. */
   forProgram?: boolean;
+  /** Workouts already picked (the invite window's single workouts): marked "✓ chosen" and pressed. */
+  chosenIds?: ReadonlySet<string>;
 }) {
   const resultsId = useId();
   const [query, setQuery] = useState('');
@@ -35,13 +38,23 @@ export function WorkoutChoices({
 
   const searching = query.trim() !== '';
   const sections = !searching && hints ? pickerSections(library, hints) : null;
-  const button = (w: ChoiceWorkout) => (
-    <li key={w.id}>
-      <button type="button" className={calendar.result} disabled={disabled} onClick={() => onPick(w)}>
-        <span>{w.name}</span>
-      </button>
-    </li>
-  );
+  const button = (w: ChoiceWorkout) => {
+    const chosen = chosenIds?.has(w.id) ?? false;
+    return (
+      <li key={w.id}>
+        <button
+          type="button"
+          className={calendar.result}
+          disabled={disabled}
+          aria-pressed={chosenIds ? chosen : undefined}
+          onClick={() => onPick(w)}
+        >
+          <span>{w.name}</span>
+          {chosen ? <span aria-hidden="true" className={styles.chosenTag}>✓ chosen</span> : null}
+        </button>
+      </li>
+    );
+  };
   const section = (title: string, items: readonly ChoiceWorkout[]) =>
     items.length === 0 ? null : (
       <section key={title} aria-label={title}>

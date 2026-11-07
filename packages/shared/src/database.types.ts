@@ -251,6 +251,68 @@ export type Database = {
           },
         ]
       }
+      client_invite_plan_items: {
+        Row: {
+          created_at: string
+          id: string
+          invite_id: string
+          position: number
+          program_id: string | null
+          start_on: string
+          workout_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invite_id: string
+          position?: number
+          program_id?: string | null
+          start_on: string
+          workout_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invite_id?: string
+          position?: number
+          program_id?: string | null
+          start_on?: string
+          workout_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_invite_plan_items_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "client_invites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_invite_plan_items_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_invite_plan_items_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_invite_plan_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -2711,6 +2773,16 @@ export type Database = {
       set_community_post_pinned: {
         Args: { p_pinned: boolean; p_post_id: string }
         Returns: undefined
+      }
+      set_invite_plan: {
+        Args: {
+          p_invite_id: string
+          p_program_id?: string
+          p_start_on?: string
+          p_workout_days?: string[]
+          p_workout_ids?: string[]
+        }
+        Returns: number
       }
       set_nutrition_targets: {
         Args: {

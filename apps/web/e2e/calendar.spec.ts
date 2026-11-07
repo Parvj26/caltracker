@@ -123,7 +123,7 @@ test('assign a program from next Monday; a double click still copies it once', a
 
   // The client's name on the Clients list opens their page (Overview); the Training tab has the calendar.
   await page.goto('/clients');
-  await page.getByRole('table', { name: 'Clients' }).getByRole('link', { name: meName, exact: true }).click();
+  await page.getByRole('table', { name: 'Clients', exact: true }).getByRole('link', { name: meName, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${me}$`));
   await expect(page.getByRole('heading', { level: 1, name: meName })).toBeVisible();
   await page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Training' }).click();

@@ -17,10 +17,12 @@ type Props = {
   onConfirm: () => Promise<SimpleOutcome>;
   /** Element to focus after success (the row, and with it this button, disappears). */
   focusAfterId: string;
+  /** A small text button (inside a row's status line) instead of a bordered row button. */
+  inline?: boolean;
 };
 
 /** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
-export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId }: Props) {
+export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false }: Props) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -39,19 +41,22 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
     });
   }
 
+  const open = () => {
+    setError(null);
+    dialogRef.current?.showModal();
+  };
+
   return (
     <>
-      <Button
-        variant="secondary"
-        className={styles.rowButton}
-        aria-label={ariaLabel}
-        onClick={() => {
-          setError(null);
-          dialogRef.current?.showModal();
-        }}
-      >
-        {label}
-      </Button>
+      {inline ? (
+        <button type="button" className={styles.inlineAction} aria-label={ariaLabel} onClick={open}>
+          {label}
+        </button>
+      ) : (
+        <Button variant="secondary" className={styles.rowButton} aria-label={ariaLabel} onClick={open}>
+          {label}
+        </Button>
+      )}
       <dialog
         ref={dialogRef}
         className={styles.dialog}
