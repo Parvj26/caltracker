@@ -1372,6 +1372,74 @@ export type Database = {
           },
         ]
       }
+      meals: {
+        Row: {
+          calories: number | null
+          carbs_g: number | null
+          client_id: string
+          created_at: string
+          eaten_at: string
+          eaten_on: string
+          fat_g: number | null
+          id: string
+          name: string | null
+          note: string
+          photo_height: number | null
+          photo_path: string | null
+          photo_thumb_path: string | null
+          photo_width: number | null
+          protein_g: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          calories?: number | null
+          carbs_g?: number | null
+          client_id?: string
+          created_at?: string
+          eaten_at?: string
+          eaten_on: string
+          fat_g?: number | null
+          id?: string
+          name?: string | null
+          note?: string
+          photo_height?: number | null
+          photo_path?: string | null
+          photo_thumb_path?: string | null
+          photo_width?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          calories?: number | null
+          carbs_g?: number | null
+          client_id?: string
+          created_at?: string
+          eaten_at?: string
+          eaten_on?: string
+          fat_g?: number | null
+          id?: string
+          name?: string | null
+          note?: string
+          photo_height?: number | null
+          photo_path?: string | null
+          photo_thumb_path?: string | null
+          photo_width?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           body: string
@@ -1413,6 +1481,47 @@ export type Database = {
           },
           {
             foreignKeyName: "messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nutrition_targets: {
+        Row: {
+          calories: number | null
+          carbs_g: number | null
+          client_id: string
+          fat_g: number | null
+          protein_g: number | null
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          calories?: number | null
+          carbs_g?: number | null
+          client_id: string
+          fat_g?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          calories?: number | null
+          carbs_g?: number | null
+          client_id?: string
+          fat_g?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_targets_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2280,6 +2389,10 @@ export type Database = {
         Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
         Returns: Json
       }
+      can_access_meal_photo: {
+        Args: { p_name: string; p_write: boolean }
+        Returns: boolean
+      }
       can_access_message_image: {
         Args: { p_name: string; p_write: boolean }
         Returns: boolean
@@ -2555,6 +2668,17 @@ export type Database = {
       }
       set_community_post_pinned: {
         Args: { p_pinned: boolean; p_post_id: string }
+        Returns: undefined
+      }
+      set_nutrition_targets: {
+        Args: {
+          p_calories: number
+          p_carbs_g: number
+          p_client_id: string
+          p_fat_g: number
+          p_protein_g: number
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       set_program_weeks: {
