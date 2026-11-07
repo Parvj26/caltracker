@@ -175,7 +175,7 @@ test('a client with nothing planned is under Nothing planned, with Open and Assi
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Nothing in the next 7 days');
   await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.getByRole('button', { name: /^Assign to / })).toBeVisible();
+  await expect(row.getByRole('link', { name: /^Assign to / })).toHaveAttribute('href', `/clients/${clientId}/training`);
 });
 
 test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
@@ -285,22 +285,6 @@ test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
   await expect(box).toBeFocused();
 });
 
-test('?assign=1 on the Training tab opens the assign dialog, and a reload does not reopen it', async ({ page }) => {
-  const last = `Assn${unique()}`;
-  const clientId = await newClient(last);
-  const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: `Ending ${unique()}`, weeks: 1, start_date: dayOffset(-3) }).select('id').single();
-  if (a.error) throw a.error;
-  created.assignments.push(a.data.id);
-  await signInAsCoach(page);
-  // Old links (and bookmarks) to ?assign=1 still open the dialog; Home's Assign now opens its own dialog in place.
-  await page.goto(`/clients/${clientId}/training?assign=1`);
-  await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
-  await expect(page).not.toHaveURL(/assign=1/);
-  await page.reload();
-  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-});
-
 test('a workout on the coach\'s own date shows in Today\'s clients when it is evening in Los Angeles and already tomorrow in UTC', async ({ browser }) => {
   const last = `LA${unique()}`;
   const clientId = await newClient(last);
@@ -347,17 +331,4 @@ test('ArrowDown and ArrowUp wrap round the results, and Escape clears the box', 
   await expect(box).toHaveAttribute('aria-expanded', 'false');
   await box.fill('zzzz-no-such-client');
   await expect(page.getByRole('status').filter({ hasText: 'No clients match.' })).toBeVisible();
-});
-
-test('?assign=1 on a removed client\'s page opens no dialog', async ({ page }) => {
-  const last = `Removed${unique()}`;
-  const pastId = await newClient(last);
-  const past = await admin.from('past_clients').insert({ workspace_id: workspaceId, user_id: pastId, email: `past-${unique()}@example.com`, first_name: 'Home', last_name: last });
-  if (past.error) throw past.error;
-  const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', pastId);
-  if (gone.error) throw gone.error;
-  await signInAsCoach(page);
-  await page.goto(`/clients/${pastId}?assign=1`);
-  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
 });

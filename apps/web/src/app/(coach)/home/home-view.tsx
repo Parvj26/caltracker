@@ -18,11 +18,7 @@ import {
   type HomeClient,
   type TodayRow,
 } from '@caltracker/shared';
-import { QuickAssignDialog } from '@/components/assign/quick-assign';
 import { Card, Chip, Tile } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
-import { deleteClientWorkout } from '../clients/[clientId]/actions';
-import calendar from '@/components/calendar/calendar.module.css';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { checkInput, GROUP_ID, GROUP_TITLE, reasonText } from '@/lib/daily-check';
@@ -112,19 +108,17 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   );
 }
 
-type OnAssign = (client: { id: string; name: string }) => void;
-
-/** Every client row's quick Assign: opens the Workout / Program dialog on Home, with no page load. */
-function AssignButton({ id, name, onAssign }: { id: string; name: string; onAssign: OnAssign }) {
+/** Every client row's Assign: opens the client's Training calendar, where the coach adds workouts or a program. */
+function AssignLink({ id, name }: { id: string; name: string }) {
   return (
-    <button type="button" className={styles.assign} aria-label={`Assign to ${name}`} onClick={() => onAssign({ id, name })}>
+    <Link href={`/clients/${id}/training`} className={styles.assign} aria-label={`Assign to ${name}`}>
       Assign
-    </button>
+    </Link>
   );
 }
 
 /** One Needs attention row: who, why, and what to do about it. */
-function AttentionRow({ client, why, onAssign }: { client: HomeClient; why: string; onAssign: OnAssign }) {
+function AttentionRow({ client, why }: { client: HomeClient; why: string }) {
   const name = fullName(client);
   const message = messageHref(client.id);
   return (
@@ -136,7 +130,7 @@ function AttentionRow({ client, why, onAssign }: { client: HomeClient; why: stri
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}`} className={styles.assign} aria-label={`Open ${name}`}>Open</Link>
-        <AssignButton id={client.id} name={name} onAssign={onAssign} />
+        <AssignLink id={client.id} name={name} />
         <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
       </span>
     </li>
@@ -144,7 +138,7 @@ function AttentionRow({ client, why, onAssign }: { client: HomeClient; why: stri
 }
 
 /** A Body scans 30+ days row: who, when they were last scanned, and a shortcut to the scan form. */
-function ScanDueRow({ client, why, onAssign }: { client: HomeClient; why: string; onAssign: OnAssign }) {
+function ScanDueRow({ client, why }: { client: HomeClient; why: string }) {
   const name = fullName(client);
   return (
     <li className={cx(styles.row, styles.attentionRow)}>
@@ -155,7 +149,7 @@ function ScanDueRow({ client, why, onAssign }: { client: HomeClient; why: string
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}/body?scan=1`} className={styles.assign} aria-label={`Add a scan for ${name}`}>Add scan</Link>
-        <AssignButton id={client.id} name={name} onAssign={onAssign} />
+        <AssignLink id={client.id} name={name} />
       </span>
     </li>
   );
@@ -183,23 +177,6 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
     if (today && lastToday.current && today !== lastToday.current) router.refresh();
     if (today) lastToday.current = today;
   }, [today, router]);
-  const [assigning, setAssigning] = useState<{ id: string; name: string } | null>(null);
-  const [toast, setToast] = useState<{ message: string; undoId?: string } | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 8000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-  async function undo(workoutId: string) {
-    setToast(null);
-    try {
-      await deleteClientWorkout(workoutId);
-      setToast({ message: 'Removed it again.' });
-    } catch (e) {
-      setToast({ message: failureMessage(e, "Couldn't undo. Remove it from the client's calendar.") });
-    }
-    router.refresh();
-  }
   const searchable = useMemo(() => [...data.clients].sort(compareByLastName), [data.clients]);
   const view = useMemo(() => {
     if (!today) return null;
@@ -305,7 +282,7 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                             {a.label}
                           </Link>
                         ))}
-                        <AssignButton id={r.client.id} name={name} onAssign={setAssigning} />
+                        <AssignLink id={r.client.id} name={name} />
                         <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
                       </span>
                     </li>
@@ -329,7 +306,7 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                 row={(item) => {
                   const c = byId.get(item.clientId);
                   return c ? (
-                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} onAssign={setAssigning} />
+                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} />
                   ) : null;
                 }}
               />
@@ -339,39 +316,13 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                 id="scans-due"
                 title="Body scans 30+ days"
                 items={scansDue}
-                row={(d) => <ScanDueRow key={d.client.id} client={d.client} why={d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'} onAssign={setAssigning} />}
+                row={(d) => <ScanDueRow key={d.client.id} client={d.client} why={d.lastScanOn ? `Last scan ${formatShortDate(d.lastScanOn, today)}` : 'Never scanned'} />}
               />
             ) : null}
           </Card>
         </aside>
       </div>
 
-      {assigning ? (
-        <QuickAssignDialog
-          client={assigning}
-          onDone={(done) => {
-            setAssigning(null);
-            setToast(done.kind === 'workout' ? { message: done.message, undoId: done.workoutId } : { message: done.message });
-            router.refresh();
-          }}
-          onClose={() => setAssigning(null)}
-        />
-      ) : null}
-      <div className={calendar.toastRegion} aria-live="polite">
-        {toast ? (
-          <div className={calendar.toast}>
-            <span>{toast.message}</span>
-            {toast.undoId ? (
-              <button type="button" className={calendar.smallButton} onClick={() => void undo(toast.undoId!)}>
-                Undo
-              </button>
-            ) : null}
-            <button type="button" className={calendar.smallButton} onClick={() => setToast(null)}>
-              Dismiss
-            </button>
-          </div>
-        ) : null}
-      </div>
     </div>
   );
 }

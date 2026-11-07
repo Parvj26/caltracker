@@ -126,10 +126,4 @@ test("the program picker starts on the coach's most recently assigned program", 
   await page.getByRole('button', { name: 'Assign program', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Assign a program' }).getByLabel('Program')).toHaveValue(zebra);
 
-  // Home's quick Assign too.
-  await page.goto('/home');
-  await page.getByRole('button', { name: `Assign to ${coach.clientName}` }).first().click();
-  const quick = page.getByRole('dialog', { name: `Assign to ${coach.clientName}` });
-  await quick.getByRole('tab', { name: 'Program' }).click();
-  await expect(quick.getByRole('combobox', { name: 'Program' })).toHaveValue(zebra);
 });

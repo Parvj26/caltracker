@@ -68,7 +68,6 @@ export function ClientCalendar({
   library,
   programs,
   upcomingWorkouts,
-  openAssign = false,
   hints = NO_HINTS,
 }: {
   client: ClientRef;
@@ -86,8 +85,6 @@ export function ClientCalendar({
   programs: PickerProgram[];
   /** Every workout on the client's calendar from about a week back on (assign warns about days already taken). */
   upcomingWorkouts: readonly ExistingWorkout[];
-  /** Open the assign dialog on load (the Assign shortcut on Home, ?assign=1). */
-  openAssign?: boolean;
   /** The coach's Recent and Most used workouts (pickers show them first) and last-assigned program (the default). */
   hints?: PickerHints;
 }) {
@@ -107,15 +104,7 @@ export function ClientCalendar({
     setShown(entries);
     setItems(entries);
   }
-  const [assigning, setAssigning] = useState(openAssign && !readOnly);
-  // Drop ?assign=1 once it has opened the dialog, so a reload doesn't open it again.
-  useEffect(() => {
-    if (!openAssign) return;
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has('assign')) return;
-    url.searchParams.delete('assign');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-  }, [openAssign]);
+  const [assigning, setAssigning] = useState(false);
   const [adding, setAdding] = useState(false);
   const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
@@ -337,6 +326,10 @@ export function ClientCalendar({
           onAssigned={(programName, count) => {
             setAssigning(false);
             say(`Assigned ${programName}: ${workoutsText(count)} added.`);
+          }}
+          onAddWorkout={() => {
+            setAssigning(false);
+            setAdding(true);
           }}
           onClose={() => setAssigning(false)}
         />

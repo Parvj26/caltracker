@@ -29,7 +29,7 @@ function oldLinkTarget(clientId: string, query: Query): string | null {
     return s ? `?${s}` : '';
   };
   if (query.scan !== undefined) return `/clients/${clientId}/body${keep(['scan'])}`;
-  const training = ['assign', 'month', 'view', 'from'];
+  const training = ['month', 'view', 'from'];
   if (training.some((k) => query[k] !== undefined)) return `/clients/${clientId}/training${keep(training)}`;
   return null;
 }

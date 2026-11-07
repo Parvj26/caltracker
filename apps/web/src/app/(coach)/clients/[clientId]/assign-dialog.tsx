@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   IsoDateSchema,
@@ -15,7 +14,7 @@ import {
 import type { IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ErrorText, SelectField, TextField } from '@/components/ui';
+import { Button, ButtonLink, ErrorText, SelectField, TextField } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
@@ -48,6 +47,7 @@ export function AssignDialog({
   existing,
   today,
   onAssigned,
+  onAddWorkout,
   onClose,
 }: {
   clientId: string;
@@ -60,6 +60,8 @@ export function AssignDialog({
   /** The coach's own today, from the browser. */
   today: IsoDate;
   onAssigned: (programName: string, count: number) => void;
+  /** With no programs yet: add a single workout instead (closes this and opens "+ Add workout"). */
+  onAddWorkout?: () => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -125,9 +127,20 @@ export function AssignDialog({
     >
       <h2 id={titleId} className={styles.dialogTitle}>Assign a program</h2>
       {programs.length === 0 ? (
-        <p className={styles.dialogBody}>
-          You have no programs yet. <Link href="/programs/new">Build a program</Link> first.
-        </p>
+        <>
+          <p className={styles.dialogBody}>
+            You have no programs yet. Build one to plan weeks at once, or add a single workout to {clientName}&apos;s
+            calendar now.
+          </p>
+          <div className={styles.emptyActions}>
+            <ButtonLink href="/programs/new">Build a program</ButtonLink>
+            {onAddWorkout ? (
+              <Button variant="secondary" onClick={onAddWorkout}>
+                Add a single workout
+              </Button>
+            ) : null}
+          </div>
+        </>
       ) : (
         <>
           <p className={styles.dialogBody}>Copies the program&apos;s workouts onto {clientName}&apos;s calendar.</p>
