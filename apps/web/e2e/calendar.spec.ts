@@ -54,7 +54,7 @@ const nextMonth = (month: string) => addDays(`${month}-28`, 7).slice(0, 7);
 /** Today in the browser's own time zone (what the app must use). */
 const browserToday = (page: Page) => page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
 
-const calendarUrl = (month?: string, client = clientId) => `/clients/${client}${month ? `?month=${month}` : ''}`;
+const calendarUrl = (month?: string, client = clientId) => `/clients/${client}/training${month ? `?month=${month}` : ''}`;
 const day = (page: Page, date: string): Locator => page.locator(`[data-date="${date}"]`);
 const item = (page: Page, date: string, name: string): Locator =>
   day(page, date).getByRole('button', { name, exact: true });
@@ -121,11 +121,13 @@ test('assign a program from next Monday; a double click still copies it once', a
     { week: 2, day: 3, workoutName: workout },
   ]);
 
-  // The client's name on the Clients list opens their calendar.
+  // The client's name on the Clients list opens their page (Overview); the Training tab has the calendar.
   await page.goto('/clients');
   await page.getByRole('table', { name: 'Clients' }).getByRole('link', { name: meName, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${me}$`));
   await expect(page.getByRole('heading', { level: 1, name: meName })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Training' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${me}/training$`));
 
   const monday = nextMonday(await browserToday(page));
   const end = addDays(monday, 13);
@@ -167,7 +169,7 @@ test('a lost response, then a different date, then the same date again still cop
   const monday = nextMonday(await browserToday(page));
 
   // The first Assign reaches the server (which assigns), but the browser gets an error back.
-  const pageUrl = new RegExp(`/clients/${me}(\\?.*)?$`);
+  const pageUrl = new RegExp(`/clients/${me}/training(\\?.*)?$`);
   let lost = false;
   await page.route(pageUrl, async (route) => {
     if (route.request().method() !== 'POST' || lost) return route.continue();
@@ -241,7 +243,7 @@ test("editing the library workout leaves the client's copy alone, and the other 
   // The back link returns to the calendar.
   await page.goBack();
   await page.getByRole('link', { name: `${meName}'s calendar` }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${me}\\?month=${monthOf(monday)}$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${me}/training\\?month=${monthOf(monday)}$`));
 });
 
 /** Drag with real pointer events: press, move in 10 steps (past the 4 px activation distance), release. */
@@ -455,9 +457,11 @@ test('a past client opens read-only from Past clients; their workout editor is a
   await page.getByRole('heading', { name: /Past clients \(\d+\)/ }).getByRole('button').click();
   await page.getByRole('table', { name: 'Past clients' }).getByRole('link', { name: `Pat ${lastName}`, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${pastId}$`));
-  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
+  await expect(page.getByText('Past client', { exact: true })).toBeVisible();
 
   await page.goto(`/clients/${pastId}?month=${month}`);
+  await expect(page).toHaveURL(new RegExp(`/clients/${pastId}/training\\?month=${month}$`));
+  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
   await expect(day(page, date).getByText(workout, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Assign program' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Add workout to / })).toHaveCount(0);
@@ -552,7 +556,7 @@ test('a client with nothing scheduled sees the two choice tiles, and each opens 
   if (member.error) throw member.error;
 
   await signInAsCoach(page);
-  await page.goto(`/clients/${freshId}`);
+  await page.goto(`/clients/${freshId}/training`);
   const empty = page.getByRole('region', { name: "Nothing on Robin's calendar yet" });
   await expect(empty).toBeVisible();
   const assignTile = empty.getByRole('button', { name: 'Assign a program', exact: true });
@@ -684,7 +688,7 @@ test('+ Add workout: after an unclear failure, a different day gets a fresh id a
   const second = `${month}-17`;
 
   // The first Add reaches the server (which adds it), but the browser gets an error back.
-  const pageUrl = new RegExp(`/clients/${clientId}(\\?.*)?$`);
+  const pageUrl = new RegExp(`/clients/${clientId}/training(\\?.*)?$`);
   let lost = false;
   await page.route(pageUrl, async (route) => {
     if (route.request().method() !== 'POST' || lost) return route.continue();
@@ -770,7 +774,7 @@ test('assigning over days that already have workouts warns first, lists the days
   if (slots.error) throw slots.error;
 
   await signInAsCoach(page);
-  await page.goto(`/clients/${cleo}`);
+  await page.goto(`/clients/${cleo}/training`);
   const monday = nextMonday(await browserToday(page));
   // Already on Cleo's calendar: something on the Wednesday (program day 3), nothing on the Monday.
   const taken = `Already there ${unique()}`;

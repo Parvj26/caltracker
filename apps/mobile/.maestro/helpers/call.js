@@ -19,6 +19,7 @@
 //   assert-reply       fails unless the client has sent exactly one message whose text is NAME
 //   assert-read        fails unless the client has read every coach message
 //   cleanup-messages   deletes the demo client's conversation
+//   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);

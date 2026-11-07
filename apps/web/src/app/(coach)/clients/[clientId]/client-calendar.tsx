@@ -190,7 +190,7 @@ export function ClientCalendar({
     <>
       <header className={styles.titleRow}>
         <div className={styles.titleBlock}>
-          <h1 className={styles.title}>{client.name}</h1>
+          <h2 className={styles.title}>Training</h2>
           {readOnly ? (
             <p className={styles.caption}>
               Past client · removed <LocalDate iso={client.removedAt!} />

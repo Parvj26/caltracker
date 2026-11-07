@@ -23,7 +23,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
 
   return (
     <div className={styles.page}>
-      <Link href={`/clients/${client.id}?month=${loaded.scheduledOn.slice(0, 7)}`} className={styles.back}>
+      <Link href={`/clients/${client.id}/training?month=${loaded.scheduledOn.slice(0, 7)}`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
       <header className={styles.titleRow}>

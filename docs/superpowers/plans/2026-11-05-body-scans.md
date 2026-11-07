@@ -82,9 +82,9 @@
 
 **Produces:**
 - `METRICS`, with labels, units (mass vs other) and ranges.
-- `toDisplay(metricKey, value, units)` and `fromDisplay(...)`, which reuse `fromKg` and `toKg`.
-- `measurementSeries(rows, metricKey, range)`.
-- `changeSince(series)`, which returns wording such as "−1.4 since 6 Oct".
+- `toInputValue(metricKey, value, units)` and `fromDisplay(...)` for input boxes, `formatMetric(key, stored, units, customDef?)` for read-only text, `isInRange(key, value, customDef?)`. These reuse `fromKg` and `toKg`.
+- `measurementSeries(rows, range, today)`: rows are one metric's `{measured_on, value, createdAt?}`; keeps the latest value per date; returns `[]` under 2 points.
+- `changeSince(series, metricKey, units, today)`, which converts stored values the way `formatMetric` shows them and returns wording such as "−1.4 since 6 Oct".
 - `isScanDue(client, latestCoachScanOn, today)`.
 
 - [ ] **Step 1: Write failing tests:**
@@ -111,6 +111,10 @@
   - Coach home lists a seeded overdue client, and Add scan opens the form.
 - [ ] **Step 2: Run.** Expected: FAIL. **Step 3: Implement.** **Step 4: Run** `pnpm check && CI=1 pnpm test:e2e`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(web): record InBody scans and chart client progress`
+
+**File removal:**
+- The web delete-scan action removes the printout through the Storage API (`remove([path])`), not by SQL. Deleting rows in `storage.objects` leaves the real file behind.
+- Go-live plan, account and workspace deletion: an Edge Function removes the files in every bucket (including `scan-attachments`) through the Storage API before the rows are deleted. Deleting a workspace does not remove its printouts by itself.
 
 ### Task 4: Client app
 **Files:**
