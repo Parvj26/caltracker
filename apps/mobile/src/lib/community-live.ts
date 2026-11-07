@@ -1,6 +1,7 @@
 // Live updates for the Community tab through Supabase Realtime. Realtime checks every INSERT/UPDATE against my own
-// RLS (so I only ever hear about my community, never about blocked members); DELETE events can't be filtered and carry
-// only the row's uuid key, so any delete just triggers a reload. Changes are debounced into one reload.
+// RLS (so I only ever hear about my community, never about blocked members). DELETE events are never used (Realtime
+// can't filter or check them): a delete bumps the community row's activity_at, which arrives as a filtered UPDATE.
+// Changes are debounced into one reload.
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
@@ -9,7 +10,7 @@ import { supabase } from './supabase';
 const DEBOUNCE_MS = 400;
 let channelCount = 0;
 
-type Source = { table: 'community_posts' | 'community_comments' | 'community_likes' | 'community_notifications'; filter: string; deletes?: boolean };
+type Source = { table: 'communities' | 'community_posts' | 'community_comments' | 'community_likes' | 'community_notifications'; filter: string };
 
 /**
  * Calls `onChange` (debounced) when a matching row changes, once after the channel (re)joins, and when the app comes
@@ -34,11 +35,10 @@ export function useLive(sources: Source[], onChange: () => void): void {
     };
     channelCount += 1;
     let channel = supabase.channel(`community:${channelCount}:${Math.random().toString(36).slice(2)}`);
-    for (const { table, filter, deletes } of list) {
+    for (const { table, filter } of list) {
       channel = channel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter }, fire)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, fire);
-      if (deletes) channel = channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table }, fire);
     }
     void (async () => {
       // Load my token into Realtime first; otherwise the join can go out as anon and RLS hides every change.

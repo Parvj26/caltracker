@@ -51,9 +51,11 @@ export default function PostScreen() {
   useLive(
     community
       ? [
-          { table: 'community_comments', filter: `post_id=eq.${id}`, deletes: true },
-          { table: 'community_likes', filter: `post_id=eq.${id}`, deletes: true },
-          { table: 'community_posts', filter: `id=eq.${id}`, deletes: true },
+          // Deletes arrive as an update of the community row.
+          { table: 'communities', filter: `id=eq.${community.id}` },
+          { table: 'community_comments', filter: `post_id=eq.${id}` },
+          { table: 'community_likes', filter: `post_id=eq.${id}` },
+          { table: 'community_posts', filter: `id=eq.${id}` },
         ]
       : [],
     () => void load(),

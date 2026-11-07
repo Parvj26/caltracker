@@ -56,10 +56,7 @@ env:
 - extendedWaitUntil:
     visible: 'Share to community'
     timeout: 10000
-- assertVisible:
-    id: community-card
-- assertVisible: 'Workout done'
-- assertVisible: '.*≈ .*Giraffe.*'
+- assertVisible: 'Your workout card'
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Leg day done'
@@ -86,7 +83,7 @@ env:
 - extendedWaitUntil:
     visible: 'Share to community'
     timeout: 10000
-- assertVisible: 'Giraffe'
+- assertVisible: 'Your Giraffe sticker'
 - tapOn:
     id: new-post-submit
 
@@ -98,6 +95,9 @@ env:
     timeout: 15000
 - assertVisible: 'New sticker'
 - assertVisible: 'Workout done'
+# Built by the database from the log and its award: counts and the animal, no volume.
+- assertVisible: '1 exercise · 3 sets'
+- assertVisible: '≈ .*Giraffe.*'
 
 - runScript:
     file: helpers/call.js

@@ -10,15 +10,12 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 export type LiveTable =
   | 'workout_logs'
   | 'awards'
+  | 'communities'
   | 'community_posts'
   | 'community_comments'
   | 'community_likes'
   | 'community_reports';
-/**
- * `deletes`: also refresh on deletes. Realtime cannot filter DELETE events (and sends only the row's uuid key), so
- * any delete in that table counts; use it only on tables with uuid keys, where the event reveals nothing.
- */
-export type LiveSource = { table: LiveTable; filter: string; deletes?: boolean };
+export type LiveSource = { table: LiveTable; filter: string };
 
 let channelCount = 0;
 
@@ -72,12 +69,12 @@ export function LiveRefresh({ on, renderedAt, maxWaitMs }: { on: LiveSource[]; r
     channelCount += 1;
     let channel = supabase.channel(`live:${channelCount}:${Math.random().toString(36).slice(2)}`);
     const onChange = () => scheduler.current?.change();
-    for (const { table, filter, deletes } of sources) {
-      // DELETE only when asked: the app never deletes logs from the phone (it discards them), and DELETE events skip filters.
+    for (const { table, filter } of sources) {
+      // No DELETE: Realtime can't filter or check DELETE events. Deletes that matter (community posts, comments,
+      // likes) bump communities.activity_at instead, which arrives as a filtered UPDATE.
       channel = channel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter }, onChange)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, onChange);
-      if (deletes) channel = channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table }, onChange);
     }
 
     // Load the coach's token into Realtime before joining. Otherwise the first join can go out with only the anon key

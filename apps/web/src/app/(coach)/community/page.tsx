@@ -56,9 +56,11 @@ export default async function CommunityPage() {
 
       <LiveRefresh
         on={[
-          { table: 'community_posts', filter: `workspace_id=eq.${coach.workspaceId}`, deletes: true },
-          { table: 'community_comments', filter: `workspace_id=eq.${coach.workspaceId}`, deletes: true },
-          { table: 'community_likes', filter: `workspace_id=eq.${coach.workspaceId}`, deletes: true },
+          // Deletes arrive as an update of the community row (activity_at).
+          { table: 'communities', filter: `id=eq.${data.communityId}` },
+          { table: 'community_posts', filter: `workspace_id=eq.${coach.workspaceId}` },
+          { table: 'community_comments', filter: `workspace_id=eq.${coach.workspaceId}` },
+          { table: 'community_likes', filter: `workspace_id=eq.${coach.workspaceId}` },
           { table: 'community_reports', filter: `workspace_id=eq.${coach.workspaceId}` },
         ]}
         renderedAt={now}

@@ -122,7 +122,7 @@ export default function SummaryScreen() {
 
   const lines = summaryLines(log, units);
   // Cards to share: the workout (volume and its animal) and, when it set any, its PRs.
-  const workoutCard = workoutShareCard(log, award);
+  const workoutCard = workoutShareCard(log);
   const prCard = prShareCard(log, award);
   const mayReopen = canReopen(log, Date.now());
 

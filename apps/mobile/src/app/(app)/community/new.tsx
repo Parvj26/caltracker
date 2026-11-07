@@ -2,30 +2,27 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, parseCard } from '@caltracker/shared';
-import { CardView } from '@/components/community/parts';
+import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest } from '@caltracker/shared';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { createPost } from '@/lib/community-api';
 import { PhotoError, pickPhotos, preparePhoto, type PreparedPhoto } from '@/lib/community-photo';
 import { useCommunity } from '@/lib/use-community';
-import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /**
  * Write a post: text (links work), up to 4 photos (shrunk on the phone first), and optionally a card shared from the
- * zoo book or a workout summary (`?card=` JSON). A failed post keeps everything and offers Retry; the post id stays
+ * zoo book or a workout summary (`?card=` JSON: only which sticker or workout; the database builds the card). A failed post keeps everything and offers Retry; the post id stays
  * the same, so a retry never posts twice.
  */
 export default function NewPostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ card?: string }>();
   const { text, space, radius } = useTheme();
-  const units = useUnits() ?? 'lb';
   const { community } = useCommunity();
   const card = useMemo(() => {
     try {
-      return params.card ? parseCard(JSON.parse(params.card)) : null;
+      return params.card ? parseCardRequest(JSON.parse(params.card)) : null;
     } catch {
       return null;
     }
@@ -84,7 +81,12 @@ export default function NewPostScreen() {
       <Text style={text('screenTitle')} accessibilityRole="header">
         {card ? 'Share to community' : 'New post'}
       </Text>
-      {card ? <CardView card={card} units={units} /> : null}
+      {card ? (
+        <View style={[styles.cardChip, { borderRadius: radius.card, padding: space[4] }]} testID="community-card-request">
+          <Text style={text('sectionHeading')}>{cardRequestLabel(card)}</Text>
+          <Text style={text('caption')}>Shown as a card with your stats once posted.</Text>
+        </View>
+      ) : null}
       <TextInput
         testID="new-post-body"
         accessibilityLabel="Post text"
@@ -134,6 +136,7 @@ const styles = StyleSheet.create({
   wrap: { flexWrap: 'wrap' },
   input: { borderWidth: 2, borderColor: palette.border, textAlignVertical: 'top', color: palette.ink },
   thumb: { width: 80, height: 80 },
+  cardChip: { backgroundColor: palette.lime },
   remove: { position: 'absolute', top: 0, right: 0, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   removeText: { color: palette.bg, textShadowColor: palette.ink, textShadowRadius: 4 },
 });

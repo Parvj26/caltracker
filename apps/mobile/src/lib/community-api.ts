@@ -6,6 +6,7 @@ import {
   contentTypeFor,
   memberName,
   parseCard,
+  type CardRequest,
   type CommunityCard,
   type Database,
   type NotificationRow,
@@ -174,7 +175,7 @@ export async function createPost(input: {
   postId: string;
   community: CommunityInfo;
   body: string;
-  card: CommunityCard | null;
+  card: CardRequest | null;
   photos: PreparedPhoto[];
 }): Promise<void> {
   const me = await myId();
