@@ -419,7 +419,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     [tableFor, op, withPick, docOf, units],
   );
 
-  /** Mark all: asks first when it ticks more than one set, and says which sets it leaves (nothing to save yet). */
+  /** Mark all: asks first when it ticks more than one set, and says which get no weight and which it leaves. */
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
     Keyboard.dismiss();
     const picked = pickOf ? withPick(pickOf)(log) : log;
@@ -436,7 +436,8 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       });
       return;
     }
-    if (plan.tick === 1 && plan.skip === 0) return run();
+    // One set with its numbers: no need to ask. A set with no weight (maybe bodyweight) is ticked, but said first.
+    if (plan.tick === 1 && plan.skip === 0 && plan.noWeight === 0) return run();
     const q = markAllQuestion(plan);
     Alert.alert(q.title, q.message ?? undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -597,6 +598,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           setFinishOpen(false);
           void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
         }}
+        onSaveDraft={(feel, note) => void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()))}
         onFinish={(feel, note) => void finishNow(feel, note)}
         onDiscard={() => {
           setFinishOpen(false);
