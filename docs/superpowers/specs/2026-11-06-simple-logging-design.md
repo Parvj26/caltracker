@@ -25,6 +25,10 @@ complicated.
      possible until a set is ticked, then the other options say which one is being done.
    Done goes to the next page, after the section's last page to the next section's start page, and after the last
    section to the finish sheet. ✕ goes back to the section start page.
+   Moving never needs Done and never logs anything: ‹ and › beside the dots step one page back or forward, into
+   the previous or next section too; swiping past a section's first or last page goes on into the previous
+   section's last page or the next section's first page; the header title ("Section 2 of 3 · All sections ▾")
+   opens the overview, which lists every section. Unticked sets stay unticked, and Finish still lists them.
 4. **Finish workout?**: "N of M sets done", which sets aren't ticked (saved as not done), How did it feel?
    (Easy / OK / Good / Hard / Max), a note for the coach, Keep going / Finish. Then the sticker reveal and the
    summary, which now lists **Changes from the plan** (substitutes and swaps, the picked option of each pick-one

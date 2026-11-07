@@ -186,6 +186,29 @@ export function afterDone(sections: readonly FlowSection[], at: FlowPlace): Afte
   return { kind: 'finish' };
 }
 
+/**
+ * One page back (-1) or forward (+1), crossing into the previous or next section, without Done and without logging
+ * anything. Pick-one options are stepped one by one (unlike Done, which skips the options not chosen). Null at
+ * either end of the workout.
+ */
+export function stepPlace(sections: readonly FlowSection[], at: FlowPlace, delta: -1 | 1): FlowPlace | null {
+  const page = at.page + delta;
+  if (page >= 0 && page < (sections[at.section]?.pages.length ?? 0)) return { section: at.section, page };
+  for (let s = at.section + delta; s >= 0 && s < sections.length; s += delta) {
+    const n = sections[s].pages.length;
+    if (n > 0) return { section: s, page: delta < 0 ? n - 1 : 0 };
+  }
+  return null;
+}
+
+/** What the ‹ and › buttons (and the swipe past a section's edge) say: "Next page", "Previous section: Warm-Up". */
+export function stepLabel(sections: readonly FlowSection[], at: FlowPlace, delta: -1 | 1): string | null {
+  const to = stepPlace(sections, at, delta);
+  if (!to) return null;
+  const dir = delta < 0 ? 'Previous' : 'Next';
+  return to.section === at.section ? `${dir} page` : `${dir} section: ${sections[to.section].title}`;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // The "Start section" list and the workout overview
 

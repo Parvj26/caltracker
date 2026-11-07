@@ -20,6 +20,8 @@ import {
   afterDone,
   buildPage,
   deleteChoices,
+  stepLabel,
+  stepPlace,
   buildSections,
   finishModel,
   historyLines,
@@ -188,6 +190,50 @@ describe('navigation', () => {
     // From any option of a pick-one group, Done skips the other options.
     expect(afterDone(s, { section: 2, page: 0 })).toEqual({ kind: 'finish' });
     expect(afterDone(s, { section: 2, page: 1 })).toEqual({ kind: 'finish' });
+  });
+
+  it('steps one page back or forward across sections, without Done (options one by one)', () => {
+    const s = buildSections(mockLog());
+    expect(stepPlace(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepPlace(s, { section: 0, page: 0 }, 1)).toEqual({ section: 1, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, 1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 1, page: 1 }, 1)).toEqual({ section: 2, page: 0 });
+    // Back from a section's first page lands on the previous section's last page.
+    expect(stepPlace(s, { section: 2, page: 0 }, -1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 0 }, 1)).toEqual({ section: 2, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 2 }, 1)).toBeNull();
+  });
+
+  it('steps over a section with no pages', () => {
+    const s = buildSections(mockLog());
+    const gap = [s[0], { ...s[1], pages: [] }, s[2]];
+    expect(stepPlace(gap, { section: 0, page: 0 }, 1)).toEqual({ section: 2, page: 0 });
+    expect(stepPlace(gap, { section: 2, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+  });
+
+  it('names where a step goes', () => {
+    const s = buildSections(mockLog());
+    expect(stepLabel(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepLabel(s, { section: 0, page: 0 }, 1)).toBe('Next section: Resistance Training');
+    expect(stepLabel(s, { section: 1, page: 0 }, 1)).toBe('Next page');
+    expect(stepLabel(s, { section: 1, page: 0 }, -1)).toBe('Previous section: Warm-Up');
+    expect(stepLabel(s, { section: 2, page: 1 }, -1)).toBe('Previous page');
+  });
+
+  it('moving never logs anything: stepping leaves the log as it was', () => {
+    const log = mockLog();
+    const before = JSON.stringify(log);
+    const s = buildSections(log);
+    let at: { section: number; page: number } | null = { section: 0, page: 0 };
+    let steps = 0;
+    while (at) {
+      at = stepPlace(s, at, 1);
+      steps += 1;
+    }
+    expect(steps).toBe(6); // 1 + 2 + 3 pages, then the end
+    expect(JSON.stringify(log)).toBe(before);
+    expect(finishModel(log).done).toBe(0);
   });
 
   it('resumes at the first open page, and at the picked option of a pick-one group', () => {
