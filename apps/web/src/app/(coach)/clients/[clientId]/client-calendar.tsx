@@ -16,6 +16,7 @@ import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
 import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
+import { AssignToClientsDialog } from '@/components/assign/assign-to-clients';
 import { AddWorkoutDialog } from './add-workout-dialog';
 import { AssignDialog, type ExistingWorkout } from './assign-dialog';
 import { AssignmentsPanel } from './assignments-panel';
@@ -109,6 +110,7 @@ export function ClientCalendar({
   const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);
+  const [copying, setCopying] = useState<CalendarEntry | null>(null);
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -296,6 +298,7 @@ export function ClientCalendar({
                 item={item}
                 logHref={logHref(item.logId)}
                 resultsHref={`${logHref(item.logId)}?edit=1`}
+                onCopy={() => setCopying({ ...item, date })}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             ) : (
@@ -308,6 +311,7 @@ export function ClientCalendar({
                 editHref={`/clients/${client.id}/workouts/${item.id}`}
                 onMove={() => setMoving({ ...item, date })}
                 {...(editable ? {} : { moveLabel: 'Move to another day' })}
+                onCopy={() => setCopying({ ...item, date })}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             )
@@ -370,6 +374,19 @@ export function ClientCalendar({
             setMoving(null);
           }}
           onClose={() => setMoving(null)}
+        />
+      ) : null}
+
+      {copying ? (
+        // Copy to…: the workout as it is (done ones too, as a fresh plan) onto another day, for this client or others.
+        <AssignToClientsDialog
+          source={{ kind: 'copy', id: copying.id, name: copying.name, date: copying.date }}
+          preselect={[client.id]}
+          onDone={(message) => {
+            setCopying(null);
+            say(message);
+          }}
+          onClose={() => setCopying(null)}
         />
       ) : null}
 

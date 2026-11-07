@@ -193,6 +193,7 @@ test('a missed past workout can be edited: its card opens the editor and the cha
     'Log session',
     'Edit',
     'Move to another day',
+    'Copy to…',
     'Delete',
   ]);
   await page.keyboard.press('Escape');
@@ -228,7 +229,7 @@ test('a done workout: Edit results opens the correction form; its plan stays rea
   const done = card(page, pastDate, name);
   await done.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   const menu = day(page, pastDate).getByRole('menu', { name: `Options for ${name}` });
-  await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Delete']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Copy to…', 'Delete']);
   await menu.getByRole('menuitem', { name: 'Edit results' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/logs/${logId}$`));
   await expect(page.getByRole('button', { name: 'Save corrections' })).toBeVisible();

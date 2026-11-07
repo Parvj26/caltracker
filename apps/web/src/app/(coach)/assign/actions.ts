@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { AssignToClientsInput, addDays, compareByLastName, localToday } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
-import { assignOne, scheduleOne, todayError, GENERIC } from '@/lib/assign';
+import { assignOne, copyOne, scheduleOne, todayError, GENERIC } from '@/lib/assign';
 import { requireCoach } from '@/lib/auth';
 import { readAll } from '@/lib/coach-home';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -92,7 +92,7 @@ export async function loadAssignTargets(input: { programId?: string | null } = {
 export type ClientResult = { clientId: string } & ({ ok: true; count: number } | { ok: false; error: string });
 
 /**
- * Puts one library workout (or program) on each target client's calendar, on that client's day. Each client is one
+ * Puts one library workout (or program, or for Copy to… a client's calendar workout) on each target client's calendar, on that client's day. Each client is one
  * database call, all or nothing for that client; one client failing doesn't stop the others. Answers per client, in
  * the order sent. A refusal for the whole request (bad input, a wrong device date) comes back as { ok: false }.
  */
@@ -109,6 +109,10 @@ export async function assignToClients(
   const supabase = await createServerSupabase();
   const one = async (t: (typeof targets)[number]): Promise<ClientResult> => {
     try {
+      if (kind === 'copy') {
+        const r = await copyOne(supabase, { newId: t.id, sourceId, clientId: t.clientId, date: t.date, today });
+        return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ok: false, error: r.error };
+      }
       if (kind === 'workout') {
         const r = await scheduleOne(supabase, { newId: t.id, workoutId: sourceId, clientId: t.clientId, date: t.date, today });
         return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ok: false, error: r.error };
