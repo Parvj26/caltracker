@@ -19,6 +19,9 @@ import { upperCoreLog } from './log-fixtures';
 import {
   afterDone,
   buildPage,
+  deleteChoices,
+  stepLabel,
+  stepPlace,
   buildSections,
   finishModel,
   historyLines,
@@ -26,6 +29,8 @@ import {
   markAllPlan,
   markAllQuestion,
   readTyped,
+  invalidAnnouncement,
+  sheetDraft,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -189,6 +194,50 @@ describe('navigation', () => {
     expect(afterDone(s, { section: 2, page: 1 })).toEqual({ kind: 'finish' });
   });
 
+  it('steps one page back or forward across sections, without Done (options one by one)', () => {
+    const s = buildSections(mockLog());
+    expect(stepPlace(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepPlace(s, { section: 0, page: 0 }, 1)).toEqual({ section: 1, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, 1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 1, page: 1 }, 1)).toEqual({ section: 2, page: 0 });
+    // Back from a section's first page lands on the previous section's last page.
+    expect(stepPlace(s, { section: 2, page: 0 }, -1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 0 }, 1)).toEqual({ section: 2, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 2 }, 1)).toBeNull();
+  });
+
+  it('steps over a section with no pages', () => {
+    const s = buildSections(mockLog());
+    const gap = [s[0], { ...s[1], pages: [] }, s[2]];
+    expect(stepPlace(gap, { section: 0, page: 0 }, 1)).toEqual({ section: 2, page: 0 });
+    expect(stepPlace(gap, { section: 2, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+  });
+
+  it('names where a step goes', () => {
+    const s = buildSections(mockLog());
+    expect(stepLabel(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepLabel(s, { section: 0, page: 0 }, 1)).toBe('Next section: Resistance Training');
+    expect(stepLabel(s, { section: 1, page: 0 }, 1)).toBe('Next page');
+    expect(stepLabel(s, { section: 1, page: 0 }, -1)).toBe('Previous section: Warm-Up');
+    expect(stepLabel(s, { section: 2, page: 1 }, -1)).toBe('Previous page');
+  });
+
+  it('moving never logs anything: stepping leaves the log as it was', () => {
+    const log = mockLog();
+    const before = JSON.stringify(log);
+    const s = buildSections(log);
+    let at: { section: number; page: number } | null = { section: 0, page: 0 };
+    let steps = 0;
+    while (at) {
+      at = stepPlace(s, at, 1);
+      steps += 1;
+    }
+    expect(steps).toBe(6); // 1 + 2 + 3 pages, then the end
+    expect(JSON.stringify(log)).toBe(before);
+    expect(finishModel(log).done).toBe(0);
+  });
+
   it('resumes at the first open page, and at the picked option of a pick-one group', () => {
     let log = mockLog();
     expect(resumePlace(log, buildSections(log))).toEqual({ section: 0, page: 0 });
@@ -285,13 +334,17 @@ describe('pages', () => {
     expect(supersetRounds(block).map((r) => r.entries.map((e) => e.exerciseIndex))).toEqual([[0, 1], [0, 1], [0, 1], [0]]);
     const page = buildSections(log)[1].pages[0];
     let m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 1 of 4');
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.exercises.map((e) => e.label)).toEqual(['A1', 'A2']);
     expect(m.kind === 'superset' && m.rounds[0].restLine).toBe('Rest 1:00 after the round');
     log = completeSet(log, block.exercises[0].sets[0].id, NOW);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 2 of 4');
+    // The title stays "Superset 1"; round 1 is ticked off under it and round 2 is the current one.
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.currentRound).toBe(2);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4 ✓', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.rounds[0].done).toBe(true);
   });
 
@@ -469,12 +522,75 @@ describe('markAllPlan', () => {
     const ex = log.blocks[0].exercises[0];
     log = updateActual(log, ex.sets[0].id, { actualReps: 10 });
     // 10 typed on set 1; sets 2 and 3 take the client's own reps from the set before.
-    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0 });
+    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0, noWeight: 0 });
     const blank = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
     const bex = blank.blocks[0].exercises[0];
-    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3 });
+    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3, noWeight: 0 });
     expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
-    expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
-    expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+    expect(markAllQuestion({ tick: 4, skip: 0, noWeight: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 0 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+  });
+
+  it('still ticks weight and reps sets with reps but no weight (bodyweight), and says how many have no weight', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Pull-up', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    // Reps typed on set 1 only; no weight, no coach target, no last time.
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8 });
+    const plan = markAllPlan(log, [ex.id], {});
+    expect(plan).toEqual({ tick: 3, skip: 0, noWeight: 3 });
+    const ticked = markAll(log, [ex.id], {}, NOW).blocks[0].exercises[0].sets;
+    expect(ticked.every((x) => x.completedAt !== null && x.actualWeightKg === null && x.actualReps === 8)).toBe(true);
+    expect(markAllQuestion(plan)).toEqual({ title: 'Tick 3 sets with these numbers?', message: '3 sets have no weight.' });
+    expect(markAllQuestion({ tick: 1, skip: 0, noWeight: 1 }).message).toBe('1 set has no weight.');
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 1 }).message).toBe(
+      '1 set has no weight. 1 set has no numbers yet, so it stays unticked.',
+    );
+  });
+
+  it('counts no weight only for weight and reps exercises', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8, actualWeightKg: 40 });
+    expect(markAllPlan(log, [ex.id], {}).noWeight).toBe(0);
+  });
+});
+
+describe('invalidAnnouncement', () => {
+  it('speaks a box\'s reason once, when it becomes invalid or the reason changes', () => {
+    expect(invalidAnnouncement(null, 'Whole reps only')).toBe('Whole reps only');
+    expect(invalidAnnouncement('Whole reps only', 'Whole reps only')).toBeNull(); // still invalid: said already
+    expect(invalidAnnouncement('Whole reps only', 'That’s more than a set can hold')).toBe('That’s more than a set can hold');
+    expect(invalidAnnouncement('Whole reps only', null)).toBeNull(); // valid again: nothing to say
+  });
+});
+
+describe('sheetDraft', () => {
+  const saved = { feel: 'Good' as const, note: 'Saved note' };
+  it('starts from the saved feeling and note when the sheet opens', () => {
+    expect(sheetDraft({ wasVisible: false, visible: true, draft: { feel: null, note: 'old' }, saved })).toEqual(saved);
+  });
+  it('keeps what the client is typing when the saved note changes underneath', () => {
+    const typing = { feel: null, note: 'Half a sent' };
+    expect(sheetDraft({ wasVisible: true, visible: true, draft: typing, saved: { feel: 'Hard', note: 'From elsewhere' } })).toBe(typing);
+  });
+  it('leaves a closed sheet alone', () => {
+    const draft = { feel: null, note: '' };
+    expect(sheetDraft({ wasVisible: true, visible: false, draft, saved })).toBe(draft);
+    expect(sheetDraft({ wasVisible: false, visible: false, draft, saved })).toBe(draft);
+  });
+});
+
+describe('deleting a set', () => {
+  it('offers every set but the only one, named with its numbers', () => {
+    const log = mockLog();
+    const push = log.blocks[2].exercises[0];
+    expect(deleteChoices(push, 'lb', []).map((c) => c.title)).toEqual([
+      'Warm-up 1 · 35 lb × 12 reps',
+      'Set 1 · 35 lb × 12 reps',
+      'Drop set · 20 lb × 12 reps',
+      'Drop set to failure · 15 lb',
+    ]);
+    const circles = log.blocks[0].exercises[0];
+    expect(deleteChoices(circles, 'lb', [])).toEqual([]);
   });
 });

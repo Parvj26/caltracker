@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Chip } from '@/components/ui';
+import { ButtonLink, Chip } from '@/components/ui';
 import { getClient, getClientLimitations } from '@/lib/page-data';
 import { ClientTabs } from '../client-tabs';
 import styles from '../client-page.module.css';
 
 /**
- * The client page's frame: back to Clients, the client's name, a gentle flag when the coach has noted injuries, and
- * the tabs (Overview, Training, Body, Documents, Settings). Each tab is its own page below this layout.
+ * The client page's frame: back to Clients, the client's name, a gentle flag when the coach has noted injuries,
+ * Message (or, for a past client, their read-only message history on the Training tab), and the tabs (Overview,
+ * Training, Body, Documents, Settings). Each tab is its own page below this layout.
  */
 export default async function ClientTabsLayout({ children, params }: { children: ReactNode; params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
@@ -27,6 +28,17 @@ export default async function ClientTabsLayout({ children, params }: { children:
             <Chip tone="amber">Injury notes</Chip>
           </Link>
         ) : null}
+        <div className={styles.headerActions}>
+          {client.removedAt ? (
+            <Link href={`/clients/${client.id}/training#message-history`} className={styles.link}>
+              Message history
+            </Link>
+          ) : (
+            <ButtonLink variant="secondary" href={`/messages/${client.id}`}>
+              Message
+            </ButtonLink>
+          )}
+        </div>
       </header>
       <ClientTabs clientId={client.id} />
       <div className={styles.panel}>{children}</div>

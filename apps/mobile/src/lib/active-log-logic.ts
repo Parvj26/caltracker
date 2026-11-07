@@ -291,3 +291,12 @@ export function idleMinutes(lastActivityAt: string, nowMs: number): number {
   const t = Date.parse(lastActivityAt);
   return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 60_000));
 }
+
+/**
+ * The heading of the "your coach logs this" screen. Once the coach has stopped (20 minutes without activity, or they
+ * are no longer a coach of the business) the screen offers "Continue on my phone", so it says they stopped. Pure.
+ */
+export function coachBannerHeading(coach: { status: LogStatus | null; canReclaim: boolean }): string {
+  if (coach.status === 'completed') return 'Your coach logged this session';
+  return coach.canReclaim ? 'Your coach stopped logging' : 'Your coach is logging this session';
+}

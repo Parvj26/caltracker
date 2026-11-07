@@ -245,7 +245,8 @@ export default async function ClientPage({
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />
       {history ? (
-        <section aria-labelledby="history-heading">
+        // The client header's "Message history" link lands here.
+        <section id="message-history" aria-labelledby="history-heading">
           <h2 id="history-heading" className={styles.historyHeading}>Messages</h2>
           <div className={cx(messageStyles.pane, messageStyles.embedded)}>
             <Conversation

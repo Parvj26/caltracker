@@ -23,7 +23,7 @@ export {
 export type { CsvError, ParsedClientCsv } from './invites/csv';
 export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
-export { FREE_EXERCISE_DB_IMAGE_PREFIX, mapFreeExercise } from './exercises/free-exercise-db';
+export { FREE_EXERCISE_DB_IMAGE_PREFIX, exerciseImageObjectPath, mapFreeExercise } from './exercises/free-exercise-db';
 export { equipmentLabel, workoutEquipment } from './exercises/equipment';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
 export { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
@@ -179,7 +179,9 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
-export { coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { rebaseEdits } from './logs/rebase';
+export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
 export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
@@ -278,7 +280,16 @@ export type {
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
 export { LANDMARK_JOURNEY, STICKERS } from './awards/catalogue';
 export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogue';
-export { formatMultiple, isQualifying, ladderAnimal } from './awards/ladder';
+export {
+  formatMultiple,
+  instantMs,
+  isQualifying,
+  ladderHistoryBefore,
+  normalizeInstant,
+  pickLadderAnimal,
+  seededRng,
+} from './awards/ladder';
+export type { LadderAward, LadderPick } from './awards/ladder';
 export { detectPrs, epley1rm, logBests } from './awards/prs';
 export type { PersonalRecord, PrKind } from './awards/prs';
 export { journeyStep, liveStreak, localDay, streakWeek, streakWeeks, weekKey } from './awards/streak';
@@ -344,6 +355,8 @@ export { dayLabel, messageYoutubeIds } from './messages/format';
 export { mergeOutbox } from './messages/outbox';
 export { FULL_MAX_EDGE, THUMB_MAX_EDGE, MAX_PHOTOS, fitWithin, photoPaths, thumbPathOf, isAlreadyUploaded, mergeById } from './messages/photos';
 export type { PhotoExt } from './messages/photos';
+export { photoDisplaySize, photoSourceFor } from './media/display';
+export type { PhotoSize } from './media/display';
 export {
   chooseSubstitute,
   clearSubstitute,

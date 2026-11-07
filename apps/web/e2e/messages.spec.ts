@@ -115,6 +115,10 @@ test('the coach sends text and a photo and both appear', async ({ page }) => {
   await expect(photo).toBeVisible();
   // The private photo loads through its signed URL.
   await expect.poll(() => photo.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  // The bubble shows the full-size photo (not the thumbnail stretched), uncropped.
+  await expect(photo).toHaveAttribute('src', /\/message-images\/[^?]+[0-9a-f]\.(webp|jpg)\?/);
+  expect(await photo.getAttribute('src')).not.toMatch(/-thumb\.(webp|jpg)/);
+  await expect(photo).toHaveCSS('object-fit', 'contain');
 
   const stored = await admin.from('messages').select('body, image_paths, sender_id').eq('body', 'Form check').single();
   expect(stored.error).toBeNull();
@@ -164,10 +168,17 @@ test('"Seen" appears once the client has read the coach\'s message', async ({ pa
   await expect(bubble.getByText('Seen')).toBeVisible();
 });
 
-test('the Message button on the client\'s Training tab opens that conversation', async ({ page }) => {
+test('the Message button in the client header, on every tab, opens that conversation', async ({ page }) => {
   const client = await makeClient('Deepa');
   await signInAsCoach(page);
-  await page.goto(`/clients/${client.id}/training`);
+  // The header is shared by every client tab.
+  for (const tab of ['', '/training', '/body', '/documents', '/settings']) {
+    await page.goto(`/clients/${client.id}${tab}`);
+    // Once per page (the Training tab no longer has its own).
+    const message = page.getByRole('link', { name: 'Message', exact: true });
+    await expect(message).toHaveCount(1);
+    await expect(message).toHaveAttribute('href', `/messages/${client.id}`);
+  }
   await page.getByRole('link', { name: 'Message', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
   await expect(page.getByRole('heading', { name: client.name })).toBeVisible();
@@ -229,6 +240,11 @@ test('a past client\'s Training tab shows their history read-only', async ({ pag
   await expect(page.getByText("you can read the history but can't send new messages")).toBeVisible();
   await expect(page.getByLabel('Message', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Message', exact: true })).toHaveCount(0);
+  // Every tab's header links to that history instead.
+  await page.goto(`/clients/${client.id}`);
+  await page.getByRole('link', { name: 'Message history', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training#message-history$`));
+  await expect(page.getByRole('log').getByText('Thanks for everything, coach')).toBeVisible();
 
   // Not in the inbox.
   await page.goto('/messages');

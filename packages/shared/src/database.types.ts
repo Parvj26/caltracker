@@ -64,6 +64,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          ladder_sticker_key: string | null
           log_id: string
           log_revision: number
           result: Json
@@ -72,6 +73,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          ladder_sticker_key?: string | null
           log_id: string
           log_revision?: number
           result: Json
@@ -80,6 +82,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          ladder_sticker_key?: string | null
           log_id?: string
           log_revision?: number
           result?: Json
@@ -1937,6 +1940,7 @@ export type Database = {
           revision: number
           started_at: string
           status: Database["public"]["Enums"]["log_status"]
+          taken_over_from: string | null
           updated_at: string
           workout_id: string | null
           workspace_id: string
@@ -1956,6 +1960,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id: string
@@ -1975,6 +1980,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id?: string

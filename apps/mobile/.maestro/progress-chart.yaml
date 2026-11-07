@@ -24,7 +24,7 @@ env:
     timeout: 15000
 - runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
-    visible: 'Giraffe ×1'
+    visible: '.+ ×1'
     timeout: 10000
 - tapOn:
     id: summary-done

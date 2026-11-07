@@ -1,5 +1,6 @@
-# Share to community from a workout summary and from the zoo book: finish "E2E Log" (3 x 8 at 60 kg, a giraffe), tap
-# "Share to community" on the summary, post the card with a caption, then share the giraffe sticker from the zoo book.
+# Share to community from a workout summary and from the zoo book: finish "E2E Log" (3 x 8 at 60 kg, one animal up
+# to a giraffe, picked at random for a new client), tap "Share to community" on the summary, post the card with a
+# caption, then share that animal's sticker (the only owned tile, so `sticker-.*` finds it) from the zoo book.
 # Run via `pnpm --filter mobile e2e`.
 appId: app.caltracker.client
 env:
@@ -78,15 +79,15 @@ env:
     id: tab-zoo
 - scrollUntilVisible:
     element:
-      id: sticker-giraffe
+      id: 'sticker-.*'
 - tapOn:
-    id: sticker-giraffe
+    id: 'sticker-.*'
 - tapOn:
     id: sheet-share
 - extendedWaitUntil:
     visible: 'Share to community'
     timeout: 10000
-- assertVisible: 'Your Giraffe sticker'
+- assertVisible: 'Your .+ sticker'
 - tapOn:
     id: new-post-submit
 
@@ -102,7 +103,7 @@ env:
 - assertVisible: 'Workout done'
 # Built by the database from the log and its award: counts and the animal, no volume.
 - assertVisible: '1 exercise · 3 sets'
-- assertVisible: '≈ .*Giraffe.*'
+- assertVisible: '≈ .+'
 
 - runScript:
     file: helpers/call.js
