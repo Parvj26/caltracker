@@ -85,6 +85,14 @@ test('the coach posts with a photo, a client likes and comments live, and the co
   await expect(mine).toBeVisible();
   await expect(mine.getByRole('link', { name: 'https://caltracker.app' })).toHaveAttribute('target', '_blank');
   await expect(mine.getByRole('link', { name: 'Open photo 1 full size' })).toBeVisible();
+  // The feed shows the full-size photo (not the small thumbnail stretched), whole: uncropped, at its stored size.
+  const feedPhoto = mine.getByRole('img', { name: 'Photo 1' });
+  await expect(feedPhoto).toHaveAttribute('src', /\/community-images\/[^?]+[0-9a-f]\.(webp|jpg)\?/);
+  expect(await feedPhoto.getAttribute('src')).not.toMatch(/-thumb\.(webp|jpg)/);
+  await expect(feedPhoto).toHaveCSS('object-fit', 'contain');
+  await expect(feedPhoto).toHaveAttribute('width', /^\d+$/);
+  await expect(feedPhoto).toHaveAttribute('height', /^\d+$/);
+  await expect.poll(() => feedPhoto.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   await expect(page.getByLabel('Write a post')).toHaveValue('');
 
   // The client sees it, with the coach's name, and gets a notification.

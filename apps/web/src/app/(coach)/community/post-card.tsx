@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { COMMENT_BODY_MAX, cardText, likersLine, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { SharpPhoto } from '@/components/sharp-photo';
 import { Chip, ErrorText } from '@/components/ui';
 import { addComment, deleteComment, deletePost, setLiked, setPinned, type CommunityOutcome } from './actions';
 import type { FeedPost } from './data';
@@ -98,13 +99,13 @@ export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewe
       ) : null}
       {post.card ? <CardView card={post.card} units={units} /> : null}
       {post.images.length > 0 ? (
-        <ul className={styles.photoGrid} data-count={post.images.length} aria-label="Photos">
+        // Each photo whole, at its own shape, one under the other (no crop); very tall ones are capped at 80% of the window.
+        <ul className={styles.photoStack} aria-label="Photos">
           {post.images.map((img, i) => (
             <li key={img.id}>
-              {img.fullUrl && img.thumbUrl ? (
-                <a href={img.fullUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open photo ${i + 1} full size`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.thumbUrl} alt={`Photo ${i + 1}`} loading="lazy" />
+              {img.fullUrl ? (
+                <a className={styles.photoLink} href={img.fullUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open photo ${i + 1} full size`}>
+                  <SharpPhoto full={img.fullUrl} thumb={img.thumbUrl ?? undefined} alt={`Photo ${i + 1}`} width={img.width} height={img.height} maxHeight="80vh" />
                 </a>
               ) : (
                 <span className={styles.caption}>Photo unavailable</span>
