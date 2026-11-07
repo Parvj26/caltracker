@@ -50,6 +50,34 @@ export function summarizeReactions(rows: readonly ReactionRow[], viewerId: strin
   return out;
 }
 
+/** One tap as a change to one row, so a failed tap can be undone on its own (see invertReactionChange). */
+export type ReactionChange = { op: 'add' | 'remove'; row: ReactionRow };
+
+/** What a tap does: add the reaction as the newest if the viewer had not used it, or remove their row if they had. */
+export function reactionTap(
+  rows: readonly ReactionRow[],
+  viewer: { userId: string; name: string },
+  key: ReactionKey,
+  nowIso: string,
+): ReactionChange {
+  const existing = rows.find((r) => r.userId === viewer.userId && r.reaction === key);
+  if (existing) return { op: 'remove', row: existing };
+  return { op: 'add', row: { userId: viewer.userId, reaction: key, createdAt: nowIso, name: viewer.name } };
+}
+
+const sameSlot = (a: ReactionRow, b: ReactionRow) => a.userId === b.userId && a.reaction === b.reaction;
+
+/** Applies a change: an add never duplicates (one of each per person), a remove touches only that person's row. */
+export function applyReactionChange(rows: readonly ReactionRow[], change: ReactionChange): ReactionRow[] {
+  if (change.op === 'remove') return rows.filter((r) => !sameSlot(r, change.row));
+  return rows.some((r) => sameSlot(r, change.row)) ? [...rows] : [...rows, change.row];
+}
+
+/** The change that undoes `change` (a failed add is removed; a failed remove is put back as it was). */
+export function invertReactionChange(change: ReactionChange): ReactionChange {
+  return { op: change.op === 'add' ? 'remove' : 'add', row: change.row };
+}
+
 /** The rows after the viewer taps a reaction: added as the newest if they had not used it, removed if they had. */
 export function toggleReaction(
   rows: readonly ReactionRow[],
@@ -57,9 +85,7 @@ export function toggleReaction(
   key: ReactionKey,
   nowIso: string,
 ): ReactionRow[] {
-  const had = rows.some((r) => r.userId === viewer.userId && r.reaction === key);
-  if (had) return rows.filter((r) => !(r.userId === viewer.userId && r.reaction === key));
-  return [...rows, { userId: viewer.userId, reaction: key, createdAt: nowIso, name: viewer.name }];
+  return applyReactionChange(rows, reactionTap(rows, viewer, key, nowIso));
 }
 
 const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;

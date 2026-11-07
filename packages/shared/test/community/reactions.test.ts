@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   REACTIONS,
+  applyReactionChange,
   groupedReactionText,
+  invertReactionChange,
   isReactionKey,
   reactionButtonLabel,
+  reactionTap,
   summarizeReactions,
   toggleReaction,
   whoReactedLabel,
@@ -86,6 +89,44 @@ describe('toggleReaction', () => {
     let next = toggleReaction([], { userId: 'me', name: 'Me' }, 'heart', '2026-11-06T13:00:00Z');
     next = toggleReaction(next, { userId: 'me', name: 'Me' }, 'clap', '2026-11-06T13:00:01Z');
     expect(summarizeReactions(next, 'me').map((r) => r.key)).toEqual(['heart', 'clap']);
+  });
+});
+
+describe('per-tap changes (for undoing one failed tap)', () => {
+  const me = { userId: 'me', name: 'Me' };
+
+  it('describes a tap as an add or a remove of one row', () => {
+    const rows = [row('me', 'fire', '2026-11-06T09:00:00Z', 'Me')];
+    expect(reactionTap(rows, me, 'heart', '2026-11-06T13:00:00Z')).toEqual({ op: 'add', row: row('me', 'heart', '2026-11-06T13:00:00Z', 'Me') });
+    expect(reactionTap(rows, me, 'fire', '2026-11-06T13:00:00Z')).toEqual({ op: 'remove', row: rows[0] });
+  });
+
+  it('applies a change without duplicating or touching other rows', () => {
+    const rows = [row('kim', 'fire', '2026-11-06T10:00:00Z', 'Kim')];
+    const add = { op: 'add' as const, row: row('me', 'fire', '2026-11-06T13:00:00Z', 'Me') };
+    expect(applyReactionChange(applyReactionChange(rows, add), add)).toEqual([...rows, add.row]);
+    expect(applyReactionChange(rows, { op: 'remove', row: add.row })).toEqual(rows);
+  });
+
+  it('undoes only the failed tap, keeping a later tap that succeeded', () => {
+    let rows: ReactionRow[] = [row('me', 'fire', '2026-11-06T09:00:00Z', 'Me'), row('kim', 'clap', '2026-11-06T10:00:00Z', 'Kim')];
+    const first = reactionTap(rows, me, 'party', '2026-11-06T13:00:00Z'); // add party: will fail
+    rows = applyReactionChange(rows, first);
+    const second = reactionTap(rows, me, 'fire', '2026-11-06T13:00:01Z'); // remove fire: succeeds
+    rows = applyReactionChange(rows, second);
+    rows = applyReactionChange(rows, invertReactionChange(first));
+    expect(summarizeReactions(rows, 'me').map((r) => [r.key, r.mine])).toEqual([['clap', false]]);
+  });
+
+  it('puts a failed remove back as it was', () => {
+    const original = row('me', 'heart', '2026-11-06T09:00:00Z', 'Me');
+    let rows: ReactionRow[] = [original];
+    const tap = reactionTap(rows, me, 'heart', '2026-11-06T13:00:00Z');
+    rows = applyReactionChange(rows, tap);
+    rows = applyReactionChange(rows, reactionTap(rows, me, 'muscle', '2026-11-06T13:00:01Z'));
+    rows = applyReactionChange(rows, invertReactionChange(tap));
+    expect(rows).toContainEqual(original);
+    expect(summarizeReactions(rows, 'me').map((r) => r.key)).toEqual(['heart', 'muscle']);
   });
 });
 

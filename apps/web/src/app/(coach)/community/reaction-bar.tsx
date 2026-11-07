@@ -3,9 +3,11 @@
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
   REACTIONS,
+  applyReactionChange,
+  invertReactionChange,
   reactionButtonLabel,
+  reactionTap,
   summarizeReactions,
-  toggleReaction,
   whoReactedLabel,
   type ReactionKey,
   type ReactionRow,
@@ -59,15 +61,15 @@ export function ReactionBar({
   }, [pickerOpen]);
 
   const toggle = (key: ReactionKey) => {
-    const on = !shown.some((r) => r.userId === viewer.userId && r.reaction === key);
-    const before = shown;
-    setShown(toggleReaction(shown, viewer, key, new Date().toISOString()));
+    const change = reactionTap(shown, viewer, key, new Date().toISOString());
+    setShown((rows) => applyReactionChange(rows, change));
     setPickerOpen(false);
     setError(null);
     startTransition(async () => {
-      const r: CommunityOutcome = await setReaction(target, key, on);
+      const r: CommunityOutcome = await setReaction(target, key, change.op === 'add');
       if (!r.ok) {
-        setShown(before);
+        // Undo only this tap: other taps made since then stay.
+        setShown((rows) => applyReactionChange(rows, invertReactionChange(change)));
         setError(r.error);
       }
     });

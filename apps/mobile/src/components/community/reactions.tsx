@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   REACTIONS,
+  applyReactionChange,
+  invertReactionChange,
   reactionButtonLabel,
+  reactionTap,
   summarizeReactions,
-  toggleReaction,
   whoReactedLabel,
   type ReactionKey,
   type ReactionRow,
@@ -32,13 +34,13 @@ export function useReactions(opts: { target: ReactionTarget; rows: ReactionRow[]
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const toggle = (key: ReactionKey) => {
-    const on = !shown.some((r) => r.userId === me && r.reaction === key);
-    const before = shown;
-    setShown(toggleReaction(shown, { userId: me, name: 'You' }, key, new Date().toISOString()));
-    void setReaction(target, key, on)
+    const change = reactionTap(shown, { userId: me, name: 'You' }, key, new Date().toISOString());
+    setShown((rows) => applyReactionChange(rows, change));
+    void setReaction(target, key, change.op === 'add')
       .then(onChanged)
       .catch((e: unknown) => {
-        setShown(before);
+        // Undo only this tap: other taps made since then stay.
+        setShown((rows) => applyReactionChange(rows, invertReactionChange(change)));
         Alert.alert(errorText(e));
       });
   };
