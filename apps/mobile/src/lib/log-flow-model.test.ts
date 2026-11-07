@@ -580,6 +580,86 @@ describe('sheetDraft', () => {
   });
 });
 
+describe('Auto progression on the phone', () => {
+  /** One straight exercise, 3 × 8–10, with or without a weight typed by the coach. */
+  const progressionLog = (targetWeightKg: number | null) =>
+    startLogFromWorkout(
+      WorkoutDoc.parse({
+        id: uuid(),
+        name: 'Push',
+        notes: null,
+        blocks: [
+          {
+            id: uuid(),
+            kind: 'straight',
+            exercises: [exercise('Bench Press', [1, 2, 3].map(() => set('normal', { targetRepsMin: 8, targetRepsMax: 10, targetWeightKg })))],
+          },
+        ],
+      }),
+      uuid,
+      NOW,
+    );
+  const page = { kind: 'straight' as const, key: 'p', blockIndex: 0 };
+  const lastFor = (log: WorkoutLogDoc): LastResults => ({
+    [log.blocks[0].exercises[0].exerciseId]: {
+      finishedAt: NOW,
+      sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, actualReps: 10, actualWeightKg: 135 * LB, actualDurationS: null, actualDistanceM: null })),
+    },
+  });
+  const historyFor = (log: WorkoutLogDoc) => ({
+    [log.blocks[0].exercises[0].exerciseId]: {
+      region: 'upper' as const,
+      sessions: [{ sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, completed: true, reps: 10, weightKg: 135 * LB })) }],
+    },
+  });
+
+  it('pre-fills the suggested weight and shows the hint', () => {
+    const log = progressionLog(null);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBe('Suggested 140 lb · ↑ +5 lb');
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([140, 140, 140]);
+    // "Last time" still shows what was actually lifted.
+    expect(model.exercise.lastTime[0]?.actualWeightKg).toBeCloseTo(135 * LB);
+  });
+
+  it('changes nothing without history (Auto progression off)', () => {
+    const log = progressionLog(null);
+    const model = buildPage(log, page, 'lb', lastFor(log), {});
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([135, 135, 135]);
+  });
+
+  it('lets a weight the coach typed win', () => {
+    const log = progressionLog(150 * LB);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([150, 150, 150]);
+  });
+
+  it('hides the suggestion when a set was ticked with another weight before the history loaded', () => {
+    let log = progressionLog(null);
+    const ex = log.blocks[0].exercises[0];
+    // Ticked offline with last time's 135 lb; then the history arrives.
+    log = completeSetWith(log, ex.sets[0].id, { reps: 10, weightKg: 135 * LB, durationS: null, distanceM: null }, NOW);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    // The open sets carry the ticked weight forward, matching what the line (not) says.
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([135, 135, 135]);
+  });
+
+  it('Mark all ticks with the suggested weight', () => {
+    const log = progressionLog(null);
+    const ex = log.blocks[0].exercises[0];
+    const done = markAll(log, [ex.id], lastFor(log), NOW, { history: historyFor(log), units: 'lb' });
+    expect(done.blocks[0].exercises[0].sets.map((s) => Math.round((s.actualWeightKg ?? 0) / LB))).toEqual([140, 140, 140]);
+    expect(markAllPlan(log, [ex.id], lastFor(log), { history: historyFor(log), units: 'lb' })).toEqual({ tick: 3, skip: 0, noWeight: 0 });
+  });
+});
+
 describe('deleting a set', () => {
   it('offers every set but the only one, named with its numbers', () => {
     const log = mockLog();

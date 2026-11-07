@@ -1,0 +1,35 @@
+# NOT RUN YET (written without a simulator; run it before relying on it).
+# Auto progression (docs/superpowers/specs/2026-11-07-auto-progression-design.md), phone side: yesterday the client
+# finished Barbell Squat 3 × 10 @ 60 kg; today's "E2E Progress" plans 3 × 8–10 with no weight, from a new program
+# (Auto progression on). The squat page shows the suggestion (60 kg + 5 kg, lower body: "Suggested 65 kg · ↑ +5 kg",
+# or 142 lb · ↑ +10 lb for a pounds user) and Mark all ticks every set with the suggested weight.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today-progression, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Progress' }
+- extendedWaitUntil:
+    visible: 'Suggested .* · ↑ \+.*'
+    timeout: 10000
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '0' }
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

@@ -122,6 +122,31 @@ export async function loadFeed(communityId: string): Promise<FeedPost[]> {
   return [...rows.values()].map(toFeedPost);
 }
 
+/** The newest few posts by time (pinned ones included, in their place), for the Today tab's community card. */
+export async function loadLatestPosts(communityId: string, limit: number): Promise<FeedPost[]> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select(POST_SELECT)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) fail(error, 'Couldn’t load the community.');
+  return ((data ?? []) as unknown as PostRow[]).map(toFeedPost);
+}
+
+/** Whether I already shared this workout to the community (as a workout card). */
+export async function sharedWorkout(logId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('id')
+    .eq('author_id', await myId())
+    .eq('card->>kind', 'workout')
+    .eq('card->>logId', logId)
+    .limit(1);
+  if (error) fail(error, 'Couldn’t load the community.');
+  return (data ?? []).length > 0;
+}
+
 export async function loadPost(postId: string): Promise<FeedPost | null> {
   const { data, error } = await supabase.from('community_posts').select(POST_SELECT).eq('id', postId).maybeSingle();
   if (error) fail(error, 'Couldn’t load the post.');
@@ -195,6 +220,15 @@ export async function createPost(input: {
     p_images: images,
   });
   if (error) fail(error, postErrorMessage(error.code, input.card !== null));
+}
+
+/**
+ * The card a share would post, built by the database the same way (preview_community_card), so the composer can show
+ * it before posting. Null when it can't be built right now (no signal, or a refusal the Post button will explain).
+ */
+export async function previewCard(communityId: string, card: CardRequest): Promise<CommunityCard | null> {
+  const { data, error } = await supabase.rpc('preview_community_card', { p_community_id: communityId, p_card: card });
+  return error ? null : parseCard(data);
 }
 
 export async function deletePost(post: FeedPost): Promise<void> {

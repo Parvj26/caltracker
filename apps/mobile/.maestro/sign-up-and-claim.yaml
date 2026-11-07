@@ -49,7 +49,8 @@ env:
 - tapOn:
     text: Not Now
     optional: true
-- assertVisible: 'Welcome to Demo Coaching'
+- assertVisible:
+    id: today-greeting
 # A brand-new client has no workouts yet, so Today shows the first-time welcome.
 - extendedWaitUntil:
     visible: 'Your first workout is coming!'

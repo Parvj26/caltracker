@@ -32,8 +32,6 @@ const dayFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'nume
 
 /** The problems a coach acts on; "new bests" is a celebration and never makes Home say someone needs attention. */
 const PROBLEMS: ReadonlySet<AttentionKind> = new Set(['missed_in_a_row', 'missed', 'program_ending', 'nothing_planned', 'quiet']);
-/** Reasons where the next step is planning: those rows get an Assign action. */
-const NEEDS_PLAN: ReadonlySet<AttentionKind> = new Set(['program_ending', 'nothing_planned']);
 
 /** A client's conversation, so Today's clients and Needs attention rows can offer "Message". */
 function messageHref(clientId: string): string {
@@ -110,8 +108,17 @@ function Group<T>({ id, title, items, row }: { id?: string; title: string; items
   );
 }
 
+/** Every client row's Assign: opens the client's Training calendar, where the coach adds workouts or a program. */
+function AssignLink({ id, name }: { id: string; name: string }) {
+  return (
+    <Link href={`/clients/${id}/training`} className={styles.assign} aria-label={`Assign to ${name}`}>
+      Assign
+    </Link>
+  );
+}
+
 /** One Needs attention row: who, why, and what to do about it. */
-function AttentionRow({ client, why, assign }: { client: HomeClient; why: string; assign: boolean }) {
+function AttentionRow({ client, why }: { client: HomeClient; why: string }) {
   const name = fullName(client);
   const message = messageHref(client.id);
   return (
@@ -123,9 +130,7 @@ function AttentionRow({ client, why, assign }: { client: HomeClient; why: string
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}`} className={styles.assign} aria-label={`Open ${name}`}>Open</Link>
-        {assign ? (
-          <Link href={`/clients/${client.id}/training?assign=1`} className={styles.assign} aria-label={`Assign a program to ${name}`}>Assign</Link>
-        ) : null}
+        <AssignLink id={client.id} name={name} />
         <Link href={message} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
       </span>
     </li>
@@ -144,6 +149,7 @@ function ScanDueRow({ client, why }: { client: HomeClient; why: string }) {
       </span>
       <span className={styles.rowActions}>
         <Link href={`/clients/${client.id}/body?scan=1`} className={styles.assign} aria-label={`Add a scan for ${name}`}>Add scan</Link>
+        <AssignLink id={client.id} name={name} />
       </span>
     </li>
   );
@@ -276,7 +282,8 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                             {a.label}
                           </Link>
                         ))}
-                          <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
+                        <AssignLink id={r.client.id} name={name} />
+                        <Link href={messageHref(r.client.id)} className={styles.assign} aria-label={`Message ${name}`}>Message</Link>
                       </span>
                     </li>
                   );
@@ -299,7 +306,7 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
                 row={(item) => {
                   const c = byId.get(item.clientId);
                   return c ? (
-                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} assign={NEEDS_PLAN.has(g.kind)} />
+                    <AttentionRow key={item.clientId} client={c} why={reasonText(item.reason, view.today)} />
                   ) : null;
                 }}
               />
@@ -315,6 +322,7 @@ export function HomeView({ coachFirstName, coachId, data }: { coachFirstName: st
           </Card>
         </aside>
       </div>
+
     </div>
   );
 }

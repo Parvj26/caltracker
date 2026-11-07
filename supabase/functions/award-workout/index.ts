@@ -20,6 +20,8 @@ import {
 //   - a coach correction (web, Task 7): { logId, recompute: true }. That rewrites the log's PRs, the client's
 //     bests and stats from the logs, and never rolls again. A workout keeps its ladder animal forever (only its
 //     multiple follows the corrected volume); one with no animal yet may get one. Never a second one per log.
+// The award stored includes the workout's volume (volumeKg, from the shared logVolumeKg), so a shared workout card can
+// say how much was lifted without the database adding anything up; a recompute refreshes it.
 // A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
 // plain call. A recompute of a log with no award yet is a full award (the client was always due it).
 // A client the coach has removed gets nothing: 403 with hint 'not_a_client', as save_workout_log answers.

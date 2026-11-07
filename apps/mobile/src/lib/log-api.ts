@@ -7,10 +7,12 @@ import {
   LOG_TREE_SELECT,
   WorkoutDoc,
   logRowToDoc,
+  progressionHistoryFromRows,
   type Database,
   type IsoDate,
   type LogStatus,
   type LogTreeRow,
+  type ProgressionHistory,
   type SetType,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
@@ -103,6 +105,19 @@ export async function fetchLastResults(exerciseIds: string[]): Promise<LastResul
     });
   }
   return out;
+}
+
+/**
+ * Auto progression: the client's last two finished sessions of these exercises for one planned workout
+ * (progression_history), for the shared nextSuggestion. Empty when the workout's program has Auto progression off,
+ * the workout isn't from a program, or the id isn't a uuid.
+ */
+export async function fetchProgression(workoutId: string, exerciseIds: string[]): Promise<ProgressionHistory> {
+  const ids = [...new Set(exerciseIds)].filter((id) => UUID.test(id));
+  if (!UUID.test(workoutId) || ids.length === 0) return {};
+  const { data, error } = await supabase.rpc('progression_history', { p_workout_id: workoutId, p_exercise_ids: ids });
+  if (error) throw failed('progression', error);
+  return progressionHistoryFromRows(data);
 }
 
 /**
