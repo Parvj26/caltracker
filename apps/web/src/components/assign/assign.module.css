@@ -45,19 +45,3 @@
 .modes legend { margin-bottom: var(--ct-space-1); padding: 0; font-weight: var(--ct-weight-section-heading); }
 .mode { display: flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); cursor: pointer; }
 .mode input { width: 18px; height: 18px; accent-color: var(--ct-ink); }
-
-/* Home's quick Assign: Workout / Program tabs. */
-.tabs { display: flex; gap: var(--ct-space-1); padding: var(--ct-space-1); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
-.tab, .tabOn {
-  flex: 1;
-  min-height: var(--ct-tap-min);
-  border: 0;
-  border-radius: var(--ct-radius-input);
-  background: transparent;
-  color: var(--ct-ink);
-  font: inherit;
-  font-weight: var(--ct-weight-section-heading);
-  cursor: pointer;
-}
-.tabOn { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.panel { display: flex; flex-direction: column; gap: var(--ct-space-3); }
