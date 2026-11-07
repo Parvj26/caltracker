@@ -218,10 +218,9 @@ describe('createLogSync', () => {
     // the server applies this one final save and says the coach logs it now.
     const local = sampleLog({ revision: 9 });
     const store = await storeWith(local, 5);
-    const server = sampleLog({ revision: 9, name: 'Server copy' });
-    const save = vi.fn((doc: WorkoutLogDoc): Promise<SaveLogResult> =>
-      Promise.resolve({ applied: true, revision: doc.revision, status: 'in_progress', loggedByOther: true }),
-    );
+    // The server stores it 1000 above the take over's revision (5), so the coach's page re-applies its edits on it.
+    const server = sampleLog({ revision: 1005, name: 'Server copy' });
+    const save = vi.fn((): Promise<SaveLogResult> => Promise.resolve({ applied: true, revision: 1005, status: 'in_progress', loggedByOther: true }));
     const held: WorkoutLogDoc[] = [];
     const rejected = vi.fn();
     const sync = createLogSync({ save, fetchLog: vi.fn(() => Promise.resolve(server)), store, onHeldByOther: (d) => held.push(d), onRejected: rejected });
@@ -231,7 +230,7 @@ describe('createLogSync', () => {
     expect(held).toEqual([server]);
     // Nothing was lost, so no "sets replaced" note.
     expect(rejected).not.toHaveBeenCalled();
-    expect(await store.load()).toEqual({ log: server, lastSyncedRevision: 9 });
+    expect(await store.load()).toEqual({ log: server, lastSyncedRevision: 1005 });
   });
 
   it('after a reclaim (or hand back) adopts the server copy over its own older queued edits', async () => {
