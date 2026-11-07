@@ -19,7 +19,7 @@ export type AwardInput = {
   rng: Rng;
   /** The ladder animals awarded for logs finished before this one, oldest first (ladderHistoryBefore). */
   ladderHistory: readonly string[];
-  /** The animal already stored for this log, kept on a recompute while the volume still reaches it. */
+  /** The animal already stored for this log: a workout keeps it forever, whatever the volume becomes. */
   keepLadder?: string | null;
 };
 

@@ -246,6 +246,10 @@ describe('computeAward', () => {
     expect(a.ladder).toMatchObject({ key: 'red-panda', multiple: 2, isNew: true, count: 1 });
     expect(calls).toBe(0); // under 5 sets: no rolls, and the pick has its own seeded source
   });
+  it('a stored animal stays after a correction below it, with a multiple under 1', () => {
+    const a = computeAward(base({ log: mkLog([{ sets: sets(5, 20, 10) }]) })); // 1,000 kg, stored rhino 2,300 kg
+    expect(a.ladder).toMatchObject({ key: 'rhino', multiple: 1000 / 2300 });
+  });
   it('drops only from those not owned', () => {
     const owned = new Map([['pink-river-dolphin', { count: 1, shiny: false }]]);
     expect(computeAward(base({ owned, rng: () => 0.01 })).drop).toBe('kakapo');
@@ -256,7 +260,7 @@ describe('computeAward', () => {
     expect(a.drop).toBeNull();
   });
   it('a cardio-only log has no ladder', () => {
-    const a = computeAward(base({ log: mkLog([{ trackingType: 'distance', sets: sets(6) }]) }));
+    const a = computeAward(base({ log: mkLog([{ trackingType: 'distance', sets: sets(6) }]), keepLadder: null }));
     expect(a.ladder).toBeNull();
   });
   it('landmarks only when the streak moves up; milestones only when the count moves', () => {

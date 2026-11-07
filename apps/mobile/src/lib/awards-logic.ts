@@ -7,6 +7,7 @@ import {
   STICKERS,
   formatMultiple,
   formatLogVolume,
+  instantMs,
   ladderHistoryBefore,
   logVolumeKg,
   pickLadderAnimal,
@@ -206,7 +207,7 @@ export function withLocalPick(cache: LadderCache, pick: LadderAward): LadderCach
 /** Every ladder award to count: the server's, then previews it doesn't have yet that are under a week old. */
 export function ladderAwardsFrom(cache: LadderCache, nowMs: number): LadderAward[] {
   const known = new Set(cache.server.map((a) => a.logId));
-  const fresh = cache.local.filter((a) => !known.has(a.logId) && nowMs - Date.parse(a.finishedAt) <= PENDING_MAX_AGE_MS);
+  const fresh = cache.local.filter((a) => !known.has(a.logId) && nowMs - instantMs(a.finishedAt) <= PENDING_MAX_AGE_MS);
   return [...cache.server, ...fresh];
 }
 

@@ -116,6 +116,13 @@ describe('the ladder history on the phone', () => {
     expect(ladderAwardsFrom(cache, NOW).map((x) => x.key)).toEqual(['cat', 'goat', 'horse']);
   });
 
+  it('reads microsecond Postgres timestamps when ageing previews out', () => {
+    const fresh = withLocalPick(emptyLadderCache, a('p1', '2026-11-06 10:00:00.123456+00', 'pig'));
+    expect(ladderAwardsFrom(fresh, NOW).map((x) => x.key)).toEqual(['pig']);
+    const old = withLocalPick(emptyLadderCache, a('p0', '2026-10-20T10:00:00.999999+00:00', 'pig'));
+    expect(ladderAwardsFrom(old, NOW)).toEqual([]);
+  });
+
   it('replaces a preview for the same log, and forgets previews older than a week', () => {
     let cache = withLocalPick(emptyLadderCache, a('p1', '2026-11-06T10:00:00Z', 'pig'));
     cache = withLocalPick(cache, a('p1', '2026-11-06T10:00:00Z', 'cow'));

@@ -35,7 +35,25 @@ export function seededRng(seed: string): Rng {
   };
 }
 
-const atMs = (iso: string) => Date.parse(iso);
+/**
+ * A timestamp as Postgres sends it ("2026-11-07T05:12:19.123456+00:00", or with a space and "+00") turned into an
+ * ISO instant every JavaScript engine parses: a "T", at most 3 fractional digits, and "Z" for UTC. Hermes (the
+ * phone) can return NaN for microseconds, which would silently break the order of the ladder history.
+ */
+export function normalizeInstant(ts: string): string {
+  return ts
+    .trim()
+    .replace(' ', 'T')
+    .replace(/(\.\d{3})\d+/, '$1')
+    .replace(/(?:\+00(?::?00)?|-00:00)$/, 'Z');
+}
+
+/** The instant in ms since the epoch, after normalizeInstant. */
+export function instantMs(ts: string): number {
+  return Date.parse(normalizeInstant(ts));
+}
+
+const atMs = instantMs;
 
 /**
  * The ladder animals a client was awarded for logs finished before `log` (by finish time, then log id), oldest
@@ -62,7 +80,9 @@ export function ladderHistoryBefore(
  *   2. one the client has not been awarded yet, at random (seeded by the log id, so always the same one);
  *   3. if they have them all, the one whose last award is the oldest (lighter first on a tie).
  * `history` is the animals awarded before this log, oldest first (ladderHistoryBefore). `keep` is the animal
- * already stored for this log: it stays as long as the volume still reaches it. Null below the lightest animal.
+ * already stored for this log: a workout keeps its animal forever (product owner, 2026-11-07), even when a
+ * correction takes the volume below it, so it always comes back, with the multiple of the volume now (maybe under
+ * 1). With nothing stored: null below the lightest animal.
  */
 export function pickLadderAnimal(
   volumeKg: number,
@@ -71,11 +91,11 @@ export function pickLadderAnimal(
   keep?: string | null,
 ): LadderPick | null {
   const pick = (sticker: StickerDef): LadderPick => ({ sticker, multiple: volumeKg / (sticker.weightKg ?? 1) });
+  const kept = keep ? LADDER_BY_KEY.get(keep) : undefined;
+  if (kept) return pick(kept);
+
   const eligible = LADDER.filter((s) => (s.weightKg ?? Infinity) <= volumeKg);
   if (eligible.length === 0) return null;
-
-  const kept = keep ? LADDER_BY_KEY.get(keep) : undefined;
-  if (kept && eligible.includes(kept)) return pick(kept);
 
   const lastAwarded = new Map<string, number>();
   history.forEach((key, i) => lastAwarded.set(key, i));
@@ -99,8 +119,12 @@ function plural(name: string): string {
   return `${name}s`;
 }
 
-/** "≈ 1 Hippo", "≈ 1.4 Hippos": one decimal under 10, whole numbers from 10 up, thousands grouped ("≈ 1,500 Rabbits"). */
+/**
+ * "≈ 1 Hippo", "≈ 1.4 Hippos": one decimal under 10, whole numbers from 10 up, thousands grouped ("≈ 1,500 Rabbits").
+ * Under 1 (a kept animal after a correction): "≈ 0.8 Horses", and "< 0.1 Horses" for a sliver above nothing.
+ */
 export function formatMultiple(multiple: number, name: string): string {
+  if (multiple > 0 && multiple < 0.05) return `< 0.1 ${plural(name)}`;
   const rounded = multiple < 10 ? Math.round(multiple * 10) / 10 : Math.round(multiple);
   const text = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `≈ ${text} ${rounded === 1 ? name : plural(name)}`;
