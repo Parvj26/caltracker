@@ -77,8 +77,9 @@ test('a workout today is Not started, then Done once a log completes, linking to
   await page.goto('/home');
   let row = rowFor(page, last);
   await expect(row).toContainText('Not started');
-  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.locator('[role="note"]').filter({ hasText: 'Log session' })).toBeVisible();
+  // The row and its "Log session" button both open the coach's session logging page.
+  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
+  await expect(row.getByRole('link', { name: /^Log session: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
 
   const start = new Date(Date.now() - 52 * 60_000).toISOString();
   const logId = await seedLog(admin, { workspaceId, clientId, name: 'Leg day', plannedWorkoutId: workoutId, startedAt: start, finishedAt: new Date().toISOString() });
@@ -87,16 +88,39 @@ test('a workout today is Not started, then Done once a log completes, linking to
   row = rowFor(page, last);
   await expect(row).toContainText('Done ✓');
   await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(row.getByRole('link', { name: /^View log: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(row.getByRole('link', { name: /^Log session: / })).toHaveCount(0);
 });
 
 test('an in-progress log shows Training now', async ({ page }) => {
   const last = `Train${unique()}`;
   const clientId = await newClient(last);
   const workoutId = await plan(clientId, 'Push', dayOffset(0));
-  created.logs.push(await seedLog(admin, { workspaceId, clientId, name: 'Push', plannedWorkoutId: workoutId, status: 'in_progress', startedAt: new Date().toISOString() }));
+  const logId = await seedLog(admin, { workspaceId, clientId, name: 'Push', plannedWorkoutId: workoutId, status: 'in_progress', startedAt: new Date().toISOString(), loggedBy: clientId });
+  created.logs.push(logId);
   await signInAsCoach(page);
   await page.goto('/home');
-  await expect(rowFor(page, last)).toContainText('Training now');
+  const row = rowFor(page, last);
+  await expect(row).toContainText('Training now');
+  // Watch live opens the workout in progress (the row too); Take over opens the session page, which offers it.
+  await expect(row.getByRole('link').first()).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await row.getByRole('link', { name: /^Take over: / }).click();
+  await expect(page).toHaveURL(`/clients/${clientId}/log/${workoutId}`);
+  await expect(page.getByRole('button', { name: 'Take over' })).toBeVisible();
+});
+
+test('the coach\'s own session in progress offers Continue session', async ({ page }) => {
+  const last = `Mine${unique()}`;
+  const clientId = await newClient(last);
+  const workoutId = await plan(clientId, 'Pull', dayOffset(0));
+  const coach = (await admin.auth.admin.listUsers({ perPage: 1000 })).data.users.find((u) => u.email === COACH_EMAIL)!;
+  created.logs.push(await seedLog(admin, { workspaceId, clientId, name: 'Pull', plannedWorkoutId: workoutId, status: 'in_progress', startedAt: new Date().toISOString(), loggedBy: coach.id }));
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const row = rowFor(page, last);
+  await expect(row.getByRole('link', { name: /^Continue session: / })).toHaveAttribute('href', `/clients/${clientId}/log/${workoutId}`);
+  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveCount(0);
 });
 
 test('the four tiles are the same height, linked or not', async ({ page }) => {

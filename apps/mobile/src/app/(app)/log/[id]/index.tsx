@@ -44,6 +44,7 @@ import {
   type WorkoutLogDoc,
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
+import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExercisePicker } from '@/components/log/exercise-picker';
 import { OptionPage, StraightPage, SupersetPage, type PageHandlers } from '@/components/log/log-pages';
@@ -55,6 +56,7 @@ import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
+import { useCoachLogging } from '@/lib/coach-logging';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import {
@@ -124,8 +126,9 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
 /** The workout being logged: overview, each section's start page, and the section's pages. */
 export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  // Hook-up point for the coach-logging banner (PR #37): call useCoachLogging(id) here, before the early returns,
-  // and render its read-only banner above OpenLog when byCoach.
+  // Single active logger: while the coach logs this workout from the website, the client sees a read-only banner
+  // (with "Continue on my phone" once the coach has stopped for 20 minutes) instead of the logging pages.
+  const coach = useCoachLogging(id);
   const router = useRouter();
   const { text } = useTheme();
   const { log: active, ready } = useActiveLog();
@@ -133,6 +136,7 @@ export default function LogScreen() {
   const log = active && active.id === id ? active : null;
 
   const back = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
+  if (coach.byCoach) return <CoachLoggingBanner coach={coach} onBack={back} />;
 
   if (!ready || units === null) {
     return (

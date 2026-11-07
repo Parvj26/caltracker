@@ -186,10 +186,11 @@ test('a missed past workout can be edited: its card opens the editor and the cha
   await page.goto(`/clients/${clientId}/training?view=1w&from=${pastDate}`);
   const missed = card(page, pastDate, name);
   await expect(missed.getByText('Missed', { exact: true })).toBeVisible();
-  // Past days still can't take a drop, so the name isn't a drag handle; the menu offers Edit.
+  // Past days still can't take a drop, so the name isn't a drag handle; the menu offers Edit (and Log session).
   await expect(day(page, pastDate).getByRole('button', { name, exact: true })).toHaveCount(0);
   await missed.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await expect(day(page, pastDate).getByRole('menu', { name: `Options for ${name}` }).getByRole('menuitem')).toHaveText([
+    'Log session',
     'Edit',
     'Move to another day',
     'Delete',

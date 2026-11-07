@@ -19,12 +19,30 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg)
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-take-over client@demo.local   the seed coach takes over their workout
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-log-set client@demo.local   the coach ticks set 2 (10 reps @ 60 kg)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-hand-back client@demo.local   the coach hands it back
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-idle client@demo.local   the coach's last activity 21 min ago
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-finish client@demo.local   the coach ticks the rest and finishes
 // `serve <port>` exposes the same actions over http://127.0.0.1 for Maestro (see run-e2e.sh).
 import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import { addDays, localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
+import {
+  LOG_TREE_SELECT,
+  addDays,
+  completeSet,
+  finishLog,
+  localToday,
+  logRowToDoc,
+  splitFullName,
+  updateActual,
+  type Database,
+  type LogTreeRow,
+  type WorkoutDoc,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 
 let statusEnv: string | undefined;
 /** A value from `supabase status -o env` (read once). */
@@ -469,6 +487,102 @@ export async function logNotes(email: string): Promise<string> {
   return '';
 }
 
+// ---- Coach session logging (docs/superpowers/specs/2026-11-06-coach-session-logging-design.md) ----
+// The seed coach drives the demo client's in-progress workout through the same RPCs as the coach website
+// (take_over_workout_log, coach_save_workout_log, hand_back_workout_log), signed in with the anon key.
+
+/** The demo client's id and their in-progress log, waiting up to 20 s for the phone's upload. */
+async function inProgressLog(email: string): Promise<{ clientId: string; logId: string }> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`coach session helpers only drive ${DEMO_CLIENT}`);
+  const clientId = await findUserId(DEMO_CLIENT);
+  if (!clientId) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
+  for (let i = 0; i < 40; i += 1) {
+    const { data, error } = await admin.from('workout_logs').select('id').eq('client_id', clientId).eq('status', 'in_progress').limit(1);
+    if (error) throw error;
+    if (data[0]) return { clientId, logId: data[0].id };
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`${DEMO_CLIENT} has no workout in progress`);
+}
+
+type CoachClient = Awaited<ReturnType<typeof coachClient>>;
+
+/** The coach's copy of the log (what the website's session page loads). */
+async function coachDoc(coach: CoachClient, logId: string): Promise<WorkoutLogDoc> {
+  const { data, error } = await coach.from('workout_logs').select(LOG_TREE_SELECT).eq('id', logId).single();
+  if (error) throw error;
+  // The select string is built by concatenation, so supabase-js cannot infer its shape; LogTreeRow describes it.
+  return logRowToDoc(data as unknown as LogTreeRow);
+}
+
+async function coachSave(coach: CoachClient, clientId: string, doc: WorkoutLogDoc): Promise<void> {
+  const { data, error } = await coach.rpc('coach_save_workout_log', {
+    p_client_id: clientId,
+    p_doc: doc as unknown as Database['public']['Functions']['coach_save_workout_log']['Args']['p_doc'],
+  });
+  if (error) throw error;
+  if ((data as { applied?: boolean } | null)?.applied !== true) throw new Error(`Coach save not applied: ${JSON.stringify(data)}`);
+}
+
+/** Takes over once the phone's ticked set has reached the server (waits up to 20 s), as a coach in the room would. */
+export async function coachTakeOver(email: string): Promise<void> {
+  const { logId } = await inProgressLog(email);
+  for (let i = 0; i < 40; i += 1) {
+    const { data, error } = await admin.from('workout_logs').select(LOG_TREE_SELECT).eq('id', logId).single();
+    if (error) throw error;
+    const doc = logRowToDoc(data as unknown as LogTreeRow);
+    if (doc.blocks.some((b) => b.exercises.some((e) => e.sets.some((x) => x.completedAt !== null)))) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const coach = await coachClient();
+  const { error } = await coach.rpc('take_over_workout_log', { p_log_id: logId });
+  if (error) throw error;
+}
+
+/** The coach ticks the second set of the first exercise with 10 reps at 60 kg. */
+export async function coachLogSet(email: string): Promise<void> {
+  const { clientId, logId } = await inProgressLog(email);
+  const coach = await coachClient();
+  const doc = await coachDoc(coach, logId);
+  const set = doc.blocks[0]?.exercises[0]?.sets[1];
+  if (!set) throw new Error('The log has no second set');
+  const now = new Date().toISOString();
+  await coachSave(coach, clientId, completeSet(updateActual(doc, set.id, { actualReps: 10, actualWeightKg: 60 }), set.id, now));
+}
+
+export async function coachHandBack(email: string): Promise<void> {
+  const { logId } = await inProgressLog(email);
+  const coach = await coachClient();
+  const { error } = await coach.rpc('hand_back_workout_log', { p_log_id: logId });
+  if (error) throw error;
+}
+
+/** As if the coach stopped 21 minutes ago (activity is the server's clock, so the row is backdated). */
+export async function coachIdle(email: string): Promise<void> {
+  const { logId } = await inProgressLog(email);
+  const { error } = await admin
+    .from('workout_logs')
+    .update({ last_activity_at: new Date(Date.now() - 21 * 60_000).toISOString() })
+    .eq('id', logId);
+  if (error) throw error;
+}
+
+/** The coach ticks every open set with its planned numbers and finishes the session. */
+export async function coachFinish(email: string): Promise<void> {
+  const { clientId, logId } = await inProgressLog(email);
+  const coach = await coachClient();
+  let doc = await coachDoc(coach, logId);
+  const now = new Date().toISOString();
+  for (const set of doc.blocks.flatMap((b) => b.exercises.flatMap((e) => e.sets))) {
+    if (set.completedAt !== null) continue;
+    doc = updateActual(doc, set.id, { actualReps: set.actualReps ?? set.target.repsMin, actualWeightKg: set.actualWeightKg ?? set.target.weightKg });
+    doc = completeSet(doc, set.id, now);
+  }
+  const finished = finishLog(doc, now);
+  if (finished.status !== 'completed') throw new Error('The coach could not finish the log');
+  await coachSave(coach, clientId, finished);
+}
+
 /** Deletes every body scan of the seed demo client (values cascade). Nobody else's. */
 export async function cleanupScans(email: string): Promise<void> {
   if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-scans only clears ${DEMO_CLIENT}`);
@@ -568,6 +682,11 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-messages') await cleanupMessages(email);
   else if (action === 'seed-scans') await seedScans(email);
   else if (action === 'cleanup-scans') await cleanupScans(email);
+  else if (action === 'coach-take-over') await coachTakeOver(email);
+  else if (action === 'coach-log-set') await coachLogSet(email);
+  else if (action === 'coach-hand-back') await coachHandBack(email);
+  else if (action === 'coach-idle') await coachIdle(email);
+  else if (action === 'coach-finish') await coachFinish(email);
   else throw new Error(`Unknown action ${action}`);
 }
 

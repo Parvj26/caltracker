@@ -1,0 +1,60 @@
+# Single active logger: the coach takes over the client's workout and finishes the session from the website. The
+# phone, showing "Your coach is logging this session", updates live to "Your coach logged this session"; Today
+# shows it done, and its summary carries the "Logged by coach" pill.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
+- tapOn:
+    id: tick-0-0-0
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-take-over, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible: 'Your coach is logging this session'
+    timeout: 20000
+# ---- The coach finishes: the phone updates without any tap ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-finish, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible: 'Your coach logged this session'
+    timeout: 20000
+- assertVisible:
+    id: logged-by-coach
+- takeScreenshot: coach-logging-finished
+- tapOn:
+    id: coach-logging-back
+- extendedWaitUntil:
+    visible: 'Done ✓.*'
+    timeout: 20000
+- tapOn: 'View'
+- extendedWaitUntil:
+    visible: '3 sets completed'
+    timeout: 20000
+- assertVisible:
+    id: logged-by-coach
+- assertVisible: 'Logged by coach'
+- takeScreenshot: coach-logging-summary
+- tapOn:
+    id: summary-done
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

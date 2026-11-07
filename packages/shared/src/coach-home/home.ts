@@ -13,6 +13,8 @@ export type HomeLog = {
   startedAt: string;
   finishedAt: string | null;
   lastActivityAt: string;
+  /** Who is logging it (workout_logs.logged_by); left out when the caller doesn't track it. */
+  loggedBy?: string | null;
 };
 export type HomeWorkout = { id: string; clientId: string; name: string; scheduledOn: IsoDate; logs: HomeLog[] };
 export type HomeClient = {
@@ -31,7 +33,7 @@ export type HomeAssignment = {
 };
 export type WorkoutStatus =
   | { kind: 'not_started' }
-  | { kind: 'training'; logId: string }
+  | { kind: 'training'; logId: string; loggedBy?: string | null | undefined }
   | { kind: 'done'; logId: string; durationS: number };
 export type TodayRow = { workout: HomeWorkout; client: HomeClient; status: WorkoutStatus };
 
@@ -46,7 +48,7 @@ export function workoutStatus(w: HomeWorkout): WorkoutStatus {
   }
   if (newest) return { kind: 'done', logId: newest.id, durationS: logDurationS(newest) };
   const running = w.logs.find((l) => l.status === 'in_progress');
-  if (running) return { kind: 'training', logId: running.id };
+  if (running) return { kind: 'training', logId: running.id, loggedBy: running.loggedBy };
   return { kind: 'not_started' };
 }
 

@@ -9,6 +9,8 @@
 // Server contract (global-constraints "SYNC SEMANTICS"): save returns { applied, revision, status }, and
 // revision is the phone's own counter that the server never changes.
 //   * applied=true: the sent revision is now on the server. If the phone changed the log meanwhile, send again.
+//   * applied=false with loggedByOther: the coach logs this workout now (single active logger). Adopt the server's
+//     doc, never push, and tell the screen (onHeldByOther) so it shows "Your coach is logging this session".
 //   * applied=false: the server refused (stale or locked). Fetch its doc and let resolveRefusal decide. When the
 //     phone takes the server's doc over its own and that loses sets the phone had ticked (lostCompletedSets), the
 //     phone's copy is kept (store.keepRejected) and onRejected tells the client.
@@ -29,7 +31,11 @@ const MAX_ROUNDS = 5;
 /** Consecutive network failures after which the status reads "offline" rather than "pending". */
 const OFFLINE_AFTER_FAILURES = 2;
 
-export type SaveLogResult = { applied: boolean; revision: number; status: LogStatus };
+/**
+ * `loggedByOther`: someone else logs this workout now (the coach took it over from the website). The phone must
+ * take the server's copy and never push its own over it, whatever its revision.
+ */
+export type SaveLogResult = { applied: boolean; revision: number; status: LogStatus; loggedByOther?: boolean };
 export type SyncStatus = 'synced' | 'pending' | 'offline';
 /** `adopted` is the server's doc when the phone replaced its own copy with it, so the screen can show it. */
 export type SyncResult = { status: SyncStatus; adopted: WorkoutLogDoc | null };
@@ -64,6 +70,11 @@ export type LogSyncDeps = {
    * The doc may have uploaded and left the store by the time the screen reads it again.
    */
   onAutoFinish?: (doc: WorkoutLogDoc) => void;
+  /**
+   * The server said someone else (the coach) logs the active workout: its copy, now adopted, is `doc`. The screen
+   * stops editing and cancels the "Still training?" reminder.
+   */
+  onHeldByOther?: (doc: WorkoutLogDoc) => void;
 };
 
 export type LogSync = {
@@ -120,13 +131,14 @@ export type RefusalResolution = { kind: 'push' } | { kind: 'adopt'; stored: Stor
  * What to do after the server refused a save. Pure.
  *   * push: the server still has the log in progress at an older revision (a duplicate save whose answer was
  *     lost), so the phone's newer copy should be sent again.
- *   * adopt: anything else. The log is locked (a coach correction, a manual finish or discard elsewhere)
- *     or the server already has this revision, so the phone takes the server's doc.
+ *   * adopt: anything else. The log is locked (a coach correction, a manual finish or discard elsewhere), the
+ *     server already has this revision, or someone else logs it now (loggedByOther: never push over it), so the
+ *     phone takes the server's doc.
  *   * retry: the server's doc could not be read; keep the phone's copy and try again later.
  */
-export function resolveRefusal(local: WorkoutLogDoc, server: WorkoutLogDoc | null): RefusalResolution {
+export function resolveRefusal(local: WorkoutLogDoc, server: WorkoutLogDoc | null, loggedByOther = false): RefusalResolution {
   if (server === null) return { kind: 'retry' };
-  if (server.status === 'in_progress' && local.revision > server.revision) return { kind: 'push' };
+  if (!loggedByOther && server.status === 'in_progress' && local.revision > server.revision) return { kind: 'push' };
   return { kind: 'adopt', stored: { log: server, lastSyncedRevision: server.revision } };
 }
 
@@ -250,7 +262,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
         continue;
       }
       const server = await fetchLog(p.log.id);
-      const d = resolveRefusal(p.log, server);
+      const d = resolveRefusal(p.log, server, result.loggedByOther === true);
       if (d.kind !== 'adopt') return 'retry';
       // The server's copy settles it. Nothing to show: this log is not open on the phone any more.
       const lost = lostCompletedSets(p.log, d.stored.log);
@@ -322,7 +334,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
         let replaced: { local: WorkoutLogDoc; lost: string[] } | null = null;
         await store.update((s) => {
           if (s === null || s.log.id !== sent.id) return s; // the log is gone from the phone
-          decision = resolveRefusal(s.log, server);
+          decision = resolveRefusal(s.log, server, result.loggedByOther === true);
           if (decision.kind !== 'adopt') return s;
           const lost = lostCompletedSets(s.log, decision.stored.log);
           if (lost.length > 0) replaced = { local: s.log, lost };
@@ -340,6 +352,7 @@ export function createLogSync(deps: LogSyncDeps): LogSync {
           failures = 0;
           if (r) await reject(r.local, r.lost);
           notify('onAdopt', deps.onAdopt, adopted);
+          if (result.loggedByOther === true) notify('onHeldByOther', deps.onHeldByOther, adopted);
         }
         // 'push', after adopting, or gone: go round again.
       }

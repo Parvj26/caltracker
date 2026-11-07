@@ -1814,6 +1814,23 @@ export type Database = {
         Args: { p_client: string; p_workspace: string }
         Returns: string
       }
+      coach_last_results: {
+        Args: { p_client_id: string; p_exercise_ids: string[] }
+        Returns: {
+          actual_distance_m: number
+          actual_duration_s: number
+          actual_reps: number
+          actual_weight_kg: number
+          exercise_id: string
+          finished_at: string
+          position: number
+          set_type: Database["public"]["Enums"]["set_type"]
+        }[]
+      }
+      coach_save_workout_log: {
+        Args: { p_client_id: string; p_doc: Json }
+        Returns: Json
+      }
       copy_program_week: {
         Args: {
           p_from: number
@@ -1885,6 +1902,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: string
       }
+      hand_back_workout_log: { Args: { p_log_id: string }; Returns: Json }
       invite_for_join: {
         Args: { token: string }
         Returns: {
@@ -1977,6 +1995,7 @@ export type Database = {
           last_used: string
         }[]
       }
+      reclaim_workout_log: { Args: { p_log_id: string }; Returns: Json }
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
@@ -2004,6 +2023,7 @@ export type Database = {
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
+      take_over_workout_log: { Args: { p_log_id: string }; Returns: Json }
       unassign_program: {
         Args: { p_assignment_id: string; p_from_date: string }
         Returns: number
@@ -2014,6 +2034,7 @@ export type Database = {
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
       workout_content_hash: { Args: { p_workout: string }; Returns: string }
       workout_is_done: { Args: { p_workout_id: string }; Returns: boolean }
+      workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"

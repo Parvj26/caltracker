@@ -46,6 +46,10 @@ describe('workoutStatus', () => {
     const l = log({ status: 'in_progress', finishedAt: null });
     expect(workoutStatus(wk({ logs: [l] }))).toEqual({ kind: 'training', logId: l.id });
   });
+  it('says who is logging the workout in progress', () => {
+    const l = { ...log({ status: 'in_progress', finishedAt: null }), loggedBy: 'coach-1' };
+    expect(workoutStatus(wk({ logs: [l] }))).toEqual({ kind: 'training', logId: l.id, loggedBy: 'coach-1' });
+  });
   it('is done with the completed log', () => {
     const c = log();
     expect(workoutStatus(wk({ logs: [log({ status: 'discarded' }), c] }))).toMatchObject({

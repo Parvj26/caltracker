@@ -1,0 +1,96 @@
+# Single active logger: the coach takes over the client's workout, logs set 2, then stops. While the coach is
+# active the phone only shows "Your coach is logging this session"; once the coach has had no activity for
+# 20 minutes (simulated by backdating it) the phone offers "Continue on my phone", which takes the workout back
+# and opens the logging page with the coach's set. The client finishes with a note, which is saved.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
+- tapOn:
+    id: tick-0-0-0
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-take-over, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: coach-logging-banner
+    timeout: 20000
+- assertVisible: 'Your coach is logging this session'
+- assertNotVisible:
+    id: coach-logging-reclaim
+# ---- 20 minutes without coach activity ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-idle, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: coach-logging-reclaim
+    timeout: 20000
+- assertVisible: 'Your coach stopped logging 21 min ago. You can carry on here.'
+- assertVisible: 'Continue on my phone'
+- takeScreenshot: coach-logging-reclaim
+- tapOn:
+    id: coach-logging-reclaim
+- extendedWaitUntil:
+    visible:
+      id: page-done
+    timeout: 20000
+- assertNotVisible:
+    id: coach-logging-banner
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, checked'
+- assertVisible:
+    id: actual-reps-0-0-1
+    text: '10'
+- takeScreenshot: coach-logging-reclaimed
+# ---- Finish on the phone with a note: it is saved on the reclaimed log ----
+- tapOn:
+    id: tick-0-0-2
+- tapOn:
+    id: page-done
+- extendedWaitUntil:
+    visible:
+      id: finish-sheet
+    timeout: 10000
+- assertVisible:
+    id: finish-count
+    text: '3 of 3 sets done.'
+- tapOn:
+    id: feel-Good
+- tapOn:
+    id: finish-note
+- inputText: 'Took it back'
+- hideKeyboard
+- runFlow: helpers/finish-from-sheet.yaml
+- assertVisible: '3 sets completed'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
+- assertTrue: '${output.call == "Felt: Good | Took it back"}'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

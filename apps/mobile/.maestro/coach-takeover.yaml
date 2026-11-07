@@ -1,0 +1,118 @@
+# Single active logger (docs/superpowers/specs/2026-11-06-coach-session-logging-design.md), phone side: the client
+# starts "E2E Log" (Barbell Squat 3 × 8 @ 60 kg) and ticks set 1; the coach takes it over from the website (driven
+# here through the same RPCs). The open workout turns into "Your coach is logging this session" with no logging
+# pages, and opening it again from Today shows the same. The coach ticks set 2 (10 reps) and hands it back: the
+# phone is back on the logging page with the coach's set, and the client finishes it.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
+- tapOn:
+    id: tick-0-0-0
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+# ---- The coach takes over: the open workout becomes read only, live ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-take-over, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: coach-logging-banner
+    timeout: 20000
+- assertVisible: 'Your coach is logging this session'
+- assertVisible:
+    id: logged-by-coach
+- assertNotVisible:
+    id: page-done
+- assertNotVisible:
+    id: tick-0-0-0
+- assertNotVisible:
+    id: coach-logging-reclaim
+- takeScreenshot: coach-logging-held
+# Back to Today and in again: still the banner, never the logging pages.
+- tapOn:
+    id: coach-logging-back
+- extendedWaitUntil:
+    visible: 'E2E Log'
+    timeout: 20000
+- tapOn:
+    id: resume-banner
+    optional: true
+- tapOn:
+    text: 'Resume'
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: coach-logging-banner
+    timeout: 20000
+- assertNotVisible:
+    id: page-done
+# ---- The coach logs set 2 (10 reps) and hands back: the phone resumes with the coach's set ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-hand-back, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    notVisible:
+      id: coach-logging-banner
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: page-done
+    timeout: 20000
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, checked'
+- assertVisible:
+    id: actual-reps-0-0-1
+    text: '10'
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, unchecked'
+- takeScreenshot: coach-logging-handed-back
+# The phone logs again: tick the last set and finish.
+- tapOn:
+    id: tick-0-0-2
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+- tapOn:
+    id: page-done
+- extendedWaitUntil:
+    visible:
+      id: finish-sheet
+    timeout: 10000
+- assertVisible:
+    id: finish-count
+    text: '3 of 3 sets done.'
+- runFlow: helpers/finish-from-sheet.yaml
+- assertVisible: '3 sets completed'
+# Logged on the phone in the end, so no "Logged by coach".
+- assertNotVisible:
+    id: logged-by-coach
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }
