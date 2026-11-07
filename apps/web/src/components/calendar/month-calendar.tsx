@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/core';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { isLiveWorkout } from '@caltracker/shared';
 import type { IsoDate, WorkoutPreview } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
@@ -171,6 +171,7 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
                           firstShown={date === weeks[0]![0]}
                           isToday={date === today}
                           draggable={draggable && editable}
+                          dragActive={dragging !== null}
                           renderItem={renderItem}
                           logHref={logHref}
                           itemHref={itemHref}
@@ -202,6 +203,7 @@ function DayCell({
   firstShown,
   isToday,
   draggable,
+  dragActive,
   editable,
   renderItem,
   logHref,
@@ -220,12 +222,16 @@ function DayCell({
   inMonth: boolean;
   isToday: boolean;
   draggable: boolean;
+  /** A card is being dragged: days that take a drop are outlined, locked (past) days fade back. */
+  dragActive: boolean;
   editable: boolean;
   renderItem: Props['renderItem'];
   onAdd?: () => void;
 }) {
   const data: DropData = { date };
   const { setNodeRef, isOver } = useDroppable({ id: `day-${date}`, data, disabled: !draggable });
+  // While a card is dragged, every day says whether it takes the drop: "open" (outlined) or "locked" (faded).
+  const drop = dragActive ? (draggable ? 'open' : 'locked') : undefined;
   return (
     <div
       ref={setNodeRef}
@@ -233,7 +239,15 @@ function DayCell({
       aria-label={formatLongDay(date)}
       aria-current={isToday ? 'date' : undefined}
       data-date={date}
-      className={cx(styles.day, !inMonth && styles.otherMonth, isToday && styles.today, isOver && styles.dayOver)}
+      data-drop={drop}
+      className={cx(
+        styles.day,
+        !inMonth && styles.otherMonth,
+        isToday && styles.today,
+        drop === 'open' && styles.dropOpen,
+        drop === 'locked' && styles.dropLocked,
+        isOver && styles.dayOver,
+      )}
     >
       {layout === 'month' ? (
         <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
@@ -257,6 +271,7 @@ function DayCell({
               date={date}
               // A done workout stays on the day it was done.
               draggable={draggable && !item.logId}
+              lockedDone={draggable && Boolean(item.logId)}
               editable={editable}
               renderItem={renderItem}
               logHref={logHref}
@@ -297,6 +312,7 @@ function DayItem({
   item,
   date,
   draggable,
+  lockedDone,
   editable,
   renderItem,
   logHref,
@@ -317,15 +333,19 @@ function DayItem({
   live: boolean;
   date: IsoDate;
   draggable: boolean;
+  /** Done, on a day that could otherwise take moves: it stays put, and an attempt to drag it says why. */
+  lockedDone: boolean;
   editable: boolean;
   renderItem: Props['renderItem'];
 }) {
   const data: DragData = { item, from: date };
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
+  // The whole card is the drag source (mouse and touch). The name button stays the keyboard handle: it carries the
+  // a11y attributes and is the activator node, so Space on the "⋯" menu never picks the card up.
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
   // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
   const controls = renderItem(item, date, editable);
   const router = useRouter();
-  // A drag ends with a click on the handle; that click must not also open the card. dnd-kit already swallows it; this
+  // A drag ends with a click on the card; that click must not also open it. dnd-kit already swallows it; this
   // is a guard for the moment the drag ends. The flag clears just after every drag ends (dropped on another day, its
   // own day, a past day, or cancelled with Esc), so the next real click always opens the card.
   const dragged = useRef(false);
@@ -340,6 +360,36 @@ function DayItem({
     }, 0);
     return () => clearTimeout(timer);
   }, [isDragging]);
+  // A done card can't move: pressing on it and moving past the drag distance shows why, and that release doesn't open it.
+  const [lockedTip, setLockedTip] = useState(false);
+  const press = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!lockedTip) return;
+    const timer = setTimeout(() => setLockedTip(false), 2500);
+    return () => clearTimeout(timer);
+  }, [lockedTip]);
+  const lockedHandlers = lockedDone
+    ? {
+        onPointerDown: (event: PointerEvent<HTMLLIElement>) => {
+          if (event.button !== 0 || (event.target as HTMLElement).closest('a, button, [data-item-controls]')) return;
+          press.current = { x: event.clientX, y: event.clientY };
+        },
+        onPointerMove: (event: PointerEvent<HTMLLIElement>) => {
+          const p = press.current;
+          if (!p || Math.hypot(event.clientX - p.x, event.clientY - p.y) < 4) return;
+          press.current = null;
+          dragged.current = true;
+          setLockedTip(true);
+        },
+        onPointerUp: () => {
+          press.current = null;
+          if (!dragged.current) return;
+          setTimeout(() => {
+            dragged.current = false;
+          }, 0);
+        },
+      }
+    : {};
   const target = (event: MouseEvent<HTMLLIElement>) =>
     // The "⋯" menu, its dialogs and the "✓ Done" link keep their own behaviour.
     !dragged.current && href && !(event.target as HTMLElement).closest('a, [data-item-controls]') ? href : null;
@@ -359,7 +409,18 @@ function DayItem({
   return (
     // A mouse and touch shortcut: the name button and the "⋯" menu stay the keyboard and screen-reader way in.
     <li
-      className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed, href && styles.clickable)}
+      ref={draggable ? setNodeRef : undefined}
+      {...(draggable ? listeners : lockedHandlers)}
+      className={cx(
+        styles.item,
+        item.programName ? styles.programItem : styles.singleItem,
+        isDragging && styles.dragging,
+        missed && styles.missed,
+        href && styles.clickable,
+        draggable && styles.grab,
+        lockedDone && styles.locked,
+      )}
+      title={lockedDone ? DONE_STAYS : undefined}
       onClick={openCard}
       onAuxClick={openCardInTab}
     >
@@ -368,9 +429,8 @@ function DayItem({
           <button
             type="button"
             id={calendarItemDomId(item.id)}
-            ref={setNodeRef}
+            ref={setActivatorNodeRef}
             {...attributes}
-            {...listeners}
             className={cx(styles.itemHandle, styles.grab)}
             title={item.name}
           >
@@ -389,7 +449,8 @@ function DayItem({
           </span>
         )}
         {controls ? (
-          <div className={styles.itemControls} data-item-controls>
+          // Its buttons and dialogs keep their own clicks: pressing them never starts a card drag.
+          <div className={styles.itemControls} data-item-controls onPointerDown={stopPointer}>
             {controls}
           </div>
         ) : null}
@@ -410,12 +471,17 @@ function DayItem({
         </div>
       ) : null}
       {item.logId && logHref ? (
-        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>
+        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`} onPointerDown={stopPointer}>
           <span aria-hidden="true">✓</span> Done
         </Link>
       ) : null}
       {item.logId && item.loggedByCoach ? <span className={styles.coachNote}>Logged by coach</span> : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
+      {lockedTip ? (
+        <span role="status" className={styles.lockedTip}>
+          {DONE_STAYS}
+        </span>
+      ) : null}
       {item.programName ? (
         <span className={styles.itemProgram}>
           {item.programName}
@@ -429,6 +495,9 @@ function DayItem({
     </li>
   );
 }
+
+const DONE_STAYS = 'Done workouts stay on the day they were done';
+const stopPointer = (event: PointerEvent) => event.stopPropagation();
 
 /** A workout the client added on the phone: a different look, "Added by client", and the whole card opens the log. */
 function ClientAddedItem({ name, href }: { name: string; href: string }) {
