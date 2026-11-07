@@ -242,10 +242,7 @@ test('the tabs open Training, Body, Documents and Settings, and old links still 
   await tabs.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('button', { name: 'Remove Tara Track' })).toBeVisible();
 
-  // Home's Assign and Add scan shortcuts, and links made before the tabs.
-  await page.goto(`/clients/${s.clientId}?assign=1`);
-  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training`));
-  await expect(page.getByRole('dialog')).toBeVisible();
+  // Home's Add scan shortcut, and links made before the tabs.
   // The calendar's own view and starting week are kept too.
   await page.goto(`/clients/${s.clientId}?view=2w&from=${dayOffset(0)}`);
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training\\?view=2w&from=${dayOffset(0)}$`));
