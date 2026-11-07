@@ -1,6 +1,7 @@
-# Single active logger: the coach takes over the client's workout and finishes the session from the website. The
-# phone, showing "Your coach is logging this session", updates live to "Your coach logged this session"; Today
-# shows it done, and its summary carries the "Logged by coach" pill.
+# Single active logger: the coach takes over the client's workout, ticks a set and finishes the session from the
+# website. The phone keeps the workout on screen read only under "Your coach is logging this session", shows the
+# coach's set live, then updates to "Your coach logged this session"; Today shows it done, and its summary carries
+# the "Logged by coach" pill.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -27,6 +28,24 @@ env:
 - extendedWaitUntil:
     visible: 'Your coach is logging this session'
     timeout: 20000
+# The pages stay, read only.
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertNotVisible:
+    id: page-done
+# ---- The coach ticks set 2: it shows on the phone live ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0-1
+      text: 'checkbox, checked'
+    timeout: 5000
+- assertVisible:
+    id: actual-reps-0-0-1
+    text: '10'
 # ---- The coach finishes: the phone updates without any tap ----
 - runScript:
     file: helpers/call.js
