@@ -47,7 +47,7 @@ function MarkAll({ page, title, onPress }: { page: number; title: string; onPres
   if (!onPress) return null;
   return (
     <View style={{ marginTop: space[2] }}>
-      <Button variant="secondary" testID={`mark-all-${page}`} title={title} onPress={onPress} />
+      <Button variant="secondary" size="logging" testID={`mark-all-${page}`} title={title} onPress={onPress} />
     </View>
   );
 }
@@ -59,7 +59,7 @@ const keyOf = (page: number, ex: ExerciseModel) => `${page}-${ex.exerciseIndex}`
  * after. Switching stays possible until a set is ticked.
  */
 function SubstituteStrip({ ex, idKey, readOnly, onPress }: { ex: ExerciseModel; idKey: string; readOnly: boolean; onPress: () => void }) {
-  const { text, space, radius } = useTheme();
+  const { logText: text, space, radius } = useTheme();
   const sub = ex.substitute;
   const canSwitch = logControls(readOnly).substituteSwitch;
   if (!sub || ((sub.locked || !canSwitch) && sub.doingInsteadOf === null)) return null;
@@ -91,7 +91,7 @@ function SubstituteStrip({ ex, idKey, readOnly, onPress }: { ex: ExerciseModel; 
 }
 
 function Notes({ ex, idKey }: { ex: ExerciseModel; idKey: string }) {
-  const { text } = useTheme();
+  const { logText: text } = useTheme();
   return (
     <>
       {ex.restLine ? (
@@ -127,7 +127,7 @@ function SingleExercise({
   readOnly,
   recentSetId,
 }: Common & { ex: ExerciseModel; rows: RowModel[]; disabled: boolean }) {
-  const { text, space } = useTheme();
+  const { logText: text, space } = useTheme();
   const idKey = keyOf(page, ex);
   const can = logControls(readOnly);
   return (
@@ -168,7 +168,7 @@ export function StraightPage({ model, ...common }: Common & { model: StraightPag
 
 export function OptionPage({ model, ...common }: Common & { model: OptionPageModel }) {
   // The option line is the heading here (it says which option this is); the exercise name follows it.
-  const { text, space, radius } = useTheme();
+  const { logText: text, space, radius } = useTheme();
   return (
     <View style={{ gap: space[3] }}>
       <Text
@@ -201,7 +201,7 @@ export function SupersetPage({
   readOnly,
   recentSetId,
 }: Common & { model: SupersetPageModel }) {
-  const { text, space } = useTheme();
+  const { logText: text, space } = useTheme();
   const can = logControls(readOnly);
   return (
     <View style={{ gap: space[4] }}>

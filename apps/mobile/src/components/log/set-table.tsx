@@ -16,6 +16,7 @@ import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import type { ActualPatch, StepField, Units } from '@caltracker/shared';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { palette, pressedOpacity } from '@/theme/theme';
+import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
 
 const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
@@ -27,8 +28,11 @@ const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
 
 const SPOKEN: Record<StepField, string> = { weight: 'weight', reps: 'reps', duration: 'time', distance: 'distance' };
 
-/** Numbers grow with the phone's text size up to this much; beyond it they would no longer fit their box. */
-const MAX_FONT_SCALE = 1.4;
+/**
+ * Numbers grow with the phone's text size up to this much; beyond it they would no longer fit their box. The cap was
+ * 1.4 at the app's sizes: shared out over the logging pages' bigger text, the largest size in points stays the same.
+ */
+const MAX_FONT_SCALE = logMaxFontScale(1.4);
 
 /** The bar above the number pad (iOS): number pads have no return key, so this is how the keyboard goes away. */
 export const KEYBOARD_BAR_ID = 'log-number-pad';
@@ -38,7 +42,7 @@ export const KEYBOARD_BAR_ID = 'log-number-pad';
  * can drop the box's focus between two keystrokes (typing 140 saved 1).
  */
 export const KeyboardBar = memo(function KeyboardBar() {
-  const { text, space } = useTheme();
+  const { logText: text, space } = useTheme();
   if (Platform.OS !== 'ios') return null;
   return (
     <InputAccessoryView nativeID={KEYBOARD_BAR_ID}>
@@ -101,7 +105,7 @@ function Cell({
   readOnly: boolean;
   onType: (patch: ActualPatch) => void;
 }) {
-  const { text, space, radius } = useTheme();
+  const { logText: text, space, radius } = useTheme();
   const [draft, setDraft] = useState(cell.value);
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -189,7 +193,7 @@ type RowProps = {
  * is no swipe on a row: a sideways swipe always changes the page.
  */
 function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, readOnly = false, recent = false, handlers }: RowProps) {
-  const { text, space, radius } = useTheme();
+  const { logText: text, space, radius } = useTheme();
   const indented = row.tagKind === 'drop' || row.tagKind === 'failure';
   const tagged = row.tagKind !== 'normal';
   const id = `${idKey}-${row.setIndex}`;
@@ -318,7 +322,7 @@ export function SetTable({
   handlers: TableHandlers;
   onAddSet: (() => void) | null;
 }) {
-  const { text, space, radius } = useTheme();
+  const { logText: text, space, radius } = useTheme();
   const headings = rows[0]?.cells.map((c) => c.heading) ?? [];
   return (
     <View style={[styles.table, { borderRadius: radius.card, padding: space[2], gap: space[1] }]}>
@@ -353,7 +357,7 @@ export function SetTable({
 }
 
 export function AddSetButton({ testID, onPress, title = '+ Add set' }: { testID: string; onPress: () => void; title?: string }) {
-  const { text } = useTheme();
+  const { logText: text } = useTheme();
   return (
     <Pressable
       testID={testID}
