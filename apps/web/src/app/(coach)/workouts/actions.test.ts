@@ -126,6 +126,21 @@ describe('saveWorkout', () => {
     expect(calls.some((c) => c.rpc === 'save_workout')).toBe(true);
   });
 
+  it('saves a workout whose only logs are in progress or discarded', async () => {
+    // The workout's logs as the database holds them; the query asks only for completed ones.
+    const logs = [{ id: 'l1', status: 'in_progress' }, { id: 'l2', status: 'discarded' }];
+    respond = (call) =>
+      call.op === 'rpc' ? { data: WORKOUT } : { data: logs.filter((l) => l.status === call.filters.status).map(({ id }) => ({ id })) };
+    expect(await saveWorkout(doc)).toEqual({ ok: true, id: WORKOUT });
+    expect(calls.some((c) => c.rpc === 'save_workout')).toBe(true);
+  });
+
+  it("passes on the database's own refusal (a log finished between the check and the save)", async () => {
+    const refusal = "This workout is already done, so its plan can't change. Edit the logged results instead.";
+    respond = (call) => (call.op === 'rpc' ? { data: null, error: { code: '23514', message: refusal } } : { data: [] });
+    expect(await saveWorkout(doc)).toEqual({ ok: false, error: refusal });
+  });
+
   it("refuses a workout the client has finished, so the log's plan stays as it was", async () => {
     respond = (call) => (call.table === 'workout_logs' ? { data: [{ id: 'log' }] } : { data: WORKOUT });
     const outcome = await saveWorkout(doc);
