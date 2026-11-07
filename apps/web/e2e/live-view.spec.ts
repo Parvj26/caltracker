@@ -309,6 +309,16 @@ test('with two people training, tabs switch between watching one and logging the
   await page.goto(`/clients/${parv.id}/log/${parvWorkout}`);
   await expect(page.getByRole('tab', { name: /^Parv/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Finish session' })).toBeVisible();
+  // The footer's three buttons share one height and line (and wrap neatly on a narrower iPad).
+  const footer = ['Finish session', 'Hand back to Parv', 'Cancel session'].map((name) => page.getByRole('button', { name }));
+  for (const width of [1194, 820]) {
+    await page.setViewportSize({ width, height: 1400 });
+    const boxes = await Promise.all(footer.map(async (b) => (await b.boundingBox())!));
+    for (const b of boxes) expect(b.height).toBe(48);
+    if (width === 1194) for (const b of boxes) expect(b.y).toBe(boxes[0]!.y);
+    if (SCREENSHOTS) await footer[0]!.locator('xpath=ancestor::fieldset[1]').screenshot({ path: `${SCREENSHOTS}/session-footer-${width}.png` });
+  }
+  await page.setViewportSize({ width: 1194, height: 1400 });
   await page.getByRole('tab', { name: /^Vaishali/ }).click();
   await expect(page.getByText('LIVE · VAISHALI KOHLI')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finish session' })).toHaveCount(0);

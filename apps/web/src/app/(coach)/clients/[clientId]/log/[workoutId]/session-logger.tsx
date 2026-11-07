@@ -749,14 +749,14 @@ export function SessionLogger({
             onBlur={() => edit((l) => setLogNotes(l, notes, nowIso()))}
           />
         </label>
-        <div className={styles.actions}>
-          <Button variant="finish" className={styles.big} onClick={() => void finish()} pending={finishing}>
+        <div className={styles.footerActions}>
+          <Button variant="finish" className={styles.footerButton} onClick={() => void finish()} pending={finishing}>
             {finishing ? 'Finishing…' : 'Finish session'}
           </Button>
-          <Button variant="secondary" className={styles.big} onClick={() => void handBack()} pending={handingBack}>
+          <Button variant="secondary" className={styles.footerButton} onClick={() => void handBack()} pending={handingBack}>
             Hand back to {client.firstName || 'client'}
           </Button>
-          <Button variant="secondary" className={styles.big} onClick={() => void cancel()}>
+          <Button variant="secondary" className={cx(styles.footerButton, styles.quietButton)} onClick={() => void cancel()}>
             Cancel session
           </Button>
         </div>
