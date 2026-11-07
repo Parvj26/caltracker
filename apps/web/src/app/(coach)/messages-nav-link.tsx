@@ -6,7 +6,7 @@ import { useBrowserSupabase, useChanges, useOnWake } from './messages/use-realti
 import { NavLink } from './nav-link';
 
 /**
- * The Messages sidebar item with the unread total. It starts from the server's count and stays right on its own:
+ * The Inbox sidebar item with the unread total. It starts from the server's count and stays right on its own:
  * Realtime events for new messages and for the coach's own reads, and a refetch whenever the window wakes up.
  */
 export function MessagesNavLink({ userId, workspaceId, initial }: { userId: string; workspaceId: string; initial: number }) {
@@ -41,5 +41,5 @@ export function MessagesNavLink({ userId, workspaceId, initial }: { userId: stri
   );
   useOnWake(refetch);
 
-  return <NavLink href="/messages" label="Messages" icon="messages" badge={count} />;
+  return <NavLink href="/messages" label="Inbox" icon="messages" badge={count} />;
 }
