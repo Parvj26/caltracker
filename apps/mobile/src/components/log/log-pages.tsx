@@ -92,6 +92,11 @@ function Notes({ ex, idKey }: { ex: ExerciseModel; idKey: string }) {
           {ex.restLine}
         </Text>
       ) : null}
+      {ex.progression ? (
+        <Text testID={`progression-${idKey}`} style={text('caption')} accessibilityLabel={`Auto progression: ${ex.progression}`}>
+          {ex.progression}
+        </Text>
+      ) : null}
       {ex.note ? (
         <Text testID={`exercise-note-${idKey}`} style={text('body')}>
           {`Note: ${ex.note}`}

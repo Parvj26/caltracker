@@ -25,20 +25,25 @@ import {
   substitutedFrom,
   isBlockDone,
   isChoiceLocked,
+  formatWeight,
   kgToInput,
   liveExercises,
   needsPick,
   openSetCount,
   pickChoice,
+  prefillLastTime,
+  progressionHint,
   resolveSetValues,
   roundRestSeconds,
   sectionRuns,
+  suggestionForLogExercise,
   toKg,
   toMeters,
   type ActualPatch,
   type LogBlockDoc,
   type LogExerciseDoc,
   type LogSetDoc,
+  type ProgressionHistory,
   type SetValues,
   type StepField,
   type Units,
@@ -434,7 +439,25 @@ export type ExerciseModel = {
   substitute: SubstituteModel | null;
   swappedFromExerciseId: string | null;
   lastTime: readonly LastResultSet[];
+  /** Auto progression's suggestion, "Suggested 140 lb · ↑ +5 lb", or null. */
+  progression: string | null;
 };
+
+/** Auto progression for the pre-fill: the client's recent sessions (empty when off) and their units. */
+export type Progression = { history: ProgressionHistory; units: Units };
+
+/** Last time as the pre-fill reads it for this exercise: with Auto progression's suggested weight, if any. */
+export function prefillSets(ex: LogExerciseDoc, last: LastResults, progression?: Progression): readonly LastResultSet[] {
+  const sets = last[ex.exerciseId]?.sets ?? [];
+  return progression ? prefillLastTime(ex, sets, progression.history, progression.units) : sets;
+}
+
+/** "Suggested 140 lb · ↑ +5 lb" for an exercise Auto progression moves, else null. */
+export function progressionLine(ex: LogExerciseDoc, progression?: Progression): string | null {
+  if (!progression) return null;
+  const s = suggestionForLogExercise(ex, progression.history, progression.units);
+  return s ? `Suggested ${formatWeight(s.weightKg, progression.units)} · ${progressionHint(s, progression.units)}` : null;
+}
 
 export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; rows: RowModel[]; allDone: boolean };
 
@@ -473,7 +496,13 @@ export type OptionPageModel = {
 
 export type PageModel = StraightPageModel | SupersetPageModel | OptionPageModel;
 
-function exerciseModel(ex: LogExerciseDoc, exerciseIndex: number, label: string | null, last: LastResults): ExerciseModel {
+function exerciseModel(
+  ex: LogExerciseDoc,
+  exerciseIndex: number,
+  label: string | null,
+  last: LastResults,
+  progression?: Progression,
+): ExerciseModel {
   return {
     exerciseIndex,
     logExerciseId: ex.id,
@@ -485,6 +514,7 @@ function exerciseModel(ex: LogExerciseDoc, exerciseIndex: number, label: string 
     substitute: substituteOf(ex),
     swappedFromExerciseId: ex.swappedFromExerciseId,
     lastTime: last[ex.exerciseId]?.sets ?? [],
+    progression: progressionLine(ex, progression),
   };
 }
 
@@ -504,13 +534,14 @@ export function supersetRounds(block: LogBlockDoc): Array<{ round: number; entri
   }));
 }
 
-export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last: LastResults): PageModel {
+export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last: LastResults, history?: ProgressionHistory): PageModel {
   const block = log.blocks[page.blockIndex];
-  const lastOf = (ex: LogExerciseDoc) => last[ex.exerciseId]?.sets ?? [];
+  const progression: Progression | undefined = history ? { history, units } : undefined;
+  const lastOf = (ex: LogExerciseDoc) => prefillSets(ex, last, progression);
 
   if (page.kind === 'superset') {
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
-    const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last));
+    const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last, progression));
     const rounds: RoundModel[] = supersetRounds(block).map(({ round, entries }) => {
       const rows = entries.map((e) => {
         const ex = block.exercises[e.exerciseIndex];
@@ -548,14 +579,14 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
       line: picked ? `${where} · you’re doing this one` : lockedOut ? where : `${where} · log a set to pick it`,
       picked,
       lockedOut,
-      exercise: exerciseModel(ex, page.optionIndex, null, last),
+      exercise: exerciseModel(ex, page.optionIndex, null, last, progression),
       rows: setRows(ex, units, lastOf(ex)),
       allDone: picked && isBlockDone(block),
     };
   }
 
   const ex = block.exercises[0];
-  return { kind: 'straight', exercise: exerciseModel(ex, 0, null, last), rows: setRows(ex, units, lastOf(ex)), allDone: isBlockDone(block) };
+  return { kind: 'straight', exercise: exerciseModel(ex, 0, null, last, progression), rows: setRows(ex, units, lastOf(ex)), allDone: isBlockDone(block) };
 }
 
 /** Dots under the pages: done, current or to do. */
@@ -582,8 +613,13 @@ const isEmpty = (v: SetValues) => v.reps === null && v.weightKg === null && v.du
  * What "Mark all" would do: the open sets it ticks, and the open sets it leaves because there are no numbers to
  * save for them yet (nothing typed, no coach target, no last time).
  */
-export function markAllPlan(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults): { tick: number; skip: number } {
-  const done = markAll(log, logExerciseIds, last, DELETABLE_AT);
+export function markAllPlan(
+  log: WorkoutLogDoc,
+  logExerciseIds: readonly string[],
+  last: LastResults,
+  progression?: Progression,
+): { tick: number; skip: number } {
+  const done = markAll(log, logExerciseIds, last, DELETABLE_AT, progression);
   const open = (l: WorkoutLogDoc) =>
     l.blocks.flatMap((b) => b.exercises.filter((e) => logExerciseIds.includes(e.id)).flatMap((e) => e.sets)).filter((x) => x.completedAt === null).length;
   const tick = open(log) - open(done);
@@ -605,7 +641,13 @@ export function markAllQuestion(plan: { tick: number; skip: number }): { title: 
  * it stands then, so a weight typed on set 1 carries into the sets after it. A set with nothing to save (no typed
  * number, no coach target, no last time) is left open.
  */
-export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], last: LastResults, nowIso: string): WorkoutLogDoc {
+export function markAll(
+  log: WorkoutLogDoc,
+  logExerciseIds: readonly string[],
+  last: LastResults,
+  nowIso: string,
+  progression?: Progression,
+): WorkoutLogDoc {
   let next = log;
   for (const exId of logExerciseIds) {
     const setIds = next.blocks.flatMap((b) => b.exercises.filter((e) => e.id === exId).flatMap((e) => e.sets.map((s) => s.id)));
@@ -613,7 +655,7 @@ export function markAll(log: WorkoutLogDoc, logExerciseIds: readonly string[], l
       const ex = next.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
       const set = ex?.sets.find((s) => s.id === setId);
       if (!ex || !set || set.completedAt !== null) continue;
-      const values = resolveSetValues(ex, setId, last[ex.exerciseId]?.sets ?? []);
+      const values = resolveSetValues(ex, setId, prefillSets(ex, last, progression));
       if (isEmpty(values)) continue;
       next = completeSetWith(next, setId, values, nowIso);
     }
