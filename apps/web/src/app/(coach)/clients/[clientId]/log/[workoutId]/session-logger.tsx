@@ -13,6 +13,7 @@ import {
   finishLog,
   formatClock,
   formatLastResult,
+  formatWeight,
   fromMeters,
   isBlockDone,
   isChoiceLocked,
@@ -23,20 +24,25 @@ import {
   parseClock,
   pickChoice,
   planSummary,
+  prefillLastTime,
+  progressionHint,
   resolveSetValues,
   sectionRuns,
   setExerciseNote,
   setLogNotes,
   startLogFromWorkout,
+  suggestionForLogExercise,
   stepName,
   toKg,
   toMeters,
   uncompleteSet,
   updateActual,
+  withSuggestion,
   type ActualPatch,
   type LogBlockDoc,
   type LogExerciseDoc,
   type LogSetDoc,
+  type ProgressionHistory,
   type TrackingType,
   type Units,
   type WorkoutDoc,
@@ -157,18 +163,23 @@ function ExerciseTable({
   letter,
   units,
   lastTime,
+  progression,
   edit,
 }: {
   exercise: LogExerciseDoc;
   letter: string | null;
   units: Units;
   lastTime: LastTimes[string];
+  progression: ProgressionHistory;
   edit: (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => void;
 }) {
   const fields = FIELDS[exercise.trackingType];
   const header: Record<Field, string> = { weight: units.toUpperCase(), reps: 'REPS', time: 'TIME', distance: distanceUnitFor(units).toUpperCase() };
   const plan = planSummary(exercise, units);
   const last = formatLastResult(lastTime ?? [], exercise.trackingType, units);
+  // Auto progression: the suggested weight becomes the pre-fill (a weight the coach typed in the plan wins).
+  const suggestion = suggestionForLogExercise(exercise, progression, units);
+  const prefillLast = withSuggestion(lastTime ?? [], suggestion);
   const name = `${letter ? `${letter}. ` : ''}${exercise.exerciseName}`;
   const [note, setNote] = useState(exercise.note ?? '');
 
@@ -178,6 +189,11 @@ function ExerciseTable({
         <h3 className={styles.exerciseName}>{name}</h3>
         {plan ? <p className={styles.caption}>Coach: {plan}</p> : null}
         <p className={styles.caption}>{last ?? 'Last time: first time'}</p>
+        {suggestion ? (
+          <p className={styles.caption} data-testid="progression-suggestion">
+            Suggested: {formatWeight(suggestion.weightKg, units)} · {progressionHint(suggestion, units)} (Auto progression)
+          </p>
+        ) : null}
       </header>
       <table className={styles.table}>
         <thead>
@@ -196,7 +212,7 @@ function ExerciseTable({
         </thead>
         <tbody>
           {exercise.sets.map((s, i) => {
-            const prefill = resolveSetValues(exercise, s.id, lastTime ?? []);
+            const prefill = resolveSetValues(exercise, s.id, prefillLast);
             const done = s.completedAt !== null;
             const setName = `${exercise.exerciseName} ${stepName(exercise, i)}`;
             return (
@@ -226,7 +242,7 @@ function ExerciseTable({
                         const set = ex?.sets.find((x) => x.id === s.id);
                         if (!ex || !set) return l;
                         return set.completedAt === null
-                          ? completeSetWith(l, s.id, resolveSetValues(ex, s.id, lastTime ?? []), nowIso())
+                          ? completeSetWith(l, s.id, resolveSetValues(ex, s.id, prefillLast), nowIso())
                           : uncompleteSet(l, s.id, nowIso());
                       })
                     }
@@ -273,15 +289,23 @@ function BlockPage({
   block,
   units,
   lastTimes,
+  progression,
   edit,
 }: {
   block: LogBlockDoc;
   units: Units;
   lastTimes: LastTimes;
+  progression: ProgressionHistory;
   edit: (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => void;
 }) {
   const superset = block.kind === 'superset';
   const rounds = blockRoundCount(block);
+  /** Last time with Auto progression's suggestion applied, for Mark all. */
+  const prefillOfExercise = (l: WorkoutLogDoc, blockId: string, exerciseId: string) => {
+    const ex = l.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.exerciseId === exerciseId);
+    const last = lastTimes[exerciseId] ?? [];
+    return ex ? prefillLastTime(ex, last, progression, units) : last;
+  };
   return (
     <div className={styles.pageBody}>
       <div className={styles.pageHead}>
@@ -289,7 +313,7 @@ function BlockPage({
           {superset ? `Superset · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}` : block.kind === 'choice' ? 'Pick one' : pageName(block)}
         </h2>
         {needsPick(block) ? null : (
-          <Button variant="secondary" className={styles.big} onClick={() => edit((l) => completeAllSets(l, block.id, (id) => lastTimes[id] ?? [], nowIso()))}>
+          <Button variant="secondary" className={styles.big} onClick={() => edit((l) => completeAllSets(l, block.id, (id) => prefillOfExercise(l, block.id, id), nowIso()))}>
             Mark all
           </Button>
         )}
@@ -316,6 +340,7 @@ function BlockPage({
           letter={superset ? String.fromCharCode(65 + exerciseIndex) : null}
           units={units}
           lastTime={lastTimes[exercise.exerciseId] ?? []}
+          progression={progression}
           edit={edit}
         />
       ))}
@@ -335,12 +360,15 @@ export function SessionLogger({
   initialLog,
   units,
   lastTimes,
+  progression,
 }: {
   client: { id: string; firstName: string; name: string };
   workout: WorkoutDoc;
   initialLog: WorkoutLogDoc | null;
   units: Units;
   lastTimes: LastTimes;
+  /** Auto progression history (empty when the program has it off). */
+  progression: ProgressionHistory;
 }) {
   const router = useRouter();
   const [log, setLog] = useState<WorkoutLogDoc | null>(initialLog);
@@ -614,7 +642,7 @@ export function SessionLogger({
         <div className={styles.current} aria-label="Current exercise">
           {/* While locked the boxes and buttons stay visible but cannot change anything. */}
           <fieldset disabled={locked} className={styles.fieldset}>
-            {block ? <BlockPage key={block.id} block={block} units={units} lastTimes={lastTimes} edit={edit} /> : null}
+            {block ? <BlockPage key={block.id} block={block} units={units} lastTimes={lastTimes} progression={progression} edit={edit} /> : null}
             <div className={styles.pager}>
               <Button variant="secondary" className={styles.big} disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
                 ← Previous
