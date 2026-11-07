@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
-import { expect, test } from '@playwright/test';
+import { devices, expect, test } from '@playwright/test';
 
 // Service-role client: used ONLY here, to build invite fixtures. Never in app code.
 function serviceClient(): SupabaseClient<Database> {
@@ -69,7 +69,7 @@ async function makeInvite(opts: Opts = {}) {
   return { token, email, id: data.id };
 }
 
-test('valid invite offers Open in CalTracker, then the store buttons, signed out', async ({ page }) => {
+test('valid invite offers Open in CalTracker, then explains how to get the app, signed out', async ({ page }) => {
   const { token, email } = await makeInvite();
   await page.goto(`/invite/${token}`);
   await expect(page).toHaveURL(new RegExp(`/invite/${token}$`)); // not redirected to /sign-in
@@ -78,7 +78,10 @@ test('valid invite offers Open in CalTracker, then the store buttons, signed out
   await expect(page.getByRole('link', { name: 'Open in CalTracker' })).toHaveAttribute('href', `caltracker://invite/${token}`);
   await expect(page.getByText("Don't have it yet? Install CalTracker, then tap the link in your email again.")).toBeVisible();
   await expect(page.locator('strong', { hasText: email })).toBeVisible();
-  await expect(page.getByText('Coming soon')).toHaveCount(2);
+  // No store URLs are set in tests, so the coach-help note replaces the store buttons.
+  await expect(page.getByText('Your coach will help you get the app')).toBeVisible();
+  await expect(page.getByText('Coming soon')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'App Store' })).toHaveCount(0);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
 });
 
@@ -114,4 +117,37 @@ test('after a resend the old token shows not-found and the new token is valid', 
   await expect(page.getByText("This invite link isn't valid.")).toBeVisible();
   await page.goto(`/invite/${newToken}`);
   await expect(page.getByRole('heading', { name: /invited you to CalTracker/ })).toBeVisible();
+});
+
+test('on a computer the invite shows a QR code of the same link', async ({ page }) => {
+  const { token } = await makeInvite();
+  await page.goto(`/invite/${token}`);
+  const qr = page.locator('[data-invite-qr]');
+  await expect(qr).toBeVisible();
+  await expect(qr.getByRole('img', { name: 'QR code for this invite' }).locator('svg')).toBeVisible();
+  await expect(qr.getByText('Scan with your phone to join')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open in CalTracker' })).toBeVisible();
+});
+
+test('a computer browser in a narrow window still shows the QR code', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { token } = await makeInvite();
+  await page.goto(`/invite/${token}`);
+  await expect(page.locator('[data-invite-qr]')).toBeVisible();
+});
+
+test.describe('on a phone', () => {
+  // Pixel 7 runs on Chromium like the rest of the suite; drop the browser choice, which can't be set per test.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { defaultBrowserType, ...phone } = devices['Pixel 7'];
+  test.use(phone);
+
+  test('the invite has no QR code and still offers Open in CalTracker', async ({ page }) => {
+    const { token } = await makeInvite();
+    await page.goto(`/invite/${token}`);
+    await expect(page.getByRole('heading', { name: 'Demo Coaching invited you to CalTracker' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open in CalTracker' })).toHaveAttribute('href', `caltracker://invite/${token}`);
+    await expect(page.locator('[data-invite-qr]')).toBeHidden();
+    await expect(page.getByText('Scan with your phone to join')).toBeHidden();
+  });
 });

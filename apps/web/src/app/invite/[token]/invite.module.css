@@ -15,4 +15,13 @@
   box-shadow: 0 var(--ct-base) 0 var(--ct-lime);
 }
 .button small { font-weight: var(--ct-weight-section-heading); font-size: var(--ct-size-caption); }
-.disabled { background: transparent; color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); cursor: not-allowed; }
+.note { display: grid; gap: var(--ct-space-1); }
+.noteTitle { margin: 0; font-weight: var(--ct-weight-button); }
+
+/* QR code of this invite, for computers. Hidden on phones so the page stays exactly as it was there. */
+.qr { display: none; margin: 0; flex-direction: column; align-items: center; gap: var(--ct-space-2); }
+.qrComputer { display: flex; }
+@media (min-width: 900px) { .qr { display: flex; } }
+.qrImage { width: 200px; height: 200px; }
+.qrImage svg { display: block; width: 100%; height: 100%; }
+.qrCaption { margin: 0; font-weight: var(--ct-weight-button); }

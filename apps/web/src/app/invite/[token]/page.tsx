@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { inviteUrlFrom, isMobileUserAgent, qrSvg, storeLinks } from '@/lib/invite-page';
 import { AuthShell } from '@/components/ui';
 import styles from './invite.module.css';
 
@@ -28,19 +30,23 @@ async function loadPreview(token: string): Promise<Preview> {
   }
 }
 
-function StoreButton({ label, href }: { label: string; href: string | undefined }) {
-  if (!href) {
-    return (
-      <span className={`${styles.button} ${styles.disabled}`} aria-disabled="true">
-        {label}
-        <small>Coming soon</small>
-      </span>
-    );
+/**
+ * Shown on computers: the same invite link as a QR code, so the client can switch to their phone.
+ * A computer user agent always sees it; any screen at least 900 px wide sees it through CSS. Phones never do.
+ */
+async function InviteQr({ url, computer }: { url: string; computer: boolean }) {
+  let svg: string;
+  try {
+    svg = await qrSvg(url);
+  } catch {
+    return null;
   }
   return (
-    <a className={styles.button} href={href}>
-      {label}
-    </a>
+    <figure className={`${styles.qr} ${computer ? styles.qrComputer : ''}`} data-invite-qr="">
+      {/* Safe: the SVG is generated on our server from the invite URL and holds only shapes. */}
+      <div className={styles.qrImage} role="img" aria-label="QR code for this invite" dangerouslySetInnerHTML={{ __html: svg }} />
+      <figcaption className={styles.qrCaption}>Scan with your phone to join</figcaption>
+    </figure>
   );
 }
 
@@ -50,8 +56,17 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
   const valid = preview.status === 'valid' && preview.workspace_name && preview.email;
   if (valid) {
+    const h = await headers();
+    const inviteUrl = inviteUrlFrom(
+      h.get('x-forwarded-host') ?? h.get('host'),
+      h.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? null,
+      token,
+    );
+    const computer = !isMobileUserAgent(h.get('user-agent'));
+    const stores = storeLinks(process.env.NEXT_PUBLIC_APP_STORE_URL || undefined, process.env.NEXT_PUBLIC_PLAY_STORE_URL || undefined);
     return (
       <AuthShell title={`${preview.workspace_name} invited you to CalTracker`} note="Let's get moving!">
+        {inviteUrl ? <InviteQr url={inviteUrl} computer={computer} /> : null}
         <p className={styles.lead}>Already have the app? Open it and join. You only need to choose a password.</p>
         <div className={styles.buttons}>
           {/* The token is safe to put here: it is already in the URL of this page. */}
@@ -65,10 +80,20 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <p className={styles.lead}>
           You&apos;ll sign in with <strong>{preview.email}</strong>.
         </p>
-        <div className={styles.buttons}>
-          <StoreButton label="App Store" href={process.env.NEXT_PUBLIC_APP_STORE_URL || undefined} />
-          <StoreButton label="Google Play" href={process.env.NEXT_PUBLIC_PLAY_STORE_URL || undefined} />
-        </div>
+        {stores.length > 0 ? (
+          <div className={styles.buttons}>
+            {stores.map((store) => (
+              <a key={store.label} className={styles.button} href={store.href}>
+                {store.label}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.note}>
+            <p className={styles.noteTitle}>Your coach will help you get the app</p>
+            <p className={styles.lead}>CalTracker isn&apos;t in the app stores yet. Ask your coach and they&apos;ll show you how to install it.</p>
+          </div>
+        )}
       </AuthShell>
     );
   }
