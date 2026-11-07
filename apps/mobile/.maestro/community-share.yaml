@@ -24,28 +24,29 @@ env:
 - tapOn: 'Start'
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: start-workout
     timeout: 20000
 - tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: done-0
+    id: start-workout
 - extendedWaitUntil:
     visible:
-      id: all-done-0
+      id: start-section
     timeout: 10000
 - tapOn:
-    id: finish-workout
+    id: start-section
 - extendedWaitUntil:
-    visible: 'NEW for your zoo book'
-    timeout: 15000
-- runFlow: helpers/reveal-through.yaml
+    visible:
+      id: tick-0-0-0
+    timeout: 10000
+- tapOn:
+    id: tick-0-0-0
+- tapOn:
+    id: tick-0-0-1
+- tapOn:
+    id: tick-0-0-2
+- tapOn:
+    id: page-done
+- runFlow: helpers/finish-from-sheet.yaml
 
 # The workout card, from the summary.
 - scrollUntilVisible:
@@ -60,7 +61,9 @@ env:
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Leg day done'
-- hideKeyboard
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
+- tapOn:
+    point: '85%,12%'
 - tapOn:
     id: new-post-submit
 - extendedWaitUntil:

@@ -42,7 +42,8 @@ env:
 - tapOn:
     id: community-notifications
 - extendedWaitUntil:
-    visible: 'Demo Coach posted in the community'
+    # Unread rows read "New. …" to VoiceOver.
+    visible: '(New\. )?Demo Coach posted in the community'
     timeout: 10000
 - tapOn:
     id: notifications-back
@@ -78,7 +79,9 @@ env:
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Hello from Maestro'
-- hideKeyboard
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
+- tapOn:
+    point: '85%,12%'
 - tapOn:
     id: new-post-submit
 - extendedWaitUntil:
