@@ -1,7 +1,7 @@
 -- Coach session logging (20261106012000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
-select plan(97);
+select plan(98);
 
 -- Fixtures (as postgres)
 select tests.create_user('cs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -235,11 +235,16 @@ select is(public.take_over_workout_log(:'l3'), '{"revision": 5, "status": "in_pr
   'taking over again changes nothing');
 select is((select logged_by from public.workout_logs where id = :'l3'), :'coach_a'::uuid, 'the coach logs it now');
 select tests.act_as(:'a2');
+-- The phone's final save (sets ticked before it heard of the take over) is applied once (20261107001000), and says
+-- someone else logs it now; after that its saves are refused, even with a higher revision.
 select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 9, true)),
-  '{"applied": false, "revision": 5, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  '{"applied": true, "revision": 9, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the phone''s final save after the take over is applied and says someone else logs it');
+select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 10, true)),
+  '{"applied": false, "revision": 9, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the phone''s next save is refused, even with a higher revision, and says someone else logs it');
 select tests.act_as(:'coach_a');
-select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 6, true))->>'applied', 'true',
+select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 10, true))->>'applied', 'true',
   'the coach finishes the taken-over session');
 select is(tests.cs_error(format('select public.take_over_workout_log(%L)', :'l3')), '23514 -',
   'a finished workout cannot be taken over');
