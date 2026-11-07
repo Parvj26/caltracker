@@ -110,6 +110,7 @@ describe('latest body numbers', () => {
   it('says how each changed over the last 3 months, in the viewer units', () => {
     const p = buildProgress(rows(scans), '1y', 'lb', TODAY);
     expect(p.latest.map((l) => l.change)).toEqual(['−4.4 lb since 1 Sep', '−0.6% since 1 Sep', null]);
+    expect(p.latest.map((l) => l.delta)).toEqual(['−4.4 lb', '−0.6%', null]);
   });
 
   it('leaves out a measure never taken, and is empty with no scans', () => {

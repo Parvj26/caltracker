@@ -37,7 +37,8 @@ env:
     text: Not Now
     optional: true
 - extendedWaitUntil:
-    visible: 'Welcome to Demo Coaching'
+    visible:
+      id: today-greeting
     timeout: 20000
 - runScript:
     file: helpers/call.js
@@ -58,13 +59,15 @@ env:
 - repeat:
     times: 3
     while:
-      notVisible: 'Welcome to Demo Coaching'
+      notVisible:
+        id: today-greeting
     commands:
       - tapOn:
           text: Open
           optional: true
 - extendedWaitUntil:
-    visible: 'Welcome to Demo Coaching'
+    visible:
+      id: today-greeting
     timeout: 20000
 - runScript:
     file: helpers/call.js
