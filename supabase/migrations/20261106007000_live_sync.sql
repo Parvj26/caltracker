@@ -1,17 +1,19 @@
 -- Program Live Sync (spec: docs/superpowers/specs/2026-11-06-live-sync-design.md).
 --
--- A program with live_sync on keeps the calendars of its active assignments in step with the program: from each
--- client's today onwards, workouts that came from the assignment and that nobody has touched are added, replaced or
--- removed to match the program's slots and the library workouts they point at. Past days, workouts with an
--- in-progress or completed log, and copies the coach edited for that one client (customised_at) are never touched.
+-- A program with live_sync on keeps the calendars of its active assignments in step with the program. From each
+-- client's today on, Live Sync adds workouts the program has and the client's calendar lacks; from tomorrow on, it
+-- also refreshes and removes workouts nobody has touched. It never touches past days, today's existing workouts,
+-- workouts with an in-progress or completed log, copies the coach edited for that one client (customised_at), or a
+-- program day the coach deleted from that client's calendar (live_sync_tombstones).
 --
 -- How it runs: changes that matter (a slot added, moved or removed; the program's length, name or switch changed; a
--- library workout used by a live program saved) put the program id in program_live_sync_queue. A deferred
--- constraint trigger on that queue syncs each queued program once, at commit, after every write of the transaction
--- (so save_workout's blocks and sets are all in place first), and removes it from the queue. Every save path
--- (set_program_weeks, copy_program_week, duplicate_program, save_workout, plain slot inserts, updates and deletes
--- from the website) is covered without changing those functions, and the sync is part of the same transaction:
--- if it fails, the edit fails too.
+-- library workout used by a live program saved or deleted) put the program id in program_live_sync_queue. A deferred
+-- constraint trigger on that queue syncs every queued program, in program id order, at commit, after every write of
+-- the transaction (so save_workout's blocks and sets are all in place first). Every save path is covered without
+-- changing those functions, and the sync is part of the same transaction: if it fails, the edit fails too.
+--
+-- System writes (copy_workout and the sync itself) run with the transaction setting caltracker.system_write = 'on',
+-- so the triggers below can tell them from a coach's hand edits.
 
 -- 1. Columns -------------------------------------------------------------------------------------------------------
 
@@ -25,18 +27,34 @@ alter table public.programs alter column live_sync set default true;
 grant insert (live_sync) on public.programs to authenticated;
 grant update (live_sync) on public.programs to authenticated;
 
--- revision: a library workout's save counter (+1 on every update of the row, which save_workout always stamps).
--- source_revision: on a client copy, the library workout's revision it was copied from, so Live Sync can tell a copy
--- is out of date (null on copies made before Live Sync existed: the catch-up refreshes those).
--- customised_at: when the coach last edited this client copy by hand (saved it in the builder, or moved it to another
--- day). Live Sync leaves customised copies alone.
--- All three are written only by the trigger below and definer functions; authenticated can't write them.
+-- On a client copy that came from a program:
+--   planned_on: the program day it was copied for. Moving the copy changes scheduled_on, never planned_on, so Live
+--     Sync pairs copies with program days by planned_on and a moved copy still stands for its day.
+--   source_hash: workout_content_hash of the library workout when the copy was made, so Live Sync can tell a copy is
+--     out of date (null on copies made before Live Sync: the catch-up refreshes untouched ones).
+--   customised_at: when the coach last edited this copy by hand (name, notes or day changed, or a block, exercise,
+--     set or substitute written). Live Sync leaves customised copies alone.
+-- All three are written only by triggers and definer functions; authenticated can't write them.
 alter table public.workouts
-  add column revision integer not null default 0 check (revision >= 0),
-  add column source_revision integer,
+  add column planned_on date,
+  add column source_hash text,
   add column customised_at timestamptz;
 
+-- Existing program copies: their day is the best record of the program day they were made for.
+alter table public.workouts disable trigger workouts_touch_updated_at;
+update public.workouts w set planned_on = w.scheduled_on where w.assignment_id is not null;
+alter table public.workouts enable trigger workouts_touch_updated_at;
+
 -- 2. Helpers -------------------------------------------------------------------------------------------------------
+
+create function public.is_system_write() returns boolean
+language sql stable set search_path = '' as $$
+  select coalesce(current_setting('caltracker.system_write', true), '') = 'on';
+$$;
+-- Read by triggers that run as the signed-in coach (it only reads a setting of the current transaction, which the
+-- API can't set).
+revoke execute on function public.is_system_write() from public, anon;
+grant execute on function public.is_system_write() to authenticated;
 
 -- The client's today, in their own time zone (profiles.time_zone). A zone the database doesn't know counts as UTC.
 create function public.client_today(p_client uuid) returns date
@@ -54,17 +72,53 @@ end;
 $$;
 revoke execute on function public.client_today(uuid) from public, anon, authenticated;
 
--- Every update of a library workout bumps its revision. An update of a client copy is a coach's hand edit (Live Sync
--- and copy_workout only insert and delete copies), so it marks the copy customised.
+-- A fingerprint of everything a client sees of a workout: name, notes and the ordered blocks, exercises, sets and
+-- substitutes (no ids or timestamps). Equal hashes mean equal content, so a save that changes nothing changes
+-- nothing on clients' calendars.
+create function public.workout_content_hash(p_workout uuid) returns text
+language sql stable security definer set search_path = '' as $$
+  select md5(jsonb_build_array(w.name, w.notes, (
+    select coalesce(jsonb_agg(jsonb_build_array(b.position, b.kind, b.section_id, b.section_name, (
+      select coalesce(jsonb_agg(jsonb_build_array(e.position, e.exercise_id, e.note, (
+        select coalesce(jsonb_agg(jsonb_build_array(s.position, s.set_type, s.target_reps_min, s.target_reps_max,
+          s.target_weight_kg, s.target_duration_s, s.target_distance_m, s.to_failure, s.rest_seconds, s.note)
+          order by s.position), '[]'::jsonb)
+        from public.workout_sets s where s.workout_exercise_id = e.id
+      ), (
+        select coalesce(jsonb_agg(jsonb_build_array(x.position, x.exercise_id, x.note, x.sets) order by x.position),
+          '[]'::jsonb)
+        from public.workout_substitutes x where x.workout_exercise_id = e.id
+      )) order by e.position), '[]'::jsonb)
+      from public.workout_exercises e where e.block_id = b.id
+    )) order by b.position), '[]'::jsonb)
+    from public.workout_blocks b where b.workout_id = w.id
+  ))::text)
+  from public.workouts w where w.id = p_workout;
+$$;
+revoke execute on function public.workout_content_hash(uuid) from public, anon, authenticated;
+
+-- 3. Customised copies ---------------------------------------------------------------------------------------------
+
+-- A client copy's tracking columns: planned_on never changes; source_hash changes only in system writes; a hand edit
+-- of name, notes or day marks it customised (an update that only changes links, such as source_workout_id set null
+-- when the library workout is deleted, does not). The child-table trigger below sets customised_at directly.
 create function public.mark_workout_changed() returns trigger
 language plpgsql set search_path = '' as $$
 begin
-  new.revision := old.revision + case when new.client_id is null then 1 else 0 end;
-  new.source_revision := old.source_revision;
-  new.customised_at := case
-    when new.client_id is not null and coalesce(current_setting('caltracker.live_sync', true), '') <> 'on' then now()
-    else old.customised_at
-  end;
+  if new.client_id is null then
+    return new;
+  end if;
+  new.planned_on := old.planned_on;
+  if public.is_system_write() then
+    new.customised_at := old.customised_at;
+    return new;
+  end if;
+  new.source_hash := old.source_hash;
+  if (new.name, new.notes, new.scheduled_on) is distinct from (old.name, old.notes, old.scheduled_on) then
+    new.customised_at := now();
+  else
+    new.customised_at := coalesce(new.customised_at, old.customised_at);
+  end if;
   return new;
 end;
 $$;
@@ -73,39 +127,96 @@ revoke execute on function public.mark_workout_changed() from public, anon, auth
 create trigger workouts_mark_changed before update on public.workouts
   for each row execute function public.mark_workout_changed();
 
--- copy_workout (from 20261106002100), changed only to record the library workout's revision on the copy.
-create or replace function public.copy_workout(p_source uuid, p_client uuid, p_date date, p_assignment uuid, p_new_id uuid)
-returns uuid
+-- A block, exercise, set or substitute of a program copy written outside a system write: the coach edited the copy.
+create function public.mark_parent_customised() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_id uuid := coalesce(p_new_id, gen_random_uuid());
+  v_workout uuid := case when tg_op = 'DELETE' then old.workout_id else new.workout_id end;
+  v_client uuid := case when tg_op = 'DELETE' then old.client_id else new.client_id end;
+begin
+  -- Library rows (no client) and system writes don't count.
+  if v_client is null or public.is_system_write() then
+    return null;
+  end if;
+  update public.workouts w set customised_at = now()
+  where w.id = v_workout and w.client_id is not null and w.assignment_id is not null
+    and w.customised_at is distinct from now();
+  return null;
+end;
+$$;
+revoke execute on function public.mark_parent_customised() from public, anon, authenticated;
+
+create trigger workout_blocks_mark_customised after insert or update or delete on public.workout_blocks
+  for each row execute function public.mark_parent_customised();
+create trigger workout_exercises_mark_customised after insert or update or delete on public.workout_exercises
+  for each row execute function public.mark_parent_customised();
+create trigger workout_sets_mark_customised after insert or update or delete on public.workout_sets
+  for each row execute function public.mark_parent_customised();
+create trigger workout_substitutes_mark_customised after insert or update or delete on public.workout_substitutes
+  for each row execute function public.mark_parent_customised();
+
+-- 4. Tombstones ----------------------------------------------------------------------------------------------------
+
+-- A program day the coach deleted from a client's calendar: Live Sync doesn't add that workout back on that day.
+-- Written by a trigger when a program copy is deleted outside a system write (the coach's "Delete", or "Remove from
+-- calendar"). Removed with the assignment or the library workout.
+create table public.live_sync_tombstones (
+  assignment_id uuid not null references public.program_assignments on delete cascade,
+  planned_on date not null,
+  source_workout_id uuid not null references public.workouts on delete cascade,
+  workspace_id uuid not null references public.workspaces on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (assignment_id, planned_on, source_workout_id)
+);
+create index live_sync_tombstones_workspace_idx on public.live_sync_tombstones (workspace_id);
+create index live_sync_tombstones_source_idx on public.live_sync_tombstones (source_workout_id);
+
+revoke all on table public.live_sync_tombstones from public, anon, authenticated, service_role;
+grant select on public.live_sync_tombstones to authenticated;
+grant select, insert, update, delete on public.live_sync_tombstones to service_role;
+alter table public.live_sync_tombstones enable row level security;
+-- Coaches of the workspace can read them; clients and other workspaces see nothing. Nobody signed in writes them.
+create policy live_sync_tombstones_select on public.live_sync_tombstones for select to authenticated
+  using (public.is_coach_of(workspace_id));
+
+create function public.record_live_sync_tombstone() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.is_system_write() then
+    return null;
+  end if;
+  insert into public.live_sync_tombstones (assignment_id, planned_on, source_workout_id, workspace_id)
+  select a.id, old.planned_on, old.source_workout_id, a.workspace_id
+  from public.program_assignments a
+  where a.id = old.assignment_id
+    and exists (select 1 from public.workouts w where w.id = old.source_workout_id)
+  on conflict do nothing;
+  return null;
+end;
+$$;
+revoke execute on function public.record_live_sync_tombstone() from public, anon, authenticated;
+
+create trigger workouts_live_sync_tombstone after delete on public.workouts
+  for each row when (old.assignment_id is not null and old.planned_on is not null and old.source_workout_id is not null)
+  execute function public.record_live_sync_tombstone();
+
+-- 5. Copying -------------------------------------------------------------------------------------------------------
+
+-- Deep-copy a library workout's blocks, exercises, substitutes and sets (fresh ids, same positions and targets) into
+-- p_target. Internal: callers authorize and set caltracker.system_write.
+create function public.copy_workout_children(p_source uuid, p_target uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
   v_old_blocks uuid[];
   v_new_blocks uuid[];
   v_old_exercises uuid[];
   v_new_exercises uuid[];
 begin
-  if p_client is null or p_date is null then
-    raise exception 'A client and a date are required' using errcode = '22004';
-  end if;
-
-  insert into public.workouts (id, workspace_id, client_id, scheduled_on, assignment_id, source_workout_id, name, notes,
-    source_revision)
-  select v_id, w.workspace_id, p_client, p_date, p_assignment, w.id, w.name, w.notes, w.revision
-  from public.workouts w
-  where w.id = p_source and w.client_id is null
-  on conflict (id) do nothing;
-  if not found then
-    if not exists (select 1 from public.workouts w where w.id = p_source and w.client_id is null) then
-      raise exception 'Library workout not found' using errcode = 'P0002';
-    end if;
-    return null; -- p_new_id is already taken
-  end if;
-
   with m as materialized (
     select b.id as old_id, gen_random_uuid() as new_id from public.workout_blocks b where b.workout_id = p_source
   ), ins as (
     insert into public.workout_blocks (id, workout_id, position, kind, section_id, section_name)
-    select m.new_id, v_id, b.position, b.kind, b.section_id, b.section_name
+    select m.new_id, p_target, b.position, b.kind, b.section_id, b.section_name
     from m join public.workout_blocks b on b.id = m.old_id
   )
   select coalesce(array_agg(m.old_id), '{}'), coalesce(array_agg(m.new_id), '{}')
@@ -138,25 +249,64 @@ begin
     s.target_weight_kg, s.target_duration_s, s.target_distance_m, s.to_failure, s.rest_seconds, s.note
   from unnest(v_old_exercises, v_new_exercises) as em(old_id, new_id)
   join public.workout_sets s on s.workout_exercise_id = em.old_id;
+end;
+$$;
+revoke execute on function public.copy_workout_children(uuid, uuid) from public, anon, authenticated;
 
+-- copy_workout (from 20261106002100): the children now come from copy_workout_children, and a copy records the
+-- program day it was made for (planned_on, assignments only) and the library content it was made from (source_hash).
+-- Runs as a system write, so the copy doesn't count as customised.
+create or replace function public.copy_workout(p_source uuid, p_client uuid, p_date date, p_assignment uuid, p_new_id uuid)
+returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_id uuid := coalesce(p_new_id, gen_random_uuid());
+  v_prev text := coalesce(current_setting('caltracker.system_write', true), '');
+begin
+  if p_client is null or p_date is null then
+    raise exception 'A client and a date are required' using errcode = '22004';
+  end if;
+  perform set_config('caltracker.system_write', 'on', true);
+
+  insert into public.workouts (id, workspace_id, client_id, scheduled_on, assignment_id, source_workout_id, name, notes,
+    planned_on, source_hash)
+  select v_id, w.workspace_id, p_client, p_date, p_assignment, w.id, w.name, w.notes,
+    case when p_assignment is not null then p_date end, public.workout_content_hash(w.id)
+  from public.workouts w
+  where w.id = p_source and w.client_id is null
+  on conflict (id) do nothing;
+  if not found then
+    perform set_config('caltracker.system_write', v_prev, true);
+    if not exists (select 1 from public.workouts w where w.id = p_source and w.client_id is null) then
+      raise exception 'Library workout not found' using errcode = 'P0002';
+    end if;
+    return null; -- p_new_id is already taken
+  end if;
+
+  perform public.copy_workout_children(p_source, v_id);
+  perform set_config('caltracker.system_write', v_prev, true);
   return v_id;
 end;
 $$;
 
--- 3. The sync ------------------------------------------------------------------------------------------------------
+-- 6. The sync ------------------------------------------------------------------------------------------------------
 
 -- Bring every active assignment of a live program in step with it. Internal: called by the queue trigger only.
--- Per assignment (still a current client; not ended before the client's today; not cancelled on or before it):
+-- Per assignment (still a current client; not ended before the client's today; not cancelled on or before it),
+-- locked in id order:
 --   window   = the client's today (or the start date, if later) up to the day before cancelled_on, if any;
 --   wanted   = each slot inside the program's length, on start_date + (week - 1) * 7 + (day - 1), inside the window;
---   existing = the assignment's workouts inside the window.
--- They are paired by (date, library workout, n-th of that pair), protected copies first. Protected = a log in
--- progress or completed, or customised by the coach. Then:
---   wanted with no copy            -> copy the library workout in;
---   copy with no wanted slot       -> delete it, unless protected;
---   paired, copy out of date       -> replace it (same id, fresh content), unless protected.
--- The assignment's snapshot name and length follow the program. packages/shared planLiveSync mirrors this.
--- Returns the number of customised copies left as they were although the program differs (shown to the coach).
+--   copies   = the assignment's workouts whose program day (planned_on) is inside the window.
+-- They are paired by (program day, library workout, n-th of that pair), protected copies first. Protected = a log in
+-- progress or completed, or customised. Then:
+--   wanted with no copy             -> copy the library workout in, unless the coach deleted that day's copy
+--                                      (tombstone) or that day has a started or done copy the program no longer has;
+--   copy with no wanted slot        -> delete it, if unprotected and both its days are after today;
+--   paired, library content changed -> refresh it in place (same row and id, new blocks), if unprotected and both its
+--                                      days are after today.
+-- Customised copies that differ from the program (and are after today) are counted as skipped. The assignment's
+-- snapshot name and length follow the program. packages/shared planLiveSync mirrors this.
+-- Before deleting or refreshing a copy it is locked and checked again for a log, so a log saved meanwhile wins.
 create function public.live_sync_program(p_program_id uuid) returns integer
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -166,13 +316,14 @@ declare
   v_until date;
   v_row record;
   v_skipped integer := 0;
+  v_prev text := coalesce(current_setting('caltracker.system_write', true), '');
 begin
   select * into v_program from public.programs p where p.id = p_program_id;
   if not found or not v_program.live_sync then
     return 0;
   end if;
 
-  perform set_config('caltracker.live_sync', 'on', true);
+  perform set_config('caltracker.system_write', 'on', true);
 
   for v_assignment in
     select a.id, a.client_id, a.start_date, a.end_date, a.cancelled_on, public.client_today(a.client_id) as today
@@ -183,6 +334,7 @@ begin
         select 1 from public.workspace_members m
         where m.workspace_id = a.workspace_id and m.user_id = a.client_id and m.role = 'client'
       )
+    order by a.id
     for update of a
   loop
     continue when v_assignment.end_date < v_assignment.today
@@ -195,50 +347,82 @@ begin
     where a.id = v_assignment.id and (a.program_name, a.weeks) is distinct from (v_program.name, v_program.weeks);
 
     for v_row in
-      with wanted as (
-        select w.id as source, w.revision as source_rev,
+      with lib as materialized (
+        select x.id, public.workout_content_hash(x.id) as hash
+        from (
+          select distinct w.id
+          from public.program_workouts pw
+          join public.workouts w on w.id = pw.workout_id and w.client_id is null
+            and w.workspace_id = v_program.workspace_id
+          where pw.program_id = p_program_id and pw.week <= v_program.weeks
+        ) x
+      ), wanted as (
+        select pw.workout_id as source, l.hash,
           v_assignment.start_date + ((pw.week - 1) * 7 + (pw.day - 1)) as on_date,
           row_number() over (
-            partition by v_assignment.start_date + ((pw.week - 1) * 7 + (pw.day - 1)), w.id
+            partition by v_assignment.start_date + ((pw.week - 1) * 7 + (pw.day - 1)), pw.workout_id
             order by pw.position, pw.created_at, pw.id
           ) as n
         from public.program_workouts pw
-        join public.workouts w on w.id = pw.workout_id and w.client_id is null and w.workspace_id = v_program.workspace_id
+        join lib l on l.id = pw.workout_id
         where pw.program_id = p_program_id and pw.week <= v_program.weeks
       ), copies as (
-        select c.id, c.scheduled_on as on_date, c.source_workout_id as source, c.source_revision as copy_rev,
+        select c.id, c.planned_on as on_date, c.scheduled_on, c.source_workout_id as source, c.source_hash,
           c.customised_at is not null as customised,
           exists (
             select 1 from public.workout_logs l
             where l.workout_id = c.id and l.status in ('in_progress', 'completed')
           ) as logged
         from public.workouts c
-        where c.assignment_id = v_assignment.id and c.scheduled_on between v_from and v_until
+        where c.assignment_id = v_assignment.id and c.planned_on between v_from and v_until
       ), ranked as (
         select c.*, row_number() over (
           partition by c.on_date, c.source order by (c.customised or c.logged) desc, c.id
         ) as n
         from copies c
+      ), joined as (
+        select r.id as copy_id, r.scheduled_on, r.customised, r.logged, r.source_hash as copy_hash,
+          x.source as want_source, x.hash as want_hash, coalesce(r.on_date, x.on_date) as day
+        from ranked r
+        full join (select * from wanted where on_date between v_from and v_until) x
+          on x.on_date = r.on_date and x.source = r.source and x.n = r.n
       )
-      select r.id as copy_id, r.customised, r.logged, r.copy_rev,
-        coalesce(r.on_date, x.on_date) as on_date, x.source, x.source_rev
-      from ranked r
-      full join (select * from wanted where on_date between v_from and v_until) x
-        on x.on_date = r.on_date and x.source = r.source and x.n = r.n
-      order by coalesce(r.on_date, x.on_date)
+      select j.*,
+        bool_or(coalesce(j.logged, false) and j.want_source is null) over (partition by j.day) as day_has_dropped_log,
+        exists (
+          select 1 from public.live_sync_tombstones t
+          where t.assignment_id = v_assignment.id and t.planned_on = j.day and t.source_workout_id = j.want_source
+        ) as tombstoned
+      from joined j
+      order by j.day, j.copy_id
     loop
       if v_row.copy_id is null then
-        perform public.copy_workout(v_row.source, v_assignment.client_id, v_row.on_date, v_assignment.id, null);
-      elsif v_row.source is null or v_row.copy_rev is distinct from v_row.source_rev then
-        if v_row.logged then
-          null; -- the client has started or finished it: it stays as they saw it
+        -- A program day to fill: not when the coach deleted it, or the client already did that day's old workout.
+        if not v_row.tombstoned and not v_row.day_has_dropped_log then
+          perform public.copy_workout(v_row.want_source, v_assignment.client_id, v_row.day, v_assignment.id, null);
+        end if;
+      elsif v_row.want_source is null or v_row.copy_hash is distinct from v_row.want_hash then
+        if v_row.logged or v_row.day <= v_assignment.today or v_row.scheduled_on <= v_assignment.today then
+          null; -- started or done, or today: it stays as the client has it
         elsif v_row.customised then
           v_skipped := v_skipped + 1;
         else
-          delete from public.workouts w where w.id = v_row.copy_id;
-          if v_row.source is not null then
-            perform public.copy_workout(v_row.source, v_assignment.client_id, v_row.on_date, v_assignment.id,
-              v_row.copy_id);
+          -- Lock the copy (a log being saved for it waits, or has committed), then check again in a new statement.
+          perform 1 from public.workouts w where w.id = v_row.copy_id for update;
+          if not exists (
+            select 1 from public.workout_logs l
+            where l.workout_id = v_row.copy_id and l.status in ('in_progress', 'completed')
+          ) then
+            if v_row.want_source is null then
+              delete from public.workouts w where w.id = v_row.copy_id;
+            else
+              -- Refresh in place: the row (and anything linked to it) stays; its content is replaced.
+              delete from public.workout_blocks b where b.workout_id = v_row.copy_id;
+              update public.workouts w set name = s.name, notes = s.notes, source_hash = v_row.want_hash
+              from public.workouts s
+              where w.id = v_row.copy_id and s.id = v_row.want_source;
+              perform public.copy_workout_children(v_row.want_source, v_row.copy_id);
+            end if;
           end if;
         end if;
       end if;
@@ -246,13 +430,13 @@ begin
   end loop;
 
   update public.programs p set live_synced_at = now(), live_sync_skipped = v_skipped where p.id = p_program_id;
-  perform set_config('caltracker.live_sync', '', true);
+  perform set_config('caltracker.system_write', v_prev, true);
   return v_skipped;
 end;
 $$;
 revoke execute on function public.live_sync_program(uuid) from public, anon, authenticated;
 
--- 4. The queue -----------------------------------------------------------------------------------------------------
+-- 7. The queue -----------------------------------------------------------------------------------------------------
 
 -- Programs waiting to sync at the end of the current transaction. A row lives only inside one transaction: it is
 -- removed when its program syncs, before commit, so nobody ever sees one. Nobody signed in can read or write it.
@@ -271,14 +455,19 @@ language sql security definer set search_path = '' as $$
 $$;
 revoke execute on function public.queue_live_sync(uuid) from public, anon, authenticated;
 
+-- The first firing at commit syncs everything queued, in program id order (a steady lock order between
+-- transactions); later firings find their row already gone.
 create function public.run_queued_live_sync() returns trigger
 language plpgsql security definer set search_path = '' as $$
+declare
+  v_program uuid;
 begin
-  -- Gone already when an earlier firing in this transaction synced it (SET CONSTRAINTS ... IMMEDIATE, or tests).
-  delete from public.program_live_sync_queue q where q.program_id = new.program_id;
-  if found then
-    perform public.live_sync_program(new.program_id);
-  end if;
+  for v_program in
+    select q.program_id from public.program_live_sync_queue q order by q.program_id for update
+  loop
+    delete from public.program_live_sync_queue q where q.program_id = v_program;
+    perform public.live_sync_program(v_program);
+  end loop;
   return null;
 end;
 $$;
@@ -303,6 +492,7 @@ end;
 $$;
 revoke execute on function public.live_sync_on_slot_change() from public, anon, authenticated;
 
+-- Deleting a library workout deletes its slots too (on delete cascade), so that queues its live programs.
 create trigger program_workouts_live_sync after insert or update or delete on public.program_workouts
   for each row execute function public.live_sync_on_slot_change();
 
@@ -330,7 +520,8 @@ end;
 $$;
 revoke execute on function public.live_sync_on_library_change() from public, anon, authenticated;
 
--- save_workout always stamps the workout row (before writing its blocks; the sync itself waits for commit).
+-- save_workout always stamps the library workout row (before writing its blocks; the sync waits for commit). The sync
+-- compares content hashes, so a save that changes nothing changes nothing for clients.
 create trigger workouts_live_sync after update on public.workouts
   for each row when (new.client_id is null)
   execute function public.live_sync_on_library_change();

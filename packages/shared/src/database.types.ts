@@ -332,6 +332,52 @@ export type Database = {
           },
         ]
       }
+      live_sync_tombstones: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          planned_on?: string
+          source_workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sync_tombstones_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "program_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sync_tombstones_source_workout_id_fkey"
+            columns: ["source_workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sync_tombstones_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       log_blocks: {
         Row: {
           client_id: string
@@ -1246,9 +1292,9 @@ export type Database = {
           id: string
           name: string
           notes: string | null
-          revision: number
+          planned_on: string | null
           scheduled_on: string | null
-          source_revision: number | null
+          source_hash: string | null
           source_workout_id: string | null
           updated_at: string
           workspace_id: string
@@ -1262,9 +1308,9 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
-          revision?: number
+          planned_on?: string | null
           scheduled_on?: string | null
-          source_revision?: number | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -1278,9 +1324,9 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
-          revision?: number
+          planned_on?: string | null
           scheduled_on?: string | null
-          source_revision?: number | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1418,6 +1464,10 @@ export type Database = {
         }
         Returns: string
       }
+      copy_workout_children: {
+        Args: { p_source: string; p_target: string }
+        Returns: undefined
+      }
       correct_workout_log: {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
@@ -1477,6 +1527,7 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      is_system_write: { Args: never; Returns: boolean }
       json_number_ok: {
         Args: {
           hi: number
@@ -1564,6 +1615,7 @@ export type Database = {
       uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
+      workout_content_hash: { Args: { p_workout: string }; Returns: string }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"
