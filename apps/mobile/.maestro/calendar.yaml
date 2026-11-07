@@ -23,7 +23,8 @@ env:
     text: Not Now
     optional: true
 - extendedWaitUntil:
-    visible: 'Welcome to Demo Coaching'
+    visible:
+      id: today-greeting
     timeout: 20000
 - extendedWaitUntil:
     visible: 'E2E Upper'
