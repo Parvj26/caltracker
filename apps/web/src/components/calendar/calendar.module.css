@@ -469,3 +469,6 @@
   .weekLayout .dayWeekday { display: inline; }
   .weekLayout .addButton { margin-top: 0; }
 }
+
+/* A past client's message history, under the calendar. */
+.historyHeading { margin: var(--ct-space-4) 0 var(--ct-space-2); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }

@@ -211,8 +211,8 @@ test('Home groups every client under its reason, with counts, a reason line and 
   await expect(tile).toHaveAttribute('href', '#missed-in-a-row');
   await expect(tile.getByText(/^\d+$/)).toHaveText('2');
 
-  // No Message action until messages exist.
-  await expect(attention.getByRole('link', { name: /^Message/ })).toHaveCount(0);
+  // Every row offers Message, which opens that client's conversation.
+  await expect(run.getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
 
   await nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' }).click();
   await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();

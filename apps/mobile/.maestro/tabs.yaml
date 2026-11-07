@@ -1,0 +1,26 @@
+# The phone's tab bar has exactly five tabs: Today, Workouts, Coach, Zoo and Progress.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- assertVisible:
+    id: tab-today
+- assertVisible:
+    id: tab-workouts
+- assertVisible:
+    id: tab-coach
+- assertVisible:
+    id: tab-zoo
+- assertVisible:
+    id: tab-progress
+- assertNotVisible:
+    id: tab-community
+- assertNotVisible:
+    id: tab-me
+- takeScreenshot: tabs-phone
