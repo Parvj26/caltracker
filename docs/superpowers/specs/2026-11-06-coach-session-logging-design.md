@@ -133,6 +133,8 @@ rejected copy). Chosen approach, the safest of "wait", "merge on the server" and
   the coach's save would replace the whole log, dropping the client's set. With it the coach's save is always stale.
 - A second take over before anyone saved (coach B from coach A, who changed nothing) keeps `taken_over_from` on the
   first holder, so the client's unsent sets keep their final save.
+- Hand back and reclaim clear `taken_over_from`: the client holds the log again, so the next take over opens a new
+  window for the client rather than reusing an old holder's.
 - The phone already uploads before it adopts: when it hears of the take over (Realtime, the open/foreground check, or
   a save's answer) `refreshFromServer` sends its copy first (`sync.recheck`). On `applied` + `loggedByOther`, log-sync
   marks it saved, then adopts the server copy and shows the banner (no "sets replaced" note: nothing was lost).
