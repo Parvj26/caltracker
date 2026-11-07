@@ -928,3 +928,35 @@ test('clicking anywhere on a calendar card opens the workout; dragging it does n
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 6);
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/[0-9a-f-]{36}$`));
 });
+
+test('in the month view a workout can be dragged by its card body, not just its name', async ({ page }) => {
+  const program = `Card drag plan ${unique()}`;
+  const name = `Card drag ${unique()}`;
+  created.programs.push(program);
+  created.workouts.push(name);
+  await signInAsCoach(page);
+  const month = nextMonth(monthOf(await browserToday(page)));
+  const d = (n: number) => `${month}-${String(n).padStart(2, '0')}`;
+  const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: program, weeks: 3, start_date: d(5) }).select('id').single();
+  if (a.error) throw a.error;
+  const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: clientId, scheduled_on: d(10), name, assignment_id: a.data.id }).select('id').single();
+  if (w.error) throw w.error;
+
+  // A tall window keeps both days on screen, so dnd-kit doesn't auto-scroll mid-drag.
+  await page.setViewportSize({ width: 1280, height: 1600 });
+  await page.goto(calendarUrl(month));
+  await expect(item(page, d(10), name)).toBeVisible();
+  // Grab the card by its program line, below the name button.
+  const body = day(page, d(10)).getByRole('listitem').filter({ hasText: name }).getByText(program);
+  await drag(page, body, day(page, d(13)));
+  await expect(item(page, d(13), name)).toBeVisible();
+  await expect(item(page, d(10), name)).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  // It didn't open the workout either.
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training`));
+
+  await page.reload();
+  await expect(item(page, d(13), name)).toBeVisible();
+  const moved = await admin.from('workouts').select('scheduled_on').eq('id', w.data.id).single();
+  expect(moved.data?.scheduled_on).toBe(d(13));
+});
