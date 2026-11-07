@@ -125,7 +125,8 @@ test('coach shell: sidebar nav marks Clients as the current page and the page us
       return s.borderTopStyle === 'solid' && s.borderTopWidth === '2px' && s.borderTopColor === tokenRgb;
     }).length;
   });
-  expect(cardBorders).toBeGreaterThanOrEqual(3);
+  // The Clients table is the page's card (Past clients adds another when there are any).
+  expect(cardBorders).toBeGreaterThanOrEqual(1);
 });
 
 test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait)', async ({ page }) => {
@@ -168,7 +169,7 @@ test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({
 
 test('clients page: clients show round initials avatars', async ({ page }) => {
   await signInAsDemoCoach(page);
-  const clients = page.getByRole('table', { name: 'Clients' });
+  const clients = page.getByRole('table', { name: 'Clients', exact: true });
   const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');

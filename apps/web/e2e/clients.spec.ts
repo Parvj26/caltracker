@@ -101,7 +101,7 @@ test('invite one client: the Sent screen, then they show as Invited and can be r
   await sent.getByRole('button', { name: 'Done' }).click();
   await expect(sent).toBeHidden();
 
-  const row = page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: email });
+  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: email });
   await expect(row).toContainText('New Client');
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText('Not joined yet');
@@ -120,7 +120,8 @@ test('invite with a program: it shows on the Invited row and goes on their calen
   await fillPerson(page, 'Pat', `Program${tag}`, email);
   await dialog.getByRole('button', { name: 'Program', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Program', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await dialog.getByLabel('Program', { exact: true }).selectOption({ label: program.name });
+  // The select's name is its label plus the program it shows.
+  await dialog.getByRole('combobox', { name: /^Program/ }).selectOption({ label: program.name });
   await dialog.getByLabel('Start date').fill(start);
   await dialog.getByRole('button', { name: 'Send invite' }).click();
 
@@ -128,7 +129,7 @@ test('invite with a program: it shows on the Invited row and goes on their calen
   await expect(sent.getByText(`Their ${program.name} program begins ${shortDay(start)}`)).toBeVisible();
   await sent.getByRole('button', { name: 'Done' }).click();
 
-  const table = page.getByRole('table', { name: 'Clients' });
+  const table = page.getByRole('table', { name: 'Clients', exact: true });
   const row = table.getByRole('row').filter({ hasText: `Pat Program${tag}` });
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText(program.name);
@@ -167,7 +168,7 @@ test('invite with a single workout: pick it, choose the day, and it lands on tha
   await expect(sent.getByText(`${workout.name} is on their calendar for ${shortDay(day)}`)).toBeVisible();
   await sent.getByRole('button', { name: 'Done' }).click();
 
-  const row = page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: `Sid Single${tag}` });
+  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: `Sid Single${tag}` });
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText(`Single workout: ${workout.name}`);
 
@@ -198,7 +199,7 @@ test('invites are listed newest first, after the clients', async ({ page }) => {
     await fillPerson(page, firstName, lastName, email);
     await dialog.getByRole('button', { name: 'Send invite' }).click();
     await page.getByRole('dialog', { name: `Invite sent to ${firstName}` }).getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: email })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: email })).toBeVisible();
   };
   // Added first, and first by last name: newest-first must still put it below the later one.
   const older = `older-${run}@example.com`;
@@ -206,7 +207,7 @@ test('invites are listed newest first, after the clients', async ({ page }) => {
   await add('Ada', 'Aardvark', older);
   await add('Zoe', 'Zulu', newer);
   await page.reload();
-  const rows = await page.getByRole('table', { name: 'Clients' }).getByRole('row').allTextContents();
+  const rows = await page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').allTextContents();
   const at = (text: string) => rows.findIndex((r) => r.includes(text));
   expect(at(newer)).toBeGreaterThan(-1);
   expect(at(newer)).toBeLessThan(at(older));
@@ -296,7 +297,7 @@ test('CSV upload previews valid rows and line errors, then sends the valid ones'
   await expect(preview.getByText('Invite sent')).toHaveCount(3);
   await dialog.getByRole('button', { name: 'Close' }).click();
 
-  const list = page.getByRole('table', { name: 'Clients' });
+  const list = page.getByRole('table', { name: 'Clients', exact: true });
   for (const who of ['alice', 'bob', 'cara']) {
     // Exactly one row each, so the duplicate line produced no second copy.
     await expect(list.getByRole('row').filter({ hasText: `${who}-${run}@example.com` })).toHaveCount(1);
@@ -305,7 +306,7 @@ test('CSV upload previews valid rows and line errors, then sends the valid ones'
 });
 
 test('the demo client is listed under Clients', async ({ page }) => {
-  const clients = page.getByRole('table', { name: 'Clients' });
+  const clients = page.getByRole('table', { name: 'Clients', exact: true });
   await expect(clients.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();
   await expect(page.getByText('No clients yet')).toHaveCount(0);
 });

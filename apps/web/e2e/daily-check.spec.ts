@@ -248,7 +248,7 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   await signIn(page, coach);
   await page.goto('/clients');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients 8');
-  const table = page.getByRole('table', { name: 'Clients' });
+  const table = page.getByRole('table', { name: 'Clients', exact: true });
   const rowOf = (name: string) => table.getByRole('row').filter({ hasText: name });
   const cell = (name: string, n: number) => rowOf(name).getByRole('cell').nth(n);
 
@@ -289,8 +289,9 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   await expect(cell('Sami Steady', 0)).toContainText('Active');
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 
-  // Tapping a row opens the client.
-  await cell('Quinn Quiet', 1).click();
+  // Tapping a row opens the client: the name link covers the whole row, so a tap on the last-workout cell lands on
+  // it (force: Playwright would otherwise wait because the link, not the cell, is on top, which is the point).
+  await cell('Quinn Quiet', 1).click({ force: true });
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.quiet}$`));
 });
 
@@ -311,7 +312,7 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   const ids = await seedList(coach);
   await signIn(page, coach);
   await page.goto('/clients');
-  const table = page.getByRole('table', { name: 'Clients' });
+  const table = page.getByRole('table', { name: 'Clients', exact: true });
   const names = () => table.locator('[data-client-id]').evaluateAll((rows) => rows.map((r) => r.querySelector('a')?.textContent ?? ''));
   const filters = page.getByRole('group', { name: 'Filter clients' });
 
@@ -369,18 +370,20 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   await expect.poll(async () => (await names()).slice(0, 2)).toEqual(['Enid Ending', 'Sami Steady']);
 });
 
-test('on iPad portrait the Clients list turns into stacked cards with labelled values and no sideways scroll', async ({ page }) => {
+test('on iPad portrait the Clients list turns into stacked cards with labelled values and no sideways scroll', async ({ page }, testInfo) => {
   const coach = await newCoach();
   await seedList(coach);
   await page.setViewportSize({ width: 820, height: 1180 });
   await signIn(page, coach);
   await page.goto('/clients');
-  const row = page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: 'Sami Steady' });
+  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: 'Sami Steady' });
   await expect(row.getByText('Last workout', { exact: true })).toBeVisible();
   await expect(row.getByText('4 weeks', { exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Last workout' })).toBeHidden();
   const width = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(width).toBeLessThanOrEqual(0);
+  // Kept in the CI report, so a reviewer can see both layouts without running the app.
+  await testInfo.attach('clients-820', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
   // Laptop / iPad landscape: a table with column headers, still no sideways scroll.
   await page.setViewportSize({ width: 1194, height: 834 });
@@ -388,4 +391,12 @@ test('on iPad portrait the Clients list turns into stacked cards with labelled v
   await expect(row.getByText('Last workout', { exact: true })).toBeHidden();
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(wide).toBeLessThanOrEqual(0);
+  await testInfo.attach('clients-1194', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
+  // The invite window with a program picked, and the single-workout picker.
+  await page.getByRole('button', { name: '+ Invite client' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Invite a client' });
+  await dialog.getByLabel('First name').fill('Sam');
+  await dialog.getByRole('button', { name: 'Single workout', exact: true }).click();
+  await testInfo.attach('invite-1194', { body: await page.screenshot(), contentType: 'image/png' });
 });
