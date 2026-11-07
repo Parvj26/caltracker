@@ -122,6 +122,31 @@ export async function loadFeed(communityId: string): Promise<FeedPost[]> {
   return [...rows.values()].map(toFeedPost);
 }
 
+/** The newest few posts (not the pinned ones), for the Today tab's community card. */
+export async function loadLatestPosts(communityId: string, limit: number): Promise<FeedPost[]> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select(POST_SELECT)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) fail(error, 'Couldn’t load the community.');
+  return ((data ?? []) as unknown as PostRow[]).map(toFeedPost);
+}
+
+/** Whether I already shared this workout to the community (as a workout card). */
+export async function sharedWorkout(logId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('id')
+    .eq('author_id', await myId())
+    .eq('card->>kind', 'workout')
+    .eq('card->>logId', logId)
+    .limit(1);
+  if (error) fail(error, 'Couldn’t load the community.');
+  return (data ?? []).length > 0;
+}
+
 export async function loadPost(postId: string): Promise<FeedPost | null> {
   const { data, error } = await supabase.from('community_posts').select(POST_SELECT).eq('id', postId).maybeSingle();
   if (error) fail(error, 'Couldn’t load the post.');
