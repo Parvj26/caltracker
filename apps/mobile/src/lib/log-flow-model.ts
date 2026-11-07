@@ -492,11 +492,18 @@ export function prefillSets(ex: LogExerciseDoc, last: LastResults, progression?:
   return progression ? prefillLastTime(ex, sets, progression.history, progression.units) : sets;
 }
 
-/** "Suggested 140 lb · ↑ +5 lb" for an exercise Auto progression moves, else null. */
-export function progressionLine(ex: LogExerciseDoc, progression?: Progression): string | null {
+/**
+ * "Suggested 140 lb · ↑ +5 lb" for an exercise Auto progression moves, else null. Only while the first working set
+ * actually shows that weight: a set ticked before the history loaded (offline, slow signal) carries its own weight
+ * forward, and then the line would name a number the boxes don't use.
+ */
+export function progressionLine(ex: LogExerciseDoc, last: LastResults, progression?: Progression): string | null {
   if (!progression) return null;
   const s = suggestionForLogExercise(ex, progression.history, progression.units);
-  return s ? `Suggested ${formatWeight(s.weightKg, progression.units)} · ${progressionHint(s, progression.units)}` : null;
+  const first = ex.sets.find((x) => x.setType === 'normal');
+  if (!s || !first) return null;
+  if (resolveSetValues(ex, first.id, prefillSets(ex, last, progression)).weightKg !== s.weightKg) return null;
+  return `Suggested ${formatWeight(s.weightKg, progression.units)} · ${progressionHint(s, progression.units)}`;
 }
 
 export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; rows: RowModel[]; allDone: boolean };
@@ -556,7 +563,7 @@ function exerciseModel(
     substitute: substituteOf(ex),
     swappedFromExerciseId: ex.swappedFromExerciseId,
     lastTime: last[ex.exerciseId]?.sets ?? [],
-    progression: progressionLine(ex, progression),
+    progression: progressionLine(ex, last, progression),
   };
 }
 

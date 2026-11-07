@@ -589,6 +589,18 @@ describe('Auto progression on the phone', () => {
     expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([150, 150, 150]);
   });
 
+  it('hides the suggestion when a set was ticked with another weight before the history loaded', () => {
+    let log = progressionLog(null);
+    const ex = log.blocks[0].exercises[0];
+    // Ticked offline with last time's 135 lb; then the history arrives.
+    log = completeSetWith(log, ex.sets[0].id, { reps: 10, weightKg: 135 * LB, durationS: null, distanceM: null }, NOW);
+    const model = buildPage(log, page, 'lb', lastFor(log), historyFor(log));
+    if (model.kind !== 'straight') throw new Error('expected a straight page');
+    expect(model.exercise.progression).toBeNull();
+    // The open sets carry the ticked weight forward, matching what the line (not) says.
+    expect(model.rows.map((r) => Math.round((r.values.weightKg ?? 0) / LB))).toEqual([135, 135, 135]);
+  });
+
   it('Mark all ticks with the suggested weight', () => {
     const log = progressionLog(null);
     const ex = log.blocks[0].exercises[0];
