@@ -128,6 +128,7 @@ begin
       if v_item.program_id is not null then
         select * into v_program from public.programs p where p.id = v_item.program_id and p.workspace_id = new.workspace_id;
         if not found then
+          raise warning 'apply_invite_plan: skipped a plan item of invite % (program not in this workspace)', new.id;
           continue;
         end if;
         v_assignment := gen_random_uuid();
@@ -152,6 +153,7 @@ begin
           select 1 from public.workouts w
           where w.id = v_item.workout_id and w.client_id is null and w.workspace_id = new.workspace_id
         ) then
+          raise warning 'apply_invite_plan: skipped a plan item of invite % (workout not in this library)', new.id;
           continue;
         end if;
         v_copy := public.copy_workout(v_item.workout_id, new.accepted_by, v_day, null, null);

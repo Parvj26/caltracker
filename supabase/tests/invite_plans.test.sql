@@ -1,5 +1,5 @@
 begin;
-select plan(35);
+select plan(41);
 
 -- Plan at invite: set_invite_plan keeps a program or single workouts with an open invite (coaches of the workspace
 -- only, its own library only), and accepting the invite (accept_invite_for or claim_invites) puts them on the new
@@ -103,6 +103,9 @@ select results_eq(format('select scheduled_on, name from public.workouts where c
   'its workouts are on the calendar');
 select is((select count(*)::int from public.workouts where client_id = :'new1' and created_by is distinct from :'coach_a'::uuid), 0,
   'the copies count as the coach''s');
+select is((select count(*)::int from public.workouts where client_id = :'new1'
+    and (assignment_id is null or planned_on is distinct from scheduled_on or source_hash is null)), 0,
+  'program copies carry their assignment, program day and source hash (Live Sync bookkeeping)');
 select is((select count(*)::int from public.client_invite_plan_items where invite_id = :'inv1'), 0, 'the plan is used up');
 
 -- Single workouts, one of them on a day that has passed (claim_invites path: the user signs in themselves).
@@ -122,6 +125,40 @@ insert into public.client_invite_plan_items (invite_id, workspace_id, program_id
 select tests.create_user('ip-new3@t.local', 'New Three') as new3 \gset
 select is(public.accept_invite_for(:'inv3', :'new3'), 'ok', 'an unusable plan never blocks joining');
 select is((select count(*)::int from public.program_assignments where client_id = :'new3'), 0, 'and nothing is assigned from it');
+
+-- An item that fails part-way (its second copy raises) is rolled back whole; joining still works.
+create function tests.ip_boom() returns trigger language plpgsql as $$
+begin
+  if new.name = 'IP Boom' then
+    raise exception 'boom';
+  end if;
+  return new;
+end;
+$$;
+create trigger ip_boom before insert on public.workouts for each row execute function tests.ip_boom();
+select tests.create_workout(:'ws_a', 'IP Lib Ok', null, null, :'ex') as lib_ok \gset
+drop trigger ip_boom on public.workouts;
+insert into public.workouts (workspace_id, name) values (:'ws_a', 'IP Boom') returning id as lib_boom \gset
+create trigger ip_boom before insert on public.workouts for each row execute function tests.ip_boom();
+insert into public.programs (workspace_id, name, weeks) values (:'ws_a', 'IP Boom Program', 1) returning id as prog_boom \gset
+insert into public.program_workouts (program_id, week, day, workout_id) values (:'prog_boom', 1, 1, :'lib_ok'), (:'prog_boom', 1, 2, :'lib_boom');
+select tests.create_invite(:'ws_a', 'ip-new4@t.local', 'New Four', :'coach_a', 'tok-ip-new4-000000000000') as inv4 \gset
+insert into public.client_invite_plan_items (invite_id, workspace_id, program_id, start_on) values (:'inv4', :'ws_a', :'prog_boom', :'d3');
+select tests.create_user('ip-new4@t.local', 'New Four') as new4 \gset
+select is(public.accept_invite_for(:'inv4', :'new4'), 'ok', 'a plan item that fails part-way never blocks joining');
+select is((select count(*)::int from public.program_assignments where client_id = :'new4')
+  + (select count(*)::int from public.workouts where client_id = :'new4'), 0,
+  'and its partial assignment and copies are rolled back');
+select is((select count(*)::int from public.workspace_members where user_id = :'new4' and workspace_id = :'ws_a'), 1, 'they are a client');
+drop trigger ip_boom on public.workouts;
+
+-- Cancelling an invite deletes its plan.
+select tests.create_invite(:'ws_a', 'ip-new5@t.local', 'New Five', :'coach_a', 'tok-ip-new5-000000000000') as inv5 \gset
+select tests.act_as(:'coach_a');
+select is(public.set_invite_plan(:'inv5', :'prog', :'d3'), 1, 'a plan for an invite that will be cancelled');
+delete from public.client_invites where id = :'inv5';
+reset role;
+select is((select count(*)::int from public.client_invite_plan_items where invite_id = :'inv5'), 0, 'cancelling the invite deletes its plan');
 
 -- An accepted invite can't get a plan any more.
 select tests.act_as(:'coach_a');

@@ -97,11 +97,13 @@ export async function inviteClient(input: { invite: InviteInput; plan: InvitePla
     .maybeSingle();
   const row = open.error ? null : open.data;
 
+  // Always set the plan, "Nothing yet" included: re-inviting the same email clears a plan chosen earlier, so a stale
+  // one is never applied when they join.
+  const kept = row ? await supabase.rpc('set_invite_plan', { p_invite_id: row.id, ...invitePlanArgs(plan.data) }) : null;
   let planError: string | null = null;
-  if (plan.data.kind !== 'none') {
+  if (plan.data.kind !== 'none' && (!kept || kept.error)) {
     const what = plan.data.kind === 'program' ? "the program couldn't be added. Add it" : "the workouts couldn't be added. Add them";
-    const kept = row ? await supabase.rpc('set_invite_plan', { p_invite_id: row.id, ...invitePlanArgs(plan.data) }) : null;
-    if (!kept || kept.error) planError = `Invite sent, but ${what} from their Training page once they join.`;
+    planError = `Invite sent, but ${what} from their Training page once they join.`;
   }
   revalidatePath('/clients');
   return { ok: true, result, expiresAt: row?.expires_at ?? null, planError };
