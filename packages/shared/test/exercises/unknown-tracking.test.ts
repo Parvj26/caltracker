@@ -13,6 +13,9 @@ import type { LogTreeRow } from '../../src/logs/tree';
 import { WorkoutDoc, parseWorkoutDocLenient } from '../../src/workouts/schema';
 import { formatSetTarget, formatSetsSummary, targetFieldsFor, trackingTypeLabel } from '../../src/workouts/targets';
 import { workoutRowToDoc } from '../../src/workouts/tree';
+import { liftsByExercise, logBests } from '../../src/awards/prs';
+import { nextSuggestion } from '../../src/progression/progression';
+import { mkLog } from '../awards/helpers';
 import type { WorkoutTreeRow } from '../../src/workouts/tree';
 
 const FUTURE = 'sled_meters_per_minute' as unknown as TrackingType;
@@ -371,5 +374,28 @@ describe('parsing docs saved on the phone', () => {
     expect(ex?.trackingType).toBe('reps');
     expect(ex?.sets[0]).toMatchObject({ actualWeightKg: 32, actualDurationS: 55 });
     expect(ex?.substituteOptions.map((o) => o.trackingType)).toEqual(['reps', 'weight_reps']);
+  });
+});
+
+describe('progression and PRs ignore weight-and-time and unknown types', () => {
+  // Every working set hit the top of the range with a weight, so a weight_reps exercise would get a suggestion.
+  const history = [{ sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, completed: true, reps: 10, weightKg: 60 })) }];
+  const plan = (trackingType: TrackingType) => ({
+    trackingType,
+    sets: [1, 2, 3].map(() => ({ setType: 'normal' as const, repsMin: 8, repsMax: 10, weightKg: null })),
+  });
+
+  it('auto progression suggests only for weight and reps', () => {
+    expect(nextSuggestion(history, plan('weight_reps'), 'upper', 'kg')).not.toBeNull();
+    expect(nextSuggestion(history, plan('weight_time'), 'upper', 'kg')).toBeNull();
+    expect(nextSuggestion(history, plan(FUTURE), 'upper', 'kg')).toBeNull();
+  });
+
+  it('weighted sets of weight-and-time or unknown exercises count no lifts, so no PRs', () => {
+    const sets = [{ w: 32, r: 10 }];
+    expect(liftsByExercise(mkLog([{ trackingType: 'weight_reps', sets }])).size).toBe(1);
+    expect(liftsByExercise(mkLog([{ trackingType: 'weight_time', sets }])).size).toBe(0);
+    expect(liftsByExercise(mkLog([{ trackingType: FUTURE, sets }])).size).toBe(0);
+    expect(logBests(mkLog([{ trackingType: 'weight_time', sets }]))).toEqual([]);
   });
 });
