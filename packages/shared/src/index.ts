@@ -148,6 +148,7 @@ export {
   ASSIGN_MAX_CLIENTS,
   AssignToClientsInput,
   assignSummary,
+  copyDefaultDate,
   filterClients,
   nextFreeDay,
   nextMonday,
