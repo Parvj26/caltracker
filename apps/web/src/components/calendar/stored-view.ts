@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { isCalendarView, type CalendarView } from '@caltracker/shared';
+import { CALENDAR_VIEW_COOKIE } from './view-cookie';
 
 // The coach's last picked calendar view, kept in this browser only (a convenience, not data): per coach, so two
-// coaches sharing a computer keep their own. Storage can be missing or blocked (private windows); then nothing is
-// remembered and the default view shows.
+// coaches sharing a computer keep their own. It goes in a cookie, so the server renders the right view first time
+// (no flash of the default), and in localStorage as a fallback. Either can be missing or blocked (private windows);
+// then nothing is remembered and the default view shows.
 const key = (coachId: string) => `caltracker:calendar-view:${coachId}`;
 const CHANGED = 'caltracker:calendar-view-changed';
 
@@ -31,6 +33,11 @@ export function useStoredCalendarView(coachId: string): CalendarView | null {
 }
 
 export function storeCalendarView(coachId: string, view: CalendarView): void {
+  try {
+    document.cookie = `${CALENDAR_VIEW_COOKIE}=${encodeURIComponent(`${coachId}:${view}`)}; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    // Not remembered in a cookie; localStorage below may still work.
+  }
   try {
     window.localStorage.setItem(key(coachId), view);
   } catch {

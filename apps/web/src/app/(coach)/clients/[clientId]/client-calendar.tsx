@@ -72,7 +72,7 @@ export function ClientCalendar({
   client: ClientRef;
   /** The signed-in coach: the remembered view is theirs. */
   coachId: string;
-  /** From ?view=, or null to use the remembered (or default) view. */
+  /** From ?view=, else the view remembered in a cookie, or null to use localStorage (or the default). */
   view: CalendarView | null;
   /** From ?from= (any day in the range to show), or null for the coach's today. */
   from: IsoDate | null;

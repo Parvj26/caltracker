@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { clientPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   CALENDAR_VIEWS,
@@ -15,6 +16,7 @@ import {
 } from '@caltracker/shared';
 import type { CalendarView, IsoDate, WorkoutTreeRow } from '@caltracker/shared';
 import { isMonth } from '@/components/calendar/format';
+import { CALENDAR_VIEW_COOKIE, viewFromCookie } from '@/components/calendar/view-cookie';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from './client-calendar';
@@ -60,13 +62,14 @@ export default async function ClientPage({
   const client = await getClient(clientId);
   if (!client) notFound();
 
-  // ?view=&from= pick the days on screen. An older ?month=YYYY-MM link opens that month. "Today" belongs to the
-  // coach's browser, not this (UTC) server, and without ?view= the view is the one the coach last picked in their
-  // browser: so without ?from= load around every day the browser's today can be (a day either side of UTC's), and
-  // without ?view= load enough for every view.
+  // ?view=&from= pick the days on screen. An older ?month=YYYY-MM link opens that month. Without ?view= the view is
+  // the one the coach last picked (a cookie), so the first render is already right. "Today" belongs to the coach's
+  // browser, not this (UTC) server: without ?from= load around every day the browser's today can be (a day either
+  // side of UTC's), and with no view known at all load enough for every view.
   const legacyMonth = isMonth(query.month) ? query.month : null;
   const parsedFrom = IsoDateSchema.safeParse(query.from);
-  const view: CalendarView | null = isCalendarView(query.view) ? query.view : legacyMonth ? 'month' : null;
+  const remembered = viewFromCookie((await cookies()).get(CALENDAR_VIEW_COOKIE)?.value, userId);
+  const view: CalendarView | null = isCalendarView(query.view) ? query.view : legacyMonth ? 'month' : remembered;
   const from: IsoDate | null = parsedFrom.success ? parsedFrom.data : legacyMonth ? `${legacyMonth}-01` : null;
   const utcToday = localToday('UTC');
   const { start: rangeStart, end: rangeEnd } = coveringRange(
