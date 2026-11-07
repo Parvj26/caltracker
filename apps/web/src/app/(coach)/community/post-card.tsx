@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { COMMENT_BODY_MAX, cardText, likersLine, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
+import { COMMENT_BODY_MAX, cardText, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { Chip, ErrorText } from '@/components/ui';
-import { addComment, deleteComment, deletePost, setLiked, setPinned, type CommunityOutcome } from './actions';
+import { addComment, deleteComment, deletePost, setPinned, type CommunityOutcome } from './actions';
 import type { FeedPost } from './data';
+import { ReactionBar } from './reaction-bar';
 import styles from './community.module.css';
 
 /** Post text with http(s) links made clickable (opened in a new tab, without passing the page along). */
@@ -47,12 +48,20 @@ function CardView({ card, units }: { card: CommunityCard; units: Units }) {
   );
 }
 
-export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewerId: string; units: Units; now: number }) {
+export function PostCard({
+  post,
+  viewer,
+  units,
+  now,
+}: {
+  post: FeedPost;
+  viewer: { userId: string; name: string };
+  units: Units;
+  now: number;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [pending, startTransition] = useTransition();
-  const liked = post.likerIds.includes(viewerId);
-  const otherLikers = post.likerNames.filter((_, i) => post.likerIds[i] !== viewerId);
 
   const run = (action: () => Promise<CommunityOutcome>, after?: () => void) =>
     startTransition(async () => {
@@ -115,20 +124,7 @@ export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewe
         </ul>
       ) : null}
 
-      <div className={styles.postFooter}>
-        <button
-          type="button"
-          className={styles.smallButton}
-          aria-pressed={liked}
-          disabled={pending}
-          onClick={() => run(() => setLiked(post.id, !liked))}
-        >
-          {liked ? '♥ Liked' : '♡ Like'}
-        </button>
-        <span className={styles.caption} data-testid="likers">
-          {likersLine(otherLikers, liked)}
-        </span>
-      </div>
+      <ReactionBar target={{ postId: post.id }} rows={post.reactions} viewer={viewer} label={`Reactions to ${post.authorName}’s post`} />
 
       {post.comments.length > 0 ? (
         <ul className={styles.comments} aria-label="Comments">
@@ -151,6 +147,7 @@ export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewe
                   Delete comment
                 </button>
               </p>
+              <ReactionBar target={{ commentId: c.id }} rows={c.reactions} viewer={viewer} label={`Reactions to ${c.authorName}’s comment`} />
             </li>
           ))}
         </ul>
