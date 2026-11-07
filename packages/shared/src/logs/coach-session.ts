@@ -5,6 +5,7 @@ import { liveExercises } from './flow';
 import { completeSetWith } from './ops';
 import { resolveSetValues } from './prefill';
 import type { LogStatus, WorkoutLogDoc } from './schema';
+import type { IsoDate } from '../dates/dates';
 
 /**
  * True when the log was logged by someone other than its client (their coach): the "Logged by coach" badge.
@@ -27,6 +28,14 @@ export type CoachSessionState =
   | { kind: 'done'; logId: string }
   /** The client has a different workout in progress; only one can be in progress at a time. */
   | { kind: 'other_workout'; logId: string; name: string; byCoach: boolean };
+
+/**
+ * A coach starts a session only for today's workout or a missed one, never one on a later day (the database refuses it
+ * too: hint future_workout). A workout with no date is not on a calendar, so the date doesn't limit it.
+ */
+export function canStartSessionOn(scheduledOn: IsoDate | null, today: IsoDate): boolean {
+  return scheduledOn === null || scheduledOn <= today;
+}
 
 /** Who is logging a workout, as the coach's page words it. */
 export type LoggerKind = 'me' | 'client' | 'other_coach';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AUTO_FINISH_IDLE_MS, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
 import {
+  coachBannerHeading,
   idleMinutes,
   needsServerCopy,
   parseLoggerState,
@@ -374,5 +375,13 @@ describe('single active logger', () => {
     expect(idleMinutes('2026-11-06T10:00:00.000Z', t + 25 * 60_000 + 59_000)).toBe(25);
     expect(idleMinutes('2026-11-06T10:00:00.000Z', t - 60_000)).toBe(0);
     expect(idleMinutes('bad', t)).toBe(0);
+  });
+
+  it('words the coach banner heading so it never contradicts the body', () => {
+    expect(coachBannerHeading({ status: 'in_progress', canReclaim: false })).toBe('Your coach is logging this session');
+    // 20+ minutes without the coach: the body offers "Continue on my phone", so the heading must not say "is logging".
+    expect(coachBannerHeading({ status: 'in_progress', canReclaim: true })).toBe('Your coach stopped logging');
+    expect(coachBannerHeading({ status: 'completed', canReclaim: false })).toBe('Your coach logged this session');
+    expect(coachBannerHeading({ status: 'completed', canReclaim: true })).toBe('Your coach logged this session');
   });
 });

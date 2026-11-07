@@ -1940,6 +1940,7 @@ export type Database = {
           revision: number
           started_at: string
           status: Database["public"]["Enums"]["log_status"]
+          taken_over_from: string | null
           updated_at: string
           workout_id: string | null
           workspace_id: string
@@ -1959,6 +1960,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id: string
@@ -1978,6 +1980,7 @@ export type Database = {
           revision?: number
           started_at?: string
           status?: Database["public"]["Enums"]["log_status"]
+          taken_over_from?: string | null
           updated_at?: string
           workout_id?: string | null
           workspace_id?: string

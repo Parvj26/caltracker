@@ -11,6 +11,10 @@ on the iPad or laptop.
   **Take over** (the session page, which offers it); done → **View log**. All at least 44 px.
 - **Entry points:** Home → Today's clients → **Log session** on a row; the client calendar's item menu →
   **Log session** on today's workout or a missed (past, not done) one. Logging an unplanned workout is not built.
+  A later day's workout can't be started, even from a direct link: the page shows "This workout is on a later day"
+  instead of **Start session** (the server refuses anything after UTC's tomorrow, the browser anything after the
+  coach's own today), and `coach_save_workout_log` refuses to start it after the client's today
+  (`public.client_today`, the day Live Sync uses; 22023, hint `future_workout`).
 - **Page:** `/clients/[clientId]/log/[workoutId]`. Before anything is saved it shows the workout and
   **Start session**. Once started:
   - left column (from 760 px wide, so iPad portrait too): the pages list grouped by section, a ✓ on finished pages; right column: the current
@@ -44,7 +48,7 @@ on the iPad or laptop.
 | Client logging this workout | "Parv is logging this now on their phone", progress (sets done, last update), live over Realtime; **Take over**, **View only**, Refresh | Logs as usual |
 | Coach logging (started or took over) | The logging page | The normal logging pages, read only, under a slim "Your coach is logging this session" bar: no typing, ticking, Mark all, Done, delete or switching; swiping, ‹ ›, photos and exercise info still work. Each coach save changes the log's row, which Realtime delivers; the phone fetches the coach's copy and shows it within a second or two (the set the coach ticked last is outlined). Saves from the phone are refused and the phone takes the coach's copy; without an open copy on the phone the full banner shows |
 | Coach handed back | Back to the calendar | Logs as usual from the server copy |
-| Coach stopped (20 min without activity) or is no longer a coach | — | "Your coach stopped logging N min ago" · **Continue on my phone** |
+| Coach stopped (20 min without activity) or is no longer a coach | — | Heading "Your coach stopped logging", "Your coach stopped logging N min ago. You can carry on here." · **Continue on my phone** |
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
 | Finished | Opens the finished log | Watching: straight to the sticker reveal ("Your coach logged this session", animal and extras), then the summary with "Logged by coach". Not open: the reveal shows once on the next Today visit or app foreground, for coach-finished logs of the last 14 days whose award exists (no award yet: tried again next time); the phone keeps a per-user list of log ids it has revealed |
 
@@ -111,6 +115,36 @@ Another branch (`feature/simple-logging`) is rewriting the phone's logging scree
 
 Whoever rewrites the logging screens: keep calling `useCoachLogging(id)` before the screen's early returns and render
 `CoachLoggingBanner` when `byCoach` is true.
+
+## Sets ticked just before a take over (20261107003000_coach_logging_polish)
+
+The client ticks a set; before the phone has uploaded it (a second's debounce, or a weak signal) the coach taps
+**Take over**. Without help the phone's upload would be refused (`loggedByOther`) and the set lost (kept only as a
+rejected copy). Chosen approach, the safest of "wait", "merge on the server" and "final save":
+
+- `take_over_workout_log` stores who held the log in `workout_logs.taken_over_from`.
+- Until the new holder's first save, that person's next save is applied **once** (a "final save"): only while the
+  log and the doc are in progress (a finish or discard from the phone is still refused: finishing is the coach's call
+  now) and with a higher revision, as any save. The answer is `{ applied: true, ..., loggedByOther: true }`, the
+  coach's 20 minutes still count from the take over, and `taken_over_from` is cleared by any applied save. So the
+  final save can never overwrite anything the coach did: once the coach has saved, the phone is refused as before.
+- The final save is stored 1000 above the take over's revision (like hand back and reclaim). The coach's page counts
+  its own revisions up from the take over's, so without the jump two coach edits could outrank one phone edit and
+  the coach's save would replace the whole log, dropping the client's set. With it the coach's save is always stale.
+- A second take over before anyone saved (coach B from coach A, who changed nothing) keeps `taken_over_from` on the
+  first holder, so the client's unsent sets keep their final save.
+- Hand back and reclaim clear `taken_over_from`: the client holds the log again, so the next take over opens a new
+  window for the client rather than reusing an old holder's.
+- The phone already uploads before it adopts: when it hears of the take over (Realtime, the open/foreground check, or
+  a save's answer) `refreshFromServer` sends its copy first (`sync.recheck`). On `applied` + `loggedByOther`, log-sync
+  marks it saved, then adopts the server copy and shows the banner (no "sets replaced" note: nothing was lost).
+- The coach's page: its next save is then stale. It loads the server copy (with the client's sets) and re-applies its
+  own unsaved edits on top (`rebaseEdits` in `packages/shared`, the same shared operations by set id), then saves.
+  A tick or untick is decided when the coach clicks, so a set the client ticked meanwhile is never toggled off.
+  The session note and exercise notes are refreshed from the server copy too, unless the coach is typing a session
+  note, so an old note never overwrites a newer one.
+- Left over: if the coach saves before the phone's upload arrives (the phone offline for a while), the phone's sets
+  are refused as before and kept as a rejected copy on the phone, and the client is told.
 
 ## Known limits
 

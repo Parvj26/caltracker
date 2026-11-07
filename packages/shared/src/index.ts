@@ -168,7 +168,9 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
-export { coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { rebaseEdits } from './logs/rebase';
+export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';
 export type { LogTreeRow, LogTreeSetRow } from './logs/tree';
