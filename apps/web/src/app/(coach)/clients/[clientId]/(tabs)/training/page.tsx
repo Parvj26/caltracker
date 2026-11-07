@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { clientPageTitle } from '@/lib/page-titles';
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
@@ -19,10 +18,10 @@ import { isMonth } from '@/components/calendar/format';
 import { CALENDAR_VIEW_COOKIE, viewFromCookie } from '@/components/calendar/view-cookie';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from './client-calendar';
+import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from '../../client-calendar';
 import { getClient } from '@/lib/page-data';
-import { StickersPanel } from './stickers-panel';
-import { StrengthPanel } from './strength-panel';
+import { StickersPanel } from '../../stickers-panel';
+import { StrengthPanel } from '../../strength-panel';
 import { loadClientStickers } from '@/lib/client-stickers';
 import { loadClientStrength } from '@/lib/client-strength';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -30,7 +29,7 @@ import { renderTime } from '@/lib/live-refresh';
 import styles from '@/components/calendar/calendar.module.css';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
-  return clientPageTitle((await params).clientId);
+  return clientPageTitle((await params).clientId, 'Training');
 }
 
 // Same cap as the workout library page.
@@ -199,9 +198,8 @@ export default async function ClientPage({
 
   return (
     <div className={styles.page}>
-      <Link href="/clients" className={styles.back}>← Clients</Link>
       <LiveRefresh on={[{ table: 'workout_logs', filter: `client_id=eq.${client.id}` }]} renderedAt={renderTime()} />
-      {/* The client's name and calendar (assign a program, add a workout) come first; progress sits below. */}
+      {/* The calendar (assign a program, add a workout) comes first; stickers, bests and strength sit below. */}
       <ClientCalendar
         client={client}
         coachId={userId}

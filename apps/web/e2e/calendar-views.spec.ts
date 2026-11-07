@@ -81,7 +81,7 @@ async function seedWorkout(name: string, date: string, exercises: string[] = ['B
 
 test('2 weeks by default; ‹ › step by the view; Today comes back; the picked view is remembered and in the address', async ({ page }) => {
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
   const today = await browserToday(page);
   const monday = mondayOf(today);
 
@@ -109,11 +109,11 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await expectWeeks(page, addDays(monday, 28), 4);
   await page.reload();
   await expectWeeks(page, addDays(monday, 28), 4);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
   await expect(viewLink(page, '4 Week')).toHaveAttribute('aria-current', 'page');
   await expectWeeks(page, monday, 4);
   // The server already renders the remembered view (no flash of 2 weeks first): 4 weeks of days in the HTML.
-  const html = await (await page.context().request.get(`/clients/${clientId}`)).text();
+  const html = await (await page.context().request.get(`/clients/${clientId}/training`)).text();
   expect(html.match(/data-date="/g)?.length).toBe(28);
 
   // 1 week.
@@ -131,7 +131,7 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await page.getByRole('link', { name: 'Next month' }).click();
   const nextMonth = addDays(`${today.slice(0, 7)}-28`, 7).slice(0, 7);
   await expect(page.getByRole('table', { name: monthName(`${nextMonth}-01`) })).toBeVisible();
-  await page.goto(`/clients/${clientId}?month=${today.slice(0, 7)}`);
+  await page.goto(`/clients/${clientId}/training?month=${today.slice(0, 7)}`);
   await expect(page.getByRole('table', { name: monthName(today) })).toBeVisible();
   await expect(viewLink(page, 'Month')).toHaveAttribute('aria-current', 'page');
 });
@@ -158,7 +158,7 @@ test('week cards preview their exercises, "+ N more", ✓ done and "Logged by co
   if (log.error) throw log.error;
   logs.push(log.data.id);
 
-  await page.goto(`/clients/${clientId}?view=2w&from=${doneDate}`);
+  await page.goto(`/clients/${clientId}/training?view=2w&from=${doneDate}`);
   const preview = card(page, date, big);
   await expect(preview.locator('[title^="2× Barbell Deadlift · "]')).toBeVisible();
   await expect(preview.locator('[title^="2× Barbell Squat · "]')).toHaveCount(1);
@@ -171,7 +171,7 @@ test('week cards preview their exercises, "+ N more", ✓ done and "Logged by co
   await expect(done.getByText('Missed', { exact: true })).toHaveCount(0);
 
   // The month view stays compact: names only.
-  await page.goto(`/clients/${clientId}?view=month&from=${date}`);
+  await page.goto(`/clients/${clientId}/training?view=month&from=${date}`);
   await expect(card(page, date, big)).toBeVisible();
   await expect(card(page, date, big).locator('[title^="2× Barbell Deadlift · "]')).toHaveCount(0);
 });
@@ -183,7 +183,7 @@ test('a missed past workout can be edited: its card opens the editor and the cha
   const name = `Missed edit ${unique()}`;
   const id = await seedWorkout(name, pastDate);
 
-  await page.goto(`/clients/${clientId}?view=1w&from=${pastDate}`);
+  await page.goto(`/clients/${clientId}/training?view=1w&from=${pastDate}`);
   const missed = card(page, pastDate, name);
   await expect(missed.getByText('Missed', { exact: true })).toBeVisible();
   // Past days still can't take a drop, so the name isn't a drag handle; the menu offers Edit.
@@ -208,7 +208,7 @@ test('a missed past workout can be edited: its card opens the editor and the cha
 
   // Back goes to the days around it, in the coach's own view.
   await page.getByRole('link', { name: /'s calendar$/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}\\?from=${pastDate}$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training\\?from=${pastDate}$`));
   await expect(card(page, pastDate, name).locator('[title^="2× Barbell Squat · "]')).toBeVisible();
 });
 
@@ -223,7 +223,7 @@ test('a done workout: Edit results opens the correction form; its plan stays rea
   });
   logs.push(logId);
 
-  await page.goto(`/clients/${clientId}?view=1w&from=${pastDate}`);
+  await page.goto(`/clients/${clientId}/training?view=1w&from=${pastDate}`);
   const done = card(page, pastDate, name);
   await done.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   const menu = day(page, pastDate).getByRole('menu', { name: `Options for ${name}` });
@@ -245,7 +245,7 @@ test('drag a workout to another day in the 2-week view; a done one is not dragga
   const name = `Week drag ${unique()}`;
   const id = await seedWorkout(name, next);
 
-  await page.goto(`/clients/${clientId}?view=2w&from=${today}`);
+  await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
   const handle = day(page, next).getByRole('button', { name, exact: true });
   await expect(handle).toBeVisible();
   // The second week's tall row can start below the fold; mouse events only reach what is on screen.
@@ -269,7 +269,7 @@ test('on a narrow screen the week view is a list of days', async ({ page }) => {
   await signInAsCoach(page);
   const today = await browserToday(page);
   const monday = mondayOf(today);
-  await page.goto(`/clients/${clientId}?view=1w&from=${today}`);
+  await page.goto(`/clients/${clientId}/training?view=1w&from=${today}`);
   await expect(cells(page)).toHaveCount(7);
   // One column: every day starts at the same left edge, each below the one before, and says its weekday.
   const boxes = await cells(page).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: Math.round(r.x), y: r.y })));
@@ -285,7 +285,7 @@ test('after dragging a card back onto its own day, the next click still opens it
   const name = `Drag back ${unique()}`;
   const id = await seedWorkout(name, date);
 
-  await page.goto(`/clients/${clientId}?view=1w&from=${date}`);
+  await page.goto(`/clients/${clientId}/training?view=1w&from=${date}`);
   const handle = day(page, date).getByRole('button', { name, exact: true });
   await handle.scrollIntoViewIfNeeded();
   const box = (await handle.boundingBox())!;

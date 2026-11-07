@@ -40,8 +40,8 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
 
   return (
     <div className={styles.page}>
-      {/* Back to the days around this workout, in the coach's own calendar view. */}
-      <Link href={`/clients/${client.id}?from=${loaded.scheduledOn}`} className={styles.back}>
+      {/* Back to the days around this workout, in the coach's own calendar view (remembered in a cookie). */}
+      <Link href={`/clients/${client.id}/training?from=${loaded.scheduledOn}`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
       <header className={styles.titleRow}>

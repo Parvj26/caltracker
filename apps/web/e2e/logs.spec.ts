@@ -41,7 +41,7 @@ const shortDay = (d: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UT
 const MS_DAY = 86_400_000;
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * MS_DAY).toISOString().slice(0, 10);
 const browserToday = (page: Page) => page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
-const calendarUrl = (id: string, date: string) => `/clients/${id}?month=${date.slice(0, 7)}`;
+const calendarUrl = (id: string, date: string) => `/clients/${id}/training?month=${date.slice(0, 7)}`;
 const day = (page: Page, date: string) => page.locator(`[data-date="${date}"]`);
 
 async function plan(name: string, date: string, forClient = clientId): Promise<string> {

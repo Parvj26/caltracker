@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { LineChart } from '@/components/charts/line-chart';
+import { BodyProgress } from '@/components/progress/body-progress';
 import { Card, Screen } from '@/components/ui';
 import { fetchStrength, readCachedStrength } from '@/lib/strength-api';
 import { chartModel, type StrengthData } from '@/lib/strength-logic';
@@ -10,7 +11,7 @@ import { useUnits } from '@/lib/use-units';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-/** Progress: each lift's estimated one-rep max over time. Body scans join this screen in their own phase. */
+/** Progress: each lift's estimated one-rep max over time, then body scans and the client's own weight log. */
 export default function ProgressScreen() {
   const { text, space, radius } = useTheme();
   const { session } = useSession();
@@ -19,6 +20,7 @@ export default function ProgressScreen() {
   const [data, setData] = useState<StrengthData | null>(null);
   const [offline, setOffline] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
 
@@ -51,6 +53,7 @@ export default function ProgressScreen() {
       refreshing={refreshing}
       onRefresh={() => {
         setRefreshing(true);
+        setRefreshKey((k) => k + 1);
         void load().finally(() => setRefreshing(false));
       }}
     >
@@ -117,6 +120,8 @@ export default function ProgressScreen() {
           </>
         ) : null}
       </Card>
+
+      <BodyProgress refreshKey={refreshKey} />
     </Screen>
   );
 }

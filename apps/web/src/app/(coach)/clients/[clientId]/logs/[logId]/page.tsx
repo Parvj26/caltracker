@@ -64,7 +64,7 @@ export default async function LogPage({
 
   return (
     <div className={styles.page}>
-      <Link href={`/clients/${client.id}`} className={styles.back}>
+      <Link href={`/clients/${client.id}/training`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
       <header className={styles.titleBlock}>
