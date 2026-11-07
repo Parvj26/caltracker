@@ -1,5 +1,6 @@
-# Changing the sets while logging ("E2E Log", 3 sets of Barbell Squat): swipe a row left and tap Delete, + Add set,
-# and the ••• menu's Add a drop set, whose D tag explains itself.
+# Changing the sets while logging ("E2E Log", 3 sets of Barbell Squat): long-press a row and tap Delete set, + Add
+# set, ••• → Delete a set, and the ••• menu's Add a drop set, whose D tag explains itself. Rows have no swipe: a
+# sideways swipe always changes the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -20,25 +21,44 @@ env:
     env: { NAME: 'E2E Log' }
 - assertVisible:
     id: set-0-0-2
-# Swipe the second row left (from its middle), then Delete: three sets become two.
-- swipe:
-    from:
-      id: set-0-0-1
-    direction: LEFT
-    duration: 800
+# Long-press the second row's set number, then Delete set: three sets become two.
+- longPressOn:
+    id: tag-0-0-1
 - extendedWaitUntil:
     visible:
-      id: set-delete-0-0-1
+      id: menu-delete-set
     timeout: 5000
-- takeScreenshot: swipe-delete
+- takeScreenshot: long-press-delete
 - tapOn:
-    id: set-delete-0-0-1
+    id: menu-delete-set
 - extendedWaitUntil:
     notVisible:
       id: set-0-0-2
     timeout: 5000
 - assertVisible:
     id: set-0-0-1
+# + Add set: three again.
+- tapOn:
+    id: add-set-0-0
+- extendedWaitUntil:
+    visible:
+      id: set-0-0-2
+    timeout: 5000
+# ••• → Delete a set → the third set: two again.
+- tapOn:
+    id: more-0-0
+- tapOn:
+    id: menu-delete-a-set
+- extendedWaitUntil:
+    visible:
+      id: menu-delete-set-2
+    timeout: 5000
+- tapOn:
+    id: menu-delete-set-2
+- extendedWaitUntil:
+    notVisible:
+      id: set-0-0-2
+    timeout: 5000
 # + Add set: three again.
 - tapOn:
     id: add-set-0-0

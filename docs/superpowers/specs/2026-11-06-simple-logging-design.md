@@ -34,7 +34,8 @@ complicated.
 
 - No rest timer, no rest ring, no elapsed clock: ✓ only completes the set.
 - Every number can be changed at any time, also after ticking (the set stays ticked); ✓ again unticks. + Add set;
-  swipe a row left (or the VoiceOver action) to delete it. Pre-fill is unchanged (shared `resolveSetValues`):
+  long-press a row (or ••• → Delete a set, or the VoiceOver action "Delete set") to delete it. Rows have no
+  swipe, so a sideways swipe always changes the page. Pre-fill is unchanged (shared `resolveSetValues`):
   what was typed, a changed weight carried forward unless the coach planned per-set numbers, the coach's numbers,
   then last time. Mark all ticks every open set with its pre-fill, one after the other.
 - "How did it feel?" has no column of its own: it is saved as the first line of the workout note ("Felt: Good"),

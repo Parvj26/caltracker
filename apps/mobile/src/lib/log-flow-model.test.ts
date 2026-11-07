@@ -19,6 +19,7 @@ import { upperCoreLog } from './log-fixtures';
 import {
   afterDone,
   buildPage,
+  deleteChoices,
   buildSections,
   finishModel,
   historyLines,
@@ -480,5 +481,20 @@ describe('markAllPlan', () => {
     expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
     expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
     expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+  });
+});
+
+describe('deleting a set', () => {
+  it('offers every set but the only one, named with its numbers', () => {
+    const log = mockLog();
+    const push = log.blocks[2].exercises[0];
+    expect(deleteChoices(push, 'lb', []).map((c) => c.title)).toEqual([
+      'Warm-up 1 · 35 lb × 12 reps',
+      'Set 1 · 35 lb × 12 reps',
+      'Drop set · 20 lb × 12 reps',
+      'Drop set to failure · 15 lb',
+    ]);
+    const circles = log.blocks[0].exercises[0];
+    expect(deleteChoices(circles, 'lb', [])).toEqual([]);
   });
 });

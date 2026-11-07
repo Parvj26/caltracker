@@ -412,6 +412,23 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
   });
 }
 
+/**
+ * The sets the "Delete a set" sheet offers for an exercise: every set the shared rule lets go (not the only one),
+ * named with its numbers so two drop sets can be told apart ("Set 2 · 135 lb × 8").
+ */
+export function deleteChoices(ex: LogExerciseDoc, units: Units, lastSets: readonly LastResultSet[]): Array<{ setId: string; title: string }> {
+  return setRows(ex, units, lastSets)
+    .filter((r) => r.deletable)
+    .map((r) => {
+      const parts = r.cells.flatMap((c) => {
+        const v = c.value || c.placeholder;
+        if (!v) return [];
+        return [c.field === 'duration' ? v : `${v} ${c.unit}`];
+      });
+      return { setId: r.setId, title: parts.length > 0 ? `${r.name} · ${parts.join(' × ')}` : r.name };
+    });
+}
+
 /** "Rest 1:00": the coach's rest between this exercise's sets (its working sets' longest), or null. */
 export function restLine(ex: LogExerciseDoc): string | null {
   const secs = Math.max(0, ...ex.sets.filter((s) => s.setType !== 'drop').map((s) => s.target.restSeconds ?? 0));

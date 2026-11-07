@@ -52,7 +52,6 @@ import { FinishSheet, InfoSheet, SubstituteSheet } from '@/components/log/log-sh
 import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
-import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
@@ -63,6 +62,7 @@ import {
   afterDone,
   buildPage,
   buildSections,
+  deleteChoices,
   finishModel,
   hasTypedValues,
   historyLines,
@@ -190,6 +190,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const [infoFor, setInfoFor] = useState<{ name: string; exerciseId: string } | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
   const [menuFor, setMenuFor] = useState<LogExerciseDoc | null>(null);
+  /** Deleting a set: the long-press sheet on a row, or "Delete a set" from the ⋯ menu. */
+  const [setMenu, setSetMenu] = useState<{ title: string; items: MenuItem[] } | null>(null);
   const [subFor, setSubFor] = useState<LogExerciseDoc | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -309,6 +311,15 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
+        onRowMenu: (row) => {
+          Keyboard.dismiss();
+          tapHaptic();
+          const name = docOf(exId)?.exerciseName;
+          setSetMenu({
+            title: name ? `${row.name} · ${name}` : row.name,
+            items: [{ title: 'Delete set', testID: 'menu-delete-set', onPress: () => void op((l) => removeLogSet(l, exId, row.setId, nowIso())) }],
+          });
+        },
         onTag: (row) => {
           if (row.tagKind !== 'normal') setInfo(TAG_INFO[row.tagKind]);
         },
@@ -316,7 +327,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       cache.set(exId, made);
       return made;
     };
-  }, [withPick, op, tick, markDone]);
+  }, [withPick, op, tick, markDone, docOf]);
 
   const handlers: PageHandlers = useMemo(
     () => ({
@@ -400,6 +411,22 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         title: 'Add a drop set',
         testID: 'menu-add-drop',
         onPress: () => void op((l) => addLogDrop(withPick(ex.id)(l), ex.id, lastMain.id, randomUUID, nowIso())),
+      });
+    }
+    const deletable = deleteChoices(ex, units, last[ex.exerciseId]?.sets ?? []);
+    if (deletable.length > 0) {
+      items.push({
+        title: 'Delete a set',
+        testID: 'menu-delete-a-set',
+        onPress: () =>
+          setSetMenu({
+            title: `Delete which set? · ${ex.exerciseName}`,
+            items: deletable.map((c, i) => ({
+              title: c.title,
+              testID: `menu-delete-set-${i}`,
+              onPress: () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso())),
+            })),
+          }),
       });
     }
     items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', onPress: () => confirmRemoveExercise(ex) });
@@ -505,6 +532,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onClose={() => setSubFor(null)}
       />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
+      <ActionMenu title={setMenu?.title ?? null} items={setMenu?.items ?? []} onClose={() => setSetMenu(null)} />
       <KeyboardBar />
       <FinishSheet
         visible={finishOpen}
@@ -748,7 +776,6 @@ function SectionPages({
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 automaticallyAdjustKeyboardInsets
-                onScrollBeginDrag={closeOpenSwipeRow}
                 contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] }]}
               >
                 <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
