@@ -259,6 +259,11 @@ describe('computeAward', () => {
     expect(a.ladder?.shiny).toBe(false);
     expect(a.drop).toBeNull();
   });
+  it('stores the workout volume with the award, for shared cards', () => {
+    expect(computeAward(base({ log: mkLog([{ sets: sets(5, 20, 10) }]) })).volumeKg).toBe(1000);
+    expect(computeAward(base({ log: mkLog([{ sets: sets(3, 0.1, 1) }]) })).volumeKg).toBe(0.3);
+    expect(computeAward(base({ log: mkLog([{ trackingType: 'distance', sets: sets(6) }]), keepLadder: null })).volumeKg).toBe(0);
+  });
   it('a cardio-only log has no ladder', () => {
     const a = computeAward(base({ log: mkLog([{ trackingType: 'distance', sets: sets(6) }]), keepLadder: null }));
     expect(a.ladder).toBeNull();

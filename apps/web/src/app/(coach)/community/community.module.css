@@ -167,10 +167,12 @@
   background: var(--ct-lime);
   color: var(--ct-ink);
 }
-.shareCardText { display: flex; flex-direction: column; gap: 2px; }
+.shareCardText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .shareCardText .caption { color: var(--ct-ink); }
+/* The workout's name and counts: small, under the sentence. Ink, never muted, on the lime card. */
+.shareLine { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink); }
 .shareBadge { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); text-transform: uppercase; letter-spacing: 0.04em; }
-.shareTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.shareTitle { margin: 0 0 2px; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); line-height: 1.3; overflow-wrap: anywhere; }
 .shiny { filter: saturate(1.4) drop-shadow(0 0 6px var(--ct-amber)); }
 
 .comments { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }

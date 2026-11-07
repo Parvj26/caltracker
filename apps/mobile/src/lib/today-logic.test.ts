@@ -106,8 +106,20 @@ describe('community', () => {
       }),
       ctx,
     );
+    // An older card (no volume stored): the label and the workout's name.
     expect(p.snippet).toBe('Workout done · Lower Body');
     expect(p.stickerKey).toBe(lion);
+  });
+
+  it('uses the card sentence, about the poster, when the card has one', () => {
+    const card = { kind: 'workout' as const, logId: 'l', workoutName: 'VK Upper', finishedAt: null, exerciseCount: 11, setCount: 10, stickerKey: 'cow', multiple: 1, shiny: false, volumeKg: 698.53 };
+    expect(postPreview(post({ body: '', authorId: 'vk', authorName: 'Vaishali Kapoor', card }), ctx).snippet).toBe(
+      'Vaishali lifted 1,540 lb — about as much as 1 cow 🐄',
+    );
+    expect(postPreview(post({ body: '', authorId: 'me', card }), ctx).snippet).toBe('You lifted 1,540 lb — about as much as 1 cow 🐄');
+    expect(postPreview(post({ body: '', authorId: 'vk', authorName: 'Vaishali', card: { kind: 'sticker', stickerKey: 'lion', shiny: false, count: 1 } }), ctx).snippet).toBe(
+      'Vaishali earned the Lion sticker 🦁',
+    );
   });
 
   it('labels See all with the new notifications', () => {

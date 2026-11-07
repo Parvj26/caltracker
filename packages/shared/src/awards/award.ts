@@ -30,6 +30,12 @@ export type AwardResult = {
   landmarks: string[];
   milestone: number | null;
   prs: PersonalRecord[];
+  /**
+   * The workout's volume (logVolumeKg) when it was awarded, to 3 decimals. Stored with the award so a shared workout
+   * card can say how much was lifted without the database adding anything up. Awards stored before 2026-11-07 have
+   * none.
+   */
+  volumeKg?: number;
 };
 
 export function computeAward(i: AwardInput): AwardResult {
@@ -37,7 +43,8 @@ export function computeAward(i: AwardInput): AwardResult {
   const ownedKeys = new Set(i.owned.keys());
 
   let ladder: AwardResult['ladder'] = null;
-  const animal = pickLadderAnimal(logVolumeKg(i.log), i.ladderHistory, i.log.id, i.keepLadder);
+  const volumeKg = logVolumeKg(i.log);
+  const animal = pickLadderAnimal(volumeKg, i.ladderHistory, i.log.id, i.keepLadder);
   if (animal) {
     const prev = i.owned.get(animal.sticker.key);
     const shiny = (prev?.shiny ?? false) || (qualifying && rollShiny(i.rng));
@@ -66,6 +73,7 @@ export function computeAward(i: AwardInput): AwardResult {
     landmarks,
     milestone,
     prs: detectPrs(i.log, i.prHistory, i.firstLogOfExercise),
+    volumeKg: Math.round(volumeKg * 1000) / 1000,
   };
 }
 

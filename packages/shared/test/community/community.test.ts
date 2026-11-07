@@ -188,34 +188,9 @@ describe('photos', () => {
 });
 
 describe('cards and input', () => {
-  it('words a sticker card with its tier', () => {
-    expect(cardText({ kind: 'sticker', stickerKey: 'okapi', shiny: false, count: 1 }, 'kg')).toMatchObject({ badge: 'Rare find!', title: 'Okapi' });
-    expect(cardText({ kind: 'sticker', stickerKey: 'cat', shiny: true, count: 2 }, 'kg')).toMatchObject({ badge: 'Shiny!', title: '✦ Shiny Cat' });
-  });
-
-  it('words a workout card from counts and the stored animal (no volume)', () => {
-    const card = { kind: 'workout' as const, logId: LOG, workoutName: 'Legs', finishedAt: null, exerciseCount: 3, setCount: 1, stickerKey: 'cat', multiple: 2, shiny: false };
-    expect(cardText(card, 'kg')).toMatchObject({ badge: 'Workout done', title: 'Legs', lines: ['3 exercises · 1 set', '≈ 2 Cats'] });
-    expect(cardText({ ...card, stickerKey: null, multiple: null }, 'kg').lines).toEqual(['3 exercises · 1 set']);
-  });
-
-  it('words a PR card', () => {
-    const t = cardText(
-      {
-        kind: 'pr',
-        logId: LOG,
-        workoutName: 'Push',
-        finishedAt: null,
-        prs: [
-          { exerciseName: 'Bench Press', prKind: 'reps_at_weight', valueKg: 100, reps: 5 },
-          { exerciseName: 'Dip', prKind: 'heaviest', valueKg: 20, reps: null },
-        ],
-      },
-      'kg',
-    );
-    expect(t.badge).toBe('2 new PRs!');
-    expect(t.title).toBe('Bench Press · 100 kg × 5 (most reps)');
-    expect(t.lines).toEqual(['Dip · 20 kg (heaviest)', 'Push']);
+  it('words a sticker card with its tier (the sentences are in card-sentence.test.ts)', () => {
+    expect(cardText({ kind: 'sticker', stickerKey: 'okapi', shiny: false, count: 1 }, 'kg', 'Vaishali K')).toMatchObject({ badge: 'Rare find!' });
+    expect(cardText({ kind: 'sticker', stickerKey: 'cat', shiny: true, count: 2 }, 'kg', 'Vaishali K')).toMatchObject({ badge: 'Shiny!' });
   });
 
   it('reads only cards it understands', () => {

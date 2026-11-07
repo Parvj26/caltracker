@@ -1,13 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest } from '@caltracker/shared';
+import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest, type CommunityCard } from '@caltracker/shared';
+import { CardView } from '@/components/community/parts';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
-import { createPost } from '@/lib/community-api';
+import { createPost, previewCard } from '@/lib/community-api';
 import { markWorkoutShared } from '@/lib/shared-workouts';
 import { PhotoError, pickPhotos, preparePhoto, type PreparedPhoto } from '@/lib/community-photo';
 import { useCommunity } from '@/lib/use-community';
+import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -28,6 +30,18 @@ export default function NewPostScreen() {
       return null;
     }
   }, [params.card]);
+  const units = useUnits();
+  // The card exactly as it will post (the database builds it), shown as soon as it arrives; until then, or without
+  // signal, a plain label.
+  const [preview, setPreview] = useState<CommunityCard | null>(null);
+  useEffect(() => {
+    if (!card || !community) return;
+    let alive = true;
+    void previewCard(community.id, card).then((c) => alive && setPreview(c));
+    return () => {
+      alive = false;
+    };
+  }, [card, community]);
   const [postId] = useState(() => randomUUID());
   const [body, setBody] = useState('');
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
@@ -83,7 +97,11 @@ export default function NewPostScreen() {
       <Text style={text('screenTitle')} accessibilityRole="header">
         {card ? 'Share to community' : 'New post'}
       </Text>
-      {card ? (
+      {card && preview && units ? (
+        <View testID="community-card-preview">
+          <CardView card={preview} units={units} authorName="You" />
+        </View>
+      ) : card ? (
         <View style={[styles.cardChip, { borderRadius: radius.card, padding: space[4] }]} testID="community-card-request">
           <Text style={text('sectionHeading')}>{cardRequestLabel(card)}</Text>
           <Text style={text('caption')}>Shown as a card with your stats once posted.</Text>

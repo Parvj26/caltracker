@@ -29,8 +29,9 @@ function oldLinkTarget(clientId: string, query: Query): string | null {
     return s ? `?${s}` : '';
   };
   if (query.scan !== undefined) return `/clients/${clientId}/body${keep(['scan'])}`;
-  const training = ['assign', 'month', 'view', 'from'];
-  if (training.some((k) => query[k] !== undefined)) return `/clients/${clientId}/training${keep(training)}`;
+  const training = ['month', 'view', 'from'];
+  // ?assign=1 was Home's old Assign link: it still lands on Training (no dialog opens by itself any more).
+  if (query.assign !== undefined || training.some((k) => query[k] !== undefined)) return `/clients/${clientId}/training${keep(training)}`;
   return null;
 }
 

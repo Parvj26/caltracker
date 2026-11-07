@@ -115,7 +115,7 @@ select ok(public.create_community_post(gen_random_uuid(), :'comm_a', '', jsonb_b
   'a client shares their finished workout');
 select results_eq(format($$select card - 'finishedAt' from public.community_posts where card ->> 'kind' = 'workout' and card ->> 'logId' = %L$$, :'log_a1'),
   format($$values (jsonb_build_object('kind', 'workout', 'logId', %L::text, 'workoutName', 'Logged workout', 'exerciseCount', 1,
-    'setCount', 1, 'stickerKey', 'cat', 'multiple', 2.5, 'shiny', false))$$, :'log_a1'),
+    'setCount', 1, 'stickerKey', 'cat', 'multiple', 2.5, 'shiny', false, 'volumeKg', null))$$, :'log_a1'),
   'the workout card is built from the log and its award');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
   jsonb_build_object('kind', 'workout', 'logId', :'log_a1', 'volumeKg', 999999)), '22023', null, 'a forged volume is refused');

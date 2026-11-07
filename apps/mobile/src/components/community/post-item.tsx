@@ -168,7 +168,7 @@ export function PostItem({
       </View>
 
       {post.body ? <LinkedText text={post.body} testID="post-body" /> : null}
-      {post.card ? <CardView card={post.card} units={ctx.units} /> : null}
+      {post.card ? <CardView card={post.card} units={ctx.units} authorName={post.authorName} /> : null}
       {post.images.length > 0 ? (
         <View style={{ gap: space[2] }} onLayout={(e) => setPhotosWidth(Math.round(e.nativeEvent.layout.width))} testID="post-photos">
           {post.images.map((img, i) => (
