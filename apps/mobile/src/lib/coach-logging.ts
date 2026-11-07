@@ -11,11 +11,14 @@
 //     minute while the Realtime channel is not connected.
 // When the server and the phone disagree (needsServerCopy) the phone takes the server's copy (refreshFromServer),
 // so a workout the coach took over, handed back or finished never stays stuck open on the phone.
+// While the coach holds it, every coach save (a set ticked, a number typed) changes the row too: the phone then pulls
+// the coach's copy (pullCoachCopy, coach-watch.ts) and the read-only pages follow along live.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import type { LogStatus } from '@caltracker/shared';
 import { needsServerCopy, parseLoggerState, type LoggerState } from './active-log-logic';
+import { shouldPullCoachCopy } from './coach-watch';
 import { supabase } from './supabase';
 import { useActiveLog } from './use-active-log';
 
@@ -60,7 +63,7 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
   const local = active.log && active.log.id === logId ? { status: active.log.status, heldByOther: active.heldByOther } : null;
   const localRef = useRef(local);
   localRef.current = local;
-  const { refreshFromServer } = active;
+  const { refreshFromServer, pullCoachCopy } = active;
 
   const check = useCallback(async () => {
     if (!logId) return;
@@ -69,7 +72,8 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
       prev && s && prev.status === s.status && prev.heldByOther === s.heldByOther && prev.canReclaim === s.canReclaim ? prev : s,
     );
     if (needsServerCopy(s, localRef.current)) await refreshFromServer().catch(() => undefined);
-  }, [logId, refreshFromServer]);
+    else if (shouldPullCoachCopy(s, localRef.current)) await pullCoachCopy();
+  }, [logId, refreshFromServer, pullCoachCopy]);
 
   useEffect(() => {
     void check();
@@ -79,11 +83,13 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
     void supabase.auth.getSession().then(({ data }) => {
       me = data.session?.user.id ?? null;
     });
-    // Every save of the log updates its row; only a change of who logs it, or of its status, needs a check.
+    // Every save of the log updates its row; only a change of who logs it, or of its status, needs a check. While
+    // the coach holds it, a coach save is pulled at once too (the check may pull again; the calls are folded).
     const channel = supabase
       .channel(`coach-logging-${logId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workout_logs', filter: `id=eq.${logId}` }, (payload) => {
         const row = payload.new as { logged_by?: string | null; status?: string };
+        if (row.logged_by !== me && row.status === 'in_progress' && localRef.current?.heldByOther) void pullCoachCopy();
         if (row.logged_by !== me || row.status !== 'in_progress' || localRef.current?.heldByOther) void check();
       })
       .subscribe((status) => {
@@ -100,7 +106,7 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
       sub.remove();
       void supabase.removeChannel(channel);
     };
-  }, [check, watch, logId]);
+  }, [check, watch, logId, pullCoachCopy]);
 
   const reclaim = useCallback(async () => {
     if (!logId) return false;

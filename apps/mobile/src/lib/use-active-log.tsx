@@ -15,6 +15,8 @@
 //     loggedByOther), the sync has adopted the coach's copy; heldByOther is then true, every edit here is refused
 //     and the reminder is cancelled until refreshFromServer finds the phone holds it again (hand back, reclaim) or
 //     the coach finished it
+//   * while the coach holds it, pullCoachCopy() takes each newer coach save (fetched, never sent back) so the phone
+//     can show the coach's sets live, read only
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
@@ -47,6 +49,7 @@ import {
 } from './active-log-logic';
 import { fetchInProgressLog, fetchLog, saveLog } from './log-api';
 import { cancelReminder, ensurePermission, initNotifications, onReminderTapped, scheduleReminder } from './log-notifications';
+import { adoptCoachCopy } from './coach-watch';
 import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
 import { createLogSync, type LogSync, type SyncStatus } from './log-sync';
 import { useSession } from './session';
@@ -124,6 +127,11 @@ export type ActiveLog = {
    * back or finished it, or after the client reclaimed it.
    */
   refreshFromServer: () => Promise<void>;
+  /**
+   * While the coach holds the active workout: fetches the server's copy and takes it when newer (marked synced, so
+   * it is never sent back). Sends nothing. Calls that arrive while one runs are folded into one more fetch.
+   */
+  pullCoachCopy: () => Promise<void>;
 };
 
 type Instance = { store: LogStore; sync: LogSync; reload: () => Promise<void> };
@@ -511,6 +519,39 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+  // One fetch at a time; a coach typing fast triggers many row changes, so later calls wait for one more round.
+  const pulling = useRef<Promise<void> | null>(null);
+  const pullAgain = useRef(false);
+  const pullCoachCopy = useCallback((): Promise<void> => {
+    if (pulling.current) {
+      pullAgain.current = true;
+      return pulling.current;
+    }
+    const round = async () => {
+      do {
+        pullAgain.current = false;
+        const me = current.current;
+        const id = heldRef.current;
+        if (!me || !id) return;
+        const server = await fetchLog(id).catch(() => null);
+        if (!server || current.current !== me) return;
+        const r = { changed: false };
+        await me.store.update((s) => {
+          const next = adoptCoachCopy(s, server, heldRef.current);
+          r.changed = next !== s;
+          return next;
+        });
+        if (r.changed && current.current === me) await me.reload();
+      } while (pullAgain.current);
+    };
+    const p = round()
+      .catch(() => undefined)
+      .finally(() => {
+        pulling.current = null;
+      });
+    pulling.current = p;
+    return p;
+  }, []);
   const heldByOther = log !== null && heldId === log.id;
   const forgetFinished = useCallback(() => setFinished(null), []);
 
@@ -537,6 +578,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       reopen,
       heldByOther,
       refreshFromServer,
+      pullCoachCopy,
     }),
     [
       log,
@@ -560,6 +602,7 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
       reopen,
       heldByOther,
       refreshFromServer,
+      pullCoachCopy,
     ],
   );
   return <ActiveLogContext.Provider value={value}>{children}</ActiveLogContext.Provider>;
