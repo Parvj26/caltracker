@@ -9,7 +9,7 @@ import styles from '../client-page.module.css';
 /**
  * The client page's frame: back to Clients, the client's name, a gentle flag when the coach has noted injuries,
  * Message (or, for a past client, their read-only message history on the Training tab), and the tabs (Overview,
- * Training, Body, Documents, Settings). Each tab is its own page below this layout.
+ * Training, Body, Food, Documents, Settings). Each tab is its own page below this layout.
  */
 export default async function ClientTabsLayout({ children, params }: { children: ReactNode; params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;

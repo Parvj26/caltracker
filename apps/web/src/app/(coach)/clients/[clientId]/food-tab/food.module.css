@@ -1,0 +1,41 @@
+/* Food tab of the client page. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-6); margin-top: var(--ct-space-4); }
+.section { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.muted { margin: 0; color: var(--ct-ink-muted); }
+.over { color: var(--ct-magenta-deep); font-weight: var(--ct-weight-section-heading); }
+.note { margin: 0; white-space: pre-wrap; }
+
+.weekNav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); }
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+  text-decoration: underline;
+}
+.navDisabled { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); color: var(--ct-ink-muted); }
+
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: var(--ct-space-2) var(--ct-space-3); border-bottom: 1px solid var(--ct-border); text-align: left; vertical-align: top; }
+.table thead th { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-weight: var(--ct-weight-section-heading); }
+.num { text-align: right; white-space: nowrap; }
+.table td.num { text-align: right; }
+.track { display: block; height: var(--ct-space-1); margin-top: var(--ct-space-1); border-radius: var(--ct-radius-pill); background: var(--ct-surface); overflow: hidden; }
+.fill { display: block; height: 100%; border-radius: var(--ct-radius-pill); background: var(--ct-lime); }
+.fill[data-over='true'] { background: var(--ct-amber); }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.meals { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+.meal { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); background: var(--ct-surface); min-width: 0; }
+.photo { border-radius: var(--ct-radius-input); }
+.mealBody { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.mealTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.mealMacros { margin: 0; font-variant-numeric: tabular-nums; }
+
+.targets { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.targetsForm { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.targetFields { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--ct-space-3); }
+.formActions { display: flex; align-items: center; gap: var(--ct-space-3); }
