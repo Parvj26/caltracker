@@ -7,7 +7,7 @@ import { Sticker } from '@/components/stickers/sticker';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
-import { prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
+import { SHARE_NOT_READY, prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
 import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
@@ -121,8 +121,9 @@ export default function SummaryScreen() {
   }
 
   const lines = summaryLines(log, units);
-  // Cards to share: the workout (volume and its animal) and, when it set any, its PRs.
-  const workoutCard = workoutShareCard(log);
+  // What can be shared: the workout and, when it set any, its PRs. Both need the award on the server (the database
+  // builds the card from the log and its award), so until it arrives the buttons wait.
+  const workoutCard = workoutShareCard(log, award);
   const prCard = prShareCard(log, award);
   const mayReopen = canReopen(log, Date.now());
 
@@ -207,6 +208,11 @@ export default function SummaryScreen() {
         </View>
       ) : null}
 
+      {!workoutCard ? (
+        <Text style={text('caption')} testID="summary-share-waiting">
+          {SHARE_NOT_READY}
+        </Text>
+      ) : null}
       {workoutCard || prCard ? (
         <View style={{ gap: space[2] }}>
           {workoutCard ? (

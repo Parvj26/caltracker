@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CardRequest, type AwardResult } from '@caltracker/shared';
 import type { AlbumItem } from './album-logic';
-import { prShareCard, shareHref, stickerShareCard, workoutShareCard } from './community-share';
+import { postErrorMessage, prShareCard, shareHref, stickerShareCard, workoutShareCard } from './community-share';
 import { sampleLog } from './log-fixtures';
 
 const completedLog = () => sampleLog({ status: 'completed', finishedAt: '2026-11-05T10:00:00.000Z' });
@@ -27,12 +27,13 @@ describe('community share requests', () => {
     expect(stickerShareCard(item(true))).toEqual({ kind: 'sticker', stickerKey: 'cat' });
   });
 
-  it('asks for a finished workout by id only', () => {
+  it('asks for a finished workout by id only, once its award is on the server', () => {
     const log = completedLog();
-    const card = workoutShareCard(log);
+    const card = workoutShareCard(log, award([]));
     expect(card).toEqual({ kind: 'workout', logId: log.id });
     expect(CardRequest.safeParse(card).success).toBe(true);
-    expect(workoutShareCard({ ...log, status: 'in_progress' })).toBeNull();
+    expect(workoutShareCard(log, null)).toBeNull();
+    expect(workoutShareCard({ ...log, status: 'in_progress' }, award([]))).toBeNull();
   });
 
   it('offers PRs only when the award has some', () => {
@@ -47,5 +48,12 @@ describe('community share requests', () => {
     const href = shareHref({ kind: 'sticker', stickerKey: 'cat' });
     expect(href.pathname).toBe('/community/new');
     expect(JSON.parse(href.params.card)).toEqual({ kind: 'sticker', stickerKey: 'cat' });
+  });
+
+  it('turns refusals into friendly messages', () => {
+    expect(postErrorMessage('42501', true)).toBe('You can only share your own stickers and finished workouts.');
+    expect(postErrorMessage('22023', true)).toMatch(/synced/);
+    expect(postErrorMessage('42501', false)).toBe('You can’t post in the community right now.');
+    expect(postErrorMessage('XX000', false)).toBe('Couldn’t post. Please try again.');
   });
 });

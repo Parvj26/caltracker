@@ -12,6 +12,7 @@ import {
   type NotificationRow,
   type ReportReason,
 } from '@caltracker/shared';
+import { postErrorMessage } from './community-share';
 import { supabase } from './supabase';
 import type { PreparedPhoto } from './community-photo';
 
@@ -193,7 +194,7 @@ export async function createPost(input: {
     ...(input.card ? { p_card: input.card } : {}),
     p_images: images,
   });
-  if (error) fail(error, error.code === '42501' ? 'You can’t post here any more.' : 'Couldn’t post. Please try again.');
+  if (error) fail(error, postErrorMessage(error.code, input.card !== null));
 }
 
 export async function deletePost(post: FeedPost): Promise<void> {
