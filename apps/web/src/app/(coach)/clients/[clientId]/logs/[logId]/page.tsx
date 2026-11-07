@@ -28,11 +28,11 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string; logId: string }>;
-  searchParams: Promise<{ award?: string | string[] }>;
+  searchParams: Promise<{ edit?: string | string[]; award?: string | string[] }>;
 }) {
   const { userId, units } = await requireCoach();
-  const { clientId, logId } = await params;
-  const awardNow = (await searchParams).award === '1';
+  const [{ clientId, logId }, query] = await Promise.all([params, searchParams]);
+  const awardNow = query.award === '1';
   const supabase = await createServerSupabase();
   const [client, loaded] = await Promise.all([getClient(clientId), getLog(logId)]);
   // RLS limits the log to this coach's workspace; it must also belong to the client in the URL.
@@ -69,7 +69,7 @@ export default async function LogPage({
     <div className={styles.page}>
       {/* Just finished here as a session: award it (only a finished log, and only once). */}
       {awardNow && log.status === 'completed' ? <AwardKickoff logId={log.id} /> : null}
-      <Link href={`/clients/${client.id}`} className={styles.back}>
+      <Link href={`/clients/${client.id}/training`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
       <header className={styles.titleBlock}>
@@ -111,7 +111,7 @@ export default async function LogPage({
         <ClientNote text={log.notes} label={byCoach ? 'Session note' : "Client's note on this workout"} />
       </header>
 
-      <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />
+      <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} startEditing={query.edit === '1'} />
       <Comments logId={log.id} comments={commentViews} />
       <LiveRefresh on={[{ table: 'workout_logs', filter: `id=eq.${log.id}` }, { table: 'awards', filter: `log_id=eq.${log.id}` }]} renderedAt={renderTime()} />
     </div>

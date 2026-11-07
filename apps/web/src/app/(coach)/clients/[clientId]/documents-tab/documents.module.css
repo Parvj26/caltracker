@@ -1,0 +1,51 @@
+/* The client Documents tab. Colours, radii and sizes only via var(--ct-*) (packages/design-tokens). */
+.layout { display: grid; gap: var(--ct-space-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .layout { grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr); } }
+.card { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3) var(--ct-space-4-5); min-width: 0; }
+.heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.status { margin: 0; min-height: 1.25em; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.fieldLabel { font-weight: var(--ct-weight-section-heading); }
+.fileLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.file { min-height: var(--ct-tap-min); font: inherit; max-width: 100%; }
+.check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); padding: var(--ct-space-2) 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.item:first-child { border-top: 0; }
+.itemMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 16rem; }
+.rename { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.name { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.nameButton {
+  align-self: flex-start;
+  min-height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.nameButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.nameButton:disabled { cursor: progress; }
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-1);
+  border: 0;
+  background: none;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.textButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

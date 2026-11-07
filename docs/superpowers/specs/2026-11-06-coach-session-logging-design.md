@@ -48,6 +48,10 @@ on the iPad or laptop.
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
 | Finished | Opens the finished log | — |
 
+"Back to the calendar" is the client's Training tab (`/clients/[clientId]/training`). Once finished, the workout's
+plan is locked like any done workout (`20261106009000_done_workout_plan_lock`): the coach fixes what was logged with
+**Edit results** on the log (`correct_workout_log`), which works the same for a session the coach logged.
+
 Live progress uses Realtime (PR #34): the page re-renders whenever the log row changes.
 
 ## Data and security
@@ -55,7 +59,7 @@ Live progress uses Realtime (PR #34): the page re-renders whenever the log row c
 No new tables. `workout_logs.logged_by` (already there) is who logs the workout: the client on the phone, or the
 coach. The log's `client_id` is always the client, so history, charts, PRs, streaks and stickers count it the same.
 
-Migration `20261106004000_coach_session_logging.sql`:
+Migration `20261106010000_coach_session_logging.sql`:
 
 - `private.save_workout_log_as(doc, client, logger)`: the body of `save_workout_log`, unchanged except that it takes
   the client and the logger as arguments, requires a coach logger to coach the client's workspace, stores

@@ -486,7 +486,7 @@ export function SessionLogger({
     const discarded = discardLog(current, nowIso());
     logRef.current = discarded;
     setLog(discarded);
-    if (await flush()) router.push(`/clients/${client.id}`);
+    if (await flush()) router.push(`/clients/${client.id}/training`);
   }
 
   /** Gives the workout back to the client's phone; they carry on from what is saved. */
@@ -518,7 +518,7 @@ export function SessionLogger({
       return;
     }
     stopped.current = true;
-    router.push(`/clients/${client.id}`);
+    router.push(`/clients/${client.id}/training`);
   }
 
   const status =

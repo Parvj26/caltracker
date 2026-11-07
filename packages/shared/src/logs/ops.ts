@@ -6,6 +6,7 @@ import { stepSetValue, type StepField } from './steppers';
 import { isChoiceLocked, isUnpickedSet } from './flow';
 import { canReopen } from './summary';
 import type { Units } from '../units/units';
+import { LOG_NOTES_MAX } from './finish-note';
 
 const DEFAULT_SETS = 3;
 const MAX_SETS = 30;
@@ -356,13 +357,6 @@ export function pickChoice(log: WorkoutLogDoc, blockId: string, logExerciseId: s
   );
 }
 
-/** The workout's own note (a session note when the coach logs it). Blank text clears it. Same doc back when unchanged. */
-export function setLogNotes(log: WorkoutLogDoc, notes: string | null, nowIso: string): WorkoutLogDoc {
-  const next = notes !== null && notes.trim() !== '' ? notes : null;
-  if (next === log.notes) return log;
-  return { ...log, notes: next, lastActivityAt: nowIso, revision: log.revision + 1 };
-}
-
 export function setExerciseNote(
   log: WorkoutLogDoc,
   logExerciseId: string,
@@ -370,6 +364,18 @@ export function setExerciseNote(
   nowIso: string,
 ): WorkoutLogDoc {
   return mapExercise(log, logExerciseId, (ex) => ({ ...ex, note }), nowIso);
+}
+
+/**
+ * The workout's own note (the finish sheet writes the feeling and the note for the coach here). Blank is null; a
+ * note past the schema's limit is cut so the doc stays valid. Refused (same object back) once the log is not in
+ * progress, and when nothing changes.
+ */
+export function setLogNotes(log: WorkoutLogDoc, notes: string | null, nowIso: string): WorkoutLogDoc {
+  if (log.status !== 'in_progress') return log;
+  const next = notes === null || notes.trim() === '' ? null : notes.slice(0, LOG_NOTES_MAX);
+  if (next === log.notes) return log;
+  return { ...log, notes: next, lastActivityAt: nowIso, revision: log.revision + 1 };
 }
 
 const hasCompletedSet = (log: WorkoutLogDoc) =>

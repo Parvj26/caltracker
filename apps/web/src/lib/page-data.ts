@@ -45,3 +45,18 @@ export const getExercise = cache(async (id: string) => {
   if (error) throw new Error(`Could not load exercise: ${error.message}`);
   return data;
 });
+
+/** The coach's limitations (injuries) text for a client, or '' (the client page header flags it). */
+export const getClientLimitations = cache(async (clientId: string) => {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(clientId)) return '';
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase
+    .from('client_limitations')
+    .select('body')
+    .eq('workspace_id', workspaceId)
+    .eq('client_id', clientId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load limitations: ${error.message}`);
+  return data?.body.trim() ?? '';
+});

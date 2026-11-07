@@ -1,7 +1,7 @@
--- Coach session logging (20261106004000_coach_session_logging.sql): a coach logs a client's workout from the
+-- Coach session logging (20261106010000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
-select plan(93);
+select plan(97);
 
 -- Fixtures (as postgres)
 select tests.create_user('cs-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -207,6 +207,18 @@ select is((public.award_inputs(:'l1') -> 'log' ->> 'client_id')::uuid, :'a1'::uu
   'the award is worked out for the client');
 select ok(jsonb_path_exists(public.award_inputs(:'l1'), '$.logs[*] ? (@.id == $id)', jsonb_build_object('id', :'l1')),
   'the coach''s session is in the client''s award history');
+
+-- After the session, the done-workout lock (20261106009000) keeps the plan, but the coach can still correct the
+-- logged results: the log is separate from the plan.
+select tests.act_as(:'coach_a');
+select is(tests.cs_error(format('update public.workouts set name = %L where id = %L', 'Renamed', :'w_a1')), '23514 -',
+  'the plan of a workout the coach logged is locked once finished');
+select is(public.correct_workout_log(:'l1', jsonb_build_array(jsonb_build_object(
+  'id', ('75' || substr(:'l1'::text, 3))::uuid, 'actualReps', 10))), 1, 'the coach corrects the session''s results');
+select is((select actual_reps from public.log_sets where log_id = :'l1'), 10::smallint, 'the correction is saved');
+select is((select logged_by from public.workout_logs where id = :'l1'), :'coach_a'::uuid,
+  'a correction keeps it logged by the coach');
+reset role;
 
 -- ---------------------------------------------------------------------------------------------
 -- Take over: A2 is logging on the phone, the coach takes over.

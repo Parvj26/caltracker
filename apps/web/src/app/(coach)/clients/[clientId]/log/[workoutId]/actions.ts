@@ -102,7 +102,7 @@ export async function awardSession(logId: string): Promise<void> {
   if (!UUID.test(logId)) return;
   const supabase = await createServerSupabase();
   await recomputeAward(supabase, logId);
-  revalidatePath('/clients/[clientId]', 'page');
+  revalidatePath('/clients/[clientId]', 'layout');
   revalidatePath('/activity');
   revalidatePath('/home');
 }

@@ -60,7 +60,7 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
   const name = `Session ${unique()}`;
   const workoutId = await plan(client, name, today);
 
-  await page.goto(`/clients/${client}?month=${today.slice(0, 7)}`);
+  await page.goto(`/clients/${client}/training?view=month&from=${today}`);
   await page.locator(`[data-date="${today}"]`).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await page.getByRole('menuitem', { name: 'Log session' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client}/log/${workoutId}$`));
@@ -98,8 +98,22 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
   // Activity and the calendar show who logged it.
   await page.goto(`/activity?client=${client}`);
   await expect(page.getByRole('row', { name: new RegExp(name) }).getByText('Logged by coach')).toBeVisible();
-  await page.goto(`/clients/${client}?month=${today.slice(0, 7)}`);
-  await expect(page.getByRole('link', { name: `Done, logged by coach: view the ${name} log` })).toBeVisible();
+  await page.goto(`/clients/${client}/training?view=month&from=${today}`);
+  const card = page.locator(`[data-date="${today}"]`).getByRole('listitem').filter({ hasText: name });
+  await expect(card.getByRole('link', { name: `Done: view the ${name} log` })).toBeVisible();
+  await expect(card.getByText('Logged by coach', { exact: true })).toBeVisible();
+
+  // Its plan is locked now that it is done, but the coach can still fix the logged results.
+  await card.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Edit results' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/${log.data.id}$`));
+  await page.getByLabel('Set 1 reps').fill('9');
+  await page.getByRole('button', { name: 'Save corrections' }).click();
+  await expect(page.getByText('Edited by coach')).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(async () => (await admin.from('log_sets').select('actual_reps').eq('log_id', log.data.id).order('position').limit(1).single()).data?.actual_reps)
+    .toBe(9);
+  await expect.poll(async () => (await admin.from('workout_logs').select('logged_by').eq('id', log.data.id).single()).data?.logged_by).toBe(coachId);
 });
 
 test('while the client logs on the phone the coach watches, views, then takes over', async ({ page }) => {
@@ -128,7 +142,7 @@ test('while the client logs on the phone the coach watches, views, then takes ov
 
   // Hand it back: the client's phone holds it again.
   await page.getByRole('button', { name: 'Hand back to Parv' }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${client}$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}/training$`));
   await expect.poll(async () => (await admin.from('workout_logs').select('logged_by').eq('id', logId).single()).data?.logged_by).toBe(client);
 });
 

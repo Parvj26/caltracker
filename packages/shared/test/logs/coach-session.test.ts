@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from '../../src/logs/coach-session';
-import { completeSet, pickChoice, setLogNotes, updateActual } from '../../src/logs/ops';
+import { completeSet, pickChoice, updateActual } from '../../src/logs/ops';
 import { startLogFromWorkout } from '../../src/logs/start';
 import type { WorkoutLogDoc } from '../../src/logs/schema';
 import { fixtureSectionedWorkout, fixtureWorkout, uuid } from './fixture';
@@ -141,17 +141,5 @@ describe('loggerKind', () => {
     expect(loggerKind('client', 'coach', 'client')).toBe('client');
     expect(loggerKind(null, 'coach', 'client')).toBe('client');
     expect(loggerKind('coach-2', 'coach', 'client')).toBe('other_coach');
-  });
-});
-
-describe('setLogNotes', () => {
-  it('sets, clears and leaves an unchanged note alone', () => {
-    const log = start();
-    const noted = setLogNotes(log, 'Great depth', T1);
-    expect(noted.notes).toBe('Great depth');
-    expect(noted.revision).toBe(log.revision + 1);
-    expect(setLogNotes(noted, 'Great depth', T1)).toBe(noted);
-    expect(setLogNotes(noted, '  ', T1).notes).toBeNull();
-    expect(setLogNotes(log, '', T1)).toBe(log);
   });
 });

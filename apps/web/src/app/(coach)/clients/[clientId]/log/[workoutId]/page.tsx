@@ -42,7 +42,7 @@ export default async function SessionPage({ params }: { params: Promise<{ client
   if (state.kind === 'done') redirect(`/clients/${client.id}/logs/${state.logId}`);
 
   const back = (
-    <Link href={`/clients/${client.id}`} className={styles.back}>
+    <Link href={`/clients/${client.id}/training`} className={styles.back}>
       ← {client.name}&apos;s calendar
     </Link>
   );

@@ -136,6 +136,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 ### Assignment
 - Assigning a program to a client with a start date **copies** its workouts onto the client's calendar as client-owned workout instances. Later edits to the program template do not change existing assignments.
 - The coach can drop a single workout onto any calendar day, and move, edit, or delete any day's workout on a client calendar.
+- The coach's client calendar shows 1, 2 or 4 weeks (Monday to Sunday) or a month; 2 weeks by default, and the coach's last pick is remembered in their browser. Week views preview each workout's first three exercises. Past workouts are editable: a missed one's plan can be edited (and it can be moved to today or later); a done one's **plan stays read-only** so the log still matches what the client was given, and the coach edits its **logged results** instead (the log's correction form). A done workout is never moved.
 
 ---
 
