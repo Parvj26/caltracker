@@ -22,7 +22,8 @@ After each workout, the badge shows one ladder animal and how many of it the wor
 How it stays fair and stable:
 - "Already awarded" means the animals of the client's awards (with that coach) for workouts finished **before** this one, by finish time and then log id. Later workouts never change an earlier one's animal.
 - The random choice is seeded by the workout's log id, never `Math.random`, so working the same workout out again gives the same animal. The phone's instant preview uses the same rule, log id and history, so it shows what the server will award.
-- A coach correction (or a reopened and re-finished workout) keeps the animal already awarded while the corrected volume still reaches it; only its multiple changes. If the volume drops below it, a new one is picked by the same rule and swapped in: the old sticker's count goes down by one, but a sticker is never taken away (the last one stays), and the new one is never shiny (corrections never roll).
+- **One animal per workout, kept forever** (product owner decision, 2026-11-07). A coach correction, or a reopened and re-finished workout, keeps the animal already awarded even if the corrected volume falls below its weight; only its multiple changes, and it may go under 1 ("≈ 0.8 Horses"). No sticker is added or taken away. Only a workout that had no animal and is corrected up to reach one gets one, picked by the same rule (never shiny: corrections never roll). The database enforces this: each award records the one animal granted for its log and refuses to change it.
+- Timestamps from the database (microseconds, "+00:00") are normalised before they are compared, so the phone and the server order the history the same way.
 - The rule lives in `packages/shared` (`pickLadderAnimal`). Rare finds, drops, landmarks, shiny rolls and the qualifying rule are unchanged.
 
 | # | Animal | Weight (kg) | Tier |

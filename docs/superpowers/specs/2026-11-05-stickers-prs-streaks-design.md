@@ -117,7 +117,8 @@ These are the main spec §6 rules, restated here so the build has one place to r
   - If the phone is offline, those appear as a "Surprise!" reveal the next time the app opens after the sync.
 - **Corrections and reopen:**
   - A coach correction recomputes that log's PRs and totals. It does not take away a sticker that was already shown
-    and does not re-roll.
+    and does not re-roll. A workout keeps its ladder animal forever (only the multiple changes) and never gets a
+    second one (product owner, 2026-11-07).
   - Reopening an auto-finished log and finishing it again re-runs the PR and total checks only.
 - **Tables:**
   - `sticker_awards` (client, sticker key, count, shiny, first and last earned, `log_id` of the first)
