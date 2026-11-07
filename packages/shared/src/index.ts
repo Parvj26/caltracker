@@ -414,7 +414,20 @@ export { cardRequestLabel, cardText, posterFirstName, prLine, workoutCardSentenc
 export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
-export { groupedLikeText, likersLine } from './community/likes';
+export {
+  REACTIONS,
+  applyReactionChange,
+  groupedReactionText,
+  invertReactionChange,
+  isReactionKey,
+  reactionButtonLabel,
+  reactionTap,
+  summarizeReactions,
+  toggleReaction,
+  topReactionsLine,
+  whoReactedLabel,
+} from './community/reactions';
+export type { ReactionChange, ReactionInfo, ReactionKey, ReactionRow, ReactionSummary } from './community/reactions';
 export { badgeLabel, groupNotifications, notificationText, unreadNotificationCount } from './community/notifications';
 export type { NotificationItem, NotificationKind, NotificationRow } from './community/notifications';
 export { firstYoutubeId, splitLinks } from './community/links';

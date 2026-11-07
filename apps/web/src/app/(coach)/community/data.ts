@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMUNITY_BUCKET, memberName, parseCard, sortFeed, type CommunityCard, type Database } from '@caltracker/shared';
+import { COMMUNITY_BUCKET, isReactionKey, memberName, parseCard, sortFeed, type CommunityCard, type Database, type ReactionRow } from '@caltracker/shared';
 
 // Reads the coach's community under their own session (RLS): only their workspace, nothing else.
 
@@ -8,7 +8,7 @@ const SIGNED_URL_SECONDS = 60 * 60;
 export const FEED_SIZE = 50;
 
 export type FeedImage = { id: string; thumbUrl: string | null; fullUrl: string | null; width: number; height: number };
-export type FeedComment = { id: string; authorId: string; authorName: string; body: string; createdAt: string };
+export type FeedComment = { id: string; authorId: string; authorName: string; body: string; createdAt: string; reactions: ReactionRow[] };
 export type FeedPost = {
   id: string;
   authorId: string;
@@ -20,8 +20,8 @@ export type FeedPost = {
   createdAt: string;
   pinnedAt: string | null;
   images: FeedImage[];
-  likerIds: string[];
-  likerNames: string[];
+  /** Reactions to the post itself (not its comments). */
+  reactions: ReactionRow[];
   comments: FeedComment[];
 };
 export type Member = { userId: string; name: string; role: 'coach' | 'client'; removedAt: string | null; avatarUrl: string | null };
@@ -29,8 +29,26 @@ export type Member = { userId: string; name: string; role: 'coach' | 'client'; r
 const POST_SELECT = `id, author_id, body, card, created_at, pinned_at,
   author:profiles(first_name, last_name, avatar_path),
   images:community_post_images(id, position, path, thumb_path, width, height),
-  likes:community_likes(user_id, created_at, liker:profiles(first_name, last_name)),
-  comments:community_comments(id, author_id, body, created_at, author:profiles(first_name, last_name))`;
+  reactions:community_reactions(user_id, comment_id, reaction, created_at, reactor:profiles(first_name, last_name)),
+  comments:community_comments(id, author_id, body, created_at, author:profiles(first_name, last_name),
+    reactions:community_reactions(user_id, reaction, created_at, reactor:profiles(first_name, last_name)))`;
+
+type ReactionSelect = { user_id: string; reaction: string; created_at: string; reactor: { first_name: string; last_name: string } | null };
+
+/** Rows for the reaction bar; "Former member" when the name no longer resolves. */
+const toReactionRows = (rows: readonly ReactionSelect[]): ReactionRow[] =>
+  rows.flatMap((r) =>
+    isReactionKey(r.reaction)
+      ? [
+          {
+            userId: r.user_id,
+            reaction: r.reaction,
+            createdAt: r.created_at,
+            name: memberName(r.reactor ? { firstName: r.reactor.first_name, lastName: r.reactor.last_name } : null),
+          },
+        ]
+      : [],
+  );
 
 async function signAll(supabase: Db, bucket: string, paths: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -87,10 +105,7 @@ export async function loadCommunity(supabase: Db, workspaceId: string) {
       images: [...p.images]
         .sort((a, b) => a.position - b.position)
         .map((i) => ({ id: i.id, thumbUrl: images.get(i.thumb_path) ?? null, fullUrl: images.get(i.path) ?? null, width: i.width, height: i.height })),
-      likerIds: [...p.likes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).map((l) => l.user_id),
-      likerNames: [...p.likes]
-        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-        .map((l) => memberName(l.liker ? { firstName: l.liker.first_name, lastName: l.liker.last_name } : null)),
+      reactions: toReactionRows(p.reactions.filter((r) => r.comment_id === null)),
       comments: [...p.comments]
         .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
         .map((c) => ({
@@ -99,6 +114,7 @@ export async function loadCommunity(supabase: Db, workspaceId: string) {
           authorName: memberName(c.author ? { firstName: c.author.first_name, lastName: c.author.last_name } : null),
           body: c.body,
           createdAt: c.created_at,
+          reactions: toReactionRows(c.reactions),
         })),
     })),
   );
