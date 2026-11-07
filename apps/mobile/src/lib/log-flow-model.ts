@@ -440,6 +440,8 @@ export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; row
 
 export type RoundModel = {
   round: number;
+  /** "Round 2 of 4", with " ✓" once every set of the round is ticked. The same for every round. */
+  heading: string;
   /** Each exercise with a set in this round (an uneven superset leaves the shorter one out of later rounds). */
   entries: Array<{ exerciseIndex: number; rows: RowModel[] }>;
   restLine: string | null;
@@ -448,7 +450,7 @@ export type RoundModel = {
 
 export type SupersetPageModel = {
   kind: 'superset';
-  /** "Superset 1 · Round 2 of 4". */
+  /** "Superset 1": the page's title. Each round has its own "Round 2 of 4" heading under it. */
   heading: string;
   /** The first round with an unticked set (the last round when all are done). */
   currentRound: number;
@@ -511,24 +513,28 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
   if (page.kind === 'superset') {
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
     const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last));
-    const rounds: RoundModel[] = supersetRounds(block).map(({ round, entries }) => {
+    const plan = supersetRounds(block);
+    const roundCount = plan.length;
+    const rounds: RoundModel[] = plan.map(({ round, entries }) => {
       const rows = entries.map((e) => {
         const ex = block.exercises[e.exerciseIndex];
         return { exerciseIndex: e.exerciseIndex, rows: setRows(ex, units, lastOf(ex), e.setIndexes) };
       });
       const secs = roundRestSeconds(block, round);
+      const done = rows.every((e) => e.rows.every((r) => r.done));
       return {
         round,
+        heading: `Round ${round} of ${roundCount}${done ? ' ✓' : ''}`,
         entries: rows,
         restLine: secs > 0 ? `Rest ${formatClock(secs)} after the round` : null,
-        done: rows.every((e) => e.rows.every((r) => r.done)),
+        done,
       };
     });
     const totalRounds = rounds.length;
     const currentRound = currentStep(block)?.round ?? Math.max(1, totalRounds);
     return {
       kind: 'superset',
-      heading: `Superset ${page.number} · Round ${currentRound} of ${totalRounds}`,
+      heading: `Superset ${page.number}`,
       currentRound,
       totalRounds,
       exercises,

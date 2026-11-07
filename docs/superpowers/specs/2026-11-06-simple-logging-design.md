@@ -19,8 +19,8 @@ complicated.
      how to, swap, add a drop set, remove), and the set table SET | LB | REPS | ✓ (columns follow the tracking
      type: reps only, time, distance, weight + reps). W = warm-up, D = drop (indented), F = drop to failure; the
      tag opens a short explanation.
-   - a superset: "Superset N · Round r of R", every round stacked; the current round shows each exercise with a
-     96 pt photo and its tools. An exercise with no set in a round is left out of it.
+   - a superset: the title "Superset N", then every round stacked, each under the same "Round r of R" heading
+     (✓ once ticked); the current round shows each exercise with a 96 pt photo and its tools. An exercise with no set in a round is left out of it.
    - a pick-one group: one page per option. Logging an option (a typed number or ✓) picks it; switching is
      possible until a set is ticked, then the other options say which one is being done.
    Done goes to the next page, after the section's last page to the next section's start page, and after the last

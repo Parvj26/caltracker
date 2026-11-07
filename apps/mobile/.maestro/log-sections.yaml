@@ -112,8 +112,11 @@ env:
 - extendedWaitUntil:
     visible:
       id: superset-heading-0
-      text: 'Superset 1 · Round 1 of 3'
+      text: 'Superset 1'
     timeout: 10000
+- assertVisible:
+    id: round-heading-0-1
+    text: 'Round 1 of 3, current round'
 - assertVisible:
     id: pages-title
     text: 'Upper'
@@ -122,8 +125,8 @@ env:
     env: { PAGE: '0' }
 - scrollUntilVisible:
     element:
-      id: superset-heading-0
-      text: 'Superset 1 · Round 3 of 3'
+      id: round-heading-0-3
+      text: 'Round 3 of 3 ✓'
     direction: UP
 # Round 3 is Pullups alone: Pushups has only two sets.
 - scrollUntilVisible:

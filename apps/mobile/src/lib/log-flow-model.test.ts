@@ -285,13 +285,17 @@ describe('pages', () => {
     expect(supersetRounds(block).map((r) => r.entries.map((e) => e.exerciseIndex))).toEqual([[0, 1], [0, 1], [0, 1], [0]]);
     const page = buildSections(log)[1].pages[0];
     let m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 1 of 4');
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.exercises.map((e) => e.label)).toEqual(['A1', 'A2']);
     expect(m.kind === 'superset' && m.rounds[0].restLine).toBe('Rest 1:00 after the round');
     log = completeSet(log, block.exercises[0].sets[0].id, NOW);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 2 of 4');
+    // The title stays "Superset 1"; round 1 is ticked off under it and round 2 is the current one.
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.currentRound).toBe(2);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4 ✓', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.rounds[0].done).toBe(true);
   });
 
