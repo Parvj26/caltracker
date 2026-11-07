@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
-import { Button, useReduceMotion } from '@/components/ui';
+import { Button, Toast, useReduceMotion } from '@/components/ui';
 import { formatEarned, type AlbumItem } from '@/lib/album-logic';
 import { shareHref, stickerShareCard } from '@/lib/community-share';
-import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
+import { useSaveCard } from '@/lib/use-save-card';
 import { palette, stickerTheme } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { OffScreen, ShareCard } from './share-card';
@@ -16,19 +16,11 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
   const reduceMotion = useReduceMotion();
   const router = useRouter();
   const card = useRef<HostInstance>(null);
-  const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  const { saving, save, toast, clearToast } = useSaveCard(card);
 
   const close = () => {
-    setNote(null);
+    clearToast();
     onClose();
-  };
-  const save = async () => {
-    setSaving(true);
-    setNote(null);
-    const r = await saveCardToPhotos(card);
-    setNote(SAVE_MESSAGES[r]);
-    setSaving(false);
   };
 
   return (
@@ -54,11 +46,6 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
               .filter(Boolean)
               .join(' · ')}
           </Text>
-          {note ? (
-            <Text style={[text('caption'), styles.centerText]} testID="sheet-save-note" accessibilityLiveRegion="polite">
-              {note}
-            </Text>
-          ) : null}
           {stickerShareCard(item) ? (
             <Button
               variant="secondary"
@@ -73,6 +60,7 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
             />
           ) : null}
           <Button variant="secondary" title="Save image" testID="sheet-save" busy={saving} onPress={() => void save()} />
+          <Toast message={toast} onHide={clearToast} testID="sheet-save-toast" />
           <Button title="Close" testID="sheet-close" onPress={close} />
           <OffScreen>
             <ShareCard
