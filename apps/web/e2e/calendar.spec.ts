@@ -493,6 +493,8 @@ test('a coach gets a 404 for someone who is not their client', async ({ page }) 
 
 /* ---------- Clarity update: header actions, empty state, day "+", date rules ---------- */
 
+const SAVE_UNDONE = "Couldn't save that change, so it was undone. Please try again.";
+
 async function openAddWorkout(page: Page) {
   await page.getByRole('button', { name: '+ Add workout', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a workout' });
@@ -701,6 +703,99 @@ test('+ Add workout: a failed save is undone on the calendar with a message', as
   await page.unroute(pageUrl);
   const { data } = await admin.from('workouts').select('id').eq('name', workout).eq('client_id', clientId);
   expect(data).toEqual([]);
+});
+
+test('+ Add workout: a save whose answer is lost but that landed is kept, not undone or added twice', async ({ page }) => {
+  const workout = `Landed ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  const today = await browserToday(page);
+  await page.goto(calendarUrl(monthOf(today)));
+
+  // The add reaches the server (which adds it), but the browser gets an error back.
+  const pageUrl = new RegExp(`/clients/${clientId}/training(\\?.*)?$`);
+  let lost = false;
+  await page.route(pageUrl, async (route) => {
+    if (route.request().method() !== 'POST' || lost) return route.continue();
+    lost = true;
+    await route.fetch();
+    await route.fulfill({ status: 500, body: 'lost' });
+  });
+  const dialog = await openAddWorkout(page);
+  await dialog.getByLabel('Search workouts').fill(workout);
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
+  // The calendar asks the server, finds it, and keeps it.
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await expect(page.getByText(SAVE_UNDONE)).toHaveCount(0);
+  await expect(item(page, today, workout)).toHaveCount(1);
+  await page.unroute(pageUrl);
+  const { data } = await admin.from('workouts').select('id').eq('name', workout).eq('client_id', clientId);
+  expect(data).toHaveLength(1);
+});
+
+test('+ Add workout: when even the check fails, picking the same again reuses the id, so it is added once', async ({ page }) => {
+  const workout = `Twice ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  const today = await browserToday(page);
+  await page.goto(calendarUrl(monthOf(today)));
+
+  // The add lands but its answer is lost, and the follow-up check fails too.
+  const pageUrl = new RegExp(`/clients/${clientId}/training(\\?.*)?$`);
+  let posts = 0;
+  await page.route(pageUrl, async (route) => {
+    if (route.request().method() !== 'POST' || posts >= 2) return route.continue();
+    posts += 1;
+    if (posts === 1) await route.fetch();
+    await route.fulfill({ status: 500, body: 'lost' });
+  });
+  let dialog = await openAddWorkout(page);
+  await dialog.getByLabel('Search workouts').fill(workout);
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
+  await expect(page.getByText(SAVE_UNDONE)).toBeVisible();
+  await page.unroute(pageUrl);
+
+  // The coach tries again: same workout, same day.
+  dialog = await openAddWorkout(page);
+  await dialog.getByLabel('Search workouts').fill(workout);
+  await dialog.getByRole('button', { name: workout, exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await page.reload();
+  await expect(item(page, today, workout)).toHaveCount(1);
+  const { data } = await admin.from('workouts').select('id').eq('name', workout).eq('client_id', clientId);
+  expect(data).toHaveLength(1);
+});
+
+test('Undo after moving the added workout: if the delete fails, it stays on the day it was moved to', async ({ page }) => {
+  const workout = `Undo moved ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  const month = nextMonth(monthOf(await browserToday(page)));
+  const first = `${month}-10`;
+  const second = `${month}-12`;
+  await page.goto(calendarUrl(month));
+  await addFromLibrary(page, first, workout);
+  await day(page, first).getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
+  await day(page, first).getByRole('menuitem', { name: 'Move to…' }).click();
+  const move = page.getByRole('dialog', { name: `Move ${workout}` });
+  await move.getByLabel('Date').fill(second);
+  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  await expect(item(page, second, workout)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+
+  // Undo's delete fails.
+  const pageUrl = new RegExp(`/clients/${clientId}/training(\\?.*)?$`);
+  await page.route(pageUrl, async (route) =>
+    route.request().method() === 'POST' ? route.fulfill({ status: 500, body: 'lost' }) : route.continue(),
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText(SAVE_UNDONE)).toBeVisible();
+  await expect(item(page, second, workout)).toBeVisible();
+  await expect(item(page, first, workout)).toHaveCount(0);
+  await page.unroute(pageUrl);
 });
 
 const seededIds: string[] = [];
