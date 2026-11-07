@@ -332,3 +332,74 @@ test('after dragging a card back onto its own day, the next click still opens it
   await card(page, date, name).locator('[title^="2× Barbell Squat · "]').click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
 });
+
+test.describe('on a touch screen (iPad, phone)', () => {
+  test.use({ hasTouch: true, viewport: { width: 420, height: 640 } });
+
+  /** Real touch input through Chrome's input pipeline, so a swipe scrolls natively. */
+  async function touchInput(page: Page) {
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
+      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: Math.round(x), y: Math.round(y) }] });
+    return {
+      async gesture(from: { x: number; y: number }, to: { x: number; y: number }, holdMs: number) {
+        await send('touchStart', from.x, from.y);
+        if (holdMs) await page.waitForTimeout(holdMs);
+        for (let i = 1; i <= 10; i++) {
+          await send('touchMove', from.x + ((to.x - from.x) * i) / 10, from.y + ((to.y - from.y) * i) / 10);
+          await page.waitForTimeout(16);
+        }
+        await send('touchEnd', to.x, to.y);
+      },
+    };
+  }
+  const centre = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+
+  test('a swipe across a card scrolls the calendar and leaves the card where it is', async ({ page }) => {
+    await signInAsCoach(page);
+    const today = await browserToday(page);
+    // The last day on screen: always today or later, and with plenty of calendar above it to scroll back to.
+    const date = addDays(mondayOf(today), 13);
+    const name = `Swipe ${unique()}`;
+    const id = await seedWorkout(name, date);
+
+    await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
+    const body = card(page, date, name).locator('[title^="2× Barbell Squat · "]');
+    await expect(body).toBeVisible();
+    await body.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const before = (await body.boundingBox())!;
+    const touch = await touchInput(page);
+    // Finger down on the card and straight down the screen, without holding: the calendar scrolls back up.
+    await touch.gesture(centre(before), { x: centre(before).x, y: centre(before).y + 200 }, 0);
+    await page.waitForTimeout(500);
+    const after = (await body.boundingBox())!;
+    expect(after.y - before.y).toBeGreaterThan(100);
+    await expect(page.locator('[data-drop]')).toHaveCount(0);
+    await expect(page).toHaveURL(/view=2w/);
+    const stayed = await admin.from('workouts').select('scheduled_on').eq('id', id).single();
+    expect(stayed.data?.scheduled_on).toBe(date);
+  });
+
+  test('a long press picks a card up and drops it on another day', async ({ page }) => {
+    await signInAsCoach(page);
+    const today = await browserToday(page);
+    const date = addDays(mondayOf(today), 13);
+    const target = addDays(date, -1);
+    const name = `Long press ${unique()}`;
+    const id = await seedWorkout(name, date);
+
+    await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
+    const body = card(page, date, name).locator('[title^="2× Barbell Squat · "]');
+    await expect(body).toBeVisible();
+    await body.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const from = centre((await body.boundingBox())!);
+    const to = centre((await day(page, target).boundingBox())!);
+    const touch = await touchInput(page);
+    // Hold past the 250 ms long press, then move onto the day before and let go.
+    await touch.gesture(from, to, 450);
+    await expect(day(page, target).getByRole('button', { name, exact: true })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+    const moved = await admin.from('workouts').select('scheduled_on').eq('id', id).single();
+    expect(moved.data?.scheduled_on).toBe(target);
+  });
+});
