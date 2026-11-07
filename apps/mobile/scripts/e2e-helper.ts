@@ -17,8 +17,8 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-reply client@demo.local "text"   fails unless the client sent it
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-read client@demo.local   fails unless the client has read the chat
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
-//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg)
-//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg) and a goal
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans and goal
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-coach-post "<text>"   the demo coach posts in the community
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-buddy-post "<text>"   a second demo client (buddy) posts
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-cleanup -   delete "E2E " posts, reports, blocks and the buddy
@@ -586,16 +586,21 @@ export async function coachFinish(email: string): Promise<void> {
   await coachSave(coach, clientId, finished);
 }
 
-/** Deletes every body scan of the seed demo client (values cascade). Nobody else's. */
+/** Deletes every body scan (values cascade) and the goal of the seed demo client. Nobody else's. */
 export async function cleanupScans(email: string): Promise<void> {
   if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-scans only clears ${DEMO_CLIENT}`);
   const id = await findUserId(DEMO_CLIENT);
   if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
   const { error } = await admin.from('body_measurements').delete().eq('client_id', id);
   if (error) throw error;
+  const goal = await admin.from('client_goals').delete().eq('client_id', id);
+  if (goal.error) throw goal.error;
 }
 
-/** Two coach-entered scans for the demo client (34 and 3 days ago): weight 82 kg then 80 kg, body fat 20% then 19%. Starts clean. */
+/**
+ * Two coach-entered scans for the demo client (34 and 3 days ago): weight 82 kg then 80 kg, body fat 20% then 19%,
+ * skeletal muscle 35 kg then 36 kg; and the coach's goal "Run a 5K under 30 minutes", 49 days away. Starts clean.
+ */
 export async function seedScans(email: string): Promise<void> {
   await cleanupScans(email);
   const clientId = await findUserId(email);
@@ -607,13 +612,17 @@ export async function seedScans(email: string): Promise<void> {
   if (wsErr) throw wsErr;
   const coach = await coachClient();
   try {
-    for (const [daysAgo, kg, fat] of [[34, 82, 20], [3, 80, 19]] as const) {
+    for (const [daysAgo, kg, fat, smm] of [[34, 82, 20, 35], [3, 80, 19, 36]] as const) {
       const measuredOn = addDays(localToday(), -daysAgo);
       const { error } = await coach.rpc('save_body_measurement', {
-        p: { workspace_id: ws.id, client_id: clientId, measured_on: measuredOn, values: { weight_kg: kg, body_fat_pct: fat } },
+        p: { workspace_id: ws.id, client_id: clientId, measured_on: measuredOn, values: { weight_kg: kg, body_fat_pct: fat, smm_kg: smm } },
       });
       if (error) throw error;
     }
+    const { error: goalErr } = await coach
+      .from('client_goals')
+      .insert({ workspace_id: ws.id, client_id: clientId, goal: 'Run a 5K under 30 minutes', target_date: addDays(localToday(), 49) });
+    if (goalErr) throw goalErr;
   } finally {
     await coach.auth.signOut();
   }
