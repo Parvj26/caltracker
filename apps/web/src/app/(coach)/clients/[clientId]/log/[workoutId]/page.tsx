@@ -6,6 +6,7 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
 import { laterDayNotice, loadLastTimes, loadSessionState } from '@/lib/coach-session';
+import { loadProgression } from '@/lib/progression';
 import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -81,7 +82,10 @@ export default async function SessionPage({ params }: { params: Promise<{ client
   const existing = state.kind === 'start' ? null : await getLog(state.logId);
   const log = existing?.log ?? null;
   const exerciseIds = (log ? log.blocks : workout.doc.blocks).flatMap((b) => b.exercises.map((e) => e.exerciseId));
-  const lastTimes = await loadLastTimes(supabase, client.id, exerciseIds);
+  const [lastTimes, progression] = await Promise.all([
+    loadLastTimes(supabase, client.id, exerciseIds),
+    loadProgression(supabase, workoutId, exerciseIds),
+  ]);
 
   if ((state.kind === 'client_logging' || state.kind === 'other_coach_logging') && log) {
     // Another coach's name, from their profile (coaches of one workspace can read each other's).
@@ -111,6 +115,7 @@ export default async function SessionPage({ params }: { params: Promise<{ client
         scheduledOn={workout.scheduledOn}
         units={units}
         lastTimes={lastTimes}
+        progression={progression}
       />
     </div>
   );

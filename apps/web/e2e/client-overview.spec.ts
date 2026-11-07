@@ -242,10 +242,12 @@ test('the tabs open Training, Body, Documents and Settings, and old links still 
   await tabs.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('button', { name: 'Remove Tara Track' })).toBeVisible();
 
-  // Home's Assign and Add scan shortcuts, and links made before the tabs.
+  // Home's Add scan shortcut, and links made before the tabs. An old Assign link (?assign=1) lands on Training,
+  // with nothing popping up.
   await page.goto(`/clients/${s.clientId}?assign=1`);
-  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training`));
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training$`));
+  await expect(page.getByRole('heading', { name: 'Training' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   // The calendar's own view and starting week are kept too.
   await page.goto(`/clients/${s.clientId}?view=2w&from=${dayOffset(0)}`);
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training\\?view=2w&from=${dayOffset(0)}$`));

@@ -58,7 +58,10 @@ env:
 - extendedWaitUntil:
     visible: 'Share to community'
     timeout: 10000
-- assertVisible: 'Your workout card'
+# The card as it will post, built by the database: 1,440 kg is 3,175 lb in this client's units.
+- extendedWaitUntil:
+    visible: 'You lifted 3,175 lb — about as much as .+'
+    timeout: 10000
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Leg day done'
@@ -90,7 +93,9 @@ env:
 - extendedWaitUntil:
     visible: 'Share to community'
     timeout: 10000
-- assertVisible: 'Your .+ sticker'
+- extendedWaitUntil:
+    visible: 'You earned the .+ sticker.*'
+    timeout: 10000
 - tapOn:
     id: new-post-submit
 
@@ -103,10 +108,12 @@ env:
     visible: 'E2E Leg day done'
     timeout: 15000
 - assertVisible: 'New sticker'
-- assertVisible: 'Workout done'
-# Built by the database from the log and its award: counts and the animal, no volume.
+- assertVisible: '.+ earned the .+ sticker.*'
+# Built by the database from the log and its award (the volume award-workout stored): a sentence, then the
+# workout's name and counts.
+- assertVisible: '.+ lifted 3,175 lb — about as much as .+'
+- assertVisible: 'E2E Log'
 - assertVisible: '1 exercise · 3 sets'
-- assertVisible: '≈ .+'
 
 - runScript:
     file: helpers/call.js

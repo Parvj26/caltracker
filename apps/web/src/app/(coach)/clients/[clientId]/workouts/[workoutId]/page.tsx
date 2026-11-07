@@ -2,9 +2,12 @@ import type { Metadata } from 'next';
 import { clientWorkoutPageTitle } from '@/lib/page-titles';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { suggestionsForWorkout } from '@caltracker/shared';
+import { ProgressionCard } from '@/components/progression-card';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
 import { getClient, getWorkoutDoc } from '@/lib/page-data';
+import { loadProgression } from '@/lib/progression';
 import { createServerSupabase } from '@/lib/supabase/server';
 import styles from '@/components/calendar/calendar.module.css';
 
@@ -37,6 +40,10 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
     .maybeSingle();
   if (done.error) throw new Error(`Could not check the workout: ${done.error.message}`);
   if (done.data) redirect(`/clients/${client.id}/logs/${done.data.id}`);
+  // Auto progression's suggestions (none when the program has it off). Only a hint: never fail the page over it.
+  const exerciseIds = loaded.doc.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId));
+  const progression = await loadProgression(supabase, workoutId, exerciseIds).catch(() => ({}));
+  const suggestions = suggestionsForWorkout(loaded.doc, progression, units);
 
   return (
     <div className={styles.page}>
@@ -47,6 +54,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{loaded.doc.name}</h1>
       </header>
+      <ProgressionCard doc={loaded.doc} suggestions={suggestions} units={units} />
       {/* key: opening a different workout starts a fresh builder. */}
       <WorkoutBuilder
         key={loaded.doc.id}

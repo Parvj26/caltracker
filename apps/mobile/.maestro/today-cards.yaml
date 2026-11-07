@@ -1,0 +1,68 @@
+# The Today tab: the date and "Hi <name>" header, the coach row, the sticker and PR tiles (each opens its own
+# screen), and Sign out behind the gear.
+# Run via `pnpm --filter mobile e2e .maestro/today-cards.yaml` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- assertVisible:
+    id: today-date
+- assertVisible: 'Hi .*'
+- assertVisible:
+    id: today-settings
+# The coach row opens the Coach tab.
+- extendedWaitUntil:
+    visible:
+      id: today-coach
+    timeout: 20000
+- tapOn:
+    id: today-coach
+- assertVisible:
+    id: coach-name
+- tapOn:
+    id: tab-today
+# The sticker tile shows the zoo book's progress and opens it.
+- scrollUntilVisible:
+    element:
+      id: today-sticker
+    direction: DOWN
+- extendedWaitUntil:
+    visible: '.*Zoo \d+ of \d+.*'
+    timeout: 20000
+- assertVisible:
+    id: today-prs
+- takeScreenshot: today-cards-phone
+- tapOn:
+    id: today-sticker
+- assertVisible:
+    id: zoo-animals-title
+- tapOn:
+    id: tab-today
+# Sign out lives behind the gear now.
+- scrollUntilVisible:
+    element:
+      id: today-settings
+    direction: UP
+- tapOn:
+    id: today-settings
+- assertVisible:
+    id: sign-out
+- tapOn:
+    id: settings-close
+- assertNotVisible:
+    id: sign-out
+- tapOn:
+    id: today-settings
+- tapOn:
+    id: sign-out
+- extendedWaitUntil:
+    visible:
+      id: email-input
+    timeout: 20000

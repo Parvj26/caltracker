@@ -31,7 +31,7 @@ export const getProgram = cache(async (id: string) => {
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return null;
   const supabase = await createServerSupabase();
-  const { data, error } = await supabase.from('programs').select('id, name, description, weeks').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+  const { data, error } = await supabase.from('programs').select('id, name, description, weeks, auto_progression').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
   if (error) throw new Error(`Could not load program: ${error.message}`);
   return data;
 });

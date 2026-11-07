@@ -46,8 +46,27 @@ export function kgToInput(kg: number, unit: Units): number {
   return unit === 'kg' ? round(kg, 3) : fromKg(kg, unit);
 }
 
+/**
+ * Thousands grouped with commas ("1,540", "12,345.5"). A regex rather than toLocaleString, so the phone (Hermes) and
+ * the dashboard (Workers) always print the same text.
+ */
+export function groupThousands(text: string): string {
+  const [whole = '', fraction] = text.split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
+}
+
+/** One weight in the viewer's units, thousands grouped: "61.2 kg", "135 lb", "1,000 lb". */
 export function formatWeight(kg: number, unit: Units): string {
-  return `${trim(fromKg(kg, unit), 1)} ${unit}`;
+  return `${groupThousands(trim(fromKg(kg, unit), 1))} ${unit}`;
+}
+
+/**
+ * A total (a workout's volume) in the viewer's units as a whole number, thousands grouped: "1,540 lb", "698 kg".
+ * Rounded once, from the unrounded conversion.
+ */
+export function formatTotalWeight(kg: number, unit: Units): string {
+  return `${groupThousands(String(Math.round(unit === 'lb' ? kg / KG_PER_LB : kg)))} ${unit}`;
 }
 
 export function distanceUnitFor(units: Units): DistanceUnit {

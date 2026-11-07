@@ -42,6 +42,7 @@ import {
   type LogExerciseDoc,
   type Units,
   type WorkoutLogDoc,
+  type ProgressionHistory,
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
@@ -59,7 +60,7 @@ import { Button, Card, Screen } from '@/components/ui';
 import { useCoachLogging } from '@/lib/coach-logging';
 import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
-import { fetchLastResults, type LastResults } from '@/lib/log-api';
+import { fetchLastResults, fetchProgression, type LastResults } from '@/lib/log-api';
 import {
   afterDone,
   buildPage,
@@ -70,6 +71,8 @@ import {
   historyLines,
   markAll,
   markAllPlan,
+  prefillSets,
+  type Progression,
   markAllQuestion,
   pageDots,
   pickingFirst,
@@ -232,6 +235,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [last, setLast] = useState<LastResults>({});
+  const [history, setHistory] = useState<ProgressionHistory>({});
   const lastTick = useRef<LastDone>(null);
   // The coach took over while something was open: close what edits (photos, info and history may stay open).
   useEffect(() => {
@@ -306,6 +310,18 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       alive = false;
     };
   }, [exerciseKey]);
+  // Auto progression (only for a planned workout whose program has it on): the suggested weight becomes the pre-fill.
+  const workoutId = log.workoutId;
+  useEffect(() => {
+    if (!exerciseKey || !workoutId) return;
+    let alive = true;
+    fetchProgression(workoutId, exerciseKey.split(','))
+      .then((h) => alive && setHistory(h))
+      .catch(() => undefined); // only a hint, like last time
+    return () => {
+      alive = false;
+    };
+  }, [exerciseKey, workoutId]);
   const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
 
   const blockOf = useCallback((logExerciseId: string) => log.blocks.find((b) => b.exercises.some((e) => e.id === logExerciseId)) ?? null, [log.blocks]);
@@ -326,6 +342,8 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   logRef.current = log;
   const lastRef = useRef(last);
   lastRef.current = last;
+  const progressionRef = useRef<Progression>({ history, units });
+  progressionRef.current = { history, units };
   const docOf = useCallback(
     (logExerciseId: string) => logRef.current.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId) ?? null,
     [],
@@ -354,7 +372,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
             const picked = pickFirst(l);
             const doc = picked.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
             if (!doc) return l;
-            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, lastRef.current[doc.exerciseId]?.sets ?? []), nowIso());
+            return completeSetWith(picked, row.setId, resolveSetValues(doc, row.setId, prefillSets(doc, lastRef.current, progressionRef.current)), nowIso());
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
@@ -423,9 +441,9 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
     Keyboard.dismiss();
     const picked = pickOf ? withPick(pickOf)(log) : log;
-    const plan = markAllPlan(picked, logExerciseIds, last);
+    const plan = markAllPlan(picked, logExerciseIds, last, { history, units });
     const run = () =>
-      void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, logExerciseIds, lastRef.current, nowIso())).then(
+      void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, logExerciseIds, lastRef.current, nowIso(), progressionRef.current)).then(
         (ticked) => ticked && tapHaptic(),
       );
     if (plan.tick === 0) {
@@ -688,6 +706,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
         page={pageIndex}
         units={units}
         last={last}
+        history={history}
         details={details}
         handlers={handlers}
         readOnly={readOnly}
@@ -725,6 +744,7 @@ function SectionPages({
   page,
   units,
   last,
+  history,
   details,
   handlers,
   readOnly,
@@ -746,6 +766,8 @@ function SectionPages({
   page: number;
   units: Units;
   last: LastResults;
+  /** Auto progression history (empty when off). */
+  history: ProgressionHistory;
   details: Parameters<typeof StraightPage>[0]['details'];
   handlers: PageHandlers;
   /** The coach logs this workout: the pages only show it (no Mark all or Done); moving around still works. */
@@ -774,7 +796,7 @@ function SectionPages({
   /** A swipe-through page before the first page when there is a section before this one (and one after the last). */
   const lead = edges.prev ? 1 : 0;
 
-  const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last)), [log, section, units, last]);
+  const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last, history)), [log, section, units, last, history]);
 
   // A page chosen from outside (a dot, Done, a change to the log): scroll there.
   useEffect(() => {

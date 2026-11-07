@@ -60,7 +60,7 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - Video uploads of any kind (chat, community, exercise demos)
 - Voice notes, group chats, broadcast messages
 - AMRAP, EMOM, interval-timer blocks *(pending coach confirmation — see Open Questions)*
-- %-of-max / RPE-based prescriptions, automatic progression
+- %-of-max / RPE-based prescriptions *(automatic progression was approved by the product owner for Wave 2: see `2026-11-07-auto-progression-design.md`)*
 - Multiple community groups per coach (data model allows them)
 - Scheduled posts, polls, @mentions, live video
 - Progress photos

@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { countExercises, formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
+import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
+import { Overline, Tile } from '@/components/today/parts';
+import { TodayFood } from '@/components/food/today-food';
+import { GoalCard, StickerAndPrs } from '@/components/today/progress-cards';
+import { CommunityCard, CoachRow } from '@/components/today/social-cards';
+import { TodayHeader } from '@/components/today/today-header';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import {
@@ -19,7 +25,11 @@ import {
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
+import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
+import { greeting, headerDate } from '@/lib/today-logic';
 import { useActiveLog } from '@/lib/use-active-log';
+import { useCachedLoad } from '@/lib/use-cached-load';
+import { useUnits } from '@/lib/use-units';
 import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
   fetchAnyWorkout,
@@ -103,10 +113,22 @@ async function workoutToStart(id: string): Promise<WorkoutDoc | null> {
 
 export default function Today() {
   useSurpriseReveal();
-  const { workspace } = useSession();
+  const { session, workspace } = useSession();
+  const userId = session?.user.id ?? null;
   const { text, space } = useTheme();
   const router = useRouter();
-  const { log: active, pending, banner, dismissBanner, start, finished, forgetFinished, syncStatus } = useActiveLog();
+  const units = useUnits() ?? 'lb';
+  const { log: active, pending, banner, dismissBanner, start, startEmpty, finished, forgetFinished, syncStatus } = useActiveLog();
+  // Bumped by pull to refresh: each card below reloads itself (they also reload whenever Today comes into view).
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [today, setToday] = useState<IsoDate>(() => localToday());
+  const [naming, setNaming] = useState(false);
+  const firstName = useCachedLoad(
+    userId,
+    () => (userId ? readCachedFirstName(userId) : Promise.resolve(null)),
+    () => (userId ? fetchFirstName(userId) : Promise.resolve(null)),
+    refreshKey,
+  );
   const [data, setData] = useState<TodayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -140,6 +162,7 @@ export default function Today() {
   useFocusEffect(
     useCallback(() => {
       navigating.current = false;
+      setToday(localToday()); // The day may have changed since the screen opened.
       void load();
     }, [load]),
   );
@@ -155,6 +178,8 @@ export default function Today() {
 
   async function refresh() {
     setRefreshing(true);
+    setToday(localToday());
+    setRefreshKey((k) => k + 1);
     await load();
     setRefreshing(false);
   }
@@ -225,86 +250,122 @@ export default function Today() {
     }
   }
 
+  function logAnyway() {
+    if (inProgress) {
+      Alert.alert(`${inProgress.name} is still going`, 'Finish or discard it before starting another workout.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Resume ${inProgress.name}`, onPress: () => openLog(inProgress.id) },
+      ]);
+      return;
+    }
+    setNaming(true);
+  }
+
+  async function startUnplanned(name: string) {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting('unplanned');
+    try {
+      const log = await startEmpty(name);
+      setNaming(false);
+      openLog(log.id);
+    } catch {
+      Alert.alert(START_FAILED);
+    } finally {
+      startingRef.current = false;
+      setStarting(null);
+    }
+  }
+
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
-      <View style={{ gap: space[1] }}>
-        <Text style={text('caption')}>{`Welcome to ${workspace?.workspaceName ?? ''}`}</Text>
-        <Text style={text('screenTitle')} accessibilityRole="header">
-          Today
-        </Text>
+      <View style={{ gap: space[4] }}>
+        <TodayHeader
+          date={headerDate(today)}
+          greeting={greeting(firstName.data)}
+          workspaceName={workspace?.workspaceName ?? ''}
+          onSignOut={() => void signOutAndForget()}
+        />
+
+        {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
+
+        {banner ? (
+          <Card>
+            <Text testID="auto-finish-note" style={text('sectionHeading')}>
+              {banner}
+            </Text>
+            <TextButton testID="auto-finish-ok" title="OK" onPress={dismissBanner} />
+          </Card>
+        ) : null}
+
+        {error ? (
+          <Card>
+            <ErrorText>{error}</ErrorText>
+            <Button variant="secondary" title="Try again" onPress={() => void refresh()} busy={refreshing} />
+          </Card>
+        ) : null}
+
+        {data === null && !error ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
+
+        {data?.kind === 'first-time' ? (
+          <FirstTimeWelcome
+            coachName={data.coachName}
+            workspaceName={workspace?.workspaceName ?? ''}
+            units={data.units}
+            onChangeUnits={changeUnits}
+          />
+        ) : null}
+
+        {data?.kind === 'today' && data.offline ? (
+          <Text style={text('caption')}>No connection. These are today’s workouts saved on your phone.</Text>
+        ) : null}
+
+        {data?.kind === 'today' && data.workouts.length > 0
+          ? data.workouts.map((w) => (
+              <TodayCard
+                key={w.id}
+                workout={w}
+                status={statuses[w.id] ?? null}
+                starting={starting === w.id}
+                onStart={() => void startWorkout(w)}
+                onView={openSummary}
+              />
+            ))
+          : null}
+
+        {data?.kind === 'today' && data.workouts.length === 0 ? (
+          <Tile testID="today-rest">
+            <Text style={text('screenTitle')} accessibilityRole="header">
+              Rest day
+            </Text>
+            <Text style={[text('body'), styles.muted]}>
+              {data.next
+                ? `Nothing scheduled today. Next up: ${data.next.name}, ${formatDayLabel(data.next.scheduledOn)}.`
+                : 'Nothing scheduled today.'}
+            </Text>
+            <View style={styles.start}>
+              <TextButton title="Log a workout anyway" testID="today-log-anyway" onPress={logAnyway} />
+            </View>
+          </Tile>
+        ) : null}
+
+        {/* The cards below load on their own, at the same time as today's workout, each from the phone's copy first. */}
+        {data?.kind !== 'first-time' ? (
+          <>
+            <CoachRow />
+            <CommunityCard units={units} refreshKey={refreshKey} />
+            <StickerAndPrs units={units} refreshKey={refreshKey} />
+            <GoalCard units={units} refreshKey={refreshKey} foodSlot={<TodayFood refreshKey={refreshKey} />} />
+          </>
+        ) : null}
       </View>
 
-      {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
-
-      {banner ? (
-        <Card>
-          <Text testID="auto-finish-note" style={text('sectionHeading')}>
-            {banner}
-          </Text>
-          <TextButton testID="auto-finish-ok" title="OK" onPress={dismissBanner} />
-        </Card>
-      ) : null}
-
-      {error ? (
-        <Card>
-          <ErrorText>{error}</ErrorText>
-          <Button variant="secondary" title="Try again" onPress={() => void refresh()} busy={refreshing} />
-        </Card>
-      ) : null}
-
-      {data === null && !error ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
-
-      {data?.kind === 'first-time' ? (
-        <FirstTimeWelcome
-          coachName={data.coachName}
-          workspaceName={workspace?.workspaceName ?? ''}
-          units={data.units}
-          onChangeUnits={changeUnits}
-        />
-      ) : null}
-
-      {data?.kind === 'today' && data.offline ? (
-        <Text style={text('caption')}>No connection. These are today’s workouts saved on your phone.</Text>
-      ) : null}
-
-      {data?.kind === 'today' && data.workouts.length > 0
-        ? data.workouts.map((w) => (
-            <TodayCard
-              key={w.id}
-              workout={w}
-              status={statuses[w.id] ?? null}
-              starting={starting === w.id}
-              onStart={() => void startWorkout(w)}
-              onView={openSummary}
-            />
-          ))
-        : null}
-
-      {data?.kind === 'today' && data.workouts.length === 0 ? (
-        <Card>
-          <Text style={text('sectionHeading')}>Rest day — nothing scheduled today.</Text>
-          {data.next ? (
-            <Text style={text('body')}>{`Next: ${data.next.name} · ${formatDayLabel(data.next.scheduledOn)}`}</Text>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {data?.kind === 'today' ? (
-        <Card>
-          <Text style={text('sectionHeading')} accessibilityRole="header">
-            Progress
-          </Text>
-          <Text style={text('body')}>See your charts and log your weight.</Text>
-          <Button
-            variant="secondary"
-            testID="home-progress"
-            title="Open Progress"
-            onPress={() => router.navigate('/progress')}
-          />
-        </Card>
-      ) : null}
-
-      <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />
+      <NameSheet
+        visible={naming}
+        busy={starting === 'unplanned'}
+        onStart={(name) => void startUnplanned(name)}
+        onClose={() => setNaming(false)}
+      />
     </Screen>
   );
 }
@@ -327,10 +388,12 @@ function TodayCard({
   const router = useRouter();
   const count = `${workout.exerciseCount} ${workout.exerciseCount === 1 ? 'exercise' : 'exercises'}`;
   return (
-    <Card>
+    <Tile tone="blue" testID={`today-workout-${workout.id}`}>
       <View style={{ gap: space[2] }}>
+        <Overline>Today’s workout</Overline>
         <Text style={text('screenTitle')}>{workout.name}</Text>
-        <Text style={text('body')}>{count}</Text>
+        {/* Text on a pastel tile is always ink, never muted. */}
+        <Text style={[text('body'), styles.ink]}>{count}</Text>
         {workout.programName ? (
           <View
             style={[styles.chip, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}
@@ -362,11 +425,13 @@ function TodayCard({
         testID={`view-workout-${workout.id}`}
         onPress={() => router.push({ pathname: '/workout/[id]', params: { id: workout.id } })}
       />
-    </Card>
+    </Tile>
   );
 }
 
 const styles = StyleSheet.create({
-  chip: { alignSelf: 'flex-start', backgroundColor: palette.blue },
+  chip: { alignSelf: 'flex-start', backgroundColor: palette.bg },
   ink: { color: palette.ink },
+  muted: { color: palette.inkMuted },
+  start: { alignSelf: 'flex-start' },
 });

@@ -2,6 +2,7 @@
 // client of the workspace; writes are their own meals only (the coach sets targets on the web).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MEAL_PHOTO_BUCKET, isAlreadyUploaded, type Database, type IsoDate, type MacroTargets } from '@caltracker/shared';
+import { foodCachePrefix } from './device-cache-keys';
 import { emptyFoodCache, parseFoodCache, withDay, withTargets, type FoodCache } from './food-logic';
 import type { FoodOp, MealRecord } from './food-queue';
 import { isNetworkFailure } from './network-failure';
@@ -16,7 +17,7 @@ const MEAL_COLUMNS =
   'id, workspace_id, eaten_at, eaten_on, name, note, calories, protein_g, carbs_g, fat_g, photo_path, photo_thumb_path, photo_width, photo_height';
 const SIGNED_URL_SECONDS = 3600;
 
-const cacheKey = (userId: string, workspaceId: string) => `caltracker.food.${userId}.${workspaceId}`;
+const cacheKey = (userId: string, workspaceId: string) => `${foodCachePrefix(userId)}${workspaceId}`;
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
 

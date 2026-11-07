@@ -23,7 +23,7 @@ function useShortcutHint(): string {
 
 const nameOf = (c: SearchClient) => `${c.firstName} ${c.lastName}`.trim() || 'Client';
 
-/** Jump to any current client: type part of a name, arrow to a result, Enter. ⌘K / Ctrl+K focuses the box. */
+/** Jump to any current client's Training (their calendar): type part of a name, arrow to a result, Enter. ⌘K / Ctrl+K focuses the box. */
 export function ClientSearch({ clients }: { clients: SearchClient[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +54,7 @@ export function ClientSearch({ clients }: { clients: SearchClient[] }) {
   function go(c: SearchClient) {
     setQuery('');
     setOpen(false);
-    router.push(`/clients/${c.id}`);
+    router.push(`/clients/${c.id}/training`);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
