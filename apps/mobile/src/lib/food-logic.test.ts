@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
+import { msUntilMidnight, savedTime, FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
 import type { FoodOp, MealRecord } from './food-queue';
 
 const none = { calories: null, protein: null, carbs: null, fat: null };
@@ -65,7 +65,7 @@ describe('buildSaveOp', () => {
   it('points a new photo at the meal\'s own folder and remembers its size', () => {
     const op = buildSaveOp(null, draft, { kind: 'new', local, width: 1200, height: 1600 }, ids);
     if (op.kind !== 'save') throw new Error('save expected');
-    expect(op.meal.photo).toEqual({ path: 'ws/me/m1.webp', thumbPath: 'ws/me/m1-thumb.webp', width: 1200, height: 1600 });
+    expect(op.meal.photo).toEqual({ path: 'ws/me/m1-p.webp', thumbPath: 'ws/me/m1-p-thumb.webp', width: 1200, height: 1600 });
     expect(op.localPhoto).toEqual(local);
   });
   it('keeps the meal id and photo on an edit', () => {
@@ -76,14 +76,16 @@ describe('buildSaveOp', () => {
     expect(op.meal.photo).toEqual(before.photo);
     expect(op.dropPaths).toEqual([]);
   });
-  it('drops the old files when the photo is removed or replaced by a different type', () => {
+  it('drops the old files when the photo is removed or replaced', () => {
     const before = meal('old', { photo: { path: 'ws/me/old.jpg', thumbPath: 'ws/me/old-thumb.jpg', width: 10, height: 10 } });
     const removed = buildSaveOp(before, draft, { kind: 'none' }, ids);
     expect(removed.dropPaths).toEqual(['ws/me/old.jpg', 'ws/me/old-thumb.jpg']);
     const replaced = buildSaveOp(before, draft, { kind: 'new', local, width: 5, height: 5 }, ids);
     expect(replaced.dropPaths).toEqual(['ws/me/old.jpg', 'ws/me/old-thumb.jpg']);
+    // Same type: the new photo still has its own files, and the old ones go.
     const sameType = buildSaveOp(before, draft, { kind: 'new', local: { ...local, ext: 'jpg' }, width: 5, height: 5 }, ids);
-    expect(sameType.dropPaths).toEqual([]);
+    expect(sameType.meal.photo?.path).toBe('ws/me/old-p.jpg');
+    expect(sameType.dropPaths).toEqual(['ws/me/old.jpg', 'ws/me/old-thumb.jpg']);
   });
 });
 
@@ -139,5 +141,27 @@ describe('food cache', () => {
     for (let d = 1; d <= 30; d++) c = withDay(c, `2026-10-${String(d).padStart(2, '0')}`, []);
     expect(Object.keys(c.days)).toHaveLength(FOOD_CACHE_DAYS);
     expect(Object.keys(c.days).sort()[0]).toBe(`2026-10-${String(31 - FOOD_CACHE_DAYS).padStart(2, '0')}`);
+  });
+});
+
+describe('msUntilMidnight', () => {
+  it('counts to just after the next midnight', () => {
+    expect(msUntilMidnight(new Date(2026, 10, 7, 23, 59, 0))).toBe(61_000);
+    expect(msUntilMidnight(new Date(2026, 10, 7, 0, 0, 0, 500))).toBeGreaterThan(23 * 3600_000);
+  });
+});
+
+describe('savedTime', () => {
+  const lateNight = { isNew: true, touched: false, day: '2026-11-07', minutes: 23 * 60 + 58, openedOn: '2026-11-07' };
+  const afterMidnight = new Date(2026, 10, 8, 0, 3);
+  it('saves an untouched new meal at the moment of saving, on the new day if midnight passed', () => {
+    expect(savedTime(lateNight, afterMidnight)).toEqual({ day: '2026-11-08', minutes: 3 });
+  });
+  it('keeps a time the person picked, on its day', () => {
+    expect(savedTime({ ...lateNight, touched: true, minutes: 22 * 60 }, afterMidnight)).toEqual({ day: '2026-11-07', minutes: 22 * 60 });
+  });
+  it('keeps an edit, and a new meal on an earlier day, as given', () => {
+    expect(savedTime({ ...lateNight, isNew: false }, afterMidnight)).toEqual({ day: '2026-11-07', minutes: 23 * 60 + 58 });
+    expect(savedTime({ ...lateNight, day: '2026-11-05', minutes: 720 }, afterMidnight)).toEqual({ day: '2026-11-05', minutes: 720 });
   });
 });

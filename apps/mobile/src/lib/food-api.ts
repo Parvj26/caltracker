@@ -7,6 +7,7 @@ import { emptyFoodCache, parseFoodCache, withDay, withTargets, type FoodCache } 
 import type { FoodOp, MealRecord } from './food-queue';
 import { isNetworkFailure } from './network-failure';
 import { OutboxSendError } from './outbox';
+import { sendFoodOpWith, type FoodBackend } from './food-send';
 import { photoUri } from './outbox-files';
 import { supabase } from './supabase';
 
@@ -93,9 +94,6 @@ export async function mealPhotoUrls(paths: string[]): Promise<Record<string, str
   return out;
 }
 
-const fail = (error: { code?: string; message: string }, refusal: string): OutboxSendError =>
-  isNetworkFailure(error) ? new OutboxSendError('network', error.message) : new OutboxSendError('refused', refusal);
-
 async function upload(path: string, uri: string, contentType: string): Promise<void> {
   let body: ArrayBuffer;
   try {
@@ -104,66 +102,37 @@ async function upload(path: string, uri: string, contentType: string): Promise<v
     throw new OutboxSendError('photo', "Couldn't read the photo. Please log the meal again.");
   }
   const { error } = await supabase.storage.from(MEAL_PHOTO_BUCKET).upload(path, body, { contentType, upsert: false });
+  // A repeat finds the file already there: each photo has its own name, so that is this same photo.
   if (error && !isAlreadyUploaded(error)) {
     if (isNetworkFailure(error)) throw new OutboxSendError('network', error.message);
     throw new OutboxSendError('photo', "Couldn't upload the photo. Please try again.");
   }
 }
 
-/** Removes stored files; never throws (a file left behind is private and harmless). */
-async function removeQuietly(paths: string[]): Promise<void> {
-  if (paths.length === 0) return;
-  try {
-    await supabase.storage.from(MEAL_PHOTO_BUCKET).remove(paths);
-  } catch {
-    // best effort
-  }
-}
+const backend: FoodBackend = {
+  async deleteMeal(id) {
+    const { error } = await supabase.from('meals').delete().eq('id', id);
+    return error;
+  },
+  async insertMeal(row) {
+    // client_id is filled by the database from the session (no client may set it).
+    const { error } = await supabase.from('meals').insert(row);
+    return error;
+  },
+  async updateMeal(id, fields) {
+    const { data, error } = await supabase.from('meals').update(fields).eq('id', id).select('id');
+    return { error, rows: data?.length ?? 0 };
+  },
+  upload: (path, localValue, contentType) => upload(path, photoUri(localValue), contentType),
+  async removeQuietly(paths) {
+    if (paths.length === 0) return;
+    try {
+      await supabase.storage.from(MEAL_PHOTO_BUCKET).remove(paths);
+    } catch {
+      // best effort: a file left behind is private and harmless
+    }
+  },
+};
 
-const REFUSED = "Couldn't save this meal. Please try again.";
-
-/** Sends one queued operation. Safe to repeat. Throws OutboxSendError. */
-export async function sendFoodOp(op: FoodOp): Promise<void> {
-  if (op.kind === 'delete') {
-    const { error } = await supabase.from('meals').delete().eq('id', op.mealId);
-    if (error) throw fail(error, "Couldn't delete this meal. Please try again.");
-    await removeQuietly(op.dropPaths);
-    return;
-  }
-
-  const m = op.meal;
-  if (op.localPhoto && m.photo) {
-    // An upload never overwrites, so a replaced photo of the same type is cleared first (also after a half-done try).
-    await removeQuietly([m.photo.path, m.photo.thumbPath]);
-    const type = op.localPhoto.ext === 'webp' ? 'image/webp' : 'image/jpeg';
-    await upload(m.photo.path, photoUri(op.localPhoto.fullUri), type);
-    await upload(m.photo.thumbPath, photoUri(op.localPhoto.thumbUri), type);
-  }
-
-  const fields = {
-    eaten_at: m.eatenAt,
-    eaten_on: m.eatenOn,
-    name: m.name,
-    note: m.note,
-    calories: m.macros.calories,
-    protein_g: m.macros.protein,
-    carbs_g: m.macros.carbs,
-    fat_g: m.macros.fat,
-    photo_path: m.photo?.path ?? null,
-    photo_thumb_path: m.photo?.thumbPath ?? null,
-    photo_width: m.photo?.width ?? null,
-    photo_height: m.photo?.height ?? null,
-  };
-  // client_id is filled by the database from the session (no client may set it).
-  const inserted = await supabase.from('meals').insert({ id: m.id, workspace_id: m.workspaceId, ...fields });
-  if (inserted.error?.code === '23505') {
-    // Already there: an earlier try, or an edit. Update it instead.
-    const updated = await supabase.from('meals').update(fields).eq('id', m.id).select('id');
-    if (updated.error) throw fail(updated.error, REFUSED);
-    if (updated.data.length === 0) throw new OutboxSendError('refused', "This meal can't be changed any more.");
-  } else if (inserted.error) {
-    if (inserted.error.code === '42501') throw new OutboxSendError('refused', "You can't log meals with this coach any more.");
-    throw fail(inserted.error, REFUSED);
-  }
-  await removeQuietly(op.dropPaths);
-}
+/** Sends one queued operation (see food-send.ts). Safe to repeat. Throws OutboxSendError. */
+export const sendFoodOp = (op: FoodOp): Promise<void> => sendFoodOpWith(backend, op);

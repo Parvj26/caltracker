@@ -1,7 +1,7 @@
 // What the Food tab shows and writes, worked out on the phone: the server's meals with the queued saves and deletes
 // applied on top, the operations a save or delete becomes, and the meal-time picker's steps. No network, no React.
 // The macro maths (totals, targets, hints) lives in @caltracker/shared.
-import { MACRO_KEYS, mealPhotoPaths, type IsoDate, type MacroTargets, type MealMacros } from '@caltracker/shared';
+import { MACRO_KEYS, localDateOf, mealPhotoPaths, type IsoDate, type MacroTargets, type MealMacros } from '@caltracker/shared';
 import type { FoodOp, LocalMealPhoto, MealRecord, StoredPhoto } from './food-queue';
 
 export type ShownMeal = MealRecord & { pending: 'sending' | 'failed' | null; localPhoto: LocalMealPhoto | null; opId: string | null };
@@ -41,7 +41,8 @@ export function buildSaveOp(before: MealRecord | null, draft: MealDraft, photo: 
   if (photo.kind === 'keep') stored = before?.photo ?? null;
   else if (photo.kind === 'none') stored = null;
   else {
-    const p = mealPhotoPaths(workspaceId, ids.userId, id, photo.local.ext);
+    // The photo's own id names its files, so a replacement never collides with the photo it replaces.
+    const p = mealPhotoPaths(workspaceId, ids.userId, id, photo.local.id, photo.local.ext);
     stored = { path: p.path, thumbPath: p.thumbPath, width: Math.round(photo.width), height: Math.round(photo.height) };
     localPhoto = photo.local;
   }
@@ -159,4 +160,25 @@ export function withDay(cache: FoodCache, day: IsoDate, meals: MealRecord[]): Fo
 
 export function withTargets(cache: FoodCache, targets: MacroTargets | null): FoodCache {
   return { ...cache, targets };
+}
+
+/** Milliseconds until the phone's next midnight (at least 1 s), for moving the Food tab on to the new day. */
+export function msUntilMidnight(now: Date = new Date()): number {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+  return Math.max(1000, next.getTime() - now.getTime());
+}
+
+/**
+ * The day and time a meal is saved with. The time picked is kept as given for its day. A new meal whose time was
+ * never touched, started on today (time "now"), is saved at the moment of saving instead: one started before
+ * midnight and saved after it belongs to the new day, at the real time.
+ */
+export function savedTime(
+  editor: { isNew: boolean; touched: boolean; day: IsoDate; minutes: number; openedOn: IsoDate },
+  now: Date = new Date(),
+): { day: IsoDate; minutes: number } {
+  if (editor.isNew && !editor.touched && editor.day === editor.openedOn) {
+    return { day: localDateOf(now), minutes: now.getHours() * 60 + now.getMinutes() };
+  }
+  return { day: editor.day, minutes: editor.minutes };
 }
