@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { AutoProgressionPanel } from './auto-progression-panel';
 import { DeleteProgram } from './delete-program';
@@ -72,6 +73,7 @@ export default async function ProgramPage({
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{program.name}</h1>
         <div className={styles.titleActions}>
+          <AssignButton kind="program" id={program.id} name={program.name} />
           <DuplicateButton kind="program" id={program.id} name={program.name} />
           <DeleteProgram id={program.id} name={program.name} />
         </div>

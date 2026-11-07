@@ -1,27 +1,29 @@
 // "Save image": renders a share card view to a picture in the photo library. The permission is asked once, the first time.
-import * as MediaLibrary from 'expo-media-library';
+//
+// expo-media-library 58 replaced its functions with classes: the old `saveToLibraryAsync` exported from the package
+// root now throws on every call (it only survives under "expo-media-library/legacy"). Saving goes through
+// `Asset.create`, which needs only add-only access.
+import { Asset, requestPermissionsAsync } from 'expo-media-library';
 import type { RefObject } from 'react';
 import type { HostInstance } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import { saveCard, type SaveImageResult } from './save-image-logic';
 
-export type SaveImageResult = 'saved' | 'denied' | 'failed';
+export { SAVE_MESSAGES, type SaveImageResult } from './save-image-logic';
 
-export const SAVE_MESSAGES: Record<SaveImageResult, string> = {
-  saved: 'Saved to Photos.',
-  denied: 'Allow CalTracker to add photos in Settings to save cards.',
-  failed: 'Couldn’t save the image. Try again.',
-};
-
-export async function saveCardToPhotos(card: RefObject<HostInstance | null>): Promise<SaveImageResult> {
-  try {
+export function saveCardToPhotos(card: RefObject<HostInstance | null>): Promise<SaveImageResult> {
+  return saveCard({
     // Write-only: the app adds pictures and never reads the library.
-    const perm = await MediaLibrary.requestPermissionsAsync(true);
-    if (!perm.granted) return 'denied';
-    if (!card.current) return 'failed';
-    const uri = await captureRef(card, { format: 'png', quality: 1, result: 'tmpfile' });
-    await MediaLibrary.saveToLibraryAsync(uri);
-    return 'saved';
-  } catch {
-    return 'failed';
-  }
+    requestAddPermission: async () => (await requestPermissionsAsync(true)).granted,
+    capture: async (fallback) => {
+      if (!card.current) throw new Error('The share card is not on screen yet.');
+      return captureRef(card, { format: 'png', quality: 1, result: 'tmpfile', useRenderInContext: fallback });
+    },
+    addToLibrary: async (uri) => {
+      await Asset.create(uri);
+    },
+    report: (step, error) => {
+      if (__DEV__) console.warn(`Save image failed at ${step}`, error);
+    },
+  });
 }

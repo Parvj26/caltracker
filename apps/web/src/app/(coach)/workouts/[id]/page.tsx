@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
 import { getWorkoutDoc } from '@/lib/page-data';
+import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteWorkout } from './delete-workout';
 import styles from '../workouts.module.css';
@@ -26,6 +27,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
       <header className={styles.titleRow}>
         <h1 className={styles.title}>{loaded.doc.name}</h1>
         <div className={styles.titleActions}>
+          <AssignButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
           <DuplicateButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
           <DeleteWorkout id={loaded.doc.id} name={loaded.doc.name} />
         </div>

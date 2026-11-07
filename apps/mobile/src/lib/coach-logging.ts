@@ -11,11 +11,16 @@
 //     minute while the Realtime channel is not connected.
 // When the server and the phone disagree (needsServerCopy) the phone takes the server's copy (refreshFromServer),
 // so a workout the coach took over, handed back or finished never stays stuck open on the phone.
+// While the coach holds it, every coach save (a set ticked, a number typed) changes the row too: the phone then pulls
+// the coach's copy (pullCoachCopy, coach-watch.ts) and the read-only pages follow along live. A pull that fails
+// (offline) is retried with backoff and on each minute tick; when Realtime (re)connects the phone checks and pulls
+// at once, so a dropped connection catches up. Meanwhile `live` is false and the bar says "Reconnecting…".
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import type { LogStatus } from '@caltracker/shared';
 import { needsServerCopy, parseLoggerState, type LoggerState } from './active-log-logic';
+import { retryDelayMs, rowChangeAction, shouldPullCoachCopy } from './coach-watch';
 import { supabase } from './supabase';
 import { useActiveLog } from './use-active-log';
 
@@ -46,6 +51,11 @@ export type CoachLogging = {
   lastActivityAt: string | null;
   reclaim: () => Promise<boolean>;
   reclaiming: boolean;
+  /**
+   * The coach's copy shown is current: Realtime is connected (or still connecting) and the last pull worked. False
+   * while catching up after the connection dropped or a pull failed.
+   */
+  live: boolean;
 };
 
 /**
@@ -60,47 +70,102 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
   const local = active.log && active.log.id === logId ? { status: active.log.status, heldByOther: active.heldByOther } : null;
   const localRef = useRef(local);
   localRef.current = local;
-  const { refreshFromServer } = active;
+  const { refreshFromServer, pullCoachCopy } = active;
+  const [realtime, setRealtime] = useState<'connecting' | 'up' | 'down'>('connecting');
+  const [pullFailed, setPullFailed] = useState(false);
+  const failures = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The retry runs the latest check (check and pull refer to each other).
+  const checkRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
-  const check = useCallback(async () => {
-    if (!logId) return;
-    const s = await fetchLoggerState(logId).catch(() => null);
-    setServer((prev) =>
-      prev && s && prev.status === s.status && prev.heldByOther === s.heldByOther && prev.canReclaim === s.canReclaim ? prev : s,
-    );
-    if (needsServerCopy(s, localRef.current)) await refreshFromServer().catch(() => undefined);
-  }, [logId, refreshFromServer]);
+  const clearRetry = () => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+  };
+  /** Pulls the coach's copy; on failure tries again later (backoff), through a check in case it changed hands. */
+  const pull = useCallback(async () => {
+    const ok = await pullCoachCopy();
+    clearRetry();
+    if (ok) {
+      failures.current = 0;
+      setPullFailed(false);
+      return;
+    }
+    failures.current += 1;
+    setPullFailed(true);
+    retryTimer.current = setTimeout(() => void checkRef.current(), retryDelayMs(failures.current));
+  }, [pullCoachCopy]);
+
+  const check = useCallback(
+    async (opts: { pull: boolean } = { pull: true }) => {
+      if (!logId) return;
+      const s = await fetchLoggerState(logId).catch(() => null);
+      setServer((prev) =>
+        prev && s && prev.status === s.status && prev.heldByOther === s.heldByOther && prev.canReclaim === s.canReclaim ? prev : s,
+      );
+      const wantsPull = shouldPullCoachCopy(s, localRef.current);
+      if (s && !wantsPull) {
+        // Not held any more (hand back, reclaim, finish): nothing left to catch up on.
+        clearRetry();
+        failures.current = 0;
+        setPullFailed(false);
+      }
+      if (needsServerCopy(s, localRef.current)) await refreshFromServer().catch(() => undefined);
+      else if (opts.pull && wantsPull) await pull();
+    },
+    [logId, refreshFromServer, pull],
+  );
+  checkRef.current = () => check();
+  const stale = useRef(false);
+  stale.current = pullFailed;
 
   useEffect(() => {
     void check();
     if (!watch || !logId) return;
     let live = false;
     let me: string | null = null;
+    setRealtime('connecting');
     void supabase.auth.getSession().then(({ data }) => {
       me = data.session?.user.id ?? null;
     });
-    // Every save of the log updates its row; only a change of who logs it, or of its status, needs a check.
+    // Every save of the log updates its row; only a change of who logs it, or of its status, needs a check. While
+    // the coach holds it, a coach save is pulled at once, and the check then doesn't pull again (rowChangeAction).
     const channel = supabase
       .channel(`coach-logging-${logId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workout_logs', filter: `id=eq.${logId}` }, (payload) => {
         const row = payload.new as { logged_by?: string | null; status?: string };
-        if (row.logged_by !== me || row.status !== 'in_progress' || localRef.current?.heldByOther) void check();
+        const act = rowChangeAction(row, me, localRef.current?.heldByOther ?? false);
+        if (act.pull) void pull();
+        if (act.check) void check({ pull: !act.pull });
       })
       .subscribe((status) => {
+        const was = live;
         live = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
+        if (live) {
+          setRealtime('up');
+          // Connected, or back after a drop: catch up on anything missed meanwhile.
+          if (!was) void check();
+        } else if (
+          status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR ||
+          status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT ||
+          status === REALTIME_SUBSCRIBE_STATES.CLOSED
+        ) {
+          setRealtime('down');
+        }
       });
     const timer = setInterval(() => {
-      if (!live) void check();
+      if (!live || stale.current) void check();
     }, CHECK_EVERY_MS);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void check();
     });
     return () => {
       clearInterval(timer);
+      clearRetry();
       sub.remove();
       void supabase.removeChannel(channel);
     };
-  }, [check, watch, logId]);
+  }, [check, watch, logId, pull]);
 
   const reclaim = useCallback(async () => {
     if (!logId) return false;
@@ -123,5 +188,6 @@ export function useCoachLogging(logId: string | undefined, watch = true): CoachL
     lastActivityAt: server?.lastActivityAt ?? null,
     reclaim,
     reclaiming,
+    live: realtime !== 'down' && !pullFailed,
   };
 }

@@ -29,6 +29,8 @@ import {
   markAllPlan,
   markAllQuestion,
   readTyped,
+  invalidAnnouncement,
+  sheetDraft,
   pageDots,
   pickingFirst,
   placeAfterChange,
@@ -520,13 +522,61 @@ describe('markAllPlan', () => {
     const ex = log.blocks[0].exercises[0];
     log = updateActual(log, ex.sets[0].id, { actualReps: 10 });
     // 10 typed on set 1; sets 2 and 3 take the client's own reps from the set before.
-    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0 });
+    expect(markAllPlan(log, [ex.id], {})).toEqual({ tick: 3, skip: 0, noWeight: 0 });
     const blank = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
     const bex = blank.blocks[0].exercises[0];
-    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3 });
+    expect(markAllPlan(blank, [bex.id], {})).toEqual({ tick: 0, skip: 3, noWeight: 0 });
     expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
-    expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
-    expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+    expect(markAllQuestion({ tick: 4, skip: 0, noWeight: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 0 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+  });
+
+  it('still ticks weight and reps sets with reps but no weight (bodyweight), and says how many have no weight', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Pull-up', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    // Reps typed on set 1 only; no weight, no coach target, no last time.
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8 });
+    const plan = markAllPlan(log, [ex.id], {});
+    expect(plan).toEqual({ tick: 3, skip: 0, noWeight: 3 });
+    const ticked = markAll(log, [ex.id], {}, NOW).blocks[0].exercises[0].sets;
+    expect(ticked.every((x) => x.completedAt !== null && x.actualWeightKg === null && x.actualReps === 8)).toBe(true);
+    expect(markAllQuestion(plan)).toEqual({ title: 'Tick 3 sets with these numbers?', message: '3 sets have no weight.' });
+    expect(markAllQuestion({ tick: 1, skip: 0, noWeight: 1 }).message).toBe('1 set has no weight.');
+    expect(markAllQuestion({ tick: 2, skip: 1, noWeight: 1 }).message).toBe(
+      '1 set has no weight. 1 set has no numbers yet, so it stays unticked.',
+    );
+  });
+
+  it('counts no weight only for weight and reps exercises', () => {
+    let log = addLogExercise(emptyLog('Quick', uuid, NOW), { id: uuid(), name: 'Row', trackingType: 'weight_reps' }, uuid, NOW);
+    const ex = log.blocks[0].exercises[0];
+    log = updateActual(log, ex.sets[0].id, { actualReps: 8, actualWeightKg: 40 });
+    expect(markAllPlan(log, [ex.id], {}).noWeight).toBe(0);
+  });
+});
+
+describe('invalidAnnouncement', () => {
+  it('speaks a box\'s reason once, when it becomes invalid or the reason changes', () => {
+    expect(invalidAnnouncement(null, 'Whole reps only')).toBe('Whole reps only');
+    expect(invalidAnnouncement('Whole reps only', 'Whole reps only')).toBeNull(); // still invalid: said already
+    expect(invalidAnnouncement('Whole reps only', 'That’s more than a set can hold')).toBe('That’s more than a set can hold');
+    expect(invalidAnnouncement('Whole reps only', null)).toBeNull(); // valid again: nothing to say
+  });
+});
+
+describe('sheetDraft', () => {
+  const saved = { feel: 'Good' as const, note: 'Saved note' };
+  it('starts from the saved feeling and note when the sheet opens', () => {
+    expect(sheetDraft({ wasVisible: false, visible: true, draft: { feel: null, note: 'old' }, saved })).toEqual(saved);
+  });
+  it('keeps what the client is typing when the saved note changes underneath', () => {
+    const typing = { feel: null, note: 'Half a sent' };
+    expect(sheetDraft({ wasVisible: true, visible: true, draft: typing, saved: { feel: 'Hard', note: 'From elsewhere' } })).toBe(typing);
+  });
+  it('leaves a closed sheet alone', () => {
+    const draft = { feel: null, note: '' };
+    expect(sheetDraft({ wasVisible: true, visible: false, draft, saved })).toBe(draft);
+    expect(sheetDraft({ wasVisible: false, visible: false, draft, saved })).toBe(draft);
   });
 });
 
