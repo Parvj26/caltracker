@@ -145,6 +145,14 @@ describe('planLiveSync', () => {
     expect(p).toEqual({ add: [], remove: [], replace: [], skipped: 0 });
   });
 
+  it('does not add a workout on a day the client already worked out', () => {
+    const p = plan({
+      slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],
+      busyDays: new Set(['2026-11-11']),
+    });
+    expect(p.add).toEqual([]);
+  });
+
   it('does not add back a program day the coach deleted', () => {
     const p = plan({
       slots: [{ week: 2, day: 1, position: 0, workoutId: 'A' }],

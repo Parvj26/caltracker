@@ -53,7 +53,8 @@ export type LiveSyncPlan = {
  * Wanted (day, workout) pairs come from the slots inside the program's length and the window; copies are paired with
  * them by (program day, workout, n-th), protected copies (logged or customised) first. Then:
  * - an unpaired wanted pair is added (from today on), unless the coach deleted that day's copy (`tombstones`) or the
- *   day has a started or done copy the program no longer has;
+ *   day is one the client already worked out (`busyDays`: a started or done copy or log dated that day) or has a
+ *   started or done copy the program no longer has;
  * - an unpaired untouched copy is removed, and a paired untouched copy whose library content changed is refreshed,
  *   only when both its days are after today;
  * - protected copies are never changed; customised ones that differ (after today) are counted as skipped.
@@ -67,6 +68,8 @@ export function planLiveSync(input: {
   copies: readonly LiveSyncCopy[];
   /** "day|workoutId" of program days the coach deleted from this client's calendar. */
   tombstones?: ReadonlySet<string>;
+  /** Days the client already worked out: a started or done copy on that day, or a started or done log dated then. */
+  busyDays?: ReadonlySet<IsoDate>;
   today: IsoDate;
 }): LiveSyncPlan {
   const plan: LiveSyncPlan = { add: [], remove: [], replace: [], skipped: 0 };
@@ -109,7 +112,10 @@ export function planLiveSync(input: {
       changeOrSkip(c, plan.remove);
     }
   }
-  plan.add = toAdd.filter((a) => !daysWithDroppedLog.has(a.date) && !input.tombstones?.has(key(a.date, a.workoutId)));
+  plan.add = toAdd.filter(
+    (a) =>
+      !daysWithDroppedLog.has(a.date) && !input.busyDays?.has(a.date) && !input.tombstones?.has(key(a.date, a.workoutId)),
+  );
   return plan;
 }
 

@@ -40,10 +40,7 @@ alter table public.workouts
   add column source_hash text,
   add column customised_at timestamptz;
 
--- Existing program copies: their day is the best record of the program day they were made for.
-alter table public.workouts disable trigger workouts_touch_updated_at;
-update public.workouts w set planned_on = w.scheduled_on where w.assignment_id is not null;
-alter table public.workouts enable trigger workouts_touch_updated_at;
+-- Existing program copies are filled in by live_sync_backfill_copies() at the end of this migration.
 
 -- 2. Helpers -------------------------------------------------------------------------------------------------------
 
@@ -56,21 +53,45 @@ $$;
 revoke execute on function public.is_system_write() from public, anon;
 grant execute on function public.is_system_write() to authenticated;
 
--- The client's today, in their own time zone (profiles.time_zone). A zone the database doesn't know counts as UTC.
-create function public.client_today(p_client uuid) returns date
+-- The time zone Live Sync uses for a client: their own (profiles.time_zone) when set, else the workspace's coach's
+-- (owner first). 'UTC' is the column's default, so it counts as not set. Null when neither is set or known.
+create function public.client_zone(p_client uuid, p_workspace uuid) returns text
 language plpgsql stable security definer set search_path = '' as $$
 declare
   v_zone text;
 begin
-  select p.time_zone into v_zone from public.profiles p where p.id = p_client;
-  begin
-    return (now() at time zone coalesce(v_zone, 'UTC'))::date;
-  exception when others then
-    return (now() at time zone 'UTC')::date;
-  end;
+  for v_zone in
+    select z.zone
+    from (
+      select p.time_zone as zone, 0 as rank from public.profiles p where p.id = p_client
+      union all
+      select p.time_zone, case when m.role = 'owner' then 1 else 2 end
+      from public.workspace_members m join public.profiles p on p.id = m.user_id
+      where m.workspace_id = p_workspace and m.role in ('owner', 'staff')
+    ) z
+    where z.zone is not null and z.zone <> 'UTC'
+    order by z.rank
+  loop
+    begin
+      perform now() at time zone v_zone; -- an unknown zone raises; try the next one
+      return v_zone;
+    exception when others then
+      null;
+    end;
+  end loop;
+  return null;
 end;
 $$;
-revoke execute on function public.client_today(uuid) from public, anon, authenticated;
+revoke execute on function public.client_zone(uuid, uuid) from public, anon, authenticated;
+
+-- The client's today in that zone. With no zone known, the day after UTC's today: that is the latest date that can
+-- be today anywhere, so Live Sync never changes a day that might be the client's today.
+create function public.client_today(p_client uuid, p_workspace uuid) returns date
+language sql stable security definer set search_path = '' as $$
+  select coalesce((now() at time zone public.client_zone(p_client, p_workspace))::date,
+    (now() at time zone 'UTC')::date + 1);
+$$;
+revoke execute on function public.client_today(uuid, uuid) from public, anon, authenticated;
 
 -- A fingerprint of everything a client sees of a workout: name, notes and the ordered blocks, exercises, sets and
 -- substitutes (no ids or timestamps). Equal hashes mean equal content, so a save that changes nothing changes
@@ -99,7 +120,7 @@ revoke execute on function public.workout_content_hash(uuid) from public, anon, 
 
 -- 3. Customised copies ---------------------------------------------------------------------------------------------
 
--- A client copy's tracking columns: planned_on never changes; source_hash changes only in system writes; a hand edit
+-- A client copy's tracking columns: planned_on and source_hash change only in system writes; a hand edit
 -- of name, notes or day marks it customised (an update that only changes links, such as source_workout_id set null
 -- when the library workout is deleted, does not). The child-table trigger below sets customised_at directly.
 create function public.mark_workout_changed() returns trigger
@@ -108,11 +129,10 @@ begin
   if new.client_id is null then
     return new;
   end if;
-  new.planned_on := old.planned_on;
   if public.is_system_write() then
-    new.customised_at := old.customised_at;
-    return new;
+    return new; -- copy_workout, the sync and the backfill set these columns themselves
   end if;
+  new.planned_on := old.planned_on;
   new.source_hash := old.source_hash;
   if (new.name, new.notes, new.scheduled_on) is distinct from (old.name, old.notes, old.scheduled_on) then
     new.customised_at := now();
@@ -328,7 +348,9 @@ begin
   perform set_config('caltracker.system_write', 'on', true);
 
   for v_assignment in
-    select a.id, a.client_id, a.start_date, a.end_date, a.cancelled_on, public.client_today(a.client_id) as today
+    select a.id, a.client_id, a.start_date, a.end_date, a.cancelled_on,
+      public.client_today(a.client_id, a.workspace_id) as today,
+      coalesce(public.client_zone(a.client_id, a.workspace_id), 'UTC') as zone
     from public.program_assignments a
     where a.program_id = p_program_id
       and a.workspace_id = v_program.workspace_id
@@ -390,7 +412,17 @@ begin
           on x.on_date = r.on_date and x.source = r.source and x.n = r.n
       )
       select j.*,
-        bool_or(coalesce(j.logged, false) and j.want_source is null) over (partition by j.day) as day_has_dropped_log,
+        -- A day the client has already worked out: a started or done copy the program no longer has (by its program
+        -- day), any started or done copy of this assignment on that day, or any started or done log of the client
+        -- (planned or not) dated that day in their zone.
+        bool_or(coalesce(j.logged, false) and j.want_source is null) over (partition by j.day)
+          or exists (
+            select 1 from public.workout_logs l
+            left join public.workouts c on c.id = l.workout_id
+            where l.client_id = v_assignment.client_id and l.status in ('in_progress', 'completed')
+              and ((c.assignment_id = v_assignment.id and c.scheduled_on = j.day)
+                or (coalesce(l.finished_at, l.started_at) at time zone v_assignment.zone)::date = j.day)
+          ) as day_has_dropped_log,
         exists (
           select 1 from public.live_sync_tombstones t
           where t.assignment_id = v_assignment.id and t.planned_on = j.day and t.source_workout_id = j.want_source
@@ -399,7 +431,7 @@ begin
       order by j.day, j.copy_id
     loop
       if v_row.copy_id is null then
-        -- A program day to fill: not when the coach deleted it, or the client already did that day's old workout.
+        -- A program day to fill: not when the coach deleted it, or the client already worked out that day.
         if not v_row.tombstoned and not v_row.day_has_dropped_log then
           perform public.copy_workout(v_row.want_source, v_assignment.client_id, v_row.day, v_assignment.id, null);
         end if;
@@ -442,8 +474,12 @@ revoke execute on function public.live_sync_program(uuid) from public, anon, aut
 
 -- Programs waiting to sync at the end of the current transaction. A row lives only inside one transaction: it is
 -- removed when its program syncs, before commit, so nobody ever sees one. Nobody signed in can read or write it.
+-- Keyed by transaction too, so two transactions queueing the same programs never wait on each other here (no
+-- deadlock between their queue inserts); they meet only in the sync, which locks in program, then assignment, order.
 create table public.program_live_sync_queue (
-  program_id uuid primary key
+  xact xid8 not null default pg_catalog.pg_current_xact_id(),
+  program_id uuid not null,
+  primary key (xact, program_id)
 );
 revoke all on table public.program_live_sync_queue from public, anon, authenticated, service_role;
 alter table public.program_live_sync_queue enable row level security;
@@ -453,21 +489,24 @@ create function public.queue_live_sync(p_program_id uuid) returns void
 language sql security definer set search_path = '' as $$
   insert into public.program_live_sync_queue (program_id)
   select p.id from public.programs p where p.id = p_program_id and p.live_sync
-  on conflict (program_id) do nothing;
+  on conflict (xact, program_id) do nothing;
 $$;
 revoke execute on function public.queue_live_sync(uuid) from public, anon, authenticated;
 
--- The first firing at commit syncs everything queued, in program id order (a steady lock order between
--- transactions); later firings find their row already gone.
+-- The first firing at commit syncs everything this transaction queued, in program id order (a steady lock order
+-- between transactions); later firings find nothing left.
 create function public.run_queued_live_sync() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
   v_program uuid;
 begin
   for v_program in
-    select q.program_id from public.program_live_sync_queue q order by q.program_id for update
+    select q.program_id from public.program_live_sync_queue q
+    where q.xact = pg_catalog.pg_current_xact_id()
+    order by q.program_id
   loop
-    delete from public.program_live_sync_queue q where q.program_id = v_program;
+    delete from public.program_live_sync_queue q
+    where q.xact = pg_catalog.pg_current_xact_id() and q.program_id = v_program;
     perform public.live_sync_program(v_program);
   end loop;
   return null;
@@ -516,7 +555,7 @@ create function public.live_sync_on_library_change() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   perform public.queue_live_sync(x.program_id)
-  from (select distinct pw.program_id from public.program_workouts pw where pw.workout_id = new.id) x;
+  from (select distinct pw.program_id from public.program_workouts pw where pw.workout_id = new.id order by 1) x;
   return null;
 end;
 $$;
@@ -527,3 +566,63 @@ revoke execute on function public.live_sync_on_library_change() from public, ano
 create trigger workouts_live_sync after update on public.workouts
   for each row when (new.client_id is null)
   execute function public.live_sync_on_library_change();
+
+-- 8. Copies made before Live Sync ----------------------------------------------------------------------------------
+
+-- Fill planned_on and source_hash on program copies that predate Live Sync (planned_on is null). Their history isn't
+-- known, so a copy counts as untouched only when both
+--   (a) its content equals its library workout's content now (then source_hash is that), and
+--   (b) its day is a slot day of its library workout in the assigned program;
+-- otherwise it is marked customised, and Live Sync leaves it alone. planned_on is its current day when that is a slot
+-- day; for a copy moved off its slot day it is the nearest slot day of its workout that has no copy of it (the day it
+-- most likely left), so the program day isn't filled twice.
+-- Internal; run once below (and by tests).
+create function public.live_sync_backfill_copies() returns integer
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_prev text := coalesce(current_setting('caltracker.system_write', true), '');
+  v_count integer;
+begin
+  perform set_config('caltracker.system_write', 'on', true);
+  with old as (
+    select c.id, c.scheduled_on,
+      case when c.source_workout_id is not null then public.workout_content_hash(c.source_workout_id) end as lib_hash,
+      public.workout_content_hash(c.id) as own_hash,
+      exists (
+        select 1 from public.program_assignments a
+        join public.program_workouts pw on pw.program_id = a.program_id and pw.workout_id = c.source_workout_id
+        where a.id = c.assignment_id
+          and a.start_date + ((pw.week - 1) * 7 + (pw.day - 1)) = c.scheduled_on
+      ) as on_slot_day
+    from public.workouts c
+    where c.assignment_id is not null and c.client_id is not null and c.planned_on is null
+  )
+  update public.workouts w
+  set planned_on = case when o.on_slot_day then o.scheduled_on else coalesce((
+      select x.day from (
+        select a.start_date + ((pw.week - 1) * 7 + (pw.day - 1)) as day
+        from public.program_assignments a
+        join public.program_workouts pw on pw.program_id = a.program_id and pw.workout_id = w.source_workout_id
+        where a.id = w.assignment_id and pw.week <= a.weeks
+      ) x
+      where not exists (
+        select 1 from public.workouts o2
+        where o2.assignment_id = w.assignment_id and o2.source_workout_id = w.source_workout_id and o2.scheduled_on = x.day
+      )
+      order by abs(x.day - o.scheduled_on), x.day
+      limit 1), o.scheduled_on) end,
+    source_hash = case when o.own_hash = o.lib_hash and o.on_slot_day then o.lib_hash end,
+    customised_at = case when o.own_hash = o.lib_hash and o.on_slot_day then w.customised_at
+      else coalesce(w.customised_at, now()) end
+  from old o
+  where w.id = o.id;
+  get diagnostics v_count = row_count;
+  perform set_config('caltracker.system_write', v_prev, true);
+  return v_count;
+end;
+$$;
+revoke execute on function public.live_sync_backfill_copies() from public, anon, authenticated;
+
+alter table public.workouts disable trigger workouts_touch_updated_at;
+select public.live_sync_backfill_copies();
+alter table public.workouts enable trigger workouts_touch_updated_at;

@@ -1,5 +1,5 @@
 begin;
-select plan(78);
+select plan(92);
 
 -- Live Sync runs at commit (a deferred trigger). A test never commits, so tests.flush() fires the queued syncs the
 -- way a commit would: switching the trigger to immediate runs everything queued so far.
@@ -11,7 +11,8 @@ end;
 $$;
 grant execute on function tests.flush() to authenticated, anon;
 
--- Fixtures (as postgres). Clients' time zone is UTC (the default), so their today is UTC's.
+-- Fixtures (as postgres). Clients' time zone is set to Etc/UTC, so their today is UTC's ('UTC' itself is the
+-- column default, which counts as not set).
 select (now() at time zone 'UTC')::date as today \gset
 select tests.create_user('ls-coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('ls-a1@t.local', 'Client A1') as a1 \gset
@@ -23,12 +24,16 @@ select tests.create_workspace('LS Workspace B', :'coach_b') as ws_b \gset
 select tests.add_client(:'ws_a', :'a1');
 select tests.add_client(:'ws_a', :'a2');
 select tests.add_client(:'ws_b', :'b1');
+select tests.create_user('ls-a3@t.local', 'Client A3') as a3 \gset
+select tests.add_client(:'ws_a', :'a3');
+update public.profiles set time_zone = 'Etc/UTC' where id in (:'a1', :'a2', :'b1');
 
 select tests.create_workout(:'ws_a', 'Lib One') as lib1 \gset
 select tests.create_workout(:'ws_a', 'Lib Two') as lib2 \gset
 select tests.create_workout(:'ws_a', 'Lib Three') as lib3 \gset
 select tests.create_workout(:'ws_a', 'Lib Four') as lib4 \gset
 select tests.create_workout(:'ws_b', 'Lib B') as lib_b \gset
+select tests.create_workout(:'ws_a', 'Lib Five') as lib5 \gset
 
 select gen_random_uuid() as prog \gset
 select gen_random_uuid() as prog_b \gset
@@ -357,6 +362,75 @@ select is((select count(*)::int from public.workouts where client_id = :'a1'), :
   'nothing coach B did changed A1''s calendar');
 select ok((select live_sync from public.programs where id = :'prog'), 'A''s program is still live');
 select is((select count(*)::int from public.live_sync_tombstones where assignment_id = :'asg1'), 1, 'A''s tombstone is intact');
+
+-- A day the client already worked out gets no new workout: a done copy moved onto that day, or an unplanned log.
+select tests.create_log(:'ws_a', :'a1', :'moved_copy', 'completed');
+select tests.create_log(:'ws_a', :'a1', null, 'completed') as adhoc_log \gset
+update public.workout_logs set started_at = (:'today'::date + 9) + time '11:00', finished_at = (:'today'::date + 9) + time '12:00'
+  where id = :'adhoc_log';
+select tests.act_as(:'coach_a');
+insert into public.program_workouts (id, program_id, week, day, position, workout_id) values
+  (gen_random_uuid(), :'prog', 1, 6, 1, :'lib2'),
+  (gen_random_uuid(), :'prog', 2, 5, 1, :'lib2');
+select tests.flush();
+reset role;
+select is((select count(*)::int from a1_days where d = 3 and name = 'Lib Two'), 0,
+  'no new workout on a day a done copy was moved to');
+select is((select count(*)::int from a1_days where d = 9), 0, 'no new workout on a day with an unplanned log');
+
+-- Copies made before Live Sync (planned_on null): untouched only if identical to the library and on a slot day.
+select gen_random_uuid() as prog5 \gset
+select gen_random_uuid() as asg5 \gset
+select tests.act_as(:'coach_a');
+insert into public.programs (id, workspace_id, name, weeks, live_sync) values (:'prog5', :'ws_a', 'Old one', 1, false);
+insert into public.program_workouts (id, program_id, week, day, position, workout_id) values
+  (gen_random_uuid(), :'prog5', 1, 3, 0, :'lib5'),
+  (gen_random_uuid(), :'prog5', 1, 4, 0, :'lib5'),
+  (gen_random_uuid(), :'prog5', 1, 5, 0, :'lib5');
+select public.assign_program(:'asg5', :'prog5', :'a1', :'today'::date);
+select tests.flush();
+reset role;
+select (select id from public.workouts where assignment_id = :'asg5' and scheduled_on = :'today'::date + 2) as old_same \gset
+select (select id from public.workouts where assignment_id = :'asg5' and scheduled_on = :'today'::date + 3) as old_edited \gset
+select (select id from public.workouts where assignment_id = :'asg5' and scheduled_on = :'today'::date + 4) as old_moved \gset
+-- Make them look like pre-Live Sync copies: edited and moved without any record of it.
+select set_config('caltracker.system_write', 'on', true);
+update public.workouts set planned_on = null, source_hash = null, customised_at = null where assignment_id = :'asg5';
+update public.workout_sets set target_reps_min = 3, target_reps_max = 3 where workout_id = :'old_edited';
+update public.workouts set scheduled_on = :'today'::date + 6 where id = :'old_moved';
+select set_config('caltracker.system_write', '', true);
+select is(public.live_sync_backfill_copies(), 3, 'the backfill fills in the old copies');
+select ok((select customised_at is null and source_hash = public.workout_content_hash(:'lib5') and planned_on = scheduled_on
+  from public.workouts where id = :'old_same'), 'an identical old copy on its slot day counts as untouched');
+select isnt((select customised_at from public.workouts where id = :'old_edited'), null, 'an edited old copy counts as customised');
+select ok((select customised_at is not null and planned_on = :'today'::date + 4 from public.workouts where id = :'old_moved'),
+  'a moved old copy counts as customised and stands for the slot day it left');
+select tests.act_as(:'coach_a');
+update public.programs set live_sync = true where id = :'prog5';
+update public.workouts set notes = 'Lib five v2' where id = :'lib5';
+select tests.flush();
+reset role;
+select is((select notes from public.workouts where id = :'old_same'), 'Lib five v2', 'the identical old copy is refreshed normally');
+select is((select count(*)::int from public.workouts where id in (:'old_edited', :'old_moved') and notes is null), 2,
+  'the edited and moved old copies survive turning Live Sync on');
+select is((select count(*)::int from public.workouts where assignment_id = :'asg5'), 3, 'no slot day is filled twice');
+
+-- The queue is per transaction, so two transactions never wait on each other's queue rows.
+select col_is_pk('public', 'program_live_sync_queue', array['xact', 'program_id'], 'the queue is keyed by transaction');
+
+-- Today without a known zone: the coach's zone, else the day after UTC's today.
+select is(public.client_today(:'a3', :'ws_a'), (now() at time zone 'UTC')::date + 1,
+  'no client or coach zone: today is the day after UTC''s');
+update public.profiles set time_zone = 'Pacific/Kiritimati' where id = :'coach_a';
+select is(public.client_today(:'a3', :'ws_a'), (now() at time zone 'Pacific/Kiritimati')::date,
+  'no client zone: the coach''s zone decides');
+update public.profiles set time_zone = 'America/Los_Angeles' where id = :'a3';
+select is(public.client_today(:'a3', :'ws_a'), (now() at time zone 'America/Los_Angeles')::date,
+  'the client''s own zone comes first');
+update public.profiles set time_zone = 'Not/AZone' where id = :'a3';
+select is(public.client_today(:'a3', :'ws_a'), (now() at time zone 'Pacific/Kiritimati')::date,
+  'an unknown client zone falls back to the coach''s');
+update public.profiles set time_zone = 'UTC' where id in (:'coach_a', :'a3');
 
 -- A client can't trigger a sync or touch tombstones.
 select count(*) as a1_before from public.workouts where client_id = :'a1' \gset
