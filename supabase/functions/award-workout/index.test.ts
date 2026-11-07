@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { weekKey, type AwardResult, type Rng } from '@caltracker/shared';
+import { STICKERS, pickLadderAnimal, weekKey, type AwardResult, type Rng } from '@caltracker/shared';
 import { createHandler } from './index.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL') ?? 'http://127.0.0.1:54321';
@@ -108,6 +108,7 @@ async function makeLog(
 }
 
 const five = (w: number, r = 10) => Array.from({ length: 5 }, () => ({ w, r }));
+const weightOf = (key: string | undefined) => STICKERS.find((s) => s.key === key)?.weightKg ?? NaN;
 
 function call(handler: ReturnType<typeof createHandler>, body: unknown, headers: Record<string, string> = {}) {
   return handler(
@@ -205,11 +206,13 @@ t('an in-progress log gets 409; a bad body 400; an unknown log 404', async () =>
 t('the same log twice gives one award and an identical response', async () => {
   const { ws, exerciseId } = await makeWorkspace();
   const client = await addClient(ws);
-  const { logId } = await makeLog(ws, client.id, exerciseId, five(60)); // 3,000 kg: a rhino
+  const { logId } = await makeLog(ws, client.id, exerciseId, five(60)); // 3,000 kg: rabbit up to rhino
   const first = await call(handlerWith(() => 0.5), { logId }, asUser(client.token));
   assertEquals(first.status, 200);
   const a = (await first.json()) as AwardResult;
-  assertEquals(a.ladder, { key: 'rhino', multiple: 3000 / 2300, isNew: true, count: 1, shiny: false });
+  // A new client: the animal is the seeded pick for this log id, the same one the phone previews.
+  const pick = pickLadderAnimal(3000, [], logId)!;
+  assertEquals(a.ladder, { key: pick.sticker.key, multiple: pick.multiple, isNew: true, count: 1, shiny: false });
   assertEquals(a.milestone, 1);
   assertEquals(a.landmarks, ['chichen-itza']);
   assertEquals(a.prs, [], 'the first log of an exercise is a baseline');
@@ -224,7 +227,10 @@ t('the same log twice gives one award and an identical response', async () => {
   assertEquals(rows[0]!.client_id, client.id);
   assertEquals(rows[0]!.workspace_id, ws);
   const owned = await stickers(client.id);
-  assertEquals(owned.map((s) => [s.sticker_key, s.count]), [['chichen-itza', 1], ['rhino', 1]]);
+  assertEquals(
+    owned.map((s) => [s.sticker_key, s.count]),
+    [['chichen-itza', 1], [pick.sticker.key, 1]].sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
+  );
   const { data: stats } = await admin.from('client_stats').select('workouts, streak, journey_week, streak_week').eq('client_id', client.id).single();
   const { data: log } = await admin.from('workout_logs').select('finished_at').eq('id', logId).single();
   // The streak's last week is the Monday of the workout's week (the profile's zone is UTC by default).
@@ -260,7 +266,7 @@ t('injected rolls are deterministic: 0 hits shiny and a drop, 0.5 hits neither',
   assertEquals(b.ladder?.shiny, false);
   assertEquals(b.drop, null);
   const owned = await stickers(lucky.id);
-  assertEquals(owned.find((s) => s.sticker_key === 'rhino')?.shiny, true);
+  assertEquals(owned.find((s) => s.sticker_key === a.ladder?.key)?.shiny, true);
   assert(owned.some((s) => s.sticker_key === 'pink-river-dolphin'));
 });
 
@@ -279,6 +285,10 @@ t('a recompute after a coach correction lowers the PR and leaves the stickers al
     reps: 5,
     log_id: big.logId,
   });
+  // Pin the stored animal to a cat (4 kg), which the corrected volume still reaches.
+  const stored = { ...before, ladder: { ...before.ladder!, key: 'cat', multiple: 3000 / 4 } };
+  const { error: pinError } = await admin.from('awards').update({ result: stored }).eq('log_id', big.logId);
+  if (pinError) throw pinError;
   const stickersBefore = await stickers(client.id);
   const { data: statsBefore } = await admin.from('client_stats').select('pr_count, lifetime_volume_kg').eq('client_id', client.id).single();
   assertEquals(statsBefore, { pr_count: 2, lifetime_volume_kg: 5500 });
@@ -294,7 +304,7 @@ t('a recompute after a coach correction lowers the PR and leaves the stickers al
   const after = (await res.json()) as AwardResult;
 
   assertEquals(after.prs, [], 'the corrected log no longer sets a best');
-  assertEquals(after.ladder, before.ladder, 'the sticker shown stays');
+  assertEquals(after.ladder, { ...stored.ladder, multiple: 1750 / 4 }, 'the animal shown stays, with the new multiple');
   assertEquals(after.drop, before.drop);
   assertEquals((await records(client.id)).find((r) => r.kind === 'heaviest'), {
     kind: 'heaviest',
@@ -387,8 +397,9 @@ t('two workouts of one client awarded at once: one retries, and the stickers add
     Object.fromEntries(expected),
     'sticker counts are the sum of both awards',
   );
-  assertEquals(owned.find((s) => s.sticker_key === 'rhino')?.count, 2);
-  assertEquals(awards.map((a) => a.ladder?.count).sort(), [1, 2], 'the retried award counts the first one');
+  // The retried award counts the first one: a second of the same animal is ×2.
+  const [k1, k2] = awards.map((a) => a.ladder?.key);
+  assertEquals(awards.map((a) => a.ladder?.count).sort(), k1 === k2 ? [1, 2] : [1, 1]);
 });
 
 t('a reopened and re-finished log is recomputed on the next call, and its stickers stay', async () => {
@@ -414,12 +425,56 @@ t('a reopened and re-finished log is recomputed on the next call, and its sticke
   assertEquals(res.status, 200);
   const after = (await res.json()) as AwardResult;
   assertEquals(after.prs.map((p) => p.kind).sort(), ['e1rm', 'heaviest']);
-  assertEquals({ ...after, prs: [] }, { ...first, prs: [] }, 'same stickers, same rolls');
+  // Same animal and rolls; only the multiple follows the new volume (2,600 kg).
+  assertEquals(
+    { ...after, prs: [] },
+    { ...first, prs: [], ladder: first.ladder && { ...first.ladder, multiple: 2600 / weightOf(first.ladder.key) } },
+    'same stickers, same rolls',
+  );
   assertEquals(await stickers(client.id), stickersBefore, 'sticker_awards unchanged');
   assertEquals((await awardRows(log.logId))[0]!.result, after);
   const { data: row } = await admin.from('awards').select('log_revision').eq('log_id', log.logId).single();
   assertEquals(row, { log_revision: 2 });
   assertEquals(await (await call(handler, { logId: log.logId }, asUser(client.token))).json(), after, 'then stable');
+});
+
+t('a correction below the stored animal swaps in a new pick by the same rule, and never rolls', async () => {
+  const { ws, coach, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  const first = await makeLog(ws, client.id, exerciseId, five(10, 1), { minutesAgo: 60 }); // 50 kg
+  const log = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 10 }); // 3,000 kg
+  const handler = handlerWith(() => 0.5);
+  const a1 = (await (await call(handler, { logId: first.logId }, asUser(client.token))).json()) as AwardResult;
+  const a2 = (await (await call(handler, { logId: log.logId }, asUser(client.token))).json()) as AwardResult;
+  assertEquals(a1.ladder?.key, pickLadderAnimal(50, [], first.logId)?.sticker.key);
+  assertEquals(a2.ladder?.key, pickLadderAnimal(3000, [a1.ladder!.key], log.logId)?.sticker.key, 'the history counts');
+
+  // Pin the stored animal to a rhino (2,300 kg) the corrected volume (500 kg) no longer reaches.
+  const pinned = { ...a2, ladder: { ...a2.ladder!, key: 'rhino', shiny: false } };
+  const { error: pinError } = await admin.from('awards').update({ result: pinned }).eq('log_id', log.logId);
+  if (pinError) throw pinError;
+  const totalBefore = (await stickers(client.id)).reduce((n, s) => n + s.count, 0);
+
+  const { error } = await coach.client.rpc('correct_workout_log', {
+    p_log_id: log.logId,
+    p_sets: log.setIds.map((id) => ({ id, actualWeightKg: 10 })),
+  });
+  if (error) throw error;
+  const res = await call(handlerWith(() => 0), { logId: log.logId, recompute: true }, asUser(coach.token));
+  assertEquals(res.status, 200);
+  const after = (await res.json()) as AwardResult;
+  const expected = pickLadderAnimal(500, [a1.ladder!.key], log.logId, 'rhino')!;
+  assertEquals(after.ladder?.key, expected.sticker.key);
+  assert(weightOf(after.ladder?.key) <= 500);
+  assertEquals(after.ladder?.multiple, expected.multiple);
+  assertEquals(after.ladder?.shiny, false, 'no roll on a correction');
+  assertEquals(after.drop, pinned.drop);
+  // The new animal is added; the rhino had no row here, so nothing else changes.
+  assertEquals((await stickers(client.id)).reduce((n, s) => n + s.count, 0), totalBefore + 1);
+  assertEquals((await awardRows(log.logId))[0]!.result, after);
+  // A second recompute keeps the new animal.
+  const again = (await (await call(handler, { logId: log.logId, recompute: true }, asUser(coach.token))).json()) as AwardResult;
+  assertEquals(again.ladder, after.ladder);
 });
 
 t('a client the coach removed gets 403 not_a_client and no award', async () => {

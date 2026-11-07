@@ -18,7 +18,8 @@ import {
 //   - the phone, with the client's JWT, after its completed log is saved: { logId }
 //   - the catch-up cron job (pg_net), with the x-award-secret header: { logId }
 //   - a coach correction (web, Task 7): { logId, recompute: true }. That rewrites the log's PRs, the client's
-//     bests and stats from the logs, and never touches stickers or rolls again.
+//     bests and stats from the logs, and never rolls again. The stored ladder animal stays while the corrected
+//     volume still reaches it; otherwise a new one is picked by the same rule (pickLadderAnimal) and swapped in.
 // A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
 // plain call. A recompute of a log with no award yet is a full award (the client was always due it).
 // A client the coach has removed gets nothing: 403 with hint 'not_a_client', as save_workout_log answers.
@@ -48,6 +49,8 @@ type Inputs = {
   history_version: string;
   owned: Owned[];
   owned_total: number;
+  /** The ladder animal of each of the client's awards in this workspace, with its log's finish time. */
+  ladder_awards: Array<{ log_id: string; finished_at: string; key: string }>;
   logs: LogTreeRow[];
 };
 type Applied = { status: 'existing' | 'awarded' | 'recomputed'; result: AwardResult } | { status: 'conflict' };
@@ -140,9 +143,18 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
         return json(inputs.award);
       }
 
-      const ctx = awardContext(inputs.logs.map(logRowToDoc), logId, safeTimeZone(inputs.time_zone), now().toISOString());
+      const ladderAwards = (inputs.ladder_awards ?? []).map((a) => ({ logId: a.log_id, finishedAt: a.finished_at, key: a.key }));
+      const ctx = awardContext(
+        inputs.logs.map(logRowToDoc),
+        logId,
+        safeTimeZone(inputs.time_zone),
+        now().toISOString(),
+        ladderAwards,
+      );
       const owned = new Map(inputs.owned.map((o) => [o.key, { count: o.count, shiny: o.shiny }]));
-      const award = computeAward({ ...ctx, owned, rng });
+      // An award already stored keeps its animal while the volume still reaches it (apply_award swaps it otherwise).
+      const keepLadder = inputs.award ? (inputs.award.ladder?.key ?? null) : null;
+      const award = computeAward({ ...ctx, owned, rng, keepLadder });
 
       const { data: applied, error: applyError } = await admin.rpc('apply_award', {
         p_log_id: logId,
