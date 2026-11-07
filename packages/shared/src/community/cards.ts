@@ -1,15 +1,14 @@
 import { STICKERS } from '../awards/catalogue';
 import { formatMultiple } from '../awards/ladder';
-import { formatLogVolume } from '../logs/format';
 import { formatWeight, type Units } from '../units/units';
-import type { CardPr, CommunityCard } from './schema';
+import type { CardPr, CardRequest, CommunityCard } from './schema';
 
 export type CardText = {
   /** The tier banner ("Rare find!", "Shiny!", "New PR!", "Workout done") */
   badge: string;
-  /** The big line ("Okapi", "3,175 lb ≈ 1.2 Giraffes", "Bench Press · 100 kg × 5") */
+  /** The big line ("Okapi", the workout's name, "Bench Press · 100 kg × 5") */
   title: string;
-  /** Smaller lines under it (the workout name, more PRs) */
+  /** Smaller lines under it ("4 exercises · 12 sets", "≈ 2 Giraffes", more PRs, the workout name) */
   lines: string[];
   /** The sticker to draw, if any */
   stickerKey: string | null;
@@ -52,10 +51,10 @@ export function cardText(card: CommunityCard, units: Units): CardText {
         shiny: card.shiny,
       };
     case 'workout': {
-      const lifted = formatLogVolume(card.volumeKg, units).replace(/ lifted$/, '');
-      const title =
-        card.stickerKey && card.multiple ? `${lifted} ${formatMultiple(card.multiple, stickerName(card.stickerKey))}` : `${lifted} lifted`;
-      return { badge: 'Workout done', title, lines: [card.workoutName], stickerKey: card.stickerKey, shiny: card.shiny };
+      const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+      const lines = [`${plural(card.exerciseCount, 'exercise')} · ${plural(card.setCount, 'set')}`];
+      if (card.stickerKey && card.multiple) lines.push(formatMultiple(card.multiple, stickerName(card.stickerKey)));
+      return { badge: 'Workout done', title: card.workoutName || 'Workout', lines, stickerKey: card.stickerKey, shiny: card.shiny };
     }
     case 'pr': {
       const [first, ...rest] = card.prs.map((p) => prLine(p, units));
@@ -67,5 +66,17 @@ export function cardText(card: CommunityCard, units: Units): CardText {
         shiny: false,
       };
     }
+  }
+}
+
+/** What the composer shows for a card before it is posted (the database builds the real card). */
+export function cardRequestLabel(req: CardRequest): string {
+  switch (req.kind) {
+    case 'sticker':
+      return `Your ${stickerName(req.stickerKey)} sticker`;
+    case 'workout':
+      return 'Your workout card';
+    case 'pr':
+      return 'Your personal bests';
   }
 }

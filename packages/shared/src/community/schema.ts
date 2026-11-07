@@ -23,30 +23,42 @@ const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 export const CardPr = z.object({
   exerciseName: z.string().min(1).max(120),
   prKind: z.enum(['heaviest', 'reps_at_weight', 'e1rm']),
-  valueKg: z.number().positive().max(10000),
-  reps: z.number().int().positive().max(1000).nullable(),
+  valueKg: z.number().positive(),
+  reps: z.number().int().positive().nullable(),
 });
 export type CardPr = z.infer<typeof CardPr>;
 
 /**
- * What a client chose to share. Only these fields ever reach other members: the database checks the sticker is in
- * the author's zoo book, or the workout is the author's own finished one.
+ * What the app asks to share: only which sticker or which workout. The database (create_community_post) builds the
+ * card that is stored and shown from its own records (the zoo book, the workout log and its stored award) and refuses
+ * any other key, so nothing on a card can be made up by the phone.
  */
+export const CardRequest = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('sticker'), stickerKey: z.string().min(1).max(100) }),
+  z.strictObject({ kind: z.literal('workout'), logId: uuid }),
+  z.strictObject({ kind: z.literal('pr'), logId: uuid }),
+]);
+export type CardRequest = z.infer<typeof CardRequest>;
+
+/** A stored card, as the database built it. Workout cards show counts, not volume (that sum lives only here). */
 export const CommunityCard = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('sticker'), stickerKey: z.string().min(1).max(100), shiny: z.boolean() }),
+  z.object({ kind: z.literal('sticker'), stickerKey: z.string().min(1), shiny: z.boolean(), count: z.number().int().positive() }),
   z.object({
     kind: z.literal('workout'),
     logId: uuid,
-    workoutName: z.string().min(1).max(120),
-    volumeKg: z.number().nonnegative().max(10_000_000),
-    stickerKey: z.string().min(1).max(100).nullable(),
+    workoutName: z.string(),
+    finishedAt: z.string().nullable(),
+    exerciseCount: z.number().int().nonnegative(),
+    setCount: z.number().int().nonnegative(),
+    stickerKey: z.string().nullable(),
     multiple: z.number().positive().nullable(),
     shiny: z.boolean(),
   }),
   z.object({
     kind: z.literal('pr'),
     logId: uuid,
-    workoutName: z.string().min(1).max(120),
+    workoutName: z.string(),
+    finishedAt: z.string().nullable(),
     prs: z.array(CardPr).min(1).max(5),
   }),
 ]);
@@ -59,11 +71,17 @@ export function parseCard(value: unknown): CommunityCard | null {
   return parsed.success ? parsed.data : null;
 }
 
+/** Reads a share request (the composer's route parameter); null when it isn't one. */
+export function parseCardRequest(value: unknown): CardRequest | null {
+  const parsed = CardRequest.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export const PostInput = z
   .object({
     body: z.string().max(POST_BODY_MAX, `Posts can be up to ${POST_BODY_MAX} characters.`),
     photoCount: z.number().int().min(0).max(MAX_POST_PHOTOS, `Up to ${MAX_POST_PHOTOS} photos per post.`),
-    card: CommunityCard.nullable(),
+    card: CardRequest.nullable(),
   })
   .refine((p) => p.body.trim().length > 0 || p.photoCount > 0 || p.card !== null, {
     message: 'Write something or add a photo.',

@@ -319,6 +319,7 @@ export {
 export {
   COMMENT_BODY_MAX,
   CardPr,
+  CardRequest,
   CommentInput,
   CommunityCard,
   MAX_POST_PHOTOS,
@@ -329,9 +330,10 @@ export {
   REPORT_REASON_LABELS,
   ReportInput,
   parseCard,
+  parseCardRequest,
 } from './community/schema';
 export type { ReportReason } from './community/schema';
-export { cardText, prLine } from './community/cards';
+export { cardRequestLabel, cardText, prLine } from './community/cards';
 export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';

@@ -4,6 +4,7 @@ import {
   PostInput,
   ReportInput,
   badgeLabel,
+  cardRequestLabel,
   canBlock,
   canDelete,
   canPin,
@@ -19,6 +20,7 @@ import {
   memberName,
   notificationText,
   parseCard,
+  parseCardRequest,
   postAge,
   sortFeed,
   splitLinks,
@@ -195,15 +197,14 @@ describe('photos', () => {
 
 describe('cards and input', () => {
   it('words a sticker card with its tier', () => {
-    expect(cardText({ kind: 'sticker', stickerKey: 'okapi', shiny: false }, 'kg')).toMatchObject({ badge: 'Rare find!', title: 'Okapi' });
-    expect(cardText({ kind: 'sticker', stickerKey: 'cat', shiny: true }, 'kg')).toMatchObject({ badge: 'Shiny!', title: '✦ Shiny Cat' });
+    expect(cardText({ kind: 'sticker', stickerKey: 'okapi', shiny: false, count: 1 }, 'kg')).toMatchObject({ badge: 'Rare find!', title: 'Okapi' });
+    expect(cardText({ kind: 'sticker', stickerKey: 'cat', shiny: true, count: 2 }, 'kg')).toMatchObject({ badge: 'Shiny!', title: '✦ Shiny Cat' });
   });
 
-  it('words a workout card in the reader’s units', () => {
-    const card = { kind: 'workout' as const, logId: LOG, workoutName: 'Legs', volumeKg: 1000, stickerKey: null, multiple: null, shiny: false };
-    expect(cardText(card, 'kg').title).toBe('1,000 kg lifted');
-    expect(cardText(card, 'lb').title).toBe('2,205 lb lifted');
-    expect(cardText(card, 'kg').lines).toEqual(['Legs']);
+  it('words a workout card from counts and the stored animal (no volume)', () => {
+    const card = { kind: 'workout' as const, logId: LOG, workoutName: 'Legs', finishedAt: null, exerciseCount: 3, setCount: 1, stickerKey: 'cat', multiple: 2, shiny: false };
+    expect(cardText(card, 'kg')).toMatchObject({ badge: 'Workout done', title: 'Legs', lines: ['3 exercises · 1 set', '≈ 2 Cats'] });
+    expect(cardText({ ...card, stickerKey: null, multiple: null }, 'kg').lines).toEqual(['3 exercises · 1 set']);
   });
 
   it('words a PR card', () => {
@@ -212,6 +213,7 @@ describe('cards and input', () => {
         kind: 'pr',
         logId: LOG,
         workoutName: 'Push',
+        finishedAt: null,
         prs: [
           { exerciseName: 'Bench Press', prKind: 'reps_at_weight', valueKg: 100, reps: 5 },
           { exerciseName: 'Dip', prKind: 'heaviest', valueKg: 20, reps: null },
@@ -225,9 +227,18 @@ describe('cards and input', () => {
   });
 
   it('reads only cards it understands', () => {
-    expect(parseCard({ kind: 'sticker', stickerKey: 'cat', shiny: false })).not.toBeNull();
+    expect(parseCard({ kind: 'sticker', stickerKey: 'cat', shiny: false, count: 1 })).not.toBeNull();
     expect(parseCard({ kind: 'inbody', bodyFat: 20 })).toBeNull();
     expect(parseCard(null)).toBeNull();
+  });
+
+  it('asks to share only which sticker or workout, nothing else', () => {
+    expect(parseCardRequest({ kind: 'sticker', stickerKey: 'cat' })).toEqual({ kind: 'sticker', stickerKey: 'cat' });
+    expect(parseCardRequest({ kind: 'sticker', stickerKey: 'cat', shiny: true })).toBeNull();
+    expect(parseCardRequest({ kind: 'workout', logId: LOG, volumeKg: 99999 })).toBeNull();
+    expect(parseCardRequest({ kind: 'pr', logId: LOG })).toEqual({ kind: 'pr', logId: LOG });
+    expect(cardRequestLabel({ kind: 'sticker', stickerKey: 'okapi' })).toBe('Your Okapi sticker');
+    expect(cardRequestLabel({ kind: 'workout', logId: LOG })).toBe('Your workout card');
   });
 
   it('checks posts, comments and reports', () => {
