@@ -99,3 +99,43 @@ export const nextMonday = (today: string) => addDays(today, 8 - weekday(today));
 
 /** Today in the browser's own time zone (what the app uses). */
 export const browserToday = (page: Page) => page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
+
+export const COACH_PASSWORD = 'coach-password-123';
+
+/**
+ * A new coach with their own workspace and one client, for tests that depend on what this coach did before (their
+ * Recent workouts, their last program). Delete the users and workspace afterwards.
+ */
+export async function newCoachWithClient(admin: SupabaseClient<Database>, tag: string) {
+  const mk = async (email: string, first: string, last: string, password: string) => {
+    const u = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { first_name: first, last_name: last } });
+    if (u.error) throw u.error;
+    return u.data.user.id;
+  };
+  const email = `${tag.toLowerCase()}-coach-${unique()}@example.com`;
+  const coachId = await mk(email, 'Cora', 'Coach', COACH_PASSWORD);
+  const ws = await admin.from('workspaces').insert({ name: `${tag} ${unique()}` }).select('id').single();
+  if (ws.error) throw ws.error;
+  const m = await admin.from('workspace_members').insert({ workspace_id: ws.data.id, user_id: coachId, role: 'owner' });
+  if (m.error) throw m.error;
+  const clientLast = `${tag}${unique()}`;
+  const clientId = await mk(`${tag.toLowerCase()}-client-${unique()}@example.com`, 'Cleo', clientLast, 'client-password-123');
+  const c = await admin.from('workspace_members').insert({ workspace_id: ws.data.id, user_id: clientId, role: 'client' });
+  if (c.error) throw c.error;
+  return { email, coachId, workspaceId: ws.data.id, clientId, clientName: `Cleo ${clientLast}` };
+}
+
+export async function deleteCoach(admin: SupabaseClient<Database>, c: { coachId: string; clientId: string; workspaceId: string }) {
+  await admin.from('workspaces').delete().eq('id', c.workspaceId);
+  await admin.auth.admin.deleteUser(c.clientId);
+  await admin.auth.admin.deleteUser(c.coachId);
+}
+
+export async function signInAs(page: Page, email: string, password = COACH_PASSWORD) {
+  await page.context().clearCookies();
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/home$/);
+}

@@ -175,7 +175,7 @@ test('a client with nothing planned is under Nothing planned, with Open and Assi
   const row = group.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Nothing in the next 7 days');
   await expect(row.getByRole('link', { name: /^Open / })).toHaveAttribute('href', `/clients/${clientId}`);
-  await expect(row.getByRole('link', { name: /^Assign a program to / })).toHaveAttribute('href', `/clients/${clientId}/training?assign=1`);
+  await expect(row.getByRole('link', { name: /^Assign to / })).toHaveAttribute('href', `/clients/${clientId}/training`);
 });
 
 test('a program ending in 3 days shows Ends in 3 days', async ({ page }) => {
@@ -272,7 +272,8 @@ test('typing part of a name in any case finds the client, and Enter opens their 
   await box.fill(last.toLowerCase());
   await box.press('ArrowDown');
   await box.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}$`));
+  // Search lands on the client's Training (their calendar), where most visits from Home are headed.
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training$`));
 });
 
 test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
@@ -282,25 +283,6 @@ test('Cmd/Ctrl+K focuses the search box', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+K');
   await expect(box).toBeFocused();
-});
-
-test('Assign on an ending program opens the assign dialog, and a reload does not reopen it', async ({ page }) => {
-  const last = `Assn${unique()}`;
-  const clientId = await newClient(last);
-  const a = await admin.from('program_assignments').insert({ workspace_id: workspaceId, client_id: clientId, program_name: `Ending ${unique()}`, weeks: 1, start_date: dayOffset(-3) }).select('id').single();
-  if (a.error) throw a.error;
-  created.assignments.push(a.data.id);
-  await signInAsCoach(page);
-  await page.goto('/home');
-  const group = page.getByRole('region', { name: /^Program ending soon/ });
-  await expandGroup(group);
-  await group.locator('li').filter({ hasText: last }).getByRole('link', { name: /^Assign/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}`));
-  await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
-  await expect(page).not.toHaveURL(/assign=1/);
-  await page.reload();
-  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('a workout on the coach\'s own date shows in Today\'s clients when it is evening in Los Angeles and already tomorrow in UTC', async ({ browser }) => {
@@ -349,17 +331,4 @@ test('ArrowDown and ArrowUp wrap round the results, and Escape clears the box', 
   await expect(box).toHaveAttribute('aria-expanded', 'false');
   await box.fill('zzzz-no-such-client');
   await expect(page.getByRole('status').filter({ hasText: 'No clients match.' })).toBeVisible();
-});
-
-test('?assign=1 on a removed client\'s page opens no dialog', async ({ page }) => {
-  const last = `Removed${unique()}`;
-  const pastId = await newClient(last);
-  const past = await admin.from('past_clients').insert({ workspace_id: workspaceId, user_id: pastId, email: `past-${unique()}@example.com`, first_name: 'Home', last_name: last });
-  if (past.error) throw past.error;
-  const gone = await admin.from('workspace_members').delete().eq('workspace_id', workspaceId).eq('user_id', pastId);
-  if (gone.error) throw gone.error;
-  await signInAsCoach(page);
-  await page.goto(`/clients/${pastId}?assign=1`);
-  await expect(page.getByText(/^Past client · removed /)).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
