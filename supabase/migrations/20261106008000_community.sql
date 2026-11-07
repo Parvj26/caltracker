@@ -422,10 +422,21 @@ end;
 $$;
 create trigger community_posts_touch_activity after delete on public.community_posts
   for each row execute function public.community_touch_activity();
+-- A comment or like deleted on its own bumps it too; one deleted along with its post does not (the post's own delete
+-- already did, so a post with N comments and likes bumps once, not N + 1 times).
+create function public.community_touch_activity_child() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.community_posts p where p.id = old.post_id) then
+    update public.communities c set activity_at = clock_timestamp() where c.id = old.community_id;
+  end if;
+  return old;
+end;
+$$;
 create trigger community_comments_touch_activity after delete on public.community_comments
-  for each row execute function public.community_touch_activity();
+  for each row execute function public.community_touch_activity_child();
 create trigger community_likes_touch_activity after delete on public.community_likes
-  for each row execute function public.community_touch_activity();
+  for each row execute function public.community_touch_activity_child();
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Functions the apps call
@@ -502,7 +513,9 @@ begin
       'reps', pr -> 'reps') order by ord)
     into v_prs
   from jsonb_array_elements(coalesce(v_award -> 'prs', '[]'::jsonb)) with ordinality as t(pr, ord)
-  left join public.exercises x on x.id::text = pr ->> 'exerciseId'
+  left join public.exercises x on x.id = case
+    when pr ->> 'exerciseId' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then (pr ->> 'exerciseId')::uuid
+  end
   where ord <= 5;
   if v_prs is null then
     raise exception 'This workout set no personal bests' using errcode = '22023';
@@ -722,6 +735,7 @@ revoke execute on function
   public.community_notify_post(), public.community_notify_comment(), public.community_notify_like(),
   public.community_unnotify_like(), public.community_notify_report(),
   public.build_community_card(uuid, uuid, jsonb), public.community_touch_activity(),
+  public.community_touch_activity_child(),
   public.create_community_post(uuid, uuid, text, jsonb, jsonb), public.set_community_post_pinned(uuid, boolean),
   public.remove_community_member(uuid, uuid), public.restore_community_member(uuid, uuid),
   public.report_community_content(text, uuid, uuid, text), public.resolve_community_report(uuid, text),

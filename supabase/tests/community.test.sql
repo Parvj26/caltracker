@@ -1,5 +1,5 @@
 begin;
-select plan(154);
+select plan(157);
 
 -- Community (docs/superpowers/specs/2026-11-06-community-design.md): workspace isolation, removed members, client vs
 -- coach powers, blocks, reports, notifications, cards, photos and Realtime.
@@ -22,6 +22,8 @@ select tests.create_log(:'ws_a', :'a1') as log_a1 \gset
 select tests.create_log(:'ws_a', :'a2') as log_a2 \gset
 select tests.create_log(:'ws_a', :'a1', null, 'in_progress') as log_a1_open \gset
 select tests.create_log(:'ws_a', :'a1') as log_a1_plain \gset
+-- A finished log of A1's kept from an earlier coach (another workspace).
+select tests.create_log(:'ws_b', :'a1') as log_a1_other_ws \gset
 insert into public.sticker_awards (client_id, workspace_id, sticker_key) values (:'a1', :'ws_a', 'cat');
 select le.exercise_id as ex_a1, e.name as ex_a1_name
 from public.log_exercises le join public.log_blocks b on b.id = le.block_id join public.exercises e on e.id = le.exercise_id
@@ -138,6 +140,11 @@ select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::js
   jsonb_build_object('kind', 'workout', 'logId', :'log_a1_open')), '42501', null, 'an unfinished workout is refused');
 select throws_ok(format($$select public.create_community_post(%L, %L, '', '{"kind":"inbody"}')$$, gen_random_uuid(), :'comm_a'),
   '22023', null, 'an unknown card is refused');
+select throws_ok(format($$select public.create_community_post(%L, %L, '', %L::jsonb)$$, gen_random_uuid(), :'comm_a',
+  jsonb_build_object('kind', 'workout', 'logId', :'log_a1_other_ws')), '42501', null,
+  'a workout of their own from another workspace is refused');
+select ok(not has_function_privilege('authenticated', 'public.build_community_card(uuid, uuid, jsonb)', 'execute'),
+  'the card builder cannot be called directly');
 select throws_ok(format($$insert into public.community_post_images (post_id, workspace_id, position, path, thumb_path, width, height)
   values (%L, %L, 3, 'x', 'y', 1, 1)$$, :'p2', :'ws_a'), '42501', null, 'photos cannot be added to a post directly');
 reset role;
@@ -457,11 +464,28 @@ select tests.act_as(:'coach_a');
 delete from public.community_comments where post_id = :'p_coach';
 reset role;
 select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted comment bumps activity_at');
+-- A deleted post bumps once, not once more for each of its comments and likes.
+create table tests.cm_bumps (n int);
+grant all on tests.cm_bumps to authenticated;
+create function tests.cm_count_bump() returns trigger language plpgsql as $$
+begin
+  if new.activity_at is distinct from old.activity_at then insert into tests.cm_bumps values (1); end if;
+  return new;
+end $$;
+create trigger cm_count_bump after update on public.communities for each row execute function tests.cm_count_bump();
+select tests.act_as(:'a3');
+insert into public.community_comments (post_id, body) values (:'p_coach', 'one');
+insert into public.community_comments (post_id, body) values (:'p_coach', 'two');
+insert into public.community_likes (post_id) values (:'p_coach');
+reset role;
 update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
+delete from tests.cm_bumps;
 select tests.act_as(:'coach_a');
-delete from public.community_posts where id = :'p3';
+delete from public.community_posts where id = :'p_coach';
 reset role;
 select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted post bumps activity_at');
+select is((select count(*)::int from tests.cm_bumps), 1, 'a post with comments and likes bumps it once');
+drop trigger cm_count_bump on public.communities;
 select ok(not has_column_privilege('authenticated', 'public.communities', 'activity_at', 'update'),
   'only the database sets activity_at');
 select lives_ok(format($$delete from public.workspaces where id = %L$$, :'ws_b'), 'deleting a workspace removes its community cleanly');
