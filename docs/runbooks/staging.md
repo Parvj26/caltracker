@@ -92,7 +92,7 @@ Invite sending limits: the dashboard sends 20 invites per call, one call after a
 
 Actions -> Deploy staging -> Run workflow (branch `main`):
 
-- `action = import-exercises`: loads the ~870 exercise library.
+- `action = import-exercises`: loads the exercise library (876 free-exercise-db exercises plus 10 CalTracker extras) and its pictures. Each source picture is downloaded from the pinned free-exercise-db commit, checked against the sha256 in `scripts/exercise-images-manifest.json`, and stored as a WebP (at most 1600 px) plus a 320 px `-thumb.webp`. Safe to repeat: pictures already in the bucket are skipped. Which exercise gets which picture, and which have none, is in `scripts/exercise-image-match-report.md`.
 - `action = provision-coach`: fill `coach_email`, `coach_first_name`, `coach_last_name` (optional) and `workspace_name`. Creates the coach, the workspace and sends the invite email (the link opens `/set-password`). Safe to repeat: an existing owner is left unchanged, except that one who has never signed in gets a new set-password email.
 
 These use `STAGING_SUPABASE_SERVICE_ROLE_KEY`. The values are passed as environment variables and the key is never printed.
