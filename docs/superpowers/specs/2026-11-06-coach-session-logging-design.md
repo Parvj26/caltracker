@@ -46,7 +46,7 @@ on the iPad or laptop.
 | Coach handed back | Back to the calendar | Logs as usual from the server copy |
 | Coach stopped (20 min without activity) or is no longer a coach | — | "Your coach stopped logging N min ago" · **Continue on my phone** |
 | Client has a different workout in progress | "They need to finish it first" (one workout in progress per client, a database rule) | — |
-| Finished | Opens the finished log | — |
+| Finished | Opens the finished log | Watching: straight to the sticker reveal ("Your coach logged this session", animal and extras), then the summary with "Logged by coach". Not open: the reveal shows once on the next Today visit or app foreground, for coach-finished logs of the last 14 days whose award exists (no award yet: tried again next time); the phone keeps a per-user list of log ids it has revealed |
 
 "Back to the calendar" is the client's Training tab (`/clients/[clientId]/training`). Once finished, the workout's
 plan is locked like any done workout (`20261106009000_done_workout_plan_lock`): the coach fixes what was logged with

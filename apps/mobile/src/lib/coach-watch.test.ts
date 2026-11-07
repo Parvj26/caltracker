@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkoutLogDoc } from '@caltracker/shared';
-import { adoptCoachCopy, coachWatchView, latestTickedSetId, logControls, shouldPullCoachCopy } from './coach-watch';
+import { adoptCoachCopy, coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish, shouldPullCoachCopy } from './coach-watch';
 import { sampleLog, upperCoreLog } from './log-fixtures';
 
 const held = { status: 'in_progress' as const, heldByOther: true, canReclaim: false, lastActivityAt: '2026-11-05T09:10:00.000Z' };
@@ -120,5 +120,18 @@ describe('adoptCoachCopy', () => {
   });
   it('leaves a finished or discarded copy to refreshFromServer, which ends the workout properly', () => {
     expect(adoptCoachCopy(stored, sampleLog({ revision: 6, status: 'completed' }), mine.id)).toBe(stored);
+  });
+});
+
+describe('revealAfterCoachFinish', () => {
+  it('opens the reveal when the coach finishes the workout the client was watching', () => {
+    expect(revealAfterCoachFinish(true, { byCoach: true, status: 'completed' })).toBe(true);
+  });
+  it('not while the coach is still logging, after a hand back, or when the client never watched it', () => {
+    expect(revealAfterCoachFinish(true, { byCoach: true, status: 'in_progress' })).toBe(false);
+    expect(revealAfterCoachFinish(true, { byCoach: false, status: 'completed' })).toBe(false);
+    expect(revealAfterCoachFinish(true, { byCoach: true, status: 'discarded' })).toBe(false);
+    // Opened a coach-finished workout from history: the full banner, no reveal (Today handles that one).
+    expect(revealAfterCoachFinish(false, { byCoach: true, status: 'completed' })).toBe(false);
   });
 });

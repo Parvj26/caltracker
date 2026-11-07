@@ -1,10 +1,12 @@
 // "Surprise!": the extra stickers a finished workout earned that the reveal couldn't show (offline, or the server
 // was slow). Checked when Today comes into view and when the app returns to the foreground; the first award
-// that has something to show opens the reveal screen in its surprise mode.
+// that has something to show opens the reveal screen in its surprise mode. Then a workout the coach finished that
+// this phone hasn't revealed yet (coach-reveal.ts) opens the full reveal (?coach=1), animal and all.
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
 import { collectPending, pendingQueue } from './awards';
+import { nextCoachReveal } from './coach-reveal';
 import { surpriseCards } from './awards-logic';
 import { useSession } from './session';
 
@@ -26,6 +28,8 @@ export function useSurpriseReveal(): void {
         }
         await pendingQueue(userId).remove(e.logId); // nothing to show: forget it
       }
+      const coached = await nextCoachReveal(userId);
+      if (coached) router.push({ pathname: '/log/[id]/reveal', params: { id: coached, coach: '1' } });
     } finally {
       checking.current = false;
     }

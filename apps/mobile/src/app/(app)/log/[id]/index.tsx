@@ -57,7 +57,7 @@ import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { useCoachLogging } from '@/lib/coach-logging';
-import { coachWatchView, latestTickedSetId, logControls } from '@/lib/coach-watch';
+import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import {
@@ -142,6 +142,17 @@ export default function LogScreen() {
 
   const back = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
   const view = coachWatchView(coach.byCoach, log, id);
+  // Watching when the coach finishes: straight to the sticker reveal, then the summary ("Logged by coach").
+  const watched = useRef(false);
+  useEffect(() => {
+    if (view === 'watch') watched.current = true;
+  }, [view]);
+  const revealNow = revealAfterCoachFinish(watched.current || view === 'watch', coach);
+  useEffect(() => {
+    if (!revealNow || !id) return;
+    watched.current = false;
+    router.replace({ pathname: '/log/[id]/reveal', params: { id, coach: '1' } });
+  }, [revealNow, id, router]);
   if (view === 'banner') return <CoachLoggingBanner coach={coach} onBack={back} />;
 
   if (!ready || units === null) {

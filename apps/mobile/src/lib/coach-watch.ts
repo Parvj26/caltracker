@@ -101,3 +101,11 @@ export function adoptCoachCopy(stored: StoredLog | null, server: WorkoutLogDoc, 
   if (server.status !== 'in_progress' || server.revision <= stored.log.revision) return stored;
   return { log: server, lastSyncedRevision: server.revision };
 }
+
+/**
+ * The client was watching the coach log this workout and the coach just finished it: go straight to the sticker
+ * reveal (then the summary), as after the client's own Finish. Pure.
+ */
+export function revealAfterCoachFinish(watched: boolean, coach: { byCoach: boolean; status: LogStatus | null }): boolean {
+  return watched && coach.byCoach && coach.status === 'completed';
+}
