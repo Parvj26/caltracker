@@ -112,6 +112,9 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await page.goto(`/clients/${clientId}`);
   await expect(viewLink(page, '4 Week')).toHaveAttribute('aria-current', 'page');
   await expectWeeks(page, monday, 4);
+  // The server already renders the remembered view (no flash of 2 weeks first): 4 weeks of days in the HTML.
+  const html = await (await page.context().request.get(`/clients/${clientId}`)).text();
+  expect(html.match(/data-date="/g)?.length).toBe(28);
 
   // 1 week.
   await viewLink(page, '1 Week').click();
@@ -273,4 +276,30 @@ test('on a narrow screen the week view is a list of days', async ({ page }) => {
   expect(new Set(boxes.map((b) => b.x)).size).toBe(1);
   boxes.slice(1).forEach((b, i) => expect(b.y).toBeGreaterThan(boxes[i]!.y));
   await expect(day(page, monday).getByText('Mon', { exact: false }).first()).toBeVisible();
+});
+
+test('after dragging a card back onto its own day, the next click still opens it', async ({ page }) => {
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const date = addDays(today, 2);
+  const name = `Drag back ${unique()}`;
+  const id = await seedWorkout(name, date);
+
+  await page.goto(`/clients/${clientId}?view=1w&from=${date}`);
+  const handle = day(page, date).getByRole('button', { name, exact: true });
+  await handle.scrollIntoViewIfNeeded();
+  const box = (await handle.boundingBox())!;
+  // Pick it up, move well past the 4 px start distance, and put it down on its own day.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 30, { steps: 5 });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect(page).toHaveURL(/view=1w/);
+  const moved = await admin.from('workouts').select('scheduled_on').eq('id', id).single();
+  expect(moved.data?.scheduled_on).toBe(date);
+
+  // A real click on the card now opens the editor.
+  await card(page, date, name).locator('[title^="2× Barbell Squat · "]').click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
 });
