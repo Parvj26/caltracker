@@ -4,9 +4,10 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   pointerWithin,
   rectIntersection,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -118,7 +119,10 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    // Mouse: a drag starts after 4 px, so a plain click still opens the card. Touch: a long press picks the card up,
+    // so a normal swipe across cards still scrolls the calendar (iPad).
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
   const draggable = Boolean(onDropItem);
@@ -339,7 +343,7 @@ function DayItem({
   renderItem: Props['renderItem'];
 }) {
   const data: DragData = { item, from: date };
-  // The whole card is the drag source (mouse and touch). The name button stays the keyboard handle: it carries the
+  // The whole card is the drag source (mouse, or a long press on touch). The name button stays the keyboard handle: it carries the
   // a11y attributes and is the activator node, so Space on the "⋯" menu never picks the card up.
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
   // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
@@ -370,8 +374,9 @@ function DayItem({
   }, [lockedTip]);
   const lockedHandlers = lockedDone
     ? {
+        // Mouse only: on touch a swipe across a done card is a scroll.
         onPointerDown: (event: PointerEvent<HTMLLIElement>) => {
-          if (event.button !== 0 || (event.target as HTMLElement).closest('a, button, [data-item-controls]')) return;
+          if (event.pointerType !== 'mouse' || event.button !== 0 || (event.target as HTMLElement).closest('a, button, [data-item-controls]')) return;
           press.current = { x: event.clientX, y: event.clientY };
         },
         onPointerMove: (event: PointerEvent<HTMLLIElement>) => {
@@ -450,7 +455,7 @@ function DayItem({
         )}
         {controls ? (
           // Its buttons and dialogs keep their own clicks: pressing them never starts a card drag.
-          <div className={styles.itemControls} data-item-controls onPointerDown={stopPointer}>
+          <div className={styles.itemControls} data-item-controls {...keepPress}>
             {controls}
           </div>
         ) : null}
@@ -471,7 +476,7 @@ function DayItem({
         </div>
       ) : null}
       {item.logId && logHref ? (
-        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`} onPointerDown={stopPointer}>
+        <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`} {...keepPress}>
           <span aria-hidden="true">✓</span> Done
         </Link>
       ) : null}
@@ -497,7 +502,9 @@ function DayItem({
 }
 
 const DONE_STAYS = 'Done workouts stay on the day they were done';
-const stopPointer = (event: PointerEvent) => event.stopPropagation();
+/** Presses on these keep their own behaviour: they never reach the card's drag sensors (mouse, touch) or done-card tip. */
+const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
+const keepPress = { onPointerDown: stop, onMouseDown: stop, onTouchStart: stop };
 
 /** A workout the client added on the phone: a different look, "Added by client", and the whole card opens the log. */
 function ClientAddedItem({ name, href }: { name: string; href: string }) {
