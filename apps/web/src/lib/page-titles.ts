@@ -13,9 +13,10 @@ export const pageTitle = (...parts: (string | null | undefined)[]): Metadata => 
   title: parts.filter((p): p is string => Boolean(p && p.trim())).join(' · ') || NOT_FOUND,
 });
 
-export async function clientPageTitle(clientId: string): Promise<Metadata> {
+/** A client page tab: "Maya Patel · Clients" for Overview, "Body · Maya Patel · Clients" for the others. */
+export async function clientPageTitle(clientId: string, tab?: string): Promise<Metadata> {
   const client = await getClient(clientId);
-  return client ? pageTitle(client.name, 'Clients') : pageTitle(NOT_FOUND);
+  return client ? pageTitle(tab, client.name, 'Clients') : pageTitle(NOT_FOUND);
 }
 
 export async function logPageTitle(clientId: string, logId: string): Promise<Metadata> {

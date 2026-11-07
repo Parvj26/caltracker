@@ -22,9 +22,15 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 }
 
 /** One logged workout: planned against actual, comments, and corrections. A past client's log stays readable. */
-export default async function LogPage({ params }: { params: Promise<{ clientId: string; logId: string }> }) {
+export default async function LogPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientId: string; logId: string }>;
+  searchParams: Promise<{ edit?: string | string[] }>;
+}) {
   const { userId, units } = await requireCoach();
-  const { clientId, logId } = await params;
+  const [{ clientId, logId }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
   const [client, loaded] = await Promise.all([getClient(clientId), getLog(logId)]);
   // RLS limits the log to this coach's workspace; it must also belong to the client in the URL.
@@ -58,7 +64,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
 
   return (
     <div className={styles.page}>
-      <Link href={`/clients/${client.id}`} className={styles.back}>
+      <Link href={`/clients/${client.id}/training`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
       <header className={styles.titleBlock}>
@@ -94,7 +100,7 @@ export default async function LogPage({ params }: { params: Promise<{ clientId: 
         <ClientNote text={log.notes} label="Client's note on this workout" />
       </header>
 
-      <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} />
+      <CorrectForm log={log} units={units} swappedFrom={swappedFrom} canCorrect={log.status === 'completed'} startEditing={query.edit === '1'} />
       <Comments logId={log.id} comments={commentViews} />
       <LiveRefresh on={[{ table: 'workout_logs', filter: `id=eq.${log.id}` }, { table: 'awards', filter: `log_id=eq.${log.id}` }]} renderedAt={renderTime()} />
     </div>

@@ -75,7 +75,7 @@ export function groupNotifications(rows: readonly NotificationRow[], blocked: Re
 }
 
 /** The badge number: unread items after grouping (5 likes on one post count once). */
-export function unreadCount(items: readonly NotificationItem[]): number {
+export function unreadNotificationCount(items: readonly NotificationItem[]): number {
   return items.filter((i) => i.unread).length;
 }
 

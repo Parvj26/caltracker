@@ -3,7 +3,7 @@
 import { cancelInvite, removeClient } from './actions';
 import { ConfirmButton } from './confirm-button';
 
-export function RemoveClientButton({ userId, name }: { userId: string; name: string }) {
+export function RemoveClientButton({ userId, name, focusAfterId = 'clients-heading' }: { userId: string; name: string; focusAfterId?: string }) {
   const who = name || 'this client';
   return (
     <ConfirmButton
@@ -13,7 +13,7 @@ export function RemoveClientButton({ userId, name }: { userId: string; name: str
       body="They'll lose access to your workouts, messages and community. Their history stays under Past clients, and re-inviting them brings everything back."
       confirmLabel="Remove"
       onConfirm={() => removeClient(userId)}
-      focusAfterId="clients-heading"
+      focusAfterId={focusAfterId}
     />
   );
 }

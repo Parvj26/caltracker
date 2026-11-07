@@ -41,7 +41,7 @@ const shortDay = (d: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UT
 const MS_DAY = 86_400_000;
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * MS_DAY).toISOString().slice(0, 10);
 const browserToday = (page: Page) => page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
-const calendarUrl = (id: string, date: string) => `/clients/${id}?month=${date.slice(0, 7)}`;
+const calendarUrl = (id: string, date: string) => `/clients/${id}/training?month=${date.slice(0, 7)}`;
 const day = (page: Page, date: string) => page.locator(`[data-date="${date}"]`);
 
 async function plan(name: string, date: string, forClient = clientId): Promise<string> {
@@ -312,7 +312,9 @@ test.describe('logged workout page', () => {
     await expect(squat.getByRole('row').nth(3)).toContainText('Not done');
     await squat.getByLabel('Set 1 reps').fill('6');
     await page.getByRole('button', { name: 'Save corrections' }).click();
-    await expect(page.getByText('Edited by coach')).toBeVisible();
+    // Saving waits for the award-workout function to recompute the client's bests (recomputeAward), which can take
+    // well over the default 5 s when the function is cold or busy with the other workers' finishes.
+    await expect(page.getByText('Edited by coach')).toBeVisible({ timeout: 30_000 });
     await page.getByRole('textbox', { name: 'Comment' }).fill('Great depth today');
     await page.getByRole('button', { name: 'Post comment' }).click();
     await expect(page.getByRole('region', { name: 'Comments' }).getByRole('listitem')).toContainText('Great depth today');
@@ -436,7 +438,8 @@ test.describe('logged workout page', () => {
     await expect(page.getByText("Reps can't be blank.")).toBeVisible();
     await page.getByLabel('Set 1 reps').fill('6');
     await page.getByRole('button', { name: 'Save corrections' }).click();
-    await expect(page.getByText('Edited by coach')).toBeVisible();
+    // Saving waits for the award-workout recompute (see the planned-against-actual test).
+    await expect(page.getByText('Edited by coach')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
     await expect(page.getByRole('table', { name: 'Barbell Squat' }).getByRole('row').nth(1)).toContainText('60 kg × 6');
     const rows = await admin.from('log_sets').select('actual_reps, position').eq('log_id', id).order('position');

@@ -24,7 +24,7 @@ import {
   postAge,
   sortFeed,
   splitLinks,
-  unreadCount,
+  unreadNotificationCount,
   withoutBlocked,
   type NotificationRow,
 } from '../../src';
@@ -85,7 +85,7 @@ describe('notifications', () => {
   });
 
   it('counts unread items after grouping', () => {
-    expect(unreadCount(groupNotifications(rows))).toBe(3);
+    expect(unreadNotificationCount(groupNotifications(rows))).toBe(3);
     expect(badgeLabel(0)).toBeNull();
     expect(badgeLabel(7)).toBe('7');
     expect(badgeLabel(120)).toBe('99+');

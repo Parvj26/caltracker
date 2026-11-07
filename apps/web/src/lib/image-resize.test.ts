@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWithFallback, fitSquare, type ToBlob } from './image-resize';
+import { PhotoError, compressPhoto, encodeWithFallback, fitSquare, type ToBlob } from './image-resize';
 
 describe('fitSquare', () => {
   it('crops the centre of a landscape photo to its short side and scales down to the max', () => {
@@ -52,5 +52,13 @@ describe('encodeWithFallback', () => {
   });
   it('throws when neither format can be made', async () => {
     await expect(encodeWithFallback(fake({ 'image/webp': 'image/png', 'image/jpeg': 'image/png' }), 0.85)).rejects.toThrow();
+  });
+});
+
+describe('compressPhoto', () => {
+  it('refuses a file that is not a picture before trying to decode it', async () => {
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    await expect(compressPhoto(file)).rejects.toBeInstanceOf(PhotoError);
+    await expect(compressPhoto(file)).rejects.toThrow('Only photos can be sent.');
   });
 });

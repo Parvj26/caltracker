@@ -2,9 +2,11 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 import { borderWidth, radius, space, typeScale } from '@caltracker/design-tokens';
 import { fontFamilyFor } from '@/theme/fonts';
-import { badgeLabel } from '@caltracker/shared';
-import { useCommunity } from '@/lib/use-community';
+import { useUnreadCount } from '@/lib/use-messages';
 import { palette, white } from '@/theme/theme';
+
+// Files are discovered alphabetically (coach.tsx first), so a bare navigation into the tabs would open Coach. Today is home.
+export const unstable_settings = { initialRouteName: 'today' };
 
 /** Simple drawn icons (no icon font yet): a sun-like dot for Today, a small calendar for Workouts. */
 function TodayIcon({ color }: { color: ColorValue }) {
@@ -15,6 +17,16 @@ function WorkoutsIcon({ color }: { color: ColorValue }) {
   return (
     <View style={[styles.calendarIcon, { borderColor: color }]}>
       <View style={[styles.calendarBar, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+/** A speech bubble: a rounded box with a small tail. */
+function CoachIcon({ color }: { color: ColorValue }) {
+  return (
+    <View>
+      <View style={[styles.bubbleIcon, { borderColor: color }]} />
+      <View style={[styles.bubbleTail, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -39,25 +51,11 @@ function ZooIcon({ color }: { color: ColorValue }) {
   );
 }
 
-/** Three dots in a row (people) for Community. */
-function CommunityIcon({ color }: { color: ColorValue }) {
-  return (
-    <View style={styles.communityIcon}>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={[styles.communityDot, { borderColor: color }, i === 1 && styles.communityDotMiddle]} />
-      ))}
-    </View>
-  );
-}
-
 // Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
 // tab) starts on Today, not on whichever tab the router would pick.
-export const unstable_settings = { initialRouteName: 'today' };
-
-// The other tabs in the spec (Messages, Me) arrive with their phases.
+// The other tabs in the spec (Community, Me) arrive with their phases.
 export default function TabsLayout() {
-  const { unread } = useCommunity();
-  const badge = badgeLabel(unread);
+  const unread = useUnreadCount();
   return (
     <Tabs
       screenOptions={{
@@ -87,18 +85,18 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="zoo"
-        options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
-      />
-      <Tabs.Screen
-        name="community"
+        name="coach"
         options={{
-          title: 'Community',
-          tabBarButtonTestID: 'tab-community',
-          tabBarIcon: ({ color }) => <CommunityIcon color={color} />,
-          tabBarBadge: badge ?? undefined,
+          title: 'Coach',
+          tabBarButtonTestID: 'tab-coach',
+          tabBarIcon: ({ color }) => <CoachIcon color={color} />,
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: palette.magenta, color: white },
         }}
+      />
+      <Tabs.Screen
+        name="zoo"
+        options={{ title: 'Zoo', tabBarButtonTestID: 'tab-zoo', tabBarIcon: ({ color }) => <ZooIcon color={color} /> }}
       />
       <Tabs.Screen
         name="progress"
@@ -121,6 +119,8 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.card,
     overflow: 'hidden',
   },
+  bubbleIcon: { width: space[4.5], height: space[3.5] + 2, borderRadius: space[1], borderWidth: borderWidth.card },
+  bubbleTail: { position: 'absolute', left: space[2], bottom: -2, width: space[1] + 2, height: space[1] + 2, transform: [{ rotate: '45deg' }] },
   zooIcon: {
     width: space[4.5],
     height: space[4.5],
@@ -133,7 +133,4 @@ const styles = StyleSheet.create({
   progressBar: { flex: 1, borderRadius: 1 },
   zooDot: { width: space[1], height: space[1], borderRadius: radius.pill },
   calendarBar: { height: space[1] },
-  communityIcon: { width: space[6], height: space[4.5], flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 1 },
-  communityDot: { width: space[2] + 1, height: space[2] + 1, borderRadius: radius.pill, borderWidth: borderWidth.card },
-  communityDotMiddle: { width: space[2.5] + 1, height: space[2.5] + 1, marginBottom: space[1] },
 });

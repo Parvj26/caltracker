@@ -1,0 +1,40 @@
+# The Coach tab's photo button opens the system photo picker. iOS's picker runs outside the app, so it asks for no
+# permission; if a "would like to access your photos" alert ever appears, it must carry the app.json wording
+# (photosPermission). The built app's Info.plist carries that wording too.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+    permissions: { photos: unset }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-coach
+- extendedWaitUntil:
+    visible:
+      id: coach-composer-input
+    timeout: 20000
+- tapOn:
+    id: coach-photo-button
+- runFlow:
+    when:
+      visible: '.*would like to access your photos.*'
+    commands:
+      - assertVisible: 'CalTracker uses your photos so you can send them to your coach.'
+      - takeScreenshot: photo-permission
+      - tapOn: "Don’t Allow"
+# iOS's own picker: it names the app and says it only sees the photos the client selects.
+- extendedWaitUntil:
+    visible: 'Select up to .* photos.*'
+    timeout: 15000
+- assertNotVisible: '.*would like to access your photos.*'
+- takeScreenshot: photo-picker
+- tapOn: 'Cancel'
+- extendedWaitUntil:
+    visible:
+      id: coach-composer-input
+    timeout: 10000

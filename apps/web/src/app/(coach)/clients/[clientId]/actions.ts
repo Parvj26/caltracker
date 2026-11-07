@@ -29,7 +29,7 @@ const GENERIC = "Couldn't save. Please try again.";
 const ALREADY_DONE = "You can't move a workout that's already done: it stays on the day it was done. View its log instead.";
 const NOT_A_CLIENT = "You can't add workouts for this client. They may no longer be your client.";
 
-const refreshCalendar = () => revalidatePath('/clients/[clientId]', 'page');
+const refreshCalendar = () => revalidatePath('/clients/[clientId]', 'layout');
 
 /**
  * Date rules (single workouts today or later, programs from up to 7 days back) are measured from the coach's own

@@ -134,8 +134,9 @@ A coaching platform where coaches build and assign workout programs, log in-pers
 - Built in the dashboard on a weekly grid with drag-and-drop.
 
 ### Assignment
-- Assigning a program to a client with a start date **copies** its workouts onto the client's calendar as client-owned workout instances. Later edits to the program template do not change existing assignments.
+- Assigning a program to a client with a start date **copies** its workouts onto the client's calendar as client-owned workout instances. Later edits to the program template do not change existing assignments. **Exception: Live Sync** (product owner, 2026-11-06): a program with Live Sync on keeps its active assignments' upcoming, untouched workouts in step with the program (see `2026-11-06-live-sync-design.md`).
 - The coach can drop a single workout onto any calendar day, and move, edit, or delete any day's workout on a client calendar.
+- The coach's client calendar shows 1, 2 or 4 weeks (Monday to Sunday) or a month; 2 weeks by default, and the coach's last pick is remembered in their browser. Week views preview each workout's first three exercises. Past workouts are editable: a missed one's plan can be edited (and it can be moved to today or later); a done one's **plan stays read-only** so the log still matches what the client was given, and the coach edits its **logged results** instead (the log's correction form). A done workout is never moved.
 
 ---
 

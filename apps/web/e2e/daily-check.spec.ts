@@ -45,7 +45,8 @@ async function newCoach(): Promise<Coach> {
   return coach;
 }
 
-async function addClient(coach: Coach, firstName: string, lastName: string, joinedDaysAgo = 30): Promise<string> {
+// Joined 20 days ago by default: under 30, so "Body scans 30+ days" (covered in body-scans.spec) stays out of these groups.
+async function addClient(coach: Coach, firstName: string, lastName: string, joinedDaysAgo = 20): Promise<string> {
   const id = await newUser(`daily-${unique()}@example.com`, firstName, lastName);
   coach.userIds.push(id);
   const m = await admin.from('workspace_members').insert({
@@ -194,11 +195,11 @@ test('Home groups every client under its reason, with counts, a reason line and 
 
   const ending = row('Program ending soon', 'Enid Ending');
   await expect(ending).toContainText(/Ends in 3 days · \w{3} \d{1,2} \w{3}/);
-  await expect(ending.getByRole('link', { name: 'Assign a program to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}?assign=1`);
+  await expect(ending.getByRole('link', { name: 'Assign a program to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}/training?assign=1`);
 
   const nothing = row('Nothing planned', 'Nell Nothing');
   await expect(nothing).toContainText('Nothing in the next 7 days');
-  await expect(nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' })).toHaveAttribute('href', `/clients/${ids.nothing}?assign=1`);
+  await expect(nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' })).toHaveAttribute('href', `/clients/${ids.nothing}/training?assign=1`);
 
   await expect(row('No workout in 5+ days', 'Quinn Quiet')).toContainText('No workout in 8 days');
   await expect(row('New personal bests', 'Sami Steady')).toContainText('1 lift improved');
@@ -210,8 +211,8 @@ test('Home groups every client under its reason, with counts, a reason line and 
   await expect(tile).toHaveAttribute('href', '#missed-in-a-row');
   await expect(tile.getByText(/^\d+$/)).toHaveText('2');
 
-  // No Message action until messages exist.
-  await expect(attention.getByRole('link', { name: /^Message/ })).toHaveCount(0);
+  // Every row offers Message, which opens that client's conversation.
+  await expect(run.getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
 
   await nothing.getByRole('link', { name: 'Assign a program to Nell Nothing' }).click();
   await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();

@@ -89,7 +89,9 @@ env:
 
 # Both cards are in the feed.
 - tapOn:
-    id: tab-community
+    id: tab-coach
+- tapOn:
+    id: open-community
 - extendedWaitUntil:
     visible: 'E2E Leg day done'
     timeout: 15000

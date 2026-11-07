@@ -102,6 +102,152 @@ export type Database = {
           },
         ]
       }
+      body_measurement_values: {
+        Row: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Insert: {
+          measurement_id: string
+          metric_key: string
+          value: number
+        }
+        Update: {
+          measurement_id?: string
+          metric_key?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurement_values_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "body_measurements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      body_measurements: {
+        Row: {
+          attachment_path: string | null
+          client_id: string
+          created_at: string
+          entered_by: string | null
+          id: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          client_id: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on: string
+          source: string
+          workspace_id: string
+        }
+        Update: {
+          attachment_path?: string | null
+          client_id?: string
+          created_at?: string
+          entered_by?: string | null
+          id?: string
+          measured_on?: string
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_documents: {
+        Row: {
+          client_id: string
+          content_type: string
+          created_at: string
+          id: string
+          name: string
+          shared_with_client: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          name: string
+          shared_with_client?: boolean
+          size_bytes: number
+          storage_path: string
+          uploaded_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          name?: string
+          shared_with_client?: boolean
+          size_bytes?: number
+          storage_path?: string
+          uploaded_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_goals: {
+        Row: {
+          client_id: string
+          goal: string
+          target_date: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          goal: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          goal?: string
+          target_date?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_goals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invites: {
         Row: {
           accepted_at: string | null
@@ -151,6 +297,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_limitations: {
+        Row: {
+          body: string
+          client_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          client_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_limitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -688,6 +901,105 @@ export type Database = {
           },
         ]
       }
+      conversation_reads: {
+        Row: {
+          conversation_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_message_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_metrics: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          max: number
+          min: number
+          name: string
+          unit_label: string
+          workspace_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max: number
+          min: number
+          name: string
+          unit_label?: string
+          workspace_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          max?: number
+          min?: number
+          name?: string
+          unit_label?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_metrics_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_favorites: {
         Row: {
           coach_id: string
@@ -808,6 +1120,45 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "exercises_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_sync_tombstones: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          planned_on?: string
+          source_workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sync_tombstones_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "program_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sync_tombstones_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1018,6 +1369,54 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string
+          client_msg_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          image_paths: string[]
+          sender_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          client_msg_id?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          sender_id?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          client_msg_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          sender_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       past_clients: {
         Row: {
           email: string
@@ -1219,6 +1618,21 @@ export type Database = {
           },
         ]
       }
+      program_live_sync_queue: {
+        Row: {
+          program_id: string
+          xact: unknown
+        }
+        Insert: {
+          program_id: string
+          xact?: unknown
+        }
+        Update: {
+          program_id?: string
+          xact?: unknown
+        }
+        Relationships: []
+      }
       program_workouts: {
         Row: {
           created_at: string
@@ -1276,6 +1690,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          live_sync: boolean
+          live_sync_skipped: number
+          live_synced_at: string | null
           name: string
           updated_at: string
           weeks: number
@@ -1286,6 +1703,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name: string
           updated_at?: string
           weeks?: number
@@ -1296,6 +1716,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name?: string
           updated_at?: string
           weeks?: number
@@ -1704,10 +2127,13 @@ export type Database = {
           client_id: string | null
           created_at: string
           created_by: string | null
+          customised_at: string | null
           id: string
           name: string
           notes: string | null
+          planned_on: string | null
           scheduled_on: string | null
+          source_hash: string | null
           source_workout_id: string | null
           updated_at: string
           workspace_id: string
@@ -1717,10 +2143,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name: string
           notes?: string | null
+          planned_on?: string | null
           scheduled_on?: string | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -1730,10 +2159,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name?: string
           notes?: string | null
+          planned_on?: string | null
           scheduled_on?: string | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1842,11 +2274,23 @@ export type Database = {
         Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
         Returns: Json
       }
+      can_access_message_image: {
+        Args: { p_name: string; p_write: boolean }
+        Returns: boolean
+      }
       can_block_in_community: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean
       }
+      can_post_to_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       can_read_community_image: { Args: { p_name: string }; Returns: boolean }
+      can_read_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       can_upload_community_image: { Args: { p_name: string }; Returns: boolean }
       can_view_community: { Args: { p_community_id: string }; Returns: boolean }
       claim_invites: {
@@ -1855,6 +2299,14 @@ export type Database = {
           workspace_id: string
           workspace_name: string
         }[]
+      }
+      client_today: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
+      }
+      client_zone: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
       }
       copy_program_week: {
         Args: {
@@ -1881,6 +2333,10 @@ export type Database = {
         }
         Returns: string
       }
+      copy_workout_children: {
+        Args: { p_source: string; p_target: string }
+        Returns: undefined
+      }
       correct_workout_log: {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
@@ -1895,6 +2351,8 @@ export type Database = {
         }
         Returns: string
       }
+      document_path_client: { Args: { name: string }; Returns: string }
+      document_path_workspace: { Args: { name: string }; Returns: string }
       duplicate_program: {
         Args: { p_name: string; p_new_id: string; p_program_id: string }
         Returns: string
@@ -1927,6 +2385,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_or_create_conversation: {
+        Args: { p_client_id: string }
+        Returns: string
+      }
       has_blocked: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean
@@ -1954,6 +2416,7 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      is_system_write: { Args: never; Returns: boolean }
       json_number_ok: {
         Args: {
           hi: number
@@ -1977,6 +2440,15 @@ export type Database = {
           set_type: Database["public"]["Enums"]["set_type"]
         }[]
       }
+      latest_coach_scans: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_id: string
+          measured_on: string
+        }[]
+      }
+      live_sync_backfill_copies: { Args: never; Returns: number }
+      live_sync_program: { Args: { p_program_id: string }; Returns: number }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
@@ -1987,6 +2459,11 @@ export type Database = {
         }[]
       }
       mark_community_notifications_read: { Args: never; Returns: undefined }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      message_image_conversation: { Args: { p_name: string }; Returns: string }
       my_removal: {
         Args: never
         Returns: {
@@ -1994,6 +2471,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
       recent_exercises_for_client: {
         Args: { p_limit?: number }
         Returns: {
@@ -2033,11 +2511,14 @@ export type Database = {
         Args: { p_community_id: string; p_user_id: string }
         Returns: undefined
       }
+      save_body_measurement: { Args: { p: Json }; Returns: string }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string
       }
       save_workout_log: { Args: { p_doc: Json }; Returns: Json }
+      scan_path_client: { Args: { name: string }; Returns: string }
+      scan_path_workspace: { Args: { name: string }; Returns: string }
       schedule_workout: {
         Args: {
           p_client_id: string
@@ -2065,6 +2546,8 @@ export type Database = {
       uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
+      workout_content_hash: { Args: { p_workout: string }; Returns: string }
+      workout_is_done: { Args: { p_workout_id: string }; Returns: boolean }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"

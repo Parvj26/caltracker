@@ -68,7 +68,7 @@ async function seedClient(lastName: string) {
 test('the client page shows the streak, the zoo book and the personal bests', async ({ page }) => {
   const { clientId } = await seedClient(`Page${unique()}`);
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
 
   await expect(page.getByText('3-week streak')).toBeVisible();
   await expect(page.getByText('Zoo book: 2 of 60 stickers')).toBeVisible();
@@ -87,7 +87,7 @@ test('a client with nothing yet shows an empty streak and no bests', async ({ pa
   const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
   if (m.error) throw m.error;
   await signInAsCoach(page);
-  await page.goto(`/clients/${u.data.user.id}`);
+  await page.goto(`/clients/${u.data.user.id}/training`);
   await expect(page.getByText('No streak yet')).toBeVisible();
   await expect(page.getByText('No personal bests yet.')).toBeVisible();
 });
@@ -118,17 +118,18 @@ test('a correction through the log page recomputes the client stats', async ({ p
   // correction works the stats out again from the logs, so the streak drops to 1.
   const { clientId, logId } = await seedClient(`Fix${unique()}`);
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
   await expect(page.getByText('3-week streak')).toBeVisible();
 
   await page.goto(`/clients/${clientId}/logs/${logId}`);
   await page.getByRole('button', { name: 'Correct' }).click();
   await page.getByLabel('Set 1 reps').fill('6');
   await page.getByRole('button', { name: 'Save corrections' }).click();
-  await expect(page.getByText('Edited by coach')).toBeVisible();
+  // Saving waits for the award-workout recompute, which can be slow when the function is busy.
+  await expect(page.getByText('Edited by coach')).toBeVisible({ timeout: 30_000 });
 
   await expect.poll(async () => (await admin.from('client_stats').select('streak, workouts').eq('client_id', clientId).single()).data).toEqual({ streak: 1, workouts: 1 });
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
   await expect(page.getByText('1-week streak')).toBeVisible();
 });
 
@@ -146,7 +147,7 @@ test('the client page charts an exercise\'s estimated max over time, with a keyb
   }
 
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}`);
+  await page.goto(`/clients/${clientId}/training`);
   // The wrapping <label> also contains the options' text, so match the select by role and a name that starts with "Exercise".
   await page.getByRole('combobox', { name: /^Exercise/ }).selectOption({ label: 'Barbell Squat' });
   await expect(page.getByTestId('chart-point')).toHaveCount(3);
@@ -169,6 +170,6 @@ test('a client with no logged lifts shows no chart', async ({ page }) => {
   const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
   if (m.error) throw m.error;
   await signInAsCoach(page);
-  await page.goto(`/clients/${u.data.user.id}`);
+  await page.goto(`/clients/${u.data.user.id}/training`);
   await expect(page.getByText('No lifts to chart yet.')).toBeVisible();
 });

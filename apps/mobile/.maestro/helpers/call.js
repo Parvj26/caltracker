@@ -1,4 +1,4 @@
-/* global http, HELPER_URL, ACTION, EMAIL, NAME */
+/* global http, HELPER_URL, ACTION, EMAIL, NAME, output */
 // Calls the local e2e helper bridge (scripts/e2e-helper.ts serve), started by scripts/run-e2e.sh.
 // Maestro scripts cannot run shell commands, so the bridge wraps the service-role helpers.
 // Inputs (env): ACTION, EMAIL, NAME (invite only), HELPER_URL. Actions:
@@ -13,12 +13,21 @@
 //                      Dumbbell Bicep Curl 2 x 12 @ 10 kg
 //   coach-profile      sets the demo coach's business (EMAIL) and bio (NAME)
 //   coach-profile-reset  puts the demo business name back and clears the bio (EMAIL ignored; pass '-')
+//   assign-today-mockup like assign-today, "E2E Upper/Core": the simple-logging mock-ups (sections, supersets, a
+//                      substitute, drops, a pick-one finisher)
+//   log-notes          the workout note of EMAIL's latest log, lines joined with " | " (returned as output.call)
 //   community-coach-post / community-buddy-post   the demo coach / a second demo client ("Buddy Demo") posts EMAIL as
 //                      the text in the demo community
 //   community-cleanup  deletes "E2E " and card posts, reports, blocks and the buddy (EMAIL is ignored; pass '-')
 //   cleanup-logs       deletes every workout log of client@demo.local, and the stickers, personal bests and stats
 //                      they earned (refuses any other EMAIL)
+//   coach-message      the seed coach sends the client NAME as a chat message (client@demo.local only)
+//   assert-reply       fails unless the client has sent exactly one message whose text is NAME
+//   assert-read        fails unless the client has read every coach message
+//   cleanup-messages   deletes the demo client's conversation
+//   seed-scans         two coach scans for client@demo.local (82 kg then 80 kg); cleanup-scans deletes that client's scans
 var url = HELPER_URL + '/' + ACTION + '?email=' + encodeURIComponent(EMAIL);
 if (typeof NAME !== 'undefined') url += '&name=' + encodeURIComponent(NAME);
 var res = http.get(url);
 if (!res.ok) throw new Error(ACTION + ' failed: ' + res.status + ' ' + res.body);
+output.call = res.body;

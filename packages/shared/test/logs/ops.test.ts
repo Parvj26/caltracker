@@ -9,6 +9,7 @@ import {
   removeLogExercise,
   removeLogSet,
   setExerciseNote,
+  setLogNotes,
   stepActual,
   swapLogExercise,
   uncompleteSet,
@@ -230,6 +231,8 @@ describe('log ops', () => {
       addLogExercise(log, pick(), makeId, T1),
       removeLogExercise(log, log.blocks[1]!.exercises[0]!.id, T1),
       setExerciseNote(log, ex.id, 'n', T1),
+      setLogNotes(log, 'Felt: Good\nnote', T1),
+      setLogNotes(log, 'z'.repeat(2500), T1),
     ];
     for (const o of outputs) expect(WorkoutLogDoc.safeParse(o).success).toBe(true);
   });

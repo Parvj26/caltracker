@@ -289,6 +289,21 @@ export default function Today() {
         </Card>
       ) : null}
 
+      {data?.kind === 'today' ? (
+        <Card>
+          <Text style={text('sectionHeading')} accessibilityRole="header">
+            Progress
+          </Text>
+          <Text style={text('body')}>See your charts and log your weight.</Text>
+          <Button
+            variant="secondary"
+            testID="home-progress"
+            title="Open Progress"
+            onPress={() => router.navigate('/progress')}
+          />
+        </Card>
+      ) : null}
+
       <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />
     </Screen>
   );

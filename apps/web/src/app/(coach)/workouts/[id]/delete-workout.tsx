@@ -54,7 +54,9 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
         <p id={bodyId} className={styles.dialogBody} aria-live="polite">
           {uses === null
             ? 'Checking which programs use it…'
-            : `Used in ${uses} ${uses === 1 ? 'program' : 'programs'}. Deleting removes it from them. Clients' calendars keep their copies.`}
+            : `Used in ${uses} ${uses === 1 ? 'program' : 'programs'}. Deleting removes it from them. Clients' calendars keep their copies${
+                uses > 0 ? ', except upcoming ones not yet started from programs with Live Sync on' : ''
+              }.`}
         </p>
         {error ? <ErrorText>{error}</ErrorText> : null}
         <div className={styles.dialogActions}>

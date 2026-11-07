@@ -13,6 +13,12 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-logs client@demo.local   delete the demo client's logs
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile "<business>" "<bio>"   set the demo coach's business name and bio
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-profile-reset -   put them back (Demo Coaching, no bio)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts coach-message client@demo.local "text"   the coach sends a chat message
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-reply client@demo.local "text"   fails unless the client sent it
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-read client@demo.local   fails unless the client has read the chat
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-coach-post "<text>"   the demo coach posts in the community
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-buddy-post "<text>"   a second demo client (buddy) posts
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-cleanup -   delete "E2E " posts, reports, blocks and the buddy
@@ -21,7 +27,7 @@ import { execSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import { localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
+import { addDays, localToday, splitFullName, type Database, type WorkoutDoc } from '@caltracker/shared';
 
 let statusEnv: string | undefined;
 /** A value from `supabase status -o env` (read once). */
@@ -137,7 +143,7 @@ type PlanBlock = {
   kind: 'straight' | 'superset' | 'choice';
   /** The section heading the block sits under (consecutive blocks with the same name share one section). */
   section?: string;
-  exercises: Array<{ name: string; sets: PlanSet[] }>;
+  exercises: Array<{ name: string; sets: PlanSet[]; substitutes?: Array<{ name: string; sets: PlanSet[] }> }>;
 };
 
 /**
@@ -153,7 +159,7 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
   try {
     const { data: ws, error: wsErr } = await coach.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
     if (wsErr) throw wsErr;
-    const names = [...new Set(blocks.flatMap((b) => b.exercises.map((e) => e.name)))];
+    const names = [...new Set(blocks.flatMap((b) => b.exercises.flatMap((e) => [e.name, ...(e.substitutes ?? []).map((x) => x.name)])))];
     const { data: found, error: exErr } = await coach
       .from('exercises')
       .select('id, name, tracking_type')
@@ -184,7 +190,17 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
             trackingType: ex.tracking_type,
             note: null,
             sets: e.sets.map((s) => ({ ...s, id: randomUUID() })),
-            substitutes: [],
+            substitutes: (e.substitutes ?? []).map((sub) => {
+              const subEx = byName.get(sub.name)!;
+              return {
+                id: randomUUID(),
+                exerciseId: subEx.id,
+                exerciseName: subEx.name,
+                trackingType: subEx.tracking_type,
+                note: null,
+                sets: sub.sets.map((x) => ({ ...x, id: randomUUID() })),
+              };
+            }),
           };
         }),
       })),
@@ -298,6 +314,67 @@ export async function assignTodaySections(email: string): Promise<void> {
   ]);
 }
 
+const LB = 0.45359237;
+const lb = (n: number) => Math.round(n * LB * 1000) / 1000;
+
+/**
+ * "E2E Upper/Core" today, the simple-logging mock-ups: Warm-Up [Arm Circles 1 × 0:30]; Resistance Training
+ * [superset 1: Dumbbell Bench Press 35/45/55/30 lb + Dumbbell Alternate Bicep Curl 3 sets (uneven), 1:00 round rest;
+ * superset 2: Wide-Grip Lat Pulldown 85/115 lb (substitute Machine Assisted Pull Up 2 × 10 @ 40 lb) + Triceps
+ * Pushdown 70/80 lb; Triceps Pushdown - Rope Attachment W 20 lb × 10, 40 lb × 12, drop 30 lb, drop 20 lb to
+ * failure]; Finisher [pick one: Overhead Slam 2 × 12 @ 15 lb, Farmer's Walk, Medicine Ball Scoop Throw].
+ */
+export async function assignTodayMockup(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const w = (reps: number, pounds: number, rest: number) => plan('normal', reps, lb(pounds), rest);
+  await assignWorkout(email, 'E2E Upper/Core', [
+    {
+      kind: 'straight',
+      section: 'Warm-Up',
+      exercises: [{ name: 'Arm Circles', sets: [{ ...plan('normal', null, null, 0), targetDurationS: 30 }] }],
+    },
+    {
+      kind: 'superset',
+      section: 'Resistance Training',
+      exercises: [
+        { name: 'Dumbbell Bench Press', sets: [w(12, 35, 0), w(12, 45, 0), w(10, 55, 0), w(5, 30, 0)] },
+        { name: 'Dumbbell Alternate Bicep Curl', sets: [w(12, 20, 60), w(12, 25, 60), w(12, 25, 60)] },
+      ],
+    },
+    {
+      kind: 'superset',
+      section: 'Resistance Training',
+      exercises: [
+        {
+          name: 'Wide-Grip Lat Pulldown',
+          sets: [w(12, 85, 0), w(12, 115, 0)],
+          substitutes: [{ name: 'Machine Assisted Pull Up', sets: [w(10, 40, 0), w(10, 40, 0)] }],
+        },
+        { name: 'Triceps Pushdown', sets: [w(12, 70, 60), w(12, 80, 60)] },
+      ],
+    },
+    {
+      kind: 'straight',
+      section: 'Resistance Training',
+      exercises: [
+        {
+          name: 'Triceps Pushdown - Rope Attachment',
+          sets: [plan('warmup', 10, lb(20), 60), w(12, 40, 60), plan('drop', null, lb(30), 0), plan('drop', null, lb(20), 0, true)],
+        },
+      ],
+    },
+    {
+      kind: 'choice',
+      section: 'Finisher',
+      exercises: [
+        { name: 'Overhead Slam', sets: [w(12, 15, 30), w(12, 15, 30)] },
+        { name: "Farmer's Walk", sets: [{ ...plan('normal', null, null, 60), targetDistanceM: 40 }, { ...plan('normal', null, null, 60), targetDistanceM: 40 }] },
+        { name: 'Medicine Ball Scoop Throw', sets: [w(10, 10, 30), w(10, 10, 30)] },
+      ],
+    },
+  ]);
+}
+
 /** The only account whose logs the flows may delete. */
 const DEMO_CLIENT = 'client@demo.local';
 
@@ -312,6 +389,119 @@ export async function cleanupLogs(email: string): Promise<void> {
   for (const table of ['sticker_awards', 'personal_records', 'client_stats'] as const) {
     const { error: awardError } = await admin.from(table).delete().eq('client_id', id);
     if (awardError) throw awardError;
+  }
+}
+
+/** The demo client's conversation id and the seed coach's id (messages are inserted as the coach, with the service role). */
+async function demoChat(email: string): Promise<{ conversationId: string | null; clientId: string; coachId: string }> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`chat helpers only touch ${DEMO_CLIENT}`);
+  const clientId = await findUserId(DEMO_CLIENT);
+  const coachId = await findUserId('coach@demo.local');
+  if (!clientId || !coachId) throw new Error('Seed users not found (run pnpm db:reset).');
+  const { data, error } = await admin.from('conversations').select('id').eq('client_id', clientId).maybeSingle();
+  if (error) throw error;
+  return { conversationId: data?.id ?? null, clientId, coachId };
+}
+
+/** The seed coach writes to the demo client (creates the conversation if needed). */
+export async function coachMessage(email: string, body: string): Promise<void> {
+  const { conversationId, clientId, coachId } = await demoChat(email);
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  let id = conversationId;
+  if (!id) {
+    const made = await admin.from('conversations').insert({ workspace_id: ws.id, client_id: clientId }).select('id').single();
+    if (made.error) throw made.error;
+    id = made.data.id;
+  }
+  // A trigger copies workspace_id from the conversation; the generated type just requires a value.
+  const { error } = await admin.from('messages').insert({ conversation_id: id, workspace_id: ws.id, sender_id: coachId, body });
+  if (error) throw error;
+}
+
+/** Throws unless the demo client has sent a message with exactly this text. */
+export async function assertReply(email: string, body: string): Promise<void> {
+  const { conversationId, clientId } = await demoChat(email);
+  if (!conversationId) throw new Error('No conversation');
+  const { data, error } = await admin.from('messages').select('id').eq('conversation_id', conversationId).eq('sender_id', clientId).eq('body', body);
+  if (error) throw error;
+  if (data.length !== 1) throw new Error(`Expected exactly one client message "${body}", found ${data.length}`);
+}
+
+/** Throws unless the demo client has read every coach message. */
+export async function assertRead(email: string): Promise<void> {
+  const { conversationId, clientId, coachId } = await demoChat(email);
+  if (!conversationId) throw new Error('No conversation');
+  const [{ data: reads, error: e1 }, { data: last, error: e2 }] = await Promise.all([
+    admin.from('conversation_reads').select('last_read_at').eq('conversation_id', conversationId).eq('user_id', clientId).maybeSingle(),
+    admin.from('messages').select('created_at').eq('conversation_id', conversationId).eq('sender_id', coachId).order('created_at', { ascending: false }).limit(1),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  const newest = last[0]?.created_at;
+  if (!reads || (newest && Date.parse(reads.last_read_at) < Date.parse(newest))) throw new Error('The client has unread coach messages');
+}
+
+/** Deletes the demo client's conversation (messages and reads cascade). Nobody else's. */
+export async function cleanupMessages(email: string): Promise<void> {
+  const { conversationId } = await demoChat(email);
+  if (!conversationId) return;
+  const { error } = await admin.from('conversations').delete().eq('id', conversationId);
+  if (error) throw error;
+}
+
+/**
+ * The workout note of the client's latest finished log (the finish sheet writes "Felt: …" there), lines joined by
+ * " | ". Waits up to 15 s for the phone's upload.
+ */
+export async function logNotes(email: string): Promise<string> {
+  const id = await findUserId(email);
+  if (!id) throw new Error(`No user with email ${email}`);
+  for (let i = 0; i < 30; i += 1) {
+    const { data, error } = await admin
+      .from('workout_logs')
+      .select('notes')
+      .eq('client_id', id)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    if (data[0]) return (data[0].notes ?? '').split('\n').join(' | ');
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return '';
+}
+
+/** Deletes every body scan of the seed demo client (values cascade). Nobody else's. */
+export async function cleanupScans(email: string): Promise<void> {
+  if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-scans only clears ${DEMO_CLIENT}`);
+  const id = await findUserId(DEMO_CLIENT);
+  if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
+  const { error } = await admin.from('body_measurements').delete().eq('client_id', id);
+  if (error) throw error;
+}
+
+/** Two coach-entered scans for the demo client (34 and 3 days ago): weight 82 kg then 80 kg, body fat 20% then 19%. Starts clean. */
+export async function seedScans(email: string): Promise<void> {
+  await cleanupScans(email);
+  const clientId = await findUserId(email);
+  if (!clientId) throw new Error(`User ${email} not found`);
+  // The flow types pounds, so make that explicit rather than rely on the default.
+  const { error: unitsErr } = await admin.from('profiles').update({ units: 'lb' }).eq('id', clientId);
+  if (unitsErr) throw unitsErr;
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  const coach = await coachClient();
+  try {
+    for (const [daysAgo, kg, fat] of [[34, 82, 20], [3, 80, 19]] as const) {
+      const measuredOn = addDays(localToday(), -daysAgo);
+      const { error } = await coach.rpc('save_body_measurement', {
+        p: { workspace_id: ws.id, client_id: clientId, measured_on: measuredOn, values: { weight_kg: kg, body_fat_pct: fat } },
+      });
+      if (error) throw error;
+    }
+  } finally {
+    await coach.auth.signOut();
   }
 }
 
@@ -412,6 +602,7 @@ async function communityCleanup(): Promise<void> {
 async function run(action: string, email: string, name: string): Promise<string | void> {
   if (action === 'confirmlink') return confirmLink(email);
   if (action === 'invitelink') return inviteLink(email, name);
+  if (action === 'log-notes') return logNotes(email);
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
   else if (action === 'cleanup') await cleanup(email);
@@ -421,10 +612,17 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign-today') await assignToday(email);
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'assign-today-sections') await assignTodaySections(email);
+  else if (action === 'assign-today-mockup') await assignTodayMockup(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   // For these two the "email" is the business name and the "name" is the bio.
   else if (action === 'coach-profile') await setCoachProfile(email, name);
   else if (action === 'coach-profile-reset') await setCoachProfile(DEMO_BUSINESS, '');
+  else if (action === 'coach-message') await coachMessage(email, name);
+  else if (action === 'assert-reply') await assertReply(email, name);
+  else if (action === 'assert-read') await assertRead(email);
+  else if (action === 'cleanup-messages') await cleanupMessages(email);
+  else if (action === 'seed-scans') await seedScans(email);
+  else if (action === 'cleanup-scans') await cleanupScans(email);
   else if (action === 'community-coach-post') await communityPost((await demoCommunity()).coachId, email);
   else if (action === 'community-buddy-post') await communityPost(await buddyId(), email);
   else if (action === 'community-cleanup') await communityCleanup();

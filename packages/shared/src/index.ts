@@ -68,6 +68,17 @@ export {
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
 export {
+  CALENDAR_VIEWS,
+  DEFAULT_CALENDAR_VIEW,
+  calendarRange,
+  coveringRange,
+  isCalendarView,
+  shiftMonth,
+  stepCalendar,
+  switchAnchor,
+} from './dates/calendar-range';
+export type { CalendarRange, CalendarView } from './dates/calendar-range';
+export {
   BLOCK_KINDS,
   SET_TYPES,
   WorkoutBlockDoc,
@@ -86,6 +97,8 @@ export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow, WorkoutTreeSubstituteRow } from './workouts/tree';
 export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
+export { workoutPreview } from './workouts/preview';
+export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
   addExerciseToSuperset,
@@ -131,6 +144,8 @@ export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
 export type { PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
 export { programClashes } from './programs/clashes';
+export { isLiveWorkout, liveSyncStatus, liveSyncWindow, planLiveSync } from './programs/live-sync';
+export type { LiveSyncAssignment, LiveSyncCopy, LiveSyncPlan, LiveSyncSlot } from './programs/live-sync';
 export type { ProgramClash } from './programs/clashes';
 export {
   BAD_TODAY_ERROR,
@@ -169,6 +184,7 @@ export {
   reopenLog,
   removeLogSet,
   setExerciseNote,
+  setLogNotes,
   stepActual,
   swapLogExercise,
   toggleSet,
@@ -176,6 +192,8 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
+export { FEELINGS, LOG_NOTES_MAX, composeFinishNotes, readFinishNotes } from './logs/finish-note';
+export type { Feeling } from './logs/finish-note';
 export {
   coachLine,
   formatLastResult,
@@ -307,6 +325,12 @@ export {
   ProfileInput,
   characterCount,
 } from './profile/schema';
+export type { Message, OutboxItem } from './messages/types';
+export { seenMessageId, unreadCount } from './messages/state';
+export { dayLabel, messageYoutubeIds } from './messages/format';
+export { mergeOutbox } from './messages/outbox';
+export { FULL_MAX_EDGE, THUMB_MAX_EDGE, MAX_PHOTOS, fitWithin, photoPaths, thumbPathOf, isAlreadyUploaded, mergeById } from './messages/photos';
+export type { PhotoExt } from './messages/photos';
 export {
   chooseSubstitute,
   clearSubstitute,
@@ -316,6 +340,30 @@ export {
   substituteChoices,
   substitutedFrom,
 } from './logs/substitutes';
+export { BUILT_IN_METRIC_KEYS, MAX_LB_DISPLAY_DRIFT_KG, METRICS, displayValue, formatMetric, fromDisplay, isInRange, parseWeightInput, toInputValue } from './body/metrics';
+export type { BuiltInMetricKey, CustomMetricDef, MetricDef } from './body/metrics';
+export { CHART_RANGES, CHART_RANGE_LABELS, changeSince, formatShortDate, measurementSeries } from './body/series';
+export type { ChartRange, SeriesPoint } from './body/series';
+export { SCAN_DUE_DAYS, isScanDue } from './body/due';
+export { ageLabel, latestUpdates, trainingSummary } from './coach-home/client-overview';
+export type { ClientUpdate, ClientUpdateKind, TrackedCount, TrainingSummary } from './coach-home/client-overview';
+export {
+  DOCUMENT_MAX_BYTES,
+  DOCUMENT_NAME_MAX_LENGTH,
+  GOAL_MAX_LENGTH,
+  NOTE_MAX_LENGTH,
+  countdownLabel,
+  daysUntil,
+  documentKind,
+  formatFileSize,
+  validateDocumentName,
+  validateGoal,
+  validateLimitations,
+  validateNote,
+} from './clients/records';
+export type { TextCheck } from './clients/records';
+export { OVERVIEW_METRICS, OVERVIEW_PERIODS, OVERVIEW_PERIOD_LABELS, bodyOverview, formatMetricChange } from './body/overview';
+export type { MetricOverview, OverviewMetric, OverviewPeriod, OverviewScan } from './body/overview';
 export {
   COMMENT_BODY_MAX,
   CardPr,
@@ -338,7 +386,7 @@ export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
 export { groupedLikeText, likersLine } from './community/likes';
-export { badgeLabel, groupNotifications, notificationText, unreadCount } from './community/notifications';
+export { badgeLabel, groupNotifications, notificationText, unreadNotificationCount } from './community/notifications';
 export type { NotificationItem, NotificationKind, NotificationRow } from './community/notifications';
 export { firstYoutubeId, splitLinks } from './community/links';
 export type { TextSegment } from './community/links';

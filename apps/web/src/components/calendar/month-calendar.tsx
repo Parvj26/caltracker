@@ -17,12 +17,12 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useId, useState, type ReactNode } from 'react';
-import { monthGrid } from '@caltracker/shared';
-import type { IsoDate } from '@caltracker/shared';
+import { useRouter } from 'next/navigation';
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { isLiveWorkout } from '@caltracker/shared';
+import type { IsoDate, WorkoutPreview } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
-import { formatLongDay, formatMonth, formatShortDay, shiftMonth } from './format';
+import { formatDayMonth, formatLongDay, formatShortDay, formatWeekday } from './format';
 import styles from './calendar.module.css';
 
 export type CalendarItem = {
@@ -36,11 +36,28 @@ export type CalendarItem = {
   logId?: string | null;
   /** A workout the client added and finished themselves (no planned workout): a link to its log, never moved. */
   addedByClient?: boolean;
+  /** Its first exercises, shown on the taller week-view cards. */
+  preview?: WorkoutPreview;
+  /** Its finished log was logged by the coach (an in-person session), not by the client. */
+  loggedByCoach?: boolean;
+  /** From a program assignment: whether its program has Live Sync on, and this copy was edited or started. */
+  liveSync?: { programLive: boolean; customised: boolean; started: boolean };
 };
 
 type Props = {
-  /** "YYYY-MM". */
-  month: string;
+  /** Monday-first rows of seven days (from calendarRange). */
+  weeks: IsoDate[][];
+  /** The month view's "YYYY-MM": days outside it are dimmed. Null in the week views, where every day counts. */
+  month: string | null;
+  /** The grid's accessible name, e.g. "November 2026" or "2 Nov – 15 Nov 2026". */
+  label: string;
+  /**
+   * 'month': compact cells (names only). 'week': taller cells whose cards preview their exercises, falling back to a
+   * list of days when the calendar is narrow.
+   */
+  layout: 'month' | 'week';
+  /** Shown above the grid (the view switcher, TODAY and ‹ ›). */
+  toolbar?: ReactNode;
   days: Record<IsoDate, CalendarItem[]>;
   /** The viewer's own today (computed in the browser), or null before it is known. */
   today: IsoDate | null;
@@ -51,6 +68,11 @@ type Props = {
   renderItem: (item: CalendarItem, date: IsoDate, editable: boolean) => ReactNode;
   /** Where an item's finished log lives, for its "✓" link. */
   logHref?: (logId: string) => string;
+  /**
+   * Where a click anywhere on an item's card goes (its log once done, otherwise the workout), or null for a card that
+   * opens nothing. Mouse and touch only: keyboard users keep the name button (drag) and the "⋯" menu.
+   */
+  itemHref?: (item: CalendarItem, editable: boolean) => string | null;
   /** Present: items can be dragged onto other days. Absent: item names are plain text. */
   onDropItem?: (itemId: string, date: IsoDate) => void;
   /** Present: each day has a "+" button. */
@@ -88,19 +110,17 @@ const announcements: Announcements = {
 };
 
 /**
- * A Monday-first month of days. Each day cell carries data-date; today has an ink ring and aria-current="date".
- * Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space to drop); the "+"
- * button and the item controls from renderItem are the non-drag path.
+ * Monday-first weeks of days: a month, or 1, 2 or 4 weeks. Each day cell carries data-date; today has an ink ring and
+ * aria-current="date". Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space
+ * to drop); the "+" button and the item controls from renderItem are the non-drag path.
  */
-export function MonthCalendar({ month, days, today, renderItem, logHref, onDropItem, onAddToDay, editableFrom }: Props) {
-  const pathname = usePathname();
+export function MonthCalendar({ weeks, month, label, layout, toolbar, days, today, renderItem, logHref, itemHref, onDropItem, onAddToDay, editableFrom }: Props) {
   const dndId = useId();
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
   );
-  const weeks = monthGrid(month);
   const draggable = Boolean(onDropItem);
 
   function onDragStart(e: DragStartEvent) {
@@ -115,16 +135,8 @@ export function MonthCalendar({ month, days, today, renderItem, logHref, onDropI
   }
 
   return (
-    <div className={styles.calendar}>
-      <div className={styles.monthBar}>
-        <Link href={`${pathname}?month=${shiftMonth(month, -1)}`} className={styles.monthLink} aria-label="Previous month">
-          <span aria-hidden="true">←</span>
-        </Link>
-        <h2 className={styles.monthTitle} aria-live="polite">{formatMonth(month)}</h2>
-        <Link href={`${pathname}?month=${shiftMonth(month, 1)}`} className={styles.monthLink} aria-label="Next month">
-          <span aria-hidden="true">→</span>
-        </Link>
-      </div>
+    <div className={cx(styles.calendar, layout === 'week' && styles.weekLayout)}>
+      {toolbar}
 
       <DndContext
         id={dndId}
@@ -136,7 +148,7 @@ export function MonthCalendar({ month, days, today, renderItem, logHref, onDropI
         onDragCancel={() => setDragging(null)}
       >
         <div className={styles.scroll}>
-          <table className={styles.grid} aria-label={formatMonth(month)}>
+          <table className={styles.grid} aria-label={label}>
             <thead>
               <tr>
                 {WEEKDAYS.map((d) => (
@@ -154,11 +166,14 @@ export function MonthCalendar({ month, days, today, renderItem, logHref, onDropI
                         <DayCell
                           date={date}
                           items={days[date] ?? NONE}
-                          inMonth={date.startsWith(`${month}-`)}
+                          inMonth={month === null || date.startsWith(`${month}-`)}
+                          layout={layout}
+                          firstShown={date === weeks[0]![0]}
                           isToday={date === today}
                           draggable={draggable && editable}
                           renderItem={renderItem}
                           logHref={logHref}
+                          itemHref={itemHref}
                           today={today}
                           editable={editable}
                           {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
@@ -183,17 +198,24 @@ function DayCell({
   date,
   items,
   inMonth,
+  layout,
+  firstShown,
   isToday,
   draggable,
   editable,
   renderItem,
   logHref,
+  itemHref,
   today,
   onAdd,
 }: {
   date: IsoDate;
+  layout: Props['layout'];
+  /** The first day on screen: the week views name its month. */
+  firstShown: boolean;
   today: IsoDate | null;
   logHref: Props['logHref'];
+  itemHref: Props['itemHref'];
   items: CalendarItem[];
   inMonth: boolean;
   isToday: boolean;
@@ -213,7 +235,16 @@ function DayCell({
       data-date={date}
       className={cx(styles.day, !inMonth && styles.otherMonth, isToday && styles.today, isOver && styles.dayOver)}
     >
-      <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
+      {layout === 'month' ? (
+        <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
+      ) : (
+        // The weekday shows only when the days are a list (narrow screens); the columns have it otherwise. The month
+        // shows on the first day on screen and on each 1st.
+        <span className={styles.dayNumber} aria-hidden="true">
+          <span className={styles.dayWeekday}>{formatWeekday(date)} </span>
+          {firstShown || date.endsWith('-01') ? formatDayMonth(date) : Number(date.slice(8))}
+        </span>
+      )}
       {items.length > 0 ? (
         <ul className={styles.items}>
           {items.map((item) =>
@@ -229,7 +260,14 @@ function DayCell({
               editable={editable}
               renderItem={renderItem}
               logHref={logHref}
+              showPreview={layout === 'week'}
+              href={itemHref ? itemHref(item, editable) : null}
               missed={item.logId === null && today !== null && date < today}
+              live={
+                item.liveSync !== undefined &&
+                today !== null &&
+                isLiveWorkout({ ...item.liveSync, date }, today)
+              }
             />
             ),
           )}
@@ -262,12 +300,21 @@ function DayItem({
   editable,
   renderItem,
   logHref,
+  href,
   missed,
+  showPreview,
+  live,
 }: {
   item: CalendarItem;
+  /** The week views' taller cards: up to three exercise lines and "+ N more exercises". */
+  showPreview: boolean;
   logHref: Props['logHref'];
+  /** Where a click anywhere on the card goes, or null. */
+  href: string | null;
   /** Planned, its day has passed (in the viewer's zone) and no finished log. */
   missed: boolean;
+  /** Kept up to date by the program's Live Sync. */
+  live: boolean;
   date: IsoDate;
   draggable: boolean;
   editable: boolean;
@@ -277,8 +324,45 @@ function DayItem({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `item-${item.id}`, data, disabled: !draggable });
   // The item's controls (its "⋯" menu) sit in the top-right corner; the name leaves room for them.
   const controls = renderItem(item, date, editable);
+  const router = useRouter();
+  // A drag ends with a click on the handle; that click must not also open the card. dnd-kit already swallows it; this
+  // is a guard for the moment the drag ends. The flag clears just after every drag ends (dropped on another day, its
+  // own day, a past day, or cancelled with Esc), so the next real click always opens the card.
+  const dragged = useRef(false);
+  useEffect(() => {
+    if (isDragging) {
+      dragged.current = true;
+      return;
+    }
+    if (!dragged.current) return;
+    const timer = setTimeout(() => {
+      dragged.current = false;
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isDragging]);
+  const target = (event: MouseEvent<HTMLLIElement>) =>
+    // The "⋯" menu, its dialogs and the "✓ Done" link keep their own behaviour.
+    !dragged.current && href && !(event.target as HTMLElement).closest('a, [data-item-controls]') ? href : null;
+  const openCard = (event: MouseEvent<HTMLLIElement>) => {
+    const to = target(event);
+    if (!to) return;
+    if (event.metaKey || event.ctrlKey) window.open(to, '_blank', 'noopener');
+    else router.push(to);
+  };
+  // Middle-click opens the card in a new tab, like a link.
+  const openCardInTab = (event: MouseEvent<HTMLLIElement>) => {
+    const to = event.button === 1 ? target(event) : null;
+    if (!to) return;
+    event.preventDefault();
+    window.open(to, '_blank', 'noopener');
+  };
   return (
-    <li className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed)}>
+    // A mouse and touch shortcut: the name button and the "⋯" menu stay the keyboard and screen-reader way in.
+    <li
+      className={cx(styles.item, item.programName ? styles.programItem : styles.singleItem, isDragging && styles.dragging, missed && styles.missed, href && styles.clickable)}
+      onClick={openCard}
+      onAuxClick={openCardInTab}
+    >
       <div className={styles.itemRow}>
         {draggable ? (
           <button
@@ -304,15 +388,44 @@ function DayItem({
             </span>
           </span>
         )}
-        {controls ? <div className={styles.itemControls}>{controls}</div> : null}
+        {controls ? (
+          <div className={styles.itemControls} data-item-controls>
+            {controls}
+          </div>
+        ) : null}
       </div>
+      {showPreview && item.preview && item.preview.lines.length > 0 ? (
+        <div className={styles.cardPreview}>
+          {item.preview.lines.map((line, i) => (
+            <span key={i} className={styles.previewLine} title={line.text}>
+              <span aria-hidden="true">{line.text}</span>
+              <span className={styles.srOnly}>{line.spoken}</span>
+            </span>
+          ))}
+          {item.preview.more > 0 ? (
+            <span className={styles.previewMore}>
+              + {item.preview.more} more {item.preview.more === 1 ? 'exercise' : 'exercises'}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {item.logId && logHref ? (
         <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`}>
           <span aria-hidden="true">✓</span> Done
         </Link>
       ) : null}
+      {item.logId && item.loggedByCoach ? <span className={styles.coachNote}>Logged by coach</span> : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
-      {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+      {item.programName ? (
+        <span className={styles.itemProgram}>
+          {item.programName}
+          {live ? (
+            <span className={styles.liveTag} title="Live Sync: changes to the program update this workout">
+              {' · '}Live
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </li>
   );
 }

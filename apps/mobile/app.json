@@ -36,7 +36,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CalTracker uses your photos so you can share them with your coach and your community.",
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach and share them in your community.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -44,7 +44,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": false,
+          "photosPermission": "CalTracker uses your photos so you can send them to your coach.",
           "savePhotosPermission": "Save your sticker cards to Photos.",
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": []

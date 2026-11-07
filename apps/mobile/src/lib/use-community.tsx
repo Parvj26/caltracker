@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { groupNotifications, unreadCount, type NotificationItem, type NotificationRow } from '@caltracker/shared';
+import { groupNotifications, unreadNotificationCount, type NotificationItem, type NotificationRow } from '@caltracker/shared';
 import { coachIds, loadBlocked, loadNotifications, myCommunity, type CommunityInfo } from './community-api';
 import { useLive } from './community-live';
 import { useSession } from './session';
@@ -96,7 +96,7 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
       blocked,
       notifications,
       rows,
-      unread: unreadCount(notifications),
+      unread: unreadNotificationCount(notifications),
       refresh,
       refreshNotifications,
       setBlocked,

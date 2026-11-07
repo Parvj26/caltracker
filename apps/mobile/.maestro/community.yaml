@@ -23,10 +23,12 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - extendedWaitUntil:
     visible:
-      id: tab-community
+      id: tab-coach
     timeout: 20000
 - tapOn:
-    id: tab-community
+    id: tab-coach
+- tapOn:
+    id: open-community
 - extendedWaitUntil:
     visible: 'E2E Welcome to the group!.*'
     timeout: 15000
