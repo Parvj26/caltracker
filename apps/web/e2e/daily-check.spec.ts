@@ -222,92 +222,170 @@ test('Home groups every client under its reason, with counts, a reason line and 
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('the Clients list shows status, last workout, this week and program for each client, with no hydration errors', async ({ page }) => {
+/** Days since Monday (0 on a Monday): how many of the last few days fall in this week. */
+const sinceMonday = () => (new Date().getDay() + 6) % 7;
+const longWeekday = (n: number) => new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(new Date(Date.now() + n * MS_DAY));
+
+/** seedFive plus Tina Training, who is logging today's workout right now, and a pending invite. */
+async function seedList(coach: Coach) {
+  const ids = await seedFive(coach);
+  const training = await addClient(coach, 'Tina', 'Training');
+  await finish(coach, training, await plan(coach, training, 0), 0, 'in_progress');
+  await invite(coach);
+  // Misses this week: Rowan missed 2 and 1 days ago, Olive 2 days ago (only the days since Monday count).
+  const rowanMissed = Math.min(2, sinceMonday());
+  const oliveMissed = sinceMonday() >= 2 ? 1 : 0;
+  return { ...ids, training, rowanMissed, oliveMissed };
+}
+
+test('the Clients list shows a status line, last workout, this week, 4 weeks and plan for each client, with no hydration errors', async ({ page }) => {
   const messages: string[] = [];
   page.on('console', (m) => messages.push(m.text()));
   // A production build reports hydration mismatches as minified React errors (#418, #423, #425) on pageerror.
   page.on('pageerror', (e) => messages.push(e.message));
   const coach = await newCoach();
-  await seedFive(coach);
-  await invite(coach);
+  const ids = await seedList(coach);
   await signIn(page, coach);
   await page.goto('/clients');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients 8');
   const table = page.getByRole('table', { name: 'Clients' });
   const rowOf = (name: string) => table.getByRole('row').filter({ hasText: name });
+  const cell = (name: string, n: number) => rowOf(name).getByRole('cell').nth(n);
 
-  await expect(rowOf('Rowan Run').getByRole('cell').nth(1)).toHaveText(/^Needs attention/);
-  await expect(rowOf('Enid Ending').getByRole('cell').nth(1)).toHaveText(/^Program ending/);
-  await expect(rowOf('Nell Nothing').getByRole('cell').nth(1)).toHaveText(/^Nothing planned/);
-  const steady = rowOf('Sami Steady');
-  await expect(steady.getByRole('cell').nth(1)).toHaveText(/^On track/);
-  await expect(steady.getByRole('cell').nth(2)).toContainText('Today');
-  await expect(steady.getByRole('cell').nth(3)).toContainText(/\d \/ \d/);
-  await expect(steady.getByRole('cell').nth(4)).toContainText('Hypertrophy 8');
-  await expect(steady.getByRole('cell').nth(4)).toContainText(/ends \d{1,2} \w{3}/);
-  await expect(rowOf('Nell Nothing').getByRole('cell').nth(2)).toContainText('None yet');
-  await expect(rowOf('Nell Nothing').getByRole('cell').nth(4)).toContainText('No program');
-  await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: 'Ivy Invited' })).toContainText('Invited');
-  // The week count reads as words to a screen reader.
-  await expect(steady.getByRole('cell').nth(3).getByText(/^\d+ of \d+ done this week$/)).toBeAttached();
+  // Client cell: name and a status line.
+  await expect(cell('Tina Training', 0)).toContainText('● Training now');
+  await expect(cell('Rowan Run', 0)).toContainText(ids.rowanMissed > 0 ? `Missed ${ids.rowanMissed} this week` : 'Active');
+  await expect(cell('Olive Once', 0)).toContainText(ids.oliveMissed > 0 ? 'Missed 1 this week' : 'Active');
+  await expect(cell('Enid Ending', 0)).toContainText(`Plan ends ${longWeekday(3)}`);
+  await expect(cell('Nell Nothing', 0)).toContainText('Nothing planned');
+  await expect(cell('Sami Steady', 0)).toContainText('Active');
+
+  // Last workout, this week, 4 weeks.
+  await expect(cell('Sami Steady', 1)).toContainText('Today · Session');
+  await expect(cell('Olive Once', 1)).toContainText('Yesterday · Session');
+  await expect(cell('Nell Nothing', 1)).toContainText('None yet');
+  await expect(cell('Sami Steady', 2)).toContainText(/\d of \d/);
+  await expect(cell('Rowan Run', 3)).toContainText('0%');
+  await expect(cell('Olive Once', 3)).toContainText('50%');
+  await expect(cell('Sami Steady', 3)).toContainText('100%');
+  await expect(cell('Sami Steady', 3).getByText('(1 of 1 done)')).toBeAttached();
+
+  // Plan: the program and its end; "nothing after" when it ends this week; quick adds when nothing is planned.
+  await expect(cell('Sami Steady', 4)).toContainText('Hypertrophy 8');
+  await expect(cell('Sami Steady', 4)).toContainText(/ends \d{1,2} \w{3}/);
+  await expect(cell('Enid Ending', 4)).toContainText('Strength Block');
+  await expect(cell('Enid Ending', 4)).toContainText('nothing after');
+  await expect(cell('Nell Nothing', 4).getByRole('link', { name: 'Add a workout for Nell Nothing' })).toHaveAttribute(
+    'href',
+    `/clients/${ids.nothing}/training?add=workout`,
+  );
+
+  // The pending invite is a row too.
+  const ivy = rowOf('Ivy Invited');
+  await expect(ivy).toContainText('Invited today');
+  await expect(ivy).toContainText('Not joined yet');
+
   await page.reload();
-  await expect(rowOf('Sami Steady').getByRole('cell').nth(1)).toHaveText(/^On track/);
+  await expect(cell('Sami Steady', 0)).toContainText('Active');
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
+
+  // Tapping a row opens the client.
+  await cell('Quinn Quiet', 1).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${ids.quiet}$`));
 });
 
-test('Clients search filters as you type, status chips filter, and sort reorders', async ({ page }) => {
+test('"+ Program" on a row with nothing planned opens the assign dialog on their Training page', async ({ page }) => {
   const coach = await newCoach();
-  await seedFive(coach);
-  await invite(coach);
+  const nothing = await addClient(coach, 'Nell', 'Nothing', 2);
+  await signIn(page, coach);
+  await page.goto('/clients');
+  await page.getByRole('link', { name: 'Assign a program to Nell Nothing' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${nothing}/training`));
+  await expect(page.getByRole('dialog', { name: 'Assign a program' })).toBeVisible();
+  // Once open, the address no longer asks for it, so a reload doesn't open it again.
+  await expect(page).not.toHaveURL(/add=/);
+});
+
+test('Clients search filters as you type, chips filter, and sort reorders', async ({ page }) => {
+  const coach = await newCoach();
+  const ids = await seedList(coach);
   await signIn(page, coach);
   await page.goto('/clients');
   const table = page.getByRole('table', { name: 'Clients' });
-  const names = () => table.locator('[data-client-id] a').allTextContents();
-  const filters = page.getByRole('group', { name: 'Filter by status' });
+  const names = () => table.locator('[data-client-id]').evaluateAll((rows) => rows.map((r) => r.querySelector('a')?.textContent ?? ''));
+  const filters = page.getByRole('group', { name: 'Filter clients' });
 
   // The result line is always there (a live region), and says so when nothing is filtered.
-  await expect(page.getByRole('status').filter({ hasText: 'Showing all 7' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Showing all 8' })).toBeAttached();
 
-  // Default sort is by last name.
-  await expect.poll(names).toEqual(['Enid Ending', 'Nell Nothing', 'Olive Once', 'Quinn Quiet', 'Rowan Run', 'Sami Steady']);
+  // Only chips with someone in them, each with its count.
+  const missed = (ids.rowanMissed > 0 ? 1 : 0) + (ids.oliveMissed > 0 ? 1 : 0);
+  await expect(filters.getByRole('button')).toHaveText([
+    'All 8',
+    ...(missed > 0 ? [`Missed this week ${missed}`] : []),
+    'Plan ending 1',
+    'Nothing planned 1',
+    'Invited 1',
+  ]);
+
+  // Default sort: most recent workout first, never-trained last (by name).
+  await expect.poll(names).toEqual(['Sami Steady', 'Enid Ending', 'Olive Once', 'Quinn Quiet', 'Nell Nothing', 'Rowan Run', 'Tina Training']);
 
   // Search: part of a name, any case, as you type.
   const search = page.getByRole('searchbox', { name: 'Search clients' });
   await search.pressSequentially('ste');
   await expect.poll(names).toEqual(['Sami Steady']);
-  await expect(page.getByRole('status').filter({ hasText: 'Showing 1 of 7' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Showing 1 of 8' })).toBeAttached();
   await search.fill('zzz');
   await expect(table.getByText('No clients match.')).toBeVisible();
   await search.fill('');
 
-  // Filter chips carry counts and filter the list.
-  await expect(filters.getByRole('button', { name: /^Needs attention 3$/ })).toBeVisible();
-  await filters.getByRole('button', { name: /^Needs attention/ }).click();
-  await expect(filters.getByRole('button', { name: /^Needs attention/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect.poll(names).toEqual(['Olive Once', 'Quinn Quiet', 'Rowan Run']);
-  await expect(page.getByRole('table', { name: 'Pending invites' })).toHaveCount(0);
-  await filters.getByRole('button', { name: /^Nothing planned/ }).click();
+  // Chips are real toggle buttons.
+  const chip = (name: RegExp) => filters.getByRole('button', { name });
+  await chip(/^Plan ending/).click();
+  await expect(chip(/^Plan ending/)).toHaveAttribute('aria-pressed', 'true');
+  await expect(chip(/^All/)).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(names).toEqual(['Enid Ending']);
+  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
+  await chip(/^Nothing planned/).click();
   await expect.poll(names).toEqual(['Nell Nothing']);
-  await filters.getByRole('button', { name: /^Invited/ }).click();
-  await expect(table).toHaveCount(0);
-  await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: 'Ivy Invited' })).toBeVisible();
-  await filters.getByRole('button', { name: /^All/ }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Showing all 7' })).toBeVisible();
+  if (missed > 0) {
+    await chip(/^Missed this week/).click();
+    await expect.poll(async () => (await names()).length).toBe(missed);
+  }
+  await chip(/^Invited/).click();
+  await expect.poll(names).toEqual([]);
+  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toBeVisible();
+  await chip(/^All/).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Showing all 8' })).toBeAttached();
 
-  // Sort by last workout (most recent first, never-trained last) and by program end (soonest first, none last).
-  await page.getByLabel('Sort by').selectOption('last_workout');
-  await expect.poll(names).toEqual(['Sami Steady', 'Enid Ending', 'Olive Once', 'Quinn Quiet', 'Nell Nothing', 'Rowan Run']);
-  await page.getByLabel('Sort by').selectOption('end_date');
+  // Sort: by name; lowest 4-week completion first (nothing due last); soonest plan end first (none last).
+  const sort = page.getByLabel('Sort:');
+  await sort.selectOption('name');
+  await expect.poll(names).toEqual(['Enid Ending', 'Nell Nothing', 'Olive Once', 'Quinn Quiet', 'Rowan Run', 'Sami Steady', 'Tina Training']);
+  await sort.selectOption('completion');
+  await expect.poll(async () => (await names()).slice(0, 3)).toEqual(['Rowan Run', 'Olive Once', 'Sami Steady']);
+  await sort.selectOption('plan_end');
   await expect.poll(async () => (await names()).slice(0, 2)).toEqual(['Enid Ending', 'Sami Steady']);
 });
 
-test('below 900 px the Clients list turns into stacked cards with labelled values', async ({ page }) => {
+test('on iPad portrait the Clients list turns into stacked cards with labelled values and no sideways scroll', async ({ page }) => {
   const coach = await newCoach();
-  await seedFive(coach);
+  await seedList(coach);
   await page.setViewportSize({ width: 820, height: 1180 });
   await signIn(page, coach);
   await page.goto('/clients');
   const row = page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: 'Sami Steady' });
-  await expect(row.getByText('Last workout:')).toBeVisible();
+  await expect(row.getByText('Last workout', { exact: true })).toBeVisible();
+  await expect(row.getByText('4 weeks', { exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Last workout' })).toBeHidden();
   const width = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(width).toBeLessThanOrEqual(0);
+
+  // Laptop / iPad landscape: a table with column headers, still no sideways scroll.
+  await page.setViewportSize({ width: 1194, height: 834 });
+  await expect(page.getByRole('columnheader', { name: 'Last workout' })).toBeVisible();
+  await expect(row.getByText('Last workout', { exact: true })).toBeHidden();
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(wide).toBeLessThanOrEqual(0);
 });

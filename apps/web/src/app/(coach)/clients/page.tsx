@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { formatFullName, localToday } from '@caltracker/shared';
+import { COMPLETION_WINDOW_DAYS, formatFullName, localToday } from '@caltracker/shared';
 import { Card } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
 import { loadHomeData } from '@/lib/coach-home';
+import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { AddClientForm } from './add-client-form';
 import { avatarTone, initials } from './avatar';
-import { ClientDirectory } from './client-directory';
-import { CsvUpload } from './csv-upload';
+import { ClientDirectory, type DirectoryInvite, type InvitePlanSummary } from './client-directory';
+import { InviteClientButton } from './invite-dialog';
 import { newestInviteFirst } from './pending-order';
 import { PastClients } from './past-clients';
 import { ResendButton } from './resend-button';
@@ -19,15 +19,12 @@ export const metadata: Metadata = { title: 'Clients' };
 
 /** The Clients list looks this far back for each client's last workout (Home only needs 30 days). */
 const LAST_WORKOUT_LOOKBACK_DAYS = 90;
+/** How far ahead the list looks for a client's next single workout (the Plan column). */
+const NEXT_WORKOUT_AHEAD_DAYS = 60;
+/** Same cap as the workout library page. */
+const LIBRARY_LIMIT = 200;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
-
-function expiryLabel(expiresAt: string): string {
-  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / DAY_MS);
-  if (days <= 0) return 'Expired';
-  return `Expires in ${days} day${days === 1 ? '' : 's'}`;
-}
 
 function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   return (
@@ -37,32 +34,37 @@ function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   );
 }
 
-/** With `href`, the name links to that page (a joined client's calendar). */
-function NameCell({ name, toneKey, href }: { name: string; toneKey: string; href?: string }) {
-  return (
-    <div role="cell" className={styles.nameCell}>
-      <Avatar name={name} toneKey={toneKey} />
-      {href ? (
-        <Link href={href} className={cx(styles.name, styles.nameLink)}>{name || 'Client'}</Link>
-      ) : (
-        <span className={styles.name}>{name}</span>
-      )}
-    </div>
-  );
+const isExpired = (expiresAt: string) => Date.parse(expiresAt) <= Date.now();
+
+type PlanItemRow = { start_on: string; position: number; programs: { name: string } | null; workouts: { name: string } | null };
+
+/** What an invite will start with, from the plan kept with it (see set_invite_plan). */
+function planSummary(items: PlanItemRow[]): InvitePlanSummary {
+  const sorted = [...items].sort((a, b) => a.position - b.position);
+  const first = sorted[0];
+  if (!first) return null;
+  if (first.programs) return { kind: 'program', name: first.programs.name, on: first.start_on };
+  const workouts = sorted.filter((i) => i.workouts);
+  const firstWorkout = workouts[0];
+  if (!firstWorkout?.workouts) return null;
+  return { kind: 'single', name: firstWorkout.workouts.name, on: firstWorkout.start_on, more: workouts.length - 1 };
 }
 
-const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 export default async function ClientsPage() {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, userId, firstName, lastName } = await requireCoach();
   const supabase = await createServerSupabase();
+  const utcToday = localToday('UTC');
 
-  const [data, invites, past] = await Promise.all([
-    // Current clients with their recent workouts, programs and PRs: the same rows Home's daily check reads.
-    loadHomeData(supabase, workspaceId, localToday('UTC'), LAST_WORKOUT_LOOKBACK_DAYS),
+  // A fixed number of workspace-scoped reads (never one per client), all in parallel.
+  const [data, invites, past, library, programs, pickerHistory] = await Promise.all([
+    // Current clients with 4 weeks back and 2 months ahead of planned workouts, their programs and last workouts.
+    loadHomeData(supabase, workspaceId, utcToday, LAST_WORKOUT_LOOKBACK_DAYS, {
+      backDays: COMPLETION_WINDOW_DAYS,
+      aheadDays: NEXT_WORKOUT_AHEAD_DAYS,
+    }),
     supabase
       .from('client_invites')
-      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at')
+      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at, client_invite_plan_items(start_on, position, programs(name), workouts(name))')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
     supabase
@@ -70,16 +72,17 @@ export default async function ClientsPage() {
       .select('user_id, email, first_name, last_name, full_name, removed_at')
       .eq('workspace_id', workspaceId)
       .order('removed_at', { ascending: false }),
+    // For "Give them something to start with" in the invite window.
+    supabase.from('workouts').select('id, name').eq('workspace_id', workspaceId).is('client_id', null).order('name').limit(LIBRARY_LIMIT),
+    supabase.from('programs').select('id, name, weeks').eq('workspace_id', workspaceId).order('name'),
+    loadPickerHistory(supabase, workspaceId, userId),
   ]);
   if (past.error) throw new Error(`Could not load past clients: ${past.error.message}`);
   if (invites.error) throw new Error(`Could not load invites: ${invites.error.message}`);
+  if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
+  if (programs.error) throw new Error(`Could not load programs: ${programs.error.message}`);
 
-  // Client emails live in auth.users, which RLS hides; fall back to the accepted invite's email.
-  const emailByUser = new Map(
-    invites.data.filter((i) => i.accepted_by).map((i) => [i.accepted_by as string, i.email]),
-  );
-  const clients = data.clients.map((c) => ({ id: c.id, name: formatFullName(c), email: emailByUser.get(c.id) ?? '' }));
-  const pending = invites.data
+  const pending: DirectoryInvite[] = invites.data
     .filter((i) => i.accepted_at === null)
     .sort(newestInviteFirst)
     .map((i) => ({
@@ -88,25 +91,26 @@ export default async function ClientsPage() {
       email: i.email,
       firstName: i.first_name,
       lastName: i.last_name,
-      sent: dateFormat.format(new Date(i.sent_at)),
-      expiry: expiryLabel(i.expires_at),
+      sentAt: i.sent_at,
+      expired: isExpired(i.expires_at),
+      plan: planSummary(i.client_invite_plan_items),
     }));
 
   return (
     <div className={styles.page}>
       <header className={styles.titleRow}>
-        <h1 className={styles.title}>Clients</h1>
-        <p className={styles.caption}>
-          {count(clients.length, 'client', 'clients')} · {count(pending.length, 'pending invite', 'pending invites')}
-        </p>
+        <h1 className={styles.title}>
+          Clients <span className={styles.titleCount}>{data.clients.length + pending.length}</span>
+        </h1>
+        <InviteClientButton
+          coachName={formatFullName({ firstName, lastName }) || 'Your coach'}
+          library={library.data}
+          programs={programs.data}
+          hints={pickerHints(pickerHistory, library.data)}
+        />
       </header>
 
-      <Card className={styles.addCard}>
-        <AddClientForm />
-        <CsvUpload />
-      </Card>
-
-      <ClientDirectory data={data} people={clients} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
+      <ClientDirectory data={data} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
 
       {past.data.length > 0 ? (
         <Card className={styles.listCard}>
@@ -123,7 +127,10 @@ export default async function ClientsPage() {
               <div role="rowgroup">
                 {past.data.map((p) => (
                   <div role="row" key={p.user_id} className={styles.row}>
-                    <NameCell name={p.full_name || p.email} toneKey={p.user_id} href={`/clients/${p.user_id}`} />
+                    <div role="cell" className={styles.nameCell}>
+                      <Avatar name={p.full_name || p.email} toneKey={p.user_id} />
+                      <Link href={`/clients/${p.user_id}`} className={cx(styles.name, styles.nameLink)}>{p.full_name || p.email || 'Client'}</Link>
+                    </div>
                     <span role="cell" className={styles.email}>{p.email}</span>
                     <span role="cell" className={styles.meta}>
                       {`Removed ${dateFormat.format(new Date(p.removed_at))}`}

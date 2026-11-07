@@ -18,16 +18,17 @@ export function RemoveClientButton({ userId, name, focusAfterId = 'clients-headi
   );
 }
 
-export function CancelInviteButton({ inviteId, email }: { inviteId: string; email: string }) {
+export function CancelInviteButton({ inviteId, email, inline = false }: { inviteId: string; email: string; inline?: boolean }) {
   return (
     <ConfirmButton
-      label="Cancel invite"
+      inline={inline}
+      label={inline ? 'Cancel' : 'Cancel invite'}
       ariaLabel={`Cancel invite to ${email}`}
       title="Cancel this invite?"
       body={`Cancel the invite to ${email}? The link in their email will stop working.`}
       confirmLabel="Cancel invite"
       onConfirm={() => cancelInvite(inviteId)}
-      focusAfterId="pending-heading"
+      focusAfterId="clients-heading"
     />
   );
 }

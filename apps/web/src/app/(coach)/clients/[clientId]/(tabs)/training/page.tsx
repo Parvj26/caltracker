@@ -64,6 +64,7 @@ export default async function ClientPage({
     view?: string | string[];
     from?: string | string[];
     month?: string | string[];
+    add?: string | string[];
   }>;
 }) {
   const { workspaceId, units, userId } = await requireCoach();
@@ -242,6 +243,7 @@ export default async function ClientPage({
         programs={pickerPrograms}
         upcomingWorkouts={scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : []))}
         {...(hints ? { hints } : {})}
+        openOnLoad={query.add === 'workout' || query.add === 'program' ? query.add : null}
       />
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />

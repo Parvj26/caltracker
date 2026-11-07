@@ -15,9 +15,11 @@ type Props = {
   label?: string;
   /** Names the row for screen readers, e.g. "Re-invite Sam Lee". */
   ariaLabel?: string;
+  /** A small text button inside a row's status line (the Clients list) instead of a bordered button. */
+  inline?: boolean;
 };
 
-export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel }: Props) {
+export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel, inline = false }: Props) {
   const [message, setMessage] = useState<StatusView | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -29,6 +31,17 @@ export function ResendButton({ email, firstName, lastName, label = 'Resend', ari
       const result = outcome.results[0];
       setMessage(result ? statusView(result.status, result.message) : null);
     });
+  }
+
+  if (inline) {
+    return (
+      <>
+        <button type="button" className={styles.inlineAction} onClick={resend} disabled={pending} aria-busy={pending || undefined} aria-label={pending ? undefined : ariaLabel}>
+          {pending ? 'Sending…' : label}
+        </button>
+        {message ? <span role="status" className={styles.inlineStatus}><StatusChip view={message} /></span> : null}
+      </>
+    );
   }
 
   return (

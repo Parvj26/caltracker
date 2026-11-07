@@ -89,10 +89,12 @@ test('remove a client: confirm, they move to Past clients, then re-invite them',
   const client = await makeClient('Remy', 'Removable');
   await signInAsCoach(page);
   const clients = page.getByRole('table', { name: 'Clients' });
-  const row = clients.getByRole('row').filter({ hasText: client.email });
-  await expect(row).toBeVisible();
+  await expect(clients.getByRole('row').filter({ hasText: client.name })).toBeVisible();
 
-  await row.getByRole('button', { name: `Remove ${client.name}` }).click();
+  // Remove lives on the client's Settings tab (the list rows open the client).
+  await page.goto(`/clients/${client.id}/settings`);
+  const remove = page.getByRole('button', { name: `Remove ${client.name}` });
+  await remove.click();
   const dialog = page.getByRole('dialog', { name: `Remove ${client.name}?` });
   await expect(dialog).toBeVisible();
   await expect(
@@ -103,12 +105,13 @@ test('remove a client: confirm, they move to Past clients, then re-invite them',
   // Cancel keeps them.
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toBeHidden();
-  await expect(row).toBeVisible();
+  await expect(remove).toBeVisible();
 
-  await row.getByRole('button', { name: `Remove ${client.name}` }).click();
+  await remove.click();
   await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
-  await expect(clients.getByRole('row').filter({ hasText: client.email })).toHaveCount(0);
-  await expect(page.locator('#clients-heading')).toBeFocused();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.goto('/clients');
+  await expect(clients.getByRole('row').filter({ hasText: client.name })).toHaveCount(0);
 
   // Past clients is folded under its heading.
   const toggle = page.getByRole('heading', { name: /Past clients \(\d+\)/ }).getByRole('button');
@@ -123,24 +126,25 @@ test('remove a client: confirm, they move to Past clients, then re-invite them',
   const { data: member } = await admin.from('workspace_members').select('user_id').eq('user_id', client.id);
   expect(member).toEqual([]);
 
-  // Re-invite sends a fresh invite (it shows under Pending invites until they accept).
+  // Re-invite sends a fresh invite (it shows as Invited on the list until they accept).
   await past.getByRole('button', { name: `Re-invite ${client.name}` }).click();
   await expect(past.getByText('Invite sent')).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: client.email })).toBeVisible();
+  await expect(clients.getByRole('row').filter({ hasText: client.email })).toContainText('Invited');
 });
 
 test('cancel an invite: confirm, it disappears, and its link stops working', async ({ page }) => {
   const invite = await makePendingInvite();
   await signInAsCoach(page);
-  const pending = page.getByRole('table', { name: 'Pending invites' });
+  const pending = page.getByRole('table', { name: 'Clients' });
   const row = pending.getByRole('row').filter({ hasText: invite.email });
+  await expect(row).toContainText('Invited today');
   await row.getByRole('button', { name: `Cancel invite to ${invite.email}` }).click();
   const dialog = page.getByRole('dialog', { name: 'Cancel this invite?' });
   await expect(dialog.getByText(`Cancel the invite to ${invite.email}? The link in their email will stop working.`)).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel invite' }).click();
   await expect(pending.getByRole('row').filter({ hasText: invite.email })).toHaveCount(0);
-  // Focus lands on the section heading, not lost on the page.
-  await expect(page.getByRole('heading', { name: 'Pending invites' })).toBeFocused();
+  // Focus lands on the list's heading, not lost on the page.
+  await expect(page.locator('#clients-heading')).toBeFocused();
 
   await page.goto(`/invite/${invite.token}`);
   await expect(page.getByText("This invite link isn't valid.")).toBeVisible();
@@ -149,7 +153,7 @@ test('cancel an invite: confirm, it disappears, and its link stops working', asy
 test('cancelling an invite that was accepted meanwhile says so instead of pretending', async ({ page }) => {
   const invite = await makePendingInvite();
   await signInAsCoach(page);
-  const row = page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: invite.email });
+  const row = page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: invite.email });
   await row.getByRole('button', { name: `Cancel invite to ${invite.email}` }).click();
   // The client accepts while the coach is reading the dialog.
   const { error } = await admin
@@ -162,6 +166,6 @@ test('cancelling an invite that was accepted meanwhile says so instead of preten
   await expect(dialog.getByText('This invite was already used or cancelled. If they joined, remove them from Clients instead.')).toBeVisible();
   // Closing the dialog refreshes the page: the accepted invite is no longer pending.
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('table', { name: 'Pending invites' }).getByRole('row').filter({ hasText: invite.email })).toHaveCount(0);
+  await expect(page.getByRole('table', { name: 'Clients' }).getByRole('row').filter({ hasText: invite.email })).toHaveCount(0);
   await admin.from('client_invites').delete().eq('email', invite.email);
 });

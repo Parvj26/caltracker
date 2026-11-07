@@ -3,35 +3,72 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import {
-  checkClients,
   compareByLastName,
-  compareClientChecks,
+  compareDirectoryRows,
+  directoryCounts,
+  directoryRows,
   foldForSearch,
-  lastWorkoutLabel,
-  type ClientCheck,
-  type ClientSort,
-  type ClientStatus,
+  invitedLabel,
+  matchesDirectoryFilter,
+  type DirectoryFilter,
+  type DirectoryRow,
+  type DirectorySort,
   type IsoDate,
 } from '@caltracker/shared';
-import { Card, Chip, SelectField } from '@/components/ui';
+import { formatShortDay } from '@/components/calendar/format';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
-import { checkInput, homeClients, reasonText, STATUS_LABEL, STATUS_TONE } from '@/lib/daily-check';
+import { homeClients, localDateOf } from '@/lib/daily-check';
 import { useBrowserToday } from '@/lib/local-today';
 import { avatarTone, initials } from './avatar';
+import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from './directory-copy';
 import { ResendButton } from './resend-button';
-import { CancelInviteButton, RemoveClientButton } from './row-actions';
+import { CancelInviteButton } from './row-actions';
 import styles from './clients.module.css';
 
-export type DirectoryPerson = { id: string; name: string; email: string };
-export type DirectoryInvite = { id: string; name: string; email: string; firstName: string; lastName: string; sent: string; expiry: string };
+/** What a pending invite starts with when they join (kept with the invite). */
+export type InvitePlanSummary =
+  | { kind: 'program'; name: string; on: IsoDate }
+  | { kind: 'single'; name: string; on: IsoDate; more: number }
+  | null;
+export type DirectoryInvite = {
+  id: string;
+  name: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  sentAt: string;
+  /** The link has run out (they need a resend). */
+  expired: boolean;
+  plan: InvitePlanSummary;
+};
 
-type Filter = 'all' | ClientStatus | 'invited';
-const FILTERS: readonly Filter[] = ['all', 'needs_attention', 'program_ending', 'nothing_planned', 'on_track', 'invited'];
-const SORT_LABEL: Record<ClientSort, string> = { name: 'Name', last_workout: 'Last workout', end_date: 'Program end date' };
+const FILTERS: readonly DirectoryFilter[] = ['all', 'missed', 'plan_ending', 'nothing_planned', 'invited'];
+const FILTER_LABEL: Record<DirectoryFilter, string> = {
+  all: 'All',
+  missed: 'Missed this week',
+  plan_ending: 'Plan ending',
+  nothing_planned: 'Nothing planned',
+  invited: 'Invited',
+};
+const SORT_LABEL: Record<DirectorySort, string> = {
+  last_workout: 'Last workout',
+  name: 'Name',
+  completion: '4-week completion',
+  plan_end: 'Plan end',
+};
+const STATUS_CLASS: Record<DirectoryRow['status']['kind'], string | undefined> = {
+  training: styles.statusAlert,
+  missed: styles.statusAlert,
+  plan_ending: styles.statusWarn,
+  nothing_planned: styles.statusMuted,
+  active: styles.statusGood,
+};
 
-const endFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const shortDate = (d: IsoDate) => endFormat.format(new Date(`${d}T00:00:00Z`));
+const matches = (query: string, ...fields: string[]) => {
+  const q = foldForSearch(query.trim());
+  return q === '' || fields.some((f) => foldForSearch(f).includes(q));
+};
 
 function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   return (
@@ -41,229 +78,271 @@ function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   );
 }
 
-const matches = (query: string, ...fields: string[]) => {
-  const q = foldForSearch(query.trim());
-  return q === '' || fields.some((f) => foldForSearch(f).includes(q));
-};
+/** A cell's caption, shown only when the table becomes stacked cards (the column headers are hidden then). */
+const CardLabel = ({ children }: { children: string }) => (
+  <span aria-hidden="true" className={styles.cardLabel}>{children}</span>
+);
+
+const Dash = () => (
+  <>
+    <span aria-hidden="true" className={styles.muted}>—</span>
+    <span className={styles.visuallyHidden}>None</span>
+  </>
+);
+
+function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: string; row: DirectoryRow | null; today: IsoDate | null; lookbackDays: number }) {
+  const plan = row && today ? planLines(row.plan, today) : null;
+  const pct = row?.fourWeeks.percent ?? null;
+  return (
+    <div role="row" className={cx(styles.row, styles.linkRow)} data-client-id={id}>
+      <div role="cell" className={cx(styles.clientCell, styles.cellClient)}>
+        <Avatar name={name} toneKey={id} />
+        <span className={styles.nameStack}>
+          {/* The link covers the whole row (see .rowLink::after), so tapping anywhere opens the client. */}
+          <Link href={`/clients/${id}`} className={styles.rowLink}>{name || 'Client'}</Link>
+          {row && today ? (
+            <span className={cx(styles.statusLine, STATUS_CLASS[row.status.kind])}>
+              {row.status.kind === 'training' ? <span aria-hidden="true">● </span> : null}
+              {statusText(row.status, today)}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <span role="cell" className={cx(styles.cell, styles.cellLast)}>
+        <CardLabel>Last workout</CardLabel>
+        {row && today ? lastWorkoutText(row, today, lookbackDays) : null}
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellWeek)}>
+        <CardLabel>This week</CardLabel>
+        {row ? (
+          row.week.planned === 0 ? (
+            <Dash />
+          ) : (
+            <b className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned}`}</b>
+          )
+        ) : null}
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellFour)}>
+        <CardLabel>4 weeks</CardLabel>
+        {row ? (
+          pct === null ? (
+            <Dash />
+          ) : (
+            <span className={styles.completion}>
+              <span aria-hidden="true" className={styles.bar}>
+                <span
+                  className={cx(styles.barFill, pct < LOW_COMPLETION_PERCENT && styles.barLow)}
+                  style={{ width: `${pct}%` }}
+                />
+              </span>
+              <b>{`${pct}%`}</b>
+              <span className={styles.visuallyHidden}>{` (${row.fourWeeks.done} of ${row.fourWeeks.due} done)`}</span>
+            </span>
+          )
+        ) : null}
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellPlan)}>
+        <CardLabel>Plan</CardLabel>
+        {plan ? (
+          <span className={styles.planStack}>
+            <span className={styles.planTitle} title={plan.title}>{plan.title}</span>
+            <span className={cx(styles.planDetail, plan.warn && styles.planWarn)}>{plan.detail}</span>
+          </span>
+        ) : row && today ? (
+          <span className={styles.planEmpty}>
+            <span className={styles.muted}>Nothing planned</span>
+            <span className={styles.planButtons}>
+              <Link href={`/clients/${id}/training?add=workout`} className={styles.miniButton} aria-label={`Add a workout for ${name}`}>
+                + Workout
+              </Link>
+              <Link href={`/clients/${id}/training?add=program`} className={styles.miniButton} aria-label={`Assign a program to ${name}`}>
+                + Program
+              </Link>
+            </span>
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate | null }) {
+  const { expired } = invite;
+  const plan = invite.plan;
+  return (
+    <div role="row" className={styles.row} data-invite-id={invite.id}>
+      <div role="cell" className={cx(styles.clientCell, styles.cellClient)}>
+        <Avatar name={invite.name} toneKey={invite.email} />
+        <span className={styles.nameStack}>
+          <span className={styles.rowName}>{invite.name}</span>
+          <span className={cx(styles.statusLine, styles.statusMuted)}>
+            {today ? invitedLabel(localDateOf(invite.sentAt), today) : 'Invited'}
+            {expired ? ' · link expired' : null}
+          </span>
+          <span className={styles.inviteActions}>
+            <ResendButton email={invite.email} firstName={invite.firstName} lastName={invite.lastName} inline ariaLabel={`Resend invite to ${invite.email}`} />
+            <CancelInviteButton inviteId={invite.id} email={invite.email} inline />
+          </span>
+        </span>
+      </div>
+      <span role="cell" className={cx(styles.cell, styles.cellLast, styles.muted)}>
+        <CardLabel>Last workout</CardLabel>
+        Not joined yet
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellWeek)}>
+        <CardLabel>This week</CardLabel>
+        <Dash />
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellFour)}>
+        <CardLabel>4 weeks</CardLabel>
+        <Dash />
+      </span>
+      <span role="cell" className={cx(styles.cell, styles.cellPlan)}>
+        <CardLabel>Plan</CardLabel>
+        {plan ? (
+          <span className={styles.planStack}>
+            <span className={styles.planTitle}>{plan.kind === 'program' ? plan.name : `Single workout: ${plan.name}`}</span>
+            <span className={styles.planDetail}>
+              {plan.kind === 'program' ? `starts ${formatShortDay(plan.on)}` : formatShortDay(plan.on)}
+              {plan.kind === 'single' && plan.more > 0 ? ` · ${plan.more} more` : null}
+            </span>
+          </span>
+        ) : (
+          <span className={styles.muted}>{invite.email}</span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 /**
- * The Clients list: search, status filter and sort over current clients and pending invites. Status and the dated
- * columns use the coach's own today, so they appear right after the page loads in the browser.
+ * The Clients list: search, filter chips (only those with someone in them), sort, and one row per client and pending
+ * invite. Stats use the coach's own today, so they appear right after the page loads in the browser.
  */
-export function ClientDirectory({
-  data,
-  people,
-  invites,
-  lookbackDays,
-}: {
-  data: HomeData;
-  people: DirectoryPerson[];
-  invites: DirectoryInvite[];
-  lookbackDays: number;
-}) {
+export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeData; invites: DirectoryInvite[]; lookbackDays: number }) {
   const today = useBrowserToday();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
-  const [sort, setSort] = useState<ClientSort>('name');
+  const [filter, setFilter] = useState<DirectoryFilter>('all');
+  const [sort, setSort] = useState<DirectorySort>('last_workout');
+
+  const people = useMemo(() => {
+    const names = new Map(data.clients.map((c) => [c.id, c.lastWorkoutName]));
+    return homeClients(data).map((c) => ({ ...c, lastWorkoutName: names.get(c.id) ?? null }));
+  }, [data]);
 
   const rows = useMemo(() => {
-    const personById = new Map(people.map((p) => [p.id, p]));
-    const input = today ? checkInput(data, today, Intl.DateTimeFormat().resolvedOptions().timeZone, lookbackDays) : null;
-    const checks = new Map<string, ClientCheck>((input ? checkClients(input) : []).map((c) => [c.clientId, c]));
-    return (input?.clients ?? homeClients(data)).map((c) => ({
-      id: c.id,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      joinedOn: c.joinedOn,
-      name: personById.get(c.id)?.name ?? `${c.firstName} ${c.lastName}`.trim(),
-      email: personById.get(c.id)?.email ?? '',
-      check: checks.get(c.id) ?? null,
-    }));
-  }, [data, people, today, lookbackDays]);
+    if (!today) return null;
+    return directoryRows({
+      clients: people,
+      workouts: data.workouts,
+      assignments: data.assignments,
+      today,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      lookbackDays,
+    });
+  }, [people, data, today, lookbackDays]);
+  const rowById = useMemo(() => new Map((rows ?? []).map((r) => [r.clientId, r])), [rows]);
 
-  const counts = useMemo(() => {
-    const out: Record<Filter, number> = { all: rows.length + invites.length, needs_attention: 0, program_ending: 0, nothing_planned: 0, on_track: 0, invited: invites.length };
-    for (const r of rows) if (r.check) out[r.check.status] += 1;
-    return out;
-  }, [rows, invites.length]);
+  const counts: Record<DirectoryFilter, number> = useMemo(() => {
+    const c = rows ? directoryCounts(rows) : { all: people.length, missed: 0, plan_ending: 0, nothing_planned: 0 };
+    return { ...c, all: people.length + invites.length, invited: invites.length };
+  }, [rows, people.length, invites.length]);
+  // Only chips with someone in them; "All" always. The one picked stays even if it empties (so it can be unpicked).
+  const chips = FILTERS.filter((f) => f === 'all' || f === filter || counts[f] > 0);
 
   const shownClients = useMemo(() => {
-    const list = rows.filter((r) => (filter === 'all' || r.check?.status === filter) && matches(query, r.name, r.email));
-    const cmp = compareClientChecks(sort);
-    return list.sort((a, b) => (a.check && b.check ? cmp({ ...a, check: a.check }, { ...b, check: b.check }) : compareByLastName(a, b)));
-  }, [rows, filter, query, sort]);
-  const shownInvites = invites.filter((i) => matches(query, i.name, i.email));
+    const nameOf = (c: { firstName: string; lastName: string }) => `${c.firstName} ${c.lastName}`.trim();
+    const list = people.filter((c) => {
+      const row = rowById.get(c.id);
+      if (filter !== 'all' && !(row && matchesDirectoryFilter(row, filter))) return false;
+      return matches(query, nameOf(c));
+    });
+    const cmp = compareDirectoryRows(sort);
+    return list
+      .sort((a, b) => {
+        const x = rowById.get(a.id);
+        const y = rowById.get(b.id);
+        return x && y ? cmp(x, y) : compareByLastName(a, b);
+      })
+      .map((c) => ({ id: c.id, name: nameOf(c), row: rowById.get(c.id) ?? null }));
+  }, [people, rowById, filter, query, sort]);
+  const shownInvites = filter === 'all' || filter === 'invited' ? invites.filter((i) => matches(query, i.name, i.email)) : [];
 
-  const showClients = filter !== 'invited';
-  const showInvites = filter === 'all' || filter === 'invited';
+  const shownTotal = shownClients.length + shownInvites.length;
   const filtering = query.trim() !== '' || filter !== 'all';
-  const shownTotal = (showClients ? shownClients.length : 0) + (showInvites ? shownInvites.length : 0);
 
   return (
-    <>
+    <section aria-labelledby="clients-heading" className={styles.directory}>
+      <h2 id="clients-heading" tabIndex={-1} className={styles.visuallyHidden}>Client list</h2>
       <div className={styles.toolbar} role="search" aria-label="Find clients">
         <label className={styles.searchField}>
           <span className={styles.visuallyHidden}>Search clients</span>
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or email"
+            placeholder="Search clients"
             className={styles.searchInput}
             autoComplete="off"
           />
         </label>
-        <SelectField label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as ClientSort)} className={styles.sortField}>
-          {(Object.keys(SORT_LABEL) as ClientSort[]).map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
-        </SelectField>
-        <div role="group" aria-label="Filter by status" className={styles.filters}>
-          {FILTERS.map((f) => {
-            const label = f === 'all' ? 'All' : STATUS_LABEL[f];
-            const known = today !== null || f === 'all' || f === 'invited';
-            return (
-              <button
-                key={f}
-                type="button"
-                aria-pressed={filter === f}
-                className={styles.filterChip}
-                // aria-disabled, not disabled: the chip stays focusable and announced while the statuses load.
-                aria-disabled={!known || undefined}
-                onClick={() => {
-                  if (known) setFilter(f);
-                }}
-              >
-                {label}{' '}
-                {known ? <span className={styles.filterCount}>{counts[f]}</span> : null}
-              </button>
-            );
-          })}
+        <div role="group" aria-label="Filter clients" className={styles.filters}>
+          {chips.map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              className={cx(styles.filterChip, f === 'missed' && styles.filterAlert)}
+              onClick={() => setFilter(f)}
+            >
+              {FILTER_LABEL[f]} <span className={styles.filterCount}>{counts[f]}</span>
+            </button>
+          ))}
         </div>
-        {/* Always rendered (never display: none), so screen readers announce each change. */}
-        <p role="status" className={styles.filterResult}>
-          {filtering ? `Showing ${shownTotal} of ${counts.all}` : `Showing all ${counts.all}`}
-        </p>
+        <label className={styles.sortField}>
+          <span>Sort:</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as DirectorySort)} className={styles.sortSelect}>
+            {(Object.keys(SORT_LABEL) as DirectorySort[]).map((s) => (
+              <option key={s} value={s}>{SORT_LABEL[s]}</option>
+            ))}
+          </select>
+        </label>
       </div>
+      {/* Always rendered (never display: none), so screen readers announce each change. */}
+      <p role="status" className={styles.visuallyHidden}>
+        {filtering ? `Showing ${shownTotal} of ${counts.all}` : `Showing all ${counts.all}`}
+      </p>
 
-      {showClients ? (
-        <Card className={styles.listCard}>
-          <section aria-labelledby="clients-heading">
-            <h2 id="clients-heading" tabIndex={-1} className={styles.sectionHeading}>Clients</h2>
-            <div role="table" aria-label="Clients" className={cx(styles.rows, styles.clientRows)}>
-              <div role="rowgroup" className={styles.headRow}>
-                <div role="row" className={styles.row}>
-                  <span role="columnheader">Name</span>
-                  <span role="columnheader">Status</span>
-                  <span role="columnheader">Last workout</span>
-                  <span role="columnheader">This week</span>
-                  <span role="columnheader">Program</span>
-                  <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
-                </div>
-              </div>
-              <div role="rowgroup">
-                {shownClients.length === 0 ? (
-                  <div role="row" className={styles.emptyRow}>
-                    <span role="cell">{rows.length === 0 ? 'No clients yet. Add one above.' : 'No clients match.'}</span>
-                  </div>
-                ) : (
-                  shownClients.map((r) => {
-                    const c = r.check;
-                    const why = c && today ? c.reasons.filter((x) => x.kind !== 'new_bests').map((x) => reasonText(x, today)) : [];
-                    return (
-                      <div role="row" key={r.id} className={styles.row} data-client-id={r.id}>
-                        <div role="cell" className={styles.nameCell}>
-                          <Avatar name={r.name} toneKey={r.id} />
-                          <span className={styles.nameStack}>
-                            <Link href={`/clients/${r.id}`} className={cx(styles.name, styles.nameLink)}>{r.name || 'Client'}</Link>
-                            {r.email ? <span className={styles.email}>{r.email}</span> : null}
-                          </span>
-                        </div>
-                        <span role="cell" className={styles.statusCell}>
-                          {c ? <Chip tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Chip> : null}
-                          {why.map((w) => <span key={w} className={styles.why}>{w}</span>)}
-                        </span>
-                        <span role="cell" className={styles.meta}>
-                          <span aria-hidden="true" className={styles.narrowOnly}>Last workout: </span>
-                          {c && today ? lastWorkoutLabel(c.lastWorkoutOn, today, r.joinedOn, lookbackDays) : ''}
-                        </span>
-                        <span role="cell" className={styles.meta}>
-                          <span aria-hidden="true" className={styles.narrowOnly}>This week: </span>
-                          {c ? (
-                            <>
-                              <span aria-hidden="true">{c.week.done} / {c.week.planned}</span>
-                              <span className={styles.visuallyHidden}>{`${c.week.done} of ${c.week.planned} done this week`}</span>
-                            </>
-                          ) : null}
-                        </span>
-                        <span role="cell" className={styles.programCell}>
-                          {c?.program ? (
-                            <>
-                              <span className={styles.programName} title={c.program.name}>{c.program.name}</span>
-                              <span className={styles.programEnd}>ends {shortDate(c.program.endDate)}</span>
-                            </>
-                          ) : c ? (
-                            <span className={styles.programEnd}>No program</span>
-                          ) : null}
-                        </span>
-                        <div role="cell" className={styles.actions}>
-                          <RemoveClientButton userId={r.id} name={r.name} />
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+      <div className={styles.tableWrap}>
+        <div role="table" aria-label="Clients" className={styles.table}>
+          <div role="rowgroup" className={styles.tableHead}>
+            <div role="row" className={styles.row}>
+              <span role="columnheader">Client</span>
+              <span role="columnheader">Last workout</span>
+              <span role="columnheader">This week</span>
+              <span role="columnheader">4 weeks</span>
+              <span role="columnheader">Plan</span>
             </div>
-          </section>
-        </Card>
-      ) : null}
-
-      {showInvites ? (
-        <Card className={styles.listCard}>
-          <section aria-labelledby="pending-heading">
-            <h2 id="pending-heading" tabIndex={-1} className={styles.sectionHeading}>Pending invites</h2>
-            <div role="table" aria-label="Pending invites" className={cx(styles.rows, styles.inviteRows)}>
-              <div role="rowgroup" className={styles.headRow}>
-                <div role="row" className={styles.row}>
-                  <span role="columnheader">Name</span>
-                  <span role="columnheader">Email</span>
-                  <span role="columnheader">Sent</span>
-                  <span role="columnheader">Status</span>
-                  <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
-                </div>
+          </div>
+          <div role="rowgroup">
+            {shownTotal === 0 ? (
+              <div role="row" className={styles.emptyRow}>
+                <span role="cell">{counts.all === 0 ? 'No clients yet. Invite your first client.' : 'No clients match.'}</span>
               </div>
-              <div role="rowgroup">
-                {shownInvites.length === 0 ? (
-                  <div role="row" className={styles.emptyRow}>
-                    <span role="cell">{invites.length === 0 ? 'No pending invites.' : 'No invites match.'}</span>
-                  </div>
-                ) : (
-                  shownInvites.map((i) => (
-                    <div role="row" key={i.id} className={styles.row}>
-                      <div role="cell" className={styles.nameCell}>
-                        <Avatar name={i.name} toneKey={i.email} />
-                        <span className={styles.name}>{i.name}</span>
-                      </div>
-                      <span role="cell" className={styles.email}>{i.email}</span>
-                      <span role="cell" className={styles.meta}>
-                        <span aria-hidden="true" className={styles.narrowOnly}>Sent </span>
-                        {i.sent}
-                      </span>
-                      <span role="cell" className={styles.expires}>
-                        <Chip tone={STATUS_TONE.invited}>{STATUS_LABEL.invited}</Chip>
-                        <Chip tone={i.expiry === 'Expired' ? 'amber' : 'grey'}>{i.expiry}</Chip>
-                      </span>
-                      <div role="cell" className={styles.actions}>
-                        <ResendButton email={i.email} firstName={i.firstName} lastName={i.lastName} />
-                        <CancelInviteButton inviteId={i.id} email={i.email} />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </section>
-        </Card>
-      ) : null}
-    </>
+            ) : null}
+            {shownClients.map((c) => (
+              <ClientRow key={c.id} id={c.id} name={c.name} row={c.row} today={today} lookbackDays={lookbackDays} />
+            ))}
+            {shownInvites.map((i) => (
+              <InviteRow key={i.id} invite={i} today={today} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
