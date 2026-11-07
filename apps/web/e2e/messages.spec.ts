@@ -115,6 +115,10 @@ test('the coach sends text and a photo and both appear', async ({ page }) => {
   await expect(photo).toBeVisible();
   // The private photo loads through its signed URL.
   await expect.poll(() => photo.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  // The bubble shows the full-size photo (not the thumbnail stretched), uncropped.
+  await expect(photo).toHaveAttribute('src', /\/message-images\/[^?]+[0-9a-f]\.(webp|jpg)\?/);
+  expect(await photo.getAttribute('src')).not.toMatch(/-thumb\.(webp|jpg)/);
+  await expect(photo).toHaveCSS('object-fit', 'contain');
 
   const stored = await admin.from('messages').select('body, image_paths, sender_id').eq('body', 'Form check').single();
   expect(stored.error).toBeNull();

@@ -1,5 +1,6 @@
-# The Zoo tab after the sticker-reveal flow: finish a 3 x 8 at 60 kg (a giraffe), then open Zoo. The header, the
-# animal count and a x1 giraffe show; tapping it opens the sheet with its fact. Run via `pnpm --filter mobile e2e`.
+# The Zoo tab after the sticker-reveal flow: finish a 3 x 8 at 60 kg (one animal up to a giraffe, picked at random
+# for a new client), then open Zoo. The header, the animal count and that animal x1 show (the only owned tile, so
+# `sticker-.*` finds it); tapping it opens the sheet with its fact. Run via `pnpm --filter mobile e2e`.
 appId: app.caltracker.client
 env:
   EMAIL: client@demo.local
@@ -24,7 +25,7 @@ env:
     timeout: 15000
 - runFlow: helpers/reveal-through.yaml
 - extendedWaitUntil:
-    visible: 'Giraffe ×1'
+    visible: '.+ ×1'
     timeout: 10000
 - tapOn:
     id: summary-done
@@ -41,16 +42,16 @@ env:
 - assertVisible: '1 of 30 · Shiny .* / 30'
 - scrollUntilVisible:
     element:
-      id: sticker-giraffe
+      id: 'sticker-.*'
 # The tile is one element for VoiceOver ("Giraffe, 1 collected"), so its ×1 badge is read from the tile's label.
 - assertVisible:
-    id: sticker-giraffe
-    text: 'Giraffe, 1 collected'
+    id: 'sticker-.*'
+    text: '.+, 1 collected'
 - tapOn:
-    id: sticker-giraffe
+    id: 'sticker-.*'
 - assertVisible:
     id: sheet-fact
-    text: 'Giraffes can sprint.*'
+    text: '.+'
 - assertVisible: 'First earned.*'
 - tapOn:
     id: sheet-close

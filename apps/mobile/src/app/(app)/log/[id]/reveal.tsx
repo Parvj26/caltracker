@@ -8,9 +8,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { logVolumeKg, type AwardResult } from '@caltracker/shared';
+import { logVolumeKg, type AwardResult, type LadderAward } from '@caltracker/shared';
 import { RevealCard } from '@/components/stickers/reveal-card';
-import { pendingQueue, requestAward } from '@/lib/awards';
+import { loadLadderAwards, pendingQueue, rememberLadderPick, requestAward } from '@/lib/awards';
 import { buildRevealCards, surpriseCards } from '@/lib/awards-logic';
 import { useSession } from '@/lib/session';
 import { useActiveLog } from '@/lib/use-active-log';
@@ -23,7 +23,8 @@ import { useTheme } from '@/theme/use-theme';
  * The big reveal after Finish: a dark full screen showing the sticker this workout's weight earned, then any
  * extra cards (drop, rare find, landmark, milestone) the server awards. Finish -> reveal -> summary.
  *
- *   * the ladder card comes from this phone's own log at once, so it shows with no signal
+ *   * the ladder card comes from this phone's own log at once, so it shows with no signal: the same shared rule as
+ *     the server, with the client's earlier animals (read from the server for up to 1.5 s, else the phone's copy)
  *   * the server's answer is waited for up to 4 s; after that the extras are queued and shown as "Surprise!" the
  *     next time the app opens (?surprise=1 is that second showing, read from the queue)
  *   * a workout with nothing to show (cardio only, nothing new) goes straight on to the summary
@@ -37,7 +38,9 @@ export default function RevealScreen() {
   const router = useRouter();
   const units = useUnits();
   const { text, space, radius, device } = useTheme();
-  const userId = useSession().session?.user.id ?? null;
+  const { session, workspace } = useSession();
+  const userId = session?.user.id ?? null;
+  const workspaceId = workspace?.workspaceId ?? null;
   const { finishedLog, log: active, pending, ready } = useActiveLog();
 
   const log =
@@ -54,6 +57,8 @@ export default function RevealScreen() {
     { result: AwardResult; volumeKg: number } | null | 'none'
   >(null);
   const [index, setIndex] = useState(0);
+  // The client's earlier ladder animals, for the preview; null while loading.
+  const [ladderAwards, setLadderAwards] = useState<LadderAward[] | null>(null);
   const left = useRef(false);
   const asked = useRef(false);
 
@@ -88,6 +93,19 @@ export default function RevealScreen() {
     [],
   );
 
+  useEffect(() => {
+    if (isSurprise || !userId) return;
+    if (!workspaceId) {
+      setLadderAwards([]);
+      return;
+    }
+    let alive = true;
+    void loadLadderAwards(userId, workspaceId).then((a) => alive && setLadderAwards(a));
+    return () => {
+      alive = false;
+    };
+  }, [isSurprise, userId, workspaceId]);
+
   // Surprise: the award the queue is holding for this log.
   useEffect(() => {
     if (!isSurprise || !userId) return;
@@ -112,8 +130,15 @@ export default function RevealScreen() {
       return queued && queued !== 'none'
         ? surpriseCards(queued.result, units, queued.volumeKg)
         : [];
-    return log ? buildRevealCards(log, award, units) : [];
-  }, [units, isSurprise, queued, log, award]);
+    return log && ladderAwards ? buildRevealCards(log, award, units, ladderAwards) : [];
+  }, [units, isSurprise, queued, log, award, ladderAwards]);
+
+  // The animal shown counts for the next workout's preview until the server's list has it.
+  const shownKey = !isSurprise && cards[0]?.type === 'ladder' ? cards[0].stickerKey : null;
+  useEffect(() => {
+    if (!shownKey || !log?.finishedAt || !userId || !workspaceId) return;
+    void rememberLadderPick(userId, workspaceId, { logId: log.id, finishedAt: log.finishedAt, key: shownKey });
+  }, [shownKey, log?.id, log?.finishedAt, userId, workspaceId]);
 
   const finish = useCallback(async () => {
     if (isSurprise && userId) await pendingQueue(userId).remove(id);
@@ -124,7 +149,7 @@ export default function RevealScreen() {
   // Nothing to reveal: on to the summary (or back to Today for an empty surprise).
   const nothing = isSurprise
     ? queued === 'none' || (queued !== null && cards.length === 0)
-    : settled && units !== null && cards.length === 0;
+    : settled && units !== null && ladderAwards !== null && cards.length === 0;
   const missing = !isSurprise && ready && !log;
   useEffect(() => {
     if (nothing) void finish();
@@ -133,7 +158,7 @@ export default function RevealScreen() {
 
   // No card yet and the server hasn't answered: let the client move on instead of staring at a spinner.
   const waitingForServer =
-    !isSurprise && !settled && cards.length === 0 && !missing;
+    !isSurprise && !settled && ladderAwards !== null && cards.length === 0 && !missing;
 
   const card = cards[Math.min(index, cards.length - 1)];
   const last = index >= cards.length - 1;

@@ -1,16 +1,20 @@
 // What the sticker reveal shows, and the queue of reveals that could not be shown yet. Pure (no network, no
 // React), so it is unit tested. The server call lives in awards.ts.
 //
-// Rules for the cards come from @caltracker/shared (ladderAnimal, revealCards, STICKERS); this file only turns
+// Rules for the cards come from @caltracker/shared (pickLadderAnimal, revealCards, STICKERS); this file only turns
 // them into the words and the order on screen.
 import {
   STICKERS,
   formatMultiple,
   formatLogVolume,
-  ladderAnimal,
+  instantMs,
+  ladderHistoryBefore,
   logVolumeKg,
+  pickLadderAnimal,
   revealCards,
   type AwardResult,
+  type LadderAward,
+  type LadderPick,
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
@@ -70,16 +74,33 @@ function ladderView(
 }
 
 /**
+ * The animal this phone expects the server to pick for the log: the same shared rule, seeded by the same log id,
+ * with the client's ladder awards of the logs finished before it (ladderAwards: the server's, plus the phone's own
+ * previews it has not awarded yet).
+ */
+export function previewLadder(log: WorkoutLogDoc, ladderAwards: readonly LadderAward[]): LadderPick | null {
+  const history = log.finishedAt
+    ? ladderHistoryBefore(ladderAwards, { id: log.id, finishedAt: log.finishedAt })
+    : ladderAwards.map((a) => a.key);
+  return pickLadderAnimal(logVolumeKg(log), history, log.id);
+}
+
+/**
  * The cards to show, in order. The ladder card comes from this phone's own log at once (so it shows with no
  * signal, without a pill, because only the server knows whether the animal is new); when the server's award is
  * there, its ladder fields replace that and its drop, rare finds, landmarks and milestone follow.
  * A log with no weighted sets has no ladder card.
  */
-export function buildRevealCards(log: WorkoutLogDoc, award: AwardResult | null, units: Units): RevealCardView[] {
+export function buildRevealCards(
+  log: WorkoutLogDoc,
+  award: AwardResult | null,
+  units: Units,
+  ladderAwards: readonly LadderAward[],
+): RevealCardView[] {
   const volumeKg = logVolumeKg(log);
   const cards: RevealCardView[] = [];
 
-  const local = ladderAnimal(volumeKg);
+  const local = previewLadder(log, ladderAwards);
   const ladder =
     award?.ladder ??
     (local
@@ -139,6 +160,55 @@ export function surpriseCards(award: AwardResult, units: Units, volumeKg: number
   if (award.ladder?.shiny) cards.push({ ...ladderView(volumeKg, units, award.ladder, true), lead2: null });
   cards.push(...extraCards(award, true));
   return cards;
+}
+
+// ---- the ladder history ---------------------------------------------------------------------------------
+// The preview needs the animals the client was awarded before, like the server. The phone keeps the server's list
+// (refreshed whenever there is signal) and its own previews of workouts the server hasn't awarded yet, so two
+// workouts in a row with no signal still preview what the server will pick.
+
+/** `server`: the client's ladder awards with this coach, as last read. `local`: this phone's unconfirmed previews. */
+export type LadderCache = { server: LadderAward[]; local: LadderAward[] };
+
+export const emptyLadderCache: LadderCache = { server: [], local: [] };
+
+export const ladderCacheKey = (userId: string, workspaceId: string) => `caltracker.ladderAwards.${userId}.${workspaceId}`;
+
+function isLadderAward(v: unknown): v is LadderAward {
+  if (typeof v !== 'object' || v === null) return false;
+  const a = v as Record<string, unknown>;
+  return typeof a.logId === 'string' && typeof a.finishedAt === 'string' && typeof a.key === 'string';
+}
+
+/** The saved history, or an empty one when there is none or it is unreadable. */
+export function parseLadderCache(raw: string | null): LadderCache {
+  if (!raw) return emptyLadderCache;
+  try {
+    const v = JSON.parse(raw) as { server?: unknown; local?: unknown };
+    if (!Array.isArray(v.server) || !Array.isArray(v.local)) return emptyLadderCache;
+    if (!v.server.every(isLadderAward) || !v.local.every(isLadderAward)) return emptyLadderCache;
+    return { server: v.server, local: v.local };
+  } catch {
+    return emptyLadderCache;
+  }
+}
+
+/** The server's list replaces the old one; previews of logs it now has an award for are dropped. */
+export function withServerAwards(cache: LadderCache, server: LadderAward[]): LadderCache {
+  const known = new Set(server.map((a) => a.logId));
+  return { server, local: cache.local.filter((a) => !known.has(a.logId)) };
+}
+
+/** Remembers the phone's preview for a log (replacing an earlier one for the same log). */
+export function withLocalPick(cache: LadderCache, pick: LadderAward): LadderCache {
+  return { ...cache, local: [...cache.local.filter((a) => a.logId !== pick.logId), pick] };
+}
+
+/** Every ladder award to count: the server's, then previews it doesn't have yet that are under a week old. */
+export function ladderAwardsFrom(cache: LadderCache, nowMs: number): LadderAward[] {
+  const known = new Set(cache.server.map((a) => a.logId));
+  const fresh = cache.local.filter((a) => !known.has(a.logId) && nowMs - instantMs(a.finishedAt) <= PENDING_MAX_AGE_MS);
+  return [...cache.server, ...fresh];
 }
 
 // ---- the pending queue ----------------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dayLabel, isAlreadyUploaded, mergeById, mergeOutbox, messageYoutubeIds, photoPaths, seenMessageId, thumbPathOf, type PhotoExt } from '@caltracker/shared';
 import type { Message, OutboxItem } from '@caltracker/shared';
+import { SharpPhoto } from '@/components/sharp-photo';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
@@ -93,19 +94,18 @@ function Bubble({
 }) {
   const pending = 'state' in item ? item : null;
   const youtube = messageYoutubeIds(item.body);
-  const photos = pending ? pending.previews : item.imagePaths.map((p) => urls[thumbPathOf(p)]);
-  const fullHref = (i: number) => (pending ? pending.previews[i] : urls[item.imagePaths[i]!]);
+  // A message on its way shows the local files; a sent one shows the full photo, its thumbnail as the placeholder.
+  const photos = pending
+    ? pending.previews.map((src) => ({ full: src, thumb: undefined }))
+    : item.imagePaths.map((p) => ({ full: urls[p], thumb: urls[thumbPathOf(p)] }));
   return (
     <div className={cx(styles.item, mine ? styles.itemMine : styles.itemTheirs)} data-message={pending ? 'pending' : 'sent'}>
       <div className={cx(styles.bubble, pending?.state === 'failed' && styles.bubbleFailed)}>
         {photos.length > 0 ? (
-          <div className={cx(styles.photos, photos.length === 1 && styles.photosOne)}>
-            {photos.map((src, i) => (
-              <a key={i} className={styles.photo} href={fullHref(i)} target="_blank" rel="noreferrer" aria-label={`Open photo ${i + 1}`}>
-                {src ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- a private photo behind a signed URL
-                  <img src={src} alt={`Photo ${i + 1}`} loading="lazy" />
-                ) : null}
+          <div className={styles.photos}>
+            {photos.map((p, i) => (
+              <a key={i} className={styles.photo} href={p.full} target="_blank" rel="noreferrer" aria-label={`Open photo ${i + 1}`}>
+                {p.full ? <SharpPhoto full={p.full} thumb={p.thumb} alt={`Photo ${i + 1}`} maxHeight="360px" /> : null}
               </a>
             ))}
           </div>

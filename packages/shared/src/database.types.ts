@@ -64,6 +64,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          ladder_sticker_key: string | null
           log_id: string
           log_revision: number
           result: Json
@@ -72,6 +73,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          ladder_sticker_key?: string | null
           log_id: string
           log_revision?: number
           result: Json
@@ -80,6 +82,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          ladder_sticker_key?: string | null
           log_id?: string
           log_revision?: number
           result?: Json

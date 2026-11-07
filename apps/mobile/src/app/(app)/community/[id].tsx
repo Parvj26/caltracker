@@ -109,7 +109,7 @@ export default function PostScreen() {
       {post === undefined ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {post === null ? <Text style={text('sectionHeading')}>This post isn’t available any more.</Text> : null}
       {post && ctx && !blocked.has(post.authorId) ? (
-        <PostItem post={post} ctx={ctx} avatarUrl={media.avatarUrl(post)} thumbUrls={media.thumbs} fullUrls={media.fullUrl} />
+        <PostItem post={post} ctx={ctx} avatarUrl={media.avatarUrl(post)} photoUrls={media.photos} fullUrls={media.fullUrl} />
       ) : null}
 
       {post ? (
