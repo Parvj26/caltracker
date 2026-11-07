@@ -10,7 +10,7 @@ const overrides = JSON.parse(await readFile(path.join(here, 'exercise-tracking-o
   string
 >;
 const fixMigration = await readFile(
-  path.join(here, '../supabase/migrations/20261106014100_library_tracking_fixes.sql'),
+  path.join(here, '../supabase/migrations/20261107005100_library_tracking_fixes.sql'),
   'utf8',
 );
 
