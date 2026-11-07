@@ -36,7 +36,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
   return JSON.parse(line.slice('RESULT:'.length)) as { userId: string; workspaceId: string };
 }
 
-async function emailLinkFor(email: string, subject?: string): Promise<string> {
+async function emailLinkFor(email: string, subject?: string, timeout = 20_000): Promise<string> {
   const query = encodeURIComponent(`to:"${email}"`);
   let id: string | undefined;
   await expect
@@ -50,7 +50,7 @@ async function emailLinkFor(email: string, subject?: string): Promise<string> {
         )?.ID;
         return id;
       },
-      { timeout: 20_000 },
+      { timeout },
     )
     .toBeTruthy();
   const msg = (await (await fetch(`${MAILPIT}/message/${id}`)).json()) as { HTML: string };
@@ -193,14 +193,18 @@ test('forgot password: same message for any email, and the emailed link lets a c
     await page.getByRole('button', { name: 'Send link' }).click();
     await expect(page.getByText("If that email has an account, we've sent a link.")).toBeVisible();
 
-    // GoTrue allows one email per address per second, so wait out the invite we just triggered.
-    await page.waitForTimeout(1500);
-    await page.goto('/forgot-password');
-    await page.getByLabel('Email').fill(email);
-    await page.getByRole('button', { name: 'Send link' }).click();
-    await expect(page.getByText("If that email has an account, we've sent a link.")).toBeVisible();
+    // GoTrue allows one email per address per second, and the page shows the same message even when it held the email
+    // back (right after the invite provisioning sent). So send again until the reset email actually arrives.
+    let resetLink = '';
+    await expect(async () => {
+      await page.goto('/forgot-password');
+      await page.getByLabel('Email').fill(email);
+      await page.getByRole('button', { name: 'Send link' }).click();
+      await expect(page.getByText("If that email has an account, we've sent a link.")).toBeVisible();
+      resetLink = await emailLinkFor(email, 'Reset your CalTracker password', 3_000);
+    }).toPass({ timeout: 20_000 });
 
-    await page.goto(await emailLinkFor(email, 'Reset your CalTracker password'));
+    await page.goto(resetLink);
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page).toHaveURL(/\/set-password$/);
     await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);

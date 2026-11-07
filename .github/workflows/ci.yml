@@ -10,12 +10,17 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Every job runs on the self-hosted Mac runner (`caltracker-mac`), a developer Mac shared with local Supabase stacks
-# (lane A "fitness-tracker" on 543xx, lane B "fitness-tracker-b" on 544xx). Jobs that start Supabase first run
-# scripts/ci-isolate-supabase.sh, which moves this checkout to project "fitness-tracker-ci" on 545xx (web app on 3300),
-# and always stop that stack at the end, so CI never touches the developers' stacks.
-# To go back to GitHub-hosted runners, change every `runs-on` back to `ubuntu-latest` (the isolation steps are harmless
-# there, and `playwright install` can take `--with-deps` again).
+# dorny/paths-filter reads the PR's changed files through the API.
+permissions:
+  contents: read
+  pull-requests: read
+
+# Jobs run on GitHub-hosted runners, side by side. Jobs that start Supabase first run scripts/ci-isolate-supabase.sh,
+# which moves the checkout to project "fitness-tracker-ci" on ports 545xx (web app on 3300). That only matters on a
+# shared machine (a self-hosted runner next to developers' stacks) and is harmless here.
+#
+# The required checks are `check`, `db` and `e2e`. They always run and report; when a PR does not touch what a job
+# tests (see the `changes` job), the job's steps are skipped and it reports success. Pushes to main run everything.
 env:
   CI_SUPABASE_PROJECT_ID: fitness-tracker-ci
   # Must match the ports scripts/ci-isolate-supabase.sh writes into supabase/config.toml.
@@ -25,41 +30,110 @@ env:
   CI_SITE_URL: http://localhost:3300
 
 jobs:
+  # Decides which jobs this PR needs. Anything shared (lockfile, root config, this workflow) counts for every job.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ github.event_name == 'push' || steps.filter.outputs.db == 'true' }}
+      e2e: ${{ github.event_name == 'push' || steps.filter.outputs.e2e == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            shared: &shared
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - '.nvmrc'
+              - 'tsconfig*.json'
+              - '.github/workflows/ci.yml'
+            db:
+              - *shared
+              - 'supabase/**'
+              - 'packages/shared/**'
+              - 'scripts/**'
+            e2e:
+              - *shared
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'supabase/**'
+              - 'scripts/**'
+
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # turbo --affected compares against the PR's base branch, so it needs the history.
+          fetch-depth: 0
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Restore the Turbo cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-check-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-check-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Two PRs picking the same migration timestamp, or a PR whose migration is older than one already on main,
+      # would apply in the wrong order. Seconds to run, so it goes first.
+      - name: Migration versions are unique and newer than main
+        run: bash scripts/check-migrations.sh
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      # On a PR, only packages the PR changed (and the ones that depend on them). A change to the lockfile or root
+      # config counts as changing everything. Pushes to main check everything.
+      - name: Typecheck, lint and unit tests
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            pnpm exec turbo typecheck lint test --affected
+          else
+            pnpm check
+          fi
 
   db:
-    needs: check
+    needs: changes
     runs-on: ubuntu-latest
+    env:
+      RUN: ${{ needs.changes.outputs.db }}
     steps:
+      - name: Nothing to test
+        if: env.RUN != 'true'
+        run: echo "This PR does not change supabase/, packages/shared, scripts/ or shared config, so the db tests are skipped."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.RUN == 'true'
       - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        if: env.RUN == 'true'
         with:
           version: 2.67.1
       - name: Use the CI project id and ports (never the developers' stacks)
+        if: env.RUN == 'true'
         run: bash scripts/ci-isolate-supabase.sh
       - name: Remove a CI stack left over from a cancelled run
+        if: env.RUN == 'true'
         run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID" || true
       # Start the full stack once: a bare `supabase db start` here makes a later
       # `supabase start` report "already running" and leave Auth/API stopped.
-      - run: supabase start -x studio,imgproxy,vector,logflare,supavisor
-      - run: bash scripts/reload-auth-templates.sh
-      - run: supabase test db
+      - if: env.RUN == 'true'
+        run: supabase start -x studio,imgproxy,vector,logflare,supavisor
+      - if: env.RUN == 'true'
+        run: bash scripts/reload-auth-templates.sh
+      - if: env.RUN == 'true'
+        run: supabase test db
       - name: Check generated types are up to date
+        if: env.RUN == 'true'
         run: supabase gen types typescript --local | diff - packages/shared/src/database.types.ts
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        if: env.RUN == 'true'
         with:
           deno-version: 2.9.8
       - name: Edge Function tests
+        if: env.RUN == 'true'
         run: |
           bash scripts/sync-functions-shared.sh
           eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
@@ -67,24 +141,36 @@ jobs:
           SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
             deno test --allow-all --config supabase/functions/deno.json supabase/functions/
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: env.RUN == 'true'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.RUN == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - if: env.RUN == 'true'
+        run: pnpm install --frozen-lockfile
       - name: Integration tests
+        if: env.RUN == 'true'
         run: |
           eval "$(supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=')"
           : "${API_URL:?supabase status gave no API_URL (is the API running?)}"
           SUPABASE_URL=$API_URL SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
             PUBLIC_SITE_URL=$CI_SITE_URL pnpm test:integration
       - name: Stop the CI Supabase stack
-        if: always()
+        if: always() && env.RUN == 'true'
         run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
 
-  e2e:
-    needs: check
+  # The web e2e suite, split over 4 runners. Each shard has its own Supabase stack and builds the app once.
+  # The `e2e` job below is the one required check: it waits for the shards and merges their reports.
+  e2e-shard:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    name: e2e (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
@@ -115,20 +201,81 @@ jobs:
       - name: Write web env
         run: bash apps/web/scripts/write-local-env.sh
       - run: pnpm install --frozen-lockfile
-      # --with-deps installs system packages with apt, which only exists on Linux runners.
+      - name: Restore Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # --with-deps installs system packages with apt, which only exists on Linux runners. With the browser cached
+      # this only installs the system packages.
       - run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
         working-directory: apps/web
+      - name: Restore the Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**', 'apps/web/public/**', 'apps/web/next.config.ts', 'packages/*/src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # The only build: Playwright's CI web server just runs `next start` on it.
       - run: pnpm --filter web build
       - name: End-to-end tests
-        run: pnpm test:e2e
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/4
         env:
           CI: 'true'
+          E2E_WORKERS: '4'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
+        if: ${{ !cancelled() }}
         with:
-          name: playwright-report
-          path: apps/web/playwright-report
-          retention-days: 7
+          name: blob-report-${{ matrix.shard }}
+          path: apps/web/blob-report
+          retention-days: 1
       - name: Stop the CI Supabase stack
         if: always()
         run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
+
+  # Required check: passes when every shard passed, or when the PR does not touch the web app (no shards ran).
+  e2e:
+    needs: [changes, e2e-shard]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nothing to test
+        if: needs.changes.outputs.e2e != 'true'
+        run: echo "This PR does not change apps/web, packages, supabase/, scripts/ or shared config, so web e2e is skipped."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.e2e == 'true'
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: needs.changes.outputs.e2e == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: needs.changes.outputs.e2e == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: needs.changes.outputs.e2e == 'true'
+        run: pnpm install --frozen-lockfile --filter web
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.changes.outputs.e2e == 'true'
+        with:
+          pattern: blob-report-*
+          path: apps/web/all-blob-reports
+          merge-multiple: true
+      - name: Merge the shard reports into one HTML report
+        if: needs.changes.outputs.e2e == 'true'
+        working-directory: apps/web
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.changes.outputs.e2e == 'true'
+        with:
+          name: playwright-report
+          if-no-files-found: warn
+          path: apps/web/playwright-report
+          retention-days: 7
+      - name: Fail if the changes job failed (we can't tell whether e2e was needed)
+        if: needs.changes.result != 'success'
+        run: exit 1
+      - name: Fail unless every shard passed
+        if: needs.changes.outputs.e2e == 'true' && needs.e2e-shard.result != 'success'
+        run: |
+          echo "::error::One or more e2e shards did not pass (${{ needs.e2e-shard.result }}). See the playwright-report artifact."
+          exit 1

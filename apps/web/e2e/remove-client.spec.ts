@@ -2,7 +2,8 @@ import { execSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { signInAsCoach } from './helpers';
 
 // Remove client, Past clients and Cancel invite (docs/superpowers/specs/2026-11-04-remove-client-design.md).
 
@@ -82,15 +83,6 @@ async function makePendingInvite() {
   });
   if (error) throw error;
   return { email, token };
-}
-
-async function signInAsCoach(page: Page) {
-  await page.goto('/sign-in');
-  await page.getByLabel('Email').fill('coach@demo.local');
-  await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/home$/);
-  await page.goto('/clients');
 }
 
 test('remove a client: confirm, they move to Past clients, then re-invite them', async ({ page }) => {

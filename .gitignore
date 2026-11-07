@@ -35,6 +35,9 @@ supabase/.temp/
 coverage/
 playwright-report/
 test-results/
+apps/web/e2e/.auth/
+blob-report/
+all-blob-reports/
 
 # OS / editor
 .DS_Store
