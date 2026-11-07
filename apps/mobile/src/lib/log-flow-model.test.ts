@@ -595,6 +595,8 @@ describe('Auto progression on the phone', () => {
     const done = markAll(log, [ex.id], lastFor(log), NOW, { history: historyFor(log), units: 'lb' });
     expect(done.blocks[0].exercises[0].sets.map((s) => Math.round((s.actualWeightKg ?? 0) / LB))).toEqual([140, 140, 140]);
     expect(markAllPlan(log, [ex.id], lastFor(log), { history: historyFor(log), units: 'lb' })).toEqual({ tick: 3, skip: 0 });
+  });
+});
 
 describe('deleting a set', () => {
   it('offers every set but the only one, named with its numbers', () => {
