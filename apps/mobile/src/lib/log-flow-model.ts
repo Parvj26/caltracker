@@ -7,7 +7,7 @@
 //   * a pick-one group is one page per option (logging an option picks it).
 // Every rule (pre-fill, pick-one, rounds, drops, counting) comes from @caltracker/shared; this file only lays it out.
 import {
-  TARGET_FIELDS,
+  targetFieldsFor,
   blockRoundCount,
   completeSetWith,
   completedSetCount,
@@ -349,9 +349,9 @@ function cellFor(field: StepField, set: LogSetDoc, values: SetValues, units: Uni
   }
 }
 
-/** The fields a tracking type logs, weight first ("135 × 8"). */
+/** The fields a tracking type logs, weight first ("135 × 8"). A type this build doesn't know logs as the fallback (reps). */
 export function fieldsFor(ex: Pick<LogExerciseDoc, 'trackingType'>): StepField[] {
-  const keep = TARGET_FIELDS[ex.trackingType] as readonly string[];
+  const keep = targetFieldsFor(ex.trackingType) as readonly string[];
   return FIELD_ORDER.filter((f) => keep.includes(f));
 }
 

@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { TRACKING_TYPES } from '../exercises/tracking';
+import { isRawObject, mapRawArray, withKnownTrackingType } from '../exercises/lenient';
+import type { RawObject } from '../exercises/lenient';
+import { FALLBACK_TRACKING_TYPE, TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, sectionRuns } from './sections';
-import { TARGET_FIELDS, TRACKING_TYPE_LABELS } from './targets';
+import { fitSetTargets, targetFieldsFor, trackingTypeLabel } from './targets';
 
 export const SET_TYPES = ['normal', 'warmup', 'drop'] as const;
 export type SetType = (typeof SET_TYPES)[number];
@@ -97,7 +99,7 @@ type IssueSink = { addIssue: (issue: { code: 'custom'; message: string; path: Pr
 
 /** The per-set rules, shared by an exercise's sets and each substitute's sets. */
 function checkSets(sets: readonly WorkoutSetDoc[], trackingType: TrackingType, path: PropertyKey[], ctx: IssueSink) {
-  const allowed = TARGET_FIELDS[trackingType];
+  const allowed = targetFieldsFor(trackingType);
   sets.forEach((s, si) => {
     const setPath = [...path, si];
     if (si === 0 && s.setType === 'drop') {
@@ -112,7 +114,7 @@ function checkSets(sets: readonly WorkoutSetDoc[], trackingType: TrackingType, p
         if (s[key] !== null) {
           ctx.addIssue({
             code: 'custom',
-            message: `${FIELD_LABELS[field]} doesn't apply to ${TRACKING_TYPE_LABELS[trackingType]}.`,
+            message: `${FIELD_LABELS[field]} doesn't apply to ${trackingTypeLabel(trackingType)}.`,
             path: [...setPath, key],
           });
         }
@@ -259,3 +261,21 @@ export const WorkoutDoc = z
     })),
   }));
 export type WorkoutDoc = z.output<typeof WorkoutDoc>;
+
+/*
+ * Lenient read, for a workout saved on the phone or sent by the server: an exercise or substitute whose tracking
+ * type this build doesn't know (a newer server's) reads as FALLBACK_TRACKING_TYPE, keeping only the targets that type
+ * uses, instead of failing the parse. Known types read exactly as the strict schema reads them. Writes keep using
+ * WorkoutDoc.
+ */
+const fitRawSets = (o: RawObject): RawObject => mapRawArray(o, 'sets', (s) => fitSetTargets(FALLBACK_TRACKING_TYPE, s as WorkoutSetDoc));
+
+export function parseWorkoutDocLenient(raw: unknown) {
+  if (!isRawObject(raw)) return WorkoutDoc.safeParse(raw);
+  const fixed = mapRawArray(raw, 'blocks', (b) =>
+    mapRawArray(b, 'exercises', (e) =>
+      mapRawArray(withKnownTrackingType(e, fitRawSets), 'substitutes', (sub) => withKnownTrackingType(sub, fitRawSets)),
+    ),
+  );
+  return WorkoutDoc.safeParse(fixed);
+}

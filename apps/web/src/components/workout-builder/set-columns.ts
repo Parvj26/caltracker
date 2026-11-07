@@ -1,4 +1,4 @@
-import { TARGET_FIELDS } from '@caltracker/shared';
+import { targetFieldsFor } from '@caltracker/shared';
 import type { TrackingType } from '@caltracker/shared';
 
 /** One column of an exercise's set rows. The captions match the start of each input's accessible name. */
@@ -11,7 +11,7 @@ export type SetColumn = { key: 'label' | 'type' | 'reps' | 'weight' | 'duration'
  * drop set's "To failure" box still has its place.
  */
 export function setColumns(trackingType: TrackingType, showRest: boolean): SetColumn[] {
-  const fields = TARGET_FIELDS[trackingType];
+  const fields = targetFieldsFor(trackingType);
   const cols: SetColumn[] = [
     { key: 'label', caption: '', width: '24px' },
     { key: 'type', caption: 'Type', width: '7rem' },

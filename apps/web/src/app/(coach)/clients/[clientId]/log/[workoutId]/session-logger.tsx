@@ -31,6 +31,7 @@ import {
   stepName,
   toKg,
   toMeters,
+  toTrackingType,
   uncompleteSet,
   updateActual,
   type ActualPatch,
@@ -166,7 +167,7 @@ function ExerciseTable({
   lastTime: LastTimes[string];
   edit: (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => void;
 }) {
-  const fields = FIELDS[exercise.trackingType];
+  const fields = FIELDS[toTrackingType(exercise.trackingType)];
   const header: Record<Field, string> = { weight: units.toUpperCase(), reps: 'REPS', time: 'TIME', distance: distanceUnitFor(units).toUpperCase() };
   const plan = planSummary(exercise, units);
   const last = formatLastResult(lastTime ?? [], exercise.trackingType, units);

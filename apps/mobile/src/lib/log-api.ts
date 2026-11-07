@@ -7,6 +7,7 @@ import {
   LOG_TREE_SELECT,
   WorkoutDoc,
   logRowToDoc,
+  parseWorkoutDocLenient,
   type Database,
   type IsoDate,
   type LogStatus,
@@ -226,7 +227,7 @@ async function readCache(today: IsoDate): Promise<Record<string, CachedDetail>> 
 
 function validDetail(hit: CachedDetail | undefined): CachedDetail | null {
   if (!hit || typeof hit.scheduledOn !== 'string') return null;
-  const doc = WorkoutDoc.safeParse(hit.doc);
+  const doc = parseWorkoutDocLenient(hit.doc);
   if (!doc.success) return null;
   const videoUrls = typeof hit.videoUrls === 'object' && hit.videoUrls !== null ? hit.videoUrls : {};
   return { doc: doc.data, scheduledOn: hit.scheduledOn, videoUrls };

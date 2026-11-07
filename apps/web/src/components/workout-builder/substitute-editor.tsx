@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { TRACKING_TYPE_LABELS, formatSetsSummary, setLabels, substituteSetShowsRest } from '@caltracker/shared';
+import { trackingTypeLabel, formatSetsSummary, setLabels, substituteSetShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutSubstituteDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { rowNames } from './block-editor';
@@ -50,7 +50,7 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
           <span aria-hidden="true">⇄ </span>or: {sub.exerciseName}
         </span>
         <span className={styles.caption}>
-          {TRACKING_TYPE_LABELS[sub.trackingType]} · {formatSetsSummary(sub.sets, sub.trackingType, units).text}
+          {trackingTypeLabel(sub.trackingType)} · {formatSetsSummary(sub.sets, sub.trackingType, units).text}
         </span>
         <div className={styles.blockTools}>
           <button

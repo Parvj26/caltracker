@@ -2,7 +2,7 @@ import type { TrackingType } from '../exercises/tracking';
 import { MAX_SUBSTITUTES } from './schema';
 import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc, WorkoutSubstituteDoc } from './schema';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from './sections';
-import { TARGET_FIELDS } from './targets';
+import { targetFieldsFor } from './targets';
 
 export type ExercisePick = { id: string; name: string; trackingType: TrackingType };
 
@@ -405,7 +405,7 @@ export function replaceExercise(
   workoutExerciseId: string,
   ex: ExercisePick,
 ): WorkoutDoc {
-  const allowed = TARGET_FIELDS[ex.trackingType];
+  const allowed = targetFieldsFor(ex.trackingType);
   return mapExercise(doc, blockId, workoutExerciseId, (e) => ({
     ...e,
     exerciseId: ex.id,
@@ -417,7 +417,7 @@ export function replaceExercise(
   }));
 }
 
-const fitSet = (s: WorkoutSetDoc, allowed: (typeof TARGET_FIELDS)[TrackingType]): WorkoutSetDoc => ({
+const fitSet = (s: WorkoutSetDoc, allowed: ReturnType<typeof targetFieldsFor>): WorkoutSetDoc => ({
   ...s,
   targetRepsMin: allowed.includes('reps') ? s.targetRepsMin : null,
   targetRepsMax: allowed.includes('reps') ? s.targetRepsMax : null,
@@ -468,7 +468,7 @@ export function addSubstitute(
   if (!block || !e || block.kind === 'choice') return doc;
   if (e.substitutes.length >= MAX_SUBSTITUTES) return doc;
   if (e.exerciseId === ex.id || e.substitutes.some((x) => x.exerciseId === ex.id)) return doc;
-  const allowed = TARGET_FIELDS[ex.trackingType];
+  const allowed = targetFieldsFor(ex.trackingType);
   const sub: WorkoutSubstituteDoc = {
     id: makeId(),
     exerciseId: ex.id,

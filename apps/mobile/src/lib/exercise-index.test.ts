@@ -47,6 +47,15 @@ describe('createExerciseIndexLoader', () => {
     expect([...storage.map.keys()].some((k) => k.startsWith(EXERCISE_INDEX_KEY))).toBe(true);
   });
 
+  it('reads a saved row with a tracking type this build does not know as reps', async () => {
+    const storage = memoryStorage();
+    const future = row('f', { trackingType: 'sled_meters_per_minute' as unknown as ExerciseIndexRow['trackingType'] });
+    await createExerciseIndexLoader(storage, () => Promise.resolve([future]), 'u1', () => 0)();
+    const r = await createExerciseIndexLoader(storage, never, 'u1', () => 1)();
+    expect(r.fromCache).toBe(true);
+    expect(r.rows.map((x) => x.trackingType)).toEqual(['reps']);
+  });
+
   it('answers from a young saved copy at once and still refreshes it in the background', async () => {
     const storage = memoryStorage();
     await createExerciseIndexLoader(storage, () => Promise.resolve([row('a')]), 'u1', () => 0)();

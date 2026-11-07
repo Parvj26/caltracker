@@ -13,6 +13,7 @@ import {
   needsPick,
   sectionRuns,
   substitutedFrom,
+  toTrackingType,
   type LogSetDoc,
   type TrackingType,
   type Units,
@@ -31,7 +32,7 @@ export function draftFor(set: LogSetDoc, trackingType: TrackingType, units: Unit
   const weight = set.actualWeightKg === null ? '' : String(kgToInput(set.actualWeightKg, units));
   const time = set.actualDurationS === null ? '' : formatClock(set.actualDurationS);
   const distance = set.actualDistanceM === null ? '' : String(fromMeters(set.actualDistanceM, distanceUnitFor(units)));
-  switch (trackingType) {
+  switch (toTrackingType(trackingType)) {
     case 'weight_reps': return { weight, reps };
     case 'reps': return { reps };
     case 'time': return { time };
@@ -43,7 +44,7 @@ export function draftFor(set: LogSetDoc, trackingType: TrackingType, units: Unit
 const reps = (n: number) => `${n} ${n === 1 ? 'rep' : 'reps'}`;
 
 function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
-  switch (t) {
+  switch (toTrackingType(t)) {
     case 'weight_reps':
       if (s.actualReps !== null && s.actualWeightKg !== null) return `${formatWeight(s.actualWeightKg, units)} × ${s.actualReps}`;
       if (s.actualReps !== null) return reps(s.actualReps);

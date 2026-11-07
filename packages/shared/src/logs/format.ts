@@ -1,4 +1,5 @@
 // Display text for logs, in the viewer's units. Pure, shared by the phone and the dashboard.
+import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { KG_PER_LB, formatDistance, formatDuration, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
@@ -34,7 +35,8 @@ export type ResultSet = {
 const reps = (n: number) => `${n} ${n === 1 ? 'rep' : 'reps'}`;
 
 function resultText(s: ResultSet, trackingType: TrackingType, units: Units): string | null {
-  switch (trackingType) {
+  // A type this build doesn't know (a newer server's) is worded as the fallback.
+  switch (toTrackingType(trackingType)) {
     case 'weight_reps':
       if (s.actualWeightKg !== null && s.actualReps !== null) return `${formatWeight(s.actualWeightKg, units)} × ${s.actualReps}`;
       if (s.actualReps !== null) return reps(s.actualReps);
