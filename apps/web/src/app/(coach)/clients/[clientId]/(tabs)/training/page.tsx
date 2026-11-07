@@ -1,8 +1,21 @@
 import type { Metadata } from 'next';
 import { clientPageTitle } from '@/lib/page-titles';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { addDays, localToday, monthGrid } from '@caltracker/shared';
-import { isMonth, shiftMonth } from '@/components/calendar/format';
+import {
+  CALENDAR_VIEWS,
+  IsoDateSchema,
+  WORKOUT_TREE_SELECT,
+  addDays,
+  coveringRange,
+  isCalendarView,
+  localToday,
+  workoutPreview,
+  workoutRowToDoc,
+} from '@caltracker/shared';
+import type { CalendarView, IsoDate, WorkoutTreeRow } from '@caltracker/shared';
+import { isMonth } from '@/components/calendar/format';
+import { CALENDAR_VIEW_COOKIE, viewFromCookie } from '@/components/calendar/view-cookie';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientCalendar, type AssignmentSummary, type CalendarEntry, type ClientLogEntry, type PickerProgram } from '../../client-calendar';
@@ -22,32 +35,51 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 // Same cap as the workout library page.
 const LIBRARY_LIMIT = 200;
 
+// Each calendar workout with its exercises (for the week views' previews), program and completed logs. The select
+// string is built by concatenation, so supabase-js cannot infer its shape; CalendarRow describes it.
+const CALENDAR_SELECT = `${WORKOUT_TREE_SELECT}, program_assignments(program_name), workout_logs(id, finished_at, logged_by)`;
+type CalendarRow = WorkoutTreeRow & {
+  program_assignments: { program_name: string } | null;
+  workout_logs: { id: string; finished_at: string | null; logged_by: string | null }[];
+};
+
 export default async function ClientPage({
   params,
   searchParams,
 }: {
   params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ month?: string | string[]; assign?: string | string[] }>;
+  searchParams: Promise<{
+    view?: string | string[];
+    from?: string | string[];
+    month?: string | string[];
+    assign?: string | string[];
+  }>;
 }) {
-  const { workspaceId, units } = await requireCoach();
+  const { workspaceId, units, userId } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
   const client = await getClient(clientId);
   if (!client) notFound();
 
-  // "Today" belongs to the coach's browser, not this (UTC) server. Without ?month= the browser picks the month from
-  // its own today, which is at most a day from UTC's, so load the months either side as well.
-  const month = isMonth(query.month) ? query.month : null;
+  // ?view=&from= pick the days on screen. An older ?month=YYYY-MM link opens that month. Without ?view= the view is
+  // the one the coach last picked (a cookie), so the first render is already right. "Today" belongs to the coach's
+  // browser, not this (UTC) server: without ?from= load around every day the browser's today can be (a day either
+  // side of UTC's), and with no view known at all load enough for every view.
+  const legacyMonth = isMonth(query.month) ? query.month : null;
+  const parsedFrom = IsoDateSchema.safeParse(query.from);
+  const remembered = viewFromCookie((await cookies()).get(CALENDAR_VIEW_COOKIE)?.value, userId);
+  const view: CalendarView | null = isCalendarView(query.view) ? query.view : legacyMonth ? 'month' : remembered;
+  const from: IsoDate | null = parsedFrom.success ? parsedFrom.data : legacyMonth ? `${legacyMonth}-01` : null;
   const utcToday = localToday('UTC');
-  const firstMonth = month ?? shiftMonth(utcToday.slice(0, 7), -1);
-  const lastMonth = month ?? shiftMonth(utcToday.slice(0, 7), 1);
-  const rangeStart = monthGrid(firstMonth)[0]![0]!;
-  const rangeEnd = monthGrid(lastMonth).at(-1)!.at(-1)!;
+  const { start: rangeStart, end: rangeEnd } = coveringRange(
+    view ? [view] : CALENDAR_VIEWS,
+    from ? [from] : [addDays(utcToday, -1), addDays(utcToday, 1)],
+  );
 
   const [workouts, assignments, library, programs, stickers, strength, scheduled, unplanned] = await Promise.all([
     supabase
       .from('workouts')
-      .select('id, name, scheduled_on, assignment_id, program_assignments(program_name), workout_logs(id, finished_at)')
+      .select(CALENDAR_SELECT)
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
       .gte('scheduled_on', rangeStart)
@@ -126,19 +158,23 @@ export default async function ClientPage({
   // finished at 11 pm in the client's zone stays on its planned day. Only completed logs count: a discarded or
   // in-progress one leaves the workout open (and Missed once its day has passed). The logs come embedded with
   // each workout, so no long id list goes into a URL.
-  const entries: CalendarEntry[] = workouts.data.flatMap((w) =>
-    w.scheduled_on
-      ? [
-          {
-            id: w.id,
-            name: w.name,
-            date: w.scheduled_on,
-            programName: w.program_assignments?.program_name ?? null,
-            logId: w.workout_logs[0]?.id ?? null,
-          },
-        ]
-      : [],
-  );
+  // "Logged by coach": the log was saved by someone other than the client (a coach of the workspace logging an
+  // in-person session). A log whose author's account is gone (logged_by null) says nothing.
+  const entries: CalendarEntry[] = (workouts.data as unknown as CalendarRow[]).flatMap((w) => {
+    if (!w.scheduled_on) return [];
+    const log = w.workout_logs[0];
+    return [
+      {
+        id: w.id,
+        name: w.name,
+        date: w.scheduled_on,
+        programName: w.program_assignments?.program_name ?? null,
+        logId: log?.id ?? null,
+        loggedByCoach: Boolean(log?.logged_by && log.logged_by !== client.id),
+        preview: workoutPreview(workoutRowToDoc(w), units),
+      },
+    ];
+  });
   // A log whose planned workout was deleted since also has no workout_id, but its exercises still point at the plan:
   // that one was planned, not added by the client, so it stays off the calendar with the workout the coach deleted.
   const clientLogs: ClientLogEntry[] = unplanned.data.flatMap((l) =>
@@ -166,7 +202,9 @@ export default async function ClientPage({
       {/* The calendar (assign a program, add a workout) comes first; stickers, bests and strength sit below. */}
       <ClientCalendar
         client={client}
-        month={month}
+        coachId={userId}
+        view={view}
+        from={from}
         entries={entries}
         clientLogs={clientLogs}
         assignments={summaries}
