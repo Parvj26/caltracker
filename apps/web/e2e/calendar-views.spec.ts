@@ -80,6 +80,8 @@ async function seedWorkout(name: string, date: string, exercises: string[] = ['B
 }
 
 test('2 weeks by default; ‹ › step by the view; Today comes back; the picked view is remembered and in the address', async ({ page }) => {
+  // It walks every view and reloads several times: about 30 s on a busy CI shard, so it gets triple time.
+  test.slow();
   await signInAsCoach(page);
   await page.goto(`/clients/${clientId}/training`);
   const today = await browserToday(page);

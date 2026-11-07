@@ -412,6 +412,7 @@ t('a reopened and re-finished log is recomputed on the next call, and its sticke
   const handler = handlerWith(() => 0.5);
   const first = (await (await call(handler, { logId: log.logId }, asUser(client.token))).json()) as AwardResult;
   assertEquals(first.prs, []);
+  assertEquals(first.volumeKg, 2500, 'the volume is stored with the award, for shared cards');
   const stickersBefore = await stickers(client.id);
 
   // The client reopens the workout, adds weight to the last set and finishes again: the phone's revision goes up.
@@ -425,10 +426,15 @@ t('a reopened and re-finished log is recomputed on the next call, and its sticke
   assertEquals(res.status, 200);
   const after = (await res.json()) as AwardResult;
   assertEquals(after.prs.map((p) => p.kind).sort(), ['e1rm', 'heaviest']);
-  // Same animal and rolls; only the multiple follows the new volume (2,600 kg).
+  // Same animal and rolls; only the multiple and the stored volume follow the new volume (2,600 kg).
   assertEquals(
     { ...after, prs: [] },
-    { ...first, prs: [], ladder: first.ladder && { ...first.ladder, multiple: 2600 / weightOf(first.ladder.key) } },
+    {
+      ...first,
+      prs: [],
+      volumeKg: 2600,
+      ladder: first.ladder && { ...first.ladder, multiple: 2600 / weightOf(first.ladder.key) },
+    },
     'same stickers, same rolls',
   );
   assertEquals(await stickers(client.id), stickersBefore, 'sticker_awards unchanged');
@@ -460,6 +466,7 @@ t('a workout keeps its animal forever: a correction below it, then a re-finish, 
   assertEquals(res.status, 200);
   const after = (await res.json()) as AwardResult;
   assertEquals(after.ladder, { ...a2.ladder!, multiple: 50 / weightOf(a2.ladder?.key) }, 'same animal, new multiple');
+  assertEquals([a2.volumeKg, after.volumeKg], [3000, 50], 'the stored volume follows the correction');
   assertEquals(after.drop, a2.drop, 'no roll');
   assertEquals(await stickers(client.id), stickersBefore, 'no sticker added or taken');
 

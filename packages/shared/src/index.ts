@@ -45,8 +45,10 @@ export {
   formatClock,
   formatDistance,
   formatDuration,
+  formatTotalWeight,
   formatWeight,
   fromKg,
+  groupThousands,
   fromMeters,
   kgToInput,
   parseClock,
@@ -304,6 +306,7 @@ export { shortDate, strengthExercises, strengthSeries, strengthSummary } from '.
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
+export { RECENT_PR_DAYS, RECENT_PR_LIMIT, awardRecords, recentPrAmount, recentPrs } from './awards/recent-prs';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';
 export {
@@ -408,7 +411,7 @@ export {
   parseCardRequest,
 } from './community/schema';
 export type { ReportReason } from './community/schema';
-export { cardRequestLabel, cardText, prLine } from './community/cards';
+export { cardRequestLabel, cardText, posterFirstName, prLine, workoutCardSentence } from './community/cards';
 export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
@@ -426,3 +429,26 @@ export {
   fitLongEdge,
 } from './community/photos';
 export type { CommunityPhotoExt } from './community/photos';
+export {
+  exerciseRegion,
+  nextSuggestion,
+  prefillLastTime,
+  prescriptionOfLogExercise,
+  prescriptionOfWorkoutExercise,
+  progressionHint,
+  progressionHistoryFromRows,
+  suggestionForLogExercise,
+  suggestionsForLog,
+  suggestionsForWorkout,
+  withSuggestion,
+} from './progression/progression';
+export type {
+  BodyRegion,
+  ExerciseHistory,
+  PrescribedSet,
+  Prescription,
+  ProgressionHistory,
+  ProgressionSession,
+  ProgressionSet,
+  Suggestion,
+} from './progression/progression';
