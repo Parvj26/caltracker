@@ -18,8 +18,8 @@ import {
 //   - the phone, with the client's JWT, after its completed log is saved: { logId }
 //   - the catch-up cron job (pg_net), with the x-award-secret header: { logId }
 //   - a coach correction (web, Task 7): { logId, recompute: true }. That rewrites the log's PRs, the client's
-//     bests and stats from the logs, and never rolls again. The stored ladder animal stays while the corrected
-//     volume still reaches it; otherwise a new one is picked by the same rule (pickLadderAnimal) and swapped in.
+//     bests and stats from the logs, and never rolls again. A workout keeps its ladder animal forever (only its
+//     multiple follows the corrected volume); one with no animal yet may get one. Never a second one per log.
 // A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
 // plain call. A recompute of a log with no award yet is a full award (the client was always due it).
 // A client the coach has removed gets nothing: 403 with hint 'not_a_client', as save_workout_log answers.
@@ -152,7 +152,7 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
         ladderAwards,
       );
       const owned = new Map(inputs.owned.map((o) => [o.key, { count: o.count, shiny: o.shiny }]));
-      // An award already stored keeps its animal while the volume still reaches it (apply_award swaps it otherwise).
+      // An award already stored keeps its animal forever; apply_award and the awards trigger hold that too.
       const keepLadder = inputs.award ? (inputs.award.ladder?.key ?? null) : null;
       const award = computeAward({ ...ctx, owned, rng, keepLadder });
 
