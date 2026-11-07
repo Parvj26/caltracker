@@ -1,0 +1,47 @@
+/* "Assign" from the library: the button, the client checklist and the per-client notes. Colours and sizes only via var(--ct-*). */
+.actions { display: inline-flex; flex-wrap: wrap; align-items: flex-start; gap: var(--ct-space-2); }
+.small {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-lime);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.small:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+
+.listHead { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.linkButton {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.clients { max-height: 240px; min-height: 88px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.client {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-3);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+}
+.client:hover { background: var(--ct-surface); }
+.clientLabel { display: flex; flex: 1; align-items: center; gap: var(--ct-space-3); min-height: var(--ct-tap-min); cursor: pointer; }
+.clientLabel input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
+.note { color: var(--ct-ink-muted); font-size: var(--ct-size-caption); text-align: right; }
+.done { color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+.failed { color: var(--ct-ink); font-size: var(--ct-size-caption); }
+.modes { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; border: 0; }
+.modes legend { margin-bottom: var(--ct-space-1); padding: 0; font-weight: var(--ct-weight-section-heading); }
+.mode { display: flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); cursor: pointer; }
+.mode input { width: 18px; height: 18px; accent-color: var(--ct-ink); }
