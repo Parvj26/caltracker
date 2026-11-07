@@ -10,7 +10,7 @@ import { supabase } from './supabase';
 const DEBOUNCE_MS = 400;
 let channelCount = 0;
 
-type Source = { table: 'communities' | 'community_posts' | 'community_comments' | 'community_likes' | 'community_notifications'; filter: string };
+type Source = { table: 'communities' | 'community_posts' | 'community_comments' | 'community_reactions' | 'community_notifications'; filter: string };
 
 /**
  * Calls `onChange` (debounced) when a matching row changes, once after the channel (re)joins, and when the app comes
