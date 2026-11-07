@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fontFamilyFor } from './fonts';
-import { textStyle } from './typography';
+import { LOG_TEXT_SCALE, logMaxFontScale, logTextStyle, textStyle } from './typography';
 
 describe('textStyle', () => {
   it('builds the phone screen title from the tokens', () => {
@@ -33,6 +33,37 @@ describe('textStyle', () => {
 
   it('rounds tracking to avoid float noise', () => {
     expect(textStyle('button', 'phone').letterSpacing).toBe(0.45);
+  });
+});
+
+describe('logTextStyle', () => {
+  it('makes the logging pages 10% bigger, in whole points', () => {
+    expect(LOG_TEXT_SCALE).toBe(1.1);
+    const sizes = (['screenTitle', 'sectionHeading', 'body', 'caption', 'button'] as const).map((r) => logTextStyle(r, 'phone').fontSize);
+    expect(sizes).toEqual([24, 18, 17, 13, 17]);
+    expect(logTextStyle('screenTitle', 'tablet').fontSize).toBe(26);
+    expect(logTextStyle('button', 'tablet').fontSize).toBe(18);
+  });
+
+  it('keeps everything else of the role', () => {
+    const app = textStyle('caption', 'phone');
+    expect(logTextStyle('caption', 'phone')).toEqual({ ...app, fontSize: 13 });
+    expect(logTextStyle('bigNumber', 'phone').fontVariant).toEqual(['tabular-nums']);
+  });
+
+  it('scales tracking with the bigger size', () => {
+    expect(logTextStyle('button', 'phone').letterSpacing).toBe(0.51);
+  });
+
+  it('leaves the app-wide sizes alone', () => {
+    expect(textStyle('sectionHeading', 'phone').fontSize).toBe(16);
+    expect(textStyle('button', 'phone').fontSize).toBe(15);
+  });
+
+  it('keeps the largest Dynamic Type size where the app cap had it', () => {
+    expect(logMaxFontScale(1.4)).toBe(1.27);
+    // Box numbers: 16 × 1.4 = 22.4 pt before; 18 × 1.27 = 22.86 pt now (within half a point).
+    expect(Math.abs(18 * logMaxFontScale(1.4) - 16 * 1.4)).toBeLessThan(0.5);
   });
 });
 

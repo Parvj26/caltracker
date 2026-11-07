@@ -37,18 +37,20 @@ type ButtonProps = {
   disabled?: boolean;
   /** Announced as busy while true (and disabled). */
   busy?: boolean;
+  /** 'logging': the workout logging pages' bigger label. */
+  size?: 'regular' | 'logging';
 };
 
 /**
  * Chunky button. Primary and finish sit on a 4 pt coloured base and sink 2 pt when pressed
  * (they fade instead when Reduce Motion is on).
  */
-export function Button({ title, onPress, variant = 'primary', testID, disabled = false, busy = false }: ButtonProps) {
-  const { text, device, radius } = useTheme();
+export function Button({ title, onPress, variant = 'primary', testID, disabled = false, busy = false, size = 'regular' }: ButtonProps) {
+  const { text, logText, device, radius } = useTheme();
   const reduceMotion = useReduceMotion();
   const face = FACE[variant];
   const off = disabled || busy;
-  const label = text('button');
+  const label = size === 'logging' ? logText('button') : text('button');
   const fontSize = variant === 'finish' ? Math.max(19, label.fontSize ?? 0) : label.fontSize;
 
   return (

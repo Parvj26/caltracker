@@ -95,6 +95,7 @@ import { useDelayedFlag } from '@/lib/use-delayed-flag';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { useUnits } from '@/lib/use-units';
 import { contentMaxWidth, palette, pressedOpacity, white } from '@/theme/theme';
+import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
 
 type Screen = { mode: 'overview' } | { mode: 'start'; section: number } | { mode: 'pages'; section: number; page: number };
@@ -787,7 +788,7 @@ function SectionPages({
   onMarkAll: (logExerciseIds: string[], pickOf: string | null) => void;
   onDone: (page: number) => void;
 }) {
-  const { text, space, radius } = useTheme();
+  const { text, logText, space, radius } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<FlowPage>>(null);
@@ -871,10 +872,10 @@ function SectionPages({
           accessibilityHint="Shows every section, to jump to any of them."
           style={({ pressed }) => [styles.headerTitle, pressed && { opacity: pressedOpacity }]}
         >
-          <Text style={[text('sectionHeading'), styles.onInk, styles.centre]} numberOfLines={2} maxFontSizeMultiplier={1.6}>
+          <Text style={[logText('sectionHeading'), styles.onInk, styles.centre]} numberOfLines={2} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
             {section.title}
           </Text>
-          <Text testID="pages-sections" style={[text('caption'), styles.onInk, styles.centre]} maxFontSizeMultiplier={1.6}>
+          <Text testID="pages-sections" style={[logText('caption'), styles.onInk, styles.centre]} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
             {sectionCount > 1 ? `Section ${sectionIndex + 1} of ${sectionCount} · All sections ▾` : 'Overview ▾'}
           </Text>
         </Pressable>
@@ -932,13 +933,13 @@ function SectionPages({
               accessibilityRole="button"
               style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
             >
-              <Text style={[text('button'), styles.onInk]}>Done</Text>
+              <Text style={[logText('button'), styles.onInk]}>Done</Text>
             </Pressable>
           )}
           <View style={styles.stepRow}>
             <StepButton testID="page-prev" glyph="‹" label={steps.prev} onPress={() => onStep(-1)} />
             {dots.length > MAX_DOTS ? (
-              <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
+              <Text testID="page-count" style={logText('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
                 {`${page + 1} / ${dots.length}`}
               </Text>
             ) : dots.length > 1 ? (
@@ -968,7 +969,7 @@ function SectionPages({
 
 /** ‹ or › beside the dots: one page back or forward, into the next or previous section too. Dimmed at the ends. */
 function StepButton({ testID, glyph, label, onPress }: { testID: string; glyph: string; label: string | null; onPress: () => void }) {
-  const { text } = useTheme();
+  const { logText: text } = useTheme();
   return (
     <Pressable
       testID={testID}
@@ -987,7 +988,7 @@ function StepButton({ testID, glyph, label, onPress }: { testID: string; glyph: 
 
 /** Past a section's first or last page: the section a swipe goes on to. Landing here opens it. */
 function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: string }) {
-  const { text, space } = useTheme();
+  const { logText: text, space } = useTheme();
   return (
     <View testID={dir < 0 ? 'edge-prev' : 'edge-next'} style={[styles.edge, { width, padding: space[4], gap: space[2] }]}>
       <Text style={[text('caption'), styles.centre]}>{dir < 0 ? '‹ Previous section' : 'Next section ›'}</Text>
@@ -997,6 +998,8 @@ function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: st
 }
 
 const DOT = 8;
+/** The header's title may grow this much with the phone's text size (1.6 at the app's size: same largest size). */
+const HEADER_MAX_SCALE = logMaxFontScale(1.6);
 /** Past this many pages the dots (with ‹ and › beside them) no longer fit a phone's width: "3 / 12" instead. */
 const MAX_DOTS = 6;
 
