@@ -15,32 +15,10 @@ env:
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
-- extendedWaitUntil:
-    visible: 'E2E Log'
-    timeout: 20000
-- tapOn: 'Start'
-- extendedWaitUntil:
-    visible:
-      id: done-0
-    timeout: 20000
-# Done on each of the three sets (sets 1 and 2 start a rest, which is skipped; the last set starts none).
+# Tick the three sets (no rest timer), Done, then Finish on the Finish workout? sheet.
+- runFlow: helpers/log-squat-3x8.yaml
 - tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
-- tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: all-done-0
-    timeout: 10000
-# Finish from the top bar.
-- tapOn:
-    id: finish-workout
+    id: finish-confirm
 - extendedWaitUntil:
     visible: 'NEW for your zoo book'
     timeout: 15000

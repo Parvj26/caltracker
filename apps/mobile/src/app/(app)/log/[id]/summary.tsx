@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { STICKERS, canReopen, logVolumeKg, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View, type HostInstance } from 'react-native';
 import { OffScreen, ShareCard } from '@/components/stickers/share-card';
 import { Sticker } from '@/components/stickers/sticker';
@@ -11,6 +11,8 @@ import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
+import { planChanges } from '@/lib/log-flow-model';
+import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { REOPEN_OFFLINE, useActiveLog } from '@/lib/use-active-log';
 import { useUnits } from '@/lib/use-units';
 import { palette, stickerTheme } from '@/theme/theme';
@@ -86,6 +88,12 @@ export default function SummaryScreen() {
   const done = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
 
   const log = local ?? (remote.kind === 'ok' ? remote.log : null);
+  // The names of exercises swapped out: the log keeps only their ids.
+  const swappedFrom = useMemo(
+    () => (log ? log.blocks.flatMap((b) => b.exercises.flatMap((e) => (e.swappedFromExerciseId ? [e.swappedFromExerciseId] : []))) : []),
+    [log],
+  );
+  const names = useExerciseDetails(swappedFrom);
 
   if (units === null || (log === null && remote.kind === 'loading')) {
     return (
@@ -120,6 +128,7 @@ export default function SummaryScreen() {
   }
 
   const lines = summaryLines(log, units);
+  const changes = planChanges(log, (exerciseId) => names[exerciseId]?.name ?? null);
   const mayReopen = canReopen(log, Date.now());
 
   const ladder = award?.ladder ?? null;
@@ -166,6 +175,20 @@ export default function SummaryScreen() {
           {lines.sets}
         </Text>
       </View>
+
+      {changes.length > 0 ? (
+        <View style={{ gap: space[2] }} testID="summary-changes">
+          <Text style={text('sectionHeading')} accessibilityRole="header">
+            Changes from the plan
+          </Text>
+          {changes.map((c, i) => (
+            // Two identical lines are possible (the same swap in two slots), so the key includes the position.
+            <Text key={`${i}-${c}`} style={text('body')}>
+              {c}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
       {award && summaryStickers(award).length > 0 ? (
         <View style={{ gap: space[2] }} testID="summary-stickers">

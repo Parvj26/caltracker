@@ -1,6 +1,6 @@
-# Review Focus 1: closing the app mid-workout never loses a ticked set. Start, Done on set 1, close the app,
-# open it again (same install, no clearState): Today offers Resume, the page is on set 2, and Edit sets shows set 1
-# ticked.
+# Closing the app mid-workout never loses a ticked set. Start, tick set 1, close the app, open it again (same
+# install, no clearState): Today offers Resume, the screen opens on the exercise with set 1 still ticked. ✕ goes
+# back to the section start, ⌄ to the overview, and the workout keeps going until it is discarded there.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -12,23 +12,18 @@ env:
     env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
-    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
     permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
-- extendedWaitUntil:
-    visible: 'E2E Log'
-    timeout: 20000
-- tapOn: 'Start'
-- extendedWaitUntil:
-    visible:
-      id: done-0
-    timeout: 20000
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
 - tapOn:
-    id: done-0
-- tapOn:
-    id: rest-skip
+    id: tick-0-0-0
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
 - stopApp
 - launchApp
 - extendedWaitUntil:
@@ -38,33 +33,55 @@ env:
 - assertVisible: '.*Resume E2E Log.*'
 - tapOn:
     id: resume-banner
+# Something is ticked, so it opens straight on the first page with an open set.
 - extendedWaitUntil:
     visible:
-      id: done-0
+      id: page-done
     timeout: 20000
-- assertVisible: 'Set 2 of 3'
-- tapOn:
-    id: edit-sets-0
-- extendedWaitUntil:
-    visible:
-      id: tick-0-0
-    timeout: 10000
 # iOS reads a checkbox's state as its value ("checkbox, checked"), which Maestro matches as text.
 - assertVisible:
-    id: tick-0-0
+    id: tick-0-0-0
     text: 'checkbox, checked'
 - assertVisible:
-    id: tick-0-1
+    id: tick-0-0-1
     text: 'checkbox, unchecked'
+# ✕: back to the section's start page, which now says Continue.
 - tapOn:
-    id: edit-sets-close
-- assertNotVisible:
-    id: edit-sets-sheet
+    id: close-section
+- extendedWaitUntil:
+    visible:
+      id: start-section
+      text: 'Continue section'
+    timeout: 10000
+# ⌄: the workout overview, still going.
+- tapOn:
+    id: section-back
+- extendedWaitUntil:
+    visible:
+      id: start-workout
+      text: 'Continue'
+    timeout: 10000
+# ✕ on the overview leaves for Today; the workout keeps going.
+- tapOn:
+    id: overview-close
+- extendedWaitUntil:
+    visible:
+      id: resume-banner
+    timeout: 10000
+- tapOn:
+    id: resume-banner
+# Coming back opens where it was left: the overview.
+- extendedWaitUntil:
+    visible:
+      id: workout-overview
+    timeout: 10000
 # Leave nothing in progress for the next flow.
+- scrollUntilVisible:
+    element:
+      id: discard-workout
+    direction: DOWN
 - tapOn:
-    id: log-pill
-- tapOn:
-    id: discard-button
+    id: discard-workout
 - tapOn: 'Discard'
 - extendedWaitUntil:
     visible: 'Start'

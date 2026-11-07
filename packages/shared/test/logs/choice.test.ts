@@ -24,6 +24,7 @@ import {
   removeLogSet,
   reopenLog,
   setExerciseNote,
+  setLogNotes,
   stepActual,
   swapLogExercise,
   updateActual,
@@ -270,6 +271,7 @@ describe('every op keeps a choice-containing log valid (the phone drops a log th
         ok(pickChoice(log, b.id, null, T), 'pickChoice');
       }
       ok(addLogExercise(log, pick('Row'), uuid, T), 'addLogExercise');
+      ok(setLogNotes(log, 'Felt: Good\n' + 'n'.repeat(2500), T), 'setLogNotes');
       ok(discardLog(log, T), 'discardLog');
     }
     // Finishing needs a ticked set; reopening needs a log finished automatically within the last day.

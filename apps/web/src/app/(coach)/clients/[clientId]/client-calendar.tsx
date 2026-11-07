@@ -1,10 +1,13 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { localDateOf } from '@caltracker/shared';
-import type { IsoDate } from '@caltracker/shared';
+import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
+import type { CalendarView, IsoDate } from '@caltracker/shared';
+import { CalendarToolbar } from '@/components/calendar/calendar-toolbar';
 import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
-import { formatShortDay } from '@/components/calendar/format';
+import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
+import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/stored-view';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ButtonLink } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
@@ -44,16 +47,20 @@ const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 const forCoach = (message: string) => message.startsWith('You ') || message.startsWith('Pick ') || message.includes('date looks wrong');
 
 /**
- * One client's month: assign a program, add single library workouts ("+ Add workout" or a day's "+"), and move
- * (drag or "Move to…"), edit or delete single workouts. Single workouts go on today or later, so past days are
- * not drag targets: a missed workout can be moved to today or later ("Move to another day") or deleted, and a done
- * one opens its log ("View log") or is deleted (the log stays). Moves and deletes show at once and are undone, with
- * a message, if saving fails; the server re-sends the calendar after every change. A past client's calendar is read-only: no assigning, adding, moving, editing or
- * removing.
+ * One client's calendar, 1, 2 or 4 weeks or a month at a time (?view=&from=; without ?view= the coach's last pick in
+ * this browser, else 2 weeks): assign a program, add single library workouts ("+ Add workout" or a day's "+"), and
+ * move (drag or "Move to…"), edit or delete workouts. Single workouts go on today or later, so past days are not drag
+ * targets. A workout not yet done can be edited on any day, past ones included (a missed one can also be moved to
+ * today or later with "Move to another day"). A done one opens its log; its results are edited there ("Edit
+ * results"), and its plan stays as it was so the log still matches it (the server refuses saving it too). Moves and
+ * deletes show at once and are undone, with a message, if saving fails; the server re-sends the calendar after every
+ * change. A past client's calendar is read-only: no assigning, adding, moving, editing or removing.
  */
 export function ClientCalendar({
   client,
-  month: monthParam,
+  coachId,
+  view: viewParam,
+  from,
   entries,
   clientLogs,
   assignments,
@@ -63,7 +70,12 @@ export function ClientCalendar({
   openAssign = false,
 }: {
   client: ClientRef;
-  month: string | null;
+  /** The signed-in coach: the remembered view is theirs. */
+  coachId: string;
+  /** From ?view=, else the view remembered in a cookie, or null to use localStorage (or the default). */
+  view: CalendarView | null;
+  /** From ?from= (any day in the range to show), or null for the coach's today. */
+  from: IsoDate | null;
   entries: CalendarEntry[];
   /** Shown on the day they finished in the coach's zone, as "Added by client", linking to the log. */
   clientLogs: readonly ClientLogEntry[];
@@ -78,7 +90,12 @@ export function ClientCalendar({
   const today = useLocalToday();
   const timeZone = useTimeZone();
   const readOnly = client.removedAt !== null;
-  const month = monthParam ?? today.slice(0, 7);
+  const pathname = usePathname();
+  const storedView = useStoredCalendarView(coachId);
+  const view = viewParam ?? storedView ?? DEFAULT_CALENDAR_VIEW;
+  const range = calendarRange(view, from ?? today);
+  const viewHref = (v: CalendarView, anchor: IsoDate) => `${pathname}?view=${v}&from=${anchor}`;
+  const onScreen = (date: IsoDate) => (range.month ? date.startsWith(`${range.month}-`) : date >= range.start && date <= range.end);
   const [items, setItems] = useState(entries);
   const [shown, setShown] = useState(entries);
   if (shown !== entries) {
@@ -179,12 +196,35 @@ export function ClientCalendar({
     (days[localDateOf(log.finishedAt, timeZone)] ??= []).push({ id: `log-${log.id}`, name: log.name, programName: null, logId: log.id, addedByClient: true });
   }
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
-  // Empty: nothing in the month on screen (planned, or added by the client) and no program still running.
+  // Empty: nothing in the days on screen (planned, or added by the client) and no program still running.
   const empty =
     !readOnly &&
-    !items.some((x) => x.date.startsWith(`${month}-`)) &&
-    !clientLogs.some((l) => localDateOf(l.finishedAt, timeZone).startsWith(`${month}-`)) &&
+    !items.some((x) => onScreen(x.date)) &&
+    !clientLogs.some((l) => onScreen(localDateOf(l.finishedAt, timeZone))) &&
     !assignments.some((a) => a.endDate >= today);
+  // The month view's padding days belong to other months: it steps from its own 1st.
+  const shownFrom = range.month ? `${range.month}-01` : range.start;
+  const title = range.month ? formatMonth(range.month) : formatRange(range.start, range.end);
+  const grid = {
+    weeks: range.weeks,
+    month: range.month,
+    label: title,
+    layout: range.month ? ('month' as const) : ('week' as const),
+    days,
+    today,
+    logHref,
+    toolbar: (
+      <CalendarToolbar
+        view={view}
+        title={title}
+        todayHref={viewHref(view, today)}
+        prevHref={viewHref(view, stepCalendar(view, shownFrom, -1))}
+        nextHref={viewHref(view, stepCalendar(view, shownFrom, 1))}
+        viewHref={(v) => viewHref(v, switchAnchor(range, today))}
+        onPickView={(v) => storeCalendarView(coachId, v)}
+      />
+    ),
+  };
 
   return (
     <>
@@ -227,35 +267,33 @@ export function ClientCalendar({
       </p>
 
       {readOnly ? (
-        <MonthCalendar month={month} days={days} today={today} logHref={logHref} renderItem={() => null} />
+        <MonthCalendar {...grid} itemHref={(item) => (item.logId ? logHref(item.logId) : null)} renderItem={() => null} />
       ) : (
         <MonthCalendar
-          month={month}
-          days={days}
-          today={today}
-          logHref={logHref}
+          {...grid}
+          // Clicking a card: a done workout opens its log; any other opens it for editing, on a past day too.
+          itemHref={(item) => (item.logId ? logHref(item.logId) : `/clients/${client.id}/workouts/${item.id}`)}
           editableFrom={today}
           onDropItem={move}
           onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
           renderItem={(item, date, editable) =>
-            editable ? (
+            item.logId ? (
+              // Done, on any day: open its log or edit its results there, or clear it from the calendar (the log
+              // stays). Its plan isn't edited and it isn't moved: the log was done against it, on its day.
               <ItemMenu
                 item={item}
-                logHref={item.logId ? logHref(item.logId) : undefined}
-                editHref={`/clients/${client.id}/workouts/${item.id}`}
-                // Done stays on its day (the server refuses moving it too).
-                onMove={item.logId ? undefined : () => setMoving({ ...item, date })}
+                logHref={logHref(item.logId)}
+                resultsHref={`${logHref(item.logId)}?edit=1`}
                 onDelete={() => setDeleting({ ...item, date })}
               />
-            ) : item.logId ? (
-              // A past day, done: open its log, or clear it from the calendar (the log stays).
-              <ItemMenu item={item} logHref={logHref(item.logId)} onDelete={() => setDeleting({ ...item, date })} />
             ) : (
-              // A past day, missed: no editing, but it can be rescheduled to today or later, or cleared.
+              // Not done: edit it on any day. Today or later moves anywhere from today on; a missed one is
+              // rescheduled to today or later.
               <ItemMenu
                 item={item}
+                editHref={`/clients/${client.id}/workouts/${item.id}`}
                 onMove={() => setMoving({ ...item, date })}
-                moveLabel="Move to another day"
+                {...(editable ? {} : { moveLabel: 'Move to another day' })}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             )
