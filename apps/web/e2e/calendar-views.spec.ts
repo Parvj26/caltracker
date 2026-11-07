@@ -239,7 +239,7 @@ test('a done workout: Edit results opens the correction form; its plan stays rea
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/logs/${logId}$`));
 });
 
-test('drag a workout to another day in the 2-week view; a done one is not draggable', async ({ page }) => {
+test('drag a workout by its card body in the 2-week view; a done one stays put and says why', async ({ page }) => {
   await signInAsCoach(page);
   const today = await browserToday(page);
   const next = addDays(mondayOf(today), 7);
@@ -247,22 +247,48 @@ test('drag a workout to another day in the 2-week view; a done one is not dragga
   const id = await seedWorkout(name, next);
 
   await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
-  const handle = day(page, next).getByRole('button', { name, exact: true });
-  await expect(handle).toBeVisible();
+  await expect(day(page, next).getByRole('button', { name, exact: true })).toBeVisible();
+  // Grab the card by its exercise preview, not its name.
+  const body = card(page, next, name).locator('[title^="2× Barbell Squat · "]');
+  const target = day(page, addDays(next, 2));
   // The second week's tall row can start below the fold; mouse events only reach what is on screen.
-  await day(page, addDays(next, 2)).scrollIntoViewIfNeeded();
-  await drag(page, handle, day(page, addDays(next, 2)));
-  await expect(day(page, addDays(next, 2)).getByRole('button', { name, exact: true })).toBeVisible();
+  await target.scrollIntoViewIfNeeded();
+  const a = (await body.boundingBox())!;
+  const b = (await target.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+  // Mid-drag: days that take the drop are marked open, days before today locked.
+  await expect(target).toHaveAttribute('data-drop', 'open');
+  await expect(day(page, today)).toHaveAttribute('data-drop', 'open');
+  if (mondayOf(today) < today) await expect(day(page, mondayOf(today))).toHaveAttribute('data-drop', 'locked');
+  await page.mouse.up();
+  await expect(target.getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.locator('[data-drop]')).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   const moved = await admin.from('workouts').select('scheduled_on').eq('id', id).single();
   expect(moved.data?.scheduled_on).toBe(addDays(next, 2));
+  await page.reload();
+  await expect(day(page, addDays(next, 2)).getByRole('button', { name, exact: true })).toBeVisible();
 
   const doneName = `Week done ${unique()}`;
   const doneId = await seedWorkout(doneName, next);
-  logs.push(await seedLog(admin, { workspaceId, clientId, name: doneName, plannedWorkoutId: doneId, startedAt: new Date(Date.now() - 3_600_000).toISOString(), finishedAt: new Date().toISOString() }));
+  const logId = await seedLog(admin, { workspaceId, clientId, name: doneName, plannedWorkoutId: doneId, startedAt: new Date(Date.now() - 3_600_000).toISOString(), finishedAt: new Date().toISOString() });
+  logs.push(logId);
   await page.reload();
-  await expect(card(page, next, doneName)).toBeVisible();
+  const done = card(page, next, doneName);
+  await expect(done).toBeVisible();
   await expect(day(page, next).getByRole('button', { name: doneName, exact: true })).toHaveCount(0);
+  await expect(done).toHaveAttribute('title', 'Done workouts stay on the day they were done');
+  await expect(done).toHaveCSS('cursor', 'default');
+  // Trying to drag it shows why, leaves it where it is, and doesn't open its log.
+  await day(page, addDays(next, 2)).scrollIntoViewIfNeeded();
+  await drag(page, done.locator('[title^="2× Barbell Squat · "]'), day(page, addDays(next, 2)));
+  await expect(done.getByRole('status')).toHaveText('Done workouts stay on the day they were done');
+  await expect(page).toHaveURL(/view=2w/);
+  await expect(card(page, next, doneName)).toBeVisible();
+  const stayed = await admin.from('workouts').select('scheduled_on').eq('id', doneId).single();
+  expect(stayed.data?.scheduled_on).toBe(next);
 });
 
 test('on a narrow screen the week view is a list of days', async ({ page }) => {
