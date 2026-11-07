@@ -433,6 +433,7 @@ export {
   kcalFromMacros,
   kcalHint,
   macroProgress,
+  mealMacroLine,
   mealPhotoPaths,
   mealProblems,
   mealReference,

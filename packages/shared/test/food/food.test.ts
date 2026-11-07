@@ -14,6 +14,7 @@ import {
   macroProgress,
   mealPhotoPaths,
   mealProblems,
+  mealMacroLine,
   mealReference,
   mealsByDay,
   parseMacroInput,
@@ -202,5 +203,13 @@ describe('mealReference', () => {
     expect(mealReference({ name: null, eatenOn: '2026-11-07', eatenAt: '2026-11-07T19:00:00Z' }, '2026-11-07', 'UTC')).toBe(
       'About your meal today (7:00 pm): ',
     );
+  });
+});
+
+describe('mealMacroLine', () => {
+  it('lists only the entered macros, calories first', () => {
+    expect(mealMacroLine({ calories: 650, protein: 42, carbs: null, fat: 12.5 })).toBe('650 kcal · P 42 g · F 12.5 g');
+    expect(mealMacroLine({ calories: null, protein: null, carbs: 80, fat: null })).toBe('C 80 g');
+    expect(mealMacroLine({ calories: null, protein: null, carbs: null, fat: null })).toBe('');
   });
 });

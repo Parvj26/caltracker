@@ -176,3 +176,10 @@ export function mealReference(meal: { name: string | null; eatenOn: IsoDate; eat
   const when = label === 'Today' ? 'today' : label === 'Yesterday' ? 'yesterday' : `on ${label}`;
   return `About your ${what} ${when} (${formatMealTime(meal.eatenAt, timeZone)}): `;
 }
+
+/** "650 kcal · P 42 g · F 12.5 g": only the macros that were entered. Empty when none were. */
+export function mealMacroLine(m: MealMacros): string {
+  return MACRO_KEYS.filter((k) => m[k] !== null)
+    .map((k) => (k === 'calories' ? formatMacro(k, m[k]!) : `${MACRO_SHORT[k]} ${formatMacro(k, m[k]!)}`))
+    .join(' · ');
+}
