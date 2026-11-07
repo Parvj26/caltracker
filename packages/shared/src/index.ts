@@ -281,6 +281,7 @@ export { shortDate, strengthExercises, strengthSeries, strengthSummary } from '.
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
+export { RECENT_PR_DAYS, RECENT_PR_LIMIT, awardRecords, recentPrAmount, recentPrs } from './awards/recent-prs';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';
 export {
