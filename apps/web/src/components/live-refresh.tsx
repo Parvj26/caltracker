@@ -13,7 +13,7 @@ export type LiveTable =
   | 'communities'
   | 'community_posts'
   | 'community_comments'
-  | 'community_likes'
+  | 'community_reactions'
   | 'community_reports';
 export type LiveSource = { table: LiveTable; filter: string };
 
@@ -71,7 +71,7 @@ export function LiveRefresh({ on, renderedAt, maxWaitMs }: { on: LiveSource[]; r
     const onChange = () => scheduler.current?.change();
     for (const { table, filter } of sources) {
       // No DELETE: Realtime can't filter or check DELETE events. Deletes that matter (community posts, comments,
-      // likes) bump communities.activity_at instead, which arrives as a filtered UPDATE.
+      // reactions) bump communities.activity_at instead, which arrives as a filtered UPDATE.
       channel = channel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter }, onChange)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, onChange);

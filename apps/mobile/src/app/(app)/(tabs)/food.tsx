@@ -1,13 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { addDays, dailyTotals, foodDayLabel, localToday } from '@caltracker/shared';
 import { LogMealSheet, type LogChoice } from '@/components/food/log-meal-sheet';
 import { MacroBars } from '@/components/food/macro-bars';
 import { MealRow } from '@/components/food/meal-row';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import { mealPhotoUrls } from '@/lib/food-api';
-import { clampDay } from '@/lib/food-logic';
+import { clampDay, msUntilMidnight } from '@/lib/food-logic';
 import { PhotoError } from '@/lib/compress-photo';
 import { photoParams, pickMealPhoto } from '@/lib/pick-meal-photo';
 import { useFood } from '@/lib/use-food';
@@ -31,15 +31,29 @@ export default function FoodScreen() {
   const [urls, setUrls] = useState<Record<string, string>>({});
 
   const loadDay = food?.loadDay;
-  useFocusEffect(
-    useCallback(() => {
-      // A tab left open overnight moves on to the new today.
-      const now = localToday();
-      if (now === today) return;
-      setToday(now);
-      if (day === today) setDay(now);
-    }, [today, day]),
-  );
+  // Today moves on at midnight, on coming back to the app and on returning to the tab; a person looking at today
+  // follows it to the new day, one looking at an earlier day stays there.
+  const todayRef = useRef(today);
+  useEffect(() => {
+    todayRef.current = today;
+  }, [today]);
+  const rollOver = useCallback(() => {
+    const now = localToday();
+    const prev = todayRef.current;
+    if (now === prev) return;
+    todayRef.current = now;
+    setToday(now);
+    setDay((d) => (d === prev ? now : d));
+  }, []);
+  useFocusEffect(rollOver);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => state === 'active' && rollOver());
+    return () => sub.remove();
+  }, [rollOver]);
+  useEffect(() => {
+    const t = setTimeout(rollOver, msUntilMidnight());
+    return () => clearTimeout(t);
+  }, [today, rollOver]);
   useFocusEffect(
     useCallback(() => {
       void loadDay?.(day);

@@ -14,7 +14,7 @@ import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /**
- * The community feed, opened from the Coach tab: pinned posts first, then newest. New posts, comments and likes arrive
+ * The community feed, opened from the Coach tab: pinned posts first, then newest. New posts, comments and reactions arrive
  * live.
  */
 export default function CommunityScreen() {
@@ -54,7 +54,7 @@ export default function CommunityScreen() {
           { table: 'communities', filter: `id=eq.${community.id}` },
           { table: 'community_posts', filter: `community_id=eq.${community.id}` },
           { table: 'community_comments', filter: `community_id=eq.${community.id}` },
-          { table: 'community_likes', filter: `community_id=eq.${community.id}` },
+          { table: 'community_reactions', filter: `community_id=eq.${community.id}` },
         ]
       : [],
     () => void load(),

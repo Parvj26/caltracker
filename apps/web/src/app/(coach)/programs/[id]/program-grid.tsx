@@ -31,6 +31,7 @@ import type { LiveSyncState } from '@/lib/live-sync';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
+import type { WorkoutHints } from '@caltracker/shared';
 import styles from '../programs.module.css';
 
 export type Slot = { id: string; week: number; day: number; position: number; workoutId: string; workoutName: string };
@@ -84,6 +85,7 @@ export function ProgramGrid({
   library,
   justCopied = false,
   liveSync,
+  hints,
 }: {
   program: Program;
   initialSlots: Slot[];
@@ -92,6 +94,8 @@ export function ProgramGrid({
   liveSync: LiveSyncState;
   /** Opened right after "Duplicate" (?copied=1): say once what the copy shares with the original. */
   justCopied?: boolean;
+  /** The coach's Recent and Most used workouts, at the top of the day "+" picker. */
+  hints?: WorkoutHints;
 }) {
   const [slots, setSlots] = useState(initialSlots);
   const [weeks, setWeeks] = useState(program.weeks);
@@ -377,6 +381,7 @@ export function ProgramGrid({
         <WorkoutPicker
           cellLabel={cellLabel(picker.week, picker.day)}
           library={library}
+          hints={hints}
           forProgram
           onPick={(w) => {
             addSlot(w, picker.week, picker.day);

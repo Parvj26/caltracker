@@ -74,19 +74,25 @@ describe('community', () => {
     createdAt: '2026-11-06T10:00:00Z',
     pinnedAt: null,
     images: [],
-    likerIds: [],
-    likerNames: [],
+    reactions: [],
     commentCount: 0,
     ...over,
   });
   const ctx = { me: 'me', coaches: new Set(['coach']), units: 'lb' as const };
 
-  it('shows the author (marking the coach and me), the words and the likes and comments', () => {
+  it('shows the author (marking the coach and me), the words and the top reactions and comments', () => {
     const p = postPreview(
-      post({ likerIds: ['me'], commentCount: 1, images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }),
+      post({
+        reactions: [
+          { userId: 'me', reaction: 'fire', createdAt: '2026-11-06T10:00:00Z', name: 'Me' },
+          { userId: 'me', reaction: 'heart', createdAt: '2026-11-06T10:01:00Z', name: 'Me' },
+          { userId: 'kim', reaction: 'heart', createdAt: '2026-11-06T10:02:00Z', name: 'Kim' },
+        ],
+        commentCount: 1,
+        images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }),
       ctx,
     );
-    expect(p).toEqual({ id: 'p1', author: 'Smoke Coach · Coach', snippet: 'Happy Diwali', stats: '❤️ 1 · 1 comment', thumbPath: 'a-thumb.webp', stickerKey: null });
+    expect(p).toEqual({ id: 'p1', author: 'Smoke Coach · Coach', snippet: 'Happy Diwali', stats: '❤️ 2 · 🔥 1 · 1 comment', thumbPath: 'a-thumb.webp', stickerKey: null });
     expect(postPreview(post({ authorId: 'me', commentCount: 2 }), ctx)).toMatchObject({ author: 'You', stats: '2 comments' });
     expect(postPreview(post({ authorId: 'vk', authorName: 'VK' }), ctx)).toMatchObject({ author: 'VK', stats: '' });
   });

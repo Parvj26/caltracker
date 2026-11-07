@@ -120,9 +120,18 @@ export function mealProblems(draft: { macros: MealMacros; hasPhoto: boolean; nam
   return out;
 }
 
-/** `{workspace}/{client}/{meal}.{ext}` and its `-thumb.{ext}` in the meal-photos bucket (the database checks this). */
-export function mealPhotoPaths(workspaceId: string, clientId: string, mealId: string, ext: MealPhotoExt): { path: string; thumbPath: string } {
-  const base = `${workspaceId}/${clientId}/${mealId}`;
+/**
+ * `{workspace}/{client}/{meal}-{photo}.{ext}` and its `-thumb.{ext}` in the meal-photos bucket (the database checks
+ * this). The photo's own id means a replaced photo gets new files: uploads never overwrite, and the old ones are deleted.
+ */
+export function mealPhotoPaths(
+  workspaceId: string,
+  clientId: string,
+  mealId: string,
+  photoId: string,
+  ext: MealPhotoExt,
+): { path: string; thumbPath: string } {
+  const base = `${workspaceId}/${clientId}/${mealId}-${photoId}`;
   return { path: `${base}.${ext}`, thumbPath: `${base}-thumb.${ext}` };
 }
 

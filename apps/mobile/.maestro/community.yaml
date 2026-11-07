@@ -1,4 +1,4 @@
-# Community tab (spec §7): a coach post arrives with a notification badge, the client likes and comments, posts,
+# Community tab (spec §7): a coach post arrives with a notification badge, the client reacts and comments, posts,
 # reports, blocks another client, and deletes their own post. Run via `pnpm --filter mobile e2e` (needs a dev build
 # with expo-image-picker; the photo picker itself is not driven here).
 appId: app.caltracker.client
@@ -48,13 +48,40 @@ env:
 - tapOn:
     id: notifications-back
 
-# Like the coach's post (the newest), then comment on it.
+# React to the coach's post (the newest): fire from the "+" button, muscle by pressing and holding the post, then tap
+# muscle again to take it back.
 - tapOn:
-    id: like-button
+    id: reaction-add
+    index: 0
+- tapOn:
+    id: react-fire
+- extendedWaitUntil:
+    visible:
+      id: reaction-fire-toggle
+    timeout: 10000
+- longPressOn: 'E2E Welcome to the group!.*'
+- tapOn:
+    id: react-muscle
+- extendedWaitUntil:
+    visible:
+      id: reaction-muscle-toggle
+    timeout: 10000
+- tapOn:
+    id: reaction-muscle-toggle
+- extendedWaitUntil:
+    notVisible:
+      id: reaction-muscle-toggle
+    timeout: 10000
+# Tapping a count lists who reacted.
+- tapOn:
+    id: reaction-fire-count
     index: 0
 - extendedWaitUntil:
-    visible: 'You like this'
-    timeout: 10000
+    visible: '.*Reacted with fire'
+    timeout: 5000
+- tapOn: 'OK'
+
+# Comment on it, and react to the comment by pressing and holding it.
 - tapOn:
     id: comments-button
     index: 0
@@ -69,6 +96,13 @@ env:
     id: comment-send
 - extendedWaitUntil:
     visible: 'E2E Thanks coach!'
+    timeout: 10000
+- longPressOn: 'E2E Thanks coach!'
+- tapOn:
+    id: react-clap
+- extendedWaitUntil:
+    visible:
+      id: reaction-clap-toggle
     timeout: 10000
 - tapOn:
     id: post-back

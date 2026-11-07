@@ -20,7 +20,7 @@ import {
 import { SharpPhoto } from '@/components/photo/sharp-photo';
 import { Button, ErrorText, Screen, TextButton, TextField } from '@/components/ui';
 import { PhotoError } from '@/lib/compress-photo';
-import { defaultMinutes, minutesOf, stepMinutes, timeLabel, type PhotoChoice } from '@/lib/food-logic';
+import { defaultMinutes, minutesOf, savedTime, stepMinutes, timeLabel, type PhotoChoice } from '@/lib/food-logic';
 import { mealPhotoUrls } from '@/lib/food-api';
 import { photoUri } from '@/lib/outbox-files';
 import { photoFromParams, pickMealPhoto, type PickedMealPhoto } from '@/lib/pick-meal-photo';
@@ -41,13 +41,15 @@ export default function MealScreen() {
   const router = useRouter();
   const food = useFood();
   const params = useLocalSearchParams<Record<string, string>>();
-  const today = localToday();
+  const [today] = useState(() => localToday());
   const before = params.id ? (food?.findMeal(params.id) ?? null) : null;
   const day = before?.eatenOn ?? (IsoDateSchema.safeParse(params.day).success && params.day <= today ? params.day : today);
 
   const [name, setName] = useState(before?.name ?? '');
   const [note, setNote] = useState(before?.note ?? '');
   const [minutes, setMinutes] = useState(() => (before ? minutesOf(before.eatenAt) : defaultMinutes(day, today)));
+  // Whether the person moved the time: an untouched new meal is saved at the moment of saving (see savedTime).
+  const [timeTouched, setTimeTouched] = useState(false);
   const [macroText, setMacroText] = useState<Record<MacroKey, string>>(() => ({
     calories: toText(before?.macros.calories ?? null),
     protein: toText(before?.macros.protein ?? null),
@@ -127,7 +129,7 @@ export default function MealScreen() {
     const choice: PhotoChoice = picked ? { kind: 'new', local: picked.local, width: picked.width, height: picked.height } : stored ? { kind: 'keep' } : { kind: 'none' };
     setBusy(true);
     void food
-      .save(before, { day, minutes, name, note, macros: parsed.macros }, choice)
+      .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day, minutes, openedOn: today }), name, note, macros: parsed.macros }, choice)
       .finally(() => router.back());
   }
 
@@ -209,11 +211,17 @@ export default function MealScreen() {
       <View style={{ gap: space[2] }}>
         <Text style={text('sectionHeading')}>Time</Text>
         <View style={styles.timeRow}>
-          <Stepper glyph="−" label="15 minutes earlier" testID="meal-time-earlier" onPress={() => setMinutes((m) => stepMinutes(m, -1))} />
+          <Stepper glyph="−" label="15 minutes earlier" testID="meal-time-earlier" onPress={() => {
+              setTimeTouched(true);
+              setMinutes((m) => stepMinutes(m, -1));
+            }} />
           <Text style={[text('sectionHeading'), styles.time]} testID="meal-time" accessibilityLiveRegion="polite">
             {timeLabel(minutes)}
           </Text>
-          <Stepper glyph="+" label="15 minutes later" testID="meal-time-later" onPress={() => setMinutes((m) => stepMinutes(m, 1))} />
+          <Stepper glyph="+" label="15 minutes later" testID="meal-time-later" onPress={() => {
+              setTimeTouched(true);
+              setMinutes((m) => stepMinutes(m, 1));
+            }} />
         </View>
       </View>
 

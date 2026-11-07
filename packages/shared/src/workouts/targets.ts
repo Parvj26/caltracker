@@ -1,3 +1,4 @@
+import { FALLBACK_TRACKING_TYPE } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { formatDistance, formatDuration, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
@@ -8,6 +9,7 @@ export const TARGET_FIELDS: Record<TrackingType, ReadonlyArray<'reps' | 'weight'
   reps: ['reps'],
   time: ['duration'],
   distance: ['distance'],
+  weight_time: ['weight', 'duration'],
 };
 
 export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
@@ -15,7 +17,37 @@ export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
   reps: 'reps only',
   time: 'time',
   distance: 'distance',
+  weight_time: 'weight and time',
 };
+
+type TargetField = 'reps' | 'weight' | 'duration' | 'distance';
+
+/** The target fields a tracking type uses; an unknown type (from a newer server) gets the fallback's, never undefined. */
+export function targetFieldsFor(trackingType: TrackingType): ReadonlyArray<TargetField> {
+  return (TARGET_FIELDS as Partial<Record<string, ReadonlyArray<TargetField>>>)[trackingType] ?? TARGET_FIELDS[FALLBACK_TRACKING_TYPE];
+}
+
+/** "weight and reps", "reps only", ...; an unknown type reads as the fallback's label. */
+export function trackingTypeLabel(trackingType: TrackingType): string {
+  return (TRACKING_TYPE_LABELS as Partial<Record<string, string>>)[trackingType] ?? TRACKING_TYPE_LABELS[FALLBACK_TRACKING_TYPE];
+}
+
+/** The set with every target its tracking type doesn't use cleared (an unknown type keeps only the fallback's). */
+export function fitSetTargets<S extends Pick<WorkoutSetDoc, 'targetRepsMin' | 'targetRepsMax' | 'targetWeightKg' | 'targetDurationS' | 'targetDistanceM'>>(
+  trackingType: TrackingType,
+  s: S,
+): S {
+  const allowed = targetFieldsFor(trackingType);
+  const keep = <T>(field: TargetField, v: T | null): T | null => (allowed.includes(field) ? v : null);
+  return {
+    ...s,
+    targetRepsMin: keep('reps', s.targetRepsMin),
+    targetRepsMax: keep('reps', s.targetRepsMax),
+    targetWeightKg: keep('weight', s.targetWeightKg),
+    targetDurationS: keep('duration', s.targetDurationS),
+    targetDistanceM: keep('distance', s.targetDistanceM),
+  };
+}
 
 /** Only the target fields are read, so a log set's snapshot can be worded the same way. */
 export type SetTargetFields = Pick<
@@ -26,10 +58,10 @@ export type SetTargetFields = Pick<
 export function formatSetTarget(set: SetTargetFields & Partial<WorkoutSetDoc>, trackingType: TrackingType, units: Units): string {
   if (set.toFailure) {
     // "10 lb × to failure" when the set has a weight to show; otherwise just "To failure".
-    const weighted = TARGET_FIELDS[trackingType].includes('weight') && set.targetWeightKg !== null;
+    const weighted = targetFieldsFor(trackingType).includes('weight') && set.targetWeightKg !== null;
     return weighted ? `${formatWeight(set.targetWeightKg!, units)} × to failure` : 'To failure';
   }
-  const fields = TARGET_FIELDS[trackingType];
+  const fields = targetFieldsFor(trackingType);
   const parts: string[] = [];
   if (fields.includes('reps')) {
     const min = set.targetRepsMin ?? set.targetRepsMax;

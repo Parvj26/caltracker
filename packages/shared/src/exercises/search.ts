@@ -1,6 +1,7 @@
 import { EXERCISE_ALIASES, EXERCISE_NAME_SYNONYMS } from './aliases';
 import { COMMON_EXERCISES } from './popular';
 import { EXERCISE_OTHER_NAMES } from './synonyms';
+import { toTrackingType } from './tracking';
 import type { TrackingType } from './tracking';
 
 export { EXERCISE_ALIASES } from './aliases';
@@ -69,7 +70,8 @@ export function exerciseIndexRowFromDb(e: ExerciseIndexDbRow): ExerciseIndexRow 
     secondaryMuscles: e.secondary_muscles,
     equipment: e.equipment,
     category: e.category,
-    trackingType: e.tracking_type,
+    // A type this build doesn't know (a newer server's) reads as the fallback, so the picker and the log never crash.
+    trackingType: toTrackingType(e.tracking_type),
     source: e.source === 'custom' ? 'custom' : 'builtin',
     imagePath: e.image_paths[0] ?? null,
   };

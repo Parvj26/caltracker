@@ -6,17 +6,17 @@ import {
   canBlock,
   canDelete,
   canReport,
-  likersLine,
   photoDisplaySize,
   postAge,
   type Units,
 } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { SharpPhoto } from '@/components/photo/sharp-photo';
-import { block, deletePost, report, setLiked, type FeedPost } from '@/lib/community-api';
+import { block, deletePost, report, type FeedPost } from '@/lib/community-api';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { CardView, LinkedText } from './parts';
+import { useReactions } from './reactions';
 import { ChoiceSheet, PhotoViewer, type Choice } from './sheets';
 
 export type PostContext = {
@@ -38,7 +38,7 @@ export function useContentMenu(ctx: PostContext) {
   const [sheet, setSheet] = useState<{ title: string; choices: Choice[] } | null>(null);
 
   const askBlock = (authorId: string, authorName: string) =>
-    Alert.alert(`Block ${authorName}?`, 'You won’t see their posts, comments or likes. They won’t be told.', [
+    Alert.alert(`Block ${authorName}?`, 'You won’t see their posts, comments or reactions. They won’t be told.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Block',
@@ -125,40 +125,20 @@ export function PostItem({
   onOpenComments?: () => void;
 }) {
   const { text, space, radius } = useTheme();
-  const [liked, setLikedState] = useState(post.likerIds.includes(ctx.me));
-  const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const menu = useContentMenu(ctx);
   // Photos fill the card's width (measured; estimated from the window until then), at most 70% of the screen tall.
   const screen = useWindowDimensions();
   const [photosWidth, setPhotosWidth] = useState<number | null>(null);
   const photoBox = { maxWidth: photosWidth ?? Math.max(1, screen.width - 4 * space[4]), maxHeight: Math.round(screen.height * 0.7) };
-  // The server's answer wins once the feed reloads.
-  const [seen, setSeen] = useState(post.likerIds);
-  if (seen !== post.likerIds) {
-    setSeen(post.likerIds);
-    setLikedState(post.likerIds.includes(ctx.me));
-  }
-  const others = post.likerNames.filter((_, i) => post.likerIds[i] !== ctx.me);
   const isCoach = ctx.coaches.has(post.authorId);
-
-  const toggleLike = async () => {
-    const next = !liked;
-    setLikedState(next);
-    setBusy(true);
-    try {
-      await setLiked(post.id, next);
-      ctx.onChanged();
-    } catch (e) {
-      setLikedState(!next);
-      Alert.alert(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const reactions = useReactions({ target: { postId: post.id }, rows: post.reactions, me: ctx.me, onChanged: ctx.onChanged });
 
   return (
-    <View
+    // Press and hold anywhere on the post to react (the "+" button does the same, for screen readers too).
+    <Pressable
+      accessible={false}
+      onLongPress={reactions.openPicker}
       style={[styles.post, { borderRadius: radius.card, padding: space[4], gap: space[3] }]}
       testID={`post-${post.id}`}
       accessibilityLabel={`Post by ${post.authorName}`}
@@ -213,19 +193,9 @@ export function PostItem({
         </View>
       ) : null}
 
-      <View style={[styles.row, { gap: space[3] }]}>
-        <Pressable
-          testID="like-button"
-          accessibilityRole="button"
-          accessibilityState={{ selected: liked, busy }}
-          accessibilityLabel={liked ? 'Unlike' : 'Like'}
-          onPress={() => void toggleLike()}
-          disabled={busy}
-          style={({ pressed }) => [styles.action, { borderRadius: radius.pill, paddingHorizontal: space[3] }, liked && styles.liked, pressed && { opacity: pressedOpacity }]}
-        >
-          <Text style={text('sectionHeading')}>{liked ? '♥' : '♡'} Like</Text>
-        </Pressable>
-        {onOpenComments ? (
+      {reactions.bar}
+      {onOpenComments ? (
+        <View style={[styles.row, { gap: space[3] }]}>
           <Pressable
             testID="comments-button"
             accessibilityRole="button"
@@ -236,16 +206,12 @@ export function PostItem({
               💬 {post.commentCount > 0 ? `${post.commentCount} ${post.commentCount === 1 ? 'comment' : 'comments'}` : 'Comment'}
             </Text>
           </Pressable>
-        ) : null}
-      </View>
-      {liked || others.length > 0 ? (
-        <Text style={text('caption')} testID="likers">
-          {likersLine(others, liked)}
-        </Text>
+        </View>
       ) : null}
       {menu.element}
+      {reactions.picker}
       <PhotoViewer url={viewing} onClose={() => setViewing(null)} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -256,5 +222,4 @@ const styles = StyleSheet.create({
   menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   photo: { alignSelf: 'center' },
   action: { minHeight: 44, justifyContent: 'center', backgroundColor: palette.bg },
-  liked: { backgroundColor: palette.pink },
 });

@@ -4,7 +4,7 @@ import type { Database } from '@caltracker/shared';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // Community on the website: the coach posts (text and a photo), clients (signed in with the anon key, as the phone is)
-// like, comment and report, and the coach pins, deletes, handles reports and removes a member from the community.
+// react, comment and report, and the coach pins, deletes, handles reports and removes a member from the community.
 const admin = serviceClient();
 // The database fills in who and where; the generated Insert types still list those columns.
 type Insert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
@@ -30,7 +30,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  // Deleting the user takes their posts, comments, likes and reports' links with them.
+  // Deleting the user takes their posts, comments, reactions and reports' links with them.
   for (const id of createdUsers) await admin.auth.admin.deleteUser(id);
 });
 
@@ -71,7 +71,7 @@ async function openCommunity(page: Page) {
   await expect(page.locator('[data-live="live"]')).toHaveCount(1, { timeout: 15_000 });
 }
 
-test('the coach posts with a photo, a client likes and comments live, and the coach pins and moderates', async ({ page }) => {
+test('the coach posts with a photo, a client reacts and comments live, and the coach reacts, pins and moderates', async ({ page }) => {
   const sam = await newClient('Sam');
   await openCommunity(page);
 
@@ -102,11 +102,51 @@ test('the coach posts with a photo, a client likes and comments live, and the co
   const note = await sam.phone.from('community_notifications').select('kind').eq('post_id', postId);
   expect(note.data).toEqual([{ kind: 'coach_post' }]);
 
-  // The client likes and comments; the coach's open page updates by itself.
-  expect((await sam.phone.from('community_likes').insert({ post_id: postId } as Insert<'community_likes'>)).error).toBeNull();
+  // The client reacts (two of the six) and comments; the coach's open page updates by itself.
+  for (const reaction of ['fire', 'muscle'] as const) {
+    const r = await sam.phone.from('community_reactions').insert({ post_id: postId, reaction } as Insert<'community_reactions'>);
+    expect(r.error).toBeNull();
+  }
   expect((await sam.phone.from('community_comments').insert({ post_id: postId, body: 'Glad to be here!' } as Insert<'community_comments'>)).error).toBeNull();
-  await expect(mine.getByTestId('likers')).toHaveText('Sam Tester likes this');
+  const postBar = mine.getByRole('group', { name: /^Reactions to .*’s post$/ });
+  await expect(postBar.getByRole('button', { name: 'React with fire, 1 person' })).toBeVisible();
+  await expect(postBar.getByRole('button', { name: 'React with muscle, 1 person' })).toBeVisible();
   await expect(mine.getByText('Glad to be here!')).toBeVisible();
+  // Two reactions from Sam on one post are one notification for the coach.
+  const coachNotes = await admin.from('community_notifications').select('kind, actor_id').eq('post_id', postId).eq('kind', 'reaction');
+  expect(coachNotes.data).toEqual([{ kind: 'reaction', actor_id: sam.id }]);
+
+  // Tapping a count shows who reacted.
+  await postBar.getByRole('button', { name: 'See who reacted with fire' }).click();
+  await expect(mine.getByTestId('who-reacted')).toContainText('Sam Tester');
+
+  // The coach joins the fire reaction, then adds and takes back a party one from the picker.
+  await postBar.getByRole('button', { name: 'React with fire, 1 person' }).click();
+  await expect(postBar.getByRole('button', { name: 'Remove your fire reaction, 2 people' })).toBeVisible();
+  await postBar.getByRole('button', { name: 'Add a reaction' }).click();
+  await mine.getByRole('group', { name: 'Choose a reaction' }).getByRole('button', { name: 'React with party' }).click();
+  await expect(postBar.getByRole('button', { name: 'Remove your party reaction, 1 person' })).toBeVisible();
+  // Shown at once; stored by the server action. After a reload it is still there.
+  const partyRows = async () =>
+    (await admin.from('community_reactions').select('id').eq('post_id', postId).eq('reaction', 'party').is('comment_id', null)).data?.length;
+  await expect.poll(partyRows, { timeout: 15_000 }).toBe(1);
+  await page.reload();
+  await expect(postBar.getByRole('button', { name: 'Remove your party reaction, 1 person' })).toBeVisible();
+  await postBar.getByRole('button', { name: 'Remove your party reaction, 1 person' }).click();
+  await expect(postBar.getByRole('button', { name: /party/ })).toHaveCount(0);
+  await expect(postBar.getByRole('button', { name: 'Remove your fire reaction, 2 people' })).toBeVisible();
+
+  // Comments get reactions too; the client hears about it.
+  const commentBar = mine.getByRole('group', { name: 'Reactions to Sam Tester’s comment' });
+  await commentBar.getByRole('button', { name: 'Add a reaction' }).click();
+  await mine.getByRole('group', { name: 'Choose a reaction' }).getByRole('button', { name: 'React with clap' }).click();
+  await expect(commentBar.getByRole('button', { name: 'Remove your clap reaction, 1 person' })).toBeVisible();
+  await expect
+    // Server actions run one after another, so this one can wait behind the ones before it.
+    .poll(async () => (await sam.phone.from('community_notifications').select('kind, comment_id').eq('kind', 'reaction')).data?.length ?? 0, {
+      timeout: 15_000,
+    })
+    .toBe(1);
 
   // Pin, then delete the client's comment.
   await mine.getByRole('button', { name: 'Pin', exact: true }).click();
@@ -115,10 +155,6 @@ test('the coach posts with a photo, a client likes and comments live, and the co
   page.once('dialog', (d) => void d.accept());
   await mine.getByRole('button', { name: 'Delete comment' }).click();
   await expect(mine.getByText('Glad to be here!')).toHaveCount(0);
-
-  // The coach can like too.
-  await mine.getByRole('button', { name: '♡ Like' }).click();
-  await expect(mine.getByTestId('likers')).toHaveText('You and Sam Tester like this');
 
   // Delete the post (and its photo).
   page.once('dialog', (d) => void d.accept());

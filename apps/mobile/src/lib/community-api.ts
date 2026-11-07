@@ -4,12 +4,15 @@ import {
   COMMUNITY_BUCKET,
   communityPhotoPaths,
   contentTypeFor,
+  isReactionKey,
   memberName,
   parseCard,
   type CardRequest,
   type CommunityCard,
   type Database,
   type NotificationRow,
+  type ReactionKey,
+  type ReactionRow,
   type ReportReason,
 } from '@caltracker/shared';
 import { postErrorMessage } from './community-share';
@@ -22,7 +25,7 @@ const SIGNED_URL_SECONDS = 60 * 60;
 
 export type CommunityInfo = { id: string; workspaceId: string; name: string };
 export type FeedImage = { id: string; path: string; thumbPath: string; width: number; height: number };
-export type FeedComment = { id: string; authorId: string; authorName: string; body: string; createdAt: string };
+export type FeedComment = { id: string; authorId: string; authorName: string; body: string; createdAt: string; reactions: ReactionRow[] };
 export type FeedPost = {
   id: string;
   authorId: string;
@@ -33,8 +36,8 @@ export type FeedPost = {
   createdAt: string;
   pinnedAt: string | null;
   images: FeedImage[];
-  likerIds: string[];
-  likerNames: string[];
+  /** Reactions to the post itself (not its comments). */
+  reactions: ReactionRow[];
   commentCount: number;
 };
 
@@ -75,8 +78,27 @@ export async function coachIds(communityId: string): Promise<Set<string>> {
 const POST_SELECT = `id, author_id, body, card, created_at, pinned_at,
   author:profiles(first_name, last_name, avatar_path),
   images:community_post_images(id, position, path, thumb_path, width, height),
-  likes:community_likes(user_id, created_at, liker:profiles(first_name, last_name)),
+  reactions:community_reactions(user_id, comment_id, reaction, created_at, reactor:profiles(first_name, last_name)),
   comments:community_comments(count)`;
+
+const REACTION_SELECT = 'user_id, reaction, created_at, reactor:profiles(first_name, last_name)';
+type ReactionSelect = { user_id: string; reaction: string; created_at: string; reactor: { first_name: string; last_name: string } | null };
+
+/** Rows for the reaction bar; "Former member" when the name no longer resolves. */
+function toReactionRows(rows: readonly ReactionSelect[]): ReactionRow[] {
+  return rows.flatMap((r) =>
+    isReactionKey(r.reaction)
+      ? [
+          {
+            userId: r.user_id,
+            reaction: r.reaction,
+            createdAt: r.created_at,
+            name: memberName(r.reactor ? { firstName: r.reactor.first_name, lastName: r.reactor.last_name } : null),
+          },
+        ]
+      : [],
+  );
+}
 
 type PostRow = {
   id: string;
@@ -87,12 +109,11 @@ type PostRow = {
   pinned_at: string | null;
   author: { first_name: string; last_name: string; avatar_path: string | null } | null;
   images: { id: string; position: number; path: string; thumb_path: string; width: number; height: number }[];
-  likes: { user_id: string; created_at: string; liker: { first_name: string; last_name: string } | null }[];
+  reactions: (ReactionSelect & { comment_id: string | null })[];
   comments: { count: number }[];
 };
 
 export function toFeedPost(p: PostRow): FeedPost {
-  const likes = [...p.likes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   return {
     id: p.id,
     authorId: p.author_id,
@@ -103,8 +124,7 @@ export function toFeedPost(p: PostRow): FeedPost {
     createdAt: p.created_at,
     pinnedAt: p.pinned_at,
     images: [...p.images].sort((a, b) => a.position - b.position).map((i) => ({ id: i.id, path: i.path, thumbPath: i.thumb_path, width: i.width, height: i.height })),
-    likerIds: likes.map((l) => l.user_id),
-    likerNames: likes.map((l) => memberName(l.liker ? { firstName: l.liker.first_name, lastName: l.liker.last_name } : null)),
+    reactions: toReactionRows(p.reactions.filter((r) => r.comment_id === null)),
     commentCount: p.comments[0]?.count ?? 0,
   };
 }
@@ -156,7 +176,7 @@ export async function loadPost(postId: string): Promise<FeedPost | null> {
 export async function loadComments(postId: string): Promise<FeedComment[]> {
   const { data, error } = await supabase
     .from('community_comments')
-    .select('id, author_id, body, created_at, author:profiles(first_name, last_name)')
+    .select(`id, author_id, body, created_at, author:profiles(first_name, last_name), reactions:community_reactions(${REACTION_SELECT})`)
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
   if (error) fail(error, 'Couldn’t load the comments.');
@@ -166,6 +186,7 @@ export async function loadComments(postId: string): Promise<FeedComment[]> {
     authorName: memberName(c.author ? { firstName: c.author.first_name, lastName: c.author.last_name } : null),
     body: c.body,
     createdAt: c.created_at,
+    reactions: toReactionRows(c.reactions),
   }));
 }
 
@@ -239,14 +260,23 @@ export async function deletePost(post: FeedPost): Promise<void> {
   if (files.length) await supabase.storage.from(COMMUNITY_BUCKET).remove(files);
 }
 
-export async function setLiked(postId: string, liked: boolean): Promise<void> {
-  if (liked) {
-    const { error } = await supabase.from('community_likes').insert({ post_id: postId } as Tables['community_likes']['Insert']);
-    if (error && error.code !== '23505') fail(error, 'Couldn’t like the post.');
+export type ReactionTarget = { postId: string } | { commentId: string };
+
+/** Adds (on) or takes back (off) one of my reactions on a post or a comment. */
+export async function setReaction(target: ReactionTarget, reaction: ReactionKey, on: boolean): Promise<void> {
+  if (on) {
+    // The database fills in who and where (and a comment's post); the generated Insert type still lists them.
+    type Insert = Tables['community_reactions']['Insert'];
+    const row = ('commentId' in target ? { comment_id: target.commentId, reaction } : { post_id: target.postId, reaction }) as Partial<Insert> as Insert;
+    const { error } = await supabase.from('community_reactions').insert(row);
+    // Already there (a double tap) is fine.
+    if (error && error.code !== '23505') fail(error, 'Couldn’t add the reaction.');
     return;
   }
-  const { error } = await supabase.from('community_likes').delete().eq('post_id', postId).eq('user_id', await myId());
-  if (error) fail(error, 'Couldn’t remove the like.');
+  let del = supabase.from('community_reactions').delete().eq('user_id', await myId()).eq('reaction', reaction);
+  del = 'commentId' in target ? del.eq('comment_id', target.commentId) : del.eq('post_id', target.postId).is('comment_id', null);
+  const { error } = await del;
+  if (error) fail(error, 'Couldn’t remove the reaction.');
 }
 
 export async function addComment(postId: string, body: string): Promise<void> {
