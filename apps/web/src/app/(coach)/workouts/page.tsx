@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { countExercises } from '@caltracker/shared';
+import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { Button, ButtonLink, Card, TextField } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
@@ -8,6 +9,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
 import { LocalDate } from './local-date';
 import styles from './workouts.module.css';
+import assignStyles from '@/components/assign/assign.module.css';
 
 export const metadata: Metadata = { title: 'Workouts' };
 
@@ -86,7 +88,10 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
                     <LocalDate iso={w.updatedAt} />
                   </td>
                   <td>
-                    <DuplicateButton kind="workout" id={w.id} name={w.name} compact />
+                    <div className={assignStyles.actions}>
+                      <AssignButton kind="workout" id={w.id} name={w.name} compact />
+                      <DuplicateButton kind="workout" id={w.id} name={w.name} compact />
+                    </div>
                   </td>
                 </tr>
               ))}
