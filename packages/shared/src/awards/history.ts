@@ -1,6 +1,8 @@
 import type { WorkoutLogDoc } from '../logs/schema';
 import { logVolumeKg } from '../logs/summary';
 import type { AwardInput, AwardResult } from './award';
+import { ladderHistoryBefore } from './ladder';
+import type { LadderAward } from './ladder';
 import { detectPrs, logBests } from './prs';
 import type { PersonalRecord } from './prs';
 import type { ClientStats } from './rare';
@@ -105,7 +107,7 @@ export function clientStatsAt(
   };
 }
 
-export type AwardContext = Omit<AwardInput, 'owned' | 'rng'> & {
+export type AwardContext = Omit<AwardInput, 'owned' | 'rng' | 'keepLadder'> & {
   /** The bests over every completed log: what personal_records should hold. */
   records: PersonalRecord[];
   /** The stats over every completed log, as of now: what client_stats should hold. */
@@ -117,12 +119,14 @@ export type AwardContext = Omit<AwardInput, 'owned' | 'rng'> & {
 /**
  * The award inputs for one log, judged against the logs finished before it (so a catch-up that runs out of order
  * still counts milestones and streak weeks where they fell), plus what the stored bests and stats become.
+ * `ladderAwards` is every ladder animal the client was awarded; only those of earlier logs count for the pick.
  */
 export function awardContext(
   logs: readonly WorkoutLogDoc[],
   logId: string,
   timeZone: string,
   nowIso: string,
+  ladderAwards: readonly LadderAward[] = [],
 ): AwardContext {
   const ordered = completedInOrder(logs);
   const i = ordered.findIndex((l) => l.id === logId);
@@ -135,6 +139,7 @@ export function awardContext(
   const own = all.prs.get(log.id) ?? [];
   return {
     log,
+    ladderHistory: ladderHistoryBefore(ladderAwards, { id: log.id, finishedAt: log.finishedAt }),
     prHistory: earlier.records,
     firstLogOfExercise: firstLogExercises(log, earlier.records),
     statsBefore: clientStatsAt(before, timeZone, log.finishedAt, prsBefore),

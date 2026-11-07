@@ -43,6 +43,9 @@ env:
     visible:
       id: coach-logging-reclaim
     timeout: 20000
+# The heading says the coach stopped too, never "is logging" next to "Continue on my phone".
+- assertVisible: 'Your coach stopped logging'
+- assertNotVisible: 'Your coach is logging this session'
 - assertVisible: 'Your coach stopped logging 21 min ago. You can carry on here.'
 - assertVisible: 'Continue on my phone'
 - takeScreenshot: coach-logging-reclaim

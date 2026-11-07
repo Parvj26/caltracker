@@ -9,12 +9,12 @@ import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-ca
 import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
 import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/stored-view';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
-import { deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
+import { clientWorkoutExists, deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
 import { AssignToClientsDialog } from '@/components/assign/assign-to-clients';
 import { AddWorkoutDialog } from './add-workout-dialog';
@@ -107,7 +107,7 @@ export function ClientCalendar({
   }
   const [assigning, setAssigning] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [picker, setPicker] = useState<{ date: IsoDate; newId: string } | null>(null);
+  const [picker, setPicker] = useState<{ date: IsoDate } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);
   const [copying, setCopying] = useState<CalendarEntry | null>(null);
@@ -118,6 +118,8 @@ export function ClientCalendar({
   const [undoable, setUndoable] = useState<CalendarEntry | null>(null);
   // Each add's save, by its new id, so Undo waits for the add to land before removing it.
   const saves = useRef(new Map<string, Promise<void>>());
+  // Adds that got no clear answer, by "workout id|day": their id, reused if the coach picks the same again.
+  const unclear = useRef(new Map<string, string>());
   const say = (message: string | null, undo: CalendarEntry | null = null) => {
     setToast(message);
     setUndoable(undo);
@@ -176,24 +178,48 @@ export function ClientCalendar({
   }
 
   function remove(entry: CalendarEntry) {
+    // As it is now (Undo's copy is from when it was added; it may have been moved since), so a failed delete puts it
+    // back where it now is.
+    const current = items.find((x) => x.id === entry.id) ?? entry;
     // An add still saving is removed once it has landed (a failed add has nothing to remove).
     const added = saves.current.get(entry.id) ?? Promise.resolve();
     optimistic(
       (s) => s.filter((x) => x.id !== entry.id),
       () => added.catch(() => undefined).then(() => deleteClientWorkout(entry.id)),
-      (s) => (s.some((x) => x.id === entry.id) ? s : [...s, entry]),
+      (s) => (s.some((x) => x.id === entry.id) ? s : [...s, current]),
     );
   }
 
-  /** Adds a library workout on a day at once (saved in the background), with Undo in the toast. */
-  function schedule(workout: LibraryWorkout, date: IsoDate, newId: string) {
+  /**
+   * Adds a library workout on a day at once (saved in the background), with Undo in the toast. When an add gets no
+   * clear answer (the connection dropped), it may have landed anyway: the calendar asks the server, and keeps it if it
+   * is there. If even that can't be told, the id is kept for that workout and day, so picking it again resends the
+   * same id and the database adds it only once.
+   */
+  function schedule(workout: LibraryWorkout, date: IsoDate) {
+    const key = `${workout.id}|${date}`;
+    const newId = unclear.current.get(key) ?? crypto.randomUUID();
     const entry: CalendarEntry = { id: newId, name: workout.name, programName: null, logId: null, date };
     optimistic(
       (s) => (s.some((x) => x.id === newId) ? s : [...s, entry]),
       () => {
-        const save = scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date, today }).then((outcome) => {
+        const save = (async () => {
+          let outcome: Awaited<ReturnType<typeof scheduleWorkout>>;
+          try {
+            outcome = await scheduleWorkout({ newId, workoutId: workout.id, clientId: client.id, date, today });
+          } catch (e) {
+            const landed = await clientWorkoutExists(newId).catch(() => null);
+            if (landed) {
+              unclear.current.delete(key);
+              return; // It got through: keep it (the status says saved).
+            }
+            if (landed === null) unclear.current.set(key, newId);
+            else unclear.current.delete(key);
+            throw e;
+          }
+          unclear.current.delete(key);
           if (!outcome.ok) throw new Error(outcome.error);
-        });
+        })();
         saves.current.set(newId, save);
         return save;
       },
@@ -255,9 +281,6 @@ export function ClientCalendar({
         </div>
         {readOnly ? null : (
           <div className={styles.titleActions}>
-            <ButtonLink variant="secondary" href={`/messages/${client.id}`}>
-              Message
-            </ButtonLink>
             <Button variant="secondary" onClick={() => setAssigning(true)}>
               Assign program
             </Button>
@@ -289,7 +312,7 @@ export function ClientCalendar({
           itemHref={(item) => (item.logId ? logHref(item.logId) : `/clients/${client.id}/workouts/${item.id}`)}
           editableFrom={today}
           onDropItem={move}
-          onAddToDay={(date) => setPicker({ date, newId: crypto.randomUUID() })}
+          onAddToDay={(date) => setPicker({ date })}
           renderItem={(item, date, editable) =>
             item.logId ? (
               // Done, on any day: open its log or edit its results there, or clear it from the calendar (the log
@@ -346,7 +369,7 @@ export function ClientCalendar({
           today={today}
           onPick={(workout, date) => {
             setAdding(false);
-            schedule(workout, date, crypto.randomUUID());
+            schedule(workout, date);
           }}
           onClose={() => setAdding(false)}
         />
@@ -358,7 +381,7 @@ export function ClientCalendar({
           library={library}
           hints={hints}
           onPick={(w) => {
-            schedule(w, picker.date, picker.newId);
+            schedule(w, picker.date);
             setPicker(null);
           }}
           onClose={() => setPicker(null)}

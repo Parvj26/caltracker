@@ -106,6 +106,14 @@ env:
     id: finish-note
 - inputText: 'Felt strong'
 - hideKeyboard
+# Leaving the box saves the note; typing on afterwards is never overwritten by that save.
+- tapOn:
+    id: finish-note
+- inputText: ' today'
+- hideKeyboard
+- assertVisible:
+    id: finish-note
+    text: 'Felt strong today'
 # Keep going keeps the draft: the feeling and the note are back when the sheet opens again.
 - tapOn:
     id: finish-keep-going
@@ -118,7 +126,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: finish-note
-      text: 'Felt strong'
+      text: 'Felt strong today'
     timeout: 10000
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
@@ -142,7 +150,7 @@ env:
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
-- assertTrue: '${output.call == "Felt: Good | Felt strong"}'
+- assertTrue: '${output.call == "Felt: Good | Felt strong today"}'
 # Later, from Today: View opens the summary again.
 - tapOn: 'View'
 - extendedWaitUntil:

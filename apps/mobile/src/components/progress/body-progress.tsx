@@ -21,8 +21,9 @@ import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /**
- * The client's body progress, shown on the Progress tab below Strength: a chart per measure with two or more values,
- * their own weight log, and the history. `refreshKey` changes when the screen is pulled to refresh.
+ * The client's body progress, shown on the Progress tab below Strength: the goal their coach set, their latest
+ * weight, body fat and muscle, a chart per measure with two or more values, their own weight log, and the history.
+ * `refreshKey` changes when the screen is pulled to refresh.
  */
 export function BodyProgress({ refreshKey }: { refreshKey: number }) {
   const { text, space, radius } = useTheme();
@@ -161,6 +162,23 @@ export function BodyProgress({ refreshKey }: { refreshKey: number }) {
 
   return (
     <>
+      {model?.goal ? (
+        <Card>
+          <Text style={text('sectionHeading')} accessibilityRole="header">
+            Your goal
+          </Text>
+          <Text style={text('body')} testID="goal-text">
+            {model.goal.text}
+          </Text>
+          {model.goal.countdown ? (
+            <Text style={text('caption')} testID="goal-countdown">
+              {`${model.goal.countdown} · ${model.goal.date}`}
+            </Text>
+          ) : null}
+          <Text style={text('caption')}>Set by your coach</Text>
+        </Card>
+      ) : null}
+
       <Text style={text('sectionHeading')} accessibilityRole="header">
         Body
       </Text>
@@ -173,6 +191,27 @@ export function BodyProgress({ refreshKey }: { refreshKey: number }) {
       ) : null}
       {loading ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {offline ? <Text style={text('caption')}>No connection. This is your progress as last saved on this phone.</Text> : null}
+
+      {model && model.latest.length > 0 ? (
+        <Card>
+          <Text style={text('sectionHeading')} accessibilityRole="header">
+            Latest
+          </Text>
+          {model.latest.map((l) => (
+            <View
+              key={l.key}
+              testID={`latest-${l.key}`}
+              accessible
+              accessibilityLabel={`${l.label}, ${l.value} on ${l.date}.${l.change ? ` ${l.change}.` : ''}`}
+              style={[styles.latest, { gap: space[1] }]}
+            >
+              <Text style={text('caption')}>{l.label}</Text>
+              <Text style={text('bigNumber')}>{l.value}</Text>
+              <Text style={text('caption')}>{l.change ? `${l.date} · ${l.change}` : l.date}</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
 
       <Card>
         <Text style={text('sectionHeading')} accessibilityRole="header">
@@ -325,6 +364,7 @@ const styles = StyleSheet.create({
   rangeOn: { backgroundColor: palette.ink },
   rangeOnText: { color: palette.bg },
   entry: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 12 },
+  latest: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap' },
   action: { minHeight: tapTarget.min, minWidth: tapTarget.min, justifyContent: 'center' },
   underline: { textDecorationLine: 'underline' },

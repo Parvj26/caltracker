@@ -45,6 +45,7 @@ import {
 } from '@caltracker/shared';
 import { ActionMenu, type MenuItem } from '@/components/log/action-menu';
 import { CoachLoggingBanner } from '@/components/log/coach-logging-banner';
+import { CoachWatchFrame, WindowInsets } from '@/components/log/coach-watch-bar';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExercisePicker } from '@/components/log/exercise-picker';
 import { OptionPage, StraightPage, SupersetPage, type PageHandlers } from '@/components/log/log-pages';
@@ -52,17 +53,18 @@ import { FinishSheet, InfoSheet, SubstituteSheet } from '@/components/log/log-sh
 import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
-import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
 import { useCoachLogging } from '@/lib/coach-logging';
+import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
 import { fetchLastResults, type LastResults } from '@/lib/log-api';
 import {
   afterDone,
   buildPage,
   buildSections,
+  deleteChoices,
   finishModel,
   hasTypedValues,
   historyLines,
@@ -74,6 +76,8 @@ import {
   placeAfterChange,
   resumePlace,
   startGroups,
+  stepLabel,
+  stepPlace,
   substituteCards,
   substituteOf,
   type ExerciseModel,
@@ -126,8 +130,9 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
 /** The workout being logged: overview, each section's start page, and the section's pages. */
 export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  // Single active logger: while the coach logs this workout from the website, the client sees a read-only banner
-  // (with "Continue on my phone" once the coach has stopped for 20 minutes) instead of the logging pages.
+  // Single active logger: while the coach logs this workout from the website, the client sees the same pages read
+  // only, following the coach's saves live, under a slim bar (with "Continue on my phone" once the coach has stopped
+  // for 20 minutes). Without an open copy on this phone (or once finished) the full banner shows instead.
   const coach = useCoachLogging(id);
   const router = useRouter();
   const { text } = useTheme();
@@ -136,7 +141,21 @@ export default function LogScreen() {
   const log = active && active.id === id ? active : null;
 
   const back = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
-  if (coach.byCoach) return <CoachLoggingBanner coach={coach} onBack={back} />;
+  const view = coachWatchView(coach.byCoach, log, id);
+  // Watching when the coach finishes: straight to the sticker reveal, then the summary ("Logged by coach").
+  const watched = useRef(false);
+  useEffect(() => {
+    // Handed back or reclaimed: the client logs again, so a later finish is theirs (their own reveal).
+    if (view === 'watch') watched.current = true;
+    else if (view === 'own') watched.current = false;
+  }, [view]);
+  const revealNow = revealAfterCoachFinish(watched.current || view === 'watch', coach);
+  useEffect(() => {
+    if (!revealNow || !id) return;
+    watched.current = false;
+    router.replace({ pathname: '/log/[id]/reveal', params: { id, coach: '1' } });
+  }, [revealNow, id, router]);
+  if (view === 'banner') return <CoachLoggingBanner coach={coach} onBack={back} />;
 
   if (!ready || units === null) {
     return (
@@ -159,7 +178,12 @@ export default function LogScreen() {
     );
   }
 
-  return <OpenLog log={log} units={units} back={back} />;
+  const watching = view === 'watch';
+  return (
+    <CoachWatchFrame coach={watching ? coach : null}>
+      <OpenLog log={log} units={units} back={back} readOnly={watching} />
+    </CoachWatchFrame>
+  );
 }
 
 /** Where a fresh open lands: the overview before anything is ticked, else the first open page. */
@@ -171,9 +195,21 @@ function firstScreen(log: WorkoutLogDoc, sections: FlowSection[]): Screen {
   return at ? { mode: 'pages', ...at } : { mode: 'overview' };
 }
 
-function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back: () => void }) {
+function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Units; back: () => void; readOnly: boolean }) {
   const router = useRouter();
-  const { syncStatus, op, tick, markDone, finish, discard } = useActiveLog();
+  const { syncStatus, op: edit, tick: toggle, markDone: tickAll, finish, discard } = useActiveLog();
+  // Read only (the coach logs it): every edit stops here too, not only in the hidden controls. The store refuses
+  // them anyway (heldRef); this keeps a tap that lands mid-take-over from doing anything.
+  const can = logControls(readOnly);
+  const canRef = useRef(can);
+  canRef.current = can;
+  const op = useCallback((fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => (canRef.current.type ? edit(fn) : Promise.resolve()), [edit]);
+  const tick = useCallback((setId: string) => (canRef.current.tick ? toggle(setId) : Promise.resolve(null)), [toggle]);
+  const markDone = useCallback(
+    (fn: (l: WorkoutLogDoc) => WorkoutLogDoc) => (canRef.current.tick ? tickAll(fn) : Promise.resolve(false)),
+    [tickAll],
+  );
+  const recentSetId = useMemo(() => (readOnly ? latestTickedSetId(log) : null), [readOnly, log]);
   const sections = useMemo(() => buildSections(log), [log]);
   const [screen, setScreenState] = useState<Screen>(() => firstScreen(log, sections));
   const setScreen = useCallback(
@@ -190,11 +226,24 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const [infoFor, setInfoFor] = useState<{ name: string; exerciseId: string } | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
   const [menuFor, setMenuFor] = useState<LogExerciseDoc | null>(null);
+  /** Deleting a set: the long-press sheet on a row, or "Delete a set" from the ⋯ menu. */
+  const [setMenu, setSetMenu] = useState<{ title: string; items: MenuItem[] } | null>(null);
   const [subFor, setSubFor] = useState<LogExerciseDoc | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [last, setLast] = useState<LastResults>({});
   const lastTick = useRef<LastDone>(null);
+  // The coach took over while something was open: close what edits (photos, info and history may stay open).
+  useEffect(() => {
+    if (!readOnly) return;
+    Keyboard.dismiss();
+    setPicker(null);
+    setNoteFor(null);
+    setMenuFor(null);
+    setSetMenu(null);
+    setSubFor(null);
+    setFinishOpen(false);
+  }, [readOnly]);
   /** A block just added: open its page once the sections include it. */
   const jumpTo = useRef<string | null>(null);
 
@@ -309,6 +358,15 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
+        onRowMenu: (row) => {
+          Keyboard.dismiss();
+          tapHaptic();
+          const name = docOf(exId)?.exerciseName;
+          setSetMenu({
+            title: name ? `${row.name} · ${name}` : row.name,
+            items: [{ title: 'Delete set', testID: 'menu-delete-set', onPress: () => void op((l) => removeLogSet(l, exId, row.setId, nowIso())) }],
+          });
+        },
         onTag: (row) => {
           if (row.tagKind !== 'normal') setInfo(TAG_INFO[row.tagKind]);
         },
@@ -316,7 +374,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       cache.set(exId, made);
       return made;
     };
-  }, [withPick, op, tick, markDone]);
+  }, [withPick, op, tick, markDone, docOf]);
 
   const handlers: PageHandlers = useMemo(
     () => ({
@@ -361,7 +419,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     [tableFor, op, withPick, docOf, units],
   );
 
-  /** Mark all: asks first when it ticks more than one set, and says which sets it leaves (nothing to save yet). */
+  /** Mark all: asks first when it ticks more than one set, and says which get no weight and which it leaves. */
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
     Keyboard.dismiss();
     const picked = pickOf ? withPick(pickOf)(log) : log;
@@ -378,7 +436,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       });
       return;
     }
-    if (plan.tick === 1 && plan.skip === 0) return run();
+    // One set with its numbers: no need to ask. A set with no weight (maybe bodyweight) is ticked, but said first.
+    if (plan.tick === 1 && plan.skip === 0 && plan.noWeight === 0) return run();
     const q = markAllQuestion(plan);
     Alert.alert(q.title, q.message ?? undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -400,6 +459,22 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         title: 'Add a drop set',
         testID: 'menu-add-drop',
         onPress: () => void op((l) => addLogDrop(withPick(ex.id)(l), ex.id, lastMain.id, randomUUID, nowIso())),
+      });
+    }
+    const deletable = deleteChoices(ex, units, last[ex.exerciseId]?.sets ?? []);
+    if (deletable.length > 0) {
+      items.push({
+        title: 'Delete a set',
+        testID: 'menu-delete-a-set',
+        onPress: () =>
+          setSetMenu({
+            title: `Delete which set? · ${ex.exerciseName}`,
+            items: deletable.map((c, i) => ({
+              title: c.title,
+              testID: `menu-delete-set-${i}`,
+              onPress: () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso())),
+            })),
+          }),
       });
     }
     items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', onPress: () => confirmRemoveExercise(ex) });
@@ -438,7 +513,11 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   };
 
   // ---- Finish and discard ----
-  const discardNow = () => void discard().then(back);
+  // Read only: the coach may have taken over while the alert was open. iOS can't close an open Alert from code, so
+  // its buttons do nothing then (the edits below are gated too).
+  const discardNow = () => {
+    if (canRef.current.discard) void discard().then(back);
+  };
   const confirmDiscard = () =>
     Alert.alert('Discard this workout?', 'Your ticked sets won’t be saved.', [
       { text: 'Keep going', style: 'cancel' },
@@ -446,6 +525,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     ]);
   const saved = readFinishNotes(log.notes);
   const finishNow = async (feel: Feeling | null, note: string) => {
+    if (!canRef.current.finish) return;
     setFinishing(true);
     try {
       await op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
@@ -463,7 +543,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const syncLate = useDelayedFlag(syncStatus !== 'synced', SYNC_PILL_AFTER_MS);
 
   const sheets = (
-    <>
+    <WindowInsets>
       <ExercisePicker
         title={picker?.mode === 'swap' ? `Swap ${picker.ex.exerciseName}` : 'Add an exercise'}
         visible={picker !== null}
@@ -505,6 +585,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onClose={() => setSubFor(null)}
       />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
+      <ActionMenu title={setMenu?.title ?? null} items={setMenu?.items ?? []} onClose={() => setSetMenu(null)} />
       <KeyboardBar />
       <FinishSheet
         visible={finishOpen}
@@ -517,13 +598,14 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           setFinishOpen(false);
           void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()));
         }}
+        onSaveDraft={(feel, note) => void op((l) => setLogNotes(l, composeFinishNotes(feel, note), nowIso()))}
         onFinish={(feel, note) => void finishNow(feel, note)}
         onDiscard={() => {
           setFinishOpen(false);
           confirmDiscard();
         }}
       />
-    </>
+    </WindowInsets>
   );
 
   const pill = syncLate ? (
@@ -551,6 +633,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           onAddExercise={() => setPicker({ mode: 'add' })}
           onFinish={() => setFinishOpen(true)}
           onDiscard={confirmDiscard}
+          readOnly={readOnly}
         />
         {pill}
         {sheets}
@@ -579,6 +662,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           onBack={() => setScreen({ mode: 'overview' })}
           onInfo={(item) => setInfoFor({ name: item.name, exerciseId: item.exerciseId })}
           onAddExercise={() => setPicker({ mode: 'add' })}
+          readOnly={readOnly}
         />
         {pill}
         {sheets}
@@ -586,18 +670,37 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     );
   }
 
+  const pageIndex = Math.min(screen.page, section.pages.length - 1);
+  const here = { section: sectionIndex, page: pageIndex };
+  // Moving never needs Done: ‹ and › step a page (into the next or previous section too), a swipe past the
+  // section's first or last page goes on into the next section, and the title opens the list of sections.
+  const go = (to: { section: number; page: number } | null) => to && setScreen({ mode: 'pages', ...to });
+  const prevSection = stepPlace(sections, { section: sectionIndex, page: 0 }, -1);
+  const nextSection = stepPlace(sections, { section: sectionIndex, page: section.pages.length - 1 }, 1);
   return (
     <View style={styles.fill}>
       <SectionPages
         key={section.key}
         log={log}
         section={section}
-        page={Math.min(screen.page, section.pages.length - 1)}
+        sectionIndex={sectionIndex}
+        sectionCount={sections.length}
+        page={pageIndex}
         units={units}
         last={last}
         details={details}
         handlers={handlers}
+        readOnly={readOnly}
+        recentSetId={recentSetId}
+        steps={{ prev: stepLabel(sections, here, -1), next: stepLabel(sections, here, 1) }}
+        edges={{
+          prev: prevSection ? sections[prevSection.section].title : null,
+          next: nextSection ? sections[nextSection.section].title : null,
+        }}
         onPage={(page) => setScreen({ mode: 'pages', section: sectionIndex, page })}
+        onStep={(delta) => go(stepPlace(sections, here, delta))}
+        onEdge={(delta) => go(delta < 0 ? prevSection : nextSection)}
+        onSections={() => setScreen({ mode: 'overview' })}
         onClose={() => setScreen({ mode: 'start', section: sectionIndex })}
         onMarkAll={markAllNow}
         onDone={(page) => {
@@ -617,24 +720,46 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
 function SectionPages({
   log,
   section,
+  sectionIndex,
+  sectionCount,
   page,
   units,
   last,
   details,
   handlers,
+  readOnly,
+  recentSetId,
+  steps,
+  edges,
   onPage,
+  onStep,
+  onEdge,
+  onSections,
   onClose,
   onMarkAll,
   onDone,
 }: {
   log: WorkoutLogDoc;
   section: FlowSection;
+  sectionIndex: number;
+  sectionCount: number;
   page: number;
   units: Units;
   last: LastResults;
   details: Parameters<typeof StraightPage>[0]['details'];
   handlers: PageHandlers;
+  /** The coach logs this workout: the pages only show it (no Mark all or Done); moving around still works. */
+  readOnly: boolean;
+  recentSetId: string | null;
+  /** What ‹ and › say ("Next page", "Previous section: Warm-Up"); null at either end of the workout. */
+  steps: { prev: string | null; next: string | null };
+  /** The section a swipe past the first or last page goes on to (its title), or null. */
+  edges: { prev: string | null; next: string | null };
   onPage: (page: number) => void;
+  onStep: (delta: -1 | 1) => void;
+  onEdge: (delta: -1 | 1) => void;
+  /** The title: the workout overview, which lists every section. */
+  onSections: () => void;
   onClose: () => void;
   /** Ticks every open set of these exercises; `pickOf` is the option a pick-one page picks first. */
   onMarkAll: (logExerciseIds: string[], pickOf: string | null) => void;
@@ -646,6 +771,8 @@ function SectionPages({
   const listRef = useRef<FlatList<FlowPage>>(null);
   const shown = useRef(page);
   const initial = useRef(page).current;
+  /** A swipe-through page before the first page when there is a section before this one (and one after the last). */
+  const lead = edges.prev ? 1 : 0;
 
   const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last)), [log, section, units, last]);
 
@@ -653,8 +780,8 @@ function SectionPages({
   useEffect(() => {
     if (shown.current === page) return;
     shown.current = page;
-    listRef.current?.scrollToOffset({ offset: page * width, animated: true });
-  }, [page, width]);
+    listRef.current?.scrollToOffset({ offset: (page + lead) * width, animated: true });
+  }, [page, width, lead]);
 
   // VoiceOver: each page that comes on screen (swiped, a dot, Done) is read from its heading.
   const headings = useRef(new Map<number, HostInstance>());
@@ -677,12 +804,16 @@ function SectionPages({
 
   // A rotation or iPad resize changes the page width: stay on the same page.
   useEffect(() => {
-    listRef.current?.scrollToOffset({ offset: shown.current * width, animated: false });
-  }, [width]);
+    listRef.current?.scrollToOffset({ offset: (shown.current + lead) * width, animated: false });
+  }, [width, lead]);
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (width <= 0) return;
-    const i = Math.min(Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width)), section.pages.length - 1);
+    const raw = Math.round(e.nativeEvent.contentOffset.x / width) - lead;
+    // Swiped onto the next or previous section's edge page: go on into that section.
+    if (raw < 0 && edges.prev) return onEdge(-1);
+    if (raw >= section.pages.length && edges.next) return onEdge(1);
+    const i = Math.min(Math.max(0, raw), section.pages.length - 1);
     if (i === shown.current) return;
     shown.current = i;
     Keyboard.dismiss();
@@ -692,7 +823,7 @@ function SectionPages({
   const dots = pageDots(log, section, page);
   /** Mark all for a page, or null when there is nothing to mark (all ticked, or an option locked out). */
   const markFor = (m: PageModel): (() => void) | null => {
-    if (m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
+    if (readOnly || m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
     const ids = m.kind === 'superset' ? m.exercises.map((e) => e.logExerciseId) : [m.exercise.logExerciseId];
     return () => onMarkAll(ids, m.kind === 'option' ? m.exercise.logExerciseId : null);
   };
@@ -710,15 +841,21 @@ function SectionPages({
         >
           <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
         </Pressable>
-        <Text
+        <Pressable
           testID="pages-title"
-          style={[text('sectionHeading'), styles.onInk, styles.headerTitle]}
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.6}
-          accessibilityRole="header"
+          onPress={onSections}
+          accessibilityRole="button"
+          accessibilityLabel={section.title}
+          accessibilityHint="Shows every section, to jump to any of them."
+          style={({ pressed }) => [styles.headerTitle, pressed && { opacity: pressedOpacity }]}
         >
-          {section.title}
-        </Text>
+          <Text style={[text('sectionHeading'), styles.onInk, styles.centre]} numberOfLines={2} maxFontSizeMultiplier={1.6}>
+            {section.title}
+          </Text>
+          <Text testID="pages-sections" style={[text('caption'), styles.onInk, styles.centre]} maxFontSizeMultiplier={1.6}>
+            {sectionCount > 1 ? `Section ${sectionIndex + 1} of ${sectionCount} · All sections ▾` : 'Overview ▾'}
+          </Text>
+        </Pressable>
         <View style={styles.headerButton} />
       </View>
       <View style={[styles.sheet, { borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4 }]}>
@@ -735,11 +872,13 @@ function SectionPages({
           windowSize={3}
           initialNumToRender={1}
           initialScrollIndex={Math.min(initial, section.pages.length - 1)}
-          getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+          getItemLayout={(_, index) => ({ length: width, offset: width * (index + lead), index })}
+          ListHeaderComponent={edges.prev ? <EdgePage width={width} dir={-1} title={edges.prev} /> : undefined}
+          ListFooterComponent={edges.next ? <EdgePage width={width} dir={1} title={edges.next} /> : undefined}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: info.index * width, animated: false })}
+          onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: (info.index + lead) * width, animated: false })}
           renderItem={({ item, index }) => {
-            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null });
+            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null, readOnly, recentSetId });
             const m = models[index];
             return (
               <ScrollView
@@ -748,7 +887,6 @@ function SectionPages({
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 automaticallyAdjustKeyboardInsets
-                onScrollBeginDrag={closeOpenSwipeRow}
                 contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] }]}
               >
                 <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
@@ -765,44 +903,80 @@ function SectionPages({
           }}
         />
         <View style={[styles.footer, { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: insets.bottom + space[2], gap: space[2] }]}>
-          <Pressable
-            testID="page-done"
-            onPress={() => onDone(page)}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
-          >
-            <Text style={[text('button'), styles.onInk]}>Done</Text>
-          </Pressable>
-          {dots.length > MAX_DOTS ? (
-            <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
-              {`${page + 1} / ${dots.length}`}
-            </Text>
-          ) : dots.length > 1 ? (
-            <View style={styles.dots} accessibilityRole="tablist">
-              {dots.map((d, i) => (
-                <Pressable
-                  key={section.pages[i].key}
-                  testID={`dot-${i}`}
-                  onPress={() => onPage(i)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: d === 'current' }}
-                  accessibilityLabel={`${what(section.pages[i])} ${i + 1} of ${dots.length}${d === 'done' ? ', done' : ''}. Or swipe left and right.`}
-                  style={styles.dotTarget}
-                >
-                  <View style={[styles.dot, d === 'current' ? styles.dotCurrent : d === 'done' ? styles.dotDone : styles.dotTodo]} />
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+          {readOnly ? null : (
+            <Pressable
+              testID="page-done"
+              onPress={() => onDone(page)}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
+            >
+              <Text style={[text('button'), styles.onInk]}>Done</Text>
+            </Pressable>
+          )}
+          <View style={styles.stepRow}>
+            <StepButton testID="page-prev" glyph="‹" label={steps.prev} onPress={() => onStep(-1)} />
+            {dots.length > MAX_DOTS ? (
+              <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
+                {`${page + 1} / ${dots.length}`}
+              </Text>
+            ) : dots.length > 1 ? (
+              <View style={styles.dots} accessibilityRole="tablist">
+                {dots.map((d, i) => (
+                  <Pressable
+                    key={section.pages[i].key}
+                    testID={`dot-${i}`}
+                    onPress={() => onPage(i)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: d === 'current' }}
+                    accessibilityLabel={`${what(section.pages[i])} ${i + 1} of ${dots.length}${d === 'done' ? ', done' : ''}. Or swipe left and right.`}
+                    style={styles.dotTarget}
+                  >
+                    <View style={[styles.dot, d === 'current' ? styles.dotCurrent : d === 'done' ? styles.dotDone : styles.dotTodo]} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <StepButton testID="page-next" glyph="›" label={steps.next} onPress={() => onStep(1)} />
+          </View>
         </View>
       </View>
     </View>
   );
 }
 
+/** ‹ or › beside the dots: one page back or forward, into the next or previous section too. Dimmed at the ends. */
+function StepButton({ testID, glyph, label, onPress }: { testID: string; glyph: string; label: string | null; onPress: () => void }) {
+  const { text } = useTheme();
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      disabled={label === null}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={label ?? (glyph === '‹' ? 'Previous page' : 'Next page')}
+      accessibilityState={{ disabled: label === null }}
+      style={({ pressed }) => [styles.dotTarget, label === null && styles.stepOff, pressed && { opacity: pressedOpacity }]}
+    >
+      <Text style={text('screenTitle')}>{glyph}</Text>
+    </Pressable>
+  );
+}
+
+/** Past a section's first or last page: the section a swipe goes on to. Landing here opens it. */
+function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: string }) {
+  const { text, space } = useTheme();
+  return (
+    <View testID={dir < 0 ? 'edge-prev' : 'edge-next'} style={[styles.edge, { width, padding: space[4], gap: space[2] }]}>
+      <Text style={[text('caption'), styles.centre]}>{dir < 0 ? '‹ Previous section' : 'Next section ›'}</Text>
+      <Text style={[text('screenTitle'), styles.centre]}>{title}</Text>
+    </View>
+  );
+}
+
 const DOT = 8;
-/** Past this many pages the dots no longer fit a phone's width: "3 / 12" instead. */
-const MAX_DOTS = 8;
+/** Past this many pages the dots (with ‹ and › beside them) no longer fit a phone's width: "3 / 12" instead. */
+const MAX_DOTS = 6;
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
@@ -810,7 +984,11 @@ const styles = StyleSheet.create({
   onInk: { color: white },
   header: { flexDirection: 'row', alignItems: 'center' },
   headerButton: { width: tapTarget.min, minHeight: tapTarget.min, justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center' },
+  headerTitle: { flex: 1, alignItems: 'center', minHeight: tapTarget.min, justifyContent: 'center' },
+  centre: { textAlign: 'center' },
+  stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  stepOff: { opacity: 0.25 },
+  edge: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sheet: { flex: 1, backgroundColor: palette.bg, overflow: 'hidden' },
   pageContent: { alignItems: 'center' },
   column: { width: '100%', maxWidth: contentMaxWidth },
