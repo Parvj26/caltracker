@@ -1,6 +1,7 @@
-# The sticker reveal after Finish: a seeded workout of 3 x 8 at 60 kg is 1,440 kg, which is a giraffe's worth.
+# The sticker reveal after Finish: a seeded workout of 3 x 8 at 60 kg is 1,440 kg, which reaches every animal up
+# to a giraffe. A new client gets one of those at random (seeded by the log id), so the flow doesn't name it.
 # Finish shows the dark reveal (what was lifted, the animal, "NEW for your zoo book", Continue), then the summary
-# with its sticker row ("Giraffe ×1"). The demo client starts with an empty zoo book (cleanup-logs clears it).
+# with its sticker row ("<Animal> ×1"). The demo client starts with an empty zoo book (cleanup-logs clears it).
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL; the award-workout Edge
 # Function must be served: `supabase functions serve`).
 appId: app.caltracker.client
@@ -22,7 +23,7 @@ env:
 - runFlow: helpers/log-squat-3x8.yaml
 - tapOn:
     id: finish-confirm
-# The reveal: 1,440 kg is 3,175 lb in this client's units, and about 1.x giraffes.
+# The reveal: 1,440 kg is 3,175 lb in this client's units, and some number of one animal.
 - extendedWaitUntil:
     visible:
       id: reveal-continue
@@ -31,8 +32,8 @@ env:
 - assertVisible: 'that’s about'
 - assertVisible:
     id: reveal-headline
-    text: '.*Giraffe.*'
-# The server's answer lands a moment after the card shows: a first giraffe is NEW for the zoo book.
+    text: '.+!'
+# The server's answer lands a moment after the card shows (the same animal): a first one is NEW for the zoo book.
 - extendedWaitUntil:
     visible: 'NEW for your zoo book'
     timeout: 10000
@@ -45,7 +46,7 @@ env:
 - assertVisible:
     id: summary-stickers
 - extendedWaitUntil:
-    visible: 'Giraffe ×1'
+    visible: '.+ ×1'
     timeout: 10000
 - tapOn:
     id: summary-done

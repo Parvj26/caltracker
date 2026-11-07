@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { AwardResult } from '@caltracker/shared';
+import { ladderHistoryBefore, pickLadderAnimal, type AwardResult, type LadderAward } from '@caltracker/shared';
 import {
   NEW_PILL,
   buildRevealCards,
+  emptyLadderCache,
+  ladderAwardsFrom,
+  ladderCacheKey,
+  parseLadderCache,
+  previewLadder,
+  withLocalPick,
+  withServerAwards,
   classifyAwardFailure,
   createRevealQueue,
   expired,
@@ -20,7 +27,7 @@ function weightedLog(kg: number) {
   const base = sampleLog({ status: 'completed' });
   const ex = base.blocks[0].exercises[0];
   const set = { ...ex.sets[0], actualWeightKg: kg, actualReps: 1, completedAt: '2026-11-05T09:05:00.000Z' };
-  return { ...base, blocks: [{ ...base.blocks[0], exercises: [{ ...ex, sets: [set] }] }] };
+  return { ...base, finishedAt: '2026-11-05T09:10:00.000Z', blocks: [{ ...base.blocks[0], exercises: [{ ...ex, sets: [set] }] }] };
 }
 function cardioLog() {
   const base = sampleLog({ status: 'completed' });
@@ -31,16 +38,30 @@ function cardioLog() {
 
 describe('buildRevealCards', () => {
   it('shows the ladder animal from the local log with no server answer, without a pill', () => {
-    const cards = buildRevealCards(weightedLog(1440), null, 'lb');
+    const cards = buildRevealCards(weightedLog(1440), null, 'lb', []);
     expect(cards).toHaveLength(1);
     expect(cards[0]).toMatchObject({ type: 'ladder', lead: 'You lifted 3,175 lb', lead2: 'that’s about', pill: null });
-    expect(cards[0].headline).toMatch(/^\d+(\.\d)? .+!$/);
+    expect(cards[0].headline).toMatch(/^\d+(,\d{3})*(\.\d)? .+!$/);
+  });
+
+  it('previews the same animal the server picks: same rule, same log id, same history', () => {
+    const log = weightedLog(1440);
+    const history: LadderAward[] = [
+      { logId: 'a', finishedAt: '2026-11-01T10:00:00Z', key: 'cat' },
+      { logId: 'b', finishedAt: '2026-11-02T10:00:00Z', key: 'giraffe' },
+      // Finished after this log: never counts for it.
+      { logId: 'z', finishedAt: '2099-01-01T00:00:00Z', key: 'rabbit' },
+    ];
+    const server = pickLadderAnimal(1440, ladderHistoryBefore(history, { id: log.id, finishedAt: log.finishedAt }), log.id);
+    expect(previewLadder(log, history)?.sticker.key).toBe(server?.sticker.key);
+    expect(buildRevealCards(log, null, 'lb', history)[0].stickerKey).toBe(server?.sticker.key);
+    expect(['cat', 'giraffe']).not.toContain(previewLadder(log, history)?.sticker.key);
   });
 
   it('has no ladder card for a log with no weighted sets, and no crash', () => {
-    expect(buildRevealCards(cardioLog(), null, 'lb')).toEqual([]);
+    expect(buildRevealCards(cardioLog(), null, 'lb', [])).toEqual([]);
     const award = { ...empty, milestone: 10 };
-    expect(buildRevealCards(cardioLog(), award, 'lb').map((c) => c.type)).toEqual(['milestone']);
+    expect(buildRevealCards(cardioLog(), award, 'lb', []).map((c) => c.type)).toEqual(['milestone']);
   });
 
   it('merges the server award: ladder, drop, rare, landmark, milestone in that order', () => {
@@ -52,7 +73,7 @@ describe('buildRevealCards', () => {
       milestone: 10,
       prs: [],
     };
-    const cards = buildRevealCards(weightedLog(1440), award, 'lb');
+    const cards = buildRevealCards(weightedLog(1440), award, 'lb', []);
     expect(cards.map((c) => c.type)).toEqual(['ladder', 'drop', 'rare', 'landmark', 'milestone']);
     expect(cards[0]).toMatchObject({ headline: '1.4 Giraffes!', pill: NEW_PILL });
     expect(cards[1].pill).toBe(NEW_PILL);
@@ -60,9 +81,47 @@ describe('buildRevealCards', () => {
 
   it('words a repeat as Another X ×N, and shiny as Shiny X', () => {
     const repeat: AwardResult = { ...empty, ladder: { key: 'giraffe', multiple: 1.4, isNew: false, count: 4, shiny: false } };
-    expect(buildRevealCards(weightedLog(1440), repeat, 'lb')[0]).toMatchObject({ headline: 'Another giraffe! ×4', pill: null });
+    expect(buildRevealCards(weightedLog(1440), repeat, 'lb', [])[0]).toMatchObject({ headline: 'Another giraffe! ×4', pill: null });
     const shiny: AwardResult = { ...empty, ladder: { key: 'giraffe', multiple: 1, isNew: true, count: 1, shiny: true } };
-    expect(buildRevealCards(weightedLog(1440), shiny, 'lb')[0]).toMatchObject({ headline: '✦ Shiny giraffe!', shiny: true });
+    expect(buildRevealCards(weightedLog(1440), shiny, 'lb', [])[0]).toMatchObject({ headline: '✦ Shiny giraffe!', shiny: true });
+  });
+});
+
+describe('the ladder history on the phone', () => {
+  const NOW = Date.parse('2026-11-06T12:00:00Z');
+  const a = (logId: string, finishedAt: string, key: string): LadderAward => ({ logId, finishedAt, key });
+  const s1 = a('s1', '2026-11-01T10:00:00Z', 'cat');
+  const s2 = a('s2', '2026-11-02T10:00:00Z', 'goat');
+
+  it('keeps one cache per user and coach', () => {
+    expect(ladderCacheKey('u1', 'w1')).not.toBe(ladderCacheKey('u1', 'w2'));
+    expect(ladderCacheKey('u1', 'w1')).not.toBe(ladderCacheKey('u2', 'w1'));
+  });
+
+  it('reads back what it wrote, and an unreadable cache as empty', () => {
+    const cache = withLocalPick(withServerAwards(emptyLadderCache, [s1]), a('p1', '2026-11-06T10:00:00Z', 'pig'));
+    expect(parseLadderCache(JSON.stringify(cache))).toEqual(cache);
+    expect(parseLadderCache(null)).toEqual(emptyLadderCache);
+    expect(parseLadderCache('{oops')).toEqual(emptyLadderCache);
+    expect(parseLadderCache(JSON.stringify({ server: [{ logId: 1 }], local: 'x' }))).toEqual(emptyLadderCache);
+  });
+
+  it('counts the phone’s own previews until the server has awarded those logs', () => {
+    const offline = a('p1', '2026-11-06T10:00:00Z', 'pig');
+    let cache = withLocalPick(withServerAwards(emptyLadderCache, [s1, s2]), offline);
+    expect(ladderAwardsFrom(cache, NOW).map((x) => x.key)).toEqual(['cat', 'goat', 'pig']);
+    // The server has awarded it now (maybe another animal): its answer replaces the preview.
+    cache = withServerAwards(cache, [s1, s2, a('p1', offline.finishedAt, 'horse')]);
+    expect(cache.local).toEqual([]);
+    expect(ladderAwardsFrom(cache, NOW).map((x) => x.key)).toEqual(['cat', 'goat', 'horse']);
+  });
+
+  it('replaces a preview for the same log, and forgets previews older than a week', () => {
+    let cache = withLocalPick(emptyLadderCache, a('p1', '2026-11-06T10:00:00Z', 'pig'));
+    cache = withLocalPick(cache, a('p1', '2026-11-06T10:00:00Z', 'cow'));
+    expect(cache.local.map((x) => x.key)).toEqual(['cow']);
+    const old = withLocalPick(emptyLadderCache, a('p0', '2026-10-20T10:00:00Z', 'pig'));
+    expect(ladderAwardsFrom(old, NOW)).toEqual([]);
   });
 });
 
