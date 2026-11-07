@@ -1,7 +1,9 @@
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 /** The web app under test (same port as playwright.config.ts: E2E_WEB_PORT, 3000 by default). */
 export const WEB_URL = `http://localhost:${process.env.E2E_WEB_PORT ?? '3000'}`;
@@ -11,13 +13,33 @@ export const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324';
 
 export const COACH_EMAIL = 'coach@demo.local';
 
-export async function signInAsCoach(page: Page) {
+/** Where the setup project (auth.setup.ts) saves the demo coach's signed-in cookies. Git-ignored. */
+export const COACH_STATE = join(__dirname, '.auth', 'coach.json');
+
+/** Signs in through the real sign-in form (the setup project, and specs that test signing in itself). */
+export async function signInThroughForm(page: Page, email = COACH_EMAIL, password = 'demo-password-123') {
   await page.goto('/sign-in');
-  await page.getByLabel('Email').fill(COACH_EMAIL);
-  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
-  // Most specs start from the Clients page, so go there once signed in (home.spec covers the landing page itself).
+}
+
+/**
+ * Starts this page signed in as the demo coach, on the Clients page. Reuses the session the setup project saved once
+ * per run instead of filling the sign-in form in every test (sign-in.spec covers the form itself). Falls back to the
+ * form when the saved session is missing, e.g. a run with --no-deps.
+ * Never sign this shared session out: signing out ends it for every test in the run. Sign-out tests use their own.
+ */
+export async function signInAsCoach(page: Page) {
+  if (existsSync(COACH_STATE)) {
+    const state = JSON.parse(readFileSync(COACH_STATE, 'utf8')) as { cookies: Parameters<BrowserContext['addCookies']>[0] };
+    await page.context().clearCookies();
+    await page.context().addCookies(state.cookies);
+  } else {
+    await signInThroughForm(page);
+  }
+  // Most specs start from the Clients page (home.spec covers the landing page itself).
   await page.goto('/clients');
 }
 
