@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { Button, TextButton } from '@/components/ui';
+import { logControls } from '@/lib/coach-watch';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import type { FlowSection, StartGroup, StartItem } from '@/lib/log-flow-model';
 import { contentMaxWidth, palette, pressedOpacity, white } from '@/theme/theme';
@@ -89,6 +90,7 @@ export function SectionStart({
   onBack,
   onInfo,
   onAddExercise,
+  readOnly = false,
 }: {
   section: FlowSection;
   index: number;
@@ -101,10 +103,13 @@ export function SectionStart({
   onBack: () => void;
   onInfo: (item: StartItem) => void;
   onAddExercise: () => void;
+  /** The coach logs this workout: no adding; Start only opens the pages to look. */
+  readOnly?: boolean;
 }) {
   const { text, space } = useTheme();
   const insets = useSafeAreaInsets();
   const empty = section.pages.length === 0;
+  const can = logControls(readOnly);
   return (
     <ScrollView testID="section-start" contentContainerStyle={[styles.content, { padding: space[4], paddingBottom: space[6] + insets.bottom }]}>
       <View style={[styles.column, { gap: space[4] }]}>
@@ -132,12 +137,16 @@ export function SectionStart({
         </View>
         {empty ? (
           <View style={{ gap: space[3] }}>
-            <Text style={text('body')}>Add your first exercise to start logging.</Text>
-            <Button title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} />
+            <Text style={text('body')}>{can.addExercise ? 'Add your first exercise to start logging.' : 'Nothing in this section yet.'}</Text>
+            {can.addExercise ? <Button title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} /> : null}
           </View>
         ) : (
           <>
-            <Button title={started ? 'Continue section' : 'Start section'} testID="start-section" onPress={onStart} />
+            <Button
+              title={readOnly ? 'View section' : started ? 'Continue section' : 'Start section'}
+              testID="start-section"
+              onPress={onStart}
+            />
             <StartList groups={groups} details={details} onInfo={onInfo} />
           </>
         )}
@@ -162,6 +171,7 @@ export function WorkoutOverview({
   onAddExercise,
   onFinish,
   onDiscard,
+  readOnly = false,
 }: {
   name: string;
   /** A set is ticked: the button says Continue. */
@@ -176,9 +186,12 @@ export function WorkoutOverview({
   onAddExercise: () => void;
   onFinish: () => void;
   onDiscard: () => void;
+  /** The coach logs this workout: no add, finish or discard; the button only opens the pages to look. */
+  readOnly?: boolean;
 }) {
   const { text, space, radius } = useTheme();
   const insets = useSafeAreaInsets();
+  const can = logControls(readOnly);
   return (
     <ScrollView testID="workout-overview" contentContainerStyle={{ paddingBottom: space[6] + insets.bottom }}>
       <View style={[styles.hero, { paddingTop: insets.top + space[2], padding: space[4], gap: space[2] }]}>
@@ -192,7 +205,7 @@ export function WorkoutOverview({
           >
             <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
           </Pressable>
-          <Text style={[text('caption'), styles.onInk]}>{started ? 'Workout in progress' : 'Today’s workout'}</Text>
+          <Text style={[text('caption'), styles.onInk]}>{readOnly ? 'Logged by your coach' : started ? 'Workout in progress' : 'Today’s workout'}</Text>
           <Text testID="overview-name" style={[text('screenTitle'), styles.onInk, styles.title]} accessibilityRole="header">
             {name}
           </Text>
@@ -203,7 +216,7 @@ export function WorkoutOverview({
               accessibilityRole="button"
               style={({ pressed }) => [styles.startPill, { borderRadius: radius.pill, paddingHorizontal: space[6] }, pressed && { opacity: pressedOpacity }]}
             >
-              <Text style={[text('button'), styles.ink]}>{started ? 'Continue' : 'Start workout'}</Text>
+              <Text style={[text('button'), styles.ink]}>{readOnly ? 'View sets' : started ? 'Continue' : 'Start workout'}</Text>
             </Pressable>
           </View>
         </View>
@@ -233,9 +246,9 @@ export function WorkoutOverview({
             {groups.length > 0 ? <StartList groups={groups} details={details} onInfo={onInfo} /> : null}
           </View>
         ))}
-        <Button variant="secondary" title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} />
-        <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={onFinish} />
-        <TextButton testID="discard-workout" title="Discard workout" onPress={onDiscard} />
+        {can.addExercise ? <Button variant="secondary" title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} /> : null}
+        {can.finish ? <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={onFinish} /> : null}
+        {can.discard ? <TextButton testID="discard-workout" title="Discard workout" onPress={onDiscard} /> : null}
       </View>
     </ScrollView>
   );

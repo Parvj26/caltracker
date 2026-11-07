@@ -1,8 +1,9 @@
 # Single active logger (docs/superpowers/specs/2026-11-06-coach-session-logging-design.md), phone side: the client
 # starts "E2E Log" (Barbell Squat 3 × 8 @ 60 kg) and ticks set 1; the coach takes it over from the website (driven
-# here through the same RPCs). The open workout turns into "Your coach is logging this session" with no logging
-# pages, and opening it again from Today shows the same. The coach ticks set 2 (10 reps) and hands it back: the
-# phone is back on the logging page with the coach's set, and the client finishes it.
+# here through the same RPCs). The open workout stays on screen read only, under "Your coach is logging this
+# session": no Done, Mark all, swap or more, and the ticks don't toggle. The coach ticks set 2 (10 reps) and it
+# appears on the phone live. Opening it again from Today shows the same. The coach hands it back: the phone logs
+# again on the same page, with the coach's set, and the client finishes it.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -26,7 +27,7 @@ env:
 - assertVisible:
     id: tick-0-0-0
     text: 'checkbox, checked'
-# ---- The coach takes over: the open workout becomes read only, live ----
+# ---- The coach takes over: the open workout stays on screen, read only, live ----
 - runScript:
     file: helpers/call.js
     env: { ACTION: coach-take-over, EMAIL: '${EMAIL}' }
@@ -36,17 +37,67 @@ env:
     timeout: 20000
 - assertVisible: 'Your coach is logging this session'
 - assertVisible:
-    id: logged-by-coach
+    id: coach-watch-read-only
+- assertNotVisible:
+    id: coach-logging-reclaim
+# The pages are still there, showing the client's ticked set 1.
+- assertVisible:
+    id: tick-0-0-0
+    text: 'checkbox, checked'
+- assertVisible:
+    id: actual-reps-0-0-0
+# ...but nothing edits: no Done, Mark all, add set, swap or more; ticks are disabled and don't toggle.
 - assertNotVisible:
     id: page-done
 - assertNotVisible:
-    id: tick-0-0-0
+    id: mark-all-0
 - assertNotVisible:
-    id: coach-logging-reclaim
-- takeScreenshot: coach-logging-held
-# Back to Today and in again: still the banner, never the logging pages.
+    id: add-set-0-0
+- assertNotVisible:
+    id: swap-0-0
+- assertNotVisible:
+    id: more-0-0
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, unchecked'
+    enabled: false
 - tapOn:
-    id: coach-logging-back
+    id: tick-0-0-1
+- assertVisible:
+    id: tick-0-0-1
+    text: 'checkbox, unchecked'
+# Exercise info still opens.
+- assertVisible:
+    id: history-0-0
+- takeScreenshot: coach-logging-held
+# ---- The coach ticks set 2 (10 reps): it appears on the phone without any tap ----
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0-1
+      text: 'checkbox, checked'
+    timeout: 5000
+- assertVisible:
+    id: actual-reps-0-0-1
+    text: '10'
+- takeScreenshot: coach-logging-live-tick
+# Back to Today and in again: still read only, with the coach's set.
+- tapOn:
+    id: close-section
+- tapOn:
+    id: section-back
+- extendedWaitUntil:
+    visible:
+      id: overview-close
+    timeout: 10000
+- assertNotVisible:
+    id: finish-workout
+- assertNotVisible:
+    id: add-exercise
+- tapOn:
+    id: overview-close
 - extendedWaitUntil:
     visible: 'E2E Log'
     timeout: 20000
@@ -60,12 +111,16 @@ env:
     visible:
       id: coach-logging-banner
     timeout: 20000
+- tapOn:
+    id: start-workout
+- extendedWaitUntil:
+    visible:
+      id: tick-0-0-1
+      text: 'checkbox, checked'
+    timeout: 10000
 - assertNotVisible:
     id: page-done
-# ---- The coach logs set 2 (10 reps) and hands back: the phone resumes with the coach's set ----
-- runScript:
-    file: helpers/call.js
-    env: { ACTION: coach-log-set, EMAIL: '${EMAIL}' }
+# ---- The coach hands back: the phone logs again on the same page, with the coach's set ----
 - runScript:
     file: helpers/call.js
     env: { ACTION: coach-hand-back, EMAIL: '${EMAIL}' }
