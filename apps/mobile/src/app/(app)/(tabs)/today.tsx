@@ -7,6 +7,7 @@ import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
 import { Overline, Tile } from '@/components/today/parts';
+import { TodayFood } from '@/components/food/today-food';
 import { GoalCard, StickerAndPrs } from '@/components/today/progress-cards';
 import { CommunityCard, CoachRow } from '@/components/today/social-cards';
 import { TodayHeader } from '@/components/today/today-header';
@@ -354,7 +355,7 @@ export default function Today() {
             <CoachRow />
             <CommunityCard units={units} refreshKey={refreshKey} />
             <StickerAndPrs units={units} refreshKey={refreshKey} />
-            <GoalCard units={units} refreshKey={refreshKey} />
+            <GoalCard units={units} refreshKey={refreshKey} foodSlot={<TodayFood refreshKey={refreshKey} />} />
           </>
         ) : null}
       </View>

@@ -176,3 +176,17 @@ export function mealReference(meal: { name: string | null; eatenOn: IsoDate; eat
   const when = label === 'Today' ? 'today' : label === 'Yesterday' ? 'yesterday' : `on ${label}`;
   return `About your ${what} ${when} (${formatMealTime(meal.eatenAt, timeZone)}): `;
 }
+
+/**
+ * The Today tab's food line: today's calories and protein against their targets ("650 of 2,000 kcal",
+ * "42 of 150 g protein"), plain where a target is blank. Null with no targets and no meals (nothing to say).
+ */
+export function todayFoodSummary(totals: DailyTotals, targets: MacroTargets | null): { calories: string; protein: string } | null {
+  if (totals.mealCount === 0 && !hasAnyTarget(targets)) return null;
+  const of = (key: 'calories' | 'protein') => {
+    const target = targets?.[key] ?? null;
+    const unit = key === 'calories' ? '' : ' protein';
+    return target === null ? `${formatMacro(key, totals[key])}${unit}` : `${formatMacro(key, totals[key]).replace(/ (kcal|g)$/, '')} of ${formatMacro(key, target)}${unit}`;
+  };
+  return { calories: of('calories'), protein: of('protein') };
+}
