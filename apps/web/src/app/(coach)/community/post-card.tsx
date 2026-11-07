@@ -1,0 +1,182 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { COMMENT_BODY_MAX, cardText, likersLine, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
+import { CoachAvatar } from '@/components/coach-avatar';
+import { Chip, ErrorText } from '@/components/ui';
+import { addComment, deleteComment, deletePost, setLiked, setPinned, type CommunityOutcome } from './actions';
+import type { FeedPost } from './data';
+import styles from './community.module.css';
+
+/** Post text with http(s) links made clickable (opened in a new tab, without passing the page along). */
+export function LinkedText({ text }: { text: string }) {
+  return (
+    <>
+      {splitLinks(text).map((s, i) =>
+        s.kind === 'link' ? (
+          <a key={i} href={s.href} target="_blank" rel="noopener noreferrer nofollow">
+            {s.text}
+          </a>
+        ) : (
+          <span key={i}>{s.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function CardView({ card, units }: { card: CommunityCard; units: Units }) {
+  const t = cardText(card, units);
+  return (
+    <div className={styles.shareCard} data-testid="share-card">
+      {t.stickerKey ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/stickers/${t.stickerKey}-sm.webp`} alt="" width={72} height={72} className={t.shiny ? styles.shiny : undefined} />
+      ) : null}
+      <div className={styles.shareCardText}>
+        <p className={styles.shareBadge}>{t.badge}</p>
+        <p className={styles.shareTitle}>{t.title}</p>
+        {t.lines.map((l) => (
+          <p key={l} className={styles.caption}>
+            {l}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PostCard({ post, viewerId, units, now }: { post: FeedPost; viewerId: string; units: Units; now: number }) {
+  const [error, setError] = useState<string | null>(null);
+  const [comment, setComment] = useState('');
+  const [pending, startTransition] = useTransition();
+  const liked = post.likerIds.includes(viewerId);
+  const otherLikers = post.likerNames.filter((_, i) => post.likerIds[i] !== viewerId);
+
+  const run = (action: () => Promise<CommunityOutcome>, after?: () => void) =>
+    startTransition(async () => {
+      setError(null);
+      const r = await action();
+      if (!r.ok) setError(r.error);
+      else after?.();
+    });
+
+  return (
+    <article className={styles.post} id={`post-${post.id}`} aria-label={`Post by ${post.authorName}`} data-testid="community-post">
+      <header className={styles.postHeader}>
+        <CoachAvatar url={post.authorAvatarUrl} name={post.authorName} seed={post.authorId} />
+        <div className={styles.postWho}>
+          <p className={styles.postAuthor}>
+            {post.authorName} {post.authorIsCoach ? <Chip tone="lime">Coach</Chip> : null}
+            {post.pinnedAt ? <Chip tone="amber">Pinned</Chip> : null}
+          </p>
+          <p className={styles.caption}>
+            <time dateTime={post.createdAt}>{postAge(post.createdAt, now)}</time>
+          </p>
+        </div>
+        <div className={styles.postTools}>
+          <button type="button" className={styles.smallButton} disabled={pending} onClick={() => run(() => setPinned(post.id, !post.pinnedAt))}>
+            {post.pinnedAt ? 'Unpin' : 'Pin'}
+          </button>
+          <button
+            type="button"
+            className={styles.smallButton}
+            disabled={pending}
+            onClick={() => {
+              if (window.confirm('Delete this post for everyone?')) run(() => deletePost(post.id));
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </header>
+
+      {post.body ? (
+        <p className={styles.postBody}>
+          <LinkedText text={post.body} />
+        </p>
+      ) : null}
+      {post.card ? <CardView card={post.card} units={units} /> : null}
+      {post.images.length > 0 ? (
+        <ul className={styles.photoGrid} data-count={post.images.length} aria-label="Photos">
+          {post.images.map((img, i) => (
+            <li key={img.id}>
+              {img.fullUrl && img.thumbUrl ? (
+                <a href={img.fullUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open photo ${i + 1} full size`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.thumbUrl} alt={`Photo ${i + 1}`} loading="lazy" />
+                </a>
+              ) : (
+                <span className={styles.caption}>Photo unavailable</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className={styles.postFooter}>
+        <button
+          type="button"
+          className={styles.smallButton}
+          aria-pressed={liked}
+          disabled={pending}
+          onClick={() => run(() => setLiked(post.id, !liked))}
+        >
+          {liked ? '♥ Liked' : '♡ Like'}
+        </button>
+        <span className={styles.caption} data-testid="likers">
+          {likersLine(otherLikers, liked)}
+        </span>
+      </div>
+
+      {post.comments.length > 0 ? (
+        <ul className={styles.comments} aria-label="Comments">
+          {post.comments.map((c) => (
+            <li key={c.id} className={styles.comment}>
+              <p className={styles.commentBody}>
+                <strong>{c.authorName}</strong> <LinkedText text={c.body} />
+              </p>
+              <p className={styles.caption}>
+                <time dateTime={c.createdAt}>{postAge(c.createdAt, now)}</time>
+                {' · '}
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  disabled={pending}
+                  onClick={() => {
+                    if (window.confirm('Delete this comment?')) run(() => deleteComment(c.id));
+                  }}
+                >
+                  Delete comment
+                </button>
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <form
+        className={styles.commentForm}
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(() => addComment(post.id, comment), () => setComment(''));
+        }}
+      >
+        <label className={styles.commentLabel}>
+          <span className={styles.visuallyHidden}>Comment on {post.authorName}’s post</span>
+          <input
+            className={styles.commentInput}
+            value={comment}
+            maxLength={COMMENT_BODY_MAX}
+            placeholder="Write a comment…"
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </label>
+        <button type="submit" className={styles.smallButton} disabled={pending || !comment.trim()}>
+          Comment
+        </button>
+      </form>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+    </article>
+  );
+}

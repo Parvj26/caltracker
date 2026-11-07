@@ -418,6 +418,489 @@ export type Database = {
           },
         ]
       }
+      communities: {
+        Row: {
+          activity_at: string
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          activity_at?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          workspace_id: string
+        }
+        Update: {
+          activity_at?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communities_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          workspace_id: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id?: string
+          created_at?: string
+          workspace_id: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_blocks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_comments: {
+        Row: {
+          author_id: string
+          body: string
+          community_id: string
+          created_at: string
+          id: string
+          post_id: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id?: string
+          body: string
+          community_id: string
+          created_at?: string
+          id?: string
+          post_id: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          community_id?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_likes: {
+        Row: {
+          community_id: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          community_id: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          community_id?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_likes_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_likes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_members: {
+        Row: {
+          community_id: string
+          joined_at: string
+          removed_at: string | null
+          removed_by: string | null
+          role: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          community_id: string
+          joined_at?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          role: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          community_id?: string
+          joined_at?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          role?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_members_community_id_workspace_id_fkey"
+            columns: ["community_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "community_members_workspace_id_user_id_fkey"
+            columns: ["workspace_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_members"
+            referencedColumns: ["workspace_id", "user_id"]
+          },
+        ]
+      }
+      community_notifications: {
+        Row: {
+          actor_id: string | null
+          comment_id: string | null
+          community_id: string
+          created_at: string
+          id: string
+          kind: string
+          post_id: string | null
+          read_at: string | null
+          recipient_id: string
+          report_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          comment_id?: string | null
+          community_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          post_id?: string | null
+          read_at?: string | null
+          recipient_id: string
+          report_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          comment_id?: string | null
+          community_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          post_id?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          report_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_notifications_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_notifications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_notifications_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "community_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_post_images: {
+        Row: {
+          height: number
+          id: string
+          path: string
+          position: number
+          post_id: string
+          thumb_path: string
+          width: number
+          workspace_id: string
+        }
+        Insert: {
+          height: number
+          id?: string
+          path: string
+          position: number
+          post_id: string
+          thumb_path: string
+          width: number
+          workspace_id: string
+        }
+        Update: {
+          height?: number
+          id?: string
+          path?: string
+          position?: number
+          post_id?: string
+          thumb_path?: string
+          width?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_images_post_id_workspace_id_fkey"
+            columns: ["post_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          author_id: string
+          body: string
+          card: Json | null
+          community_id: string
+          created_at: string
+          id: string
+          image_count: number
+          pinned_at: string | null
+          pinned_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          author_id: string
+          body?: string
+          card?: Json | null
+          community_id: string
+          created_at?: string
+          id?: string
+          image_count?: number
+          pinned_at?: string | null
+          pinned_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          card?: Json | null
+          community_id?: string
+          created_at?: string
+          id?: string
+          image_count?: number
+          pinned_at?: string | null
+          pinned_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_community_id_workspace_id_fkey"
+            columns: ["community_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      community_reports: {
+        Row: {
+          comment_id: string | null
+          community_id: string
+          created_at: string
+          id: string
+          note: string
+          post_id: string | null
+          reason: string
+          reporter_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          target_author_id: string | null
+          target_body: string
+          target_image_count: number
+          target_kind: string
+          workspace_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          community_id: string
+          created_at?: string
+          id?: string
+          note?: string
+          post_id?: string | null
+          reason: string
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_author_id?: string | null
+          target_body?: string
+          target_image_count?: number
+          target_kind: string
+          workspace_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          community_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          post_id?: string | null
+          reason?: string
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_author_id?: string | null
+          target_body?: string
+          target_image_count?: number
+          target_kind?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_reports_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_reads: {
         Row: {
           conversation_id: string
@@ -1787,18 +2270,29 @@ export type Database = {
         Returns: string
       }
       award_inputs: { Args: { p_log_id: string }; Returns: Json }
+      build_community_card: {
+        Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
+        Returns: Json
+      }
       can_access_message_image: {
         Args: { p_name: string; p_write: boolean }
+        Returns: boolean
+      }
+      can_block_in_community: {
+        Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean
       }
       can_post_to_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      can_read_community_image: { Args: { p_name: string }; Returns: boolean }
       can_read_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      can_upload_community_image: { Args: { p_name: string }; Returns: boolean }
+      can_view_community: { Args: { p_community_id: string }; Returns: boolean }
       claim_invites: {
         Args: never
         Returns: {
@@ -1864,6 +2358,16 @@ export type Database = {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
       }
+      create_community_post: {
+        Args: {
+          p_body: string
+          p_card?: Json
+          p_community_id: string
+          p_id: string
+          p_images?: Json
+        }
+        Returns: string
+      }
       document_path_client: { Args: { name: string }; Returns: string }
       document_path_workspace: { Args: { name: string }; Returns: string }
       duplicate_program: {
@@ -1903,6 +2407,10 @@ export type Database = {
         Returns: string
       }
       hand_back_workout_log: { Args: { p_log_id: string }; Returns: Json }
+      has_blocked: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: boolean
+      }
       invite_for_join: {
         Args: { token: string }
         Returns: {
@@ -1968,6 +2476,7 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      mark_community_notifications_read: { Args: never; Returns: undefined }
       mark_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: undefined
@@ -2000,6 +2509,27 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      remove_community_member: {
+        Args: { p_community_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      report_community_content: {
+        Args: {
+          p_comment_id?: string
+          p_note?: string
+          p_post_id?: string
+          p_reason: string
+        }
+        Returns: string
+      }
+      resolve_community_report: {
+        Args: { p_report_id: string; p_resolution: string }
+        Returns: undefined
+      }
+      restore_community_member: {
+        Args: { p_community_id: string; p_user_id: string }
+        Returns: undefined
+      }
       save_body_measurement: { Args: { p: Json }; Returns: string }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
@@ -2016,6 +2546,10 @@ export type Database = {
           p_workout_id: string
         }
         Returns: string
+      }
+      set_community_post_pinned: {
+        Args: { p_pinned: boolean; p_post_id: string }
+        Returns: undefined
       }
       set_program_weeks: {
         Args: { p_program_id: string; p_weeks: number }

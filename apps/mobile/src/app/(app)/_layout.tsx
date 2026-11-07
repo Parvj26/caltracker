@@ -3,6 +3,7 @@ import { landingHref } from '@/lib/landing';
 import { useSession } from '@/lib/session';
 import { MessagesProvider } from '@/lib/use-messages';
 import { ActiveLogProvider } from '@/lib/use-active-log';
+import { CommunityProvider } from '@/lib/use-community';
 import { palette } from '@/theme/theme';
 
 /**
@@ -21,6 +22,7 @@ export default function AppLayout() {
   return (
     <ActiveLogProvider>
     <MessagesProvider>
+    <CommunityProvider>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
@@ -30,11 +32,16 @@ export default function AppLayout() {
         {/* The reveal replaces the logging screen and then the summary; no swipe back into either. */}
         <Stack.Screen name="log/[id]/reveal" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="log/[id]/summary" />
+        <Stack.Screen name="community/index" />
+        <Stack.Screen name="community/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="community/[id]" />
+        <Stack.Screen name="community/notifications" />
       </Stack.Protected>
       <Stack.Protected guard={!hasCoach} redirectTo={landing}>
         <Stack.Screen name="home" />
       </Stack.Protected>
     </Stack>
+    </CommunityProvider>
     </MessagesProvider>
     </ActiveLogProvider>
   );

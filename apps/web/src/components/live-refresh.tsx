@@ -7,7 +7,14 @@ import { createRefreshScheduler, rejoinDelayMs, type RefreshScheduler } from '@/
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
 /** Tables the coach's pages listen to (each must be in the supabase_realtime publication, see the migrations). */
-export type LiveTable = 'workout_logs' | 'awards';
+export type LiveTable =
+  | 'workout_logs'
+  | 'awards'
+  | 'communities'
+  | 'community_posts'
+  | 'community_comments'
+  | 'community_likes'
+  | 'community_reports';
 export type LiveSource = { table: LiveTable; filter: string };
 
 let channelCount = 0;
@@ -63,7 +70,8 @@ export function LiveRefresh({ on, renderedAt, maxWaitMs }: { on: LiveSource[]; r
     let channel = supabase.channel(`live:${channelCount}:${Math.random().toString(36).slice(2)}`);
     const onChange = () => scheduler.current?.change();
     for (const { table, filter } of sources) {
-      // No DELETE: the app never deletes logs from the phone (it discards them), and DELETE events skip filters.
+      // No DELETE: Realtime can't filter or check DELETE events. Deletes that matter (community posts, comments,
+      // likes) bump communities.activity_at instead, which arrives as a filtered UPDATE.
       channel = channel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter }, onChange)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter }, onChange);

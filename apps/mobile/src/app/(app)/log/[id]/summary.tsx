@@ -7,6 +7,7 @@ import { Sticker } from '@/components/stickers/sticker';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
+import { SHARE_NOT_READY, prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
 import { SAVE_MESSAGES, saveCardToPhotos } from '@/lib/save-image';
 import { prPills, summaryStickers } from '@/lib/awards-logic';
 import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
@@ -132,6 +133,10 @@ export default function SummaryScreen() {
 
   const lines = summaryLines(log, units);
   const changes = planChanges(log, (exerciseId) => names[exerciseId]?.name ?? null);
+  // What can be shared: the workout and, when it set any, its PRs. Both need the award on the server (the database
+  // builds the card from the log and its award), so until it arrives the buttons wait.
+  const workoutCard = workoutShareCard(log, award);
+  const prCard = prShareCard(log, award);
   const mayReopen = canReopen(log, Date.now());
 
   const ladder = award?.ladder ?? null;
@@ -227,6 +232,22 @@ export default function SummaryScreen() {
               subline={log.name}
             />
           </OffScreen>
+        </View>
+      ) : null}
+
+      {!workoutCard ? (
+        <Text style={text('caption')} testID="summary-share-waiting">
+          {SHARE_NOT_READY}
+        </Text>
+      ) : null}
+      {workoutCard || prCard ? (
+        <View style={{ gap: space[2] }}>
+          {workoutCard ? (
+            <Button variant="secondary" title="Share to community" testID="summary-share" onPress={() => router.push(shareHref(workoutCard))} />
+          ) : null}
+          {prCard ? (
+            <Button variant="secondary" title="Share your PRs" testID="summary-share-prs" onPress={() => router.push(shareHref(prCard))} />
+          ) : null}
         </View>
       ) : null}
 

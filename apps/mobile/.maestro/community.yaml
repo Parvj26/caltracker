@@ -1,0 +1,126 @@
+# Community tab (spec §7): a coach post arrives with a notification badge, the client likes and comments, posts,
+# reports, blocks another client, and deletes their own post. Run via `pnpm --filter mobile e2e` (needs a dev build
+# with expo-image-picker; the photo picker itself is not driven here).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-cleanup, EMAIL: '-' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-buddy-post, EMAIL: 'E2E Buddy says hi' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-coach-post, EMAIL: 'E2E Welcome to the group! https://caltracker.app' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible:
+      id: tab-coach
+    timeout: 20000
+- tapOn:
+    id: tab-coach
+- tapOn:
+    id: open-community
+- extendedWaitUntil:
+    visible: 'E2E Welcome to the group!.*'
+    timeout: 15000
+- assertVisible: 'Demo Coach · Coach'
+- assertVisible: 'E2E Buddy says hi'
+
+# The coach's post shows in the notifications list (and the bell shows it as new).
+- assertVisible:
+    id: community-notifications
+    text: 'Notifications, .* new'
+- tapOn:
+    id: community-notifications
+- extendedWaitUntil:
+    # Unread rows read "New. …" to VoiceOver.
+    visible: '(New\. )?Demo Coach posted in the community'
+    timeout: 10000
+- tapOn:
+    id: notifications-back
+
+# Like the coach's post (the newest), then comment on it.
+- tapOn:
+    id: like-button
+    index: 0
+- extendedWaitUntil:
+    visible: 'You like this'
+    timeout: 10000
+- tapOn:
+    id: comments-button
+    index: 0
+- extendedWaitUntil:
+    visible: 'Comments'
+    timeout: 10000
+- tapOn:
+    id: comment-input
+- inputText: 'E2E Thanks coach!'
+- hideKeyboard
+- tapOn:
+    id: comment-send
+- extendedWaitUntil:
+    visible: 'E2E Thanks coach!'
+    timeout: 10000
+- tapOn:
+    id: post-back
+
+# Write a post.
+- tapOn:
+    id: community-new-post
+- tapOn:
+    id: new-post-body
+- inputText: 'E2E Hello from Maestro'
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
+- tapOn:
+    point: '85%,12%'
+- tapOn:
+    id: new-post-submit
+- extendedWaitUntil:
+    visible: 'E2E Hello from Maestro'
+    timeout: 15000
+
+# Report the buddy's post (newest first: my post, the coach's, the buddy's), then block them: their post disappears.
+- scrollUntilVisible:
+    element: 'E2E Buddy says hi'
+- tapOn:
+    id: post-menu
+    index: 2
+- tapOn:
+    id: menu-report
+- tapOn:
+    id: report-reason-spam
+- extendedWaitUntil:
+    visible: 'Thanks for telling us'
+    timeout: 10000
+- tapOn: 'Block Buddy Demo'
+- tapOn: 'Block'
+- extendedWaitUntil:
+    notVisible: 'E2E Buddy says hi'
+    timeout: 10000
+
+# Delete my own post (the newest).
+- scrollUntilVisible:
+    element: 'E2E Hello from Maestro'
+    direction: UP
+- tapOn:
+    id: post-menu
+    index: 0
+- tapOn:
+    id: menu-delete
+- tapOn: 'Delete'
+- extendedWaitUntil:
+    notVisible: 'E2E Hello from Maestro'
+    timeout: 10000
+
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: community-cleanup, EMAIL: '-' }

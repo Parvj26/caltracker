@@ -1,16 +1,17 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { dayLabel, thumbPathOf } from '@caltracker/shared';
+import { badgeLabel, dayLabel, thumbPathOf } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { Bubble } from '@/components/messages/bubble';
 import { Composer } from '@/components/messages/composer';
 import { useSignedUrls } from '@/components/messages/use-signed-urls';
 import { Button } from '@/components/ui';
 import { useCoachProfile } from '@/lib/use-coach-profile';
+import { useCommunity } from '@/lib/use-community';
 import { useMessages, type ThreadItem } from '@/lib/use-messages';
-import { palette, space } from '@/theme/theme';
+import { palette, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 type Row = { kind: 'day'; key: string; label: string } | { kind: 'message'; key: string; item: ThreadItem };
@@ -59,6 +60,10 @@ export default function CoachTab() {
     return out.reverse();
   }, [items, timeZone]);
 
+  // The community lives behind the Coach tab (the tab bar stays at five): a button with its unread count.
+  const router = useRouter();
+  const community = useCommunity();
+  const communityBadge = badgeLabel(community.unread);
   const header = (
     <View style={styles.header} accessibilityRole="header">
       <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={44} />
@@ -66,6 +71,22 @@ export default function CoachTab() {
         <Text style={text('sectionHeading')} testID="coach-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
         {coach?.businessName ? <Text style={text('caption')} numberOfLines={1}>{coach.businessName}</Text> : null}
       </View>
+      {community.community ? (
+        <Pressable
+          testID="open-community"
+          accessibilityRole="button"
+          accessibilityLabel={communityBadge ? `Community, ${communityBadge} new` : 'Community'}
+          onPress={() => router.push('/community')}
+          style={({ pressed }) => [styles.communityButton, pressed && styles.pressed]}
+        >
+          <Text style={text('sectionHeading')}>Community</Text>
+          {communityBadge ? (
+            <View style={styles.communityBadge}>
+              <Text style={[text('caption'), styles.communityBadgeText]}>{communityBadge}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -157,4 +178,17 @@ const styles = StyleSheet.create({
   banner: { padding: space[3], gap: space[2], backgroundColor: palette.celebrateBg },
   viewer: { flex: 1, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
+  communityButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    paddingHorizontal: space[3],
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: palette.ink,
+  },
+  pressed: { opacity: 0.75 },
+  communityBadge: { minWidth: 20, paddingHorizontal: space[1], borderRadius: radius.pill, alignItems: 'center', backgroundColor: palette.magenta },
+  communityBadgeText: { color: white },
 });

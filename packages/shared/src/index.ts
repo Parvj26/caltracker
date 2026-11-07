@@ -366,3 +366,38 @@ export {
 export type { TextCheck } from './clients/records';
 export { OVERVIEW_METRICS, OVERVIEW_PERIODS, OVERVIEW_PERIOD_LABELS, bodyOverview, formatMetricChange } from './body/overview';
 export type { MetricOverview, OverviewMetric, OverviewPeriod, OverviewScan } from './body/overview';
+export {
+  COMMENT_BODY_MAX,
+  CardPr,
+  CardRequest,
+  CommentInput,
+  CommunityCard,
+  MAX_POST_PHOTOS,
+  POST_BODY_MAX,
+  PostInput,
+  REPORT_NOTE_MAX,
+  REPORT_REASONS,
+  REPORT_REASON_LABELS,
+  ReportInput,
+  parseCard,
+  parseCardRequest,
+} from './community/schema';
+export type { ReportReason } from './community/schema';
+export { cardRequestLabel, cardText, prLine } from './community/cards';
+export type { CardText } from './community/cards';
+export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
+export type { FeedPostLike, Viewer } from './community/feed';
+export { groupedLikeText, likersLine } from './community/likes';
+export { badgeLabel, groupNotifications, notificationText, unreadNotificationCount } from './community/notifications';
+export type { NotificationItem, NotificationKind, NotificationRow } from './community/notifications';
+export { firstYoutubeId, splitLinks } from './community/links';
+export type { TextSegment } from './community/links';
+export {
+  COMMUNITY_BUCKET,
+  COMMUNITY_PHOTO_MAX_EDGE,
+  COMMUNITY_THUMB_MAX_EDGE,
+  communityPhotoPaths,
+  contentTypeFor,
+  fitLongEdge,
+} from './community/photos';
+export type { CommunityPhotoExt } from './community/photos';
