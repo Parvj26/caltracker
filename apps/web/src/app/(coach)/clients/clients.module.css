@@ -270,7 +270,7 @@
 /* ---------- Clients table (ARIA table laid out as grid rows) ---------- */
 .tableWrap { container-type: inline-size; }
 .table {
-  border: var(--ct-border-width-secondary-button) solid var(--ct-border);
+  border: var(--ct-border-width-card) solid var(--ct-border);
   border-radius: var(--ct-radius-card);
   overflow: hidden;
 }
