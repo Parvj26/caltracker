@@ -3,10 +3,11 @@
 --     the coach saves anything; a finish, another client, another workspace's coach can't use it;
 --   * a coach can't start a session for a later day's workout; the client's phone still can.
 begin;
-select plan(27);
+select plan(38);
 
 select tests.create_user('cp-coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('cp-staff-a@t.local', 'Staff A') as staff_a \gset
+select tests.create_user('cp-staff-c@t.local', 'Staff C') as staff_c \gset
 select tests.create_user('cp-a1@t.local', 'Client A1') as a1 \gset
 select tests.create_user('cp-a2@t.local', 'Client A2') as a2 \gset
 select tests.create_user('cp-coach-b@t.local', 'Coach B') as coach_b \gset
@@ -14,7 +15,7 @@ select tests.create_workspace('CP Workspace A', :'coach_a') as ws_a \gset
 select tests.create_workspace('CP Workspace B', :'coach_b') as ws_b \gset
 select tests.add_client(:'ws_a', :'a1');
 select tests.add_client(:'ws_a', :'a2');
-insert into public.workspace_members (workspace_id, user_id, role) values (:'ws_a', :'staff_a', 'staff');
+insert into public.workspace_members (workspace_id, user_id, role) values (:'ws_a', :'staff_a', 'staff'), (:'ws_a', :'staff_c', 'staff');
 
 select tests.create_exercise(null, 'CP Builtin') as ex \gset
 select tests.create_workout(:'ws_a', 'A1 Today', :'a1', current_date, :'ex') as w_today \gset
@@ -149,6 +150,36 @@ select tests.act_as(:'a2');
 select is(public.save_workout_log(tests.cp_doc(:'l2', :'w_later', 'in_progress', 2, true, 9)),
   '{"applied": true, "revision": 1001, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the client''s final save is applied after the second take over');
+
+-- ---------------------------------------------------------------------------------------------
+-- Hand back and reclaim close the window: coach A saves, B takes over (window: A), B hands back, the client ticks
+-- offline, then C takes over. The window is the client's again, so their final save applies.
+select tests.act_as(:'staff_a');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l3'), 'coach B takes over A''s saved session');
+reset role;
+select is((select taken_over_from from public.workout_logs where id = :'l3'), :'coach_a'::uuid, 'the window is A''s');
+select tests.act_as(:'staff_a');
+select is(public.hand_back_workout_log(:'l3')->>'revision', '1001', 'coach B hands it back to the client');
+reset role;
+select is((select taken_over_from from public.workout_logs where id = :'l3'), null::uuid, 'the hand back closes the window');
+select tests.act_as(:'staff_c');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l3'), 'coach C takes over before the phone uploaded');
+reset role;
+select is((select taken_over_from from public.workout_logs where id = :'l3'), :'a1'::uuid, 'the new window is the client''s');
+select tests.act_as(:'a1');
+select is(public.save_workout_log(tests.cp_doc(:'l3', :'w_missed', 'in_progress', 1002, true, 11)),
+  '{"applied": true, "revision": 2001, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the client''s offline sets get their final save');
+select is((select actual_reps from public.log_sets where log_id = :'l3'), 11::smallint, 'and are kept');
+-- Reclaim closes it too.
+select tests.act_as(:'coach_a');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l3'), 'coach A takes it from coach C');
+reset role;
+update public.workout_logs set last_activity_at = now() - interval '30 minutes' where id = :'l3';
+select tests.act_as(:'a1');
+select lives_ok(format('select public.reclaim_workout_log(%L)', :'l3'), 'the client takes it back after 20 minutes');
+reset role;
+select is((select taken_over_from from public.workout_logs where id = :'l3'), null::uuid, 'the reclaim closes the window');
 
 select * from finish();
 rollback;

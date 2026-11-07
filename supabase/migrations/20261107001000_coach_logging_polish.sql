@@ -464,3 +464,69 @@ begin
   return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
 end;
 $$;
+
+-- hand_back_workout_log and reclaim_workout_log (from 20261106012000), now also closing any final-save window: the
+-- client holds the log again, so a later take over must open a new window for the client, not reuse an old holder's
+-- (take_over_workout_log keeps taken_over_from while it is set).
+create or replace function public.hand_back_workout_log(p_log_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_uid uuid := auth.uid();
+  v_log public.workout_logs%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'Sign in to log a workout.' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('save_workout_log:' || p_log_id::text, 0));
+  select * into v_log from public.workout_logs l where l.id = p_log_id for update;
+  if not found or not public.is_coach_of(v_log.workspace_id) or v_log.logged_by is distinct from v_uid then
+    raise exception 'Only the coach logging this workout can hand it back.' using errcode = '42501';
+  end if;
+  if not public.is_client_in(v_log.workspace_id, v_log.client_id) then
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
+  end if;
+  if v_log.status <> 'in_progress' then
+    raise exception 'This workout is not in progress any more.' using errcode = '23514';
+  end if;
+  update public.workout_logs l set logged_by = l.client_id, revision = l.revision + 1000, last_activity_at = now(),
+    taken_over_from = null
+  where l.id = p_log_id;
+  return jsonb_build_object('revision', v_log.revision + 1000, 'status', v_log.status);
+end;
+$$;
+
+create or replace function public.reclaim_workout_log(p_log_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_uid uuid := auth.uid();
+  v_log public.workout_logs%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'Sign in to log a workout.' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('save_workout_log:' || p_log_id::text, 0));
+  select * into v_log from public.workout_logs l where l.id = p_log_id for update;
+  if not found or v_log.client_id <> v_uid then
+    raise exception 'This workout belongs to someone else.' using errcode = '42501';
+  end if;
+  if not public.is_client_in(v_log.workspace_id, v_uid) then
+    raise exception 'Only a current client of this coach can save workouts.'
+      using errcode = '42501', hint = 'not_a_client';
+  end if;
+  if v_log.status <> 'in_progress' then
+    raise exception 'This workout is not in progress any more.' using errcode = '23514';
+  end if;
+  if coalesce(v_log.logged_by, v_uid) = v_uid then
+    return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
+  end if;
+  if v_log.last_activity_at >= now() - private.reclaim_after() and exists (select 1 from public.workspace_members m
+      where m.workspace_id = v_log.workspace_id and m.user_id = v_log.logged_by and m.role in ('owner', 'staff')) then
+    raise exception 'Your coach is still logging this workout.' using errcode = '55000';
+  end if;
+  update public.workout_logs l set logged_by = v_uid, revision = l.revision + 1000, last_activity_at = now(),
+    taken_over_from = null
+  where l.id = p_log_id;
+  return jsonb_build_object('revision', v_log.revision + 1000, 'status', v_log.status);
+end;
+$$;
