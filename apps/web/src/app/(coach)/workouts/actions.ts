@@ -10,6 +10,8 @@ export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
 
 const GENERIC_ERROR = "Couldn't save. Please try again.";
+const ALREADY_DONE =
+  "This workout is already done, so its plan stays as it was (the log was done against it). Open its log to edit the results.";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
@@ -27,6 +29,19 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   }
 
   const supabase = await createServerSupabase();
+  // A client's workout that has a completed log keeps its plan, so planned vs. actual on the log still matches what
+  // the client was given. Any other one saves on any day, a missed past one included. (Library workouts never have
+  // logs.)
+  const done = await supabase
+    .from('workout_logs')
+    .select('id')
+    .eq('workout_id', parsed.data.id)
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'completed')
+    .limit(1);
+  if (done.error) return { ok: false, error: GENERIC_ERROR };
+  if (done.data.length > 0) return { ok: false, error: ALREADY_DONE };
+
   const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: parsed.data });
   if (error) {
     // 23514: a document guard in save_workout; its message is written for the coach.

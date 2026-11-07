@@ -1,5 +1,5 @@
-# Deleting a set while logging (in Edit sets), two ways: the set's ⋯ button then Remove set, and swiping the row left then Delete.
-# "E2E Log" starts with 3 sets of Barbell Squat.
+# Changing the sets while logging ("E2E Log", 3 sets of Barbell Squat): swipe a row left and tap Delete, + Add set,
+# and the ••• menu's Add a drop set, whose D tag explains itself.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -11,54 +11,60 @@ env:
     env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
-    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
     permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
-- extendedWaitUntil:
-    visible: 'E2E Log'
-    timeout: 20000
-- tapOn: 'Start'
-- extendedWaitUntil:
-    visible:
-      id: edit-sets-0
-    timeout: 20000
-# The set rows live in Edit sets.
-- tapOn:
-    id: edit-sets-0
-- extendedWaitUntil:
-    visible:
-      id: set-0-2
-    timeout: 10000
-# ⋯ button, then Remove set: three sets become two.
-- tapOn:
-    id: set-more-0-1
-- tapOn:
-    id: menu-remove-set
-- assertNotVisible:
-    id: set-0-2
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
 - assertVisible:
-    id: set-0-1
-# Let the menu finish closing over the sheet first.
-- waitForAnimationToEnd
-# Swipe the second row left, tap its Delete: one set left.
-# Start on the row's caption line in the Edit sets sheet, clear of the value boxes and the tick button.
+    id: set-0-0-2
+# Swipe the second row left (from its middle), then Delete: three sets become two.
 - swipe:
-    start: 62%,39%
-    end: 15%,39%
-- assertVisible:
-    id: set-delete-0-1
-- waitForAnimationToEnd
+    from:
+      id: set-0-0-1
+    direction: LEFT
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: set-delete-0-0-1
+    timeout: 5000
 - takeScreenshot: swipe-delete
 - tapOn:
-    id: set-delete-0-1
-- assertNotVisible:
-    id: set-0-1
+    id: set-delete-0-0-1
+- extendedWaitUntil:
+    notVisible:
+      id: set-0-0-2
+    timeout: 5000
 - assertVisible:
-    id: set-0-0
+    id: set-0-0-1
+# + Add set: three again.
 - tapOn:
-    id: edit-sets-close
+    id: add-set-0-0
+- extendedWaitUntil:
+    visible:
+      id: set-0-0-2
+    timeout: 5000
+# ••• → Add a drop set: a D row after the last set.
+- tapOn:
+    id: more-0-0
+- tapOn:
+    id: menu-add-drop
+- extendedWaitUntil:
+    visible:
+      id: tag-0-0-3
+      text: '.*What does D mean.*'
+    timeout: 5000
+- tapOn:
+    id: tag-0-0-3
+- extendedWaitUntil:
+    visible:
+      id: tag-info
+    timeout: 5000
+- assertVisible: 'D · Drop set'
+- tapOn:
+    id: tag-info-ok
 # Tidy up.
 - runScript:
     file: helpers/call.js

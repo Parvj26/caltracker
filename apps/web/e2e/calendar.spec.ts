@@ -243,10 +243,10 @@ test("editing the library workout leaves the client's copy alone, and the other 
   await page.goto(`/workouts/${library!.id}`);
   await expect(weight(page)).toHaveValue('100');
 
-  // The back link returns to the calendar.
+  // The back link returns to the calendar, around the workout's day.
   await page.goBack();
   await page.getByRole('link', { name: `${meName}'s calendar` }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${me}/training\\?month=${monthOf(monday)}$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${me}/training\\?from=${monday}$`));
 });
 
 /** Drag with real pointer events: press, move in 10 steps (past the 4 px activation distance), release. */
@@ -643,7 +643,7 @@ test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigne
   expect(data).toEqual([{ start_date: addDays(today, -3) }]);
 });
 
-test('a missed past workout can be deleted or moved to another day, but not edited or dragged', async ({ page }) => {
+test('a missed past workout can be edited, moved to another day or deleted, but not dragged', async ({ page }) => {
   const workout = `Missed ${unique()}`;
   created.workouts.push(workout);
   await signInAsCoach(page);
@@ -662,10 +662,9 @@ test('a missed past workout can be deleted or moved to another day, but not edit
   await expect(item(page, pastDate, workout)).toHaveCount(0);
   await cell.getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
   const menu = cell.getByRole('menu', { name: `Options for ${workout}` });
-  await expect(menu.getByRole('menuitem')).toHaveText(['Move to another day', 'Delete']);
-  await expect(menu.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Edit', 'Move to another day', 'Delete']);
   await expect(menu.getByRole('menuitem', { name: 'View log' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Move to another day' })).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeFocused();
 
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   const confirm = page.getByRole('dialog', { name: `Delete ${workout}?` });
@@ -858,11 +857,11 @@ test('a missed workout is rescheduled with "Move to another day"; a done one off
     await expect(item(page, target, missed)).toBeVisible();
     await expect(day(page, target).getByRole('listitem').filter({ hasText: missed }).getByText('Missed')).toHaveCount(0);
 
-    // The done one: View log first, then Delete; no move or edit.
+    // The done one: View log, Edit results (its logged numbers), Delete; no move, and no editing its plan.
     await page.goto(calendarUrl(monthOf(pastDate)));
     await day(page, pastDate).getByRole('button', { name: `Options for ${done}`, exact: true }).click();
     const menu = day(page, pastDate).getByRole('menu', { name: `Options for ${done}` });
-    await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Delete']);
+    await expect(menu.getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Delete']);
     await menu.getByRole('menuitem', { name: 'View log' }).click();
     await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/logs/${logId}$`));
   } finally {
@@ -884,10 +883,11 @@ test('a done workout on today or later has no Move and is not draggable; the ser
     await page.goto(calendarUrl(monthOf(today), me));
     const cell = day(page, today);
     await expect(cell.getByRole('link', { name: `Done: view the ${name} log` })).toBeVisible();
-    // The name is plain text (nothing to drag), and the menu offers View log, Edit and Delete but no Move.
+    // The name is plain text (nothing to drag), and the menu offers View log, Edit results and Delete: no Move, and
+    // its plan isn't edited (the log was done against it).
     await expect(item(page, today, name)).toHaveCount(0);
     await cell.getByRole('button', { name: `Options for ${name}`, exact: true }).click();
-    await expect(cell.getByRole('menu', { name: `Options for ${name}` }).getByRole('menuitem')).toHaveText(['View log', 'Edit', 'Delete']);
+    await expect(cell.getByRole('menu', { name: `Options for ${name}` }).getByRole('menuitem')).toHaveText(['View log', 'Edit results', 'Delete']);
   } finally {
     await admin.from('workout_logs').delete().eq('id', logId);
   }
@@ -908,4 +908,22 @@ test('a month with only workouts the client added is not shown as an empty calen
   } finally {
     await admin.from('workout_logs').delete().eq('id', logId);
   }
+});
+
+test('clicking anywhere on a calendar card opens the workout; dragging it does not', async ({ page }) => {
+  const workout = `Clickable ${unique()}`;
+  created.workouts.push(workout);
+  await signInAsCoach(page);
+  await createWorkout(page, workout);
+  const month = nextMonth(monthOf(await browserToday(page)));
+  const date = `${month}-12`;
+  await page.goto(calendarUrl(month));
+  await addFromLibrary(page, date, workout);
+  await page.reload();
+  await expect(item(page, date, workout)).toHaveCount(1);
+  const card = day(page, date).getByRole('listitem').filter({ hasText: workout });
+  // Click the card's empty lower part, away from the name and the "⋯" menu.
+  const box = (await card.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 6);
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/[0-9a-f-]{36}$`));
 });

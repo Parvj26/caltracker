@@ -68,6 +68,17 @@ export {
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
 export {
+  CALENDAR_VIEWS,
+  DEFAULT_CALENDAR_VIEW,
+  calendarRange,
+  coveringRange,
+  isCalendarView,
+  shiftMonth,
+  stepCalendar,
+  switchAnchor,
+} from './dates/calendar-range';
+export type { CalendarRange, CalendarView } from './dates/calendar-range';
+export {
   BLOCK_KINDS,
   SET_TYPES,
   WorkoutBlockDoc,
@@ -86,6 +97,8 @@ export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow, WorkoutTreeSubstituteRow } from './workouts/tree';
 export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
+export { workoutPreview } from './workouts/preview';
+export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
   addExerciseToSuperset,
@@ -171,6 +184,7 @@ export {
   reopenLog,
   removeLogSet,
   setExerciseNote,
+  setLogNotes,
   stepActual,
   swapLogExercise,
   toggleSet,
@@ -178,6 +192,8 @@ export {
   updateActual,
 } from './logs/ops';
 export type { ActualPatch } from './logs/ops';
+export { FEELINGS, LOG_NOTES_MAX, composeFinishNotes, readFinishNotes } from './logs/finish-note';
+export type { Feeling } from './logs/finish-note';
 export {
   coachLine,
   formatLastResult,

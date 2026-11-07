@@ -15,6 +15,7 @@ function query(table: string): unknown {
     eq: (col: string, v: unknown) => ((call.filters[col] = v), builder),
     is: (col: string, v: unknown) => ((call.filters[col] = v), builder),
     maybeSingle: () => builder,
+    limit: () => builder,
     then: (ok: (r: unknown) => unknown, fail: (e: unknown) => unknown) => {
       calls.push(call);
       return Promise.resolve({ data: null, error: null, ...respond(call) }).then(ok, fail);
@@ -34,7 +35,7 @@ vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => Promise.re
 const loadWorkoutDoc = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock('@/lib/workouts', () => ({ loadWorkoutDoc: (...args: unknown[]) => loadWorkoutDoc(...args) }));
 
-import { duplicateWorkout, setFavourite } from './actions';
+import { duplicateWorkout, saveWorkout, setFavourite } from './actions';
 
 const COACH = '00000000-0000-4000-8000-0000000000c1';
 const WS = '00000000-0000-4000-8000-000000000001';
@@ -60,36 +61,36 @@ describe('setFavourite', () => {
   });
 });
 
-describe('duplicateWorkout', () => {
-  const WORKOUT = '00000000-0000-4000-8000-0000000000a1';
-  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-  const doc = {
-    id: WORKOUT,
-    name: 'Upper A',
-    notes: null,
-    sections: [],
-    blocks: [
-      {
-        id: id(2),
-        sectionId: null,
-        kind: 'straight',
-        exercises: [
-          {
-            id: id(3),
-            exerciseId: EXERCISE,
-            exerciseName: 'Squat',
-            trackingType: 'weight_reps',
-            note: null,
-            sets: [
-              { id: id(4), setType: 'normal', targetRepsMin: 5, targetRepsMax: 5, targetWeightKg: 100, targetDurationS: null, targetDistanceM: null, toFailure: false, restSeconds: 120, note: null },
-            ],
-            substitutes: [],
-          },
-        ],
-      },
-    ],
-  };
+const WORKOUT = '00000000-0000-4000-8000-0000000000a1';
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const doc = {
+  id: WORKOUT,
+  name: 'Upper A',
+  notes: null,
+  sections: [],
+  blocks: [
+    {
+      id: id(2),
+      sectionId: null,
+      kind: 'straight',
+      exercises: [
+        {
+          id: id(3),
+          exerciseId: EXERCISE,
+          exerciseName: 'Squat',
+          trackingType: 'weight_reps',
+          note: null,
+          sets: [
+            { id: id(4), setType: 'normal', targetRepsMin: 5, targetRepsMax: 5, targetWeightKg: 100, targetDurationS: null, targetDistanceM: null, toFailure: false, restSeconds: 120, note: null },
+          ],
+          substitutes: [],
+        },
+      ],
+    },
+  ],
+};
 
+describe('duplicateWorkout', () => {
   it('copies a library workout of this workspace through save_workout, as a new "<name> (copy)"', async () => {
     respond = (call) => (call.op === 'rpc' ? { data: 'new-id' } : { data: { id: WORKOUT } });
     loadWorkoutDoc.mockResolvedValue({ doc, clientId: null, scheduledOn: null });
@@ -114,5 +115,43 @@ describe('duplicateWorkout', () => {
   it('refuses an id that is not a uuid', async () => {
     expect((await duplicateWorkout('nope')).ok).toBe(false);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('saveWorkout', () => {
+  it('saves a client workout that has no completed log, on any day', async () => {
+    respond = (call) => (call.op === 'rpc' ? { data: WORKOUT } : { data: [] });
+    expect(await saveWorkout(doc)).toEqual({ ok: true, id: WORKOUT });
+    expect(calls[0]).toMatchObject({ table: 'workout_logs', filters: { workout_id: WORKOUT, workspace_id: WS, status: 'completed' } });
+    expect(calls.some((c) => c.rpc === 'save_workout')).toBe(true);
+  });
+
+  it('saves a workout whose only logs are in progress or discarded', async () => {
+    // The workout's logs as the database holds them; the query asks only for completed ones.
+    const logs = [{ id: 'l1', status: 'in_progress' }, { id: 'l2', status: 'discarded' }];
+    respond = (call) =>
+      call.op === 'rpc' ? { data: WORKOUT } : { data: logs.filter((l) => l.status === call.filters.status).map(({ id }) => ({ id })) };
+    expect(await saveWorkout(doc)).toEqual({ ok: true, id: WORKOUT });
+    expect(calls.some((c) => c.rpc === 'save_workout')).toBe(true);
+  });
+
+  it("passes on the database's own refusal (a log finished between the check and the save)", async () => {
+    const refusal = "This workout is already done, so its plan can't change. Edit the logged results instead.";
+    respond = (call) => (call.op === 'rpc' ? { data: null, error: { code: '23514', message: refusal } } : { data: [] });
+    expect(await saveWorkout(doc)).toEqual({ ok: false, error: refusal });
+  });
+
+  it("refuses a workout the client has finished, so the log's plan stays as it was", async () => {
+    respond = (call) => (call.table === 'workout_logs' ? { data: [{ id: 'log' }] } : { data: WORKOUT });
+    const outcome = await saveWorkout(doc);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok ? '' : outcome.error).toMatch(/already done/);
+    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  });
+
+  it('refuses when the check fails, without saving', async () => {
+    respond = (call) => (call.table === 'workout_logs' ? { data: null, error: { message: 'boom' } } : { data: WORKOUT });
+    expect((await saveWorkout(doc)).ok).toBe(false);
+    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
   });
 });

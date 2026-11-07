@@ -1875,6 +1875,7 @@ export type Database = {
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
       workout_content_hash: { Args: { p_workout: string }; Returns: string }
+      workout_is_done: { Args: { p_workout_id: string }; Returns: boolean }
     }
     Enums: {
       block_kind: "straight" | "superset" | "choice"

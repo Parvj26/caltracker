@@ -1,8 +1,10 @@
-# The one-exercise-at-a-time logging screen on a mixed workout ("E2E Mixed"):
-#   page 1 Barbell Squat: a warm-up (20 kg × 10) then 2 × 8 @ 60 kg; + on the weight carries to the next set;
-#   page 2 superset Pullups (A1, no rest) + Pushups (A2, 1:00 rest);
-#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second with drops of 7.5 kg and 5 kg.
-# Done's label says what comes next; the rest panel shows after Done and is skipped; finishing pages auto-advance.
+# The section pages on a mixed workout ("E2E Mixed", no sections, so one section named after the workout):
+#   page 1 Barbell Squat: a warm-up row (W, 20 kg × 10) then 2 × 8 @ 60 kg;
+#   page 2 superset Pullups (A1) + Pushups (A2), 2 rounds, scrolled round by round;
+#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (F).
+# A weight typed on set 1 carries into set 2; a ticked set's numbers stay editable and it stays ticked; ✓ again
+# unticks; Mark all rounds; dots move between pages; the F tag explains itself; Done on the last page
+# opens the finish sheet, which says what isn't ticked; Keep going returns to the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -14,166 +16,163 @@ env:
     env: { ACTION: assign-today-mixed, EMAIL: '${EMAIL}' }
 - launchApp:
     clearState: true
-    # Granted up front: tapping the system's Allow could land on the page underneath as the alert closes.
     permissions: { notifications: allow }
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
-- extendedWaitUntil:
-    visible: 'E2E Mixed'
-    timeout: 20000
-- tapOn: 'Start'
-- extendedWaitUntil:
-    visible:
-      id: done-0
-    timeout: 20000
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Mixed' }
 
-# ---- Page 1: warm-up, then a + that carries forward ----
+# ---- Page 1: warm-up row, a typed weight that carries forward, editing a ticked set ----
 - assertVisible:
-    id: log-pill
-    text: '.*1 of 3.*'
+    id: exercise-name-0
+    text: 'Barbell Squat'
 - assertVisible:
-    id: step-name-0
-    text: 'Warm-up 1 of 1'
-# 20 kg in this client's pounds.
+    id: tag-0-0-0
+    text: 'Warm-up 1. What does W mean.*'
+- tapOn:
+    id: tick-0-0-0
+# 20 kg in this client's pounds, saved from the pre-fill when ticked.
 - assertVisible:
-    id: stepper-weight-value-0
+    id: actual-weight-0-0-0
     text: '44'
-- assertVisible:
-    id: done-0
-    text: 'Done · start rest 1:00'
 - tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: rest-panel
-    timeout: 10000
+    id: actual-weight-0-0-1
+- waitForAnimationToEnd
+- inputText: '140'
 - tapOn:
-    id: rest-skip
-- assertVisible:
-    id: step-name-0
-    text: 'Set 1 of 2'
-- assertVisible:
-    id: stepper-weight-value-0
-    text: '132'
+    id: tick-0-0-1
 - tapOn:
-    id: stepper-weight-plus-0
+    id: tick-0-0-2
+# Set 2 took the 140 lb typed on set 1 (the coach planned the same weight for both).
 - assertVisible:
-    id: stepper-weight-value-0
-    text: '137'
-- takeScreenshot: log-set
-- tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: rest-panel
-    timeout: 10000
-- takeScreenshot: log-rest
-- tapOn:
-    id: rest-skip
-# Set 2 starts from what set 1 actually lifted.
+    id: actual-weight-0-0-2
+    text: '140'
 - assertVisible:
-    id: step-name-0
-    text: 'Set 2 of 2'
-- assertVisible:
-    id: stepper-weight-value-0
-    text: '137'
-# Other pages are still open, so the last set still rests; finishing the page moves on to the superset.
-- assertVisible:
-    id: done-0
-    text: 'Done · start rest 1:30'
+    id: actual-reps-0-0-2
+    text: '8'
+# Change a ticked set: it stays ticked with the new number.
 - tapOn:
-    id: done-0
-- extendedWaitUntil:
-    visible:
-      id: rest-panel
-    timeout: 10000
+    id: actual-reps-0-0-2
+- waitForAnimationToEnd
+- eraseText
+- inputText: '6'
+# Done typing (Enter ends editing; the simulator has no on-screen keypad, so its Done typing bar can't show).
+- pressKey: Enter
+- assertVisible:
+    id: actual-reps-0-0-2
+    text: '6'
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+# ✓ again unticks it; the typed 6 stays.
 - tapOn:
-    id: rest-skip
+    id: tick-0-0-2
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, unchecked'
+- tapOn:
+    id: tick-0-0-2
+- assertVisible:
+    id: tick-0-0-2
+    text: 'checkbox, checked'
+- takeScreenshot: flow-01-straight
+- tapOn:
+    id: page-done
 
-# ---- Page 2: superset ----
+# ---- Page 2: superset round by round ----
 - extendedWaitUntil:
     visible:
-      id: done-1
+      id: superset-heading-1
+      text: 'Superset 1 · Round 1 of 2'
     timeout: 10000
 - assertVisible:
-    id: log-pill
-    text: '.*2 of 3.*'
+    id: exercise-name-1-0
+    text: 'A1 · Pullups'
 - assertVisible:
-    id: superset-header-1
-    text: 'SUPERSET · Round 1 of 2.*'
-- assertVisible:
-    id: done-1
-    text: 'Done · straight to A2'
-- takeScreenshot: log-superset
+    id: round-rest-1-1
+    text: 'Rest 1:00 after the round'
 - tapOn:
-    id: done-1
-- assertNotVisible:
-    id: rest-panel
-- assertVisible:
-    id: done-1
-    text: 'Done round 1 · rest 1:00'
+    id: tick-1-0-0
 - tapOn:
-    id: done-1
+    id: tick-1-1-0
 - extendedWaitUntil:
     visible:
-      id: rest-panel
-    timeout: 10000
+      id: superset-heading-1
+      text: 'Superset 1 · Round 2 of 2'
+    timeout: 5000
+- runFlow:
+    file: helpers/mark-all.yaml
+    env: { PAGE: '1' }
+- assertVisible:
+    id: tick-1-1-1
+    text: 'checkbox, checked'
+- takeScreenshot: flow-02-superset
+# A dot jumps to its page, and back.
 - tapOn:
-    id: rest-skip
-# Round 2 can wait: swipe on to the curls.
-- swipe:
-    direction: LEFT
+    id: dot-0
 - extendedWaitUntil:
     visible:
-      id: done-2
-    timeout: 10000
-- assertVisible:
-    id: log-pill
-    text: '.*3 of 3.*'
+      id: exercise-name-0
+    timeout: 5000
+- tapOn:
+    id: dot-2
+- extendedWaitUntil:
+    visible:
+      id: exercise-name-2
+      text: 'Dumbbell Bicep Curl'
+    timeout: 5000
 
-# ---- Page 3: a set with drops ----
+# ---- Page 3: drops to failure ----
+- assertVisible:
+    id: tag-2-0-2
+    text: 'Drop set to failure. What does F mean.*'
 - tapOn:
-    id: done-2
+    id: tag-2-0-2
 - extendedWaitUntil:
     visible:
-      id: rest-panel
-    timeout: 10000
+      id: tag-info
+    timeout: 5000
+- assertVisible: 'F · To failure'
 - tapOn:
-    id: rest-skip
-- assertVisible:
-    id: done-2
-    text: 'Done · straight to drop 1'
+    id: tag-info-ok
 - tapOn:
-    id: done-2
-- assertNotVisible:
-    id: rest-panel
-- assertVisible:
-    id: step-name-2
-    text: 'Drop 1 of 2'
-# 7.5 kg in pounds.
-- assertVisible:
-    id: stepper-weight-value-2
-    text: '17'
-- takeScreenshot: log-drop
+    id: tick-2-0-0
 - tapOn:
-    id: add-drop-2
+    id: page-done
+# The last page of the last section: the finish sheet, which says what isn't ticked.
 - extendedWaitUntil:
     visible:
-      id: step-name-2
-      text: 'Drop 1 of 3'
+      id: finish-sheet
     timeout: 10000
-
-# ---- Finish with sets left: asked, then the sticker reveal and the summary ----
+- assertVisible:
+    id: finish-count
+    text: '8 of 11 sets done. 3 sets of Dumbbell Bicep Curl aren’t ticked; they’ll be saved as not done.'
 - tapOn:
-    id: finish-workout
+    id: finish-keep-going
 - extendedWaitUntil:
-    visible: 'Finish with .* sets not done\? They won’t count\.'
-    timeout: 10000
-- tapOn: 'Finish'
-- runFlow: helpers/reveal-through.yaml
+    visible:
+      id: exercise-name-2
+    timeout: 5000
+# Back to the superset by its dot (it is still scrolled to where Mark all rounds was).
+- tapOn:
+    id: dot-1
+- scrollUntilVisible:
+    element:
+      id: superset-heading-1
+    direction: UP
+- tapOn:
+    id: dot-2
 - extendedWaitUntil:
-    visible: '.* sets completed'
+    visible:
+      id: exercise-name-2
+    timeout: 5000
+- tapOn:
+    id: page-done
+- runFlow: helpers/finish-from-sheet.yaml
+- extendedWaitUntil:
+    visible: '8 sets completed'
     timeout: 10000
 - assertVisible: 'E2E Mixed'
 - tapOn:

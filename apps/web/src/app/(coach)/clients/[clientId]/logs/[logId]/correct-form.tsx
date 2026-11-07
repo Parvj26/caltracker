@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { liveExercises, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
@@ -20,18 +20,30 @@ export function CorrectForm({
   units,
   swappedFrom,
   canCorrect,
+  startEditing = false,
 }: {
   log: WorkoutLogDoc;
   units: Units;
   swappedFrom: Record<string, string>;
   canCorrect: boolean;
+  /** Open with the boxes showing ("Edit results" on the calendar, ?edit=1). */
+  startEditing?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState<Drafts>({});
+  const openAtOnce = startEditing && canCorrect;
+  const [editing, setEditing] = useState(openAtOnce);
+  const [drafts, setDrafts] = useState<Drafts>(() => (openAtOnce ? initialDrafts(log, units) : {}));
   // The boxes' text and the log's version when Correct was clicked. A live update can replace `log` while the coach
   // types; corrections are worked out against these, and saving waits until the coach has seen the newer numbers.
-  const [startDrafts, setStartDrafts] = useState<Drafts>({});
-  const [startVersion, setStartVersion] = useState<string | null>(null);
+  const [startDrafts, setStartDrafts] = useState<Drafts>(() => (openAtOnce ? initialDrafts(log, units) : {}));
+  const [startVersion, setStartVersion] = useState<string | null>(() => (openAtOnce ? logVersion(log) : null));
+  // Drop ?edit=1 once it has opened the boxes, so a reload shows the log as it is.
+  useEffect(() => {
+    if (!startEditing) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('edit')) return;
+    url.searchParams.delete('edit');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  }, [startEditing]);
   const clientUpdated = editing && startVersion !== null && startVersion !== logVersion(log);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);

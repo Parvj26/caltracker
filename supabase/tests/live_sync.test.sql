@@ -1,5 +1,5 @@
 begin;
-select plan(92);
+select plan(93);
 
 -- Live Sync runs at commit (a deferred trigger). A test never commits, so tests.flush() fires the queued syncs the
 -- way a commit would: switching the trigger to immediate runs everything queued so far.
@@ -165,7 +165,8 @@ select is((select count(*)::int from a1_days), 10, 'nothing else was added or re
 select (select block_id from a1_blocks where d = 9) as plain_block \gset
 select tests.act_as(:'coach_a');
 update public.workouts set notes = 'Heavier' where id = :'lib1';
-select tests.flush();
+-- A client's copy of lib1 is done; done plans are locked (23514), so the sync must leave it alone.
+select lives_ok('select tests.flush()', 'a library edit syncs while one client''s copy of it is done');
 reset role;
 select is((select notes from public.workouts where id = :'plain_copy'), 'Heavier', 'an untouched copy gets the library edit');
 select ok(not exists (select 1 from a1_blocks where block_id = :'plain_block') and exists (select 1 from a1_blocks where d = 9),
