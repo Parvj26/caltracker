@@ -111,7 +111,49 @@
 .postAuthor { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
 .postTools { display: flex; gap: var(--ct-space-2); }
 .postBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.postFooter { display: flex; align-items: center; gap: var(--ct-space-3); }
+.reactions { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.reactionBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.reactionChip {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  overflow: hidden;
+}
+.reactionChip[data-mine='true'] { background: var(--ct-pink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.reactionToggle, .reactionCount, .reactionAdd, .reactionChoice {
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.reactionToggle { font-size: var(--ct-size-body); padding: 0 var(--ct-space-1) 0 var(--ct-space-3); min-width: 0; }
+.reactionCount { font-weight: var(--ct-weight-section-heading); padding: 0 var(--ct-space-3) 0 var(--ct-space-1); min-width: 0; text-decoration: underline dotted; }
+.reactionAdd {
+  border-radius: var(--ct-radius-pill);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  font-weight: var(--ct-weight-section-heading);
+  padding: 0 var(--ct-space-3);
+}
+.reactionAdd:hover, .reactionToggle:hover, .reactionCount:hover { color: var(--ct-ink); background: var(--ct-surface); }
+.reactionChip[data-mine='true'] .reactionToggle:hover, .reactionChip[data-mine='true'] .reactionCount:hover { background: transparent; }
+.reactionPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  align-self: flex-start;
+}
+.reactionChoice { font-size: var(--ct-size-body); border-radius: var(--ct-radius-pill); }
+.reactionChoice:hover { background: var(--ct-bg); }
+.reactionChoice[aria-pressed='true'] { background: var(--ct-pink); }
 
 .photoStack { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 .photoLink { display: block; overflow: hidden; border-radius: var(--ct-radius-input); background: var(--ct-bg); }

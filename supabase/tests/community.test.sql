@@ -54,7 +54,7 @@ select is((select role from public.community_members where community_id = :'comm
   'the owner joins as coach');
 select ok((select bool_and(relrowsecurity) from pg_class where oid in (
   'public.communities'::regclass, 'public.community_members'::regclass, 'public.community_posts'::regclass,
-  'public.community_post_images'::regclass, 'public.community_comments'::regclass, 'public.community_likes'::regclass,
+  'public.community_post_images'::regclass, 'public.community_comments'::regclass, 'public.community_reactions'::regclass,
   'public.community_blocks'::regclass, 'public.community_reports'::regclass, 'public.community_notifications'::regclass)),
   'every community table has RLS on');
 select ok(not has_table_privilege('anon', 'public.community_posts', 'select,insert,update,delete')
@@ -186,8 +186,8 @@ select throws_ok(format($$select public.create_community_post(%L, %L, 'hi')$$, g
   'B1 cannot post into A''s community');
 select throws_ok(format($$insert into public.community_comments (post_id, body) values (%L, 'hi')$$, :'p1'), '42501', null,
   'B1 cannot comment on A''s post');
-select throws_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p1'), '42501', null,
-  'B1 cannot like A''s post');
+select throws_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'heart')$$, :'p1'), '42501', null,
+  'B1 cannot react to A''s post');
 select throws_ok(format($$select public.report_community_content('spam', %L)$$, :'p1'), '42501', null,
   'B1 cannot report A''s post');
 select throws_ok(format($$insert into public.community_blocks (workspace_id, blocked_id) values (%L, %L)$$, :'ws_a', :'a1'),
@@ -200,7 +200,7 @@ select is((select count(*)::int from public.community_posts where workspace_id =
 reset role;
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Comments, likes, and what a client may not do
+-- Comments, reactions, and what a client may not do
 -- ---------------------------------------------------------------------------------------------------------------
 select tests.act_as(:'a2');
 select is((select count(*)::int from public.community_posts where workspace_id = :'ws_a'), 6,
@@ -210,9 +210,9 @@ select lives_ok(format($$insert into public.community_comments (post_id, body) v
 select is((select author_id from public.community_comments where post_id = :'p1'), :'a2'::uuid, 'the comment is A2''s');
 select is((select workspace_id from public.community_comments where post_id = :'p1'), :'ws_a'::uuid,
   'the workspace comes from the post');
-select lives_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p1'), 'A2 likes A1''s post');
-select throws_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p1'), '23505', null,
-  'one like per person');
+select lives_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'heart')$$, :'p1'), 'A2 reacts to A1''s post');
+select throws_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'heart')$$, :'p1'), '23505', null,
+  'one of each reaction per person');
 with d as (delete from public.community_posts where id = :'p1' returning 1)
 select is((select count(*)::int from d), 0, 'A2 cannot delete A1''s post');
 select throws_ok(format($$select public.set_community_post_pinned(%L, true)$$, :'p1'), '42501', null, 'a client cannot pin');
@@ -224,16 +224,16 @@ select is((select count(*)::int from public.community_reports), 0, 'a client can
 reset role;
 
 select tests.act_as(:'a3');
-select lives_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p1'), 'A3 likes A1''s post');
+select lives_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'fire')$$, :'p1'), 'A3 reacts to A1''s post');
 with d as (delete from public.community_comments where post_id = :'p1' returning 1)
 select is((select count(*)::int from d), 0, 'A3 cannot delete A2''s comment');
-with d as (delete from public.community_likes where post_id = :'p1' and user_id = :'a2' returning 1)
-select is((select count(*)::int from d), 0, 'A3 cannot remove A2''s like');
+with d as (delete from public.community_reactions where post_id = :'p1' and user_id = :'a2' returning 1)
+select is((select count(*)::int from d), 0, 'A3 cannot remove A2''s reaction');
 reset role;
 
 select tests.act_as(:'a1');
-select is((select count(*)::int from public.community_notifications where kind = 'like' and post_id = :'p1'), 2,
-  'A1 is told about both likes');
+select is((select count(*)::int from public.community_notifications where kind = 'reaction' and post_id = :'p1'), 2,
+  'A1 is told about both reactions');
 select is((select count(*)::int from public.community_notifications where kind = 'comment' and post_id = :'p1'), 1,
   'A1 is told about the comment');
 select is((select count(*)::int from public.community_notifications where kind = 'coach_post'), 1,
@@ -241,11 +241,11 @@ select is((select count(*)::int from public.community_notifications where kind =
 reset role;
 
 select tests.act_as(:'a3');
-delete from public.community_likes where post_id = :'p1';
-select is((select count(*)::int from public.community_likes where post_id = :'p1'), 1, 'A3 takes back their like');
+delete from public.community_reactions where post_id = :'p1';
+select is((select count(*)::int from public.community_reactions where post_id = :'p1'), 1, 'A3 takes back their reaction');
 reset role;
-select is((select count(*)::int from public.community_notifications where kind = 'like' and post_id = :'p1'), 1,
-  'the like notification goes with it');
+select is((select count(*)::int from public.community_notifications where kind = 'reaction' and post_id = :'p1'), 1,
+  'the reaction notification goes with it');
 
 select tests.act_as(:'a2');
 select is((select count(*)::int from public.community_notifications where recipient_id = :'a1'), 0,
@@ -406,8 +406,8 @@ select is((select count(*)::int from public.community_posts), 0, 'A3 no longer s
 select is((select count(*)::int from public.community_notifications), 0, 'A3 no longer sees notifications');
 select throws_ok(format($$select public.create_community_post(%L, %L, 'still here?')$$, gen_random_uuid(), :'comm_a'),
   '42501', null, 'A3 cannot post');
-select throws_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p_coach'), '42501', null,
-  'A3 cannot like');
+select throws_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'heart')$$, :'p_coach'), '42501', null,
+  'A3 cannot react');
 select is((select count(*)::int from storage.objects where bucket_id = 'community-images'), 0, 'A3 cannot open photos');
 select throws_ok(format($$insert into public.community_comments (post_id, body) values (%L, 'hi')$$, :'p_coach'), '42501', null,
   'A3 cannot comment');
@@ -445,26 +445,26 @@ reset role;
 -- Realtime
 -- ---------------------------------------------------------------------------------------------------------------
 select is((select count(*)::int from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'
-  and tablename in ('communities', 'community_posts', 'community_comments', 'community_likes', 'community_notifications', 'community_reports')),
-  6, 'the community, posts, comments, likes, notifications and reports are published to Realtime');
+  and tablename in ('communities', 'community_posts', 'community_comments', 'community_reactions', 'community_notifications', 'community_reports')),
+  6, 'the community, posts, comments, reactions, notifications and reports are published to Realtime');
 
 -- Deletes are announced as an UPDATE of the community's activity_at (filterable by id and checked by RLS), so feeds
 -- never have to listen to unfilterable DELETE events.
 update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
 select tests.act_as(:'a3');
-select lives_ok(format($$insert into public.community_likes (post_id) values (%L)$$, :'p_coach'), 'A3 likes the coach''s post');
+select lives_ok(format($$insert into public.community_reactions (post_id, reaction) values (%L, 'clap')$$, :'p_coach'), 'A3 reacts to the coach''s post');
 reset role;
 update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
 select tests.act_as(:'a3');
-delete from public.community_likes where post_id = :'p_coach';
+delete from public.community_reactions where post_id = :'p_coach';
 reset role;
-select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'an unlike bumps activity_at');
+select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a removed reaction bumps activity_at');
 update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
 select tests.act_as(:'coach_a');
 delete from public.community_comments where post_id = :'p_coach';
 reset role;
 select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted comment bumps activity_at');
--- A deleted post bumps once, not once more for each of its comments and likes.
+-- A deleted post bumps once, not once more for each of its comments and reactions.
 create table tests.cm_bumps (n int);
 grant all on tests.cm_bumps to authenticated;
 create function tests.cm_count_bump() returns trigger language plpgsql as $$
@@ -476,7 +476,7 @@ create trigger cm_count_bump after update on public.communities for each row exe
 select tests.act_as(:'a3');
 insert into public.community_comments (post_id, body) values (:'p_coach', 'one');
 insert into public.community_comments (post_id, body) values (:'p_coach', 'two');
-insert into public.community_likes (post_id) values (:'p_coach');
+insert into public.community_reactions (post_id, reaction) values (:'p_coach', 'party');
 reset role;
 update public.communities set activity_at = '2000-01-01' where id = :'comm_a';
 delete from tests.cm_bumps;
@@ -484,13 +484,13 @@ select tests.act_as(:'coach_a');
 delete from public.community_posts where id = :'p_coach';
 reset role;
 select ok((select activity_at > '2000-01-01' from public.communities where id = :'comm_a'), 'a deleted post bumps activity_at');
-select is((select count(*)::int from tests.cm_bumps), 1, 'a post with comments and likes bumps it once');
+select is((select count(*)::int from tests.cm_bumps), 1, 'a post with comments and reactions bumps it once');
 drop trigger cm_count_bump on public.communities;
 select ok(not has_column_privilege('authenticated', 'public.communities', 'activity_at', 'update'),
   'only the database sets activity_at');
 select lives_ok(format($$delete from public.workspaces where id = %L$$, :'ws_b'), 'deleting a workspace removes its community cleanly');
-select is((select relreplident::text from pg_class where oid = 'public.community_likes'::regclass), 'd',
-  'likes keep the default replica identity (a DELETE carries only the uuid key)');
+select is((select relreplident::text from pg_class where oid = 'public.community_reactions'::regclass), 'd',
+  'reactions keep the default replica identity (a DELETE carries only the uuid key)');
 
 select * from finish();
 rollback;

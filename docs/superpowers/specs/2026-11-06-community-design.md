@@ -1,9 +1,9 @@
 # Community (spec §7 "Community")
 
 One private community per coach workspace: the coach and all their clients post text, up to 4 photos, links, and
-sticker / workout / PR cards; like and comment; the coach pins, deletes and removes members; anyone can report or block.
+sticker / workout / PR cards; react and comment; the coach pins, deletes and removes members; anyone can report or block.
 Website: "Community" in the coach sidebar (feed, composer, members, Reports queue). Phone: a Community tab (feed,
-composer with photos, likes, comments, report/block, notifications) and "Share to community" from the zoo book sticker
+composer with photos, reactions, comments, report/block, notifications) and "Share to community" from the zoo book sticker
 sheet and the workout summary.
 
 ## Data (migration `20261106013000_community.sql`)
@@ -17,17 +17,18 @@ Every table has `workspace_id`, RLS on, nothing for `anon`.
 | `community_posts` | body ≤ 2,000, optional `card` (jsonb), `pinned_at`. | `create_community_post` RPC (author = caller); coach pins via `set_community_post_pinned` |
 | `community_post_images` | ≤ 4 per post: full path + thumbnail path, width, height. | the same RPC |
 | `community_comments` | body ≤ 1,000. | insert (post_id, body); trigger fills author/community/workspace |
-| `community_likes` | one per (post, user), uuid primary key (a Realtime DELETE only carries the key). | insert (post_id); delete own |
+| `community_reactions` | ❤️ 💪 🔥 👏 😂 🎉 on a post or a comment, stored as keys (`heart`, `muscle`, `fire`, `clap`, `laugh`, `party`); one of each per (target, user), any number of the six; `post_id` is set for comment reactions too; uuid primary key (a Realtime DELETE only carries the key). Replaced `community_likes` in `20261107007000_community_reactions.sql` (every like became a heart). | insert (post_id or comment_id, reaction); trigger fills user/post/community/workspace; delete own |
 | `community_reports` | reason (spam / harassment / inappropriate / other), note, a snapshot of the reported text and its author, open → resolved (`removed` / `kept`). | `report_community_content` RPC; coach `resolve_community_report` |
 | `community_blocks` | (workspace, blocker, blocked). | the blocker (insert/delete own) |
-| `community_notifications` | in-app list: `comment`, `like`, `coach_post`, `report`; `read_at`. | triggers only; recipient sets `read_at` |
+| `community_notifications` | in-app list: `comment`, `reaction`, `coach_post`, `report`; `read_at`. | triggers only; recipient sets `read_at` |
 
 **Access rules (RLS)**
 - Read a community and its content: an *active* member (row without `removed_at`, and still in the workspace) or a coach
   of the workspace. Other workspaces see nothing; a removed client (from the community or from the business) sees nothing.
-- Blocked content is hidden **in the database** for the blocker: posts, comments, likes and notifications whose author
+- Blocked content is hidden **in the database** for the blocker: posts, comments, reactions and notifications whose author
   is someone they blocked never come back (and so never arrive over Realtime either).
-- Post, comment, like: active members and coaches only. Delete: your own posts/comments/likes; the coach deletes any
+- Post, comment, react: active members and coaches only; nobody can react to (or comment on) content by someone they
+  blocked, and a reaction is visible only while its post or comment is. Delete: your own posts/comments/reactions; the coach deletes any
   post or comment. Pinning, removing members and the Reports queue are coach-only. Nobody can edit (no edit in V1).
 - Reports: a member can file one on anything they can see; only the coach can read them.
 - Clients can block other clients (not the coach, who is the moderator). Coaches moderate by deleting and removing.
@@ -43,22 +44,25 @@ removals apply to photos too). Delete: your own, or the coach for their workspac
 before upload (max 1600 px long edge + 320 px thumbnail); feeds load thumbnails through short-lived signed links, the
 full photo on tap.
 
-**Realtime.** `community_posts`, `community_comments`, `community_likes`, `community_notifications` and
+**Realtime.** `community_posts`, `community_comments`, `community_reactions`, `community_notifications` and
 `community_reports` are added to `supabase_realtime` (idempotent; a no-op without the publication). INSERT/UPDATE events
-are filtered by RLS; DELETE events (unlike, deleted post) carry only a random uuid, and the apps simply reload.
+are filtered by RLS; the apps never listen to DELETE events: a removed reaction, comment or post bumps `communities.activity_at`, which arrives
+as a filtered UPDATE, and the apps reload.
 
 ## Notifications (in-app now, push later)
 
-Triggers write `community_notifications` rows: a comment on my post, a like on my post (removed again on unlike), a new
+Triggers write `community_notifications` rows: a comment on my post, a reaction to my post or my comment (one row per person per post or comment, however many of the six
+they add; removed again when they take the last one back), a new
 post by the coach (to every active member), a new report (to the coaches). The phone shows a bell with an unread badge
 on the Community tab and a list; the website shows the open-report count in the sidebar. Grouping and wording are pure
-functions in `packages/shared/src/community` ("Sam and 4 others liked your post"), so a push sender can reuse them.
+functions in `packages/shared/src/community` ("Sam and 4 others reacted to your post"), so a push sender can reuse them.
 **Push hook:** a later Edge Function subscribed to inserts on `community_notifications` (Database Webhook) sends Expo
 pushes with the same text, honouring per-type toggles — no schema change needed.
 
 ## Shared logic (`packages/shared/src/community`, unit tested)
 
-Zod input schemas and limits, card schema and card text, like/notification grouping and wording, feed ordering (pinned
+Zod input schemas and limits, card schema and card text, reaction counting and grouping ("you reacted", who reacted, screen-reader labels),
+notification grouping and wording, feed ordering (pinned
 first), client-side visibility (drops blocked authors at once, before the reload), permission helpers for the UI
 (the database still decides), link finding for post text, photo paths and sizes, relative times.
 

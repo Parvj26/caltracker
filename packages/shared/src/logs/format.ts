@@ -1,4 +1,5 @@
 // Display text for logs, in the viewer's units. Pure, shared by the phone and the dashboard.
+import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { formatDistance, formatDuration, formatTotalWeight, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
@@ -34,7 +35,8 @@ export type ResultSet = {
 const reps = (n: number) => `${n} ${n === 1 ? 'rep' : 'reps'}`;
 
 function resultText(s: ResultSet, trackingType: TrackingType, units: Units): string | null {
-  switch (trackingType) {
+  // A type this build doesn't know (a newer server's) is worded as the fallback.
+  switch (toTrackingType(trackingType)) {
     case 'weight_reps':
       if (s.actualWeightKg !== null && s.actualReps !== null) return `${formatWeight(s.actualWeightKg, units)} × ${s.actualReps}`;
       if (s.actualReps !== null) return reps(s.actualReps);
@@ -46,6 +48,12 @@ function resultText(s: ResultSet, trackingType: TrackingType, units: Units): str
       return s.actualDurationS !== null ? formatDuration(s.actualDurationS) : null;
     case 'distance':
       return s.actualDistanceM !== null ? formatDistance(s.actualDistanceM, units) : null;
+    case 'weight_time': {
+      const parts: string[] = [];
+      if (s.actualWeightKg !== null) parts.push(formatWeight(s.actualWeightKg, units));
+      if (s.actualDurationS !== null) parts.push(formatDuration(s.actualDurationS));
+      return parts.length > 0 ? parts.join(' · ') : null;
+    }
   }
 }
 

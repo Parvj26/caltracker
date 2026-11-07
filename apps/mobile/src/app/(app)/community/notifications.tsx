@@ -9,7 +9,7 @@ import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 /**
- * In-app notifications: comments on my posts, likes (grouped: "Sam and 4 others liked your post") and new posts by
+ * In-app notifications: comments on my posts, reactions (grouped: "Sam and 4 others reacted to your post") and new posts by
  * the coach. Opening the list marks everything read; unread items keep their dot until the next visit.
  */
 export default function NotificationsScreen() {
@@ -50,7 +50,7 @@ export default function NotificationsScreen() {
       <Text style={text('screenTitle')} accessibilityRole="header">
         Notifications
       </Text>
-      {notifications.length === 0 ? <Text style={text('body')}>Nothing yet. Likes and comments on your posts show up here.</Text> : null}
+      {notifications.length === 0 ? <Text style={text('body')}>Nothing yet. Reactions and comments on your posts show up here.</Text> : null}
       {notifications.map((n) => {
         const unread = unreadKeys?.has(n.key) ?? n.unread;
         return (

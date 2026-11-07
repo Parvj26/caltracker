@@ -5,7 +5,7 @@ import { tapTarget } from '@caltracker/design-tokens';
 import {
   EQUIPMENT_CHIPS,
   MUSCLE_CHIPS,
-  TRACKING_TYPE_LABELS,
+  trackingTypeLabel,
   searchExercises,
   type ExerciseIndexRow,
   type ExercisePick,
@@ -192,7 +192,7 @@ export function ExercisePicker({
                 <View style={styles.fill0}>
                   <Text style={text('sectionHeading')}>{item.row.name}</Text>
                   <Text style={text('caption')}>
-                    {TRACKING_TYPE_LABELS[item.row.trackingType]}
+                    {trackingTypeLabel(item.row.trackingType)}
                     {query.trim() === '' && recentSet.has(item.row.id) ? ' · Recent' : ''}
                   </Text>
                 </View>

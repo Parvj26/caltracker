@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isRawObject, mapRawArray, withKnownTrackingType } from '../exercises/lenient';
 import { TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from '../workouts/sections';
@@ -172,3 +173,23 @@ export const WorkoutLogDoc = z
     }
   });
 export type WorkoutLogDoc = z.output<typeof WorkoutLogDoc>;
+
+/*
+ * Lenient reads, for docs from the server or the phone's own storage: a tracking type this build doesn't know (a
+ * newer server's) reads as FALLBACK_TRACKING_TYPE instead of failing the parse. The logged numbers are all kept: the
+ * log schema doesn't tie targets or actuals to the tracking type. Writes keep using the strict schemas above.
+ */
+
+/** One substitute option as stored, with an unknown tracking type read as the fallback. */
+export function parseLogSubstituteOptionLenient(raw: unknown) {
+  return LogSubstituteOption.safeParse(isRawObject(raw) ? withKnownTrackingType(raw) : raw);
+}
+
+/** A log saved on the phone or sent by the server, with unknown tracking types read as the fallback. */
+export function parseWorkoutLogDocLenient(raw: unknown) {
+  if (!isRawObject(raw)) return WorkoutLogDoc.safeParse(raw);
+  const fixed = mapRawArray(raw, 'blocks', (b) =>
+    mapRawArray(b, 'exercises', (e) => mapRawArray(withKnownTrackingType(e), 'substituteOptions', (o) => withKnownTrackingType(o))),
+  );
+  return WorkoutLogDoc.safeParse(fixed);
+}

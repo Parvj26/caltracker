@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { COMMUNITY_BUCKET, CommentInput, MAX_POST_PHOTOS, PostInput, type Database } from '@caltracker/shared';
+import { COMMUNITY_BUCKET, CommentInput, MAX_POST_PHOTOS, PostInput, isReactionKey, type Database, type ReactionKey } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -88,18 +88,27 @@ export async function deleteComment(commentId: string): Promise<CommunityOutcome
   return done();
 }
 
-export async function setLiked(postId: string, liked: boolean): Promise<CommunityOutcome> {
+export type ReactionTarget = { postId: string } | { commentId: string };
+
+/** Adds (on) or takes back (off) one of the coach's reactions on a post or a comment. */
+export async function setReaction(target: ReactionTarget, reaction: ReactionKey, on: boolean): Promise<CommunityOutcome> {
   const coach = await requireCoach();
-  if (!UUID.test(postId)) return { ok: false, error: GENERIC };
+  const postId = 'postId' in target ? target.postId : null;
+  const commentId = 'commentId' in target ? target.commentId : null;
+  if (!isReactionKey(reaction) || !UUID.test(postId ?? commentId ?? '')) return { ok: false, error: GENERIC };
   const supabase = await createServerSupabase();
-  if (liked) {
-    const row = { post_id: postId } as Tables['community_likes']['Insert'];
-    const { error } = await supabase.from('community_likes').insert(row);
-    // Already liked (a double click) is fine.
-    if (error && error.code !== '23505') return { ok: false, error: "Couldn't like the post." };
+  if (on) {
+    // Who and where (and a comment's post) are filled in by the database; the generated Insert type still lists them.
+    type Insert = Tables['community_reactions']['Insert'];
+    const row = (commentId ? { comment_id: commentId, reaction } : { post_id: postId!, reaction }) as Partial<Insert> as Insert;
+    const { error } = await supabase.from('community_reactions').insert(row);
+    // Already there (a double click) is fine.
+    if (error && error.code !== '23505') return { ok: false, error: "Couldn't add the reaction." };
   } else {
-    const { error } = await supabase.from('community_likes').delete().eq('post_id', postId).eq('user_id', coach.userId);
-    if (error) return { ok: false, error: "Couldn't remove the like." };
+    let del = supabase.from('community_reactions').delete().eq('user_id', coach.userId).eq('reaction', reaction);
+    del = commentId ? del.eq('comment_id', commentId) : del.eq('post_id', postId!).is('comment_id', null);
+    const { error } = await del;
+    if (error) return { ok: false, error: "Couldn't remove the reaction." };
   }
   return done();
 }

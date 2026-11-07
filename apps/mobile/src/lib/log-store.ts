@@ -8,7 +8,7 @@
 //   * .rejected: the phone's copy of the latest log the server refused for good (a coach correction, a finish
 //     on another device, the client removed), kept so support can recover its sets. Latest only.
 //   * .corrupt: a stored value this version of the app could not read, kept instead of deleted.
-import { WorkoutLogDoc } from '@caltracker/shared';
+import { parseWorkoutLogDocLenient, type WorkoutLogDoc } from '@caltracker/shared';
 
 export type KeyValueStorage = {
   getItem(key: string): Promise<string | null>;
@@ -48,7 +48,7 @@ function parseStored(value: unknown): StoredLog | null {
   if (typeof value !== 'object' || value === null) return null;
   const { log, lastSyncedRevision } = value as { log?: unknown; lastSyncedRevision?: unknown };
   if (typeof lastSyncedRevision !== 'number' || !Number.isInteger(lastSyncedRevision) || lastSyncedRevision < 0) return null;
-  const parsed = WorkoutLogDoc.safeParse(log);
+  const parsed = parseWorkoutLogDocLenient(log);
   return parsed.success ? { log: parsed.data, lastSyncedRevision } : null;
 }
 

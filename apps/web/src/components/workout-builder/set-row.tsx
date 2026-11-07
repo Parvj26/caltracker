@@ -2,7 +2,7 @@
 
 import { useId, useState, type InputHTMLAttributes } from 'react';
 import {
-  TARGET_FIELDS,
+  targetFieldsFor,
   distanceUnitFor,
   formatClock,
   fromMeters,
@@ -83,7 +83,7 @@ type Props = {
 };
 
 export function SetRow({ set, label, name, trackingType, units, showRest, canRemove, errors, onChange, onAddDrop, onRemove }: Props) {
-  const fields = TARGET_FIELDS[trackingType];
+  const fields = targetFieldsFor(trackingType);
   const isDrop = set.setType === 'drop';
   const distanceUnit = distanceUnitFor(units);
   const [range, setRange] = useState(

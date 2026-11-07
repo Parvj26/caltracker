@@ -15,6 +15,17 @@ describe('createLogStore', () => {
     expect(await createLogStore(storage, 'user-2').load()).toBeNull();
   });
 
+  it('reads a stored log naming a tracking type this build does not know as reps, keeping the numbers', async () => {
+    const storage = memoryStorage();
+    const log = sampleLog({ revision: 3 });
+    const raw = JSON.parse(JSON.stringify({ log, lastSyncedRevision: 2 })) as { log: { blocks: { exercises: { trackingType: string }[] }[] } };
+    raw.log.blocks[0].exercises[0].trackingType = 'sled_meters_per_minute';
+    storage.map.set('caltracker.activeLog.user-1', JSON.stringify(raw));
+    const loaded = await createLogStore(storage, 'user-1').load();
+    expect(loaded?.log.blocks[0]!.exercises[0]!.trackingType).toBe('reps');
+    expect(loaded?.log.blocks[0]!.exercises[0]!.sets).toEqual(log.blocks[0].exercises[0].sets);
+  });
+
   it('returns null when nothing is stored', async () => {
     expect(await createLogStore(memoryStorage(), 'user-1').load()).toBeNull();
   });
