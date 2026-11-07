@@ -19,12 +19,16 @@ complicated.
      how to, swap, add a drop set, remove), and the set table SET | LB | REPS | ✓ (columns follow the tracking
      type: reps only, time, distance, weight + reps). W = warm-up, D = drop (indented), F = drop to failure; the
      tag opens a short explanation.
-   - a superset: "Superset N · Round r of R", every round stacked; the current round shows each exercise with a
-     96 pt photo and its tools. An exercise with no set in a round is left out of it.
+   - a superset: the title "Superset N", then every round stacked, each under the same "Round r of R" heading
+     (✓ once ticked); the current round shows each exercise with a 96 pt photo and its tools. An exercise with no set in a round is left out of it.
    - a pick-one group: one page per option. Logging an option (a typed number or ✓) picks it; switching is
      possible until a set is ticked, then the other options say which one is being done.
    Done goes to the next page, after the section's last page to the next section's start page, and after the last
    section to the finish sheet. ✕ goes back to the section start page.
+   Moving never needs Done and never logs anything: ‹ and › beside the dots step one page back or forward, into
+   the previous or next section too; swiping past a section's first or last page goes on into the previous
+   section's last page or the next section's first page; the header title ("Section 2 of 3 · All sections ▾")
+   opens the overview, which lists every section. Unticked sets stay unticked, and Finish still lists them.
 4. **Finish workout?**: "N of M sets done", which sets aren't ticked (saved as not done), How did it feel?
    (Easy / OK / Good / Hard / Max), a note for the coach, Keep going / Finish. Then the sticker reveal and the
    summary, which now lists **Changes from the plan** (substitutes and swaps, the picked option of each pick-one
@@ -34,7 +38,8 @@ complicated.
 
 - No rest timer, no rest ring, no elapsed clock: ✓ only completes the set.
 - Every number can be changed at any time, also after ticking (the set stays ticked); ✓ again unticks. + Add set;
-  swipe a row left (or the VoiceOver action) to delete it. Pre-fill is unchanged (shared `resolveSetValues`):
+  long-press a row (or ••• → Delete a set, or the VoiceOver action "Delete set") to delete it. Rows have no
+  swipe, so a sideways swipe always changes the page. Pre-fill is unchanged (shared `resolveSetValues`):
   what was typed, a changed weight carried forward unless the coach planned per-set numbers, the coach's numbers,
   then last time. Mark all ticks every open set with its pre-fill, one after the other.
 - "How did it feel?" has no column of its own: it is saved as the first line of the workout note ("Felt: Good"),

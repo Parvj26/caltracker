@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  type AccessibilityActionEvent,
   type KeyboardTypeOptions,
 } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
@@ -16,7 +17,6 @@ import type { ActualPatch, StepField, Units } from '@caltracker/shared';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
-import { SwipeToDelete } from './swipe-to-delete';
 
 const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
   weight: 'decimal-pad',
@@ -57,12 +57,17 @@ export const KeyboardBar = memo(function KeyboardBar() {
   );
 });
 
+const DELETE_ACTIONS = [{ name: 'delete', label: 'Delete set' }];
+
 export type TableHandlers = {
   /** A number typed in a box, already checked and turned into the stored patch. Saved on every readable keystroke. */
   onType: (row: RowModel, patch: ActualPatch) => void;
   /** ✓: ticks an open set with what the boxes show; unticks a ticked one. */
   onTick: (row: RowModel) => void;
+  /** VoiceOver's "Delete set" action: removes the set straight away. */
   onDelete: (row: RowModel) => void;
+  /** A long press on a row: the sheet with "Delete set". Only for a set that may be deleted. */
+  onRowMenu: (row: RowModel) => void;
   /** The W / D / F tag: what it means. */
   onTag: (row: RowModel) => void;
 };
@@ -168,7 +173,10 @@ type RowProps = {
   handlers: TableHandlers;
 };
 
-/** One set: tag, number boxes, ✓. Swipe left to delete. */
+/**
+ * One set: tag, number boxes, ✓. Long-press the row (its tag or the space around the boxes) for "Delete set". There
+ * is no swipe on a row: a sideways swipe always changes the page.
+ */
 function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, handlers }: RowProps) {
   const { text, space, radius } = useTheme();
   const indented = row.tagKind === 'drop' || row.tagKind === 'failure';
@@ -177,14 +185,16 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
   const deletable = !disabled && row.deletable;
   const setWords = row.name.charAt(0).toLowerCase() + row.name.slice(1);
   const who = `${exerciseLabel ? `${exerciseLabel}, ` : ''}${row.name}, `;
+  const onAction = (e: AccessibilityActionEvent) => {
+    if (deletable && e.nativeEvent.actionName === 'delete') handlers.onDelete(row);
+  };
   return (
-    <SwipeToDelete testID={`set-delete-${id}`} label={`Delete ${setWords}`} onDelete={() => handlers.onDelete(row)} enabled={deletable}>
+    // Not one element for VoiceOver (accessible false): the boxes and ✓ stay separate.
+    <Pressable accessible={false} onLongPress={deletable ? () => handlers.onRowMenu(row) : undefined}>
       <View
         testID={`set-${id}`}
-        accessibilityActions={deletable ? [{ name: 'delete', label: `Delete ${setWords}` }] : undefined}
-        onAccessibilityAction={(e) => {
-          if (e.nativeEvent.actionName === 'delete') handlers.onDelete(row);
-        }}
+        accessibilityActions={deletable ? DELETE_ACTIONS : undefined}
+        onAccessibilityAction={onAction}
         style={[
           styles.row,
           { gap: space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
@@ -194,8 +204,11 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
       >
         <Pressable
           testID={`tag-${id}`}
-          disabled={!tagged}
-          onPress={() => handlers.onTag(row)}
+          disabled={!tagged && !deletable}
+          onPress={tagged ? () => handlers.onTag(row) : undefined}
+          onLongPress={deletable ? () => handlers.onRowMenu(row) : undefined}
+          accessibilityActions={deletable ? DELETE_ACTIONS : undefined}
+          onAccessibilityAction={onAction}
           accessibilityRole={tagged ? 'button' : 'text'}
           accessibilityLabel={tagged ? `${row.name}. What does ${row.tag} mean?` : row.name}
           style={({ pressed }) => [styles.tag, tagged && [styles.tagChip, { borderRadius: radius.pill }], pressed && styles.pressed]}
@@ -232,7 +245,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
           </Text>
         </Pressable>
       </View>
-    </SwipeToDelete>
+    </Pressable>
   );
 }
 

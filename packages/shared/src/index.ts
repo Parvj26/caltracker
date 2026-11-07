@@ -23,7 +23,7 @@ export {
 export type { CsvError, ParsedClientCsv } from './invites/csv';
 export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
-export { FREE_EXERCISE_DB_IMAGE_PREFIX, mapFreeExercise } from './exercises/free-exercise-db';
+export { FREE_EXERCISE_DB_IMAGE_PREFIX, exerciseImageObjectPath, mapFreeExercise } from './exercises/free-exercise-db';
 export { equipmentLabel, workoutEquipment } from './exercises/equipment';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
 export { canonicalYoutubeUrl, parseYoutubeUrl, youtubeFormSearchUrl } from './exercises/youtube';
@@ -333,6 +333,8 @@ export { dayLabel, messageYoutubeIds } from './messages/format';
 export { mergeOutbox } from './messages/outbox';
 export { FULL_MAX_EDGE, THUMB_MAX_EDGE, MAX_PHOTOS, fitWithin, photoPaths, thumbPathOf, isAlreadyUploaded, mergeById } from './messages/photos';
 export type { PhotoExt } from './messages/photos';
+export { photoDisplaySize, photoSourceFor } from './media/display';
+export type { PhotoSize } from './media/display';
 export {
   chooseSubstitute,
   clearSubstitute,

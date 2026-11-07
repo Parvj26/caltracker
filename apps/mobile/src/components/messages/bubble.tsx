@@ -1,5 +1,6 @@
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { messageYoutubeIds, thumbPathOf, type Message, type OutboxItem } from '@caltracker/shared';
+import { messageYoutubeIds, photoDisplaySize, thumbPathOf, type Message, type OutboxItem } from '@caltracker/shared';
+import { SharpPhoto, useNaturalSize } from '@/components/photo/sharp-photo';
 import { clockTime } from '@/lib/chat-format';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -18,14 +19,23 @@ export type BubbleProps = {
   onOpenPhoto: (uri: string) => void;
 };
 
+/** A chat photo whole (uncropped) at its own shape, up to 240 x 320 points; a square until its size is known. */
+function BubblePhoto({ pathKey, full, thumb }: { pathKey: string; full: string | undefined; thumb: string | undefined }) {
+  const natural = useNaturalSize(pathKey, thumb ?? full);
+  return <SharpPhoto full={full} thumb={thumb} size={photoDisplaySize(natural, PHOTO_BOX)} radius={radius.input} testID="message-photo" />;
+}
+
+const PHOTO_BOX = { maxWidth: 240, maxHeight: 320 };
+
 /** One message: photos, text, YouTube cards, then the time (or Sending… / Didn't send · Retry) and "Seen". */
 export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDelete, onOpenPhoto }: BubbleProps) {
   const { text } = useTheme();
   const pending = 'state' in item ? item : null;
-  // A message still on its way shows its local files; a sent one shows the thumbnail and opens the full photo.
+  // A message still on its way shows its local files; a sent one shows the full photo (thumbnail as placeholder).
   const photos = item.imagePaths.map((p) => ({
-    src: pending ? p : urls[thumbPathOf(p)],
-    full: pending ? p : urls[p],
+    key: p,
+    thumb: pending ? p : urls[thumbPathOf(p)],
+    full: pending ? undefined : urls[p],
   }));
   const youtube = messageYoutubeIds(item.body);
   const failed = pending?.state === 'failed';
@@ -41,9 +51,9 @@ export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDel
                 accessibilityLabel={`Open photo ${i + 1}`}
                 disabled={!p.full}
                 onPress={() => p.full && onOpenPhoto(p.full)}
-                style={({ pressed }) => [styles.photo, photos.length === 1 && styles.photoOne, pressed && { opacity: pressedOpacity }]}
+                style={({ pressed }) => [pressed && { opacity: pressedOpacity }]}
               >
-                {p.src ? <Image source={{ uri: p.src }} style={styles.photoImage} accessibilityIgnoresInvertColors /> : null}
+                <BubblePhoto pathKey={p.key} full={p.full} thumb={p.thumb} />
               </Pressable>
             ))}
           </View>
@@ -97,10 +107,7 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: palette.surface },
   bubbleFailed: { borderWidth: 2, borderColor: palette.magenta },
   mineText: { color: white },
-  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: space[1] },
-  photo: { width: 112, height: 112, borderRadius: radius.input, overflow: 'hidden', backgroundColor: palette.border },
-  photoOne: { width: 224, height: 224 },
-  photoImage: { width: '100%', height: '100%' },
+  photos: { gap: space[1] },
   youtube: { gap: space[1] },
   youtubeImage: { width: 224, height: 126, borderRadius: radius.input, backgroundColor: palette.border },
   meta: { flexDirection: 'row', gap: space[1], alignItems: 'center' },

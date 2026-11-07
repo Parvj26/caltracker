@@ -187,6 +187,29 @@ export function afterDone(sections: readonly FlowSection[], at: FlowPlace): Afte
   return { kind: 'finish' };
 }
 
+/**
+ * One page back (-1) or forward (+1), crossing into the previous or next section, without Done and without logging
+ * anything. Pick-one options are stepped one by one (unlike Done, which skips the options not chosen). Null at
+ * either end of the workout.
+ */
+export function stepPlace(sections: readonly FlowSection[], at: FlowPlace, delta: -1 | 1): FlowPlace | null {
+  const page = at.page + delta;
+  if (page >= 0 && page < (sections[at.section]?.pages.length ?? 0)) return { section: at.section, page };
+  for (let s = at.section + delta; s >= 0 && s < sections.length; s += delta) {
+    const n = sections[s].pages.length;
+    if (n > 0) return { section: s, page: delta < 0 ? n - 1 : 0 };
+  }
+  return null;
+}
+
+/** What the ‹ and › buttons (and the swipe past a section's edge) say: "Next page", "Previous section: Warm-Up". */
+export function stepLabel(sections: readonly FlowSection[], at: FlowPlace, delta: -1 | 1): string | null {
+  const to = stepPlace(sections, at, delta);
+  if (!to) return null;
+  const dir = delta < 0 ? 'Previous' : 'Next';
+  return to.section === at.section ? `${dir} page` : `${dir} section: ${sections[to.section].title}`;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // The "Start section" list and the workout overview
 
@@ -413,6 +436,23 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
   });
 }
 
+/**
+ * The sets the "Delete a set" sheet offers for an exercise: every set the shared rule lets go (not the only one),
+ * named with its numbers so two drop sets can be told apart ("Set 2 · 135 lb × 8").
+ */
+export function deleteChoices(ex: LogExerciseDoc, units: Units, lastSets: readonly LastResultSet[]): Array<{ setId: string; title: string }> {
+  return setRows(ex, units, lastSets)
+    .filter((r) => r.deletable)
+    .map((r) => {
+      const parts = r.cells.flatMap((c) => {
+        const v = c.value || c.placeholder;
+        if (!v) return [];
+        return [c.field === 'duration' ? v : `${v} ${c.unit}`];
+      });
+      return { setId: r.setId, title: parts.length > 0 ? `${r.name} · ${parts.join(' × ')}` : r.name };
+    });
+}
+
 /** "Rest 1:00": the coach's rest between this exercise's sets (its working sets' longest), or null. */
 export function restLine(ex: LogExerciseDoc): string | null {
   const secs = Math.max(0, ...ex.sets.filter((s) => s.setType !== 'drop').map((s) => s.target.restSeconds ?? 0));
@@ -441,6 +481,8 @@ export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; row
 
 export type RoundModel = {
   round: number;
+  /** "Round 2 of 4", with " ✓" once every set of the round is ticked. The same for every round. */
+  heading: string;
   /** Each exercise with a set in this round (an uneven superset leaves the shorter one out of later rounds). */
   entries: Array<{ exerciseIndex: number; rows: RowModel[] }>;
   restLine: string | null;
@@ -449,7 +491,7 @@ export type RoundModel = {
 
 export type SupersetPageModel = {
   kind: 'superset';
-  /** "Superset 1 · Round 2 of 4". */
+  /** "Superset 1": the page's title. Each round has its own "Round 2 of 4" heading under it. */
   heading: string;
   /** The first round with an unticked set (the last round when all are done). */
   currentRound: number;
@@ -512,24 +554,28 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
   if (page.kind === 'superset') {
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
     const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last));
-    const rounds: RoundModel[] = supersetRounds(block).map(({ round, entries }) => {
+    const plan = supersetRounds(block);
+    const roundCount = plan.length;
+    const rounds: RoundModel[] = plan.map(({ round, entries }) => {
       const rows = entries.map((e) => {
         const ex = block.exercises[e.exerciseIndex];
         return { exerciseIndex: e.exerciseIndex, rows: setRows(ex, units, lastOf(ex), e.setIndexes) };
       });
       const secs = roundRestSeconds(block, round);
+      const done = rows.every((e) => e.rows.every((r) => r.done));
       return {
         round,
+        heading: `Round ${round} of ${roundCount}${done ? ' ✓' : ''}`,
         entries: rows,
         restLine: secs > 0 ? `Rest ${formatClock(secs)} after the round` : null,
-        done: rows.every((e) => e.rows.every((r) => r.done)),
+        done,
       };
     });
     const totalRounds = rounds.length;
     const currentRound = currentStep(block)?.round ?? Math.max(1, totalRounds);
     return {
       kind: 'superset',
-      heading: `Superset ${page.number} · Round ${currentRound} of ${totalRounds}`,
+      heading: `Superset ${page.number}`,
       currentRound,
       totalRounds,
       exercises,
