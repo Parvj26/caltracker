@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useSyncExternalStore, useTransition, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useSyncExternalStore, useTransition, type FormEvent } from 'react';
 import {
   MACRO_KEYS,
   MACRO_NAMES,
@@ -27,6 +28,7 @@ import { Button, Card, ErrorText, TextField } from '@/components/ui';
 import { failureMessage } from '@/lib/action-errors';
 import { saveTargets } from './actions';
 import type { CoachMeal } from './load';
+import { TIME_ZONE_COOKIE } from './week';
 import styles from './food.module.css';
 
 const noSubscribe = () => () => undefined;
@@ -62,6 +64,8 @@ export function FoodView({
   targets,
   meals,
   readOnly,
+  serverZone,
+  pickedWeek,
 }: {
   clientId: string;
   firstName: string;
@@ -69,8 +73,19 @@ export function FoodView({
   targets: MacroTargets | null;
   meals: CoachMeal[];
   readOnly: boolean;
+  /** The browser zone the server used (from the cookie), or null when it had none and guessed. */
+  serverZone: string | null;
+  /** True when the address names a week (?week=), so "this week" was not guessed. */
+  pickedWeek: boolean;
 }) {
   const timeZone = useTimeZone();
+  const router = useRouter();
+  // Tell the server this browser's zone for next time; if it guessed this week wrong, load the right one now.
+  useEffect(() => {
+    if (timeZone === serverZone) return;
+    document.cookie = `${TIME_ZONE_COOKIE}=${encodeURIComponent(timeZone)}; path=/; max-age=31536000; samesite=lax`;
+    if (!pickedWeek && startOfWeek(localToday(timeZone)) !== monday) router.refresh();
+  }, [timeZone, serverZone, pickedWeek, monday, router]);
   const today = localToday(timeZone);
   const days = weekDays(monday);
   const byDay = mealsByDay(meals, days);

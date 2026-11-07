@@ -22,7 +22,8 @@ export default async function ConversationPage({
   const thread = await loadThread(supabase, workspaceId, userId, client);
   return (
     <Conversation
-      key={client.id}
+      // A new ?about= (another meal's reply) starts a fresh reply box, also on client-side navigation.
+      key={`${client.id}:${about ?? ''}`}
       conversationId={thread.conversationId}
       workspaceId={workspaceId}
       me={userId}

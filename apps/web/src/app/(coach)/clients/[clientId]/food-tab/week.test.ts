@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTargetsForm, weekFromParam } from './week';
+import { parseTargetsForm, validTimeZone, weekFromParam } from './week';
 
 describe('weekFromParam', () => {
   it('starts on the Monday of the given day, or of today', () => {
@@ -29,5 +29,16 @@ describe('parseTargetsForm', () => {
   });
   it('treats missing fields as blank', () => {
     expect(parseTargetsForm({})).toEqual({ ok: true, value: { calories: null, protein: null, carbs: null, fat: null } });
+  });
+});
+
+describe('validTimeZone', () => {
+  it('accepts real zones and refuses anything else', () => {
+    expect(validTimeZone('Pacific/Auckland')).toBe('Pacific/Auckland');
+    expect(validTimeZone('UTC')).toBe('UTC');
+    expect(validTimeZone('Mars/Olympus')).toBeNull();
+    expect(validTimeZone('')).toBeNull();
+    expect(validTimeZone(undefined)).toBeNull();
+    expect(validTimeZone('x'.repeat(65))).toBeNull();
   });
 });

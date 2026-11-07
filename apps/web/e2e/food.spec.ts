@@ -51,8 +51,9 @@ async function seedMeal(clientId: string, o: { name: string | null; calories?: n
   noon.setHours(12, 15, 0, 0);
   let photo: { photo_path: string; photo_thumb_path: string; photo_width: number; photo_height: number } | object = {};
   if (o.photo) {
-    const path = `${workspaceId}/${clientId}/${id}.jpg`;
-    const thumbPath = `${workspaceId}/${clientId}/${id}-thumb.jpg`;
+    const photoId = randomUUID();
+    const path = `${workspaceId}/${clientId}/${id}-${photoId}.jpg`;
+    const thumbPath = `${workspaceId}/${clientId}/${id}-${photoId}-thumb.jpg`;
     for (const p of [path, thumbPath]) {
       const up = await admin.storage.from('meal-photos').upload(p, JPEG, { contentType: 'image/jpeg' });
       if (up.error) throw up.error;
@@ -126,6 +127,10 @@ test('meals show with their photos, and "Reply about this meal" starts a message
   await meal.getByRole('link', { name: 'Reply about this meal' }).click();
   await expect(page).toHaveURL(new RegExp(`/messages/${client.id}\\?about=`));
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('About your Lunch today (12:15 pm): ');
+  // The bare start says nothing yet: Send waits for the coach's own words.
+  await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).pressSequentially('looks great');
+  await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled();
 });
 
 test('an empty week says so, and the next week stops at this week', async ({ page }) => {

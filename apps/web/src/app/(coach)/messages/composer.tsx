@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { MAX_PHOTOS } from '@caltracker/shared';
+import { canSendDraft } from './model';
 import styles from './messages.module.css';
 
 export type Draft = { body: string; files: File[] };
@@ -35,7 +36,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
 
-  const canSend = body.trim() !== '' || photos.length > 0;
+  const canSend = canSendDraft(body, photos.length, initialBody);
 
   function grow() {
     const el = area.current;

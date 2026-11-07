@@ -22,3 +22,17 @@ export function parseTargetsForm(input: Partial<Record<MacroKey, unknown>>): Tar
   }
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, value };
 }
+
+/** The cookie the coach's browser keeps its time zone in, so the server picks the coach's own "this week". */
+export const TIME_ZONE_COOKIE = 'ct-tz';
+
+/** A real IANA time zone name, or null. */
+export function validTimeZone(raw: string | null | undefined): string | null {
+  if (!raw || raw.length > 64) return null;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: raw });
+    return raw;
+  } catch {
+    return null;
+  }
+}
