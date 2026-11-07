@@ -37,10 +37,13 @@ export async function readCachedProgress(userId: string): Promise<ProgressRows |
   }
 }
 
-/** Every scan of the signed-in client (newest first, whoever entered it) and the workspace's custom measures. Saves a copy on the phone. */
+/**
+ * Every scan of the signed-in client (newest first, whoever entered it), the workspace's custom measures and the goal
+ * the coach set (RLS lets a client read only their own goal, while still a client). Saves a copy on the phone.
+ */
 export async function fetchMyProgress(): Promise<ProgressRows> {
   const userId = await myId();
-  const [scans, customs] = await Promise.all([
+  const [scans, customs, goal] = await Promise.all([
     supabase
       .from('body_measurements')
       .select('id, measured_on, created_at, source, attachment_path, body_measurement_values(metric_key, value)')
@@ -49,6 +52,13 @@ export async function fetchMyProgress(): Promise<ProgressRows> {
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     supabase.from('custom_metrics').select('id, name, unit_label, min, max').order('created_at'),
+    supabase
+      .from('client_goals')
+      .select('goal, target_date')
+      .eq('client_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   if (scans.error) {
     warn('scans', scans.error);
@@ -56,6 +66,10 @@ export async function fetchMyProgress(): Promise<ProgressRows> {
   }
   if (customs.error) {
     warn('custom measures', customs.error);
+    throw new Error(PROGRESS_LOAD_FAILED);
+  }
+  if (goal.error) {
+    warn('goal', goal.error);
     throw new Error(PROGRESS_LOAD_FAILED);
   }
   const rows: ProgressRows = {
@@ -68,6 +82,7 @@ export async function fetchMyProgress(): Promise<ProgressRows> {
       values: Object.fromEntries(s.body_measurement_values.map((v) => [v.metric_key, Number(v.value)])),
     })),
     customs: customs.data.map((c) => ({ ...c, min: Number(c.min), max: Number(c.max) })),
+    goal: goal.data ? { goal: goal.data.goal, targetDate: goal.data.target_date } : null,
   };
   void AsyncStorage.setItem(cacheKey(userId), serializeProgress(rows)).catch(() => undefined);
   return rows;

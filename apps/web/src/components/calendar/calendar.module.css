@@ -50,6 +50,9 @@
 .otherMonth { background: var(--ct-surface-sidebar); }
 .otherMonth .dayNumber { color: var(--ct-ink-muted); }
 .today { box-shadow: inset 0 0 0 2px var(--ct-ink); }
+/* While a card is dragged: days that take it get a dashed outline; locked (past) days fade back. */
+.dropOpen { outline: 2px dashed color-mix(in srgb, var(--ct-ink) 45%, transparent); outline-offset: -2px; }
+.dropLocked { opacity: 0.45; }
 .dayOver { box-shadow: inset 0 0 0 2px var(--ct-ink); background: var(--ct-blue); }
 .dayNumber {
   padding: var(--ct-space-1) var(--ct-space-1) 0;
@@ -104,7 +107,7 @@
 /* Never breaks inside a word: a word that doesn't fit beside the button goes under it. A single word wider than the
    whole card is cut with "…" (the full name is in the title). */
 .itemName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
-.grab { cursor: grab; touch-action: none; }
+.grab { cursor: grab; }
 .itemProgram {
   display: block;
   padding: 0 var(--ct-space-2) var(--ct-space-1);
@@ -389,6 +392,26 @@
 .clickable { cursor: pointer; }
 /* A hover outline, not a filter: a filter would make the card the containing block of its "⋯" menu. */
 .clickable:hover { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ct-ink) 12%, transparent); }
+/* The whole card is the drag source; a done card stays put, so it shows no grab hand. */
+/* No touch-action: none here: a swipe across a card scrolls, and a long press picks it up. No text selection or iOS
+   callout on that long press. */
+.item.grab { cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.item.locked { cursor: default; }
+/* Shown when someone tries to drag a done card. */
+.lockedTip {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 4px);
+  left: 0;
+  width: max-content;
+  max-width: 220px;
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-size: var(--ct-size-caption);
+  pointer-events: none;
+}
 
 /* ---------- Toolbar: TODAY, ‹ ›, the range, and the view switcher ---------- */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); }

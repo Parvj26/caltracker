@@ -52,7 +52,6 @@ import { FinishSheet, InfoSheet, SubstituteSheet } from '@/components/log/log-sh
 import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
-import { closeOpenSwipeRow } from '@/components/log/swipe-to-delete';
 import { KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
@@ -63,6 +62,7 @@ import {
   afterDone,
   buildPage,
   buildSections,
+  deleteChoices,
   finishModel,
   hasTypedValues,
   historyLines,
@@ -74,6 +74,8 @@ import {
   placeAfterChange,
   resumePlace,
   startGroups,
+  stepLabel,
+  stepPlace,
   substituteCards,
   substituteOf,
   type ExerciseModel,
@@ -190,6 +192,8 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
   const [infoFor, setInfoFor] = useState<{ name: string; exerciseId: string } | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
   const [menuFor, setMenuFor] = useState<LogExerciseDoc | null>(null);
+  /** Deleting a set: the long-press sheet on a row, or "Delete a set" from the ⋯ menu. */
+  const [setMenu, setSetMenu] = useState<{ title: string; items: MenuItem[] } | null>(null);
   const [subFor, setSubFor] = useState<LogExerciseDoc | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -309,6 +313,15 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
+        onRowMenu: (row) => {
+          Keyboard.dismiss();
+          tapHaptic();
+          const name = docOf(exId)?.exerciseName;
+          setSetMenu({
+            title: name ? `${row.name} · ${name}` : row.name,
+            items: [{ title: 'Delete set', testID: 'menu-delete-set', onPress: () => void op((l) => removeLogSet(l, exId, row.setId, nowIso())) }],
+          });
+        },
         onTag: (row) => {
           if (row.tagKind !== 'normal') setInfo(TAG_INFO[row.tagKind]);
         },
@@ -316,7 +329,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
       cache.set(exId, made);
       return made;
     };
-  }, [withPick, op, tick, markDone]);
+  }, [withPick, op, tick, markDone, docOf]);
 
   const handlers: PageHandlers = useMemo(
     () => ({
@@ -400,6 +413,22 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         title: 'Add a drop set',
         testID: 'menu-add-drop',
         onPress: () => void op((l) => addLogDrop(withPick(ex.id)(l), ex.id, lastMain.id, randomUUID, nowIso())),
+      });
+    }
+    const deletable = deleteChoices(ex, units, last[ex.exerciseId]?.sets ?? []);
+    if (deletable.length > 0) {
+      items.push({
+        title: 'Delete a set',
+        testID: 'menu-delete-a-set',
+        onPress: () =>
+          setSetMenu({
+            title: `Delete which set? · ${ex.exerciseName}`,
+            items: deletable.map((c, i) => ({
+              title: c.title,
+              testID: `menu-delete-set-${i}`,
+              onPress: () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso())),
+            })),
+          }),
       });
     }
     items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', onPress: () => confirmRemoveExercise(ex) });
@@ -505,6 +534,7 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
         onClose={() => setSubFor(null)}
       />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
+      <ActionMenu title={setMenu?.title ?? null} items={setMenu?.items ?? []} onClose={() => setSetMenu(null)} />
       <KeyboardBar />
       <FinishSheet
         visible={finishOpen}
@@ -586,18 +616,35 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
     );
   }
 
+  const pageIndex = Math.min(screen.page, section.pages.length - 1);
+  const here = { section: sectionIndex, page: pageIndex };
+  // Moving never needs Done: ‹ and › step a page (into the next or previous section too), a swipe past the
+  // section's first or last page goes on into the next section, and the title opens the list of sections.
+  const go = (to: { section: number; page: number } | null) => to && setScreen({ mode: 'pages', ...to });
+  const prevSection = stepPlace(sections, { section: sectionIndex, page: 0 }, -1);
+  const nextSection = stepPlace(sections, { section: sectionIndex, page: section.pages.length - 1 }, 1);
   return (
     <View style={styles.fill}>
       <SectionPages
         key={section.key}
         log={log}
         section={section}
-        page={Math.min(screen.page, section.pages.length - 1)}
+        sectionIndex={sectionIndex}
+        sectionCount={sections.length}
+        page={pageIndex}
         units={units}
         last={last}
         details={details}
         handlers={handlers}
+        steps={{ prev: stepLabel(sections, here, -1), next: stepLabel(sections, here, 1) }}
+        edges={{
+          prev: prevSection ? sections[prevSection.section].title : null,
+          next: nextSection ? sections[nextSection.section].title : null,
+        }}
         onPage={(page) => setScreen({ mode: 'pages', section: sectionIndex, page })}
+        onStep={(delta) => go(stepPlace(sections, here, delta))}
+        onEdge={(delta) => go(delta < 0 ? prevSection : nextSection)}
+        onSections={() => setScreen({ mode: 'overview' })}
         onClose={() => setScreen({ mode: 'start', section: sectionIndex })}
         onMarkAll={markAllNow}
         onDone={(page) => {
@@ -617,24 +664,41 @@ function OpenLog({ log, units, back }: { log: WorkoutLogDoc; units: Units; back:
 function SectionPages({
   log,
   section,
+  sectionIndex,
+  sectionCount,
   page,
   units,
   last,
   details,
   handlers,
+  steps,
+  edges,
   onPage,
+  onStep,
+  onEdge,
+  onSections,
   onClose,
   onMarkAll,
   onDone,
 }: {
   log: WorkoutLogDoc;
   section: FlowSection;
+  sectionIndex: number;
+  sectionCount: number;
   page: number;
   units: Units;
   last: LastResults;
   details: Parameters<typeof StraightPage>[0]['details'];
   handlers: PageHandlers;
+  /** What ‹ and › say ("Next page", "Previous section: Warm-Up"); null at either end of the workout. */
+  steps: { prev: string | null; next: string | null };
+  /** The section a swipe past the first or last page goes on to (its title), or null. */
+  edges: { prev: string | null; next: string | null };
   onPage: (page: number) => void;
+  onStep: (delta: -1 | 1) => void;
+  onEdge: (delta: -1 | 1) => void;
+  /** The title: the workout overview, which lists every section. */
+  onSections: () => void;
   onClose: () => void;
   /** Ticks every open set of these exercises; `pickOf` is the option a pick-one page picks first. */
   onMarkAll: (logExerciseIds: string[], pickOf: string | null) => void;
@@ -646,6 +710,8 @@ function SectionPages({
   const listRef = useRef<FlatList<FlowPage>>(null);
   const shown = useRef(page);
   const initial = useRef(page).current;
+  /** A swipe-through page before the first page when there is a section before this one (and one after the last). */
+  const lead = edges.prev ? 1 : 0;
 
   const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last)), [log, section, units, last]);
 
@@ -653,8 +719,8 @@ function SectionPages({
   useEffect(() => {
     if (shown.current === page) return;
     shown.current = page;
-    listRef.current?.scrollToOffset({ offset: page * width, animated: true });
-  }, [page, width]);
+    listRef.current?.scrollToOffset({ offset: (page + lead) * width, animated: true });
+  }, [page, width, lead]);
 
   // VoiceOver: each page that comes on screen (swiped, a dot, Done) is read from its heading.
   const headings = useRef(new Map<number, HostInstance>());
@@ -677,12 +743,16 @@ function SectionPages({
 
   // A rotation or iPad resize changes the page width: stay on the same page.
   useEffect(() => {
-    listRef.current?.scrollToOffset({ offset: shown.current * width, animated: false });
-  }, [width]);
+    listRef.current?.scrollToOffset({ offset: (shown.current + lead) * width, animated: false });
+  }, [width, lead]);
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (width <= 0) return;
-    const i = Math.min(Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width)), section.pages.length - 1);
+    const raw = Math.round(e.nativeEvent.contentOffset.x / width) - lead;
+    // Swiped onto the next or previous section's edge page: go on into that section.
+    if (raw < 0 && edges.prev) return onEdge(-1);
+    if (raw >= section.pages.length && edges.next) return onEdge(1);
+    const i = Math.min(Math.max(0, raw), section.pages.length - 1);
     if (i === shown.current) return;
     shown.current = i;
     Keyboard.dismiss();
@@ -710,15 +780,21 @@ function SectionPages({
         >
           <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
         </Pressable>
-        <Text
+        <Pressable
           testID="pages-title"
-          style={[text('sectionHeading'), styles.onInk, styles.headerTitle]}
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.6}
-          accessibilityRole="header"
+          onPress={onSections}
+          accessibilityRole="button"
+          accessibilityLabel={section.title}
+          accessibilityHint="Shows every section, to jump to any of them."
+          style={({ pressed }) => [styles.headerTitle, pressed && { opacity: pressedOpacity }]}
         >
-          {section.title}
-        </Text>
+          <Text style={[text('sectionHeading'), styles.onInk, styles.centre]} numberOfLines={2} maxFontSizeMultiplier={1.6}>
+            {section.title}
+          </Text>
+          <Text testID="pages-sections" style={[text('caption'), styles.onInk, styles.centre]} maxFontSizeMultiplier={1.6}>
+            {sectionCount > 1 ? `Section ${sectionIndex + 1} of ${sectionCount} · All sections ▾` : 'Overview ▾'}
+          </Text>
+        </Pressable>
         <View style={styles.headerButton} />
       </View>
       <View style={[styles.sheet, { borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4 }]}>
@@ -735,9 +811,11 @@ function SectionPages({
           windowSize={3}
           initialNumToRender={1}
           initialScrollIndex={Math.min(initial, section.pages.length - 1)}
-          getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+          getItemLayout={(_, index) => ({ length: width, offset: width * (index + lead), index })}
+          ListHeaderComponent={edges.prev ? <EdgePage width={width} dir={-1} title={edges.prev} /> : undefined}
+          ListFooterComponent={edges.next ? <EdgePage width={width} dir={1} title={edges.next} /> : undefined}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: info.index * width, animated: false })}
+          onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: (info.index + lead) * width, animated: false })}
           renderItem={({ item, index }) => {
             const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null });
             const m = models[index];
@@ -748,7 +826,6 @@ function SectionPages({
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 automaticallyAdjustKeyboardInsets
-                onScrollBeginDrag={closeOpenSwipeRow}
                 contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] }]}
               >
                 <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
@@ -773,36 +850,70 @@ function SectionPages({
           >
             <Text style={[text('button'), styles.onInk]}>Done</Text>
           </Pressable>
-          {dots.length > MAX_DOTS ? (
-            <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
-              {`${page + 1} / ${dots.length}`}
-            </Text>
-          ) : dots.length > 1 ? (
-            <View style={styles.dots} accessibilityRole="tablist">
-              {dots.map((d, i) => (
-                <Pressable
-                  key={section.pages[i].key}
-                  testID={`dot-${i}`}
-                  onPress={() => onPage(i)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: d === 'current' }}
-                  accessibilityLabel={`${what(section.pages[i])} ${i + 1} of ${dots.length}${d === 'done' ? ', done' : ''}. Or swipe left and right.`}
-                  style={styles.dotTarget}
-                >
-                  <View style={[styles.dot, d === 'current' ? styles.dotCurrent : d === 'done' ? styles.dotDone : styles.dotTodo]} />
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+          <View style={styles.stepRow}>
+            <StepButton testID="page-prev" glyph="‹" label={steps.prev} onPress={() => onStep(-1)} />
+            {dots.length > MAX_DOTS ? (
+              <Text testID="page-count" style={text('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
+                {`${page + 1} / ${dots.length}`}
+              </Text>
+            ) : dots.length > 1 ? (
+              <View style={styles.dots} accessibilityRole="tablist">
+                {dots.map((d, i) => (
+                  <Pressable
+                    key={section.pages[i].key}
+                    testID={`dot-${i}`}
+                    onPress={() => onPage(i)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: d === 'current' }}
+                    accessibilityLabel={`${what(section.pages[i])} ${i + 1} of ${dots.length}${d === 'done' ? ', done' : ''}. Or swipe left and right.`}
+                    style={styles.dotTarget}
+                  >
+                    <View style={[styles.dot, d === 'current' ? styles.dotCurrent : d === 'done' ? styles.dotDone : styles.dotTodo]} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <StepButton testID="page-next" glyph="›" label={steps.next} onPress={() => onStep(1)} />
+          </View>
         </View>
       </View>
     </View>
   );
 }
 
+/** ‹ or › beside the dots: one page back or forward, into the next or previous section too. Dimmed at the ends. */
+function StepButton({ testID, glyph, label, onPress }: { testID: string; glyph: string; label: string | null; onPress: () => void }) {
+  const { text } = useTheme();
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      disabled={label === null}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={label ?? (glyph === '‹' ? 'Previous page' : 'Next page')}
+      accessibilityState={{ disabled: label === null }}
+      style={({ pressed }) => [styles.dotTarget, label === null && styles.stepOff, pressed && { opacity: pressedOpacity }]}
+    >
+      <Text style={text('screenTitle')}>{glyph}</Text>
+    </Pressable>
+  );
+}
+
+/** Past a section's first or last page: the section a swipe goes on to. Landing here opens it. */
+function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: string }) {
+  const { text, space } = useTheme();
+  return (
+    <View testID={dir < 0 ? 'edge-prev' : 'edge-next'} style={[styles.edge, { width, padding: space[4], gap: space[2] }]}>
+      <Text style={[text('caption'), styles.centre]}>{dir < 0 ? '‹ Previous section' : 'Next section ›'}</Text>
+      <Text style={[text('screenTitle'), styles.centre]}>{title}</Text>
+    </View>
+  );
+}
+
 const DOT = 8;
-/** Past this many pages the dots no longer fit a phone's width: "3 / 12" instead. */
-const MAX_DOTS = 8;
+/** Past this many pages the dots (with ‹ and › beside them) no longer fit a phone's width: "3 / 12" instead. */
+const MAX_DOTS = 6;
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
@@ -810,7 +921,11 @@ const styles = StyleSheet.create({
   onInk: { color: white },
   header: { flexDirection: 'row', alignItems: 'center' },
   headerButton: { width: tapTarget.min, minHeight: tapTarget.min, justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center' },
+  headerTitle: { flex: 1, alignItems: 'center', minHeight: tapTarget.min, justifyContent: 'center' },
+  centre: { textAlign: 'center' },
+  stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  stepOff: { opacity: 0.25 },
+  edge: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sheet: { flex: 1, backgroundColor: palette.bg, overflow: 'hidden' },
   pageContent: { alignItems: 'center' },
   column: { width: '100%', maxWidth: contentMaxWidth },

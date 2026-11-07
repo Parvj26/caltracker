@@ -274,7 +274,7 @@ Three tiers of animal stickers, plus shiny variants. Full list and rules: `docs/
   - encode as WebP (JPEG fallback where WebP encoding is unavailable)
   - target ~200–400 KB per image
   - generate a ~30 KB thumbnail
-- Feeds and chats load thumbnails; full image loads on tap.
+- Feeds and chats show the full image, whole and uncropped (community posts: full card width, capped at about 80% of the screen height on web and 70% on the phone; chat bubbles: up to about 320 px wide). The thumbnail is the blurred placeholder while it loads, and is used for small previews. Tap still opens the photo on its own.
 - Images are cached on device after first load.
 - Limits: 4 images per post/message; PDFs ≤ 5 MB (InBody attachments only).
 - Storage in Supabase Storage, in workspace-scoped buckets/paths protected by storage policies matching RLS.

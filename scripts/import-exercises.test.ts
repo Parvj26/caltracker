@@ -5,9 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
-import type { Database, FreeExercise } from '@caltracker/shared';
+import { exerciseImageObjectPath, thumbPathOf, type Database, type FreeExercise } from '@caltracker/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PINNED_SHA, importExercises } from './import-exercises';
+import { loadManifest } from './exercise-images';
 
 const admin = createClient<Database>(
   process.env.SUPABASE_URL!,
@@ -66,6 +67,8 @@ async function state() {
 }
 
 const imageCount = () => subset.reduce((n, e) => n + e.images.length, 0);
+/** Every source picture is stored twice: the WebP and its thumbnail. */
+const objectPaths = () => subset.flatMap((e) => e.images.map(exerciseImageObjectPath)).flatMap((p) => [p, thumbPathOf(p)]);
 
 describe('importExercises', () => {
   it('imports from --fixture twice without duplicates', async () => {
@@ -79,10 +82,17 @@ describe('importExercises', () => {
     const { rows, objects } = await state();
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.source === 'builtin' && r.workspace_id === null)).toBe(true);
-    expect(objects).toBe(imageCount());
+    expect(objects).toBe(2 * imageCount());
+
+    const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'Plank').single();
+    expect(data?.image_paths).toEqual(subset.find((e) => e.id === 'Plank')!.images.map(exerciseImageObjectPath));
+    const full = await admin.storage.from('exercise-images').download(data!.image_paths[0]!);
+    expect(full.data?.type).toBe('image/webp');
+    const thumb = await admin.storage.from('exercise-images').download(thumbPathOf(data!.image_paths[0]!));
+    expect(thumb.data?.type).toBe('image/webp');
   });
 
-  it('upserts the CalTracker extras once as built-ins, without images, and not twice', async () => {
+  it('upserts the CalTracker extras once as built-ins, without pictures when their match is not in the import', async () => {
     const extras = JSON.parse(
       await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), 'caltracker-extra-exercises.json'), 'utf8'),
     ) as { id: string; trackingType: string }[];
@@ -115,8 +125,7 @@ describe('importExercises', () => {
 
   it('downloads from the (stubbed) GitHub host', async () => {
     const { port } = server.address() as AddressInfo;
-    const paths = subset.flatMap((e) => e.images.map((i) => `free-exercise-db/${i}`));
-    const removed = await admin.storage.from('exercise-images').remove(paths);
+    const removed = await admin.storage.from('exercise-images').remove(objectPaths());
     expect(removed.error).toBeNull();
     const summary = await importExercises(admin, { rawBase: `http://127.0.0.1:${port}`, log: quiet });
     expect(summary.exercises).toBe(3);
@@ -124,6 +133,42 @@ describe('importExercises', () => {
     expect(summary.imagesUploaded).toBe(imageCount());
     const { rows, objects } = await state();
     expect(rows).toHaveLength(3);
-    expect(objects).toBe(imageCount());
+    expect(objects).toBe(2 * imageCount());
+  });
+
+  it('refuses a picture whose sha256 differs from the manifest and leaves it off the exercise', async () => {
+    const plank = subset.find((e) => e.id === 'Plank')!;
+    const file = path.join(subsetDir, plank.images[0]!);
+    const original = await readFile(file);
+    await admin.storage.from('exercise-images').remove([exerciseImageObjectPath(plank.images[0]!), thumbPathOf(exerciseImageObjectPath(plank.images[0]!))]);
+    await cp(path.join(fixtureDir, 'Barbell_Squat', '0.jpg'), file); // a real picture, but not the pinned one
+    try {
+      const summary = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+      expect(summary.imagesFailed).toBe(1);
+      const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'Plank').single();
+      expect(data?.image_paths).toEqual(plank.images.slice(1).map(exerciseImageObjectPath));
+      const gone = await admin.storage.from('exercise-images').download(exerciseImageObjectPath(plank.images[0]!));
+      expect(gone.error).not.toBeNull();
+    } finally {
+      await writeFile(file, original);
+      await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+    }
+  });
+
+  it('gives a CalTracker extra the pictures of its alias match', async () => {
+    const real = await loadManifest();
+    const manifestFile = path.join(subsetDir, 'manifest.json');
+    const squat = real.exercises.Barbell_Squat!;
+    const manifest = { ...real, exercises: { ...real.exercises, 'caltracker:kettlebell-sumo-squat': { ...squat, match: 'alias' } } };
+    await writeFile(manifestFile, JSON.stringify(manifest));
+    try {
+      await importExercises(admin, { fixtureDir: subsetDir, manifestFile, log: quiet });
+      const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:kettlebell-sumo-squat').single();
+      expect(data?.image_paths).toEqual(squat.images.map((i) => exerciseImageObjectPath(i.path)));
+    } finally {
+      await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+    }
+    const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:kettlebell-sumo-squat').single();
+    expect(data?.image_paths).toEqual([]);
   });
 });

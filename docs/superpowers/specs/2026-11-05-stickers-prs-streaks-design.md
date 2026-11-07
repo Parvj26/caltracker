@@ -78,8 +78,10 @@ forward to. Success means:
 These are the main spec §6 rules, restated here so the build has one place to read.
 
 - **Volume:** the shared `logVolumeKg`, which counts only completed `weight_reps` sets, including warm-ups and drops.
-- **Ladder animal:** the heaviest animal whose weight is at most the workout volume. The multiple is shown as "≈ 1
-  Hippo" or "1.4 Hippos", rounded to 1 decimal under 10 and to whole numbers above that.
+- **Ladder animal:** new animals first (product owner decision, 2026-11-06; the full rule is in
+  `docs/design/collection.md` §1). Of the animals the volume reaches, one the client hasn't got yet, at random seeded by
+  the log id; once they have them all, the one they got longest ago. The multiple is that animal's ("≈ 1 Hippo",
+  "1.4 Hippos", "≈ 1,500 Rabbits"), rounded to 1 decimal under 10 and to whole numbers above that.
 - **Qualifying workout:** a completed log with at least 5 completed sets. Only qualifying workouts get drop and shiny
   rolls.
 - **Shiny:** each time a qualifying workout earns its ladder animal, a 1-in-20 roll, provided that animal isn't already
@@ -115,7 +117,8 @@ These are the main spec §6 rules, restated here so the build has one place to r
   - If the phone is offline, those appear as a "Surprise!" reveal the next time the app opens after the sync.
 - **Corrections and reopen:**
   - A coach correction recomputes that log's PRs and totals. It does not take away a sticker that was already shown
-    and does not re-roll.
+    and does not re-roll. A workout keeps its ladder animal forever (only the multiple changes) and never gets a
+    second one (product owner, 2026-11-07).
   - Reopening an auto-finished log and finishing it again re-runs the PR and total checks only.
 - **Tables:**
   - `sticker_awards` (client, sticker key, count, shiny, first and last earned, `log_id` of the first)

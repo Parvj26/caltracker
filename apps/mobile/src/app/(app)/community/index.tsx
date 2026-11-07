@@ -137,7 +137,7 @@ export default function CommunityScreen() {
               post={p}
               ctx={ctx}
               avatarUrl={media.avatarUrl(p)}
-              thumbUrls={media.thumbs}
+              photoUrls={media.photos}
               fullUrls={media.fullUrl}
               onOpenComments={() => router.push({ pathname: '/community/[id]', params: { id: p.id } })}
             />

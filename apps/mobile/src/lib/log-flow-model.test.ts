@@ -19,6 +19,9 @@ import { upperCoreLog } from './log-fixtures';
 import {
   afterDone,
   buildPage,
+  deleteChoices,
+  stepLabel,
+  stepPlace,
   buildSections,
   finishModel,
   historyLines,
@@ -189,6 +192,50 @@ describe('navigation', () => {
     expect(afterDone(s, { section: 2, page: 1 })).toEqual({ kind: 'finish' });
   });
 
+  it('steps one page back or forward across sections, without Done (options one by one)', () => {
+    const s = buildSections(mockLog());
+    expect(stepPlace(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepPlace(s, { section: 0, page: 0 }, 1)).toEqual({ section: 1, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+    expect(stepPlace(s, { section: 1, page: 0 }, 1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 1, page: 1 }, 1)).toEqual({ section: 2, page: 0 });
+    // Back from a section's first page lands on the previous section's last page.
+    expect(stepPlace(s, { section: 2, page: 0 }, -1)).toEqual({ section: 1, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 0 }, 1)).toEqual({ section: 2, page: 1 });
+    expect(stepPlace(s, { section: 2, page: 2 }, 1)).toBeNull();
+  });
+
+  it('steps over a section with no pages', () => {
+    const s = buildSections(mockLog());
+    const gap = [s[0], { ...s[1], pages: [] }, s[2]];
+    expect(stepPlace(gap, { section: 0, page: 0 }, 1)).toEqual({ section: 2, page: 0 });
+    expect(stepPlace(gap, { section: 2, page: 0 }, -1)).toEqual({ section: 0, page: 0 });
+  });
+
+  it('names where a step goes', () => {
+    const s = buildSections(mockLog());
+    expect(stepLabel(s, { section: 0, page: 0 }, -1)).toBeNull();
+    expect(stepLabel(s, { section: 0, page: 0 }, 1)).toBe('Next section: Resistance Training');
+    expect(stepLabel(s, { section: 1, page: 0 }, 1)).toBe('Next page');
+    expect(stepLabel(s, { section: 1, page: 0 }, -1)).toBe('Previous section: Warm-Up');
+    expect(stepLabel(s, { section: 2, page: 1 }, -1)).toBe('Previous page');
+  });
+
+  it('moving never logs anything: stepping leaves the log as it was', () => {
+    const log = mockLog();
+    const before = JSON.stringify(log);
+    const s = buildSections(log);
+    let at: { section: number; page: number } | null = { section: 0, page: 0 };
+    let steps = 0;
+    while (at) {
+      at = stepPlace(s, at, 1);
+      steps += 1;
+    }
+    expect(steps).toBe(6); // 1 + 2 + 3 pages, then the end
+    expect(JSON.stringify(log)).toBe(before);
+    expect(finishModel(log).done).toBe(0);
+  });
+
   it('resumes at the first open page, and at the picked option of a pick-one group', () => {
     let log = mockLog();
     expect(resumePlace(log, buildSections(log))).toEqual({ section: 0, page: 0 });
@@ -285,13 +332,17 @@ describe('pages', () => {
     expect(supersetRounds(block).map((r) => r.entries.map((e) => e.exerciseIndex))).toEqual([[0, 1], [0, 1], [0, 1], [0]]);
     const page = buildSections(log)[1].pages[0];
     let m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 1 of 4');
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.exercises.map((e) => e.label)).toEqual(['A1', 'A2']);
     expect(m.kind === 'superset' && m.rounds[0].restLine).toBe('Rest 1:00 after the round');
     log = completeSet(log, block.exercises[0].sets[0].id, NOW);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1 · Round 2 of 4');
+    // The title stays "Superset 1"; round 1 is ticked off under it and round 2 is the current one.
+    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.currentRound).toBe(2);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4 ✓', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.rounds[0].done).toBe(true);
   });
 
@@ -476,5 +527,20 @@ describe('markAllPlan', () => {
     expect(markAll(blank, [bex.id], {}, NOW)).toBe(blank);
     expect(markAllQuestion({ tick: 4, skip: 0 })).toEqual({ title: 'Tick 4 sets with these numbers?', message: null });
     expect(markAllQuestion({ tick: 2, skip: 1 }).message).toBe('1 set has no numbers yet, so it stays unticked.');
+  });
+});
+
+describe('deleting a set', () => {
+  it('offers every set but the only one, named with its numbers', () => {
+    const log = mockLog();
+    const push = log.blocks[2].exercises[0];
+    expect(deleteChoices(push, 'lb', []).map((c) => c.title)).toEqual([
+      'Warm-up 1 · 35 lb × 12 reps',
+      'Set 1 · 35 lb × 12 reps',
+      'Drop set · 20 lb × 12 reps',
+      'Drop set to failure · 15 lb',
+    ]);
+    const circles = log.blocks[0].exercises[0];
+    expect(deleteChoices(circles, 'lb', [])).toEqual([]);
   });
 });
