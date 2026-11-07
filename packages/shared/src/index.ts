@@ -293,6 +293,35 @@ export type {
   DailyCheckInput,
 } from './coach-home/daily-check';
 export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/search';
+export {
+  COMPLETION_WINDOW_DAYS,
+  compareDirectoryRows,
+  directoryCounts,
+  directoryRows,
+  fourWeekCompletion,
+  invitedLabel,
+  matchesDirectoryFilter,
+} from './coach-home/client-directory';
+export type {
+  DirectoryClient,
+  DirectoryFilter,
+  DirectoryInput,
+  DirectoryPlan,
+  DirectoryRow,
+  DirectorySort,
+  DirectoryStatus,
+  DirectoryWorkout,
+} from './coach-home/client-directory';
+export {
+  INVITE_PLAN_FAR_ERROR,
+  INVITE_PLAN_MAX_DAYS_AHEAD,
+  INVITE_PLAN_MAX_WORKOUTS,
+  INVITE_PLAN_PAST_ERROR,
+  InvitePlan,
+  invitePlanArgs,
+  invitePlanError,
+  joinedPlanDay,
+} from './invites/plan';
 export { LANDMARK_JOURNEY, STICKERS } from './awards/catalogue';
 export type { RareRequirement, StickerDef, StickerKind } from './awards/catalogue';
 export {
