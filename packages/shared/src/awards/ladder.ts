@@ -120,14 +120,23 @@ function plural(name: string): string {
 }
 
 /**
+ * How many of an animal, rounded for people: one decimal under 10, whole numbers from 10 up, thousands grouped.
+ * `count` is the number as text ("1", "1.4", "1,500"); `tiny` is true for a sliver above nothing (shown as "< 0.1").
+ */
+export function animalAmount(multiple: number, name: string): { count: string; noun: string; tiny: boolean } {
+  if (multiple > 0 && multiple < 0.05) return { count: '0.1', noun: plural(name), tiny: true };
+  const rounded = multiple < 10 ? Math.round(multiple * 10) / 10 : Math.round(multiple);
+  const count = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return { count, noun: rounded === 1 ? name : plural(name), tiny: false };
+}
+
+/**
  * "≈ 1 Hippo", "≈ 1.4 Hippos": one decimal under 10, whole numbers from 10 up, thousands grouped ("≈ 1,500 Rabbits").
  * Under 1 (a kept animal after a correction): "≈ 0.8 Horses", and "< 0.1 Horses" for a sliver above nothing.
  */
 export function formatMultiple(multiple: number, name: string): string {
-  if (multiple > 0 && multiple < 0.05) return `< 0.1 ${plural(name)}`;
-  const rounded = multiple < 10 ? Math.round(multiple * 10) / 10 : Math.round(multiple);
-  const text = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `≈ ${text} ${rounded === 1 ? name : plural(name)}`;
+  const a = animalAmount(multiple, name);
+  return a.tiny ? `< ${a.count} ${a.noun}` : `≈ ${a.count} ${a.noun}`;
 }
 
 /** A completed workout with at least 5 completed sets: the only kind that gets drop and shiny rolls. */

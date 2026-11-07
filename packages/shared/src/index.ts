@@ -45,8 +45,10 @@ export {
   formatClock,
   formatDistance,
   formatDuration,
+  formatTotalWeight,
   formatWeight,
   fromKg,
+  groupThousands,
   fromMeters,
   kgToInput,
   parseClock,
@@ -394,7 +396,7 @@ export {
   parseCardRequest,
 } from './community/schema';
 export type { ReportReason } from './community/schema';
-export { cardRequestLabel, cardText, prLine } from './community/cards';
+export { cardRequestLabel, cardText, posterFirstName, prLine, workoutCardSentence } from './community/cards';
 export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
