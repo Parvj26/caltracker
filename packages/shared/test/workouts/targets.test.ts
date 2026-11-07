@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from '../../src/workouts/targets';
 import type { WorkoutSetDoc } from '../../src/workouts/schema';
+import { toKg } from '../../src/units/units';
 
 const base: WorkoutSetDoc = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -22,6 +23,7 @@ describe('TARGET_FIELDS and labels', () => {
       reps: ['reps'],
       time: ['duration'],
       distance: ['distance'],
+      weight_time: ['weight', 'duration'],
     });
   });
   it('has a label per tracking type', () => {
@@ -30,6 +32,7 @@ describe('TARGET_FIELDS and labels', () => {
       reps: 'reps only',
       time: 'time',
       distance: 'distance',
+      weight_time: 'weight and time',
     });
   });
 });
@@ -54,6 +57,13 @@ describe('formatSetTarget', () => {
   });
   it('shows distance', () => {
     expect(formatSetTarget({ ...base, targetDistanceM: 5000 }, 'distance', 'kg')).toBe('5 km');
+  });
+  it('shows weight and time for a loaded carry', () => {
+    expect(formatSetTarget({ ...base, targetWeightKg: toKg(70, 'lb'), targetDurationS: 60 }, 'weight_time', 'lb')).toBe(
+      '70 lb · 1:00',
+    );
+    // Reps are not part of weight-and-time tracking, so a leftover rep target is not shown.
+    expect(formatSetTarget({ ...base, targetRepsMin: 8, targetDurationS: 45 }, 'weight_time', 'kg')).toBe('45 s');
   });
   it('shows To failure', () => {
     expect(formatSetTarget({ ...base, setType: 'drop', toFailure: true }, 'weight_reps', 'kg')).toBe('To failure');

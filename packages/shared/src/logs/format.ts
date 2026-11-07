@@ -46,6 +46,12 @@ function resultText(s: ResultSet, trackingType: TrackingType, units: Units): str
       return s.actualDurationS !== null ? formatDuration(s.actualDurationS) : null;
     case 'distance':
       return s.actualDistanceM !== null ? formatDistance(s.actualDistanceM, units) : null;
+    case 'weight_time': {
+      const parts: string[] = [];
+      if (s.actualWeightKg !== null) parts.push(formatWeight(s.actualWeightKg, units));
+      if (s.actualDurationS !== null) parts.push(formatDuration(s.actualDurationS));
+      return parts.length > 0 ? parts.join(' · ') : null;
+    }
   }
 }
 

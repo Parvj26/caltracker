@@ -260,6 +260,12 @@ describe('set rows', () => {
     expect(setRows({ ...ex, trackingType: 'distance' }, 'kg', [])[0].cells.map((c) => c.heading)).toEqual(['KM']);
   });
 
+  it('a weight-and-time exercise (a loaded carry) has a weight column, then TIME', () => {
+    const ex = mockLog().blocks[0].exercises[0];
+    expect(setRows({ ...ex, trackingType: 'weight_time' }, 'lb', [])[0].cells.map((c) => c.heading)).toEqual(['LB', 'TIME']);
+    expect(setRows({ ...ex, trackingType: 'weight_time' }, 'kg', [])[0].cells.map((c) => c.heading)).toEqual(['KG', 'TIME']);
+  });
+
   it('a ticked set keeps its numbers editable: the box shows what is stored', () => {
     let log = mockLog();
     const ex = () => log.blocks[2].exercises[0];

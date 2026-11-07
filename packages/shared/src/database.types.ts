@@ -2575,7 +2575,12 @@ export type Database = {
       log_status: "in_progress" | "completed" | "discarded"
       member_role: "owner" | "staff" | "client"
       set_type: "normal" | "warmup" | "drop"
-      tracking_type: "weight_reps" | "reps" | "time" | "distance"
+      tracking_type:
+        | "weight_reps"
+        | "reps"
+        | "time"
+        | "distance"
+        | "weight_time"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2710,7 +2715,7 @@ export const Constants = {
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],
       set_type: ["normal", "warmup", "drop"],
-      tracking_type: ["weight_reps", "reps", "time", "distance"],
+      tracking_type: ["weight_reps", "reps", "time", "distance", "weight_time"],
     },
   },
 } as const

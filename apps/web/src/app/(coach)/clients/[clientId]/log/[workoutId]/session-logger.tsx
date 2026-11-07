@@ -62,6 +62,7 @@ const FIELDS: Record<TrackingType, Field[]> = {
   reps: ['reps'],
   time: ['time'],
   distance: ['distance'],
+  weight_time: ['weight', 'time'],
 };
 
 /** A set's short label in the SET column: W for a warm-up, D for a drop, else the working set's number. */

@@ -8,6 +8,7 @@ export const TARGET_FIELDS: Record<TrackingType, ReadonlyArray<'reps' | 'weight'
   reps: ['reps'],
   time: ['duration'],
   distance: ['distance'],
+  weight_time: ['weight', 'duration'],
 };
 
 export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
@@ -15,6 +16,7 @@ export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
   reps: 'reps only',
   time: 'time',
   distance: 'distance',
+  weight_time: 'weight and time',
 };
 
 /** Only the target fields are read, so a log set's snapshot can be worded the same way. */

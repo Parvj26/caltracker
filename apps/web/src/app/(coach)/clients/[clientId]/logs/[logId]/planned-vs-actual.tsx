@@ -36,6 +36,7 @@ export function draftFor(set: LogSetDoc, trackingType: TrackingType, units: Unit
     case 'reps': return { reps };
     case 'time': return { time };
     case 'distance': return { distance };
+    case 'weight_time': return { weight, time };
   }
 }
 
@@ -50,6 +51,13 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
     case 'reps': return s.actualReps !== null ? reps(s.actualReps) : '–';
     case 'time': return s.actualDurationS !== null ? formatDuration(s.actualDurationS) : '–';
     case 'distance': return s.actualDistanceM !== null ? formatDistance(s.actualDistanceM, units) : '–';
+    case 'weight_time': {
+      const parts = [
+        s.actualWeightKg !== null ? formatWeight(s.actualWeightKg, units) : null,
+        s.actualDurationS !== null ? formatDuration(s.actualDurationS) : null,
+      ].filter((p) => p !== null);
+      return parts.length > 0 ? parts.join(' · ') : '–';
+    }
   }
 }
 
@@ -158,9 +166,9 @@ export function PlannedVsActual({
                               <td>
                                 {edit && draft ? (
                                   <span className={styles.inputs}>
-                                    {ex.trackingType === 'weight_reps' ? field('weight', `weight (${units})`, 'decimal') : null}
+                                    {ex.trackingType === 'weight_reps' || ex.trackingType === 'weight_time' ? field('weight', `weight (${units})`, 'decimal') : null}
                                     {ex.trackingType === 'weight_reps' || ex.trackingType === 'reps' ? field('reps', 'reps', 'numeric') : null}
-                                    {ex.trackingType === 'time' ? field('time', 'time (m:ss)', 'text') : null}
+                                    {ex.trackingType === 'time' || ex.trackingType === 'weight_time' ? field('time', 'time (m:ss)', 'text') : null}
                                     {ex.trackingType === 'distance' ? field('distance', `distance (${distUnit})`, 'decimal') : null}
                                   </span>
                                 ) : done ? (
