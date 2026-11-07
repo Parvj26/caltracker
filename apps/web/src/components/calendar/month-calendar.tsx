@@ -19,6 +19,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { isLiveWorkout } from '@caltracker/shared';
 import type { IsoDate, WorkoutPreview } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { formatDayMonth, formatLongDay, formatShortDay, formatWeekday } from './format';
@@ -39,6 +40,8 @@ export type CalendarItem = {
   preview?: WorkoutPreview;
   /** Its finished log was logged by the coach (an in-person session), not by the client. */
   loggedByCoach?: boolean;
+  /** From a program assignment: whether its program has Live Sync on, and this copy was edited or started. */
+  liveSync?: { programLive: boolean; customised: boolean; started: boolean };
 };
 
 type Props = {
@@ -260,6 +263,11 @@ function DayCell({
               showPreview={layout === 'week'}
               href={itemHref ? itemHref(item, editable) : null}
               missed={item.logId === null && today !== null && date < today}
+              live={
+                item.liveSync !== undefined &&
+                today !== null &&
+                isLiveWorkout({ ...item.liveSync, date }, today)
+              }
             />
             ),
           )}
@@ -295,6 +303,7 @@ function DayItem({
   href,
   missed,
   showPreview,
+  live,
 }: {
   item: CalendarItem;
   /** The week views' taller cards: up to three exercise lines and "+ N more exercises". */
@@ -304,6 +313,8 @@ function DayItem({
   href: string | null;
   /** Planned, its day has passed (in the viewer's zone) and no finished log. */
   missed: boolean;
+  /** Kept up to date by the program's Live Sync. */
+  live: boolean;
   date: IsoDate;
   draggable: boolean;
   editable: boolean;
@@ -405,7 +416,16 @@ function DayItem({
       ) : null}
       {item.logId && item.loggedByCoach ? <span className={styles.coachNote}>Logged by coach</span> : null}
       {missed ? <span className={styles.missedNote}>Missed</span> : null}
-      {item.programName ? <span className={styles.itemProgram}>{item.programName}</span> : null}
+      {item.programName ? (
+        <span className={styles.itemProgram}>
+          {item.programName}
+          {live ? (
+            <span className={styles.liveTag} title="Live Sync: changes to the program update this workout">
+              {' · '}Live
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </li>
   );
 }

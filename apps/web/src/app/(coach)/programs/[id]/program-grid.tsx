@@ -24,8 +24,10 @@ import { cx } from '@/components/ui/cx';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { addProgramWorkout, copyProgramWeek, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
 import { CopyWeekDialog } from './copy-week-dialog';
-import { ASSIGNED_NOTE, DUPLICATE_NOTE, DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
+import { DUPLICATE_NOTE, assignedNote, DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import { LibraryPanel } from './library-panel';
+import { LiveSyncPanel } from './live-sync-panel';
+import type { LiveSyncState } from '@/lib/live-sync';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
@@ -81,10 +83,13 @@ export function ProgramGrid({
   initialSlots,
   library,
   justCopied = false,
+  liveSync,
 }: {
   program: Program;
   initialSlots: Slot[];
   library: LibraryWorkout[];
+  /** The program's Live Sync switch and status, as loaded. */
+  liveSync: LiveSyncState;
   /** Opened right after "Duplicate" (?copied=1): say once what the copy shares with the original. */
   justCopied?: boolean;
 }) {
@@ -98,6 +103,13 @@ export function ProgramGrid({
   const [dragging, setDragging] = useState<DragData | null>(null);
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
+  // Each saved change bumps this, so the Live Sync status line asks for the new sync time.
+  const [saves, setSaves] = useState(0);
+  const [live, setLive] = useState(liveSync.on);
+  const markSaved = () => {
+    setSavedOnce(true);
+    setSaves((n) => n + 1);
+  };
   const [toast, setToast] = useState<string | null>(justCopied ? `Copied. ${DUPLICATE_NOTE}` : null);
   const [addingWeek, setAddingWeek] = useState(false);
   // The details as last saved, so "+ Add week" doesn't save half-typed edits.
@@ -130,7 +142,7 @@ export function ProgramGrid({
     setSlots(apply);
     setInFlight((n) => n + 1);
     save()
-      .then(() => setSavedOnce(true))
+      .then(markSaved)
       .catch((e: unknown) => {
         setSlots(undo);
         setToast(failureMessage(e, SAVE_ERROR));
@@ -203,8 +215,8 @@ export function ProgramGrid({
         // Same ids as shown; take the saved days and order in case the source week differed from this page.
         const saved = outcome.slots.map((x) => ({ ...x, workoutName: names.get(x.workoutId) ?? '' }));
         setSlots((s) => [...without(s), ...saved]);
-        setSavedOnce(true);
-        setToast(`Copied week ${from} to ${done}. ${ASSIGNED_NOTE}`);
+        markSaved();
+        setToast(`Copied week ${from} to ${done}. ${assignedNote(live)}`);
       })
       .catch((e: unknown) => {
         undo();
@@ -248,7 +260,7 @@ export function ProgramGrid({
     try {
       const outcome = await updateProgram(program.id, { ...savedDetails.current, weeks: next });
       if (!outcome.ok) throw new Error(outcome.error);
-      setSavedOnce(true);
+      markSaved();
     } catch (e) {
       setWeeks(next - 1);
       setToast(failureMessage(e, "Couldn't add a week, so it was undone. Please try again."));
@@ -264,6 +276,7 @@ export function ProgramGrid({
 
   return (
     <div className={styles.builder}>
+      <LiveSyncPanel programId={program.id} initial={liveSync} refreshKey={saves} onChange={setLive} />
       <ProgramDetails
         program={program}
         weeks={weeks}
@@ -271,7 +284,7 @@ export function ProgramGrid({
           savedDetails.current = details;
           setWeeks(newWeeks);
           setSlots((s) => s.filter((x) => x.week <= newWeeks));
-          setSavedOnce(true);
+          markSaved();
           if (removed !== expected) {
             setToast(`${removed === 1 ? '1 workout was' : `${removed} workouts were`} removed from the weeks you cut.`);
           }
@@ -379,6 +392,7 @@ export function ProgramGrid({
           weeks={weeks}
           slots={slots}
           saving={inFlight > 0}
+          live={live}
           onCopy={(toWeeks) => {
             copyWeekTo(copying, toWeeks);
             setCopying(null);

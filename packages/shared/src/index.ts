@@ -144,6 +144,8 @@ export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
 export type { PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
 export { programClashes } from './programs/clashes';
+export { isLiveWorkout, liveSyncStatus, liveSyncWindow, planLiveSync } from './programs/live-sync';
+export type { LiveSyncAssignment, LiveSyncCopy, LiveSyncPlan, LiveSyncSlot } from './programs/live-sync';
 export type { ProgramClash } from './programs/clashes';
 export {
   BAD_TODAY_ERROR,
