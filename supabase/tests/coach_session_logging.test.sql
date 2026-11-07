@@ -1,4 +1,4 @@
--- Coach session logging (20261106010000_coach_session_logging.sql): a coach logs a client's workout from the
+-- Coach session logging (20261106012000_coach_session_logging.sql): a coach logs a client's workout from the
 -- website, takes over a workout the client is logging, and only one person changes a workout at a time.
 begin;
 select plan(97);

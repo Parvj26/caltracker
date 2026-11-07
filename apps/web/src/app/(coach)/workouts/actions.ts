@@ -99,7 +99,8 @@ export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: 
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return { ok: false, error: "Couldn't find that workout." };
   const supabase = await createServerSupabase();
-  // Program slots go with it (on delete cascade). Clients' calendar copies are separate rows and stay.
+  // Program slots go with it (on delete cascade). Clients' calendar copies are separate rows and stay, except that
+  // Live Sync removes untouched upcoming copies from programs that have it on (the slots changed).
   // Library workouts only: a client's calendar copy is edited and deleted from that client's calendar.
   const { data, error } = await supabase
     .from('workouts')

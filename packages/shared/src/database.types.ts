@@ -586,6 +586,45 @@ export type Database = {
           },
         ]
       }
+      live_sync_tombstones: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          planned_on: string
+          source_workout_id: string
+          workspace_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          planned_on?: string
+          source_workout_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sync_tombstones_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "program_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sync_tombstones_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       log_blocks: {
         Row: {
           client_id: string
@@ -990,6 +1029,21 @@ export type Database = {
           },
         ]
       }
+      program_live_sync_queue: {
+        Row: {
+          program_id: string
+          xact: unknown
+        }
+        Insert: {
+          program_id: string
+          xact?: unknown
+        }
+        Update: {
+          program_id?: string
+          xact?: unknown
+        }
+        Relationships: []
+      }
       program_workouts: {
         Row: {
           created_at: string
@@ -1047,6 +1101,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          live_sync: boolean
+          live_sync_skipped: number
+          live_synced_at: string | null
           name: string
           updated_at: string
           weeks: number
@@ -1057,6 +1114,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name: string
           updated_at?: string
           weeks?: number
@@ -1067,6 +1127,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          live_sync?: boolean
+          live_sync_skipped?: number
+          live_synced_at?: string | null
           name?: string
           updated_at?: string
           weeks?: number
@@ -1475,10 +1538,13 @@ export type Database = {
           client_id: string | null
           created_at: string
           created_by: string | null
+          customised_at: string | null
           id: string
           name: string
           notes: string | null
+          planned_on: string | null
           scheduled_on: string | null
+          source_hash: string | null
           source_workout_id: string | null
           updated_at: string
           workspace_id: string
@@ -1488,10 +1554,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name: string
           notes?: string | null
+          planned_on?: string | null
           scheduled_on?: string | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -1501,10 +1570,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          customised_at?: string | null
           id?: string
           name?: string
           notes?: string | null
+          planned_on?: string | null
           scheduled_on?: string | null
+          source_hash?: string | null
           source_workout_id?: string | null
           updated_at?: string
           workspace_id?: string
@@ -1616,6 +1688,14 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      client_today: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
+      }
+      client_zone: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
+      }
       coach_last_results: {
         Args: { p_client_id: string; p_exercise_ids: string[] }
         Returns: {
@@ -1657,6 +1737,10 @@ export type Database = {
           p_source: string
         }
         Returns: string
+      }
+      copy_workout_children: {
+        Args: { p_source: string; p_target: string }
+        Returns: undefined
       }
       correct_workout_log: {
         Args: { p_log_id: string; p_sets: Json }
@@ -1720,6 +1804,7 @@ export type Database = {
         Returns: boolean
       }
       is_member_of: { Args: { ws: string }; Returns: boolean }
+      is_system_write: { Args: never; Returns: boolean }
       json_number_ok: {
         Args: {
           hi: number
@@ -1750,6 +1835,8 @@ export type Database = {
           measured_on: string
         }[]
       }
+      live_sync_backfill_copies: { Args: never; Returns: number }
+      live_sync_program: { Args: { p_program_id: string }; Returns: number }
       lookup_members_by_email: {
         Args: { emails: string[] }
         Returns: {
@@ -1766,6 +1853,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
       recent_exercises_for_client: {
         Args: { p_limit?: number }
         Returns: {
@@ -1817,6 +1905,7 @@ export type Database = {
       uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
       valid_substitute_sets: { Args: { p_sets: Json }; Returns: boolean }
+      workout_content_hash: { Args: { p_workout: string }; Returns: string }
       workout_is_done: { Args: { p_workout_id: string }; Returns: boolean }
       workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }

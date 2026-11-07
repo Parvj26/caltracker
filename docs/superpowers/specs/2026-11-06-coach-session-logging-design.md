@@ -59,7 +59,7 @@ Live progress uses Realtime (PR #34): the page re-renders whenever the log row c
 No new tables. `workout_logs.logged_by` (already there) is who logs the workout: the client on the phone, or the
 coach. The log's `client_id` is always the client, so history, charts, PRs, streaks and stickers count it the same.
 
-Migration `20261106010000_coach_session_logging.sql`:
+Migration `20261106012000_coach_session_logging.sql`:
 
 - `private.save_workout_log_as(doc, client, logger)`: the body of `save_workout_log`, unchanged except that it takes
   the client and the logger as arguments, requires a coach logger to coach the client's workspace, stores

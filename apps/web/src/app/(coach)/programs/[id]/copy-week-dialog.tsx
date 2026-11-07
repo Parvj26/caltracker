@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { followingWeeks, slotsInWeeks } from '@caltracker/shared';
 import { Button, SelectField } from '@/components/ui';
-import { ASSIGNED_NOTE, copyWeekButtonDomId, focusSoon } from './grid-ids';
+import { assignedNote, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -21,6 +21,7 @@ export function CopyWeekDialog({
   weeks,
   slots,
   saving,
+  live,
   onCopy,
   onClose,
 }: {
@@ -29,6 +30,8 @@ export function CopyWeekDialog({
   slots: Slot[];
   /** True while other grid changes are still saving: the copy waits, so it copies what is saved. */
   saving: boolean;
+  /** The program's Live Sync is on (changes reach clients). */
+  live: boolean;
   onCopy: (toWeeks: number[]) => void;
   onClose: () => void;
 }) {
@@ -97,7 +100,7 @@ export function CopyWeekDialog({
         <>
           <p id={bodyId} className={styles.dialogBody}>
             Puts week {week}&apos;s {plural(sourceCount, 'workout', 'workouts')} on the same days of another week, replacing
-            what that week has. {ASSIGNED_NOTE}
+            what that week has. {assignedNote(live)}
           </p>
           <SelectField label="Copy to" value={target} onChange={(e) => setTarget(e.target.value)}>
             {others.map((w) => (

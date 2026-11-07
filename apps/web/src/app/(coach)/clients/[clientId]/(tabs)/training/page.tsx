@@ -36,12 +36,18 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 // Same cap as the workout library page.
 const LIBRARY_LIMIT = 200;
 
-// Each calendar workout with its exercises (for the week views' previews), program and completed logs. The select
-// string is built by concatenation, so supabase-js cannot infer its shape; CalendarRow describes it.
-const CALENDAR_SELECT = `${WORKOUT_TREE_SELECT}, program_assignments(program_name), workout_logs(id, finished_at, logged_by)`;
+// Each calendar workout with its exercises (for the week views' previews), program (and whether it has Live Sync
+// on), completed logs and started-or-completed logs (for the Live tag). The two log embeds are aliased so each status
+// filter below applies to its own embed. The select string is built by concatenation, so supabase-js cannot infer
+// its shape; CalendarRow describes it.
+const CALENDAR_SELECT =
+  `${WORKOUT_TREE_SELECT}, customised_at, program_assignments(program_name, programs(live_sync)), ` +
+  'done_logs:workout_logs(id, finished_at, logged_by), started_logs:workout_logs(id)';
 type CalendarRow = WorkoutTreeRow & {
-  program_assignments: { program_name: string } | null;
-  workout_logs: { id: string; finished_at: string | null; logged_by: string | null }[];
+  customised_at: string | null;
+  program_assignments: { program_name: string; programs: { live_sync: boolean } | null } | null;
+  done_logs: { id: string; finished_at: string | null; logged_by: string | null }[];
+  started_logs: { id: string }[];
 };
 
 export default async function ClientPage({
@@ -85,9 +91,12 @@ export default async function ClientPage({
       .eq('client_id', client.id)
       .gte('scheduled_on', rangeStart)
       .lte('scheduled_on', rangeEnd)
-      // Completed logs of each planned workout (a discarded or in-progress one is left out), latest first.
-      .eq('workout_logs.status', 'completed')
-      .order('finished_at', { ascending: false, referencedTable: 'workout_logs' })
+      // Completed logs of each planned workout (a discarded or in-progress one is left out), latest first. Both log
+      // embeds are aliased, so each filter applies to its own embed.
+      .eq('done_logs.status', 'completed')
+      // Started or done (a discarded log doesn't count): Live Sync no longer changes it, so no "Live" tag.
+      .in('started_logs.status', ['in_progress', 'completed'])
+      .order('finished_at', { ascending: false, referencedTable: 'done_logs' })
       .order('scheduled_on')
       .order('created_at'),
     supabase
@@ -163,7 +172,7 @@ export default async function ClientPage({
   // in-person session). A log whose author's account is gone (logged_by null) says nothing.
   const entries: CalendarEntry[] = (workouts.data as unknown as CalendarRow[]).flatMap((w) => {
     if (!w.scheduled_on) return [];
-    const log = w.workout_logs[0];
+    const log = w.done_logs[0];
     return [
       {
         id: w.id,
@@ -173,6 +182,15 @@ export default async function ClientPage({
         logId: log?.id ?? null,
         loggedByCoach: log ? isLoggedByCoach({ loggedBy: log.logged_by, clientId: client.id }) : false,
         preview: workoutPreview(workoutRowToDoc(w), units),
+        ...(w.program_assignments
+          ? {
+              liveSync: {
+                programLive: w.program_assignments.programs?.live_sync ?? false,
+                customised: w.customised_at !== null,
+                started: w.started_logs.length > 0,
+              },
+            }
+          : {}),
       },
     ];
   });
