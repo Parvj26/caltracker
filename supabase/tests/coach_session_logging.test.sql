@@ -238,13 +238,13 @@ select tests.act_as(:'a2');
 -- The phone's final save (sets ticked before it heard of the take over) is applied once (20261107001000), and says
 -- someone else logs it now; after that its saves are refused, even with a higher revision.
 select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 9, true)),
-  '{"applied": true, "revision": 9, "status": "in_progress", "loggedByOther": true}'::jsonb,
-  'the phone''s final save after the take over is applied and says someone else logs it');
-select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 10, true)),
-  '{"applied": false, "revision": 9, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  '{"applied": true, "revision": 1005, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the phone''s final save after the take over is applied (1000 above the take over) and says someone else logs it');
+select is(public.save_workout_log(tests.cs_doc(:'l3', :'w_a2', 'in_progress', 1006, true)),
+  '{"applied": false, "revision": 1005, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the phone''s next save is refused, even with a higher revision, and says someone else logs it');
 select tests.act_as(:'coach_a');
-select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 10, true))->>'applied', 'true',
+select is(public.coach_save_workout_log(:'a2', tests.cs_doc(:'l3', :'w_a2', 'completed', 1006, true))->>'applied', 'true',
   'the coach finishes the taken-over session');
 select is(tests.cs_error(format('select public.take_over_workout_log(%L)', :'l3')), '23514 -',
   'a finished workout cannot be taken over');

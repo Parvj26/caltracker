@@ -3,7 +3,7 @@
 --     the coach saves anything; a finish, another client, another workspace's coach can't use it;
 --   * a coach can't start a session for a later day's workout; the client's phone still can.
 begin;
-select plan(22);
+select plan(27);
 
 select tests.create_user('cp-coach-a@t.local', 'Coach A') as coach_a \gset
 select tests.create_user('cp-staff-a@t.local', 'Staff A') as staff_a \gset
@@ -80,47 +80,49 @@ select tests.act_as(:'a1');
 select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'completed', 4, true)),
   '{"applied": false, "revision": 3, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'a finish from the phone after the take over is refused');
--- The phone uploads the set it ticked: applied once, and the answer says the coach logs it now.
+-- The phone uploads the set it ticked: applied once, 1000 above the take over's revision (as hand back does), and the
+-- answer says the coach logs it now.
 select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'in_progress', 4, true, 12)),
-  '{"applied": true, "revision": 4, "status": "in_progress", "loggedByOther": true}'::jsonb,
-  'the phone''s final save is applied');
+  '{"applied": true, "revision": 1003, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the phone''s final save is applied, above any revision the coach''s page can hold');
 reset role;
 select results_eq(format($$select s.actual_reps, s.completed_at is not null, l.logged_by, l.taken_over_from
     from public.log_sets s join public.workout_logs l on l.id = s.log_id where l.id = %L$$, :'l1'),
   format($$values (12::smallint, true, %L::uuid, null::uuid)$$, :'coach_a'),
   'the client''s ticked set is kept, the coach still logs it, and the window is closed');
 select tests.act_as(:'a1');
-select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'in_progress', 5, true, 13)),
-  '{"applied": false, "revision": 4, "status": "in_progress", "loggedByOther": true}'::jsonb,
+select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'in_progress', 1004, true, 13)),
+  '{"applied": false, "revision": 1003, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'only one final save: the next one is refused');
--- The coach's page had the take-over copy (revision 3): its save is stale, so it reloads the server copy (with the
--- client's set) and re-applies its own edit on top.
+-- The coach's page counted up from the take over (3) on its own: two edits make 5, above the phone's own 4. Its save
+-- is still stale, so it never replaces the log; the page reloads the server copy and re-applies its edits on top.
 select tests.act_as(:'coach_a');
-select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 4, true, 10)),
-  '{"applied": false, "revision": 4, "status": "in_progress"}'::jsonb, 'the coach''s older copy is stale');
-select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 5, true, 10))->>'applied',
-  'true', 'the coach''s edit on top of the client''s final save is applied');
+select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 5, false, 10)),
+  '{"applied": false, "revision": 1003, "status": "in_progress"}'::jsonb,
+  'the coach''s copy is stale even with a revision above the phone''s final save');
+select is((select actual_reps from public.log_sets where log_id = :'l1'), 12::smallint, 'so the client''s set survives');
+select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 1004, true, 10))->>'applied',
+  'true', 'the coach''s edit re-applied on top of the client''s final save is applied');
 
 -- ---------------------------------------------------------------------------------------------
 -- Once the coach has saved, the phone's queued copy can never overwrite the coach's sets.
-select is(public.hand_back_workout_log(:'l1')->>'revision', '1005', 'the coach hands it back');
-select is(public.take_over_workout_log(:'l1')->>'revision', '1005', 'and takes it again');
-select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 1006, true, 20))->>'applied',
+select is(public.hand_back_workout_log(:'l1')->>'revision', '2004', 'the coach hands it back');
+select is(public.take_over_workout_log(:'l1')->>'revision', '2004', 'and takes it again');
+select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 2005, true, 20))->>'applied',
   'true', 'the coach saves first this time');
 select tests.act_as(:'a1');
-select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'in_progress', 1500, true, 30)),
-  '{"applied": false, "revision": 1006, "status": "in_progress", "loggedByOther": true}'::jsonb,
+select is(public.save_workout_log(tests.cp_doc(:'l1', :'w_today', 'in_progress', 2500, true, 30)),
+  '{"applied": false, "revision": 2005, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the phone''s copy is refused after the coach saved');
 select is((select actual_reps from public.log_sets where log_id = :'l1'), 20::smallint, 'the coach''s numbers stay');
 
--- The coach who held it before another coach took over has the same one final save.
+-- The coach who held it (and saved) before another coach took over has the same one final save.
 select tests.act_as(:'staff_a');
 select lives_ok(format('select public.take_over_workout_log(%L)', :'l1'), 'a staff coach takes it over');
 select tests.act_as(:'coach_a');
-select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 1007, true, 21)),
-  '{"applied": true, "revision": 1007, "status": "in_progress", "loggedByOther": true}'::jsonb,
+select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l1', :'w_today', 'in_progress', 2006, true, 21)),
+  '{"applied": true, "revision": 3005, "status": "in_progress", "loggedByOther": true}'::jsonb,
   'the previous coach''s final save is applied once');
-
 -- ---------------------------------------------------------------------------------------------
 -- Only today's and missed workouts can be started by the coach.
 select is(tests.cp_error(format('select public.coach_save_workout_log(%L, %L::jsonb)', :'a2',
@@ -134,6 +136,19 @@ update public.workout_logs set status = 'completed', finished_at = now() where i
 select tests.act_as(:'coach_a');
 select is(public.coach_save_workout_log(:'a1', tests.cp_doc(:'l3', :'w_missed', 'in_progress', 1, false))->>'applied',
   'true', 'the coach can log a missed workout');
+
+-- ---------------------------------------------------------------------------------------------
+-- Coach B takes over from coach A before A saved anything: the client's unsent sets keep their final save.
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l2'), 'coach A takes over the client''s workout');
+select tests.act_as(:'staff_a');
+select lives_ok(format('select public.take_over_workout_log(%L)', :'l2'), 'coach B takes it from A before A saved');
+reset role;
+select is((select taken_over_from from public.workout_logs where id = :'l2'), :'a2'::uuid,
+  'the window still belongs to the client, not to coach A who changed nothing');
+select tests.act_as(:'a2');
+select is(public.save_workout_log(tests.cp_doc(:'l2', :'w_later', 'in_progress', 2, true, 9)),
+  '{"applied": true, "revision": 1001, "status": "in_progress", "loggedByOther": true}'::jsonb,
+  'the client''s final save is applied after the second take over');
 
 select * from finish();
 rollback;

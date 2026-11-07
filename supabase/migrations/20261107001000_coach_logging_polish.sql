@@ -3,7 +3,9 @@
 -- 1. A set the client just ticked is not lost when the coach takes over before the phone has uploaded it.
 --    take_over_workout_log remembers who held the log (taken_over_from). Until the new holder's first save, that
 --    person's next save is still applied once (a "final save"): the phone, told of the take over, uploads what it
---    has first and then shows the coach's copy. The answer is { applied: true, ..., loggedByOther: true }. Once the
+--    has first and then shows the coach's copy. The answer is { applied: true, ..., loggedByOther: true }, and the
+--    stored revision jumps 1000 above the take over's, so the coach's page (counting up from the take over) is stale
+--    and re-applies its edits on the client's copy instead of replacing it. Once the
 --    coach has saved anything, the window is closed and the phone's copy is refused as before, so the coach's own
 --    changes are never overwritten. The coach's page re-applies its unsaved edits on top of the client's final save.
 -- 2. A coach can't start a session for a workout on a later day (only today's and missed ones), even from a direct
@@ -135,6 +137,11 @@ begin
         'loggedByOther', true);
     end if;
     v_final_save := true;
+    -- Stored 1000 above the take over's revision (as hand back and reclaim do): the coach's page counts its own
+    -- revisions up from the take over's, so without the jump a coach save could rank above this one and replace the
+    -- whole log, dropping the client's sets. With it, the coach's next save is stale: the page reloads this copy and
+    -- re-applies its own edits on top.
+    v_revision := greatest(v_revision, v_log.revision + 1000);
   end if;
 
   -- A coach starts a session only for today's workout or a missed one, never a later day's (the client's today,
@@ -422,7 +429,9 @@ $$;
 
 revoke execute on function private.save_workout_log_as(jsonb, uuid, uuid) from public, anon, authenticated, service_role;
 
--- take_over_workout_log (from 20261106012000), now also remembering who held the log for their final save.
+-- take_over_workout_log (from 20261106012000), now also remembering who held the log for their final save. A second
+-- take over before anyone saved keeps the first holder (coach B taking over from coach A, who never saved, keeps the
+-- client's final save).
 create or replace function public.take_over_workout_log(p_log_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -447,7 +456,9 @@ begin
   end if;
   if v_log.logged_by is distinct from v_uid then
     update public.workout_logs l set logged_by = v_uid, last_activity_at = now(),
-      taken_over_from = coalesce(v_log.logged_by, v_log.client_id)
+      -- A take over before the last holder saved anything (taken_over_from still set) keeps the earlier holder: the
+      -- client whose unsent sets are owed their final save, never a coach who changed nothing.
+      taken_over_from = coalesce(v_log.taken_over_from, v_log.logged_by, v_log.client_id)
     where l.id = p_log_id;
   end if;
   return jsonb_build_object('revision', v_log.revision, 'status', v_log.status);
