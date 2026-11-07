@@ -10,6 +10,7 @@ import { DuplicateButton } from '@/components/duplicate-button';
 import { AutoProgressionPanel } from './auto-progression-panel';
 import { DeleteProgram } from './delete-program';
 import { loadLiveSync } from '@/lib/live-sync';
+import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -28,13 +29,13 @@ export default async function ProgramPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, userId } = await requireCoach();
   const { id } = await params;
   const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
-  const [program, slots, library, live] = await Promise.all([
+  const [program, slots, library, live, history] = await Promise.all([
     getProgram(id),
     supabase
       .from('program_workouts')
@@ -52,6 +53,7 @@ export default async function ProgramPage({
       .order('name')
       .limit(LIBRARY_LIMIT),
     loadLiveSync(supabase, workspaceId, id),
+    loadPickerHistory(supabase, workspaceId, userId),
   ]);
   if (slots.error) throw new Error(`Could not load the program's workouts: ${slots.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
@@ -66,6 +68,7 @@ export default async function ProgramPage({
     workoutName: s.workouts?.name ?? '',
   }));
   const workouts: LibraryWorkout[] = library.data;
+  const hints = pickerHints(history, workouts);
 
   return (
     <div className={styles.page}>
@@ -80,7 +83,7 @@ export default async function ProgramPage({
       </header>
       <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={program.auto_progression} />
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} />
     </div>
   );
 }

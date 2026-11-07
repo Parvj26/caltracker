@@ -43,6 +43,7 @@ export function AssignDialog({
   clientId,
   clientName,
   programs,
+  defaultProgramId = null,
   existing,
   today,
   onAssigned,
@@ -52,6 +53,8 @@ export function AssignDialog({
   clientId: string;
   clientName: string;
   programs: PickerProgram[];
+  /** The coach's most recently assigned program: picked to start with (else the first). */
+  defaultProgramId?: string | null;
   /** The client's workouts already on the calendar from a week back on, to warn about days the program lands on. */
   existing: readonly ExistingWorkout[];
   /** The coach's own today, from the browser. */
@@ -63,7 +66,9 @@ export function AssignDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [programId, setProgramId] = useState(programs[0]?.id ?? '');
+  const [programId, setProgramId] = useState(
+    () => programs.find((p) => p.id === defaultProgramId)?.id ?? programs[0]?.id ?? '',
+  );
   const [startDate, setStartDate] = useState(() => nextMonday(today));
   const [assignmentId] = useState(() => crypto.randomUUID());
   const [pending, setPending] = useState(false);

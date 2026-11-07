@@ -21,7 +21,7 @@ export {
   parseClientCsv,
 } from './invites/csv';
 export type { CsvError, ParsedClientCsv } from './invites/csv';
-export { TRACKING_TYPES, inferTrackingType } from './exercises/tracking';
+export { FALLBACK_TRACKING_TYPE, TRACKING_TYPES, inferTrackingType, isTrackingType, toTrackingType } from './exercises/tracking';
 export type { TrackingType } from './exercises/tracking';
 export { FREE_EXERCISE_DB_IMAGE_PREFIX, exerciseImageObjectPath, mapFreeExercise } from './exercises/free-exercise-db';
 export { equipmentLabel, workoutEquipment } from './exercises/equipment';
@@ -90,6 +90,7 @@ export {
   WorkoutSetDoc,
   WorkoutSubstituteDoc,
   MAX_SUBSTITUTES,
+  parseWorkoutDocLenient,
   substituteSetProblems,
 } from './workouts/schema';
 export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
@@ -98,7 +99,16 @@ export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow, WorkoutTreeSubstituteRow } from './workouts/tree';
-export { TARGET_FIELDS, TRACKING_TYPE_LABELS, formatRest, formatSetTarget, formatSetsSummary } from './workouts/targets';
+export {
+  TARGET_FIELDS,
+  TRACKING_TYPE_LABELS,
+  fitSetTargets,
+  formatRest,
+  formatSetTarget,
+  formatSetsSummary,
+  targetFieldsFor,
+  trackingTypeLabel,
+} from './workouts/targets';
 export { workoutPreview } from './workouts/preview';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
@@ -155,6 +165,8 @@ export {
   nextMonday,
   workoutClashes,
 } from './programs/assign-targets';
+export { PICKER_HINT_SIZE, pickerSections, workoutHints } from './programs/picker-hints';
+export type { WorkoutHints } from './programs/picker-hints';
 export { isLiveWorkout, liveSyncStatus, liveSyncWindow, planLiveSync } from './programs/live-sync';
 export type { LiveSyncAssignment, LiveSyncCopy, LiveSyncPlan, LiveSyncSlot } from './programs/live-sync';
 export type { ProgramClash } from './programs/clashes';
@@ -176,6 +188,8 @@ export {
   LogSetTarget,
   LogSubstituteOption,
   WorkoutLogDoc,
+  parseLogSubstituteOptionLenient,
+  parseWorkoutLogDocLenient,
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
@@ -412,7 +426,20 @@ export { cardRequestLabel, cardText, posterFirstName, prLine, workoutCardSentenc
 export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
-export { groupedLikeText, likersLine } from './community/likes';
+export {
+  REACTIONS,
+  applyReactionChange,
+  groupedReactionText,
+  invertReactionChange,
+  isReactionKey,
+  reactionButtonLabel,
+  reactionTap,
+  summarizeReactions,
+  toggleReaction,
+  topReactionsLine,
+  whoReactedLabel,
+} from './community/reactions';
+export type { ReactionChange, ReactionInfo, ReactionKey, ReactionRow, ReactionSummary } from './community/reactions';
 export { badgeLabel, groupNotifications, notificationText, unreadNotificationCount } from './community/notifications';
 export type { NotificationItem, NotificationKind, NotificationRow } from './community/notifications';
 export { firstYoutubeId, splitLinks } from './community/links';

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { memberName } from '@caltracker/shared';
 import Link from 'next/link';
 import { Card } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -18,6 +19,7 @@ export default async function CommunityPage() {
   const supabase = await createServerSupabase();
   const data = await loadCommunity(supabase, coach.workspaceId);
   const now = renderTime();
+  const viewer = { userId: coach.userId, name: memberName({ firstName: coach.firstName, lastName: coach.lastName }) };
 
   if (!data) {
     return (
@@ -48,7 +50,7 @@ export default async function CommunityPage() {
               <p className={styles.caption}>No posts yet. Say hello to kick things off — your clients get a notification.</p>
             </Card>
           ) : (
-            data.posts.map((p) => <PostCard key={p.id} post={p} viewerId={coach.userId} units={coach.units} now={now} />)
+            data.posts.map((p) => <PostCard key={p.id} post={p} viewer={viewer} units={coach.units} now={now} />)
           )}
         </div>
         <Members communityId={data.communityId} members={data.members} />
@@ -60,7 +62,7 @@ export default async function CommunityPage() {
           { table: 'communities', filter: `id=eq.${data.communityId}` },
           { table: 'community_posts', filter: `workspace_id=eq.${coach.workspaceId}` },
           { table: 'community_comments', filter: `workspace_id=eq.${coach.workspaceId}` },
-          { table: 'community_likes', filter: `workspace_id=eq.${coach.workspaceId}` },
+          { table: 'community_reactions', filter: `workspace_id=eq.${coach.workspaceId}` },
           { table: 'community_reports', filter: `workspace_id=eq.${coach.workspaceId}` },
         ]}
         renderedAt={now}

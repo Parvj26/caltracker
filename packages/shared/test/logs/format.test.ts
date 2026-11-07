@@ -64,6 +64,15 @@ describe('formatLastResult', () => {
     expect(formatLastResult([done({ actualDistanceM: 5000 })], 'distance', 'kg')).toBe('Last time: 5 km');
   });
 
+  it('formats weight-and-time exercises, ignoring reps', () => {
+    expect(formatLastResult([done({ actualWeightKg: toKg(70, 'lb'), actualDurationS: 60 })], 'weight_time', 'lb')).toBe(
+      'Last time: 70 lb · 1:00',
+    );
+    expect(formatLastResult([done({ actualWeightKg: null, actualDurationS: 45 })], 'weight_time', 'lb')).toBe('Last time: 45 s');
+    expect(formatLastResult([done({ actualWeightKg: 32 })], 'weight_time', 'kg')).toBe('Last time: 32 kg');
+    expect(formatLastResult([done({ actualWeightKg: null })], 'weight_time', 'kg')).toBeNull();
+  });
+
   it('is null with nothing to show: no sets, only warm-ups, or no values', () => {
     expect(formatLastResult([], 'weight_reps', 'lb')).toBeNull();
     expect(formatLastResult([done({ setType: 'warmup' })], 'weight_reps', 'lb')).toBeNull();

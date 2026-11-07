@@ -36,6 +36,7 @@ import {
   placeAfterChange,
   planChanges,
   resumePlace,
+  fieldsFor,
   setRows,
   startGroups,
   hasTypedValues,
@@ -307,6 +308,19 @@ describe('set rows', () => {
     const ex = log.blocks[0].exercises[0];
     expect(setRows({ ...ex, trackingType: 'time' }, 'lb', [])[0].cells.map((c) => c.heading)).toEqual(['TIME']);
     expect(setRows({ ...ex, trackingType: 'distance' }, 'kg', [])[0].cells.map((c) => c.heading)).toEqual(['KM']);
+  });
+
+  it('a tracking type this build does not know gets the reps column instead of crashing', () => {
+    const ex = mockLog().blocks[0].exercises[0];
+    const future = { ...ex, trackingType: 'sled_meters_per_minute' as unknown as typeof ex.trackingType };
+    expect(fieldsFor(future)).toEqual(['reps']);
+    expect(setRows(future, 'lb', [])[0].cells.map((c) => c.heading)).toEqual(['REPS']);
+  });
+
+  it('a weight-and-time exercise (a loaded carry) has a weight column, then TIME', () => {
+    const ex = mockLog().blocks[0].exercises[0];
+    expect(setRows({ ...ex, trackingType: 'weight_time' }, 'lb', [])[0].cells.map((c) => c.heading)).toEqual(['LB', 'TIME']);
+    expect(setRows({ ...ex, trackingType: 'weight_time' }, 'kg', [])[0].cells.map((c) => c.heading)).toEqual(['KG', 'TIME']);
   });
 
   it('a ticked set keeps its numbers editable: the box shows what is stored', () => {

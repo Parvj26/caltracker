@@ -255,10 +255,14 @@ describe('logRowToDoc with substitutes', () => {
     expect(doc.blocks[0]!.exercises[0]!.substituteOptions).toEqual(ex.substituteOptions);
     // Bad and repeated options are left out; a substituteId that is no longer among them reads as null.
     const opts = JSON.parse(JSON.stringify(ex.substituteOptions)) as Array<Record<string, unknown>>;
-    const messy = { ...row.log_blocks[0]!.log_exercises[0]!, substitute_options: [opts[0], { ...opts[1], trackingType: 'yoga' }, opts[0], 'junk', null] };
+    const messy = { ...row.log_blocks[0]!.log_exercises[0]!, substitute_options: [opts[0], { ...opts[1], exerciseId: 'not-a-uuid' }, opts[0], 'junk', null] };
     const cleaned = WorkoutLogDoc.parse(logRowToDoc({ ...row, log_blocks: [{ ...row.log_blocks[0]!, log_exercises: [messy] }] }));
     expect(cleaned.blocks[0]!.exercises[0]!.substituteOptions).toHaveLength(1);
     expect(cleaned.blocks[0]!.exercises[0]!.substituteId).toBeNull();
+    // A tracking type this build doesn't know is not a bad option: it reads as the fallback (reps) and is kept.
+    const future = { ...row.log_blocks[0]!.log_exercises[0]!, substitute_options: [opts[0], { ...opts[1], trackingType: 'yoga' }] };
+    const kept = WorkoutLogDoc.parse(logRowToDoc({ ...row, log_blocks: [{ ...row.log_blocks[0]!, log_exercises: [future] }] }));
+    expect(kept.blocks[0]!.exercises[0]!.substituteOptions.map((o) => o.trackingType)).toEqual([opts[0]!.trackingType, 'reps']);
     const notArray = logRowToDoc({ ...row, log_blocks: [{ ...row.log_blocks[0]!, log_exercises: [{ ...messy, substitute_options: { a: 1 } }] }] });
     expect(notArray.blocks[0]!.exercises[0]!.substituteOptions).toEqual([]);
     const older = { ...row.log_blocks[0]!.log_exercises[0]! };

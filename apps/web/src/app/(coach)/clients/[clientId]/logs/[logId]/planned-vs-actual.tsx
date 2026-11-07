@@ -13,6 +13,7 @@ import {
   needsPick,
   sectionRuns,
   substitutedFrom,
+  toTrackingType,
   type LogSetDoc,
   type TrackingType,
   type Units,
@@ -31,18 +32,19 @@ export function draftFor(set: LogSetDoc, trackingType: TrackingType, units: Unit
   const weight = set.actualWeightKg === null ? '' : String(kgToInput(set.actualWeightKg, units));
   const time = set.actualDurationS === null ? '' : formatClock(set.actualDurationS);
   const distance = set.actualDistanceM === null ? '' : String(fromMeters(set.actualDistanceM, distanceUnitFor(units)));
-  switch (trackingType) {
+  switch (toTrackingType(trackingType)) {
     case 'weight_reps': return { weight, reps };
     case 'reps': return { reps };
     case 'time': return { time };
     case 'distance': return { distance };
+    case 'weight_time': return { weight, time };
   }
 }
 
 const reps = (n: number) => `${n} ${n === 1 ? 'rep' : 'reps'}`;
 
 function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
-  switch (t) {
+  switch (toTrackingType(t)) {
     case 'weight_reps':
       if (s.actualReps !== null && s.actualWeightKg !== null) return `${formatWeight(s.actualWeightKg, units)} × ${s.actualReps}`;
       if (s.actualReps !== null) return reps(s.actualReps);
@@ -50,6 +52,13 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
     case 'reps': return s.actualReps !== null ? reps(s.actualReps) : '–';
     case 'time': return s.actualDurationS !== null ? formatDuration(s.actualDurationS) : '–';
     case 'distance': return s.actualDistanceM !== null ? formatDistance(s.actualDistanceM, units) : '–';
+    case 'weight_time': {
+      const parts = [
+        s.actualWeightKg !== null ? formatWeight(s.actualWeightKg, units) : null,
+        s.actualDurationS !== null ? formatDuration(s.actualDurationS) : null,
+      ].filter((p) => p !== null);
+      return parts.length > 0 ? parts.join(' · ') : '–';
+    }
   }
 }
 
@@ -158,9 +167,9 @@ export function PlannedVsActual({
                               <td>
                                 {edit && draft ? (
                                   <span className={styles.inputs}>
-                                    {ex.trackingType === 'weight_reps' ? field('weight', `weight (${units})`, 'decimal') : null}
+                                    {ex.trackingType === 'weight_reps' || ex.trackingType === 'weight_time' ? field('weight', `weight (${units})`, 'decimal') : null}
                                     {ex.trackingType === 'weight_reps' || ex.trackingType === 'reps' ? field('reps', 'reps', 'numeric') : null}
-                                    {ex.trackingType === 'time' ? field('time', 'time (m:ss)', 'text') : null}
+                                    {ex.trackingType === 'time' || ex.trackingType === 'weight_time' ? field('time', 'time (m:ss)', 'text') : null}
                                     {ex.trackingType === 'distance' ? field('distance', `distance (${distUnit})`, 'decimal') : null}
                                   </span>
                                 ) : done ? (
