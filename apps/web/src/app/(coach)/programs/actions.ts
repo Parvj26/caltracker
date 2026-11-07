@@ -303,7 +303,7 @@ export type LiveSyncOutcome = ({ ok: true } & LiveSyncState) | { ok: false; erro
 
 /**
  * Turns the program's Live Sync on or off. Turning it on runs the catch-up sync in the same transaction (a database
- * trigger at commit, see the 20261106007000_live_sync migration), so the status read afterwards already includes it.
+ * trigger at commit, see the 20261106011000_live_sync migration), so the status read afterwards already includes it.
  */
 export async function setProgramLiveSync(id: string, on: boolean): Promise<LiveSyncOutcome> {
   const { workspaceId } = await requireCoach();

@@ -60,7 +60,7 @@ page). The web "Live" tag uses the browser's today.
 
 ## How it works (database)
 
-Migration `supabase/migrations/20261106007000_live_sync.sql`.
+Migration `supabase/migrations/20261106011000_live_sync.sql`.
 
 ### New columns and table
 

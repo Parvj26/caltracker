@@ -1032,12 +1032,15 @@ export type Database = {
       program_live_sync_queue: {
         Row: {
           program_id: string
+          xact: unknown
         }
         Insert: {
           program_id: string
+          xact?: unknown
         }
         Update: {
           program_id?: string
+          xact?: unknown
         }
         Relationships: []
       }
@@ -1685,7 +1688,14 @@ export type Database = {
           workspace_name: string
         }[]
       }
-      client_today: { Args: { p_client: string }; Returns: string }
+      client_today: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
+      }
+      client_zone: {
+        Args: { p_client: string; p_workspace: string }
+        Returns: string
+      }
       copy_program_week: {
         Args: {
           p_from: number
@@ -1807,6 +1817,7 @@ export type Database = {
           measured_on: string
         }[]
       }
+      live_sync_backfill_copies: { Args: never; Returns: number }
       live_sync_program: { Args: { p_program_id: string }; Returns: number }
       lookup_members_by_email: {
         Args: { emails: string[] }

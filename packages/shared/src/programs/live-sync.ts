@@ -2,7 +2,7 @@ import { addDays, programDayToDate } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
 
 // Program Live Sync (spec: docs/superpowers/specs/2026-11-06-live-sync-design.md). The database does the sync
-// (live_sync_program in supabase/migrations/20261106007000_live_sync.sql); planLiveSync is the same rule as a pure
+// (live_sync_program in supabase/migrations/20261106011000_live_sync.sql); planLiveSync is the same rule as a pure
 // function, so the rule is written down and tested in one place and the two can be checked against each other.
 
 export type LiveSyncAssignment = { startDate: IsoDate; endDate: IsoDate; cancelledOn: IsoDate | null };
