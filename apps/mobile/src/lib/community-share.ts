@@ -13,7 +13,7 @@ export function stickerShareCard(item: AlbumItem): CardRequest | null {
  * A finished workout, once the server has its award (which also means the log has synced): the database builds the
  * card from the log and that award, so before then there is nothing to share yet.
  */
-export function workoutShareCard(log: WorkoutLogDoc, award: AwardResult | null): CardRequest | null {
+export function workoutShareCard(log: Pick<WorkoutLogDoc, 'id' | 'status'>, award: AwardResult | null): CardRequest | null {
   return log.status === 'completed' && award ? { kind: 'workout', logId: log.id } : null;
 }
 

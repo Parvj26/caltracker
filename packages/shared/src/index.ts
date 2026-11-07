@@ -303,6 +303,7 @@ export { shortDate, strengthExercises, strengthSeries, strengthSummary } from '.
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
+export { RECENT_PR_DAYS, RECENT_PR_LIMIT, awardRecords, recentPrAmount, recentPrs } from './awards/recent-prs';
 export { computeAward, revealCards } from './awards/award';
 export type { AwardInput, AwardResult, RevealCard } from './awards/award';
 export {
@@ -425,3 +426,26 @@ export {
   fitLongEdge,
 } from './community/photos';
 export type { CommunityPhotoExt } from './community/photos';
+export {
+  exerciseRegion,
+  nextSuggestion,
+  prefillLastTime,
+  prescriptionOfLogExercise,
+  prescriptionOfWorkoutExercise,
+  progressionHint,
+  progressionHistoryFromRows,
+  suggestionForLogExercise,
+  suggestionsForLog,
+  suggestionsForWorkout,
+  withSuggestion,
+} from './progression/progression';
+export type {
+  BodyRegion,
+  ExerciseHistory,
+  PrescribedSet,
+  Prescription,
+  ProgressionHistory,
+  ProgressionSession,
+  ProgressionSet,
+  Suggestion,
+} from './progression/progression';

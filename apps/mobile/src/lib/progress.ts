@@ -38,7 +38,15 @@ export type ProgressRows = { scans: ScanRow[]; customs: CustomMetricRow[]; goal:
 export type GoalModel = { text: string; countdown: string | null; date: string | null };
 
 /** One of the headline numbers (weight, body fat, muscle): its newest value and how it moved over 3 months. */
-export type LatestModel = { key: OverviewMetric; label: string; value: string; date: string; change: string | null };
+export type LatestModel = {
+  key: OverviewMetric;
+  label: string;
+  value: string;
+  date: string;
+  change: string | null;
+  /** The 3-month change alone ("−1.5 kg"), for small tiles; null with fewer than two values in that time. */
+  delta: string | null;
+};
 
 export type ChartModel = {
   key: string;
@@ -141,6 +149,7 @@ export function buildProgress(data: ProgressRows, range: ChartRange, units: Unit
             date: formatShortDate(m.latest.date, today),
             change:
               m.change === null ? null : `${formatMetricChange(m.key, m.change, units)} since ${formatShortDate(m.points[0].date, today)}`,
+            delta: m.change === null ? null : formatMetricChange(m.key, m.change, units),
           },
         ]
       : [],
