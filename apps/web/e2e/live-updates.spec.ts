@@ -142,16 +142,20 @@ test('the log page fills in sets as the client ticks them off, and shows when th
 
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}/logs/${log.id}`);
-  const facts = page.locator('header ul li');
-  await expect(facts.filter({ hasText: /^0 sets$/ })).toBeVisible();
-  await expect(page.getByText('In progress', { exact: true })).toBeVisible();
+  // While it is in progress the page is the live view.
+  const progress = page.getByRole('list', { name: 'Progress' });
+  await expect(progress).toContainText('0 of 3 sets');
+  await expect(page.getByText(/^LIVE · LIVE LOG/)).toBeVisible();
   await waitUntilLive(page);
 
   await log.save(client.phone, 1);
-  await expect(facts.filter({ hasText: /^1 set$/ })).toBeVisible(LIVE);
+  await expect(progress).toContainText('1 of 3 sets', LIVE);
   await log.save(client.phone, 2);
-  await expect(facts.filter({ hasText: /^2 sets$/ })).toBeVisible(LIVE);
+  await expect(progress).toContainText('2 of 3 sets', LIVE);
+  await expect(page.getByRole('listitem', { name: 'Barbell Squat' })).toContainText('✓ 60 kg × 8, ✓ 60 kg × 8');
 
+  // Once finished it is the finished log.
+  const facts = page.locator('header ul li');
   await log.save(client.phone, 3, 'completed');
   await expect(facts.filter({ hasText: /^3 sets$/ })).toBeVisible(LIVE);
   await expect(facts.filter({ hasText: /^Finished / })).toBeVisible(LIVE);

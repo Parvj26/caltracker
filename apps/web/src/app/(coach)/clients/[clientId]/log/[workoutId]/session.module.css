@@ -141,3 +141,17 @@
 }
 .pager { display: flex; justify-content: space-between; gap: var(--ct-space-3); }
 .footer { padding-top: var(--ct-space-4-5); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+
+/* Finish, Hand back and Cancel: one height (48 px), one type size and padding, on one line. The size is Finish's
+   (white on magenta needs at least 19 px bold). Finish's 4 px bottom shadow is drawn outside the box, so the row keeps
+   that much room below and the three boxes stay aligned. Cancel is the quiet one: no outline, underlined. */
+.footerActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); padding-bottom: var(--ct-base); }
+.footerActions .footerButton {
+  height: var(--ct-button-min-height);
+  min-height: var(--ct-button-min-height);
+  padding: 0 var(--ct-space-6);
+  font-size: max(19px, var(--ct-size-button));
+  line-height: 1;
+  white-space: nowrap;
+}
+.footerActions .quietButton { box-shadow: none; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }

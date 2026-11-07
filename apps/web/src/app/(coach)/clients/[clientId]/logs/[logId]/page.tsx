@@ -16,6 +16,8 @@ import { ClientNote } from './planned-vs-actual';
 import styles from './log.module.css';
 import { LiveRefresh } from '@/components/live-refresh';
 import { renderTime } from '@/lib/live-refresh';
+import { TrainingNowHost } from '@/components/training-now/training-now-host';
+import { loadTrainingNow, pickActivePane } from '@/lib/training-now';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string; logId: string }> }): Promise<Metadata> {
   const { clientId, logId } = await params;
@@ -28,9 +30,9 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ clientId: string; logId: string }>;
-  searchParams: Promise<{ edit?: string | string[]; award?: string | string[] }>;
+  searchParams: Promise<{ edit?: string | string[]; award?: string | string[]; with?: string | string[] }>;
 }) {
-  const { userId, units } = await requireCoach();
+  const { userId, units, workspaceId } = await requireCoach();
   const [{ clientId, logId }, query] = await Promise.all([params, searchParams]);
   const awardNow = query.award === '1';
   const supabase = await createServerSupabase();
@@ -39,6 +41,19 @@ export default async function LogPage({
   if (!client || !loaded || loaded.clientId !== client.id) notFound();
   const { log, correctedAt } = loaded;
   const byCoach = isLoggedByCoach({ loggedBy: loaded.loggedBy, clientId: loaded.clientId });
+
+  // A workout in progress opens live (and, with ?with=, whoever the coach switched to in the Training now tabs).
+  // Once it is finished, the page below shows the finished log.
+  const switchedTo = typeof query.with === 'string' ? query.with : null;
+  if (log.status === 'in_progress' || switchedTo) {
+    const now = await loadTrainingNow(supabase, { workspaceId, coachId: userId });
+    const active = pickActivePane(now.panes, [switchedTo, log.status === 'in_progress' ? log.id : null]);
+    if (active) {
+      return (
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+      );
+    }
+  }
 
   const swappedIds = [...new Set(log.blocks.flatMap((b) => b.exercises.flatMap((e) => (e.swappedFromExerciseId ? [e.swappedFromExerciseId] : []))))];
   const [comments, swapped, award] = await Promise.all([

@@ -10,6 +10,8 @@ import { loadProgression } from '@/lib/progression';
 import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { TrainingNowHost } from '@/components/training-now/training-now-host';
+import { loadTrainingNow, pickActivePane } from '@/lib/training-now';
 import { ClientLogging } from './client-logging';
 import { SessionLogger } from './session-logger';
 import styles from './session.module.css';
@@ -30,9 +32,15 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
  * active logger). One person logs a workout at a time: when the client is already logging it on the phone the coach
  * watches, or takes over.
  */
-export default async function SessionPage({ params }: { params: Promise<{ clientId: string; workoutId: string }> }) {
-  const { userId, units } = await requireCoach();
-  const { clientId, workoutId } = await params;
+export default async function SessionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientId: string; workoutId: string }>;
+  searchParams: Promise<{ with?: string | string[] }>;
+}) {
+  const { userId, units, workspaceId } = await requireCoach();
+  const [{ clientId, workoutId }, query] = await Promise.all([params, searchParams]);
   const [client, workout] = await Promise.all([getClient(clientId), getWorkoutDoc(workoutId)]);
   // RLS limits both to the coach's workspace; the workout must also be on this client's calendar. A past client's
   // calendar is read-only, so there is no session to log.
@@ -101,6 +109,17 @@ export default async function SessionPage({ params }: { params: Promise<{ client
         <ClientLogging holder={holder} log={log} units={units} done={completedSetCount(log)} />
       </div>
     );
+  }
+
+  if (state.kind === 'mine' && log) {
+    // The coach's own session, with everyone else training now one tab away (they may log two people at once).
+    const now = await loadTrainingNow(supabase, { workspaceId, coachId: userId });
+    const active = pickActivePane(now.panes, [typeof query.with === 'string' ? query.with : null, log.id]);
+    if (active) {
+      return (
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+      );
+    }
   }
 
   return (
