@@ -2325,6 +2325,15 @@ export type Database = {
         Args: { p_client_id: string; p_doc: Json }
         Returns: Json
       }
+      copy_client_workout: {
+        Args: {
+          p_client_id: string
+          p_date: string
+          p_new_id: string
+          p_source: string
+        }
+        Returns: string
+      }
       copy_program_week: {
         Args: {
           p_from: number
