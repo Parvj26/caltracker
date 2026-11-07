@@ -414,3 +414,31 @@ export {
   fitLongEdge,
 } from './community/photos';
 export type { CommunityPhotoExt } from './community/photos';
+export {
+  KCAL_PER_GRAM,
+  MACRO_KEYS,
+  MACRO_LIMITS,
+  MACRO_NAMES,
+  MACRO_SHORT,
+  MEAL_NAME_MAX,
+  MEAL_NAME_PRESETS,
+  MEAL_NOTE_MAX,
+  MEAL_PHOTO_BUCKET,
+  dailyTotals,
+  foodDayLabel,
+  formatMacro,
+  formatMealTime,
+  hasAnyMacro,
+  hasAnyTarget,
+  kcalFromMacros,
+  kcalHint,
+  macroProgress,
+  mealPhotoPaths,
+  mealProblems,
+  mealReference,
+  mealsByDay,
+  parseMacroInput,
+  shortDayLabel,
+  weekDays,
+} from './food/food';
+export type { DailyTotals, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt } from './food/food';
