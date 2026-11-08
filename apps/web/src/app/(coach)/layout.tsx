@@ -54,7 +54,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         <div className={styles.bottom}>
           <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
           <form action="/auth/sign-out" method="post">
-            <button type="submit" ph-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
+            <button type="submit" data-ph-capture-attribute-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
               {NAV_ICONS.signOut}
               <span className={styles.navLabel}>Sign out</span>
             </button>

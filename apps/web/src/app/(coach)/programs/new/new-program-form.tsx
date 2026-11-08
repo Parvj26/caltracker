@@ -6,7 +6,7 @@ import { ProgramInput } from '@caltracker/shared';
 import { Button, Card, ErrorText, TextAreaField, TextField } from '@/components/ui';
 import { createProgram } from '../actions';
 import styles from '../programs.module.css';
-import { getTaskTracker, markCreated } from '@/lib/analytics/client';
+import { markCreated, setBuildingProgram, startBuildingProgram } from '@/lib/analytics/client';
 
 const text = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
@@ -17,7 +17,7 @@ type FieldErrors = Partial<Record<'name' | 'description' | 'weeks', string>>;
 export function NewProgramForm() {
   const router = useRouter();
   // Not abandoned when this form unmounts: the task continues on the program page until a workout is placed.
-  useEffect(() => getTaskTracker().start('build_program'), []);
+  useEffect(() => startBuildingProgram(), []);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -46,6 +46,7 @@ export function NewProgramForm() {
       try {
         const { id } = await createProgram(parsed.data);
         markCreated('program', id);
+        setBuildingProgram(id);
         router.push(`/programs/${id}`);
       } catch {
         setFormError("Couldn't create the program. Please try again.");

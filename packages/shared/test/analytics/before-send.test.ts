@@ -76,3 +76,43 @@ describe('beforeSend (phone)', () => {
     expect(out?.properties.$elements).toEqual([{ tag_name: 'Text', 'attr__ph-label': 'log_set' }]);
   });
 });
+
+describe('beforeSend (nested values)', () => {
+  it('scrubs URLs inside $set and $set_once', () => {
+    const out = beforeSend({
+      event: '$identify',
+      properties: {},
+      $set: { name: 'Luis', $current_url: '/invite/abc?code=1' },
+      $set_once: { $initial_current_url: 'https://x.app/invite/abc?code=1', $initial_pathname: '/set-password?code=2', $initial_referrer: 'https://x.app/a?t=1' },
+    });
+    expect(out?.$set).toEqual({ name: 'Luis', $current_url: '/invite/[token]' });
+    expect(out?.$set_once).toEqual({ $initial_current_url: 'https://x.app/invite/[token]', $initial_pathname: '/set-password', $initial_referrer: 'https://x.app/a' });
+  });
+  it('scrubs heatmap URLs', () => {
+    const out = beforeSend({ event: '$$heatmap', properties: { $heatmap_data: { 'https://x.app/invite/abc?code=1#h': [{ x: 1 }] } } });
+    expect(out?.properties.$heatmap_data).toEqual({ 'https://x.app/invite/[token]': [{ x: 1 }] });
+  });
+  it('drops exception and web-vitals events', () => {
+    expect(beforeSend({ event: '$exception', properties: {} })).toBeNull();
+    expect(beforeSend({ event: '$web_vitals', properties: {} })).toBeNull();
+  });
+  it('keeps the click label on autocaptured clicks only', () => {
+    expect(beforeSend({ event: '$autocapture', properties: { label: 'nav_clients' } })?.properties).toEqual({ label: 'nav_clients' });
+    expect(beforeSend({ event: '$rageclick', properties: { label: 'save' } })?.properties).toEqual({ label: 'save' });
+    expect(beforeSend({ event: '$pageview', properties: { label: 'x' } })?.properties).toEqual({});
+  });
+});
+
+describe('beforeSend (phone labels)', () => {
+  it('keeps testID labels with ids removed', () => {
+    const out = beforeSend({
+      event: '$autocapture',
+      properties: { $elements: [{ tag_name: 'Pressable', attr__testID: 'done-5f0c2c1e-1111-4222-8333-444455556666', attr__children: 'Maya' }, { tag_name: 'View', attr__testID: 'dot-3' }] },
+    });
+    expect(out?.properties.$elements).toEqual([
+      { tag_name: 'Pressable', attr__testID: 'done-[id]' },
+      { tag_name: 'View', attr__testID: 'dot-[n]' },
+    ]);
+  });
+});
+

@@ -12,7 +12,9 @@ describe('scrubUrl', () => {
     expect(scrubUrl('caltracker://invite/tok')).toBe('caltracker://invite/[token]');
     expect(scrubUrl('invite/tok')).toBe('invite/[token]');
   });
-  it('leaves other paths alone', () => {
-    expect(scrubUrl('/clients/5f0c2c1e-1111-4222-8333-444455556666#x')).toBe('/clients/5f0c2c1e-1111-4222-8333-444455556666');
+  it('turns ids into [id] so reports group by screen', () => {
+    expect(scrubUrl('/clients/5f0c2c1e-1111-4222-8333-444455556666#x')).toBe('/clients/[id]');
+    expect(scrubUrl('https://staging.caltracker.app/clients/5F0C2C1E-1111-4222-8333-444455556666/logs/42')).toBe('https://staging.caltracker.app/clients/[id]/logs/[id]');
+    expect(scrubUrl('/programs/new')).toBe('/programs/new');
   });
 });

@@ -61,3 +61,18 @@ describe('track (phone)', () => {
     expect(capture.mock.calls.map((c: unknown[]) => c[0])).toEqual(['task_started']);
   });
 });
+
+describe('identifyPerson (phone)', () => {
+  it('identifies again once the coach workspace is known', async () => {
+    vi.stubEnv('EXPO_PUBLIC_POSTHOG_KEY', 'phc_test');
+    const identify = vi.fn();
+    vi.doMock('posthog-react-native', () => ({ default: class { capture = vi.fn(); identify = identify; reset = vi.fn(); } }));
+    const { identifyPerson } = await import('./client');
+    const base = { id: 'u1', name: 'A', email: 'a@x.com', workspaceName: null };
+    identifyPerson({ ...base, workspaceId: null });
+    identifyPerson({ ...base, workspaceId: null });
+    identifyPerson({ ...base, workspaceId: 'w1', workspaceName: 'Coach' });
+    expect(identify).toHaveBeenCalledTimes(2);
+    expect(identify.mock.calls[1]?.[1]).toMatchObject({ workspace_id: 'w1', workspace_name: 'Coach' });
+  });
+});

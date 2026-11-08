@@ -1,15 +1,22 @@
 import type { TaskName } from '@caltracker/shared';
 
-export type RouteTaskStep = { action: 'start' | 'complete'; task: TaskName };
+export type RouteTaskStep = { action: 'start' | 'complete' | 'abandon'; task: TaskName };
 
-/** Tasks that begin or end just by reaching a screen. `path` is already scrubbed (e.g. /invite/[token]). */
+const isWorkoutScreen = (path: string) => path.startsWith('/workout/') || path.startsWith('/log/');
+
+/**
+ * Tasks that begin, end or are given up just by reaching a screen. `path` is already scrubbed
+ * (e.g. /invite/[token]). Leaving a task's screens without finishing counts as giving up.
+ */
 export function routeTaskSteps(path: string): RouteTaskStep[] {
   const steps: RouteTaskStep[] = [];
   if (path.startsWith('/invite/')) steps.push({ action: 'start', task: 'join_from_invite' });
   if (path === '/today') steps.push({ action: 'complete', task: 'join_from_invite' });
-  if (path.startsWith('/workout/') || path.startsWith('/log/')) steps.push({ action: 'complete', task: 'find_todays_workout' });
+  if (isWorkoutScreen(path)) steps.push({ action: 'complete', task: 'find_todays_workout' });
   if (path === '/progress') steps.push({ action: 'start', task: 'view_progress' });
   if (path === '/zoo') steps.push({ action: 'complete', task: 'view_progress' });
+  if (!isWorkoutScreen(path) && path !== '/today' && path !== '/workouts') steps.push({ action: 'abandon', task: 'find_todays_workout' });
+  if (path !== '/progress' && path !== '/zoo') steps.push({ action: 'abandon', task: 'view_progress' });
   return steps;
 }
 

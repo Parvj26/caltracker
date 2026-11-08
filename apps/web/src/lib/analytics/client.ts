@@ -109,3 +109,27 @@ export function markUndone(itemType: string, id: string): void {
   createdAt.delete(`${itemType}:${id}`);
   if (at !== undefined && isQuickUndo(at, Date.now())) track('quick_undo', { item_type: itemType });
 }
+
+let building: string | null = null;
+
+/** The new program whose first workout completes the build_program task. */
+export function buildingProgramId(): string | null {
+  return building;
+}
+
+export function startBuildingProgram(): void {
+  building = null;
+  tracker.start('build_program');
+}
+
+export function setBuildingProgram(id: string): void {
+  building = id;
+}
+
+/** Completes build_program only when the workout went into the program that was just created. */
+export function programWorkoutSaved(programId: string): void {
+  if (building !== null && building === programId) {
+    tracker.complete('build_program');
+    building = null;
+  }
+}

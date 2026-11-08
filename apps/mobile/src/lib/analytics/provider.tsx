@@ -7,6 +7,7 @@ import { RageTapDetector, scrubUrl } from '@caltracker/shared';
 import { useSession } from '@/lib/session';
 import { getAnalyticsClient, getTaskTracker, identifyPerson, resetAnalytics, screen, track } from './client';
 import { routeTaskSteps } from './route-tasks';
+import { isTap } from './tap-filter';
 
 /** Size of the grid that groups nearby taps when spotting rage taps (the responder gives no element). */
 const TAP_CELL = 44;
@@ -23,6 +24,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const recent = useRef<string[]>([]);
   const rage = useRef(new RageTapDetector());
   const signedInAs = useRef<string | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const user = session?.user ?? null;
   useEffect(() => {
@@ -54,7 +56,8 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     tracker.screen(name);
     for (const step of routeTaskSteps(name)) {
       if (step.action === 'start') tracker.start(step.task);
-      else tracker.complete(step.task);
+      else if (step.action === 'complete') tracker.complete(step.task);
+      else tracker.abandon(step.task);
     }
   }, [pathname]);
 
@@ -88,12 +91,20 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const content = (
     <View
       style={{ flex: 1 }}
-      onStartShouldSetResponderCapture={(e) => {
+      // Plain touch events see every touch without taking it from buttons. Only touches that barely move
+      // count as taps, so scrolls and swipes don't inflate taps or look like rage taps.
+      onTouchStart={(e) => {
+        touchStart.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStart.current;
+        touchStart.current = null;
+        const end = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        if (!start || !isTap(start, end)) return;
         getTaskTracker().tap();
-        const { pageX, pageY } = e.nativeEvent;
-        const cell = `${scrubUrl(pathname)}:${Math.round(pageX / TAP_CELL)}:${Math.round(pageY / TAP_CELL)}`;
-        if (rage.current.tap(cell)) track('rage_tap', { screen: scrubUrl(pathname) });
-        return false;
+        const where = scrubUrl(pathname);
+        const cell = `${where}:${Math.round(end.x / TAP_CELL)}:${Math.round(end.y / TAP_CELL)}`;
+        if (rage.current.tap(cell)) track('rage_tap', { screen: where });
       }}
     >
       {children}
@@ -108,7 +119,8 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         captureTouches: true,
         captureScreens: false,
         customLabelProp: 'ph-label',
-        propsToCapture: ['ph-label'],
+        // Developer labels only (ph-label, testID); never on-screen text or accessibility labels.
+        propsToCapture: ['ph-label', 'testID'],
         maxElementsCaptured: 10,
       }}
     >

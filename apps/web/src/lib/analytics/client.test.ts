@@ -61,3 +61,19 @@ describe('quick undo (web)', () => {
     expect(capture.mock.calls).toEqual([['quick_undo', { item_type: 'program' }]]);
   });
 });
+
+describe('build_program (web)', () => {
+  it('completes only for the program that was just created', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    const capture = vi.fn();
+    vi.doMock('posthog-js', () => ({ default: { capture, init: vi.fn() } }));
+    const { initAnalytics, programWorkoutSaved, setBuildingProgram, startBuildingProgram } = await import('./client');
+    initAnalytics();
+    startBuildingProgram();
+    setBuildingProgram('p1');
+    programWorkoutSaved('p2');
+    expect(capture.mock.calls.map((c: unknown[]) => c[0])).toEqual(['task_started']);
+    programWorkoutSaved('p1');
+    expect(capture.mock.calls.map((c: unknown[]) => c[0])).toEqual(['task_started', 'task_completed']);
+  });
+});

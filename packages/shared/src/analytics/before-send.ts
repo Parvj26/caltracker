@@ -12,7 +12,17 @@ export interface OutgoingEvent {
 const URL_KEY = /(url|pathname|referrer|screen_name)$/i;
 const ROUTING_KEYS = new Set(['token', 'distinct_id']);
 const DROPPED_KEYS = ['title', '$title', '$el_text'];
-const KEPT_ELEMENT_KEYS = new Set(['tag_name', 'nth_child', 'nth_of_type', 'attr__ph-label']);
+/** PostHog events we never send: they can carry raw URLs or error text. */
+const DROPPED_EVENTS = /^\$(exception|web_vitals)/;
+/** Click events where the button's own `label` (set via data-ph-capture-attribute-label) is kept. */
+const CLICK_EVENTS = new Set(['$autocapture', '$rageclick', '$dead_click']);
+const KEPT_ELEMENT_KEYS = new Set(['tag_name', 'nth_child', 'nth_of_type', 'attr__ph-label', 'attr__testID']);
+const LABEL_KEYS = new Set(['attr__ph-label', 'attr__testID']);
+
+/** Developer labels can embed record ids; replace them so labels group (and carry nothing about a person). */
+function normalizeLabel(label: string): string {
+  return label.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '[id]').replace(/\d+/g, '[n]');
+}
 
 /** Removes text, attributes (except ph-label) and links from PostHog's compact elements chain. */
 function scrubChain(chain: string): string {
@@ -28,7 +38,10 @@ function scrubElements(elements: unknown): unknown {
   return elements.map((el: unknown) => {
     const kept: Record<string, unknown> = {};
     if (el && typeof el === 'object') {
-      for (const [k, v] of Object.entries(el)) if (KEPT_ELEMENT_KEYS.has(k)) kept[k] = v;
+      for (const [k, v] of Object.entries(el)) {
+        if (!KEPT_ELEMENT_KEYS.has(k)) continue;
+        kept[k] = LABEL_KEYS.has(k) && typeof v === 'string' ? normalizeLabel(v) : v;
+      }
     }
     return kept;
   });
@@ -39,7 +52,22 @@ function scrubElements(elements: unknown): unknown {
  * name a client), strips on-screen text and attributes from clicks, and runs custom events through
  * the shared allow-list.
  */
+function scrubPersonProps(props: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!props) return props;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) out[k] = URL_KEY.test(k) && typeof v === 'string' ? scrubUrl(v) : v;
+  return out;
+}
+
+function scrubHeatmap(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data;
+  const out: Record<string, unknown> = {};
+  for (const [url, points] of Object.entries(data)) out[scrubUrl(url)] = points;
+  return out;
+}
+
 export function beforeSend<E extends OutgoingEvent>(input: E): E | null {
+  if (DROPPED_EVENTS.test(input.event)) return null;
   const props: Record<string, unknown> = {};
   const custom = !input.event.startsWith('$');
   const allowed = custom ? sanitize(input.event, input.properties) : null;
@@ -51,10 +79,12 @@ export function beforeSend<E extends OutgoingEvent>(input: E): E | null {
     }
     if (!key.startsWith('$')) {
       if (allowed && key in allowed) props[key] = allowed[key];
+      else if (key === 'label' && CLICK_EVENTS.has(input.event) && typeof value === 'string') props[key] = value;
       continue;
     }
     if (key === '$elements') props[key] = scrubElements(value);
     else if (key === '$elements_chain' && typeof value === 'string') props[key] = scrubChain(value);
+    else if (key === '$heatmap_data') props[key] = scrubHeatmap(value);
     else if (URL_KEY.test(key) && typeof value === 'string') props[key] = scrubUrl(value);
     else props[key] = value;
   }
@@ -62,6 +92,9 @@ export function beforeSend<E extends OutgoingEvent>(input: E): E | null {
   if (custom) {
     delete out.$set;
     delete out.$set_once;
+  } else {
+    if (out.$set) out.$set = scrubPersonProps(out.$set);
+    if (out.$set_once) out.$set_once = scrubPersonProps(out.$set_once);
   }
   return out;
 }

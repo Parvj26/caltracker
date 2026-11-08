@@ -68,7 +68,9 @@ export function screen(name: string): void {
 
 export function identifyPerson(person: AnalyticsPerson): void {
   const ph = getAnalyticsClient();
-  if (!ph || identifiedAs === person.id) return;
+  // Again when the coach workspace arrives (it loads after the session), so the person gets it.
+  const key = `${person.id}:${person.workspaceId ?? ''}`;
+  if (!ph || identifiedAs === key) return;
   try {
     ph.identify(person.id, {
       name: person.name,
@@ -78,7 +80,7 @@ export function identifyPerson(person: AnalyticsPerson): void {
       ...(person.workspaceName ? { workspace_name: person.workspaceName } : {}),
       internal: isInternalEmail(person.email),
     });
-    identifiedAs = person.id;
+    identifiedAs = key;
   } catch {
     // ignore
   }

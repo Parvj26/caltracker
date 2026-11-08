@@ -3,14 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
-import { getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
+import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
+import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
 
 const SLOW_MS = 2000;
 
 /** Starts analytics for a signed-in coach and feeds taps, back presses, screens and tab visibility to the task tracker. */
 export function AnalyticsProvider({ person, children }: { person: AnalyticsPerson; children: React.ReactNode }) {
   const pathname = usePathname();
-  const navStartedAt = useRef<number | null>(null);
+  const navStartedAt = useRef<{ path: string; at: number } | null>(null);
 
   useEffect(() => {
     initAnalytics();
@@ -20,12 +21,13 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
   useEffect(() => {
     const screen = scrubUrl(pathname);
     getTaskTracker().screen(screen);
-    const startedAt = navStartedAt.current;
-    navStartedAt.current = null;
-    if (startedAt !== null) {
-      const ms = Math.round(performance.now() - startedAt);
-      if (ms > SLOW_MS) track('slow_screen', { screen, ms });
+    const started = navStartedAt.current;
+    if (started && started.path === pathname) {
+      navStartedAt.current = null;
+      const ms = slowNavMs(started.at, performance.now());
+      if (ms !== null) track('slow_screen', { screen, ms });
     }
+    if (getTaskTracker().isOpen('build_program') && buildProgramLeft(pathname, buildingProgramId())) getTaskTracker().abandon('build_program');
   }, [pathname]);
 
   // First page load.
@@ -61,7 +63,9 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
     const onClick = (e: MouseEvent) => {
       tracker.tap();
       const link = e.target instanceof Element ? e.target.closest('a[href^="/"]') : null;
-      if (link && link.getAttribute('href') !== window.location.pathname) navStartedAt.current = performance.now();
+      if (!link) return;
+      const path = navTarget(link.getAttribute('href') ?? '', link.getAttribute('target') ?? '', e, window.location.origin, window.location.pathname);
+      if (path) navStartedAt.current = { path, at: performance.now() };
     };
     const onBack = () => tracker.back();
     const onVisibility = () => (document.visibilityState === 'hidden' ? tracker.backgrounded() : tracker.foregrounded());
