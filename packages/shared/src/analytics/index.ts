@@ -7,3 +7,5 @@ export { ABANDON_AFTER_MS, TaskTracker } from './task-tracker';
 export type { Emit } from './task-tracker';
 export { RageTapDetector } from './rage-tap';
 export { QUICK_UNDO_MS, isQuickUndo } from './quick-undo';
+export { beforeSend } from './before-send';
+export type { OutgoingEvent } from './before-send';

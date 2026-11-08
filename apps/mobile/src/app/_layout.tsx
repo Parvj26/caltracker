@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { SessionProvider, useSession } from '@/lib/session';
 import { FONT_ASSETS } from '@/theme/fonts';
 import { palette } from '@/theme/theme';
@@ -59,7 +60,9 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <StatusBar style="dark" />
-      <RootStack />
+      <AnalyticsProvider>
+        <RootStack />
+      </AnalyticsProvider>
     </SessionProvider>
   );
 }

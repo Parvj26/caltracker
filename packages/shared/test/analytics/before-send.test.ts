@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beforeSend } from './before-send';
+import { beforeSend } from '../../src/analytics/before-send';
 
 describe('beforeSend (web)', () => {
   it('scrubs secrets out of URLs', () => {
@@ -60,5 +60,19 @@ describe('beforeSend (web)', () => {
   it('sanitizes $set person properties away from custom events', () => {
     const out = beforeSend({ event: 'task_started', properties: { task: 'invite_client' }, $set: { weight: 80 } });
     expect(out?.$set).toBeUndefined();
+  });
+});
+
+describe('beforeSend (phone)', () => {
+  it('hides invite tokens in screen names', () => {
+    const out = beforeSend({ event: '$screen', properties: { $screen_name: 'invite/abc123' } });
+    expect(out?.properties.$screen_name).toBe('invite/[token]');
+  });
+  it('keeps only ph-label from touched elements', () => {
+    const out = beforeSend({
+      event: '$autocapture',
+      properties: { $event_type: 'touch', $elements: [{ tag_name: 'Text', $el_text: 'Maya', attr__children: '185', 'attr__ph-label': 'log_set', attr__accessibilityLabel: 'Bench 185' }] },
+    });
+    expect(out?.properties.$elements).toEqual([{ tag_name: 'Text', 'attr__ph-label': 'log_set' }]);
   });
 });

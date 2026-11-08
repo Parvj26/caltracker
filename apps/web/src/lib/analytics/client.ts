@@ -1,6 +1,6 @@
 import posthog from 'posthog-js';
 import { TaskTracker, isInternalEmail, isQuickUndo, sanitize, type EventName } from '@caltracker/shared';
-import { beforeSend, type OutgoingEvent } from './before-send';
+import { beforeSend, type OutgoingEvent } from '@caltracker/shared';
 
 /**
  * The only door to PostHog in the web app (ESLint blocks importing posthog-js anywhere else).

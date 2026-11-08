@@ -1,4 +1,5 @@
-import { sanitize, scrubUrl } from '@caltracker/shared';
+import { sanitize } from './sanitize';
+import { scrubUrl } from './scrub-url';
 
 /** The parts of a PostHog event this guard reads and rewrites. */
 export interface OutgoingEvent {
@@ -8,7 +9,7 @@ export interface OutgoingEvent {
   $set_once?: Record<string, unknown> | undefined;
 }
 
-const URL_KEY = /(url|pathname|referrer)$/i;
+const URL_KEY = /(url|pathname|referrer|screen_name)$/i;
 const ROUTING_KEYS = new Set(['token', 'distinct_id']);
 const DROPPED_KEYS = ['title', '$title', '$el_text'];
 const KEPT_ELEMENT_KEYS = new Set(['tag_name', 'nth_child', 'nth_of_type', 'attr__ph-label']);
