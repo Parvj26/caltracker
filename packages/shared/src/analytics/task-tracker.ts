@@ -7,12 +7,12 @@ export const ABANDON_AFTER_MS = 10 * 60 * 1000;
 
 interface OpenTask {
   startedAt: number;
-  variant?: string;
+  variant?: string | undefined;
   taps: number;
   backs: number;
   errors: number;
   screens: number;
-  lastScreen?: string;
+  lastScreen?: string | undefined;
 }
 
 /**
