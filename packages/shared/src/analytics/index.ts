@@ -3,3 +3,7 @@ export type { AnalyticsProps, EventName, TaskName } from './events';
 export { sanitize } from './sanitize';
 export { scrubUrl } from './scrub-url';
 export { INTERNAL_EMAILS, isInternalEmail } from './internal';
+export { ABANDON_AFTER_MS, TaskTracker } from './task-tracker';
+export type { Emit } from './task-tracker';
+export { RageTapDetector } from './rage-tap';
+export { QUICK_UNDO_MS, isQuickUndo } from './quick-undo';
