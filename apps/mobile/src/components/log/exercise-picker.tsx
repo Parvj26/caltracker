@@ -18,6 +18,7 @@ import { loadExerciseIndexCached, loadRecentExerciseIds } from '@/lib/exercise-i
 import type { LoadedExerciseIndex } from '@/lib/exercise-index';
 import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { track } from '@/lib/analytics/client';
 
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_FAVOURITES: ReadonlySet<string> = new Set();
@@ -114,6 +115,14 @@ export function ExercisePicker({
     () => (index ? searchExercises(index, query, filters, boosts).slice(0, MAX_SHOWN) : []),
     [index, query, filters, boosts],
   );
+  // A search that finds nothing tells us which exercises to add or rename. Wait until typing settles.
+  const noHits = index !== null && hits.length === 0;
+  useEffect(() => {
+    const q = query.trim();
+    if (!noHits || q.length < 3) return;
+    const timer = setTimeout(() => track('exercise_search_no_results', { query: q }), 1500);
+    return () => clearTimeout(timer);
+  }, [noHits, query]);
   const recentSet = useMemo(() => new Set(recent), [recent]);
   const loading = index === null && !error;
   const pick = (r: ExerciseIndexRow) => onPick({ id: r.id, name: r.name, trackingType: r.trackingType });

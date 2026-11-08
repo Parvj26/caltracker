@@ -6,6 +6,7 @@ import { PhotoError, compressPhoto } from '@/lib/compress-photo';
 import type { OutboxPhoto } from '@/lib/outbox';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const BODY_MAX = 4000;
 
@@ -13,6 +14,8 @@ const BODY_MAX = 4000;
 export function Composer({ onSend }: { onSend: (draft: { body: string; photos: OutboxPhoto[] }) => void }) {
   const { text } = useTheme();
   const [body, setBody] = useState('');
+  // Starts when the client begins typing, so opening the Coach tab is not counted as a message given up.
+  const completeMessage = useAnalyticsTask('message_coach', body.trim().length > 0);
   const [photos, setPhotos] = useState<OutboxPhoto[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,7 @@ export function Composer({ onSend }: { onSend: (draft: { body: string; photos: O
 
   function submit() {
     if (!canSend) return;
+    completeMessage();
     onSend({ body, photos });
     setBody('');
     setPhotos([]);

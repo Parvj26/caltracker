@@ -1,5 +1,8 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { currentScreen, track } from './analytics/client';
+
+const SLOW_SCREEN_MS = 2000;
 
 export type CachedLoad<T> = {
   /** Null until the saved copy or the server answered. */
@@ -30,12 +33,23 @@ export function useCachedLoad<T>(
   const load = useCallback(async () => {
     if (key === null) return;
     const ticket = ++latest.current;
+    const startedAt = Date.now();
+    let reported = false;
+    // Something on screen (a saved copy or fresh data) after more than 2 s counts as a slow screen.
+    const shown = () => {
+      if (reported) return;
+      reported = true;
+      const ms = Date.now() - startedAt;
+      if (ms > SLOW_SCREEN_MS) track('slow_screen', { screen: currentScreen(), ms });
+    };
     const cached = await fns.current.readCache().catch(() => null);
     if (ticket !== latest.current) return;
+    if (cached !== null) shown();
     if (cached !== null) setState((s) => (s.key === key && s.data !== null ? s : { key, data: cached, status: 'loading' }));
     try {
       const fresh = await fns.current.fetchFresh();
       if (ticket !== latest.current) return;
+      shown();
       setState({ key, data: fresh, status: 'ready' });
     } catch {
       if (ticket !== latest.current) return;

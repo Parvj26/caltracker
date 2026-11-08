@@ -6,6 +6,7 @@ import { PostHogProvider } from 'posthog-react-native';
 import { RageTapDetector, scrubUrl } from '@caltracker/shared';
 import { useSession } from '@/lib/session';
 import { getAnalyticsClient, getTaskTracker, identifyPerson, resetAnalytics, screen, track } from './client';
+import { routeTaskSteps } from './route-tasks';
 
 /** Size of the grid that groups nearby taps when spotting rage taps (the responder gives no element). */
 const TAP_CELL = 44;
@@ -51,6 +52,10 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     if (r.length >= 2 && r[r.length - 2] === name) tracker.back();
     recent.current = [...r.slice(-4), name];
     tracker.screen(name);
+    for (const step of routeTaskSteps(name)) {
+      if (step.action === 'start') tracker.start(step.task);
+      else tracker.complete(step.task);
+    }
   }, [pathname]);
 
   useEffect(() => {

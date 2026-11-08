@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type HostInstance, type TextInputProps } from 'react-native';
 import { buttonMinHeight } from '@caltracker/design-tokens';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useRevealOnFocus } from './screen';
+import { currentScreen, getTaskTracker, track } from '@/lib/analytics/client';
 
 type TextFieldProps = TextInputProps & {
   label: string;
@@ -57,6 +58,11 @@ export function TextField({ label, hint, testID, style, onFocus, onBlur, ...rest
 /** Error message: ink text with a magenta marker, so colour is never the only signal. */
 export function ErrorText({ children, testID }: { children: string; testID?: string }) {
   const { text, space } = useTheme();
+  // Count the error (never its text) each time a new message shows.
+  useEffect(() => {
+    getTaskTracker().error();
+    track('error_shown', { code: 'alert', screen: currentScreen() });
+  }, [children]);
   return (
     <View testID={testID} accessibilityRole="alert" style={[styles.errorRow, { gap: space[2] }]}>
       <Text style={[text('sectionHeading'), styles.marker]} accessibilityElementsHidden importantForAccessibility="no">

@@ -48,7 +48,15 @@ export function track(event: EventName, props?: Record<string, unknown>): void {
   }
 }
 
+let current = '';
+
+/** The scrubbed name of the screen on show (for events raised outside a screen, like slow loads). */
+export function currentScreen(): string {
+  return current;
+}
+
 export function screen(name: string): void {
+  current = name;
   const ph = getAnalyticsClient();
   if (!ph) return;
   try {

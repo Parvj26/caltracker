@@ -12,6 +12,7 @@ import { useCommunity } from '@/lib/use-community';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 /**
  * Write a post: text (links work), up to 4 photos (shrunk on the phone first), and optionally a card shared from the
@@ -44,6 +45,7 @@ export default function NewPostScreen() {
   }, [card, community]);
   const [postId] = useState(() => randomUUID());
   const [body, setBody] = useState('');
+  const completePost = useAnalyticsTask('community_post');
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -79,6 +81,7 @@ export default function NewPostScreen() {
     setPosting(true);
     try {
       await createPost({ postId, community, body: body.trim(), card, photos });
+      completePost();
       if (card?.kind === 'workout') markWorkoutShared(card.logId);
       router.back();
     } catch (e) {
