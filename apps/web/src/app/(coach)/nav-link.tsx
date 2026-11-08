@@ -26,6 +26,7 @@ export function NavLink({
   return (
     <Link
       href={href}
+      ph-label={`nav_${href.replace(/^\//, '').replace(/\W+/g, '_')}`}
       aria-label={badge > 0 ? `${label}, ${badge} unread` : label}
       title={label}
       aria-current={current ? 'page' : undefined}

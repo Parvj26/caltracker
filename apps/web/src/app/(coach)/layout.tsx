@@ -2,6 +2,7 @@ import { CoachAvatar } from '@/components/coach-avatar';
 import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
+import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { NAV_ICONS } from './nav-icons';
 import { loadUnreadTotal } from './messages/data';
 import { MessagesNavLink } from './messages-nav-link';
@@ -30,7 +31,9 @@ export default async function CoachLayout({ children }: { children: React.ReactN
       .then((supabase) => loadUnreadTotal(supabase, coach.workspaceId, coach.userId))
       .catch(() => 0),
   ]);
+  const person = { id: coach.userId, name: fullName, email: coach.email, workspaceId: coach.workspaceId, workspaceName: coach.workspaceName };
   return (
+    <AnalyticsProvider person={person}>
     <div className={styles.shell}>
       {/* First thing a keyboard user reaches: jumps past the sidebar to the page itself. */}
       <a href="#main-content" className={styles.skipLink}>
@@ -51,7 +54,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         <div className={styles.bottom}>
           <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
           <form action="/auth/sign-out" method="post">
-            <button type="submit" aria-label="Sign out" title="Sign out" className={styles.navItem}>
+            <button type="submit" ph-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
               {NAV_ICONS.signOut}
               <span className={styles.navLabel}>Sign out</span>
             </button>
@@ -60,5 +63,6 @@ export default async function CoachLayout({ children }: { children: React.ReactN
       </aside>
       <main id="main-content" tabIndex={-1} className={styles.content}>{children}</main>
     </div>
+    </AnalyticsProvider>
   );
 }
