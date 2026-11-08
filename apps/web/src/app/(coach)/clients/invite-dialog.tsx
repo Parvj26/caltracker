@@ -24,6 +24,8 @@ import { CsvUpload } from './csv-upload';
 import { statusView, type StatusView } from './status-copy';
 import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { track } from '@/lib/analytics/client';
 
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
@@ -90,6 +92,7 @@ function InviteDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const completeInvite = useAnalyticsTask('invite_client');
   const browserToday = useBrowserToday();
   const today = browserToday ?? localToday();
   const [tab, setTab] = useState<'one' | 'csv'>('one');
@@ -155,7 +158,11 @@ function InviteDialog({
               programs={programs}
               hints={hints}
               onCancel={() => dialogRef.current?.close()}
-              onSent={setSent}
+              onSent={(s) => {
+                completeInvite();
+                track('invite_sent');
+                setSent(s);
+              }}
             />
           </div>
           <div role="tabpanel" id="invite-panel-csv" aria-labelledby="invite-tab-csv" hidden={tab !== 'csv'} className={styles.tabPanel}>

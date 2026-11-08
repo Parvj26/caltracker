@@ -18,6 +18,7 @@ import { FilterChips, hasActiveFilters } from './filter-chips';
 import { Preview } from './preview';
 import { ResultList } from './result-list';
 import styles from './exercise-search.module.css';
+import { track } from '@/lib/analytics/client';
 
 type Props = {
   mode: 'pick-one' | 'pick-many' | 'browse';
@@ -114,6 +115,15 @@ export function SearchPanel({
     const found = searchExercises(index, query, filters, boosts);
     return rowFilter ? found.filter((h) => rowFilter(h.row)) : found;
   }, [index, query, filters, boosts, rowFilter]);
+
+  // A search that finds nothing tells us which exercises to add or rename. Wait until typing settles.
+  const noHits = index !== null && hits.length === 0;
+  useEffect(() => {
+    const q = query.trim();
+    if (!noHits || q.length < 3) return;
+    const timer = setTimeout(() => track('exercise_search_no_results', { query: q }), 1500);
+    return () => clearTimeout(timer);
+  }, [noHits, query]);
 
   const activeId = hits.some((h) => h.row.id === highlightId) ? highlightId : hits[0]?.row.id;
   const active = hits.find((h) => h.row.id === activeId)?.row;

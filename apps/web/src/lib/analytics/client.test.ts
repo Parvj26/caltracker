@@ -41,3 +41,23 @@ describe('track (web)', () => {
     expect(capture).toHaveBeenCalledWith('error_shown', { code: 'save_failed' });
   });
 });
+
+describe('quick undo (web)', () => {
+  it('reports a delete within 30 seconds of creating', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    const capture = vi.fn();
+    vi.doMock('posthog-js', () => ({ default: { capture, init: vi.fn() } }));
+    const { initAnalytics, markCreated, markUndone } = await import('./client');
+    initAnalytics();
+    vi.useFakeTimers();
+    markCreated('program', 'p1');
+    vi.advanceTimersByTime(29_000);
+    markUndone('program', 'p1');
+    markCreated('program', 'p2');
+    vi.advanceTimersByTime(31_000);
+    markUndone('program', 'p2');
+    markUndone('program', 'never-made');
+    vi.useRealTimers();
+    expect(capture.mock.calls).toEqual([['quick_undo', { item_type: 'program' }]]);
+  });
+});

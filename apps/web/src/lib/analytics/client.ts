@@ -1,5 +1,5 @@
 import posthog from 'posthog-js';
-import { TaskTracker, isInternalEmail, sanitize, type EventName } from '@caltracker/shared';
+import { TaskTracker, isInternalEmail, isQuickUndo, sanitize, type EventName } from '@caltracker/shared';
 import { beforeSend, type OutgoingEvent } from './before-send';
 
 /**
@@ -94,4 +94,18 @@ export function resetAnalytics(): void {
   } catch {
     // ignore
   }
+}
+
+const createdAt = new Map<string, number>();
+
+/** Remember when something was made, so deleting it soon after counts as a quick undo. */
+export function markCreated(itemType: string, id: string): void {
+  createdAt.set(`${itemType}:${id}`, Date.now());
+}
+
+/** Call when something is deleted or reverted; reports `quick_undo` if it was made under 30 s ago. */
+export function markUndone(itemType: string, id: string): void {
+  const at = createdAt.get(`${itemType}:${id}`);
+  createdAt.delete(`${itemType}:${id}`);
+  if (at !== undefined && isQuickUndo(at, Date.now())) track('quick_undo', { item_type: itemType });
 }

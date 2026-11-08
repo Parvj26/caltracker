@@ -5,6 +5,7 @@ import { Button } from '@/components/ui';
 import { MAX_PHOTOS } from '@caltracker/shared';
 import { canSendDraft } from './model';
 import styles from './messages.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 export type Draft = { body: string; files: File[] };
 type Photo = { file: File; url: string };
@@ -17,6 +18,8 @@ const BODY_MAX = 4000;
  */
 export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) => void; initialBody?: string | undefined }) {
   const [body, setBody] = useState(initialBody.slice(0, BODY_MAX));
+  // Starts when the coach begins typing, so just opening a thread is not counted as a reply given up.
+  const completeReply = useAnalyticsTask('reply_message', body.trim().length > 0);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -66,6 +69,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
 
   function submit() {
     if (!canSend) return;
+    completeReply();
     onSend({ body, files: photos.map((p) => p.file) });
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);

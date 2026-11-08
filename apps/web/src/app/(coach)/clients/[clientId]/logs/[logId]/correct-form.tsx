@@ -10,6 +10,7 @@ import { correctLog } from './actions';
 import { CLIENT_UPDATED_MESSAGE, buildCorrections, logVersion } from './corrections';
 import { PlannedVsActual, draftFor, type Drafts } from './planned-vs-actual';
 import styles from './log.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const initialDrafts = (log: WorkoutLogDoc, units: Units): Drafts =>
   Object.fromEntries(log.blocks.flatMap((b) => liveExercises(b).flatMap(({ exercise: e }) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
@@ -31,6 +32,7 @@ export function CorrectForm({
 }) {
   const openAtOnce = startEditing && canCorrect;
   const [editing, setEditing] = useState(openAtOnce);
+  const completeEdit = useAnalyticsTask('edit_past_workout', editing);
   const [drafts, setDrafts] = useState<Drafts>(() => (openAtOnce ? initialDrafts(log, units) : {}));
   // The boxes' text and the log's version when Correct was clicked. A live update can replace `log` while the coach
   // types; corrections are worked out against these, and saving waits until the coach has seen the newer numbers.
@@ -78,6 +80,7 @@ export function CorrectForm({
         setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
         return;
       }
+      completeEdit();
       setSavedAt(Date.now());
       setEditing(false);
     });

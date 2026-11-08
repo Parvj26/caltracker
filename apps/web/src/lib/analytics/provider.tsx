@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
-import { getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, type AnalyticsPerson } from './client';
+import { getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
+
+const SLOW_MS = 2000;
 
 /** Starts analytics for a signed-in coach and feeds taps, back presses, screens and tab visibility to the task tracker. */
 export function AnalyticsProvider({ person, children }: { person: AnalyticsPerson; children: React.ReactNode }) {
   const pathname = usePathname();
+  const navStartedAt = useRef<number | null>(null);
 
   useEffect(() => {
     initAnalytics();
@@ -15,12 +18,51 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
   }, [person]);
 
   useEffect(() => {
-    getTaskTracker().screen(scrubUrl(pathname));
+    const screen = scrubUrl(pathname);
+    getTaskTracker().screen(screen);
+    const startedAt = navStartedAt.current;
+    navStartedAt.current = null;
+    if (startedAt !== null) {
+      const ms = Math.round(performance.now() - startedAt);
+      if (ms > SLOW_MS) track('slow_screen', { screen, ms });
+    }
   }, [pathname]);
+
+  // First page load.
+  useEffect(() => {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const ms = nav ? Math.round(nav.domContentLoadedEventEnd) : 0;
+    if (ms > SLOW_MS) track('slow_screen', { screen: scrubUrl(window.location.pathname), ms });
+  }, []);
+
+  // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text.
+  useEffect(() => {
+    const seen = new WeakSet<Node>();
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        for (const node of r.addedNodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          const alerts = node.matches('[role="alert"]') ? [node] : [...node.querySelectorAll('[role="alert"]')];
+          for (const el of alerts) {
+            if (seen.has(el)) continue;
+            seen.add(el);
+            getTaskTracker().error();
+            track('error_shown', { code: el.getAttribute('data-error-code') ?? 'alert', screen: scrubUrl(window.location.pathname) });
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const tracker = getTaskTracker();
-    const onClick = () => tracker.tap();
+    const onClick = (e: MouseEvent) => {
+      tracker.tap();
+      const link = e.target instanceof Element ? e.target.closest('a[href^="/"]') : null;
+      if (link && link.getAttribute('href') !== window.location.pathname) navStartedAt.current = performance.now();
+    };
     const onBack = () => tracker.back();
     const onVisibility = () => (document.visibilityState === 'hidden' ? tracker.backgrounded() : tracker.foregrounded());
     const onSubmit = (e: SubmitEvent) => {
