@@ -538,4 +538,4 @@ export {
   weekDays,
 } from './food/food';
 export type { DailyTotals, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt } from './food/food';
-export * from './analytics';
+export * from './analytics/index';
