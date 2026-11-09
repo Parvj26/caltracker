@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth } from '@caltracker/design-tokens';
 import { bestsList, localToday, personalBestRows } from '@caltracker/shared';
-import { OfflineNote, SectionHeader } from '@/components/progress/parts';
+import { LoadState, OfflineNote, SectionHeader } from '@/components/progress/parts';
 import { Screen } from '@/components/ui';
 import { deviceZone } from '@/lib/progress-hub-api';
 import { useHub, usePullRefresh } from '@/lib/use-progress-data';
@@ -25,7 +25,8 @@ export default function BestsScreen() {
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={{ gap: space[3.5] }}>
         <SectionHeader title="Personal bests" />
-        <OfflineNote show={hub.status === 'offline'} />
+        <OfflineNote show={hub.status === 'offline' && hub.data !== null} />
+        <LoadState status={hub.status} hasData={hub.data !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
         <Text style={text('caption')}>Your best lift for each exercise. Tap one to see its history.</Text>
         {hub.data && rows.length === 0 ? (
           <Text style={text('body')} testID="bests-empty">

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import {
   OVERVIEW_PERIODS,
@@ -17,11 +17,11 @@ import {
   type OverviewPeriod,
 } from '@caltracker/shared';
 import { LineChart } from '@/components/progress/line-chart';
-import { InkCard, OfflineNote, Overline, SectionHeader, Segmented, StatBox } from '@/components/progress/parts';
+import { InkCard, LoadState, OfflineNote, Overline, SectionHeader, Segmented, StatBox } from '@/components/progress/parts';
 import { WeightTrendChart } from '@/components/progress/weight-trend-chart';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { Screen } from '@/components/ui';
-import { PRINTOUT_FAILED, PROGRESS_LOAD_FAILED, deleteMyWeight, printoutUrl, saveMyWeight } from '@/lib/body-api';
+import { PRINTOUT_FAILED, deleteMyWeight, printoutUrl, saveMyWeight } from '@/lib/body-api';
 import { buildProgress, stepWeightDate, type HistoryItem } from '@/lib/progress';
 import { useSession } from '@/lib/session';
 import { useCoachProfile } from '@/lib/use-coach-profile';
@@ -176,13 +176,7 @@ export default function BodyScreen() {
           }
         />
         {body.status === 'offline' && data ? <OfflineNote show /> : null}
-        {body.status === 'offline' && !data ? (
-          <View style={{ gap: space[2] }}>
-            <ErrorText>{PROGRESS_LOAD_FAILED}</ErrorText>
-            <Button variant="secondary" title="Try again" onPress={pull.onRefresh} busy={pull.refreshing} />
-          </View>
-        ) : null}
-        {!data && body.status === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
+        <LoadState status={body.status} hasData={data !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
 
         {formOpen ? (
           <InkCard style={{ gap: space[3] }} testID="weight-form">

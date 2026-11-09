@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, localToday, type FoodPeriod } from '@caltracker/shared';
-import { InkCard, OfflineNote, Overline, SectionHeader, Segmented } from '@/components/progress/parts';
+import { InkCard, LoadState, OfflineNote, Overline, SectionHeader, Segmented } from '@/components/progress/parts';
 import { Screen } from '@/components/ui';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useFoodRange, usePullRefresh } from '@/lib/use-progress-data';
@@ -36,7 +36,8 @@ export default function FoodProgressScreen() {
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={{ gap: space[3.5] }}>
         <SectionHeader title="Food" />
-        <OfflineNote show={food.status === 'offline'} />
+        <OfflineNote show={food.status === 'offline' && food.data !== null} />
+        <LoadState status={food.status} hasData={food.data !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
         <Segmented
           label="Period"
           testIDPrefix="food-period"

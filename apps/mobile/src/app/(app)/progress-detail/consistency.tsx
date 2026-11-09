@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { borderWidth } from '@caltracker/design-tokens';
 import { consistencyWeeks, localToday, monthCalendar, plannedDonePercent } from '@caltracker/shared';
-import { InkCard, OfflineNote, Overline, SectionHeader, StatBox } from '@/components/progress/parts';
+import { InkCard, LoadState, OfflineNote, Overline, SectionHeader, StatBox } from '@/components/progress/parts';
 import { Screen } from '@/components/ui';
 import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
 import { streakNow } from '@/lib/progress-view';
@@ -43,7 +43,8 @@ export default function ConsistencyScreen() {
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={{ gap: space[3.5] }}>
         <SectionHeader title="Consistency" />
-        <OfflineNote show={hub.status === 'offline' || album.status === 'offline'} />
+        <OfflineNote show={(hub.status === 'offline' && hub.data !== null) || album.status === 'offline'} />
+        <LoadState status={hub.status} hasData={hub.data !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
         {view ? (
           <>
             <View style={[styles.row, { gap: space[2] }]}>

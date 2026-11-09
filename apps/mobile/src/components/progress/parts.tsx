@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Button, ErrorText } from '@/components/ui';
+import { PROGRESS_LOAD_FAILED } from '@/lib/body-api';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -115,6 +117,21 @@ export function Overline({ children }: { children: string }) {
 export function OfflineNote({ show }: { show: boolean }) {
   const { text } = useTheme();
   return show ? <Text style={text('caption')}>Showing your saved progress. It updates when you’re online.</Text> : null;
+}
+
+/** Shown until something is on screen: a spinner while loading, or what went wrong and Try again when offline with no saved copy. */
+export function LoadState({ status, hasData, onRetry, busy }: { status: 'loading' | 'ready' | 'offline'; hasData: boolean; onRetry: () => void; busy: boolean }) {
+  const { space } = useTheme();
+  if (hasData) return null;
+  if (status === 'offline') {
+    return (
+      <View style={{ gap: space[2] }} testID="progress-load-error">
+        <ErrorText>{PROGRESS_LOAD_FAILED}</ErrorText>
+        <Button variant="secondary" title="Try again" onPress={onRetry} busy={busy} />
+      </View>
+    );
+  }
+  return status === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null;
 }
 
 const styles = StyleSheet.create({
