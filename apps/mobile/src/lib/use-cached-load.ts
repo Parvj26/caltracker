@@ -9,6 +9,8 @@ export type CachedLoad<T> = {
   data: T | null;
   /** 'loading' before any answer; 'offline' when the server couldn't be reached (the saved copy, if any, is shown). */
   status: 'loading' | 'ready' | 'offline';
+  /** True while a load started by `refreshKey` (pull to refresh) is running, for the spinner. */
+  refreshing: boolean;
 };
 
 /**
@@ -23,7 +25,8 @@ export function useCachedLoad<T>(
   fetchFresh: () => Promise<T>,
   refreshKey: number,
 ): CachedLoad<T> {
-  const [state, setState] = useState<{ key: string | null } & CachedLoad<T>>({ key, data: null, status: 'loading' });
+  const [state, setState] = useState<{ key: string | null } & Omit<CachedLoad<T>, 'refreshing'>>({ key, data: null, status: 'loading' });
+  const [refreshing, setRefreshing] = useState(false);
   const latest = useRef(0);
   const fns = useRef({ readCache, fetchFresh });
   useEffect(() => {
@@ -63,8 +66,12 @@ export function useCachedLoad<T>(
     }, [load]),
   );
   useEffect(() => {
-    if (refreshKey > 0) void load();
+    if (refreshKey === 0) return;
+    setRefreshing(true);
+    void load().finally(() => setRefreshing(false));
   }, [refreshKey, load]);
 
-  return state.key === key ? { data: state.data, status: state.status } : { data: null, status: 'loading' };
+  return state.key === key
+    ? { data: state.data, status: state.status, refreshing }
+    : { data: null, status: 'loading', refreshing };
 }

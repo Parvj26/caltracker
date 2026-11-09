@@ -69,11 +69,28 @@ env:
 - assertVisible: ${output.weekOf}
 - assertVisible:
     id: today-chip
-# React Native flattens the row's views, so "inside today-row" can't be matched. The lime chip only renders
-# on today's date, and this client's only workout is E2E Upper, so these two prove today's row shows it.
-- assertVisible:
-    id: today-chip
+# Today is selected when the tab opens, so its card shows this client's only workout, with Start and Preview.
 - assertVisible: 'E2E Upper'
+- assertVisible: 'Start workout'
+# Preview: the plan with its totals, the coach's note box only when there is a note, and a sticky Start.
+- tapOn:
+    id: 'preview-.*'
+- extendedWaitUntil:
+    visible: 'Barbell Squat.*'
+    timeout: 20000
+- assertVisible:
+    id: plan-start
+- tapOn:
+    id: back
+# History opens from the header and lists finished workouts (none yet for this client is fine).
+- tapOn:
+    id: open-history
+- extendedWaitUntil:
+    visible:
+      id: history-month
+    timeout: 20000
+- tapOn:
+    id: back
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-workouts, EMAIL: '-' }
