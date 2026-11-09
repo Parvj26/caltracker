@@ -33,7 +33,11 @@ export function CoachIntroCard({ coachName, workspaceName }: { coachName: string
         <CoachAvatar name={name ?? workspaceName} url={coach?.avatarUrl ?? null} size={56} />
         <View style={styles.flex}>
           <Overline>Your coach</Overline>
-          {name ? <Text style={[text('screenTitle'), styles.name]}>{name}</Text> : null}
+          {name ? (
+            <Text style={[text('screenTitle'), styles.name]} accessibilityRole="header">
+              {name}
+            </Text>
+          ) : null}
           <Text style={[text('caption'), styles.business]}>{coach?.businessName ?? workspaceName}</Text>
         </View>
       </View>

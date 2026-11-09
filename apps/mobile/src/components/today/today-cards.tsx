@@ -148,7 +148,7 @@ export function RestCard({ next, today, onLogAnyway }: { next: WorkoutSummary | 
   return (
     <Hero tone="blue" testID="today-rest">
       <Overline>Rest day</Overline>
-      <Text style={[text('screenTitle'), styles.restTitle]}>Recover well. Muscles grow on rest days.</Text>
+      <Text style={[text('screenTitle'), styles.restTitle]} accessibilityRole="header">Recover well. Muscles grow on rest days.</Text>
       {next ? (
         <View style={[styles.row, styles.nextBox, { gap: space[2.5], padding: space[3], marginTop: space[1] }]} testID="today-next">
           <View style={styles.flex}>
@@ -405,8 +405,9 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     marginBottom: HERO_SHADOW,
   },
-  heroTitle: { fontSize: 30, lineHeight: 32 },
-  restTitle: { fontSize: 26, lineHeight: 29 },
+  // No fixed line height: it would clip the text at large Dynamic Type sizes.
+  heroTitle: { fontSize: 30 },
+  restTitle: { fontSize: 26 },
   meta: { color: palette.ink },
   chip: { backgroundColor: palette.bg, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink, borderRadius: radius.pill },
   chipText: { color: palette.ink, fontSize: 12 },

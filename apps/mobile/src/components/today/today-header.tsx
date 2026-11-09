@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   // The board's header: a 14 pt date over a 30 pt greeting.
   date: { fontSize: 14 },
-  greeting: { fontSize: 30, lineHeight: 36 },
+  greeting: { fontSize: 30 },
   gear: {
     width: tapTarget.min,
     height: tapTarget.min,
