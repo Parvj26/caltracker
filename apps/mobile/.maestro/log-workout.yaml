@@ -22,7 +22,7 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Log'
     timeout: 20000
-- tapOn: 'Start'
+- tapOn: 'Start workout'
 # ---- Overview, then the (unnamed) section's start page ----
 - extendedWaitUntil:
     visible:
@@ -145,14 +145,15 @@ env:
 - extendedWaitUntil:
     visible: 'Done ✓.*'
     timeout: 20000
-- assertNotVisible: 'Start'
+- assertNotVisible: 'Start workout'
 # The feeling and the note were saved with the workout (read back from the server here).
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
 - assertTrue: '${output.call == "Felt: Good | Felt strong today"}'
-# Later, from Today: View opens the summary again.
-- tapOn: 'View'
+# Later, from Today: the workout card's View summary opens the summary again.
+- tapOn:
+    id: 'view-log-.*'
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 20000

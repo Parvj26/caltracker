@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { STICKERS } from '@caltracker/shared';
 import type { FeedPost } from './community-api';
-import { buildProgress, type ProgressRows } from './progress';
 import {
   coachPreview,
-  goalCard,
   greeting,
   headerDate,
   postPreview,
-  previewTime,
-  seeAllLabel,
-  shareWorkoutTitle,
   unreadLabel,
   zooHref,
   zooSummary,
@@ -49,13 +44,6 @@ describe('coach preview', () => {
     expect(coachPreview([], 'me')).toBeNull();
   });
 
-  it('shows a clock time today and a day before that', () => {
-    const now = '2026-11-07T15:00:00Z';
-    expect(previewTime('2026-11-07T14:05:00Z', now, 'UTC')).toBe('2:05 pm');
-    expect(previewTime('2026-11-06T23:57:00Z', now, 'UTC')).toBe('Yesterday');
-    expect(previewTime('2026-11-02T10:00:00Z', now, 'UTC')).toBe('Mon 2 Nov');
-  });
-
   it('labels the unread count for VoiceOver', () => {
     expect(unreadLabel(0)).toBeNull();
     expect(unreadLabel(1)).toBe('1 unread message');
@@ -82,24 +70,13 @@ describe('community', () => {
   });
   const ctx = { me: 'me', coaches: new Set(['coach']), units: 'lb' as const };
 
-  it('shows the author (marking the coach and me), the words and the top reactions and comments', () => {
-    const p = postPreview(
-      post({
-        reactions: [
-          { userId: 'me', reaction: 'fire', createdAt: '2026-11-06T10:00:00Z', name: 'Me' },
-          { userId: 'me', reaction: 'heart', createdAt: '2026-11-06T10:01:00Z', name: 'Me' },
-          { userId: 'kim', reaction: 'heart', createdAt: '2026-11-06T10:02:00Z', name: 'Kim' },
-        ],
-        commentCount: 1,
-        images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }),
-      ctx,
-    );
-    expect(p).toEqual({ id: 'p1', author: 'Smoke Coach · Coach', snippet: 'Happy Diwali', stats: '❤️ 2 · 🔥 1 · 1 comment', thumbPath: 'a-thumb.webp', stickerKey: null });
-    expect(postPreview(post({ authorId: 'me', commentCount: 2 }), ctx)).toMatchObject({ author: 'You', stats: '2 comments' });
-    expect(postPreview(post({ authorId: 'vk', authorName: 'VK' }), ctx)).toMatchObject({ author: 'VK', stats: '' });
+  it('names the author (marking the coach and me) with the words, and nothing else', () => {
+    expect(postPreview(post({ commentCount: 1 }), ctx)).toEqual({ author: 'Smoke Coach · Coach', snippet: 'Happy Diwali' });
+    expect(postPreview(post({ authorId: 'me' }), ctx)).toEqual({ author: 'You', snippet: 'Happy Diwali' });
+    expect(postPreview(post({ authorId: 'vk', authorName: 'VK' }), ctx)).toEqual({ author: 'VK', snippet: 'Happy Diwali' });
   });
 
-  it('describes a shared card without words, with its sticker', () => {
+  it('describes a shared card without words', () => {
     const lion = STICKERS.find((s) => s.kind === 'ladder')!.key;
     const p = postPreview(
       post({
@@ -110,7 +87,10 @@ describe('community', () => {
     );
     // An older card (no volume stored): the label and the workout's name.
     expect(p.snippet).toBe('Workout done · Lower Body');
-    expect(p.stickerKey).toBe(lion);
+  });
+
+  it('says a photo-only post was a photo', () => {
+    expect(postPreview(post({ body: '', images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }), ctx).snippet).toBe('Shared a photo');
   });
 
   it('uses the card sentence, about the poster, when the card has one', () => {
@@ -124,20 +104,6 @@ describe('community', () => {
     );
   });
 
-  it('labels See all with the new notifications', () => {
-    expect(seeAllLabel(0)).toBe('See all');
-    expect(seeAllLabel(1)).toBe('See all · 1 new');
-    expect(seeAllLabel(120)).toBe('See all · 99+ new');
-  });
-
-  it('offers sharing only for today’s or yesterday’s workout, named by its day', () => {
-    expect(shareWorkoutTitle('2026-11-07T09:00:00Z', '2026-11-07', 'UTC')).toBe('Share today’s workout');
-    expect(shareWorkoutTitle('2026-11-06T09:00:00Z', '2026-11-07', 'UTC')).toBe('Share yesterday’s workout');
-    // Only for two days: older (or undated) workouts get no button.
-    expect(shareWorkoutTitle('2026-11-05T23:59:00Z', '2026-11-07', 'UTC')).toBeNull();
-    expect(shareWorkoutTitle('2026-11-01T09:00:00Z', '2026-11-07', 'UTC')).toBeNull();
-    expect(shareWorkoutTitle(null, '2026-11-07', 'UTC')).toBeNull();
-  });
 });
 
 describe('zoo', () => {
@@ -161,55 +127,5 @@ describe('zoo', () => {
 
   it('routes through one helper', () => {
     expect(zooHref()).toBe('/zoo');
-  });
-});
-
-describe('goal card', () => {
-  const TODAY = '2026-11-05';
-  const rows = (over: Partial<ProgressRows>): ProgressRows => ({ scans: [], customs: [], goal: null, ...over });
-  const scan = (id: string, measuredOn: string, values: Record<string, number>) => ({
-    id,
-    measuredOn,
-    createdAt: `${measuredOn}T08:00:00Z`,
-    source: 'coach' as const,
-    attachmentPath: null,
-    values,
-  });
-
-  it('is hidden with no goal and no scans', () => {
-    expect(goalCard(buildProgress(rows({}), '1y', 'kg', TODAY))).toBeNull();
-  });
-
-  it('shows the goal with its countdown and short tiles with the 3-month change', () => {
-    const model = buildProgress(
-      rows({
-        goal: { goal: 'Lose 5 kg', targetDate: '2026-12-24' },
-        scans: [scan('a', '2026-09-01', { weight_kg: 82, body_fat_pct: 20 }), scan('b', '2026-11-01', { weight_kg: 80, body_fat_pct: 19, smm_kg: 35 })],
-      }),
-      '1y',
-      'kg',
-      TODAY,
-    );
-    expect(goalCard(model)).toEqual({
-      goal: 'Lose 5 kg',
-      countdown: '49 days to go',
-      tiles: [
-        { key: 'weight_kg', label: 'Weight', value: '80 kg', change: '−2 kg' },
-        { key: 'body_fat_pct', label: 'Body fat', value: '19.0%', change: '−1%' },
-        { key: 'smm_kg', label: 'Muscle', value: '35 kg', change: null },
-      ],
-    });
-  });
-
-  it('shows the numbers without a goal, and a goal without numbers', () => {
-    expect(goalCard(buildProgress(rows({ scans: [scan('a', '2026-11-01', { weight_kg: 80 })] }), '1y', 'kg', TODAY))).toMatchObject({
-      goal: null,
-      countdown: null,
-    });
-    expect(goalCard(buildProgress(rows({ goal: { goal: 'Run 5k', targetDate: null } }), '1y', 'kg', TODAY))).toEqual({
-      goal: 'Run 5k',
-      countdown: null,
-      tiles: [],
-    });
   });
 });

@@ -21,7 +21,7 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Upper/Core'
     timeout: 20000
-- tapOn: 'Start'
+- tapOn: 'Start workout'
 
 # 1 · Today's workout
 - extendedWaitUntil:

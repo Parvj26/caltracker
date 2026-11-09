@@ -13,7 +13,7 @@ import { useTheme } from '@/theme/use-theme';
 /**
  * Today's "Never miss a workout" card (approved Main board): asks for notifications only while iOS has never asked.
  * "Later" hides it for 7 days on this phone. Permission is never asked on first launch, only from here (or the first
- * time a workout starts).
+ * time a workout starts). A new client sees it too, worded for their first workout (approved new-client board).
  */
 export function PushCard({ userId, coachName, firstTime }: { userId: string; coachName: string | null; firstTime: boolean }) {
   const { text, space, radius } = useTheme();
@@ -40,7 +40,7 @@ export function PushCard({ userId, coachName, firstTime }: { userId: string; coa
   );
 
   if (snoozedUntil === undefined) return null;
-  if (!showPushCard({ permission, snoozedUntil, now: Date.now(), firstTime })) return null;
+  if (!showPushCard({ permission, snoozedUntil, now: Date.now() })) return null;
 
   const later = () => {
     const until = Date.now() + PUSH_CARD_SNOOZE_MS;
@@ -58,7 +58,7 @@ export function PushCard({ userId, coachName, firstTime }: { userId: string; coa
           Never miss a workout
         </Text>
       </View>
-      <Text style={text('body')}>{pushCardText(coachName)}</Text>
+      <Text style={text('body')}>{pushCardText(coachName, firstTime)}</Text>
       <View style={[styles.row, { gap: space[3] }]}>
         <View style={styles.flex}>
           <Button

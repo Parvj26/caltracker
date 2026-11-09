@@ -5,7 +5,7 @@ appId: app.caltracker.client
 - extendedWaitUntil:
     visible: '${NAME}'
     timeout: 20000
-- tapOn: 'Start'
+- tapOn: 'Start workout'
 - extendedWaitUntil:
     visible:
       id: start-workout
