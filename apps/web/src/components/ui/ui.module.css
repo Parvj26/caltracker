@@ -130,13 +130,11 @@
 /* ---------- Hand note ---------- */
 .handNote {
   margin: 0;
-  font-family: var(--ct-font-hand), cursive;
+  font-family: var(--ct-font-sans), system-ui, sans-serif;
   font-weight: var(--ct-weight-hand);
   font-size: var(--ct-size-hand);
-  line-height: 1.1;
-  color: var(--ct-magenta);
-  transform: rotate(var(--ct-rotate-hand));
-  transform-origin: left center;
+  line-height: 1.35;
+  color: var(--ct-magenta-deep);
 }
 
 /* ---------- Logo ---------- */

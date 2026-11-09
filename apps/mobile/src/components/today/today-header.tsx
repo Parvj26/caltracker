@@ -8,6 +8,8 @@ import { NotificationsRow } from '@/components/settings/notifications-row';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { UnitsPicker } from '@/components/units-picker';
+import { useSaveUnits, useUnits } from '@/lib/use-units';
 
 const GEAR =
   'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z';
@@ -53,7 +55,7 @@ export function TodayHeader({
   );
 }
 
-/** A small settings sheet: Notifications and Sign out; profile settings can join it later. */
+/** The settings sheet: kg/lb, notifications, who coaches you, and sign out. */
 function SettingsSheet({
   visible,
   workspaceName,
@@ -67,13 +69,19 @@ function SettingsSheet({
 }) {
   const { text, space } = useTheme();
   const router = useRouter();
+  const units = useUnits();
+  const saveUnits = useSaveUnits();
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
-        <View style={[styles.column, { padding: space[4], gap: space[4] }]}>
-          <Text style={text('screenTitle')} accessibilityRole="header">
-            Settings
-          </Text>
+        <View style={[styles.column, styles.flex, { padding: space[4], gap: space[4] }]}>
+          <View style={styles.row}>
+            <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+              Settings
+            </Text>
+            <TextButton title="Close" testID="settings-close" onPress={onClose} />
+          </View>
+          {units ? <UnitsPicker units={units} onChange={saveUnits} /> : null}
           <NotificationsRow
             onPress={() => {
               onClose();
@@ -81,6 +89,8 @@ function SettingsSheet({
             }}
           />
           {workspaceName ? <Text style={text('body')} testID="settings-workspace">{`Coached by ${workspaceName}`}</Text> : null}
+          {/* Sign out sits at the very bottom, away from everyday settings. */}
+          <View style={styles.flex} />
           <Button
             variant="secondary"
             title="Sign out"
@@ -90,7 +100,6 @@ function SettingsSheet({
               onSignOut();
             }}
           />
-          <TextButton title="Close" testID="settings-close" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>

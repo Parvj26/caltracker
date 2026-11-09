@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest, type CommunityCard } from '@caltracker/shared';
 import { CardView } from '@/components/community/parts';
@@ -16,12 +16,13 @@ import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 /**
  * Write a post: text (links work), up to 4 photos (shrunk on the phone first), and optionally a card shared from the
- * zoo book or a workout summary (`?card=` JSON: only which sticker or workout; the database builds the card). A failed post keeps everything and offers Retry; the post id stays
+ * zoo book or a workout summary (`?card=` JSON: only which sticker or workout; the database builds the card).
+ * `?photos=1` (the feed's photo button) opens the photo picker straight away. A failed post keeps everything and offers Retry; the post id stays
  * the same, so a retry never posts twice.
  */
 export default function NewPostScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ card?: string }>();
+  const params = useLocalSearchParams<{ card?: string; photos?: string }>();
   const { text, space, radius } = useTheme();
   const { community } = useCommunity();
   const card = useMemo(() => {
@@ -66,6 +67,14 @@ export default function NewPostScreen() {
       setPreparing(false);
     }
   };
+
+  // The feed's photo button: open the picker once, on arrival.
+  const pickedOnArrival = useRef(false);
+  useEffect(() => {
+    if (params.photos !== '1' || pickedOnArrival.current) return;
+    pickedOnArrival.current = true;
+    void addPhotos();
+  }, [params.photos]);
 
   const submit = async () => {
     setError(null);

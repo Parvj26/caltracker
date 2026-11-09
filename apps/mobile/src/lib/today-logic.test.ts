@@ -73,9 +73,11 @@ describe('community', () => {
     card: null,
     createdAt: '2026-11-06T10:00:00Z',
     pinnedAt: null,
+    pinnedBy: null,
     images: [],
     reactions: [],
     commentCount: 0,
+    recentComments: [],
     ...over,
   });
   const ctx = { me: 'me', coaches: new Set(['coach']), units: 'lb' as const };

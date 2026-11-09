@@ -18,6 +18,7 @@
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts",
     "functions:sync": "bash scripts/sync-functions-shared.sh",
+    "posthog:dashboards": "pnpm --filter @caltracker/scripts exec tsx posthog-dashboards.ts",
     "functions:serve": "pnpm functions:sync && supabase functions serve --env-file supabase/functions/.env",
     "functions:test": "pnpm functions:sync && deno test --allow-all --config supabase/functions/deno.json supabase/functions/",
     "functions:check": "pnpm functions:sync && deno check --config supabase/functions/deno.json supabase/functions/send-invite/index.ts supabase/functions/accept-invite/index.ts supabase/functions/award-workout/index.ts supabase/functions/send-push/index.ts",
