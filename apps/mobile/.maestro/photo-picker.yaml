@@ -1,4 +1,4 @@
-# The Coach tab's photo button opens the system photo picker. iOS's picker runs outside the app, so it asks for no
+# The chat's photo button (Coach tab -> Message) opens the system photo picker. iOS's picker runs outside the app, so it asks for no
 # permission; if a "would like to access your photos" alert ever appears, it must carry the app.json wording
 # (photosPermission). The built app's Info.plist carries that wording too.
 appId: app.caltracker.client
@@ -14,6 +14,8 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-coach
+- tapOn:
+    id: coach-open-chat
 - extendedWaitUntil:
     visible:
       id: coach-composer-input
