@@ -100,9 +100,9 @@ function ReactionBar({ rows, me, onToggle, onAdd }: { rows: ReactionRow[]; me: s
         accessibilityLabel="Add a reaction"
         accessibilityHint="Or press and hold the post or comment"
         onPress={onAdd}
-        style={({ pressed }) => [styles.chip, styles.chipPart, { borderRadius: radius.pill, paddingHorizontal: space[3] }, pressed && { opacity: pressedOpacity }]}
+        style={({ pressed }) => [styles.chip, styles.chipPart, styles.addChip, { borderRadius: radius.pill, paddingHorizontal: space[3] }, pressed && { opacity: pressedOpacity }]}
       >
-        <Text style={text('sectionHeading')}>☺+</Text>
+        <Text style={text('sectionHeading')}>+ React</Text>
       </Pressable>
     </View>
   );
@@ -162,9 +162,11 @@ function ReactionPicker({
 
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
-  chip: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: palette.bg, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' },
+  chip: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: palette.surface, borderWidth: 1.5, borderColor: palette.border, overflow: 'hidden' },
   chipPart: { minHeight: 44, minWidth: 22, justifyContent: 'center' },
-  mine: { backgroundColor: palette.pink, borderColor: palette.ink },
+  // The chip is a row: centre the label vertically too.
+  addChip: { alignItems: 'center' },
+  mine: { backgroundColor: palette.drop, borderColor: palette.ink, borderWidth: 2 },
   scrim: { flex: 1, backgroundColor: palette.ink, opacity: stickerTheme.scrimOpacity },
   sheet: { backgroundColor: palette.bg },
   choices: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },

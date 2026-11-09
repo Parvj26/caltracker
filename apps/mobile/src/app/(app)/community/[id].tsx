@@ -241,6 +241,7 @@ function CommentItem({
               accessibilityRole="button"
               accessibilityLabel={`More options for ${c.authorName}’s comment`}
               onPress={onMenu}
+              hitSlop={{ top: 10, bottom: 10 }}
               style={({ pressed }) => [styles.menuButton, pressed && { opacity: pressedOpacity }]}
             >
               <Text style={text('body')}>•••</Text>
@@ -266,7 +267,8 @@ const styles = StyleSheet.create({
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
   commentRow: { flexDirection: 'row', alignItems: 'flex-start' },
   bubble: { backgroundColor: palette.surface, borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  // Drawn small so the bubble stays tight (as in the mockup); the 44 pt tap area comes from hitSlop.
+  menuButton: { minWidth: 44, height: 24, alignItems: 'center', justifyContent: 'center' },
   ink: { color: palette.ink },
   send: { minHeight: 44, justifyContent: 'center', borderWidth: 2, borderColor: palette.ink, backgroundColor: palette.lime },
   sendOff: { opacity: 0.5 },

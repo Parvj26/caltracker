@@ -228,7 +228,7 @@ export function PostItem({
       onPress={reactions.openPicker}
       style={({ pressed }) => [pill, pressed && { opacity: pressedOpacity }]}
     >
-      <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '☺+ React'}</Text>
+      <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '+ React'}</Text>
     </Pressable>
   );
 
