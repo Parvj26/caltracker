@@ -5,7 +5,7 @@ import type { StrengthPoint } from '../awards/strength-series';
 import { localDay } from '../awards/streak';
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
-import { normalizeSearchText } from '../exercises/search';
+import { buildExerciseIndex, searchExercises } from '../exercises/search';
 import type { WorkoutLogDoc } from '../logs/schema';
 import { formatWeight, fromKg, groupThousands } from '../units/units';
 import type { Units } from '../units/units';
@@ -106,15 +106,31 @@ export function strengthPickerSections(exercises: readonly StrengthExerciseLite[
     bestKg: e.points.reduce((m, p) => Math.max(m, p.e1rmKg), 0),
   });
   const byName = (a: StrengthExerciseLite, b: StrengthExerciseLite) => a.name.localeCompare(b.name);
-  const words = normalizeSearchText(query).split(' ').filter(Boolean);
-  if (words.length > 0) {
-    const hits = exercises.filter((e) => {
-      const name = normalizeSearchText(e.name);
-      return words.every((w) => name.includes(w));
-    });
-    return hits.length === 0 ? [] : [{ title: 'Results', items: [...hits].sort(byName).map(item) }];
-  }
   const lastDate = (e: StrengthExerciseLite) => e.points.at(-1)?.date ?? '';
+  if (query.trim() !== '') {
+    // The app's smart search (typos, word forms, other names like "OHP"), most recently trained first among equals.
+    const byId = new Map(exercises.map((e) => [e.exerciseId, e]));
+    const index = buildExerciseIndex(
+      exercises.map((e) => ({
+        id: e.exerciseId,
+        name: e.name,
+        primaryMuscles: e.muscle ? [e.muscle] : [],
+        secondaryMuscles: [],
+        equipment: null,
+        category: null,
+        trackingType: 'weight_reps' as const,
+        source: 'builtin' as const,
+        imagePath: null,
+      })),
+    );
+    const recent = [...exercises].sort((a, b) => (lastDate(a) < lastDate(b) ? 1 : lastDate(a) > lastDate(b) ? -1 : 0)).map((e) => e.exerciseId);
+    const hits = searchExercises(index, query, { muscles: [], equipment: [], customOnly: false }, { favourites: new Set(), recent });
+    const items = hits.flatMap((h) => {
+      const e = byId.get(h.row.id);
+      return e ? [item(e)] : [];
+    });
+    return items.length === 0 ? [] : [{ title: 'Results', items }];
+  }
   const recent = [...exercises]
     .filter((e) => e.points.length > 0)
     .sort((a, b) => (lastDate(a) < lastDate(b) ? 1 : lastDate(a) > lastDate(b) ? -1 : byName(a, b)))

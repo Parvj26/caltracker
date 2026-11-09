@@ -109,11 +109,27 @@ describe('strengthPickerSections', () => {
     expect(s[2]!.items.map((i) => i.name)).toEqual(['Back Squat', 'Leg Press']);
     expect(s[0]!.items[0]!.bestKg).toBe(105);
   });
+  it('uses the app’s smart search: typos, word forms and other names, in its ranked order', () => {
+    const lifts = [
+      ex('bp', 'Barbell Bench Press', ['2026-10-30'], 'chest'),
+      ex('sq', 'Barbell Squat', ['2026-11-01'], 'quadriceps'),
+      ex('ohp', 'Overhead Press', ['2026-10-01'], 'shoulders'),
+      ex('cu', 'Bicep Curl', ['2026-10-02'], 'biceps'),
+    ];
+    const hits = (q: string) => strengthPickerSections(lifts, q, 2)[0]?.items.map((i) => i.exerciseId) ?? [];
+    expect(hits('benchpres')[0]).toBe('bp');
+    expect(hits('squatting')).toEqual(['sq']);
+    expect(hits('OHP')[0]).toBe('ohp');
+  });
+  it('ranks the more recently trained first among equal matches', () => {
+    const lifts = [ex('a', 'Bench Press', ['2026-09-01']), ex('b', 'Leg Press', ['2026-11-01'])];
+    expect(strengthPickerSections(lifts, 'press', 2)[0]!.items.map((i) => i.exerciseId)).toEqual(['b', 'a']);
+  });
   it('searches by name, ignoring case and accents', () => {
     const s = strengthPickerSections(list, 'PRESS', 2);
     expect(s).toHaveLength(1);
     expect(s[0]!.title).toBe('Results');
-    expect(s[0]!.items.map((i) => i.name)).toEqual(['Bench Press', 'Leg Press']);
+    expect([...s[0]!.items.map((i) => i.name)].sort()).toEqual(['Bench Press', 'Leg Press']);
     expect(strengthPickerSections(list, 'zzz', 2)).toEqual([]);
   });
 });
