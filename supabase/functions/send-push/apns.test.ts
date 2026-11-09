@@ -1,5 +1,5 @@
 import { assert, assertEquals } from '@std/assert';
-import { type ApnsConfig, type ApnsPayload, apnsConfigFromEnv, createApnsClient, type JwtStore } from './apns.ts';
+import { APNS_TIMEOUT_MS, type ApnsConfig, type ApnsPayload, apnsConfigFromEnv, createApnsClient, type JwtStore } from './apns.ts';
 
 async function throwawayKey() {
   const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -131,6 +131,22 @@ for (const [name, res, kind] of mappings) {
     if (r.kind === 'invalid_token') assert(r.reason.length > 0);
   });
 }
+
+Deno.test('each request gives up after a timeout (10 s by default) and is retried later', async () => {
+  assertEquals(APNS_TIMEOUT_MS, 10_000);
+  let signal: AbortSignal | null | undefined;
+  const hanging = ((_url: string, init: RequestInit) => {
+    signal = init.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new Error('aborted')));
+    });
+  }) as unknown as typeof fetch;
+  const store: JwtStore = { get: () => Promise.resolve({ jwt: 'j.w.t', issuedAt: T0 }), put: () => Promise.resolve() };
+  const client = createApnsClient({ cfg: baseCfg, store, fetch: hanging, now: () => T0, timeoutMs: 20 });
+  const r = await client.send(TOKEN, payload);
+  assert(signal instanceof AbortSignal, 'the request carries an abort signal');
+  assertEquals(r.kind, 'retry');
+});
 
 Deno.test('apnsConfigFromEnv: null when a secret is missing or APNS_ENV is wrong', () => {
   const full: Record<string, string> = {

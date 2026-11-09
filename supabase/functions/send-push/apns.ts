@@ -16,6 +16,9 @@ export interface JwtStore {
 /** Apple rejects tokens older than 60 min and throttles refreshes more often than every 20 min. */
 export const JWT_MAX_AGE_MS = 50 * 60 * 1000;
 
+/** One APNs request gives up after this long (then retried later), so a stuck connection never stalls a run. */
+export const APNS_TIMEOUT_MS = 10_000;
+
 export function apnsConfigFromEnv(get: (k: string) => string | undefined): ApnsConfig | null {
   const keyP8 = get('APNS_KEY_P8');
   const keyId = get('APNS_KEY_ID');
@@ -30,7 +33,7 @@ export function apnsConfigFromEnv(get: (k: string) => string | undefined): ApnsC
 const INVALID_TOKEN_REASONS = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
 
 export function createApnsClient(
-  deps: { cfg: ApnsConfig; store: JwtStore; fetch: typeof fetch; now: () => Date },
+  deps: { cfg: ApnsConfig; store: JwtStore; fetch: typeof fetch; now: () => Date; timeoutMs?: number },
 ): { send(token: string, p: ApnsPayload): Promise<ApnsResult> } {
   const { cfg, store } = deps;
   const host = cfg.env === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
@@ -52,6 +55,7 @@ export function createApnsClient(
     try {
       const res = await deps.fetch(`https://${host}/3/device/${token}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(deps.timeoutMs ?? APNS_TIMEOUT_MS),
         headers: {
           authorization: `bearer ${jwt}`,
           'apns-topic': cfg.topic,
