@@ -13,8 +13,8 @@ import {
   type MacroTargets,
   type MealMacros,
   type Units,
+  type WeekSummary,
 } from '@caltracker/shared';
-import type { WorkoutStatus } from './active-log-logic';
 import type { AlbumAward } from './album-logic';
 import type { FeedPost } from './community-api';
 import { formatDayLabel } from './workouts';
@@ -213,16 +213,16 @@ export function agoText(iso: string, now: Date): string {
   return m && m[1] && m[2] ? `${m[1]} ${AGO_UNIT[m[2]] ?? m[2]} ago` : 'just now';
 }
 
-/** How many of this week's planned workouts are done. */
-export function weekTally(workoutIds: readonly string[], statuses: Readonly<Record<string, WorkoutStatus>>): { done: number; planned: number } {
-  return { done: workoutIds.filter((id) => statuses[id]?.kind === 'done').length, planned: workoutIds.length };
-}
-
-/** The "This week" tile: "1 of 4" over "workouts · 5-wk streak" (the streak comes from shared liveStreak). */
-export function weekTile(t: { done: number; planned: number }, streak: number): { big: string; small: string } {
-  const streakText = streak > 0 ? `${streak}-wk streak` : null;
-  if (t.planned === 0) return { big: 'None planned', small: streakText ?? 'this week' };
-  return { big: `${t.done} of ${t.planned}`, small: [t.planned === 1 ? 'workout' : 'workouts', streakText].filter(Boolean).join(' · ') };
+/**
+ * The "This week" tile from the shared week summary (the one Progress shows, so the two agree): "1 of 4" over
+ * "workouts · +1 extra · 5-wk streak"; with nothing planned, the workouts done alone.
+ */
+export function weekTile(w: Pick<WeekSummary, 'done' | 'planned' | 'extra' | 'streak' | 'extraLine'>): { big: string; small: string } {
+  const streakText = w.streak > 0 ? `${w.streak}-wk streak` : null;
+  const count = w.planned > 0 ? w.planned : w.done + w.extra;
+  if (count === 0) return { big: 'None planned', small: streakText ?? 'this week' };
+  const big = w.planned > 0 ? `${w.done} of ${w.planned}` : String(count);
+  return { big, small: [count === 1 ? 'workout' : 'workouts', w.extraLine, streakText].filter(Boolean).join(' · ') };
 }
 
 /** The Community line's headline from the newest post: "Sam set 2 new PRs", "Sam: Morning lift done". */

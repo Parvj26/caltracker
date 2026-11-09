@@ -4,14 +4,15 @@ import { useRouter, type Href } from 'expo-router';
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
-import { formatLogDuration, liveStreak, localToday, startOfWeek, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { formatLogDuration, localToday, thisWeekSummary, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { Sticker } from '@/components/stickers/sticker';
 import { Button, TextButton } from '@/components/ui';
-import { workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
-import { fetchAlbum, readCachedAlbum } from '@/lib/album-api';
+import type { WorkoutStatus } from '@/lib/active-log-logic';
+import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
+import { streakNow } from '@/lib/progress-view';
 import { useSession } from '@/lib/session';
-import { fetchLatestPosts, fetchWeek, readCachedPosts, readCachedWeek } from '@/lib/today-api';
+import { fetchLatestPosts, readCachedPosts } from '@/lib/today-api';
 import {
   agoText,
   coachPreview,
@@ -22,20 +23,19 @@ import {
   postPreview,
   programChip,
   unreadLabel,
-  weekTally,
   weekTile,
   workoutMeta,
   zooHref,
   zooSummary,
   type FoodBar,
 } from '@/lib/today-logic';
-import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useCommunity } from '@/lib/use-community';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { useFood } from '@/lib/use-food';
 import { useMessages } from '@/lib/use-messages';
+import { useAlbum, useHub } from '@/lib/use-progress-data';
 import type { WorkoutSummary } from '@/lib/workouts';
 import { muscleTags, planTotals } from '@/lib/workouts-plan';
 import { palette, pressedOpacity, radius, white } from '@/theme/theme';
@@ -274,32 +274,16 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
   const { text, space } = useTheme();
   const router = useRouter();
   const stacked = useStacked();
-  const { session, workspace } = useSession();
-  const { log: active, finished, pending } = useActiveLog();
-  const userId = session?.user.id ?? null;
-  const workspaceId = workspace?.workspaceId ?? null;
   const today = localToday();
-
-  const album = useCachedLoad(
-    userId && workspaceId ? `${userId}:${workspaceId}` : null,
-    () => (userId && workspaceId ? readCachedAlbum(userId, workspaceId) : Promise.resolve(null)),
-    () => (userId && workspaceId ? fetchAlbum(userId, workspaceId) : Promise.resolve({ awards: [], stats: null })),
-    refreshKey,
-  );
-  const week = useCachedLoad(
-    userId ? `${userId}:${startOfWeek(today)}` : null,
-    () => (userId ? readCachedWeek(userId, today) : Promise.resolve(null)),
-    () => (userId ? fetchWeek(userId, today) : Promise.resolve({ weekStart: startOfWeek(today), workoutIds: [], logs: [] })),
-    refreshKey,
-  );
-
+  // The same data and week summary as the Progress tab's This week card, so the two always agree.
+  const hub = useHub(refreshKey);
+  const album = useAlbum(refreshKey);
   const tile = useMemo(() => {
-    if (!week.data) return null;
-    const statuses = workoutStatuses(week.data.logs, active, finished, pending);
-    const stats = album.data?.stats ?? null;
-    const streak = stats ? liveStreak(stats.streak, stats.streakWeek, startOfWeek(today)) : 0;
-    return weekTile(weekTally(week.data.workoutIds, statuses), streak);
-  }, [week.data, album.data, active, finished, pending, today]);
+    const h = hub.data;
+    if (!h) return null;
+    const streak = streakNow(album.data?.stats ?? null, trainedDays(h), today);
+    return weekTile(thisWeekSummary({ workouts: h.workouts, addedDays: addedDays(h), prs: 0, streak: streak.current, today }));
+  }, [hub.data, album.data, today]);
   const zoo = useMemo(() => (album.data ? zooSummary(album.data.awards) : null), [album.data]);
   const newest = zoo?.newest ?? null;
   const half: StyleProp<ViewStyle> = stacked ? undefined : styles.flex;
@@ -320,7 +304,7 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
             <Text style={[text('bigNumber'), styles.weekBig]}>{tile.big}</Text>
             <Text style={[text('caption'), styles.ink]}>{tile.small}</Text>
           </>
-        ) : week.status === 'loading' ? (
+        ) : hub.status === 'loading' ? (
           <ActivityIndicator color={palette.ink} accessibilityLabel="Loading this week" />
         ) : (
           <Text style={[text('caption'), styles.ink]}>Shows when you’re online.</Text>

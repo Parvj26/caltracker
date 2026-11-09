@@ -8,7 +8,6 @@ import {
   nextSteps,
   nextUpDay,
   programChip,
-  weekTally,
   weekTile,
   welcome,
   workoutMeta,
@@ -102,24 +101,32 @@ describe('coach message time', () => {
 });
 
 describe('this week', () => {
-  it('counts the week’s planned workouts that are done', () => {
-    expect(
-      weekTally(['a', 'b', 'c', 'd'], {
-        a: { kind: 'done', logId: 'l1', durationS: 60 },
-        b: { kind: 'in_progress', logId: 'l2' },
-        x: { kind: 'done', logId: 'l3', durationS: 60 },
-      }),
-    ).toEqual({ done: 1, planned: 4 });
+  // The shared week summary (the same one Progress shows), reduced to what the tile reads.
+  const week = (done: number, planned: number, extra: number, streak: number) => ({
+    done,
+    planned,
+    extra,
+    streak,
+    extraLine: planned > 0 && extra > 0 ? `+${extra} extra` : null,
   });
 
   it('reads done of planned and the streak', () => {
-    expect(weekTile({ done: 1, planned: 4 }, 5)).toEqual({ big: '1 of 4', small: 'workouts · 5-wk streak' });
-    expect(weekTile({ done: 0, planned: 1 }, 0)).toEqual({ big: '0 of 1', small: 'workout' });
+    expect(weekTile(week(1, 4, 0, 5))).toEqual({ big: '1 of 4', small: 'workouts · 5-wk streak' });
+    expect(weekTile(week(0, 1, 0, 0))).toEqual({ big: '0 of 1', small: 'workout' });
   });
 
-  it('has a plain line for a week with nothing planned', () => {
-    expect(weekTile({ done: 0, planned: 0 }, 0)).toEqual({ big: 'None planned', small: 'this week' });
-    expect(weekTile({ done: 0, planned: 0 }, 3)).toEqual({ big: 'None planned', small: '3-wk streak' });
+  it('adds the workouts added on top of the plan, as Progress does', () => {
+    expect(weekTile(week(2, 3, 1, 4))).toEqual({ big: '2 of 3', small: 'workouts · +1 extra · 4-wk streak' });
+  });
+
+  it('counts added workouts alone when nothing is planned', () => {
+    expect(weekTile(week(0, 0, 2, 0))).toEqual({ big: '2', small: 'workouts' });
+    expect(weekTile(week(0, 0, 1, 3))).toEqual({ big: '1', small: 'workout · 3-wk streak' });
+  });
+
+  it('has a plain line for a week with nothing planned or done', () => {
+    expect(weekTile(week(0, 0, 0, 0))).toEqual({ big: 'None planned', small: 'this week' });
+    expect(weekTile(week(0, 0, 0, 3))).toEqual({ big: 'None planned', small: '3-wk streak' });
   });
 });
 
