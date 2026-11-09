@@ -1,8 +1,10 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
+import { NotificationsRow } from '@/components/settings/notifications-row';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -53,7 +55,7 @@ export function TodayHeader({
   );
 }
 
-/** The settings sheet: kg/lb, who coaches you, and sign out. */
+/** The settings sheet: kg/lb, notifications, who coaches you, and sign out. */
 function SettingsSheet({
   visible,
   workspaceName,
@@ -66,6 +68,7 @@ function SettingsSheet({
   onSignOut: () => void;
 }) {
   const { text, space } = useTheme();
+  const router = useRouter();
   const units = useUnits();
   const saveUnits = useSaveUnits();
   return (
@@ -79,6 +82,12 @@ function SettingsSheet({
             <TextButton title="Close" testID="settings-close" onPress={onClose} />
           </View>
           {units ? <UnitsPicker units={units} onChange={saveUnits} /> : null}
+          <NotificationsRow
+            onPress={() => {
+              onClose();
+              router.push('/notifications');
+            }}
+          />
           {workspaceName ? <Text style={text('body')} testID="settings-workspace">{`Coached by ${workspaceName}`}</Text> : null}
           {/* Sign out sits at the very bottom, away from everyday settings. */}
           <View style={styles.flex} />

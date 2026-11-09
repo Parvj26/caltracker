@@ -24,7 +24,8 @@ async function awardExists(logId: string): Promise<boolean> {
   return false;
 }
 
-async function revealedIds(userId: string): Promise<string[]> {
+/** The coach-finished logs whose reveal this phone has shown (a tapped "Coach logged" push opens the rest). */
+export async function revealedLogIds(userId: string): Promise<string[]> {
   try {
     return parseRevealedIds(await AsyncStorage.getItem(revealedKey(userId)));
   } catch {
@@ -35,7 +36,7 @@ async function revealedIds(userId: string): Promise<string[]> {
 /** Remembers that this coach-finished log's reveal has been shown on this phone. */
 export async function markCoachRevealed(userId: string, logId: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(revealedKey(userId), JSON.stringify(withRevealed(await revealedIds(userId), logId)));
+    await AsyncStorage.setItem(revealedKey(userId), JSON.stringify(withRevealed(await revealedLogIds(userId), logId)));
   } catch {
     // Storage full or unavailable: at worst the reveal shows again.
   }
@@ -57,7 +58,7 @@ export async function nextCoachReveal(userId: string): Promise<string | null> {
       .gte('finished_at', since);
     if (error || !data) return null;
     const logs: CoachLoggedLog[] = data.map((r) => ({ id: r.id, status: r.status, loggedBy: r.logged_by, finishedAt: r.finished_at }));
-    const revealed = new Set(await revealedIds(userId));
+    const revealed = new Set(await revealedLogIds(userId));
     for (const id of coachRevealCandidates(logs, userId, revealed, Date.now())) {
       if (await awardExists(id)) return id;
     }

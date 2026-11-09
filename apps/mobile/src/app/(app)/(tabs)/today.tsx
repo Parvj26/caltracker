@@ -10,6 +10,8 @@ import { Overline, Tile } from '@/components/today/parts';
 import { TodayFood } from '@/components/food/today-food';
 import { GoalCard, StickerAndPrs } from '@/components/today/progress-cards';
 import { CommunityCard, CoachRow } from '@/components/today/social-cards';
+import { PushCard } from '@/components/today/push-card';
+import { useCoachProfile } from '@/lib/use-coach-profile';
 import { TodayHeader } from '@/components/today/today-header';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
 import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
@@ -112,6 +114,7 @@ export default function Today() {
   useSurpriseReveal();
   const { session, workspace } = useSession();
   const userId = session?.user.id ?? null;
+  const coach = useCoachProfile();
   const { text, space } = useTheme();
   const router = useRouter();
   const units = useUnits() ?? 'lb';
@@ -276,6 +279,11 @@ export default function Today() {
         />
 
         {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
+
+        {userId ? (
+          // Not while Today is loading or on the first-time welcome: one thing at a time.
+          <PushCard userId={userId} coachName={coach?.name ?? null} firstTime={data === null || data.kind === 'first-time'} />
+        ) : null}
 
         {banner ? (
           <Card>

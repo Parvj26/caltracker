@@ -47,3 +47,11 @@ select vault.create_secret('http://host.docker.internal:54321/functions/v1/award
   'award-workout Edge Function URL for the catch-up job');
 select vault.create_secret('local-award-workout-secret', 'award_workout_secret',
   'Shared secret the catch-up job sends to award-workout');
+
+-- Local only: where the push jobs (pg_cron, public.push_dispatch) call send-push, and the shared secret they send.
+-- Not a real secret: put the same value in supabase/functions/.env as SEND_PUSH_SECRET. Without APNS_* secrets the
+-- local function answers 'send' with 503 and leaves the outbox alone. Staging: docs/runbooks/staging.md.
+select vault.create_secret('http://host.docker.internal:54321/functions/v1/send-push', 'send_push_url',
+  'send-push Edge Function URL for the push cron jobs');
+select vault.create_secret('local-send-push-secret', 'send_push_secret',
+  'Shared secret the push cron jobs send to send-push');
