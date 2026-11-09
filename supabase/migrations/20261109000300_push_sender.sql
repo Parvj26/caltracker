@@ -178,8 +178,8 @@ grant execute on function public.claim_push_batch(integer), public.push_badge_co
 
 -- 6. Dispatch and cron ------------------------------------------------------------------------------------------------
 
--- Posts a job ('send' or 'reminders') to the send-push Edge Function. 'send' also clears out finished rows older
--- than 30 days (sent or given up). Fails loudly (shown in cron.job_run_details) without its Vault secrets.
+-- Posts a job ('send' or 'reminders') to the send-push Edge Function. Fails loudly (shown in cron.job_run_details)
+-- without its Vault secrets.
 create function public.push_dispatch(p_job text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -196,11 +196,6 @@ begin
       '(docs/runbooks/staging.md)' using errcode = '55000';
   end if;
 
-  if p_job = 'send' then
-    delete from public.push_outbox o
-    where o.created_at < now() - interval '30 days' and (o.sent_at is not null or o.attempts >= 5);
-  end if;
-
   perform net.http_post(
     url := v_url,
     body := jsonb_build_object('job', p_job),
@@ -211,7 +206,16 @@ end;
 $$;
 revoke execute on function public.push_dispatch(text) from public, anon, authenticated, service_role;
 
+-- Hourly: clears out finished rows (sent or given up) older than 30 days (push_outbox_created_at_idx).
+create function public.push_cleanup() returns void
+language sql security definer set search_path = '' as $$
+  delete from public.push_outbox o
+  where o.created_at < now() - interval '30 days' and (o.sent_at is not null or o.attempts >= 5);
+$$;
+revoke execute on function public.push_cleanup() from public, anon, authenticated, service_role;
+
 -- Re-running this migration must not duplicate the jobs.
-select cron.unschedule(jobid) from cron.job where jobname in ('push-send', 'push-reminders');
+select cron.unschedule(jobid) from cron.job where jobname in ('push-send', 'push-reminders', 'push-cleanup');
 select cron.schedule('push-send', '* * * * *', 'select public.push_dispatch(''send'')');
 select cron.schedule('push-reminders', '*/15 * * * *', 'select public.push_dispatch(''reminders'')');
+select cron.schedule('push-cleanup', '17 * * * *', 'select public.push_cleanup()');

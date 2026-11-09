@@ -127,6 +127,7 @@ create table public.push_outbox (
   outcome text check (outcome in ('sent', 'disabled', 'no_device', 'expired', 'failed'))
 );
 create index push_outbox_due_idx on public.push_outbox (not_before) where sent_at is null;
+create index push_outbox_created_at_idx on public.push_outbox (created_at); -- the hourly clean-up
 create index push_outbox_pending_group_idx on public.push_outbox (user_id, group_key) where sent_at is null;
 create unique index push_outbox_daily_reminder_key on public.push_outbox (user_id, group_key)
   where type = 'daily_reminder';
