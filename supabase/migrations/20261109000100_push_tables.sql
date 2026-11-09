@@ -142,6 +142,7 @@ alter table public.push_outbox enable row level security;
 -- p_dedupe: an unsent row with the same group key just takes the new data (one pending "Today's workout changed").
 -- Otherwise a new row is added; it shares the send time of an unsent row with the same key, so a burst of
 -- reactions goes out together when the first one's gathering window ends.
+-- Rows the sender gave up on (5 attempts) are dead and never joined.
 create function private.push_enqueue(
   p_user uuid, p_workspace uuid, p_type text, p_group_key text, p_data jsonb,
   p_delay interval default '0', p_dedupe boolean default false
@@ -160,7 +161,7 @@ begin
 
   if p_dedupe then
     select o.id into v_pending from public.push_outbox o
-    where o.user_id = p_user and o.group_key = p_group_key and o.sent_at is null
+    where o.user_id = p_user and o.group_key = p_group_key and o.sent_at is null and o.attempts < 5
     order by o.created_at
     limit 1
     for update;
@@ -171,7 +172,7 @@ begin
   end if;
 
   select min(o.not_before) into v_not_before from public.push_outbox o
-  where o.user_id = p_user and o.group_key = p_group_key and o.sent_at is null;
+  where o.user_id = p_user and o.group_key = p_group_key and o.sent_at is null and o.attempts < 5;
 
   insert into public.push_outbox (user_id, workspace_id, type, group_key, data, not_before)
   values (p_user, p_workspace, p_type, p_group_key, coalesce(p_data, '{}'),
