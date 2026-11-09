@@ -41,6 +41,7 @@ import {
 } from '@/lib/workouts-plan';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
 
@@ -323,16 +324,16 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
   },
   title: { fontSize: 30 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
   ink: { color: palette.ink },
   centre: { textAlign: 'center' },
   stat: { flex: 1, alignItems: 'center', borderWidth: borderWidth.card, borderColor: palette.ink },
   statValue: { fontSize: 22 },
   // The coach's note is in the app's own font, never the handwriting one.
   note: { backgroundColor: palette.drop },
-  noteLabel: { color: palette.ink, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  noteLabel: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
   noteBody: { fontSize: 16, lineHeight: 22 },
-  overline: { color: palette.ink, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  overline: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
   exercise: { borderWidth: borderWidth.card, borderColor: palette.border },
-  last: { color: palette.magentaDeep, fontWeight: '700' },
+  last: { color: palette.magentaDeep, fontFamily: fontFamilyFor('sans', 700) },
 });

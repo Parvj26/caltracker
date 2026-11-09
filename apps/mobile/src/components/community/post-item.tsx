@@ -26,6 +26,7 @@ import { PinIcon } from './icons';
 import { CardView, LinkedText } from './parts';
 import { useReactions } from './reactions';
 import { ChoiceSheet, PhotoViewer, type Choice } from './sheets';
+import { fontFamilyFor } from '@/theme/fonts';
 
 export type PostContext = {
   me: string;
@@ -346,10 +347,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
   flex: { flex: 1 },
-  bold: { fontWeight: '800' },
-  eyebrow: { color: palette.ink, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  bold: { fontFamily: fontFamilyFor('sans', 800) },
+  eyebrow: { color: palette.ink, fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   coachBadge: { backgroundColor: palette.ink, paddingHorizontal: 6, paddingVertical: 1 },
-  coachBadgeText: { color: white, fontWeight: '800' },
+  coachBadgeText: { color: white, fontFamily: fontFamilyFor('sans', 800) },
   menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   photo: { alignSelf: 'center' },
   pill: { minHeight: 44, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surface },

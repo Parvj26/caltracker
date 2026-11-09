@@ -16,6 +16,7 @@ import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 /** One post with its reactions and comments, and a comment box pinned at the bottom. */
 export default function PostScreen() {
@@ -260,8 +261,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
   flex: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '800' },
-  eyebrow: { fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  title: { fontSize: 18, fontFamily: fontFamilyFor('sans', 800) },
+  eyebrow: { fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
   commentRow: { flexDirection: 'row', alignItems: 'flex-start' },
   bubble: { backgroundColor: palette.surface, borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },

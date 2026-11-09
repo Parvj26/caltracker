@@ -27,6 +27,7 @@ import {
 } from '@/lib/workouts-plan';
 import { palette, pressedOpacity, radius, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 type WeekData = {
   weekStart: IsoDate;
@@ -433,14 +434,14 @@ const styles = StyleSheet.create({
   dayRest: { backgroundColor: palette.bg, borderColor: palette.border },
   daySelected: { backgroundColor: palette.lime, borderColor: palette.ink },
   dayToday: { backgroundColor: palette.ink, borderColor: palette.ink },
-  dayDow: { fontWeight: '700', color: palette.ink },
-  dayNum: { fontSize: 18, fontWeight: '800' },
-  dayMark: { fontWeight: '800', color: palette.ink, minHeight: 16 },
+  dayDow: { fontFamily: fontFamilyFor('sans', 700), color: palette.ink },
+  dayNum: { fontSize: 18, fontFamily: fontFamilyFor('sans', 800) },
+  dayMark: { fontFamily: fontFamilyFor('sans', 800), color: palette.ink, minHeight: 16 },
   onInk: { color: white },
   muted: { color: palette.inkMuted },
   ink: { color: palette.ink },
-  bold: { fontWeight: '700' },
-  overline: { fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
+  overline: { fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
   dayCard: { borderWidth: borderWidth.card, borderColor: palette.ink, borderRadius: radius.card, backgroundColor: palette.bg },
   restCard: { borderColor: palette.border },
   weekChip: { backgroundColor: palette.lime, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink },

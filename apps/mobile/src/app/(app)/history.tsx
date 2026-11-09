@@ -11,6 +11,7 @@ import { useUnits } from '@/lib/use-units';
 import { historyRow, monthSummary, type CurrentCoach, type HistoryRow } from '@/lib/workout-history';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 const LOAD_FAILED = 'Couldn’t load your history. Check your connection and pull down to try again.';
 
@@ -152,12 +153,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28 },
   ink: { color: palette.ink },
   muted: { color: palette.inkMuted },
-  bold: { fontWeight: '700' },
-  heavy: { fontWeight: '800' },
-  overline: { color: palette.ink, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
+  heavy: { fontFamily: fontFamilyFor('sans', 800) },
+  overline: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
   month: { backgroundColor: palette.lime, borderWidth: borderWidth.card, borderColor: palette.ink },
   logRow: { minHeight: 60, borderWidth: borderWidth.card, borderColor: palette.border },
   dateCol: { width: tapTarget.min, alignItems: 'center' },
-  dayNum: { fontSize: 18, fontWeight: '800' },
+  dayNum: { fontSize: 18, fontFamily: fontFamilyFor('sans', 800) },
   pr: { backgroundColor: palette.tape, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink },
 });
