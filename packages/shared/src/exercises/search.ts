@@ -140,6 +140,16 @@ for (const [chip, muscles] of Object.entries(MUSCLE_CHIP_MUSCLES) as Array<[Musc
   for (const m of muscles) MUSCLE_TO_CHIP.set(m, chip);
 }
 
+/** The muscle chips of these muscles (an exercise's primary muscles, say), once each, in MUSCLE_CHIPS order. */
+export function muscleChipsOf(muscles: readonly string[]): MuscleChip[] {
+  const found = new Set<MuscleChip>();
+  for (const m of muscles) {
+    const chip = MUSCLE_TO_CHIP.get(m);
+    if (chip) found.add(chip);
+  }
+  return MUSCLE_CHIPS.filter((c) => found.has(c));
+}
+
 export function equipmentChipOf(equipment: string | null): EquipmentChip {
   switch (equipment) {
     case 'barbell':
@@ -264,11 +274,7 @@ export function buildExerciseIndex(rows: ExerciseIndexRow[]): ExerciseIndex {
       }
     }
 
-    const muscleChips = new Set<MuscleChip>();
-    for (const m of row.primaryMuscles) {
-      const chip = MUSCLE_TO_CHIP.get(m);
-      if (chip) muscleChips.add(chip);
-    }
+    const muscleChips = new Set<MuscleChip>(muscleChipsOf(row.primaryMuscles));
     if (row.category === 'strongman' || row.primaryMuscles.length + row.secondaryMuscles.length >= 4) {
       muscleChips.add('Full body');
     }

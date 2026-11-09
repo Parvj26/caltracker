@@ -375,6 +375,7 @@ export {
   buildExerciseIndex,
   equipmentChipOf,
   exerciseIndexRowFromDb,
+  muscleChipsOf,
   normalizeSearchText,
   searchExercises,
 } from './exercises/search';
