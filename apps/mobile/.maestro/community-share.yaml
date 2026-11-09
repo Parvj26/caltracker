@@ -22,7 +22,7 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Log'
     timeout: 20000
-- tapOn: 'Start'
+- tapOn: 'Start workout'
 - extendedWaitUntil:
     visible:
       id: start-workout

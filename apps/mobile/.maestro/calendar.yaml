@@ -32,7 +32,7 @@ env:
 - assertNotVisible: 'Your first workout is coming!'
 - assertNotVisible:
     id: units-kg
-- tapOn: 'See the plan'
+- tapOn: 'Preview'
 # The exercise row is one button whose label is the name, the set count and the set summary.
 - extendedWaitUntil:
     visible: 'Barbell Squat.*'

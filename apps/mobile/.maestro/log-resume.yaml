@@ -84,7 +84,7 @@ env:
     id: discard-workout
 - tapOn: 'Discard'
 - extendedWaitUntil:
-    visible: 'Start'
+    visible: 'Start workout'
     timeout: 20000
 - assertNotVisible:
     id: resume-banner

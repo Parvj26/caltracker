@@ -26,7 +26,7 @@ env:
     timeout: 20000
 
 # ---- Preview ----
-- tapOn: 'See the plan'
+- tapOn: 'Preview'
 - extendedWaitUntil:
     visible:
       id: preview-section-0
@@ -79,9 +79,9 @@ env:
 
 # ---- Upper: the uneven superset ----
 - extendedWaitUntil:
-    visible: 'Start'
+    visible: 'Start workout'
     timeout: 10000
-- tapOn: 'Start'
+- tapOn: 'Start workout'
 - extendedWaitUntil:
     visible:
       id: workout-overview
