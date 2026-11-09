@@ -55,3 +55,17 @@ export function prsThisWeekByClient(
   }
   return counts;
 }
+
+/**
+ * Lifts improved from `from` to `to` inclusive (the client's History month), each PR's day read in `timeZone`. Like
+ * prsThisWeek, a lift that breaks several records in one workout counts once.
+ */
+export function liftsImprovedBetween(events: readonly PrEvent[], from: IsoDate, to: IsoDate, timeZone: string): number {
+  const seen = new Set<string>();
+  for (const e of events) {
+    const day = localDay(e.achievedAt, timeZone);
+    if (day < from || day > to) continue;
+    seen.add(`${e.clientId}|${e.logId}|${e.exerciseId}`);
+  }
+  return seen.size;
+}
