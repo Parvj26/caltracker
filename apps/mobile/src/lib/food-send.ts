@@ -23,6 +23,7 @@ export type MealFields = {
   photo_thumb_path: string | null;
   photo_width: number | null;
   photo_height: number | null;
+  coach_meal_id: string | null;
 };
 
 export type FoodBackend = {
@@ -57,6 +58,7 @@ export function mealFields(op: FoodOp & { kind: 'save' }): MealFields {
     photo_thumb_path: m.photo?.thumbPath ?? null,
     photo_width: m.photo?.width ?? null,
     photo_height: m.photo?.height ?? null,
+    coach_meal_id: m.coachMealId ?? null,
   };
 }
 

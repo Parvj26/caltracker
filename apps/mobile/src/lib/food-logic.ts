@@ -1,7 +1,7 @@
 // What the Food tab shows and writes, worked out on the phone: the server's meals with the queued saves and deletes
 // applied on top, the operations a save or delete becomes, and the meal-time picker's steps. No network, no React.
 // The macro maths (totals, targets, hints) lives in @caltracker/shared.
-import { MACRO_KEYS, localDateOf, mealPhotoPaths, type IsoDate, type MacroTargets, type MealMacros } from '@caltracker/shared';
+import { MACRO_KEYS, localDateOf, mealPhotoPaths, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealMacros, type MealSearchItem } from '@caltracker/shared';
 import type { FoodOp, LocalMealPhoto, MealRecord, StoredPhoto } from './food-queue';
 
 export type ShownMeal = MealRecord & { pending: 'sending' | 'failed' | null; localPhoto: LocalMealPhoto | null; opId: string | null };
@@ -26,7 +26,8 @@ export function applyFoodOps(server: ReadonlyArray<MealRecord>, ops: ReadonlyArr
   return [...byId.values()];
 }
 
-export type MealDraft = { day: IsoDate; minutes: number; name: string; note: string; macros: MealMacros };
+/** `coachMealId` left out keeps the edited meal's link (none for a new meal); null clears it. */
+export type MealDraft = { day: IsoDate; minutes: number; name: string; note: string; macros: MealMacros; coachMealId?: string | null };
 export type PhotoChoice = { kind: 'keep' } | { kind: 'none' } | { kind: 'new'; local: LocalMealPhoto; width: number; height: number };
 export type OpIds = { opId: string; mealId: string; userId: string; workspaceId: string; now: string };
 
@@ -62,10 +63,54 @@ export function buildSaveOp(before: MealRecord | null, draft: MealDraft, photo: 
       note: draft.note.trim(),
       macros: draft.macros,
       photo: stored,
+      coachMealId: draft.coachMealId !== undefined ? draft.coachMealId : (before?.coachMealId ?? null),
     },
     localPhoto,
     dropPaths: pathsOf(before?.photo).filter((p) => !keep.has(p)),
   };
+}
+
+/** "Log again in one tap": a new meal now, with the name, numbers and coach link. No photo, no note. */
+export function logAgainOp(item: MealSearchItem, ids: OpIds, today: IsoDate, now: Date): FoodOp & { kind: 'save' } {
+  return {
+    opId: ids.opId,
+    createdAt: ids.now,
+    state: 'sending',
+    kind: 'save',
+    meal: {
+      id: ids.mealId,
+      workspaceId: ids.workspaceId,
+      eatenAt: now.toISOString(),
+      eatenOn: today,
+      name: item.name,
+      note: '',
+      macros: item.macros,
+      photo: null,
+      coachMealId: item.coachMealId,
+    },
+    localPhoto: null,
+    dropPaths: [],
+  };
+}
+
+/** A meal as search and "log again" see it. */
+export function historyOf(m: MealRecord): HistoryMeal {
+  return { id: m.id, eatenOn: m.eatenOn, eatenAt: m.eatenAt, name: m.name, macros: m.macros, hasPhoto: m.photo !== null, coachMealId: m.coachMealId };
+}
+
+/** The server's history with the queued saves and deletes applied (a queued meal counts at once). */
+export function historyWithOps(server: ReadonlyArray<HistoryMeal>, ops: ReadonlyArray<FoodOp>): HistoryMeal[] {
+  const byId = new Map(server.map((m) => [m.id, m]));
+  for (const op of ops) {
+    if (op.kind === 'delete') byId.delete(op.mealId);
+    else byId.set(op.meal.id, historyOf(op.meal));
+  }
+  return [...byId.values()];
+}
+
+/** The days with at least one meal (the strip's dots). */
+export function mealDaysOf(history: ReadonlyArray<{ eatenOn: IsoDate }>): Set<IsoDate> {
+  return new Set(history.map((m) => m.eatenOn));
 }
 
 export function buildDeleteOp(meal: MealRecord, opId: string, now: string): FoodOp & { kind: 'delete' } {
@@ -111,14 +156,38 @@ export function clampDay(day: IsoDate, today: IsoDate): IsoDate {
 }
 
 /** What the Food tab keeps on the phone so it opens with no signal: the targets and the recent days' meals. */
-export type FoodCache = { targets: MacroTargets | null; days: Record<IsoDate, MealRecord[]> };
+export type FoodCache = {
+  targets: MacroTargets | null;
+  days: Record<IsoDate, MealRecord[]>;
+  /** The last 90 days of meals, for search, "log again" and the strip's dots. */
+  history: HistoryMeal[];
+  /** The coach's live shared meals. */
+  coachMeals: CoachMeal[];
+};
 export const FOOD_CACHE_DAYS = 21;
 
-export const emptyFoodCache = (): FoodCache => ({ targets: null, days: {} });
+export const emptyFoodCache = (): FoodCache => ({ targets: null, days: {}, history: [], coachMeals: [] });
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNumOrNull = (v: unknown) => v === null || typeof v === 'number';
 const isMacros = (v: unknown): v is MealMacros => isRecord(v) && MACRO_KEYS.every((k) => isNumOrNull(v[k]));
+
+const isStrOrNull = (v: unknown) => v === null || typeof v === 'string';
+
+function isHistory(v: unknown): v is HistoryMeal {
+  return (
+    isRecord(v) && typeof v.id === 'string' && typeof v.eatenOn === 'string' && typeof v.eatenAt === 'string' &&
+    isStrOrNull(v.name) && isMacros(v.macros) && typeof v.hasPhoto === 'boolean' && isStrOrNull(v.coachMealId)
+  );
+}
+
+function isCoachMeal(v: unknown): v is CoachMeal {
+  return (
+    isRecord(v) && typeof v.id === 'string' && typeof v.name === 'string' && isMacros(v.macros) &&
+    typeof v.ingredients === 'string' && typeof v.howTo === 'string' && typeof v.updatedAt === 'string' &&
+    (v.photo === null || (isRecord(v.photo) && typeof v.photo.path === 'string' && typeof v.photo.thumbPath === 'string'))
+  );
+}
 
 function isMeal(v: unknown): v is MealRecord {
   return (
@@ -142,10 +211,18 @@ export function parseFoodCache(raw: string | null): FoodCache {
     const days: Record<IsoDate, MealRecord[]> = {};
     if (isRecord(v.days)) {
       for (const [day, list] of Object.entries(v.days)) {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(day) && Array.isArray(list)) days[day] = list.filter(isMeal);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day) && Array.isArray(list)) {
+          // Copies saved before coach meals have no link.
+          days[day] = list.filter(isMeal).map((m) => ({ ...m, coachMealId: typeof m.coachMealId === 'string' ? m.coachMealId : null }));
+        }
       }
     }
-    return { targets: isMacros(v.targets) ? v.targets : null, days };
+    return {
+      targets: isMacros(v.targets) ? v.targets : null,
+      days,
+      history: Array.isArray(v.history) ? v.history.filter(isHistory) : [],
+      coachMeals: Array.isArray(v.coachMeals) ? v.coachMeals.filter(isCoachMeal) : [],
+    };
   } catch {
     return emptyFoodCache();
   }
@@ -156,6 +233,14 @@ export function withDay(cache: FoodCache, day: IsoDate, meals: MealRecord[]): Fo
   const days = { ...cache.days, [day]: meals };
   const keep = Object.keys(days).sort().slice(-FOOD_CACHE_DAYS);
   return { ...cache, days: Object.fromEntries(keep.map((d) => [d, days[d]])) };
+}
+
+export function withHistory(cache: FoodCache, history: HistoryMeal[]): FoodCache {
+  return { ...cache, history };
+}
+
+export function withCoachMeals(cache: FoodCache, coachMeals: CoachMeal[]): FoodCache {
+  return { ...cache, coachMeals };
 }
 
 export function withTargets(cache: FoodCache, targets: MacroTargets | null): FoodCache {

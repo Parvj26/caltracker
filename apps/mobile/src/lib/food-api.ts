@@ -1,9 +1,11 @@
 // Server calls for the Food tab. RLS limits reads to the signed-in client's own meals and targets while they are a
 // client of the workspace; writes are their own meals only (the coach sets targets on the web).
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MEAL_PHOTO_BUCKET, isAlreadyUploaded, type Database, type IsoDate, type MacroTargets } from '@caltracker/shared';
+import { MEAL_PHOTO_BUCKET, isAlreadyUploaded, type CoachMeal, type Database, type HistoryMeal, type IsoDate, type MacroTargets } from '@caltracker/shared';
+import { fetchCoachMeals } from './coach-meals-api';
+import { HISTORY_COLUMNS, toHistoryMeal } from './coach-meals-map';
 import { foodCachePrefix } from './device-cache-keys';
-import { emptyFoodCache, parseFoodCache, withDay, withTargets, type FoodCache } from './food-logic';
+import { emptyFoodCache, parseFoodCache, withCoachMeals, withDay, withHistory, withTargets, type FoodCache } from './food-logic';
 import type { FoodOp, MealRecord } from './food-queue';
 import { isNetworkFailure } from './network-failure';
 import { OutboxSendError } from './outbox';
@@ -15,14 +17,14 @@ type MealRow = Database['public']['Tables']['meals']['Row'];
 
 export const FOOD_LOAD_FAILED = "Couldn't load your meals. Pull down to try again.";
 const MEAL_COLUMNS =
-  'id, workspace_id, eaten_at, eaten_on, name, note, calories, protein_g, carbs_g, fat_g, photo_path, photo_thumb_path, photo_width, photo_height';
+  'id, workspace_id, eaten_at, eaten_on, name, note, calories, protein_g, carbs_g, fat_g, photo_path, photo_thumb_path, photo_width, photo_height, coach_meal_id';
 const SIGNED_URL_SECONDS = 3600;
 
 const cacheKey = (userId: string, workspaceId: string) => `${foodCachePrefix(userId)}${workspaceId}`;
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
 
-export function toMealRecord(r: Pick<MealRow, 'id' | 'workspace_id' | 'eaten_at' | 'eaten_on' | 'name' | 'note' | 'calories' | 'protein_g' | 'carbs_g' | 'fat_g' | 'photo_path' | 'photo_thumb_path' | 'photo_width' | 'photo_height'>): MealRecord {
+export function toMealRecord(r: Pick<MealRow, 'id' | 'workspace_id' | 'eaten_at' | 'eaten_on' | 'name' | 'note' | 'calories' | 'protein_g' | 'carbs_g' | 'fat_g' | 'photo_path' | 'photo_thumb_path' | 'photo_width' | 'photo_height' | 'coach_meal_id'>): MealRecord {
   return {
     id: r.id,
     workspaceId: r.workspace_id,
@@ -35,6 +37,7 @@ export function toMealRecord(r: Pick<MealRow, 'id' | 'workspace_id' | 'eaten_at'
       r.photo_path && r.photo_thumb_path
         ? { path: r.photo_path, thumbPath: r.photo_thumb_path, width: r.photo_width ?? 0, height: r.photo_height ?? 0 }
         : null,
+    coachMealId: r.coach_meal_id,
   };
 }
 
@@ -67,6 +70,29 @@ export async function fetchMealsOn(userId: string, workspaceId: string, day: Iso
   if (error) throw new Error(FOOD_LOAD_FAILED);
   const meals = data.map(toMealRecord);
   await writeCache(userId, workspaceId, (c) => withDay(c, day, meals));
+  return meals;
+}
+
+/** The client's meals since a day (newest first, at most 1000), for search and "log again"; kept on the phone. */
+export async function fetchMealHistory(userId: string, workspaceId: string, since: IsoDate): Promise<HistoryMeal[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select(HISTORY_COLUMNS)
+    .eq('client_id', userId)
+    .eq('workspace_id', workspaceId)
+    .gte('eaten_on', since)
+    .order('eaten_at', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(FOOD_LOAD_FAILED);
+  const history = data.map(toHistoryMeal);
+  await writeCache(userId, workspaceId, (c) => withHistory(c, history));
+  return history;
+}
+
+/** The coach's live shared meals, kept on the phone so Meals from <coach> works offline. */
+export async function fetchCoachMealsCached(userId: string, workspaceId: string): Promise<CoachMeal[]> {
+  const meals = await fetchCoachMeals(workspaceId);
+  await writeCache(userId, workspaceId, (c) => withCoachMeals(c, meals));
   return meals;
 }
 

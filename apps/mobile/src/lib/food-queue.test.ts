@@ -17,6 +17,7 @@ const save = (opId: string, mealId = `meal-${opId}`): FoodOp => ({
     note: '',
     macros: { calories: 400, protein: null, carbs: null, fat: null },
     photo: null,
+    coachMealId: null,
   },
   localPhoto: null,
   dropPaths: [],
@@ -24,6 +25,22 @@ const save = (opId: string, mealId = `meal-${opId}`): FoodOp => ({
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+describe('parseFoodQueue', () => {
+  it('reads a save queued by the previous app version (no coach link) as not linked', () => {
+    const legacy = save('old') as FoodOp & { kind: 'save' };
+    const oldMeal: Record<string, unknown> = { ...legacy.meal };
+    delete oldMeal.coachMealId;
+    const parsed = parseFoodQueue(JSON.stringify([{ ...legacy, meal: oldMeal }]));
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.kind === 'save' && parsed[0].meal.coachMealId).toBeNull();
+  });
+  it('keeps a coach link', () => {
+    const op = save('new') as FoodOp & { kind: 'save' };
+    const parsed = parseFoodQueue(JSON.stringify([{ ...op, meal: { ...op.meal, coachMealId: 'c1' } }]));
+    expect(parsed[0]?.kind === 'save' && parsed[0].meal.coachMealId).toBe('c1');
+  });
+});
 
 describe('food queue', () => {
   it('keeps a queued save on the phone and sends it', async () => {

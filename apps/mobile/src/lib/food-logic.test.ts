@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { msUntilMidnight, savedTime, FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
+import { historyWithOps, logAgainOp, mealDaysOf, msUntilMidnight, savedTime, FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
 import type { FoodOp, MealRecord } from './food-queue';
 
 const none = { calories: null, protein: null, carbs: null, fat: null };
@@ -12,6 +12,7 @@ const meal = (id: string, over: Partial<MealRecord> = {}): MealRecord => ({
   note: '',
   macros: { ...none, protein: 20 },
   photo: null,
+  coachMealId: null,
   ...over,
 });
 const save = (m: MealRecord, opId: string, state: 'sending' | 'failed' = 'sending'): FoodOp => ({
@@ -134,7 +135,7 @@ describe('food cache', () => {
     expect(parseFoodCache(JSON.stringify(c))).toEqual(c);
     expect(parseFoodCache('nope')).toEqual(emptyFoodCache());
     expect(parseFoodCache(null)).toEqual(emptyFoodCache());
-    expect(parseFoodCache(JSON.stringify({ days: { '2026-11-07': [{ id: 1 }] } }))).toEqual({ targets: null, days: { '2026-11-07': [] } });
+    expect(parseFoodCache(JSON.stringify({ days: { '2026-11-07': [{ id: 1 }] } }))).toEqual({ targets: null, days: { '2026-11-07': [] }, history: [], coachMeals: [] });
   });
   it('keeps only the most recent days', () => {
     let c = emptyFoodCache();
@@ -163,5 +164,45 @@ describe('savedTime', () => {
   it('keeps an edit, and a new meal on an earlier day, as given', () => {
     expect(savedTime({ ...lateNight, isNew: false }, afterMidnight)).toEqual({ day: '2026-11-07', minutes: 23 * 60 + 58 });
     expect(savedTime({ ...lateNight, day: '2026-11-05', minutes: 720 }, afterMidnight)).toEqual({ day: '2026-11-05', minutes: 720 });
+  });
+});
+
+describe('coach meal link', () => {
+  const ids = { opId: 'o', mealId: 'new', userId: 'u', workspaceId: 'ws', now: '2026-11-09T12:00:00.000Z' };
+  const draft = { day: '2026-11-09', minutes: 600, name: 'Protein oats', note: '', macros: { calories: 450, protein: 35, carbs: 52, fat: 11 } };
+  it('a new meal from a coach meal carries the link', () => {
+    expect(buildSaveOp(null, { ...draft, coachMealId: 'c1' }, { kind: 'none' }, ids).meal.coachMealId).toBe('c1');
+  });
+  it('an edit keeps the link when the draft passes it through', () => {
+    const before = meal('a', { coachMealId: 'c1' });
+    expect(buildSaveOp(before, draft, { kind: 'keep' }, ids).meal.coachMealId).toBe('c1');
+    expect(buildSaveOp(before, { ...draft, coachMealId: null }, { kind: 'keep' }, ids).meal.coachMealId).toBeNull();
+  });
+  it('log again makes a new meal now, with the name, numbers and link but no photo or note', () => {
+    const item = { key: 'k', source: 'own' as const, name: 'Greek yogurt bowl', macros: { calories: 320, protein: 28, carbs: null, fat: null }, coachMealId: 'c2', count: 3, lastEatenAt: null, lastEatenOn: null };
+    const now = new Date(2026, 10, 9, 8, 30);
+    const op = logAgainOp(item, ids, '2026-11-09', now);
+    expect(op.meal).toMatchObject({ id: 'new', name: 'Greek yogurt bowl', note: '', photo: null, coachMealId: 'c2', eatenOn: '2026-11-09', macros: item.macros });
+    expect(op.meal.eatenAt).toBe(now.toISOString());
+    expect(op.localPhoto).toBeNull();
+    expect(op.dropPaths).toEqual([]);
+  });
+});
+
+describe('history', () => {
+  const h = (id: string, eatenOn: string) => ({ id, eatenOn, eatenAt: `${eatenOn}T12:00:00.000Z`, name: 'x', macros: { ...none, calories: 1 }, hasPhoto: false, coachMealId: null });
+  it('applies queued saves and deletes, so the strip shows a queued meal at once', () => {
+    const del: FoodOp = { opId: 'd', createdAt: '', state: 'sending', kind: 'delete', mealId: 'a', dropPaths: [] };
+    const out = historyWithOps([h('a', '2026-11-05'), h('b', '2026-11-06')], [save(meal('c', { eatenOn: '2026-11-08' }), 'o1'), del]);
+    expect(out.map((m) => m.id).sort()).toEqual(['b', 'c']);
+    expect([...mealDaysOf(out)].sort()).toEqual(['2026-11-06', '2026-11-08']);
+  });
+  it('reads old cached meals without a coach link', () => {
+    const old: Record<string, unknown> = { ...meal('a') };
+    delete old.coachMealId;
+    const c = parseFoodCache(JSON.stringify({ targets: null, days: { '2026-11-07': [old] } }));
+    expect(c.days['2026-11-07']?.[0]?.coachMealId).toBeNull();
+    expect(c.history).toEqual([]);
+    expect(c.coachMeals).toEqual([]);
   });
 });
