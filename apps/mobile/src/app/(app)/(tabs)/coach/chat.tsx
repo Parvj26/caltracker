@@ -2,37 +2,55 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { badgeLabel, dayLabel, thumbPathOf } from '@caltracker/shared';
+import { borderWidth } from '@caltracker/design-tokens';
+import { thumbPathOf } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { BackIcon } from '@/components/community/icons';
 import { Bubble } from '@/components/messages/bubble';
+import { CommentCard } from '@/components/messages/comment-card';
 import { Composer } from '@/components/messages/composer';
 import { useSignedUrls } from '@/components/messages/use-signed-urls';
 import { Button } from '@/components/ui';
+import { QUICK_REPLIES, buildChatRows, coachFirstName, type WorkoutComment } from '@/lib/coach-tab';
+import { fetchMyWorkoutComments } from '@/lib/log-api';
 import { useCoachProfile } from '@/lib/use-coach-profile';
-import { useCommunity } from '@/lib/use-community';
-import { useMessages, type ThreadItem } from '@/lib/use-messages';
-import { palette, radius, space, white } from '@/theme/theme';
+import { useMessages } from '@/lib/use-messages';
+import { palette, pressedOpacity, space } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
-
-type Row = { kind: 'day'; key: string; label: string } | { kind: 'message'; key: string; item: ThreadItem };
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-export default function CoachTab() {
+/**
+ * The chat with the coach, opened from the Coach profile's Message button (or a tapped message push). Realtime
+ * messages, the offline outbox, photos, earlier messages and "Seen" come from use-messages; the coach's comments on
+ * the client's workouts show inline as small cards.
+ */
+export default function CoachChat() {
   const { text } = useTheme();
+  const router = useRouter();
   // Null while loading, when there is no coach link, or on first launch offline: the header then says "Your coach".
   const coach = useCoachProfile();
   const coachName = coach?.name.trim() || null;
+  const first = coachFirstName(coachName);
   const chat = useMessages();
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  const [comments, setComments] = useState<WorkoutComment[]>([]);
   const timeZone = useMemo(zone, []);
 
   const setViewing = chat?.setViewing;
-  // Messages are marked read only while this tab is on screen.
+  // Messages are marked read only while the chat is on screen. Workout comments are fetched again each time it opens
+  // (a failed read keeps what was shown: they are a bonus to the chat).
   useFocusEffect(
     useCallback(() => {
       setViewing?.(true);
-      return () => setViewing?.(false);
+      let alive = true;
+      fetchMyWorkoutComments()
+        .then((c) => alive && setComments(c))
+        .catch(() => undefined);
+      return () => {
+        alive = false;
+        setViewing?.(false);
+      };
     }, [setViewing]),
   );
 
@@ -44,49 +62,29 @@ export default function CoachTab() {
   }, [items]);
   const urls = useSignedUrls(paths);
 
-  // Newest first, because the list is inverted (it opens at the latest message and the keyboard pushes it up).
-  const rows = useMemo<Row[]>(() => {
-    const now = new Date().toISOString();
-    const out: Row[] = [];
-    let last = '';
-    for (const item of items ?? []) {
-      const label = dayLabel(item.createdAt, now, timeZone);
-      if (label !== last) {
-        out.push({ kind: 'day', key: `day-${item.createdAt}`, label });
-        last = label;
-      }
-      out.push({ kind: 'message', key: item.clientMsgId, item });
-    }
-    return out.reverse();
-  }, [items, timeZone]);
+  const hasMore = chat?.hasMore ?? false;
+  const rows = useMemo(
+    () => buildChatRows({ items: items ?? [], comments, hasMore, now: new Date().toISOString(), timeZone }),
+    [items, comments, hasMore, timeZone],
+  );
 
-  // The community lives behind the Coach tab (the tab bar stays at five): a button with its unread count.
-  const router = useRouter();
-  const community = useCommunity();
-  const communityBadge = badgeLabel(community.unread);
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/coach'));
   const header = (
-    <View style={styles.header} accessibilityRole="header">
-      <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={44} />
-      <View style={styles.headerText}>
-        <Text style={text('sectionHeading')} testID="coach-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
-        {coach?.businessName ? <Text style={text('caption')} numberOfLines={1}>{coach.businessName}</Text> : null}
+    <View style={styles.header}>
+      <Pressable
+        testID="coach-chat-back"
+        accessibilityRole="button"
+        accessibilityLabel={first ? `Back to ${first}’s profile` : 'Back to your coach’s profile'}
+        onPress={back}
+        style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
+      >
+        <BackIcon />
+      </Pressable>
+      <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={40} ring={2} />
+      <View style={styles.headerText} accessibilityRole="header">
+        <Text style={[text('sectionHeading'), styles.headerName]} testID="coach-chat-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
+        {coachName ? <Text style={[text('body'), styles.headerSub]}>Your coach</Text> : null}
       </View>
-      {community.community ? (
-        <Pressable
-          testID="open-community"
-          accessibilityRole="button"
-          accessibilityLabel={communityBadge ? `Community, ${communityBadge} new` : 'Community'}
-          onPress={() => router.push('/community')}
-          style={({ pressed }) => [styles.communityButton, pressed && styles.pressed]}
-        >
-          <Text style={text('sectionHeading')}>Community</Text>
-          {communityBadge ? (
-            <View style={styles.communityBadge}>
-              <Text style={[text('caption'), styles.communityBadgeText]}>{communityBadge}</Text>
-            </View>
-          ) : null}
-        </Pressable>
-      ) : null}
     </View>
   );
 
@@ -126,7 +124,7 @@ export default function CoachTab() {
             ListEmptyComponent={
               // An inverted list flips its empty state too, so it is flipped back.
               <View style={[styles.center, styles.flip]}>
-                <Text style={text('body')}>No messages yet. Say hello to {coachName?.split(' ')[0] ?? 'your coach'}.</Text>
+                <Text style={text('body')}>No messages yet. Say hello to {first ?? 'your coach'}.</Text>
               </View>
             }
             ListFooterComponent={
@@ -138,7 +136,9 @@ export default function CoachTab() {
             }
             renderItem={({ item: r }) =>
               r.kind === 'day' ? (
-                <Text style={[text('caption'), styles.day]}>{r.label}</Text>
+                <Text style={[text('sectionHeading'), styles.day]}>{r.label}</Text>
+              ) : r.kind === 'comment' ? (
+                <CommentCard title={r.title} body={r.comment.body} onPress={() => router.push(`/log/${r.comment.logId}/summary`)} />
               ) : (
                 <Bubble
                   item={r.item}
@@ -155,7 +155,9 @@ export default function CoachTab() {
             }
           />
         )}
-        {unavailable ? null : <Composer onSend={chat.send} />}
+        {unavailable ? null : (
+          <Composer onSend={chat.send} placeholder={first ? `Message ${first}` : 'Write a message'} quickReplies={QUICK_REPLIES} />
+        )}
       </KeyboardAvoidingView>
       <Modal visible={openPhoto !== null} transparent animationType="fade" onRequestClose={() => setOpenPhoto(null)}>
         <Pressable style={styles.viewer} onPress={() => setOpenPhoto(null)} accessibilityRole="button" accessibilityLabel="Close photo">
@@ -168,27 +170,26 @@ export default function CoachTab() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], borderBottomWidth: 1, borderBottomColor: palette.border },
-  headerText: { flex: 1, gap: 2 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2.5],
+    paddingHorizontal: space[4],
+    paddingTop: space[2],
+    paddingBottom: space[3],
+    borderBottomWidth: borderWidth.card,
+    borderBottomColor: palette.border,
+  },
+  back: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
+  headerText: { flex: 1 },
+  headerName: { fontSize: 18 },
+  headerSub: { fontSize: 13, color: palette.inkMuted },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6] },
   flip: { transform: [{ scaleY: -1 }] },
-  list: { paddingHorizontal: space[4], paddingVertical: space[3], gap: space[3] },
-  day: { alignSelf: 'center', paddingVertical: space[2] },
+  list: { paddingHorizontal: space[4], paddingVertical: space[3], gap: space[2] },
+  day: { alignSelf: 'center', paddingVertical: space[1], fontSize: 12, color: palette.inkMuted },
   more: { alignSelf: 'center', padding: space[3] },
   banner: { padding: space[3], gap: space[2], backgroundColor: palette.celebrateBg },
   viewer: { flex: 1, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
-  communityButton: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[1],
-    paddingHorizontal: space[3],
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: palette.ink,
-  },
-  pressed: { opacity: 0.75 },
-  communityBadge: { minWidth: 20, paddingHorizontal: space[1], borderRadius: radius.pill, alignItems: 'center', backgroundColor: palette.magenta },
-  communityBadgeText: { color: white },
 });
