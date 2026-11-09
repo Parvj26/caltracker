@@ -1,7 +1,7 @@
-# Progress tab: the coach's goal shows with its countdown; the latest weight, body fat and muscle from the coach's two
-# seeded scans show in lb (the demo client's units), with the 3-month change; the scans make Weight and Body fat
-# charts; the client logs a weight, it shows in the history; deleting it again removes it.
-# The Body section sits below Strength, so every check scrolls to its element first.
+# Progress tab: the coach's goal shows with its countdown on the overview; the Body tile opens Body, where the latest
+# weight, body fat and muscle from the coach's two seeded scans show in lb (the demo client's units), with the 3-month
+# change; the scans make the weight trend and a Body fat chart; the client logs a weight, it shows in the history;
+# deleting it again removes it.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -18,42 +18,49 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-progress
-# The goal the coach set, with its countdown.
-- scrollUntilVisible:
-    element:
+# The goal the coach set, with its countdown, sits on the overview under "This week".
+- extendedWaitUntil:
+    visible:
       id: goal-text
     timeout: 20000
 - assertVisible: 'Run a 5K under 30 minutes'
 - assertVisible:
     id: goal-countdown
-    text: '[0-9]+ days to go · .*'
-# Latest numbers, in lb: 80 kg = 176.4 lb (−4.4 lb from 82 kg), 19% body fat, 36 kg = 79.4 lb of muscle.
-- scrollUntilVisible:
-    element:
-      id: latest-smm_kg
+    text: '[0-9]+ days to go'
+- assertVisible:
+    id: progress-week
+- takeScreenshot: progress-overview
+# The Body tile opens Body: latest numbers in lb: 80 kg = 176.4 lb (−4.4 lb from 82 kg), 19% body fat, 36 kg = 79.4 lb
+# of muscle.
+- tapOn:
+    id: progress-body
+- extendedWaitUntil:
+    visible:
+      id: latest-weight_kg
+    timeout: 20000
 - assertVisible:
     id: latest-weight_kg
-    text: 'Weight, 176.4 lb on .*−4.4 lb since .*'
+    text: 'Weight: 176.4 lb, −4.4 lb'
 - assertVisible:
     id: latest-body_fat_pct
-    text: 'Body fat, 19.0% on .*'
+    text: 'Body fat: 19.0%.*'
 - assertVisible:
     id: latest-smm_kg
-    text: 'Skeletal muscle mass, 79.4 lb on .*'
-- takeScreenshot: progress-goal-latest
-# The trend: a chart per measure.
-- scrollUntilVisible:
-    element:
-      id: chart-weight_kg
+    text: 'Muscle: 79.4 lb.*'
+# The weight trend, and the body fat chart under it.
+- assertVisible:
+    id: chart-weight_kg
 - scrollUntilVisible:
     element:
       id: chart-body_fat_pct
-- takeScreenshot: progress-seeded
+- takeScreenshot: progress-body
 # Log a weight: it appears in the history as "Logged by you".
 - scrollUntilVisible:
     element:
-      id: weight-input
+      id: log-weight-open
     direction: UP
+- tapOn:
+    id: log-weight-open
 - tapOn:
     id: weight-input
 - inputText: '175.5'
@@ -69,8 +76,10 @@ env:
 # Step the date back a day, then forward again (it stops at today).
 - scrollUntilVisible:
     element:
-      id: date-prev
+      id: log-weight-open
     direction: UP
+- tapOn:
+    id: log-weight-open
 - tapOn:
     id: date-prev
 - tapOn:
@@ -85,11 +94,9 @@ env:
     id: weight-save
 - assertVisible:
     id: weight-error
-# Delete the entry again.
 - tapOn:
-    id: weight-input
-- eraseText: 5
-- hideKeyboard
+    id: weight-cancel
+# Delete the entry again.
 - scrollUntilVisible:
     element:
       text: 'Logged by you'
