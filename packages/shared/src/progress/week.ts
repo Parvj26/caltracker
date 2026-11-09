@@ -25,6 +25,8 @@ export type WeekCounts = {
 export type WeekSummary = WeekCounts & {
   /** "3/4", or the workouts done alone ("2") when nothing is planned. */
   workoutsValue: string;
+  /** "+2 extra": workouts added on top of a plan, shown beside the planned count. Null without a plan or extras. */
+  extraLine: string | null;
   sentence: string;
 };
 
@@ -49,6 +51,7 @@ export function thisWeekSummary(input: {
   return {
     ...counts,
     workoutsValue: counts.planned > 0 ? `${counts.done}/${counts.planned}` : String(counts.done + counts.extra),
+    extraLine: counts.planned > 0 && counts.extra > 0 ? `+${counts.extra} extra` : null,
     sentence: weekSentence(counts),
   };
 }

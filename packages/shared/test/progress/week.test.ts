@@ -24,11 +24,26 @@ describe('thisWeekSummary', () => {
     });
     expect(s).toMatchObject({ done: 2, planned: 4, extra: 1, prs: 2, streak: 5 });
     expect(s.workoutsValue).toBe('2/4');
+    expect(s.extraLine).toBe('+1 extra');
+  });
+
+  it('shows planned done with the extra workouts beside it, never folded in', () => {
+    const s = thisWeekSummary({
+      workouts: [planned('2026-11-02'), planned('2026-11-04'), planned('2026-11-06')],
+      addedDays: ['2026-11-02', '2026-11-03'],
+      prs: 0,
+      streak: 0,
+      today,
+    });
+    expect(s.workoutsValue).toBe('0/3');
+    expect(s.extraLine).toBe('+2 extra');
+    expect(thisWeekSummary({ workouts: [planned('2026-11-02', true)], addedDays: [], prs: 0, streak: 0, today }).extraLine).toBeNull();
   });
 
   it('shows the count alone when nothing is planned', () => {
     const s = thisWeekSummary({ workouts: [], addedDays: ['2026-11-03'], prs: 0, streak: 1, today });
     expect(s.workoutsValue).toBe('1');
+    expect(s.extraLine).toBeNull();
   });
 });
 

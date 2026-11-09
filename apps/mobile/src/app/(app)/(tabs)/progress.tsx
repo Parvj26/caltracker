@@ -139,7 +139,7 @@ export default function ProgressScreen() {
           ) : null}
         </View>
         <View style={[styles.row, { gap: space[2] }]}>
-          <StatBox tone="bg" value={model.week?.workoutsValue ?? '–'} label="workouts" testID="week-workouts" />
+          <StatBox tone="bg" value={model.week?.workoutsValue ?? '–'} label="workouts" sub={model.week?.extraLine} testID="week-workouts" />
           <StatBox tone="bg" value={String(model.week?.prs ?? 0)} label="new PRs" testID="week-prs" />
           <StatBox tone="bg" value={`${model.week?.streak ?? 0} wk`} label="streak" testID="week-streak" />
         </View>
