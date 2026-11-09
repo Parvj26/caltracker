@@ -47,6 +47,8 @@ export function useReactions(opts: { target: ReactionTarget; rows: ReactionRow[]
 
   const mine = new Set(shown.filter((r) => r.userId === me).map((r) => r.reaction));
   return {
+    /** The rows as shown, my taps included. */
+    rows: shown,
     openPicker: () => setPickerOpen(true),
     bar: <ReactionBar rows={shown} me={me} onToggle={toggle} onAdd={() => setPickerOpen(true)} />,
     picker: (
