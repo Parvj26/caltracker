@@ -5,7 +5,7 @@ import { fontFamilyFor } from '@/theme/fonts';
 import { useUnreadCount } from '@/lib/use-messages';
 import { palette, white } from '@/theme/theme';
 
-// Files are discovered alphabetically (coach.tsx first), so a bare navigation into the tabs would open Coach. Today is home.
+// Files are discovered alphabetically (coach/ first), so a bare navigation into the tabs would open Coach. Today is home.
 export const unstable_settings = { initialRouteName: 'today' };
 
 /** Simple drawn icons (no icon font yet): a sun-like dot for Today, a small calendar for Workouts. */
