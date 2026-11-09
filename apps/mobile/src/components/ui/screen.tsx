@@ -37,6 +37,7 @@ export function Screen({
   refreshing,
   onRefresh,
   onScrollBegin,
+  footer,
 }: {
   children: ReactNode;
   centred?: boolean;
@@ -47,6 +48,8 @@ export function Screen({
   onRefresh?: () => void;
   /** Called when the client starts to drag the content (e.g. to close something left open). */
   onScrollBegin?: () => void;
+  /** Pinned under the scrolling content, above the keyboard (e.g. a comment box). It keeps clear of the home indicator. */
+  footer?: ReactNode;
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   // The bottom inset is room inside the scrolling content, not a fixed strip under it, so content scrolls under
@@ -92,7 +95,7 @@ export function Screen({
             style={styles.fill}
             contentContainerStyle={[
               styles.content,
-              !inTabs && { paddingBottom: PAD + bottomInset },
+              !inTabs && { paddingBottom: PAD + (footer ? 0 : bottomInset) },
               centred && styles.centred,
             ]}
             keyboardShouldPersistTaps="handled"
@@ -107,6 +110,7 @@ export function Screen({
               {children}
             </View>
           </ScrollView>
+          {footer ? <View style={[styles.footer, !inTabs && { paddingBottom: space[3] + bottomInset }]}>{footer}</View> : null}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </RevealContext.Provider>
@@ -116,6 +120,7 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
   content: { flexGrow: 1, alignItems: 'center', paddingHorizontal: space[4], paddingVertical: PAD },
+  footer: { paddingHorizontal: space[3], paddingTop: space[2.5], borderTopWidth: 2, borderTopColor: palette.border, backgroundColor: palette.bg },
   centred: { justifyContent: 'center' },
   column: { width: '100%', maxWidth: contentMaxWidth, gap: space[6] },
 });
