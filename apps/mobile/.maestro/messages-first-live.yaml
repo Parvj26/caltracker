@@ -1,5 +1,5 @@
-# On a fresh launch with no chat yet, the coach's very first message shows up live on the open Coach tab, without
-# leaving the tab or reopening the app.
+# On a fresh launch with no chat yet, the coach's very first message shows up live in the open chat (Coach tab ->
+# Message), without leaving it or reopening the app.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -16,6 +16,8 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-coach
+- tapOn:
+    id: coach-open-chat
 - extendedWaitUntil:
     visible: 'No messages yet.*'
     timeout: 20000
