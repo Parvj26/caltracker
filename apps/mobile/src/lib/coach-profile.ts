@@ -80,11 +80,31 @@ async function readSaved(userId: string): Promise<CoachRecord | null> {
   }
 }
 
-async function toProfile(record: CoachRecord, signUrl: (path: string) => Promise<string>): Promise<CoachProfile> {
+type Deps = { fetchFresh: () => Promise<CoachRecord | null>; signUrl: (path: string) => Promise<string>; now?: () => number };
+
+/** Links are signed for an hour (coach-profile-api); one is reused for 45 minutes, so it never expires on screen. */
+const REUSE_LINK_MS = 45 * 60 * 1000;
+// The last photo link, by user, photo and version: reloading the card (each time the Coach tab opens) keeps the same link,
+// so the image isn't downloaded again.
+let lastLink: { key: string; url: string; at: number } | null = null;
+
+/** Drops the remembered photo link (tests; a fresh sign-in starts clean anyway). */
+export function forgetSignedLinks(): void {
+  lastLink = null;
+}
+
+async function toProfile(userId: string, record: CoachRecord, deps: Deps): Promise<CoachProfile> {
   let avatarUrl: string | null = null;
   if (record.avatarPath) {
+    const now = (deps.now ?? Date.now)();
+    const linkKey = `${userId}|${record.avatarPath}|${record.updatedAt ?? ''}`;
     try {
-      avatarUrl = withVersion(await signUrl(thumbPathOf(record.avatarPath)), record.updatedAt);
+      if (lastLink && lastLink.key === linkKey && now - lastLink.at < REUSE_LINK_MS) {
+        avatarUrl = lastLink.url;
+      } else {
+        avatarUrl = withVersion(await deps.signUrl(thumbPathOf(record.avatarPath)), record.updatedAt);
+        lastLink = { key: linkKey, url: avatarUrl, at: now };
+      }
     } catch {
       avatarUrl = null; // initials show instead
     }
@@ -105,14 +125,14 @@ async function toProfile(record: CoachRecord, signUrl: (path: string) => Promise
  */
 export async function loadCoachProfile(
   userId: string,
-  deps: { fetchFresh: () => Promise<CoachRecord | null>; signUrl: (path: string) => Promise<string> },
+  deps: Deps,
 ): Promise<CoachProfile | null> {
   let record: CoachRecord | null;
   try {
     record = await deps.fetchFresh();
   } catch {
     const saved = await readSaved(userId);
-    return saved ? toProfile(saved, deps.signUrl) : null;
+    return saved ? toProfile(userId, saved, deps) : null;
   }
   try {
     if (record) await AsyncStorage.setItem(key(userId), JSON.stringify(record));
@@ -120,5 +140,5 @@ export async function loadCoachProfile(
   } catch {
     // saving is a bonus
   }
-  return record ? toProfile(record, deps.signUrl) : null;
+  return record ? toProfile(userId, record, deps) : null;
 }
