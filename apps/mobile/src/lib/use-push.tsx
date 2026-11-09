@@ -8,6 +8,7 @@ import { isEnabled, type PushPrefs } from '@caltracker/shared';
 import { revealedLogIds } from './coach-reveal';
 import { setStillTrainingEnabled } from './log-notifications';
 import { loadPrefs, savePrefs } from './notification-prefs';
+import type { PrefsSource } from './notification-settings-logic';
 import { onPushTapped, onTokenChanged, osPermission, registerDevice, requestPushPermission, setBadge, type PushPermission } from './push';
 import { badgeTotal, tapTarget, unreadCommentCount } from './push-logic';
 import { useSession } from './session';
@@ -23,6 +24,8 @@ type PushState = {
   refreshPermission: () => void;
   /** The client's notification settings; null until loaded (server, else this phone's copy, else defaults). */
   prefs: PushPrefs | null;
+  /** Where prefs came from; they can be changed only when 'server'. */
+  prefsSource: PrefsSource;
   /** Saves new settings: shown at once, put back (and the error rethrown) when saving fails. */
   updatePrefs: (next: PushPrefs) => Promise<void>;
 };
@@ -35,6 +38,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id ?? null;
   const [permission, setPermission] = useState<PushPermission | null>(null);
   const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+  const [prefsSource, setPrefsSource] = useState<PrefsSource>('loading');
+  const prefsSourceRef = useRef<PrefsSource>('loading');
   const prefsRef = useRef<PushPrefs | null>(null);
   const applyPrefs = useCallback((p: PushPrefs | null) => {
     prefsRef.current = p;
@@ -47,8 +52,13 @@ export function PushProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     let active = true;
     const load = () =>
-      void loadPrefs(userId).then(({ prefs: p }) => {
-        if (active) applyPrefs(p);
+      void loadPrefs(userId).then(({ prefs: p, offline }) => {
+        if (!active) return;
+        // Offline after a good load: keep what is shown (and editable).
+        if (offline && prefsSourceRef.current === 'server') return;
+        applyPrefs(p);
+        prefsSourceRef.current = offline ? 'offline' : 'server';
+        setPrefsSource(prefsSourceRef.current);
       });
     load();
     const sub = AppState.addEventListener('change', (s) => s === 'active' && load());
@@ -56,6 +66,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
       active = false;
       sub.remove();
       applyPrefs(null);
+      prefsSourceRef.current = 'loading';
+      setPrefsSource('loading');
     };
   }, [userId, applyPrefs]);
 
@@ -116,6 +128,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const updatePrefs = useCallback(
     async (next: PushPrefs) => {
       if (!userId) return;
+      if (prefsSourceRef.current !== 'server') throw new Error('You’re offline. You can change these when you’re back online.');
       const before = prefsRef.current;
       applyPrefs(next);
       try {
@@ -129,8 +142,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<PushState>(
-    () => ({ permission, requestPermission, refreshPermission, prefs, updatePrefs }),
-    [permission, requestPermission, refreshPermission, prefs, updatePrefs],
+    () => ({ permission, requestPermission, refreshPermission, prefs, prefsSource, updatePrefs }),
+    [permission, requestPermission, refreshPermission, prefs, prefsSource, updatePrefs],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
