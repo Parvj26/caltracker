@@ -48,7 +48,11 @@ export function Screen({
   onRefresh?: () => void;
   /** Called when the client starts to drag the content (e.g. to close something left open). */
   onScrollBegin?: () => void;
-  /** Pinned under the scrolling content, above the keyboard (e.g. a comment box). It keeps clear of the home indicator. */
+  /**
+   * Pinned under the scrolling content and above the keyboard: a sticky Start button, a comment box. It sits in the
+   * same centred column as the content and keeps clear of the home indicator (iOS drops that inset while the
+   * keyboard is up, since the keyboard covers it).
+   */
   footer?: ReactNode;
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -123,7 +127,11 @@ export function Screen({
               {children}
             </View>
           </ScrollView>
-          {footer ? <View style={[styles.footer, !inTabs && { paddingBottom: space[3] + (keyboardUp ? 0 : bottomInset) }]}>{footer}</View> : null}
+          {footer ? (
+            <View style={[styles.footer, { paddingBottom: space[3] + (inTabs || keyboardUp ? 0 : bottomInset) }]}>
+              <View style={styles.column}>{footer}</View>
+            </View>
+          ) : null}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </RevealContext.Provider>
@@ -133,7 +141,7 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
   content: { flexGrow: 1, alignItems: 'center', paddingHorizontal: space[4], paddingVertical: PAD },
-  footer: { paddingHorizontal: space[3], paddingTop: space[2.5], borderTopWidth: 2, borderTopColor: palette.border, backgroundColor: palette.bg },
   centred: { justifyContent: 'center' },
+  footer: { alignItems: 'center', paddingHorizontal: space[4], paddingTop: space[3], backgroundColor: palette.bg, borderTopWidth: 2, borderTopColor: palette.border },
   column: { width: '100%', maxWidth: contentMaxWidth, gap: space[6] },
 });
