@@ -389,6 +389,8 @@ export type {
   SearchFilters,
   SearchHit,
 } from './exercises/search';
+export { buildSmartIndex, smartMatch } from './search/smart-search';
+export type { SmartDoc, SmartHit, SmartIndex } from './search/smart-search';
 export {
   BIO_MAX_LENGTH,
   BUSINESS_NAME_MAX_LENGTH,
