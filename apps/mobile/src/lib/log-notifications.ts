@@ -1,5 +1,6 @@
 // Local notifications and haptics for logging. Push notifications (APNs, from the server) are in push.ts.
-//   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick.
+//   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick, unless the
+//     client switched it off (setStillTrainingEnabled).
 // Fixed identifiers, so scheduling again replaces the earlier one and cancelling needs no stored id.
 // Every call swallows errors: a notification is never worth breaking the workout over.
 import { REMINDER_DELAY_MS } from '@caltracker/shared';
@@ -56,7 +57,16 @@ function cancel(identifier: string): void {
   Notifications.cancelScheduledNotificationAsync(identifier).catch(warn(`cancel ${identifier}`));
 }
 
+/** The client's "Still training?" switch (Settings -> Notifications). Off cancels it and stops scheduling it. */
+let stillTrainingOn = true;
+
+export function setStillTrainingEnabled(on: boolean): void {
+  stillTrainingOn = on;
+  if (!on) cancelReminder();
+}
+
 export function scheduleReminder(name: string, logId: string): void {
+  if (!stillTrainingOn) return;
   const data: NotificationData = { kind: 'reminder', logId };
   schedule(REMINDER_ID, REMINDER_DELAY_MS / 1000, {
     body: `Still training? 💪 Tap to finish your ${name} workout.`,

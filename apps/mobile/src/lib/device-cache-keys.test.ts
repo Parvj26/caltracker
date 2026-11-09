@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { albumCacheKey, albumCachePrefix } from './album-logic';
-import { keysToForget, todayCacheKey } from './device-cache-keys';
+import { keysToForget, notificationPrefsKey, todayCacheKey } from './device-cache-keys';
 
 describe('keysToForget', () => {
   const keys = [
@@ -34,5 +34,12 @@ describe('keysToForget', () => {
 
   it('still forgets the Today copies when the user is unknown', () => {
     expect(keysToForget(keys, null)).toEqual(keys.filter((k) => k.startsWith('caltracker.today.')));
+  });
+
+  it('forgets this user’s notification prefs copy', () => {
+    expect(notificationPrefsKey('u1')).toBe('caltracker.notificationPrefs.u1');
+    expect(keysToForget(['caltracker.notificationPrefs.u1', 'caltracker.notificationPrefs.u2'], 'u1')).toEqual([
+      'caltracker.notificationPrefs.u1',
+    ]);
   });
 });
