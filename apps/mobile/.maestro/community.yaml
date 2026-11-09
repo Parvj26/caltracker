@@ -32,7 +32,11 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Welcome to the group!.*'
     timeout: 15000
-- assertVisible: 'Demo Coach · Coach'
+- assertVisible: 'Demo Coach'
+- assertVisible:
+    id: coach-badge
+- assertVisible:
+    id: community-subtitle
 - assertVisible: 'E2E Buddy says hi'
 
 # The coach's post shows in the notifications list (and the bell shows it as new).
@@ -48,8 +52,15 @@ env:
 - tapOn:
     id: notifications-back
 
-# React to the coach's post (the newest): fire from the "+" button, muscle by pressing and holding the post, then tap
-# muscle again to take it back.
+# Open the coach's post (the newest). React to it: fire from the "+" button, muscle by pressing and holding the post,
+# then tap muscle again to take it back.
+- tapOn:
+    id: comments-button
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: reaction-add
+    timeout: 10000
 - tapOn:
     id: reaction-add
     index: 0
@@ -83,12 +94,6 @@ env:
 
 # Comment on it, and react to the comment by pressing and holding it.
 - tapOn:
-    id: comments-button
-    index: 0
-- extendedWaitUntil:
-    visible: 'Comments'
-    timeout: 10000
-- tapOn:
     id: comment-input
 - inputText: 'E2E Thanks coach!'
 - hideKeyboard
@@ -106,6 +111,12 @@ env:
     timeout: 10000
 - tapOn:
     id: post-back
+
+# The feed shows the comment under the post, with a link to all of them.
+- extendedWaitUntil:
+    visible: 'View 1 comment'
+    timeout: 10000
+- assertVisible: '.*E2E Thanks coach!'
 
 # Write a post.
 - tapOn:
