@@ -2883,6 +2883,7 @@ export type Database = {
         }[]
       }
       push_badge_count: { Args: { p_user: string }; Returns: number }
+      push_cleanup: { Args: never; Returns: undefined }
       push_dispatch: { Args: { p_job: string }; Returns: undefined }
       push_reminder_candidates: {
         Args: never
