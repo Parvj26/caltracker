@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyTile, smoothedTrend, weightTrendSummary } from '../../src/progress/body';
+import { bodyTile, smoothedTrend, weightTrendInRange, weightTrendSummary } from '../../src/progress/body';
 
 describe('smoothedTrend', () => {
   it('starts at the first weigh-in and moves part of the way towards each new one', () => {
@@ -33,6 +33,24 @@ describe('smoothedTrend', () => {
         { date: '2026-10-01', value: 90 },
       ])[1]!.value,
     ).toBe(80);
+  });
+});
+
+describe('weightTrendInRange', () => {
+  const all = [
+    { date: '2026-10-01', value: 90 },
+    { date: '2026-10-20', value: 82 },
+    { date: '2026-11-01', value: 80 },
+  ];
+  it('smooths over every weigh-in, then keeps the range, so the line does not restart at the range’s first dot', () => {
+    const r = weightTrendInRange(all, '4w', '2026-11-05');
+    expect(r.raw.map((p) => p.date)).toEqual(['2026-10-20', '2026-11-01']);
+    expect(r.trend.map((p) => p.date)).toEqual(['2026-10-20', '2026-11-01']);
+    expect(r.trend[0]).toEqual(smoothedTrend(all)[1]);
+    expect(r.trend[0]!.value).not.toBe(82);
+  });
+  it('keeps everything for all time', () => {
+    expect(weightTrendInRange(all, 'all', '2026-11-05').raw).toHaveLength(3);
   });
 });
 

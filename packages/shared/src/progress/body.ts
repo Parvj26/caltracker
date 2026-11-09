@@ -1,6 +1,8 @@
 import { displayValue } from '../body/metrics';
 import type { SeriesPoint } from '../body/series';
-import { diffDays } from '../dates/dates';
+import { addDays, diffDays } from '../dates/dates';
+import type { IsoDate } from '../dates/dates';
+import type { OverviewPeriod } from '../body/overview';
 import type { Units } from '../units/units';
 
 /**
@@ -29,6 +31,23 @@ export function smoothedTrend(points: readonly SeriesPoint[], halfLifeDays = WEI
     out.push({ date: p.date, value: Math.round(trend * 100) / 100 });
   });
   return out;
+}
+
+const PERIOD_DAYS: Record<OverviewPeriod, number | null> = { '4w': 28, '3m': 91, '1y': 365, all: null };
+
+/**
+ * The weigh-ins and the trend to draw for a range: the trend is worked out over every weigh-in first and only then cut
+ * to the range, so it carries on from before the range instead of starting again at its first dot.
+ */
+export function weightTrendInRange(
+  all: readonly SeriesPoint[],
+  period: OverviewPeriod,
+  today: IsoDate,
+): { raw: SeriesPoint[]; trend: SeriesPoint[] } {
+  const days = PERIOD_DAYS[period];
+  const from = days === null ? null : addDays(today, -days);
+  const keep = (p: SeriesPoint) => from === null || p.date >= from;
+  return { raw: all.filter(keep), trend: smoothedTrend(all).filter(keep) };
 }
 
 /** Under this change (in the viewer's unit) the trend reads as holding steady. */

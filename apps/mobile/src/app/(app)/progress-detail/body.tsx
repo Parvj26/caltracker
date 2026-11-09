@@ -10,7 +10,7 @@ import {
   formatShortDate,
   localToday,
   parseWeightInput,
-  smoothedTrend,
+  weightTrendInRange,
   toInputValue,
   weightTrendSummary,
   type IsoDate,
@@ -62,9 +62,10 @@ export default function BodyScreen() {
 
   const trend = useMemo(() => {
     if (!data || !units) return null;
-    const weightPts = bodyOverview(data.scans, range, today).find((m) => m.key === 'weight_kg')?.points ?? [];
+    // Every weigh-in, smoothed first, then cut to the range (so the line carries on from before it).
+    const allPts = bodyOverview(data.scans, 'all', today).find((m) => m.key === 'weight_kg')?.points ?? [];
+    const { raw: weightPts, trend: smooth } = weightTrendInRange(allPts, range, today);
     if (weightPts.length === 0) return null;
-    const smooth = smoothedTrend(weightPts);
     const shown = (p: { date: IsoDate; value: number }) => ({ date: p.date, value: displayValue('weight_kg', p.value, units) });
     const values = weightPts.map((p) => p.value);
     return {
