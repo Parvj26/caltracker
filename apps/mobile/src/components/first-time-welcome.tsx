@@ -1,11 +1,8 @@
-import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { tapTarget } from '@caltracker/design-tokens';
-import type { Units } from '@caltracker/shared';
-import { Card, ErrorText, HandNote } from '@/components/ui';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { Card, HandNote } from '@/components/ui';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { useCoachProfile } from '@/lib/use-coach-profile';
-import { palette, white } from '@/theme/theme';
+import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import capybara from '../../assets/stickers/capybara-locked@256.png';
 import corgi from '../../assets/stickers/corgi-locked@256.png';
@@ -17,12 +14,10 @@ const STICKERS = [corgi, capybara, elephant] as const;
 type Props = {
   coachName: string | null;
   workspaceName: string;
-  units: Units;
-  onChangeUnits: (units: Units) => Promise<void>;
 };
 
-/** Today for a client with no workouts at all yet: meet the coach, what happens next, units, sticker teaser. */
-export function FirstTimeWelcome({ coachName, workspaceName, units, onChangeUnits }: Props) {
+/** Today for a client with no workouts at all yet: meet the coach, what happens next, sticker teaser. (kg/lb lives in Settings.) */
+export function FirstTimeWelcome({ coachName, workspaceName }: Props) {
   const { text, space, radius } = useTheme();
   const coach = useCoachProfile();
   const shownName = coach?.name ?? coachName;
@@ -68,7 +63,6 @@ export function FirstTimeWelcome({ coachName, workspaceName, units, onChangeUnit
         ))}
       </Card>
 
-      <UnitsCard units={units} onChange={onChangeUnits} />
 
       <Card>
         <View
@@ -88,65 +82,11 @@ export function FirstTimeWelcome({ coachName, workspaceName, units, onChangeUnit
   );
 }
 
-function UnitsCard({ units, onChange }: { units: Units; onChange: (units: Units) => Promise<void> }) {
-  const { text, space, radius } = useTheme();
-  const [error, setError] = useState<string | null>(null);
-
-  async function pick(next: Units) {
-    if (next === units) return;
-    setError(null);
-    try {
-      await onChange(next);
-    } catch {
-      setError('Could not save your units. Try again.');
-    }
-  }
-
-  return (
-    <Card>
-      <View style={[styles.row, { gap: space[3] }]}>
-        <Text style={[text('sectionHeading'), styles.flex]}>
-          Weights in
-        </Text>
-        <View
-          accessibilityRole="radiogroup"
-          accessibilityLabel="Weights in"
-          style={[styles.segments, { borderRadius: radius.button, padding: space[1] }]}
-        >
-          {(['kg', 'lb'] as const).map((u) => {
-            const on = u === units;
-            return (
-              <Pressable
-                key={u}
-                testID={`units-${u}`}
-                onPress={() => void pick(u)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={u === 'kg' ? 'Kilograms' : 'Pounds'}
-                style={[
-                  styles.segment,
-                  { borderRadius: radius.input, paddingHorizontal: space[4] },
-                  on && styles.segmentOn,
-                ]}
-              >
-                <Text style={[text('button'), { color: on ? white : palette.ink }]}>{u}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-      {error ? <ErrorText>{error}</ErrorText> : null}
-    </Card>
-  );
-}
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   flex: { flex: 1, minWidth: 120 },
   stepNumber: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.lime },
-  segments: { flexDirection: 'row', backgroundColor: palette.surface },
-  segment: { minHeight: tapTarget.min, minWidth: tapTarget.min + 12, alignItems: 'center', justifyContent: 'center' },
-  segmentOn: { backgroundColor: palette.ink },
   stickers: { flexDirection: 'row', justifyContent: 'space-between' },
   // The locked silhouettes are pale grey: a slightly darker tile with a border keeps them visible on white.
   stickerTile: { flex: 1, aspectRatio: 1, backgroundColor: palette.surface, borderWidth: 2, borderColor: palette.border },
