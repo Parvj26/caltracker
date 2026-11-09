@@ -65,6 +65,7 @@ export async function fetchHub(userId: string, workspaceId: string, today: IsoDa
       .from('workout_logs')
       .select(LOG_TREE_SELECT)
       .eq('client_id', userId)
+      .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .order('finished_at', { ascending: false })
       .order('id', { ascending: false })
