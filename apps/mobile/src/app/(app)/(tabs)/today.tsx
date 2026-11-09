@@ -2,7 +2,7 @@ import { useSurpriseReveal } from '@/lib/use-surprise';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { countExercises, formatLogDuration, localToday, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { countExercises, formatLogDuration, localToday, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
 import { FirstTimeWelcome } from '@/components/first-time-welcome';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
@@ -34,12 +34,10 @@ import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/wo
 import {
   fetchAnyWorkout,
   fetchMyCoachName,
-  fetchMyUnits,
   fetchNextWorkout,
   fetchWorkoutDetail,
   fetchWorkoutsBetween,
   LOAD_FAILED,
-  setMyUnits,
 } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -49,7 +47,7 @@ const DETAIL_WAIT_MS = 5000;
 const START_FAILED = 'Couldn’t open this workout. Check your connection and try again.';
 
 type TodayData =
-  | { kind: 'first-time'; coachName: string | null; units: Units }
+  | { kind: 'first-time'; coachName: string | null }
   | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null; logs: LogForDay[]; offline: boolean };
 
 const summaryOf = (d: CachedDetail): WorkoutSummary => ({
@@ -86,8 +84,7 @@ async function loadToday(): Promise<TodayData> {
     return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true };
   }
   if (workouts.length === 0 && isFirstTimeClient(any)) {
-    const [coachName, units] = await Promise.all([fetchMyCoachName(), fetchMyUnits()]);
-    return { kind: 'first-time', coachName, units };
+    return { kind: 'first-time', coachName: await fetchMyCoachName() };
   }
   void cacheToday(today, workouts);
   const [next, logs] = await Promise.all([
@@ -184,15 +181,6 @@ export default function Today() {
     setRefreshing(false);
   }
 
-  async function changeUnits(units: Units) {
-    setData((d) => (d?.kind === 'first-time' ? { ...d, units } : d));
-    try {
-      await setMyUnits(units);
-    } catch (e) {
-      void load(); // Put the saved value back on screen.
-      throw e;
-    }
-  }
 
   const inProgress = active?.status === 'in_progress' ? active : null;
   const statuses = useMemo(
@@ -311,8 +299,6 @@ export default function Today() {
           <FirstTimeWelcome
             coachName={data.coachName}
             workspaceName={workspace?.workspaceName ?? ''}
-            units={data.units}
-            onChangeUnits={changeUnits}
           />
         ) : null}
 

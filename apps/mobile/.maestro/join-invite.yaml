@@ -54,11 +54,15 @@ env:
 - extendedWaitUntil:
     visible: 'Your first workout is coming!'
     timeout: 20000
-- scrollUntilVisible:
-    element:
-      id: units-kg
+# kg/lb lives in Settings (gear on Today), with Sign out at the bottom.
+- tapOn:
+    id: today-settings
+- assertVisible:
+    id: units-kg
 - assertVisible:
     id: units-lb
+- tapOn:
+    id: settings-close
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
