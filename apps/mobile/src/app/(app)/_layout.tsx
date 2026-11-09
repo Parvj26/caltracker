@@ -32,6 +32,8 @@ export default function AppLayout() {
       <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="workout/[id]" />
+        <Stack.Screen name="plan/[id]" />
+        <Stack.Screen name="history" />
         {/* No swipe back: leaving mid-set by accident is easy, and Today's Resume banner brings it back anyway. */}
         <Stack.Screen name="log/[id]/index" options={{ gestureEnabled: false }} />
         {/* The reveal replaces the logging screen and then the summary; no swipe back into either. */}
@@ -42,6 +44,7 @@ export default function AppLayout() {
         <Stack.Screen name="community/[id]" />
         <Stack.Screen name="community/notifications" />
         <Stack.Screen name="zoo" />
+        <Stack.Screen name="progress-detail" />
         <Stack.Screen name="food/meal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notifications" />
       </Stack.Protected>

@@ -21,7 +21,7 @@ Clients get timely iPhone notifications about things their coach does (and a dai
 | key | When | Default | Example text | Opens |
 |---|---|---|---|---|
 | `workout_assigned` | Coach assigns a program or a single workout to the client | on | "New workout assigned" / "Luis assigned you Strength Block." | Workouts tab |
-| `workout_changed` | Coach changes a workout scheduled for **today** (edit or Live Sync) | on | "Today's workout changed" / "Luis updated Upper A." | that workout |
+| `workout_changed` | Coach edits a workout scheduled for **today** (Live Sync never changes today's copy, so it never sends this; dropped if the workout moves off today or is deleted first) | on | "Today's workout changed" / "Luis updated Upper A." | that workout |
 | `daily_reminder` | At the client's reminder time (default 8:00 AM, their time zone), only if a workout is scheduled today and not yet done | on | "Today: Upper A" / "Your workout is ready. Tap to start." | Today |
 | `coach_logged` | Coach finished logging a session for the client | on | "Luis logged your session" / "Your sticker is waiting." | the log summary / reveal |
 | `still_training` | 20 min after the last set of an unfinished workout (already built, on-device) | on | existing | existing |
@@ -32,7 +32,7 @@ Clients get timely iPhone notifications about things their coach does (and a dai
 | `community_coach_post` | Coach posts in the community | on | "Community" / "Luis posted in Luis Bueno Coaching." | that post |
 | `community_activity` | Reactions/comments on the client's own post; grouped per post | on | "Sam and 4 others reacted to your post." | that post |
 
-Text never includes message, comment or meal content, body data or weights. Names: the coach's display name; for community grouping, the first reactor's first name.
+Text never includes message, comment or meal content, body data or weights. Names: the coach's first name ("Your coach" when unknown); for community grouping, the first reactor's first name.
 
 ## Architecture
 
@@ -42,9 +42,9 @@ daily reminder ──(pg_cron, every 15 min)──▶ push_outbox rows ─┘
 ```
 
 1. **Devices.** `push_devices(user_id, token, platform 'ios', app_version, updated_at)`. The phone registers its APNs device token after permission is granted (expo-notifications `getDevicePushTokenAsync`) and on each app start; removes it on sign-out. RLS: a user sees and writes only their own rows.
-2. **Preferences.** `notification_prefs(user_id pk, disabled text[] of type keys, reminder_time time default '08:00', quiet_enabled bool default true, quiet_start time default '22:00', quiet_end time default '07:00', time_zone text)`. No row = all defaults. The phone keeps `time_zone` current (device IANA zone). RLS: own row only.
+2. **Preferences.** `notification_prefs(user_id pk, disabled text[] of type keys, reminder_time time default '08:00', quiet_enabled bool default true, quiet_start time default '22:00', quiet_end time default '07:00')`. No row = all defaults. Time zone: `profiles.time_zone` (kept current by the phone), else the coach's zone, else UTC. RLS: own row only.
 3. **Outbox.** `push_outbox(id, user_id, type, group_key, title, body, data jsonb (deep-link route), not_before timestamptz, created_at, sent_at, attempts, last_error)`. Written only by `security definer` trigger functions and the cron job; never readable by clients. Triggers on: program/workout assignment, today's scheduled workout change, coach-finished log, messages from the coach, workout-log comments by the coach, meal comments by the coach, nutrition target changes, coach community posts, reactions/comments on a client's post. Each trigger fires only when the actor is the coach (or another member, for community activity) and the recipient is a different user.
-4. **Sender.** Edge Function `send-push` (called by pg_cron every minute with a shared secret, like the award catch-up job): picks due rows (`sent_at is null and not_before <= now()`), drops types the user disabled, moves rows inside quiet hours to the quiet end (in the user's time zone), collapses rows with the same `group_key` into one notification ("Sam and 4 others…"), computes the badge (unread messages + unread comments), sends to every device of the user via **APNs HTTP/2 with token auth** (ES256 JWT from an Apple Push key), marks sent, retries failures up to 5 times with backoff, deletes device rows APNs reports as invalid (410 / BadDeviceToken).
+4. **Sender.** Edge Function `send-push` (called by pg_cron every minute with a shared secret, like the award catch-up job): picks due rows (`sent_at is null and not_before <= now()`), drops types the user disabled, moves rows inside quiet hours to the quiet end (in the user's time zone), collapses rows with the same `group_key` into one notification ("Sam and 4 others…"), computes the badge (unread messages + unread comments), sends to every device of the user via **APNs HTTP/2 with token auth** (ES256 JWT from an Apple Push key), marks sent, tries each notification at most 5 times in total (retries after 1, 5, 15 and 60 minutes), deletes device rows APNs reports as invalid (410 / BadDeviceToken).
 5. **Daily reminder.** pg_cron every 15 minutes inserts a `daily_reminder` row for each client whose local time just passed their reminder time today, who has a workout scheduled today not yet completed, and who has no reminder row for today yet.
 6. **Phone.** Today card (permission); Settings → Notifications screen (switches, reminder time, quiet hours, "off on this iPhone" banner with Open iPhone Settings); tap → deep link via `data.route`; badge cleared when the relevant screens are read; sign-out unregisters the device.
 

@@ -43,6 +43,14 @@ describe('buildProgress', () => {
     expect(buildProgress(rows(old), 'all', 'kg', TODAY).hiddenByRange).toBe(0);
   });
 
+  it('takes the last 4 weeks as a range too, and the change of the latest numbers over a chosen period', () => {
+    const scans = [scan('a', '2026-08-01', 84), scan('b', '2026-10-20', 82), scan('c', '2026-11-01', 80)];
+    const p = buildProgress(rows(scans), '4w', 'kg', TODAY, '4w');
+    expect(p.charts[0].points.map((x) => x.date)).toEqual(['2026-10-20', '2026-11-01']);
+    expect(p.latest.find((l) => l.key === 'weight_kg')!.delta).toBe('−2 kg');
+    expect(buildProgress(rows(scans), 'all', 'kg', TODAY, 'all').latest.find((l) => l.key === 'weight_kg')!.delta).toBe('−4 kg');
+  });
+
   it('lists history newest first; only the client own entries can be changed', () => {
     const p = buildProgress(
       rows([

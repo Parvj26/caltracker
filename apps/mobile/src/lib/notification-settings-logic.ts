@@ -81,3 +81,17 @@ export function settingsSections(prefs: PushPrefs): SettingsSection[] {
   }
   return [...sections, { title: 'Quiet hours', rows: quiet }];
 }
+
+/** Where the shown settings came from: not yet known, the server, or this phone's copy (no signal). */
+export type PrefsSource = 'loading' | 'server' | 'offline';
+
+/** Settings can be changed only once the server's copy is in, so an offline copy never overwrites newer ones. */
+export function prefsEditable(source: PrefsSource): boolean {
+  return source === 'server';
+}
+
+export function prefsNote(source: PrefsSource): string | null {
+  if (source === 'loading') return 'Loading your settings…';
+  if (source === 'offline') return 'You’re offline. You can change these when you’re back online.';
+  return null;
+}

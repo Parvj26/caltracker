@@ -15,6 +15,10 @@ describe('routeTaskSteps', () => {
     expect(routeTaskSteps('/zoo')).toContainEqual({ action: 'complete', task: 'view_progress' });
     expect(routeTaskSteps('/food').filter((s) => s.action !== 'abandon')).toEqual([]);
   });
+  it('counts opening a Progress section as viewing progress', () => {
+    expect(routeTaskSteps('/progress-detail/strength')).toContainEqual({ action: 'complete', task: 'view_progress' });
+    expect(routeTaskSteps('/progress-detail/body')).not.toContainEqual({ action: 'abandon', task: 'view_progress' });
+  });
 });
 
 describe('routeTaskSteps leaving a task', () => {

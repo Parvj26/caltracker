@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PUSH_PREFS, withType } from '@caltracker/shared';
-import { clockLabel, settingsSections, settingsSummary, shortClock, timeOptions } from './notification-settings-logic';
+import { clockLabel, prefsEditable, prefsNote, settingsSections, settingsSummary, shortClock, timeOptions } from './notification-settings-logic';
 
 describe('settingsSummary', () => {
   it('summary', () => {
@@ -66,5 +66,18 @@ describe('settingsSections', () => {
   it('hides From/To when quiet hours are off', () => {
     const s = settingsSections({ ...DEFAULT_PUSH_PREFS, quietEnabled: false });
     expect(s[3].rows.map((r) => r.label)).toEqual(['Quiet hours']);
+  });
+});
+
+describe('editing needs the server’s settings', () => {
+  it('only once loaded from the server', () => {
+    expect(prefsEditable('server')).toBe(true);
+    expect(prefsEditable('loading')).toBe(false);
+    expect(prefsEditable('offline')).toBe(false);
+  });
+  it('says why the switches are off', () => {
+    expect(prefsNote('server')).toBeNull();
+    expect(prefsNote('loading')).toBe('Loading your settings…');
+    expect(prefsNote('offline')).toBe('You’re offline. You can change these when you’re back online.');
   });
 });

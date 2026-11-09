@@ -121,13 +121,25 @@ function mockApns(reply: (token: string) => Reply = () => ({ status: 200 })) {
   return { calls, fetch: fetchFn as typeof fetch };
 }
 
-const handlerWith = (opts: { fetch?: typeof fetch; apns?: ApnsConfig | null; now?: () => Date } = {}) =>
+type HandlerOpts = {
+  fetch?: typeof fetch;
+  apns?: ApnsConfig | null;
+  now?: () => Date;
+  supabaseAdmin?: SupabaseClient;
+  budgetMs?: number;
+  concurrency?: number;
+  finishChunk?: number;
+};
+const handlerWith = (opts: HandlerOpts = {}) =>
   createHandler({
-    supabaseAdmin: admin,
+    supabaseAdmin: opts.supabaseAdmin ?? admin,
     cronSecret: SECRET,
     apns: opts.apns === undefined ? APNS : opts.apns,
     fetch: opts.fetch ?? mockApns().fetch,
     now: opts.now,
+    budgetMs: opts.budgetMs,
+    concurrency: opts.concurrency,
+    finishChunk: opts.finishChunk,
   });
 
 const call = (handler: (req: Request) => Promise<Response>, body: unknown, headers: Record<string, string> = { 'x-push-secret': SECRET }) =>
@@ -292,6 +304,66 @@ t('logs the APNs environment when a token is rejected', async () => {
   const line = warnings.find((w) => w.includes('BadDeviceToken'));
   assert(line, 'a warning names the reason');
   assertStringIncludes(line, 'production');
+});
+
+t('stops starting sends after the time budget; the rest wait for the next run', async () => {
+  const people = [];
+  for (let i = 0; i < 3; i++) {
+    const p = await makeClient();
+    people.push({ ...p, token: await addDevice(p.client) });
+    await coachMessage(p.ws, p.coach, p.client);
+  }
+  const mine = new Set(people.map((p) => p.token));
+  // Each APNs call takes 61 s on this clock: after the first send the 60 s budget is spent.
+  let clock = Date.now();
+  const apns = mockApns();
+  const slowFetch = ((input: string | URL | Request, init?: RequestInit) => {
+    if (mine.has(String(input).split('/').pop()!)) clock += 61_000;
+    return apns.fetch(input, init);
+  }) as typeof fetch;
+  const res = await call(handlerWith({ fetch: slowFetch, now: () => new Date(clock), budgetMs: 60_000, concurrency: 1 }), { job: 'send' });
+  assertEquals(res.status, 200);
+  assertEquals(apns.calls.filter((c) => mine.has(c.token)).length, 1, 'only one send started');
+  const rows = (await Promise.all(people.map((p) => outbox(p.client)))).flat();
+  assertEquals(rows.filter((r) => r.outcome === 'sent').length, 1);
+  const waiting = rows.filter((r) => r.sent_at === null);
+  assertEquals(waiting.length, 2);
+  for (const r of waiting) {
+    assertEquals(r.attempts, 0, 'not counted as a failed try');
+    assertEquals(r.claimed_until, null, 'released for the next run');
+    assert(Date.parse(r.not_before) <= clock + 1000, 'due again at once');
+  }
+});
+
+t('outcomes are recorded chunk by chunk, so sends before a failure stay recorded', async () => {
+  const a = await makeClient();
+  const b = await makeClient();
+  const tokenA = await addDevice(a.client);
+  const tokenB = await addDevice(b.client);
+  await coachMessage(a.ws, a.coach, a.client);
+  await coachMessage(b.ws, b.coach, b.client);
+  // Only our two users' rows are due in this test's batch (other rows may be too; they don't send).
+  let finishes = 0;
+  const flaky = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop !== 'rpc') return Reflect.get(target, prop, receiver);
+      return (fn: string, args?: Record<string, unknown>) => {
+        if (fn === 'finish_push_batch') {
+          const ids = ((args?.p_results ?? []) as Array<{ outcome: string }>);
+          if (ids.some((r) => r.outcome === 'sent') && ++finishes === 2) {
+            return Promise.resolve({ data: null, error: { message: 'connection lost' } });
+          }
+        }
+        return target.rpc(fn, args);
+      };
+    },
+  });
+  const apns = mockApns();
+  const res = await call(handlerWith({ supabaseAdmin: flaky, fetch: apns.fetch, concurrency: 1, finishChunk: 1 }), { job: 'send' });
+  assertEquals(res.status, 500, 'the run reports the failure');
+  const sentTokens = apns.calls.filter((c) => c.token === tokenA || c.token === tokenB).map((c) => c.token);
+  const first = sentTokens[0] === tokenA ? a : b;
+  assertEquals((await outbox(first.client))[0]!.outcome, 'sent', 'the first chunk was recorded before the failure');
 });
 
 /** A workout on the client's today in their zone, and a reminder time at the start of their current hour. */

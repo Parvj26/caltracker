@@ -1,6 +1,6 @@
 -- Push notifications: the SQL the send-push Edge Function calls, the dispatcher and its cron jobs (plan Task 6).
 begin;
-select plan(44);
+select plan(46);
 
 select tests.create_user('ps-coach@t.local', 'Luis Bueno') as coach \gset
 select tests.create_workspace('PS Coaching', :'coach') as ws \gset
@@ -38,7 +38,10 @@ select ok(has_function_privilege('service_role', 'public.claim_push_batch(intege
   'the service role can call the sender functions');
 select ok(not has_function_privilege('service_role', 'public.push_dispatch(text)', 'execute')
   and not has_function_privilege('authenticated', 'public.push_dispatch(text)', 'execute')
-  and not has_function_privilege('anon', 'public.push_dispatch(text)', 'execute'), 'only postgres (cron) runs push_dispatch');
+  and not has_function_privilege('anon', 'public.push_dispatch(text)', 'execute')
+  and not has_function_privilege('service_role', 'public.push_cleanup()', 'execute')
+  and not has_function_privilege('authenticated', 'public.push_cleanup()', 'execute')
+  and not has_function_privilege('anon', 'public.push_cleanup()', 'execute'), 'only postgres (cron) runs push_dispatch and push_cleanup');
 select ok((select relrowsecurity from pg_class where oid = 'public.push_sender_state'::regclass), 'push_sender_state has RLS');
 select table_privs_are('public', 'push_sender_state', 'authenticated', array[]::text[], 'clients cannot touch the sender state');
 select table_privs_are('public', 'push_sender_state', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
@@ -223,16 +226,21 @@ insert into public.push_outbox (user_id, workspace_id, type, group_key, created_
 insert into public.push_outbox (user_id, workspace_id, type, group_key, created_at, not_before) values
   (:'sam', :'ws', 'message', 'old-pending', now() - interval '31 days', now() + interval '1 hour');
 select lives_ok($$select public.push_dispatch('send')$$, 'dispatch send runs');
+select is((select count(*)::int from public.push_outbox where group_key in ('old-sent', 'old-failed')), 2,
+  'dispatch send leaves the clean-up to its own hourly job');
 select lives_ok($$select public.push_dispatch('reminders')$$, 'dispatch reminders runs');
 select results_eq($$select convert_from(q.body, 'utf8')::jsonb ->> 'job', q.headers ->> 'x-push-secret' from net.http_request_queue q
   where q.url = 'http://push.test/functions/v1/send-push' order by q.id$$,
   $$values ('send'::text, 'pgtap-push-secret'::text), ('reminders', 'pgtap-push-secret')$$, 'dispatch posts the job with the secret');
+select lives_ok($$select public.push_cleanup()$$, 'clean-up runs');
 select set_eq($$select group_key from public.push_outbox where group_key in ('old-sent', 'recent-sent', 'old-failed', 'old-pending')$$,
-  $$values ('recent-sent'), ('old-pending')$$, 'dispatch send deletes finished rows older than 30 days');
+  $$values ('recent-sent'), ('old-pending')$$, 'clean-up deletes finished rows older than 30 days');
 
 -- Cron ----------------------------------------------------------------------------------------------------------------
-select results_eq($$select jobname::text, schedule::text, command::text from cron.job where jobname in ('push-send', 'push-reminders') order by jobname$$,
-  $$values ('push-reminders', '*/15 * * * *', 'select public.push_dispatch(''reminders'')'),
+select results_eq($$select jobname::text, schedule::text, command::text from cron.job
+  where jobname in ('push-send', 'push-reminders', 'push-cleanup') order by jobname$$,
+  $$values ('push-cleanup', '17 * * * *', 'select public.push_cleanup()'),
+    ('push-reminders', '*/15 * * * *', 'select public.push_dispatch(''reminders'')'),
     ('push-send', '* * * * *', 'select public.push_dispatch(''send'')')$$, 'cron jobs are scheduled once');
 
 select * from finish();

@@ -2,6 +2,9 @@ import type { TaskName } from '@caltracker/shared';
 
 export type RouteTaskStep = { action: 'start' | 'complete' | 'abandon'; task: TaskName };
 
+/** Progress's section screens (Strength, Body, …): opening one counts as viewing progress, like the Zoo book. */
+const isProgressSection = (path: string) => path === '/zoo' || path.startsWith('/progress-detail/');
+
 const isWorkoutScreen = (path: string) => path.startsWith('/workout/') || path.startsWith('/log/');
 
 /**
@@ -14,9 +17,9 @@ export function routeTaskSteps(path: string): RouteTaskStep[] {
   if (path === '/today') steps.push({ action: 'complete', task: 'join_from_invite' });
   if (isWorkoutScreen(path)) steps.push({ action: 'complete', task: 'find_todays_workout' });
   if (path === '/progress') steps.push({ action: 'start', task: 'view_progress' });
-  if (path === '/zoo') steps.push({ action: 'complete', task: 'view_progress' });
+  if (isProgressSection(path)) steps.push({ action: 'complete', task: 'view_progress' });
   if (!isWorkoutScreen(path) && path !== '/today' && path !== '/workouts') steps.push({ action: 'abandon', task: 'find_todays_workout' });
-  if (path !== '/progress' && path !== '/zoo') steps.push({ action: 'abandon', task: 'view_progress' });
+  if (path !== '/progress' && !isProgressSection(path)) steps.push({ action: 'abandon', task: 'view_progress' });
   return steps;
 }
 

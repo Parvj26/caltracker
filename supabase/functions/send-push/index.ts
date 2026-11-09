@@ -32,6 +32,12 @@ export interface HandlerDeps {
   /** Used for the APNs requests. Tests inject a mock; nothing here ever reaches Apple in tests. */
   fetch?: typeof fetch;
   now?: () => Date;
+  /** Stop starting new sends after this long (the claim lasts 2 minutes, a request at most 10 s). */
+  budgetMs?: number;
+  /** Notification groups sent at once. */
+  concurrency?: number;
+  /** Groups per finish_push_batch call. */
+  finishChunk?: number;
 }
 
 type OutboxRow = {
@@ -45,8 +51,11 @@ type OutboxRow = {
 };
 type ContextRow = { user_id: string; prefs: PushPrefsRow | null; time_zone: string; badge: number; tokens: string[] };
 
-/** Devices sent to at once per notification group, and groups at once. */
+/** Groups sent at once (each to all of its user's devices at once). */
 const GROUP_CONCURRENCY = 8;
+/** A run stops starting new sends after this long: well inside the 2-minute claim, so no row is sent twice. */
+const SEND_BUDGET_MS = 60_000;
+const FINISH_CHUNK = 25;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -77,17 +86,21 @@ function senderStateStore(admin: SupabaseClient): JwtStore {
     async get() {
       const { data, error } = await admin
         .from('push_sender_state')
-        .select('apns_jwt, apns_jwt_issued_at')
+        .select('apns_jwt, apns_jwt_issued_at, apns_key_id')
         .eq('id', 1)
         .maybeSingle();
       if (error) logFailure('read jwt', error);
-      if (!data?.apns_jwt || !data.apns_jwt_issued_at) return null;
-      return { jwt: data.apns_jwt as string, issuedAt: new Date(data.apns_jwt_issued_at as string) };
+      if (!data?.apns_jwt || !data.apns_jwt_issued_at || !data.apns_key_id) return null;
+      return {
+        jwt: data.apns_jwt as string,
+        issuedAt: new Date(data.apns_jwt_issued_at as string),
+        keyId: data.apns_key_id as string,
+      };
     },
-    async put(jwt, issuedAt) {
+    async put(jwt, issuedAt, keyId) {
       const { error } = await admin
         .from('push_sender_state')
-        .upsert({ id: 1, apns_jwt: jwt, apns_jwt_issued_at: issuedAt.toISOString() });
+        .upsert({ id: 1, apns_jwt: jwt, apns_jwt_issued_at: issuedAt.toISOString(), apns_key_id: keyId });
       if (error) logFailure('store jwt', error);
     },
   };
@@ -115,7 +128,16 @@ function groupOutcome(send: PlannedSend, answers: ApnsResult[], now: Date): Omit
   return { outcome: 'failed', error };
 }
 
-export function createHandler({ supabaseAdmin: admin, cronSecret, apns, fetch: fetchFn = fetch, now = () => new Date() }: HandlerDeps) {
+export function createHandler({
+  supabaseAdmin: admin,
+  cronSecret,
+  apns,
+  fetch: fetchFn = fetch,
+  now = () => new Date(),
+  budgetMs = SEND_BUDGET_MS,
+  concurrency = GROUP_CONCURRENCY,
+  finishChunk = FINISH_CHUNK,
+}: HandlerDeps) {
   async function sendJob(cfg: ApnsConfig): Promise<Response> {
     const claimed = await admin.rpc('claim_push_batch', { p_limit: 500 });
     if (claimed.error) {
@@ -147,42 +169,65 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, apns, fetch: f
     );
 
     const at = now();
-    const { results, sends } = planBatch(rows, ctx, at);
+    const { results: planned, sends } = planBatch(rows, ctx, at);
     const client = createApnsClient({ cfg, store: senderStateStore(admin), fetch: fetchFn, now });
-    const deadTokens: string[] = [];
+    const all: FinishResult[] = [];
 
-    await pool(sends, GROUP_CONCURRENCY, async (send) => {
-      const payload = { ...send.payload, collapseId: await collapseId(send.groupKey) };
-      const answers = await Promise.all(
-        send.tokens.map(async (token): Promise<ApnsResult> => {
-          try {
-            return await client.send(token, payload);
-          } catch (e) {
-            return { kind: 'retry', reason: `send failed: ${e instanceof Error ? e.message : String(e)}` };
-          }
-        }),
-      );
-      answers.forEach((a, i) => {
-        if (a.kind !== 'invalid_token') return;
-        deadTokens.push(send.tokens[i]!);
-        // A Debug build's token is a sandbox token: a production sender gets BadDeviceToken for it.
-        console.warn(
-          `send-push: APNs (${cfg.env}) rejected device token ${send.tokens[i]!.slice(0, 8)}…: ${a.reason}; removing it`,
-        );
-      });
-      const outcome = groupOutcome(send, answers, at);
-      if (outcome.outcome === 'failed' || outcome.outcome === 'retry') {
-        console.warn(`send-push: APNs (${cfg.env}) ${send.payload.type} ${outcome.outcome}: ${outcome.error}`);
+    /** Records outcomes as soon as they are known, so a run that dies later never sends these rows again. */
+    async function finish(results: FinishResult[], deadTokens: string[]): Promise<boolean> {
+      if (results.length === 0 && deadTokens.length === 0) return true;
+      const finished = await admin.rpc('finish_push_batch', { p_results: results, p_dead_tokens: deadTokens });
+      if (finished.error) {
+        logFailure('finish', finished.error);
+        return false;
       }
-      for (const id of send.ids) results.push({ id, ...outcome });
-    });
-
-    const finished = await admin.rpc('finish_push_batch', { p_results: results, p_dead_tokens: deadTokens });
-    if (finished.error) {
-      logFailure('finish', finished.error);
-      return fail('finish failed', 500);
+      all.push(...results);
+      return true;
     }
-    const count = (...outcomes: FinishResult['outcome'][]) => results.filter((r) => outcomes.includes(r.outcome)).length;
+
+    if (!(await finish(planned, []))) return fail('finish failed', 500);
+
+    const started = now().getTime();
+    const outOfTime = () => now().getTime() - started >= budgetMs;
+    for (let i = 0; i < sends.length; i += finishChunk) {
+      const chunk = sends.slice(i, i + finishChunk);
+      const results: FinishResult[] = [];
+      const deadTokens: string[] = [];
+      await pool(chunk, concurrency, async (send) => {
+        if (outOfTime()) {
+          // Out of time: release the rows, due at once, for the next run (not counted as a failed try).
+          for (const id of send.ids) results.push({ id, outcome: 'defer', not_before: now().toISOString() });
+          return;
+        }
+        const payload = { ...send.payload, collapseId: await collapseId(send.groupKey) };
+        const answers = await Promise.all(
+          send.tokens.map(async (token): Promise<ApnsResult> => {
+            try {
+              return await client.send(token, payload);
+            } catch (e) {
+              return { kind: 'retry', reason: `send failed: ${e instanceof Error ? e.message : String(e)}` };
+            }
+          }),
+        );
+        answers.forEach((a, j) => {
+          if (a.kind !== 'invalid_token') return;
+          deadTokens.push(send.tokens[j]!);
+          // A Debug build's token is a sandbox token: a production sender gets BadDeviceToken for it.
+          console.warn(
+            `send-push: APNs (${cfg.env}) rejected device token ${send.tokens[j]!.slice(0, 8)}…: ${a.reason}; removing it`,
+          );
+        });
+        const outcome = groupOutcome(send, answers, at);
+        if (outcome.outcome === 'failed' || outcome.outcome === 'retry') {
+          console.warn(`send-push: APNs (${cfg.env}) ${send.payload.type} ${outcome.outcome}: ${outcome.error}`);
+        }
+        for (const id of send.ids) results.push({ id, ...outcome });
+      });
+      // The rows of later chunks stay claimed and are sent again by a later run once the claim lapses.
+      if (!(await finish(results, deadTokens))) return fail('finish failed', 500);
+    }
+
+    const count = (...outcomes: FinishResult['outcome'][]) => all.filter((r) => outcomes.includes(r.outcome)).length;
     return json({
       sent: count('sent'),
       deferred: count('defer'),
