@@ -50,7 +50,16 @@ const START_FAILED = 'Couldn’t open this workout. Check your connection and tr
 
 type TodayData =
   | { kind: 'first-time'; coachName: string | null }
-  | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null; logs: LogForDay[]; offline: boolean; plans: Plans };
+  | {
+      kind: 'today';
+      workouts: WorkoutSummary[];
+      next: WorkoutSummary | null;
+      logs: LogForDay[];
+      offline: boolean;
+      /** The saved copies offline; online the plans arrive later (`plansLater`), so Today never waits on them. */
+      plans: Plans;
+      plansLater: Promise<Plans> | null;
+    };
 
 const plansOf = (details: readonly CachedDetail[]): Plans => Object.fromEntries(details.map((d) => [d.doc.id, d.doc]));
 
@@ -90,14 +99,14 @@ async function loadToday(): Promise<TodayData> {
     if (cached.length === 0) throw e;
     // Today's logs as last read, so a workout finished earlier today keeps its Done ✓ after a restart.
     const logs = await readCachedTodayLogs(today);
-    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true, plans: plansOf(cached) };
+    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true, plans: plansOf(cached), plansLater: null };
   }
   if (workouts.length === 0 && isFirstTimeClient(any)) {
     return { kind: 'first-time', coachName: await fetchMyCoachName() };
   }
-  const [plans, next, logs] = await Promise.all([
-    // Read alongside the rest; a slow read never holds Today up (the card then shows just the exercise count).
-    within(cacheToday(today, workouts), DETAIL_WAIT_MS).then((p) => p ?? {}),
+  // Read alongside the rest but never waited for: the cards show the exercise count until the plans arrive.
+  const plansLater = cacheToday(today, workouts);
+  const [next, logs] = await Promise.all([
     workouts.length === 0 ? fetchNextWorkout(today) : Promise.resolve(null),
     // "Done ✓" is a bonus: Today still shows when it can't be read (then the copy saved on the phone is used).
     fetchLogsForDays(today, today).then(
@@ -108,7 +117,7 @@ async function loadToday(): Promise<TodayData> {
       () => readCachedTodayLogs(today),
     ),
   ]);
-  return { kind: 'today', workouts, next, logs, offline: false, plans };
+  return { kind: 'today', workouts, next, logs, offline: false, plans: {}, plansLater };
 }
 
 /** The planned workout to start from: the server's copy, or the one saved on the phone without signal. */
@@ -138,6 +147,8 @@ export default function Today() {
     refreshKey,
   );
   const [data, setData] = useState<TodayData | null>(null);
+  // Today's whole plans by workout id, merged in as they arrive (a late answer still fills its card).
+  const [plans, setPlans] = useState<Plans>({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
@@ -156,6 +167,10 @@ export default function Today() {
     const ticket = ++latest.current;
     try {
       const next = await loadToday();
+      if (next.kind === 'today') {
+        setPlans((p) => ({ ...p, ...next.plans }));
+        void next.plansLater?.then((later) => setPlans((p) => ({ ...p, ...later })));
+      }
       if (ticket !== latest.current) return;
       setData(next);
       setError(null);
@@ -331,7 +346,7 @@ export default function Today() {
               <WorkoutCard
                 key={w.id}
                 workout={w}
-                doc={data.plans[w.id] ?? null}
+                doc={plans[w.id] ?? null}
                 status={statuses[w.id] ?? null}
                 starting={starting === w.id}
                 onStart={() => void startWorkout(w)}
