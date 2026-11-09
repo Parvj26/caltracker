@@ -1,7 +1,7 @@
 // Starting a workout from the Workouts tab and its Preview: one workout at a time (the one going is offered
 // instead), a planned workout from the server's newest copy when it answers quickly, else the copy already on
 // screen, so Start works with poor signal.
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import type { WorkoutDoc } from '@caltracker/shared';
@@ -22,9 +22,29 @@ export function useStartWorkout() {
   const startingRef = useRef(false);
   const inProgress = active?.status === 'in_progress' ? active : null;
 
-  const openLog = useCallback((id: string) => router.push({ pathname: '/log/[id]', params: { id } }), [router]);
+  // Set when the logging screen or a summary is opened, cleared when this screen is back in view: one tap, one
+  // screen (as on Today), so a double tap never stacks two copies.
+  const navigating = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      navigating.current = false;
+    }, []),
+  );
+
+  const openLog = useCallback(
+    (id: string) => {
+      if (navigating.current) return;
+      navigating.current = true;
+      router.push({ pathname: '/log/[id]', params: { id } });
+    },
+    [router],
+  );
   const openSummary = useCallback(
-    (id: string) => router.push({ pathname: '/log/[id]/summary', params: { id } }),
+    (id: string) => {
+      if (navigating.current) return;
+      navigating.current = true;
+      router.push({ pathname: '/log/[id]/summary', params: { id } });
+    },
     [router],
   );
 
