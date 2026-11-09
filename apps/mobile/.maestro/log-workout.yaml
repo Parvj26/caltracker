@@ -151,8 +151,9 @@ env:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
 - assertTrue: '${output.call == "Felt: Good | Felt strong today"}'
-# Later, from Today: View opens the summary again.
-- tapOn: 'View'
+# Later, from Today: the workout card's View summary opens the summary again.
+- tapOn:
+    id: 'view-log-.*'
 - extendedWaitUntil:
     visible: '3 sets completed'
     timeout: 20000
