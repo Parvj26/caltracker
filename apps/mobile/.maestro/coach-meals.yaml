@@ -1,0 +1,83 @@
+# Meals from <coach>: the seed coach shares "Protein oats" (450 kcal, 35 g protein, 52 g carbs, 11 g fat). Open the
+# grid (by deep link until the Coach tab has its button), search with a typo-free partial word, combine chips, open
+# the recipe, log it (prefilled with its name and numbers), and see it on Food.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-food-targets, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-coach-meals, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-food
+- openLink: caltracker://coach-meals
+- extendedWaitUntil:
+    visible: 'Meals from .*'
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: 'coach-meal-Protein oats'
+    timeout: 10000
+- tapOn:
+    id: coach-meals-search
+- inputText: 'oat'
+- assertVisible:
+    id: 'coach-meal-Protein oats'
+- hideKeyboard
+- tapOn:
+    id: coach-meals-chip-highProtein
+- assertVisible:
+    id: 'coach-meal-Protein oats'
+- tapOn:
+    id: coach-meals-chip-under500
+- assertVisible:
+    id: 'coach-meal-Protein oats'
+- tapOn:
+    id: coach-meals-chip-lowCarb
+- assertVisible: 'No meals match. Try fewer filters.'
+- tapOn:
+    id: coach-meals-chip-lowCarb
+
+# The recipe.
+- tapOn:
+    id: 'coach-meal-Protein oats'
+- assertVisible: 'I(ngredients|NGREDIENTS)'
+- assertVisible: 'H(ow to make it|OW TO MAKE IT)'
+- assertVisible:
+    id: coach-meal-calories
+    text: '450.*'
+- tapOn:
+    id: coach-meal-log
+
+# Log a meal starts filled in.
+- assertVisible:
+    id: meal-name
+    text: 'Protein oats'
+- assertVisible:
+    id: meal-calories
+    text: '450'
+- tapOn:
+    id: meal-save
+- extendedWaitUntil:
+    visible: 'Protein oats, .*, 450 kcal · 35 P · 52 C · 11 F'
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible: 'Saving…'
+    timeout: 20000
+- takeScreenshot: coach-meals-phone
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-food, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-coach-meals, EMAIL: '-' }

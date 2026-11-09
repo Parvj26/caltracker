@@ -179,7 +179,8 @@ export default function MealScreen() {
     completeMeal({ variant: hasPhoto ? 'photo' : 'macros' });
     void food
       .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day, minutes, openedOn: today }), name, note, macros: parsed.macros, coachMealId }, choice)
-      .finally(() => router.back());
+      // From a coach meal, saving lands on Food (where the meal now shows); otherwise back where it came from.
+      .finally(() => (params.coachMealId ? router.dismissTo('/food') : router.back()));
   }
 
   function confirmDelete() {
