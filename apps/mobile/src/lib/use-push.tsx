@@ -94,9 +94,17 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const unreadMessages = useUnreadCount();
   const { rows } = useCommunity();
   const badge = badgeTotal(unreadMessages, unreadCommentCount(rows));
+  const badgeRef = useRef(badge);
+  badgeRef.current = badge;
   useEffect(() => {
     if (userId) setBadge(badge);
   }, [userId, badge]);
+  // A push may have changed the icon's badge while the app was away: put the app's count back on return.
+  useEffect(() => {
+    if (!userId) return;
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && setBadge(badgeRef.current));
+    return () => sub.remove();
+  }, [userId]);
 
   const requestPermission = useCallback(async () => {
     const granted = await requestPushPermission();
