@@ -92,7 +92,7 @@ export default function CommunityScreen() {
   const visible = useMemo(() => sortFeed(withoutBlocked(posts ?? [], blocked)), [posts, blocked]);
   const shown = useMemo(() => filterFeed(visible, filter, coaches), [visible, filter, coaches]);
   const myAvatarPaths = useMemo(() => [profile?.avatarPath ?? null], [profile]);
-  const media = usePostMedia(visible, myAvatarPaths);
+  const media = usePostMedia(visible, myAvatarPaths, blocked);
   const ctx: PostContext | null = community
     ? {
         me,
