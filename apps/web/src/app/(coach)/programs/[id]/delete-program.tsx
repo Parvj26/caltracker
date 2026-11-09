@@ -5,6 +5,7 @@ import { useId, useRef, useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import { deleteProgram } from '../actions';
 import styles from '../programs.module.css';
+import { markUndone } from '@/lib/analytics/client';
 
 /** Delete a program, after saying that clients already on it keep their calendars. */
 export function DeleteProgram({ id, name }: { id: string; name: string }) {
@@ -20,6 +21,7 @@ export function DeleteProgram({ id, name }: { id: string; name: string }) {
     startTransition(async () => {
       const outcome = await deleteProgram(id);
       if (outcome.ok) {
+        markUndone('program', id);
         dialogRef.current?.close();
         router.push('/programs');
       } else setError(outcome.error);

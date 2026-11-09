@@ -33,6 +33,7 @@ import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
 import type { WorkoutHints } from '@caltracker/shared';
 import styles from '../programs.module.css';
+import { programWorkoutSaved } from '@/lib/analytics/client';
 
 export type Slot = { id: string; week: number; day: number; position: number; workoutId: string; workoutName: string };
 export type LibraryWorkout = { id: string; name: string };
@@ -166,7 +167,11 @@ export function ProgramGrid({
     };
     optimistic(
       (s) => [...s, slot],
-      () => addProgramWorkout({ id: slot.id, programId: program.id, week, day, workoutId: workout.id }),
+      () =>
+        addProgramWorkout({ id: slot.id, programId: program.id, week, day, workoutId: workout.id }).then(() => {
+          // A new program counts as built once its first workout is saved.
+          programWorkoutSaved(program.id);
+        }),
       (s) => s.filter((x) => x.id !== slot.id),
     );
   }

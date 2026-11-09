@@ -30,6 +30,7 @@ import { saveTargets } from './actions';
 import type { CoachMeal } from './load';
 import { TIME_ZONE_COOKIE } from './week';
 import styles from './food.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const noSubscribe = () => () => undefined;
 /** The coach's own time zone in the browser; UTC while rendering on the server. */
@@ -220,6 +221,8 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
+  const [touched, setTouched] = useState(false);
+  const completeTargets = useAnalyticsTask('set_food_targets', touched && !readOnly);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -229,6 +232,8 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
       try {
         const outcome = await saveTargets(clientId, values);
         if (outcome.ok) {
+          completeTargets();
+          setTouched(false);
           setFieldErrors({});
           setSaved(true);
         } else {
@@ -265,6 +270,7 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
                 {...(fieldErrors[k] ? { error: fieldErrors[k] } : {})}
                 onChange={(e) => {
                   setSaved(false);
+                  setTouched(true);
                   setValues((v) => ({ ...v, [k]: e.target.value }));
                 }}
                 data-testid={`target-${k}`}

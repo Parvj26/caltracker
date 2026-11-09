@@ -41,4 +41,15 @@ export default tseslint.config(
     languageOptions: { sourceType: 'commonjs', globals: { module: 'writable', require: 'readonly' } },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
+  {
+    // Analytics goes through one wrapper per app, which strips anything personal before it leaves.
+    files: ['apps/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/lib/analytics/**', 'apps/mobile/src/lib/analytics/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['posthog-js', 'posthog-js/*', 'posthog-react-native', 'posthog-react-native/*'], message: 'Use @/lib/analytics/client instead.' }] },
+      ],
+    },
+  },
 );

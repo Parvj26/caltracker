@@ -8,6 +8,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { keysToForget } from './device-cache-keys';
 import { forgetIndexUser } from './exercise-index';
+import { resetAnalytics } from './analytics/client';
 import { supabase } from './supabase';
 
 export async function signOutAndForget(): Promise<void> {
@@ -19,5 +20,6 @@ export async function signOutAndForget(): Promise<void> {
   } catch {
     // the copy is a convenience; never block signing out on it
   }
+  resetAnalytics();
   await supabase.auth.signOut();
 }

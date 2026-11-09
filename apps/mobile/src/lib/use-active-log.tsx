@@ -53,6 +53,8 @@ import { adoptCoachCopy } from './coach-watch';
 import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
 import { createLogSync, type LogSync, type SyncStatus } from './log-sync';
 import { useSession } from './session';
+import { getTaskTracker } from './analytics/client';
+import { countDoneSets } from './analytics/route-tasks';
 
 /** "Add missed sets" needs the server's copy once the finished log has uploaded. */
 export const REOPEN_OFFLINE = 'Couldn’t open this workout again. Check your connection and try again.';
@@ -499,12 +501,27 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
     return s.log;
   }, [setLog]);
 
-  const finish = useCallback(() => end((l) => finishLog(l, nowIso()), 'completed'), [end]);
+  const finish = useCallback(async () => {
+    let sets = 0;
+    const ok = await end((l) => {
+      const done = finishLog(l, nowIso());
+      sets = countDoneSets(done);
+      return done;
+    }, 'completed');
+    if (ok) getTaskTracker().complete('log_workout', { sets_logged: sets });
+    return ok;
+  }, [end]);
   const discard = useCallback(async () => {
     await end((l) => discardLog(l, nowIso()), 'discarded');
   }, [end]);
-  const start = useCallback((w: WorkoutDoc) => begin(w), [begin]);
-  const startEmpty = useCallback((name: string) => begin(name), [begin]);
+  const start = useCallback((w: WorkoutDoc) => {
+    getTaskTracker().start('log_workout');
+    return begin(w);
+  }, [begin]);
+  const startEmpty = useCallback((name: string) => {
+    getTaskTracker().start('log_workout', 'empty');
+    return begin(name);
+  }, [begin]);
   const dismissBanner = useCallback(() => setBanner(null), []);
   const refreshFromServer = useCallback(async () => {
     const me = current.current;

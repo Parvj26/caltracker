@@ -7,6 +7,7 @@ import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { addComment, deleteComment } from './actions';
 import styles from './log.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 export type CommentView = { id: string; body: string; createdAt: string; authorName: string; mine: boolean };
 
@@ -14,6 +15,7 @@ export function Comments({ logId, comments }: { logId: string; comments: Comment
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const completeReview = useAnalyticsTask('review_workout');
 
   function run(action: () => ReturnType<typeof addComment>, onOk?: () => void) {
     setError(null);
@@ -21,7 +23,10 @@ export function Comments({ logId, comments }: { logId: string; comments: Comment
       try {
         const outcome = await action();
         if (!outcome.ok) setError(outcome.error);
-        else onOk?.();
+        else {
+          completeReview();
+          onOk?.();
+        }
       } catch (e) {
         setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
       }

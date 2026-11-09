@@ -21,8 +21,13 @@ if [ "$ROLE" != "anon" ]; then
   echo "That is not the anon key (its role is '${ROLE:-unknown}'). Copy the key labelled 'anon public', never 'service_role'." >&2
   exit 1
 fi
+# Usage analytics: the PostHog project key is public (write-only). Read it from STAGING_POSTHOG_KEY or the
+# Keychain item caltracker-posthog-staging-key; without it analytics stays off.
+POSTHOG_KEY=${STAGING_POSTHOG_KEY:-$(security find-generic-password -s caltracker-posthog-staging-key -w 2>/dev/null || true)}
 cat > .env.local <<EOT
 EXPO_PUBLIC_SUPABASE_URL=$STAGING_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
+EXPO_PUBLIC_POSTHOG_KEY=$POSTHOG_KEY
+EXPO_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 EOT
 echo "Wrote apps/mobile/.env.local (staging: $STAGING_URL). Run 'pnpm --filter mobile env:local' to go back to local."

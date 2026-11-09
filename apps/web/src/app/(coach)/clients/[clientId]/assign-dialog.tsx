@@ -19,6 +19,7 @@ import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 export type ExistingWorkout = { date: IsoDate; name: string };
 
@@ -64,6 +65,7 @@ export function AssignDialog({
   onAddWorkout?: () => void;
   onClose: () => void;
 }) {
+  const completeAssign = useAnalyticsTask('assign_program');
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [programId, setProgramId] = useState(
@@ -102,6 +104,7 @@ export function AssignDialog({
     try {
       const outcome = await assignProgram({ assignmentId, programId: program.id, clientId, startDate, today });
       if (outcome.ok) {
+        completeAssign();
         onAssigned(program.name, outcome.count);
         return;
       }

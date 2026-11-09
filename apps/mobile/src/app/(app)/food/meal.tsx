@@ -27,6 +27,7 @@ import { photoFromParams, pickMealPhoto, type PickedMealPhoto } from '@/lib/pick
 import { useFood } from '@/lib/use-food';
 import { palette, pressedOpacity, radius, space } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const PREVIEW = 220;
 const UNIT: Record<MacroKey, string> = { calories: 'kcal', protein: 'g', carbs: 'g', fat: 'g' };
@@ -44,6 +45,8 @@ export default function MealScreen() {
   const [today] = useState(() => localToday());
   const before = params.id ? (food?.findMeal(params.id) ?? null) : null;
   const day = before?.eatenOn ?? (IsoDateSchema.safeParse(params.day).success && params.day <= today ? params.day : today);
+  // New meals only: editing an old one is a different job.
+  const completeMeal = useAnalyticsTask('log_meal', !params.id);
 
   const [name, setName] = useState(before?.name ?? '');
   const [note, setNote] = useState(before?.note ?? '');
@@ -128,6 +131,7 @@ export default function MealScreen() {
     if (all.length > 0) return;
     const choice: PhotoChoice = picked ? { kind: 'new', local: picked.local, width: picked.width, height: picked.height } : stored ? { kind: 'keep' } : { kind: 'none' };
     setBusy(true);
+    completeMeal({ variant: hasPhoto ? 'photo' : 'macros' });
     void food
       .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day, minutes, openedOn: today }), name, note, macros: parsed.macros }, choice)
       .finally(() => router.back());
