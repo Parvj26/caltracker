@@ -33,6 +33,7 @@ import { useUnits } from '@/lib/use-units';
 import { zooHref } from '@/lib/zoo-href';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { ChevronIcon } from '@/components/ui/icons';
 
 type TileTone = 'bg' | 'celebrateBg' | 'drop';
 type TileModel = { key: string; title: string; value: string; sub: string; href: Href; tone: TileTone; testID: string };
@@ -189,9 +190,7 @@ export default function ProgressScreen() {
           >
             <View style={styles.tileHead}>
               <Text style={[text('sectionHeading'), styles.small]}>{t.title}</Text>
-              <Text style={text('sectionHeading')} accessibilityElementsHidden importantForAccessibility="no">
-                ›
-              </Text>
+              <ChevronIcon size={16} />
             </View>
             <Text style={[text('sectionHeading'), styles.tileValue]} numberOfLines={2}>
               {t.value}

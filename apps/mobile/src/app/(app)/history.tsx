@@ -12,6 +12,7 @@ import { historyRow, monthSummary, type CurrentCoach, type HistoryRow } from '@/
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
+import { ChevronIcon } from '@/components/ui/icons';
 
 const LOAD_FAILED = 'Couldn’t load your history. Check your connection and pull down to try again.';
 
@@ -49,7 +50,7 @@ export default function History() {
           accessibilityLabel="Back to Workouts"
           style={({ pressed }) => [styles.back, { borderRadius: radius.pill }, pressed && styles.pressed]}
         >
-          <Text style={text('screenTitle')}>‹</Text>
+          <ChevronIcon direction="left" />
         </Pressable>
         <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
           History

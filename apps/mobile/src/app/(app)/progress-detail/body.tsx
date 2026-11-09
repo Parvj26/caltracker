@@ -29,6 +29,7 @@ import { useBody, usePullRefresh } from '@/lib/use-progress-data';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { ChevronIcon } from '@/components/ui/icons';
 
 const RANGE_LABELS: Record<OverviewPeriod, string> = { '4w': '1 mo', '3m': '3 mo', '1y': '1 yr', all: 'All' };
 
@@ -195,7 +196,7 @@ export default function BodyScreen() {
               autoFocus={!editing}
             />
             <View style={[styles.row, { gap: space[2] }]}>
-              <StepButton testID="date-prev" glyph="‹" label="Previous day" onPress={() => setEntryDate((d) => stepWeightDate(d, -1, localToday()))} />
+              <StepButton testID="date-prev" direction="left" label="Previous day" onPress={() => setEntryDate((d) => stepWeightDate(d, -1, localToday()))} />
               <Text
                 testID="date-label"
                 style={[text('sectionHeading'), styles.dateText]}
@@ -203,7 +204,7 @@ export default function BodyScreen() {
               >
                 {entryDate === today ? `Today, ${formatShortDate(entryDate, today)}` : formatShortDate(entryDate, today)}
               </Text>
-              <StepButton testID="date-next" glyph="›" label="Next day" disabled={entryDate >= today} onPress={() => setEntryDate((d) => stepWeightDate(d, 1, localToday()))} />
+              <StepButton testID="date-next" direction="right" label="Next day" disabled={entryDate >= today} onPress={() => setEntryDate((d) => stepWeightDate(d, 1, localToday()))} />
             </View>
             {formError ? <ErrorText testID="weight-error">{formError}</ErrorText> : null}
             <Button testID="weight-save" title={editing ? 'Save change' : 'Save weight'} onPress={() => void save()} busy={saving} disabled={units === null} />
@@ -330,8 +331,7 @@ export default function BodyScreen() {
   );
 }
 
-function StepButton({ glyph, label, onPress, testID, disabled = false }: { glyph: string; label: string; onPress: () => void; testID: string; disabled?: boolean }) {
-  const { text } = useTheme();
+function StepButton({ direction, label, onPress, testID, disabled = false }: { direction: 'left' | 'right'; label: string; onPress: () => void; testID: string; disabled?: boolean }) {
   return (
     <Pressable
       testID={testID}
@@ -342,7 +342,7 @@ function StepButton({ glyph, label, onPress, testID, disabled = false }: { glyph
       onPress={onPress}
       style={({ pressed }) => [styles.step, disabled && styles.disabled, pressed && { opacity: pressedOpacity }]}
     >
-      <Text style={text('screenTitle')}>{glyph}</Text>
+      <ChevronIcon direction={direction} size={22} />
     </Pressable>
   );
 }

@@ -6,6 +6,7 @@ import { PROGRESS_LOAD_FAILED } from '@/lib/body-api';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { ChevronIcon } from '@/components/ui/icons';
 
 /** A Progress section's top row: a round back button (to Progress), the title, and an optional action on the right. */
 export function SectionHeader({ title, right }: { title: string; right?: ReactNode }) {
@@ -20,9 +21,7 @@ export function SectionHeader({ title, right }: { title: string; right?: ReactNo
         onPress={() => (router.canGoBack() ? router.back() : router.replace('/progress'))}
         style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
       >
-        <Text style={text('sectionHeading')} accessibilityElementsHidden importantForAccessibility="no">
-          ‹
-        </Text>
+        <ChevronIcon direction="left" />
       </Pressable>
       <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
         {title}

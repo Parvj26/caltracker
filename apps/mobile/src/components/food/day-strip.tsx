@@ -4,6 +4,7 @@ import type { IsoDate, StripDay } from '@caltracker/shared';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { font } from './food-type';
+import { ChevronIcon } from '@/components/ui/icons';
 
 /**
  * Seven days, today last (ink). A ● under a day with meals. The arrows page back a week at a time and forward again
@@ -30,11 +31,11 @@ export function DayStrip({
   return (
     <View style={{ gap: space[2] }}>
       <View style={styles.row}>
-        <Arrow glyph="‹" label="Earlier week" testID="food-older-week" disabled={!canGoOlder} onPress={onOlder} />
+        <Arrow direction="left" label="Earlier week" testID="food-older-week" disabled={!canGoOlder} onPress={onOlder} />
         <Text style={[font(700, 14), styles.title]} testID="food-week-title">
           {title}
         </Text>
-        <Arrow glyph="›" label="Later week" testID="food-newer-week" disabled={onNewer === null} onPress={() => onNewer?.()} />
+        <Arrow direction="right" label="Later week" testID="food-newer-week" disabled={onNewer === null} onPress={() => onNewer?.()} />
       </View>
       <View style={[styles.row, { gap: 6 }]}>
         {days.map((d) => (
@@ -45,7 +46,7 @@ export function DayStrip({
   );
 }
 
-function Arrow({ glyph, label, onPress, disabled, testID }: { glyph: string; label: string; onPress: () => void; disabled: boolean; testID: string }) {
+function Arrow({ direction, label, onPress, disabled, testID }: { direction: 'left' | 'right'; label: string; onPress: () => void; disabled: boolean; testID: string }) {
   return (
     <Pressable
       onPress={onPress}
@@ -56,7 +57,7 @@ function Arrow({ glyph, label, onPress, disabled, testID }: { glyph: string; lab
       testID={testID}
       style={({ pressed }) => [styles.arrow, disabled && styles.disabled, pressed && { opacity: pressedOpacity }]}
     >
-      <Text style={font(800, 22)}>{glyph}</Text>
+      <ChevronIcon direction={direction} size={22} />
     </Pressable>
   );
 }

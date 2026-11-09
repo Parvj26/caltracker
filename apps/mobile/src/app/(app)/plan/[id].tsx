@@ -42,6 +42,7 @@ import {
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
+import { ChevronIcon } from '@/components/ui/icons';
 
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
 
@@ -146,7 +147,7 @@ export default function PlanPreview() {
         accessibilityLabel="Back to Workouts"
         style={({ pressed }) => [styles.back, { borderRadius: radius.pill }, pressed && styles.pressed]}
       >
-        <Text style={text('screenTitle')}>‹</Text>
+        <ChevronIcon direction="left" />
       </Pressable>
 
       {loaded.kind === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}

@@ -28,6 +28,7 @@ import {
 import { palette, pressedOpacity, radius, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
+import { ChevronIcon, HistoryIcon } from '@/components/ui/icons';
 
 type WeekData = {
   weekStart: IsoDate;
@@ -155,11 +156,11 @@ export default function Workouts() {
 
       <View style={{ gap: space[2.5] }}>
         <View style={styles.row}>
-          <WeekArrow label="Previous week" glyph="‹" onPress={() => changeWeek(-1)} />
+          <WeekArrow label="Previous week" direction="left" onPress={() => changeWeek(-1)} />
           <Text style={[text('sectionHeading'), styles.weekTitle]} accessibilityRole="header">
             {weekTitle(weekStart, today)}
           </Text>
-          <WeekArrow label="Next week" glyph="›" onPress={() => changeWeek(1)} />
+          <WeekArrow label="Next week" direction="right" onPress={() => changeWeek(1)} />
         </View>
         <View style={[styles.row, { gap: space[1] }]}>
           {strip.map((d) => (
@@ -249,16 +250,14 @@ function HistoryButton({ onPress }: { onPress: () => void }) {
         pressed && styles.pressed,
       ]}
     >
-      <Text style={text('sectionHeading')} accessibilityElementsHidden importantForAccessibility="no">
-        ↺
-      </Text>
+      <HistoryIcon />
       <Text style={text('sectionHeading')}>History</Text>
     </Pressable>
   );
 }
 
-function WeekArrow({ label, glyph, onPress }: { label: string; glyph: string; onPress: () => void }) {
-  const { text, radius } = useTheme();
+function WeekArrow({ label, direction, onPress }: { label: string; direction: 'left' | 'right'; onPress: () => void }) {
+  const { radius } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -267,7 +266,7 @@ function WeekArrow({ label, glyph, onPress }: { label: string; glyph: string; on
       testID={label === 'Next week' ? 'next-week' : 'previous-week'}
       style={({ pressed }) => [styles.arrow, { borderRadius: radius.pill }, pressed && styles.pressed]}
     >
-      <Text style={text('screenTitle')}>{glyph}</Text>
+      <ChevronIcon direction={direction} size={22} />
     </Pressable>
   );
 }
@@ -405,7 +404,7 @@ function ComingUpRow({ workout, onPress }: { workout: PlannedWorkout; onPress: (
         <Text style={text('sectionHeading')}>{workout.doc.name}</Text>
         <Text style={text('caption')}>{meta}</Text>
       </View>
-      <Text style={text('sectionHeading')}>›</Text>
+      <ChevronIcon size={18} />
     </Pressable>
   );
 }
