@@ -175,7 +175,7 @@ export default function CommunityScreen() {
       {community && ctx ? (
         <View style={{ gap: space[3.5] }}>
           <View style={[styles.row, styles.shareBox, { borderRadius: radius.card, gap: space[2.5], paddingHorizontal: space[3], paddingVertical: space[2.5] }]}>
-            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} />
+            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} ring={2} />
             <Pressable
               testID="community-new-post"
               accessibilityRole="button"

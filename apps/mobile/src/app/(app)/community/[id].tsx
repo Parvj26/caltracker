@@ -227,7 +227,7 @@ function CommentItem({
   const reactions = useReactions({ target: { commentId: c.id }, rows: c.reactions, me, onChanged });
   return (
     <Pressable accessible={false} onLongPress={reactions.openPicker} style={[styles.commentRow, { gap: space[2.5] }]} testID={`comment-${c.id}`}>
-      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} />
+      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} ring={2} />
       <View style={[styles.flex, { gap: space[1] }]}>
         <View style={[styles.bubble, { paddingVertical: space[2], paddingLeft: space[3], gap: 2 }]}>
           <View style={styles.row}>

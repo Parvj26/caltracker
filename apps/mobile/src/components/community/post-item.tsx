@@ -133,7 +133,7 @@ function AuthorRow({ name, isCoach, age, avatarUrl, size, menu }: { name: string
   const { text, space } = useTheme();
   return (
     <View style={[styles.row, { gap: space[2.5] }]}>
-      <CoachAvatar name={name} url={avatarUrl} size={size} />
+      <CoachAvatar name={name} url={avatarUrl} size={size} ring={2} />
       <View style={styles.flex} accessible accessibilityLabel={`${name}${isCoach ? ', coach' : ''}, ${age}`}>
         <View style={[styles.row, styles.wrap, { gap: space[1] }]}>
           <Text style={text('sectionHeading')}>{name}</Text>
@@ -151,7 +151,7 @@ function PreviewLine({ comment, avatarUrl }: { comment: PreviewComment; avatarUr
   const { text, space } = useTheme();
   return (
     <View style={[styles.previewLine, { gap: space[2] }]} testID={`preview-comment-${comment.id}`}>
-      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} />
+      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} ring={1.5} />
       <Text style={[text('body'), styles.flex]} numberOfLines={3}>
         <Text style={styles.bold}>{comment.authorName}</Text> {comment.body}
       </Text>
