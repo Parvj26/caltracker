@@ -50,21 +50,22 @@ export const pushCardSnoozeKey = (userId: string) => `caltracker.pushCardSnoozed
 
 /**
  * The Today card asking for notifications: only while iOS has never asked (after that only iPhone Settings can turn
- * them on, which Settings -> Notifications explains), not while snoozed with "Later", and not on the first-time
- * welcome (one thing at a time).
+ * them on, which Settings -> Notifications explains) and not while snoozed with "Later". New clients see it too
+ * (approved new-client board), so they hear when their first workout arrives.
  */
 export function showPushCard(s: {
   permission: 'granted' | 'denied' | 'undetermined' | null;
   snoozedUntil: number | null;
   now: number;
-  firstTime: boolean;
 }): boolean {
-  if (s.permission !== 'undetermined' || s.firstTime) return false;
+  if (s.permission !== 'undetermined') return false;
   return s.snoozedUntil === null || s.now >= s.snoozedUntil;
 }
 
-/** The Today card's line, naming the coach by first name ("your coach" when unknown). */
-export function pushCardText(coachName: string | null): string {
+/** The Today card's line, naming the coach by first name ("your coach" when unknown); a new client's names the first workout. */
+export function pushCardText(coachName: string | null, firstTime = false): string {
   const first = coachName?.trim().split(/\s+/)[0] || 'your coach';
-  return `Get a ping when ${first} assigns a workout or sends you a message.`;
+  return firstTime
+    ? `Get a ping when ${first} assigns your first workout or messages you.`
+    : `Get a ping when ${first} assigns a workout or sends you a message.`;
 }

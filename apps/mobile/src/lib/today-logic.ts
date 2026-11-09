@@ -1,10 +1,29 @@
 // What the cards on the Today tab say, worked out from data other screens already load. Pure (no network, no React),
 // so it is unit tested. PR, unit, sticker and body rules come from @caltracker/shared; this file only arranges them.
-import { STICKERS, addDays, cardText, dayLabel, isoWeekday, localDateOf, topReactionsLine, type IsoDate, type Units } from '@caltracker/shared';
+import {
+  STICKERS,
+  addDays,
+  ageLabel,
+  cardText,
+  dailyTotals,
+  dayLabel,
+  diffDays,
+  formatMacro,
+  isoWeekday,
+  localDateOf,
+  topReactionsLine,
+  type IsoDate,
+  type MacroTargets,
+  type MealMacros,
+  type Units,
+} from '@caltracker/shared';
+import type { WorkoutStatus } from './active-log-logic';
 import type { AlbumAward } from './album-logic';
 import { clockTime } from './chat-format';
 import type { FeedPost } from './community-api';
 import type { ProgressModel } from './progress';
+import { formatDayLabel } from './workouts';
+import type { ProgramDay } from './workouts-plan';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
@@ -150,4 +169,128 @@ export function goalCard(model: ProgressModel): GoalCard | null {
     countdown: model.goal?.countdown ?? null,
     tiles: model.latest.map((l) => ({ key: l.key, label: SHORT_LABEL[l.key] ?? l.label, value: l.value, change: l.delta })),
   };
+}
+
+// ---- The redesigned Today (approved boards: workout day, rest day, new client) ------------------------------
+
+const firstWord = (name: string | null | undefined) => name?.trim().split(/\s+/)[0] || null;
+
+/** "Welcome, Parv" for a new client, or "Welcome" while the name isn't known. */
+export function welcome(firstName: string | null): string {
+  const name = firstWord(firstName);
+  return name ? `Welcome, ${name}` : 'Welcome';
+}
+
+/** Muscle groups shown on the workout card at most. */
+const MUSCLES_SHOWN = 3;
+
+/** "6 exercises · about 50 min · Chest, Back, Shoulders"; only the count until the plan is loaded (`minutes` null). */
+export function workoutMeta(exercises: number, minutes: number | null, muscles: readonly string[]): string {
+  return [
+    plural(exercises, 'exercise'),
+    minutes === null ? null : `about ${minutes} min`,
+    muscles.length > 0 ? muscles.slice(0, MUSCLES_SHOWN).join(', ') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** "Week 2 · Day 1" for a program workout; null for a one-off. */
+export function programChip(day: ProgramDay | null): string | null {
+  return day ? `Week ${day.week} · Day ${day.day}` : null;
+}
+
+/** "Wednesday" for the next workout within the coming week, else its date ("Tue 17 Nov"). */
+export function nextUpDay(date: IsoDate, today: IsoDate): string {
+  const ahead = diffDays(today, date);
+  return ahead >= 1 && ahead <= 6 ? WEEKDAYS[isoWeekday(date) - 1] ?? formatDayLabel(date) : formatDayLabel(date);
+}
+
+export type FoodBar = {
+  /** "1,240 / 2,100" (calories) or "96 / 170 g"; without a target just the total ("1,240 kcal"). */
+  value: string;
+  /** 0 to 1 against the target; null (no bar) without one. */
+  fraction: number | null;
+  /** For VoiceOver: "Calories 1,240 of 2,100 kcal". */
+  label: string;
+};
+
+function foodBar(key: 'calories' | 'protein', total: number, target: number | null): FoodBar {
+  const name = key === 'calories' ? 'Calories' : 'Protein';
+  const plain = formatMacro(key, total);
+  if (target === null || target <= 0) return { value: plain, fraction: null, label: `${name} ${plain}` };
+  const bare = plain.replace(/ (kcal|g)$/, '');
+  const goal = formatMacro(key, target);
+  const goalBare = goal.replace(/ (kcal|g)$/, '');
+  return {
+    value: key === 'calories' ? `${bare} / ${goalBare}` : `${bare} / ${goal}`,
+    fraction: Math.max(0, Math.min(1, total / target)),
+    label: `${name} ${bare} of ${goal}`,
+  };
+}
+
+/** Today's food card: calories and protein against the coach's targets (totals from shared dailyTotals). */
+export function foodCard(
+  meals: ReadonlyArray<{ name: string | null; macros: MealMacros }>,
+  targets: MacroTargets | null,
+): { calories: FoodBar; protein: FoodBar; meals: string } {
+  const totals = dailyTotals(meals.map((m) => m.macros));
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const m of meals) {
+    const name = m.name?.trim() || 'Meal';
+    if (seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    names.push(name);
+  }
+  return {
+    calories: foodBar('calories', totals.calories, targets?.calories ?? null),
+    protein: foodBar('protein', totals.protein, targets?.protein ?? null),
+    meals: meals.length === 0 ? 'No meals logged yet' : `${plural(meals.length, 'meal')} logged · ${names.join(', ')}`,
+  };
+}
+
+const AGO_UNIT: Record<string, string> = { m: 'min', h: 'h', d: 'd', w: 'wk', y: 'y' };
+
+/** "just now", "5 min ago", "2 h ago", "3 d ago", "2 wk ago" (from shared ageLabel). */
+export function agoText(iso: string, now: Date): string {
+  const short = ageLabel(iso, now);
+  const m = /^(\d+)([a-z])$/.exec(short);
+  return m && m[1] && m[2] ? `${m[1]} ${AGO_UNIT[m[2]] ?? m[2]} ago` : 'just now';
+}
+
+/** How many of this week's planned workouts are done. */
+export function weekTally(workoutIds: readonly string[], statuses: Readonly<Record<string, WorkoutStatus>>): { done: number; planned: number } {
+  return { done: workoutIds.filter((id) => statuses[id]?.kind === 'done').length, planned: workoutIds.length };
+}
+
+/** The "This week" tile: "1 of 4" over "workouts · 5-wk streak" (the streak comes from shared liveStreak). */
+export function weekTile(t: { done: number; planned: number }, streak: number): { big: string; small: string } {
+  const streakText = streak > 0 ? `${streak}-wk streak` : null;
+  if (t.planned === 0) return { big: 'None planned', small: streakText ?? 'this week' };
+  return { big: `${t.done} of ${t.planned}`, small: [t.planned === 1 ? 'workout' : 'workouts', streakText].filter(Boolean).join(' · ') };
+}
+
+/** The Community line's headline from the newest post: "Sam set 2 new PRs", "Sam: Morning lift done". */
+export function communityHeadline(row: Pick<PostPreview, 'author' | 'snippet'>): string {
+  const who = row.author === 'You' ? 'You' : (firstWord(row.author.replace(/ · Coach$/, '')) ?? row.author);
+  const snippet = row.snippet.trim();
+  if (!snippet) return `${who} posted`;
+  if (snippet === 'Shared a photo') return `${who} shared a photo`;
+  if (snippet === who || snippet.startsWith(`${who} `)) return snippet;
+  return `${who}: ${snippet}`;
+}
+
+/** "3 new" (unread community notifications), or null with none. */
+export function newCountLabel(unread: number): string | null {
+  return unread > 0 ? `${unread > 99 ? '99+' : unread} new` : null;
+}
+
+/** "What happens next" for a new client, naming the coach by first name. */
+export function nextSteps(coachName: string | null): [string, string, string] {
+  return [
+    `${firstWord(coachName) ?? 'Your coach'} builds your plan and it appears here and in Workouts.`,
+    'Tap Start, log each set, and finish. It takes a few taps.',
+    'Earn stickers and watch your progress grow.',
+  ];
 }

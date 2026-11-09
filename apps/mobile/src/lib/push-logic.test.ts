@@ -47,18 +47,18 @@ describe('pushDataOf', () => {
 
 describe('showPushCard', () => {
   it('shows only while undetermined', () => {
-    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0, firstTime: false })).toBe(true);
-    expect(showPushCard({ permission: 'granted', snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
-    expect(showPushCard({ permission: 'denied', snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
-    expect(showPushCard({ permission: null, snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0 })).toBe(true);
+    expect(showPushCard({ permission: 'granted', snoozedUntil: null, now: 0 })).toBe(false);
+    expect(showPushCard({ permission: 'denied', snoozedUntil: null, now: 0 })).toBe(false);
+    expect(showPushCard({ permission: null, snoozedUntil: null, now: 0 })).toBe(false);
   });
   it('Later hides it for 7 days', () => {
     expect(PUSH_CARD_SNOOZE_MS).toBe(7 * 24 * 60 * 60 * 1000);
-    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS - 1, firstTime: false })).toBe(false);
-    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS, firstTime: false })).toBe(true);
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS - 1 })).toBe(false);
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS })).toBe(true);
   });
-  it('never on the first-time welcome', () =>
-    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0, firstTime: true })).toBe(false));
+  it('shows for a new client too (approved new-client board)', () =>
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0 })).toBe(true));
   it('snooze key per user', () => expect(pushCardSnoozeKey('u1')).toBe('caltracker.pushCardSnoozedUntil.u1'));
 });
 
@@ -68,5 +68,9 @@ describe('pushCardText', () => {
   it('"your coach" when the name is unknown', () => {
     expect(pushCardText(null)).toBe('Get a ping when your coach assigns a workout or sends you a message.');
     expect(pushCardText('  ')).toBe('Get a ping when your coach assigns a workout or sends you a message.');
+  });
+  it('speaks of the first workout to a new client', () => {
+    expect(pushCardText('Luis Bueno', true)).toBe('Get a ping when Luis assigns your first workout or messages you.');
+    expect(pushCardText(null, true)).toBe('Get a ping when your coach assigns your first workout or messages you.');
   });
 });

@@ -74,7 +74,20 @@ describe('toWorkoutSummary', () => {
         program_assignments: { program_name: 'Strength 101' },
         workout_blocks: [{ kind: 'superset', workout_exercises: [{ count: 2 }] }, { kind: 'straight', workout_exercises: [{ count: 1 }] }],
       }),
-    ).toEqual({ id: 'w1', name: 'Upper A', scheduledOn: '2026-11-09', exerciseCount: 3, programName: 'Strength 101' });
+    ).toEqual({ id: 'w1', name: 'Upper A', scheduledOn: '2026-11-09', exerciseCount: 3, programName: 'Strength 101', programDay: null });
+  });
+
+  it('reads the program week and day from the assignment start and the planned day (a moved copy keeps it)', () => {
+    expect(
+      toWorkoutSummary({
+        id: 'w1',
+        name: 'Upper A',
+        scheduled_on: '2026-11-10',
+        planned_on: '2026-11-09',
+        program_assignments: { program_name: 'Strength 101', start_date: '2026-11-02' },
+        workout_blocks: [],
+      }).programDay,
+    ).toEqual({ week: 2, day: 1 });
   });
 
   it('counts a pick-one group once: the client does one of its options', () => {
