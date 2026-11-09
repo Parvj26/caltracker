@@ -29,12 +29,12 @@ export function TodayHeader({
   const { text, space } = useTheme();
   const [open, setOpen] = useState(false);
   return (
-    <View style={[styles.row, { gap: space[3] }]}>
-      <View style={[styles.flex, { gap: space[1] }]}>
-        <Text style={text('caption')} testID="today-date">
+    <View style={[styles.row, { gap: space[3], paddingHorizontal: space[1] }]}>
+      <View style={styles.flex}>
+        <Text style={[text('caption'), styles.date]} testID="today-date">
           {date}
         </Text>
-        <Text style={text('screenTitle')} accessibilityRole="header" testID="today-greeting">
+        <Text style={[text('screenTitle'), styles.greeting]} accessibilityRole="header" testID="today-greeting">
           {greeting}
         </Text>
       </View>
@@ -109,6 +109,9 @@ function SettingsSheet({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1 },
+  // The board's header: a 14 pt date over a 30 pt greeting.
+  date: { fontSize: 14 },
+  greeting: { fontSize: 30, lineHeight: 36 },
   gear: {
     width: tapTarget.min,
     height: tapTarget.min,

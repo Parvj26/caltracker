@@ -2,15 +2,12 @@
 // so it is unit tested. PR, unit, sticker and body rules come from @caltracker/shared; this file only arranges them.
 import {
   STICKERS,
-  addDays,
   ageLabel,
   cardText,
   dailyTotals,
-  dayLabel,
   diffDays,
   formatMacro,
   isoWeekday,
-  localDateOf,
   topReactionsLine,
   type IsoDate,
   type MacroTargets,
@@ -19,9 +16,7 @@ import {
 } from '@caltracker/shared';
 import type { WorkoutStatus } from './active-log-logic';
 import type { AlbumAward } from './album-logic';
-import { clockTime } from './chat-format';
 import type { FeedPost } from './community-api';
-import type { ProgressModel } from './progress';
 import { formatDayLabel } from './workouts';
 import type { ProgramDay } from './workouts-plan';
 
@@ -59,11 +54,6 @@ export function coachPreview(items: readonly ChatItem[], me: string | null): { t
   return { text: mine ? `You: ${text}` : text, at: last.createdAt };
 }
 
-/** "2:05 pm" for today, then "Yesterday", "Mon 2 Nov". */
-export function previewTime(iso: string, nowIso: string, timeZone: string): string {
-  const day = dayLabel(iso, nowIso, timeZone);
-  return day === 'Today' ? clockTime(iso, timeZone) : day;
-}
 
 /** "2 unread messages" for VoiceOver. */
 export function unreadLabel(count: number): string | null {
@@ -103,22 +93,7 @@ export function postPreview(post: FeedPost, ctx: { me: string; coaches: Readonly
   return { id: post.id, author, snippet, stats, thumbPath: post.images[0]?.thumbPath ?? null, stickerKey: card?.stickerKey ?? null };
 }
 
-/** "See all · 2 new", or "See all". */
-export function seeAllLabel(unread: number): string {
-  return unread > 0 ? `See all · ${unread > 99 ? '99+' : unread} new` : 'See all';
-}
 
-/**
- * "Share today's workout" or "Share yesterday's workout". Null (no button) for a workout finished before yesterday,
- * or without a finish time: sharing is offered for two days only.
- */
-export function shareWorkoutTitle(finishedAt: string | null, today: IsoDate, timeZone?: string): string | null {
-  if (!finishedAt || Number.isNaN(Date.parse(finishedAt))) return null;
-  const day = localDateOf(finishedAt, timeZone);
-  if (day === today) return 'Share today’s workout';
-  if (day === addDays(today, -1)) return 'Share yesterday’s workout';
-  return null;
-}
 
 // ---- Stickers ----------------------------------------------------------------------------------------------
 
@@ -147,27 +122,6 @@ export function zooSummary(awards: readonly AlbumAward[]): ZooSummary {
     total,
     label: `Zoo ${owned} of ${total}`,
     fraction: total === 0 ? 0 : Math.min(1, owned / total),
-  };
-}
-
-// ---- Goal and body -----------------------------------------------------------------------------------------
-
-const SHORT_LABEL: Record<string, string> = { weight_kg: 'Weight', body_fat_pct: 'Body fat', smm_kg: 'Muscle' };
-
-export type GoalCard = {
-  goal: string | null;
-  /** "48 days to go", "Today", "Passed 2 days ago"; null without a date. */
-  countdown: string | null;
-  tiles: { key: string; label: string; value: string; change: string | null }[];
-};
-
-/** The Today goal card from the Progress tab's model, or null (hidden) with no goal and no body numbers. */
-export function goalCard(model: ProgressModel): GoalCard | null {
-  if (!model.goal && model.latest.length === 0) return null;
-  return {
-    goal: model.goal?.text ?? null,
-    countdown: model.goal?.countdown ?? null,
-    tiles: model.latest.map((l) => ({ key: l.key, label: SHORT_LABEL[l.key] ?? l.label, value: l.value, change: l.delta })),
   };
 }
 

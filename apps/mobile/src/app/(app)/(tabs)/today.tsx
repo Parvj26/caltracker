@@ -1,20 +1,17 @@
 import { useSurpriseReveal } from '@/lib/use-surprise';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { countExercises, formatLogDuration, localToday, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
-import { FirstTimeWelcome } from '@/components/first-time-welcome';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { countExercises, localToday, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
-import { Overline, Tile } from '@/components/today/parts';
-import { TodayFood } from '@/components/food/today-food';
-import { GoalCard, StickerAndPrs } from '@/components/today/progress-cards';
-import { CommunityCard, CoachRow } from '@/components/today/social-cards';
+import { CoachIntroCard, NextSteps, StickerTeaser } from '@/components/today/new-client';
 import { PushCard } from '@/components/today/push-card';
+import { CoachMessageCard, CommunityPeek, FoodCard, RestCard, WeekAndSticker, WorkoutCard } from '@/components/today/today-cards';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { TodayHeader } from '@/components/today/today-header';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
-import { finishedIsLoaded, within, workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
+import { finishedIsLoaded, within, workoutStatuses } from '@/lib/active-log-logic';
 import {
   cacheTodayDetail,
   cacheTodayLogs,
@@ -28,11 +25,11 @@ import {
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
 import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
-import { greeting, headerDate } from '@/lib/today-logic';
+import { greeting, headerDate, welcome } from '@/lib/today-logic';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
 import { useUnits } from '@/lib/use-units';
-import { formatDayLabel, isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
+import { isFirstTimeClient, type WorkoutSummary } from '@/lib/workouts';
 import {
   fetchAnyWorkout,
   fetchMyCoachName,
@@ -44,13 +41,18 @@ import {
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
+/** Whole plans of today's workouts by id, for the card's time and muscle groups. */
+type Plans = Record<string, WorkoutDoc>;
+
 /** How long Start waits for the server before using the copy saved on the phone. */
 const DETAIL_WAIT_MS = 5000;
 const START_FAILED = 'Couldn’t open this workout. Check your connection and try again.';
 
 type TodayData =
   | { kind: 'first-time'; coachName: string | null }
-  | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null; logs: LogForDay[]; offline: boolean };
+  | { kind: 'today'; workouts: WorkoutSummary[]; next: WorkoutSummary | null; logs: LogForDay[]; offline: boolean; plans: Plans };
+
+const plansOf = (details: readonly CachedDetail[]): Plans => Object.fromEntries(details.map((d) => [d.doc.id, d.doc]));
 
 const summaryOf = (d: CachedDetail): WorkoutSummary => ({
   id: d.doc.id,
@@ -60,13 +62,18 @@ const summaryOf = (d: CachedDetail): WorkoutSummary => ({
   programName: null,
 });
 
-/** Saves today's workouts on the phone, so Start works with poor signal later. Best effort. */
-async function cacheToday(today: IsoDate, workouts: WorkoutSummary[]): Promise<void> {
+/**
+ * Reads today's whole workouts and saves them on the phone, so Start works with poor signal later. Best effort: the
+ * plans read (for the card's time and muscles), or the copy saved earlier when the read fails.
+ */
+async function cacheToday(today: IsoDate, workouts: WorkoutSummary[]): Promise<Plans> {
   try {
-    const details = await Promise.all(workouts.map((w) => fetchWorkoutDetail(w.id)));
-    await cacheTodayDetail(today, details.filter((d): d is CachedDetail => d !== null));
+    const details = (await Promise.all(workouts.map((w) => fetchWorkoutDetail(w.id)))).filter((d): d is CachedDetail => d !== null);
+    await cacheTodayDetail(today, details);
+    return plansOf(details);
   } catch {
     // the previous copy stays; Start fetches the workout itself when there is signal
+    return plansOf(await readCachedToday(today).catch(() => []));
   }
 }
 
@@ -83,13 +90,14 @@ async function loadToday(): Promise<TodayData> {
     if (cached.length === 0) throw e;
     // Today's logs as last read, so a workout finished earlier today keeps its Done ✓ after a restart.
     const logs = await readCachedTodayLogs(today);
-    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true };
+    return { kind: 'today', workouts: cached.map(summaryOf), next: null, logs, offline: true, plans: plansOf(cached) };
   }
   if (workouts.length === 0 && isFirstTimeClient(any)) {
     return { kind: 'first-time', coachName: await fetchMyCoachName() };
   }
-  void cacheToday(today, workouts);
-  const [next, logs] = await Promise.all([
+  const [plans, next, logs] = await Promise.all([
+    // Read alongside the rest; a slow read never holds Today up (the card then shows just the exercise count).
+    within(cacheToday(today, workouts), DETAIL_WAIT_MS).then((p) => p ?? {}),
     workouts.length === 0 ? fetchNextWorkout(today) : Promise.resolve(null),
     // "Done ✓" is a bonus: Today still shows when it can't be read (then the copy saved on the phone is used).
     fetchLogsForDays(today, today).then(
@@ -100,7 +108,7 @@ async function loadToday(): Promise<TodayData> {
       () => readCachedTodayLogs(today),
     ),
   ]);
-  return { kind: 'today', workouts, next, logs, offline: false };
+  return { kind: 'today', workouts, next, logs, offline: false, plans };
 }
 
 /** The planned workout to start from: the server's copy, or the one saved on the phone without signal. */
@@ -268,22 +276,23 @@ export default function Today() {
     }
   }
 
+  const firstTime = data?.kind === 'first-time';
+  const pushCard = userId ? <PushCard userId={userId} coachName={coach?.name ?? null} firstTime={firstTime} /> : null;
+
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
-      <View style={{ gap: space[4] }}>
+      <View style={{ gap: space[3.5] }}>
         <TodayHeader
           date={headerDate(today)}
-          greeting={greeting(firstName.data)}
+          greeting={firstTime ? welcome(firstName.data) : greeting(firstName.data)}
           workspaceName={workspace?.workspaceName ?? ''}
           onSignOut={() => void signOutAndForget()}
         />
 
         {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
 
-        {userId ? (
-          // Not while Today is loading or on the first-time welcome: one thing at a time.
-          <PushCard userId={userId} coachName={coach?.name ?? null} firstTime={data === null || data.kind === 'first-time'} />
-        ) : null}
+        {/* Not while Today is loading. A new client sees it under their coach's card (below). */}
+        {data !== null && !firstTime ? pushCard : null}
 
         {banner ? (
           <Card>
@@ -304,21 +313,25 @@ export default function Today() {
         {data === null && !error ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
 
         {data?.kind === 'first-time' ? (
-          <FirstTimeWelcome
-            coachName={data.coachName}
-            workspaceName={workspace?.workspaceName ?? ''}
-          />
+          <>
+            <CoachIntroCard coachName={data.coachName} workspaceName={workspace?.workspaceName ?? ''} />
+            {pushCard}
+            <NextSteps coachName={data.coachName} />
+            <StickerTeaser />
+          </>
         ) : null}
 
         {data?.kind === 'today' && data.offline ? (
           <Text style={text('caption')}>No connection. These are today’s workouts saved on your phone.</Text>
         ) : null}
 
-        {data?.kind === 'today' && data.workouts.length > 0
+        {/* More than one workout today: one card each, stacked. */}
+        {data?.kind === 'today'
           ? data.workouts.map((w) => (
-              <TodayCard
+              <WorkoutCard
                 key={w.id}
                 workout={w}
+                doc={data.plans[w.id] ?? null}
                 status={statuses[w.id] ?? null}
                 starting={starting === w.id}
                 onStart={() => void startWorkout(w)}
@@ -327,29 +340,15 @@ export default function Today() {
             ))
           : null}
 
-        {data?.kind === 'today' && data.workouts.length === 0 ? (
-          <Tile testID="today-rest">
-            <Text style={text('screenTitle')} accessibilityRole="header">
-              Rest day
-            </Text>
-            <Text style={[text('body'), styles.muted]}>
-              {data.next
-                ? `Nothing scheduled today. Next up: ${data.next.name}, ${formatDayLabel(data.next.scheduledOn)}.`
-                : 'Nothing scheduled today.'}
-            </Text>
-            <View style={styles.start}>
-              <TextButton title="Log a workout anyway" testID="today-log-anyway" onPress={logAnyway} />
-            </View>
-          </Tile>
-        ) : null}
+        {data?.kind === 'today' && data.workouts.length === 0 ? <RestCard next={data.next} today={today} onLogAnyway={logAnyway} /> : null}
 
         {/* The cards below load on their own, at the same time as today's workout, each from the phone's copy first. */}
-        {data?.kind !== 'first-time' ? (
+        {data?.kind === 'today' ? (
           <>
-            <CoachRow />
-            <CommunityCard units={units} refreshKey={refreshKey} />
-            <StickerAndPrs units={units} refreshKey={refreshKey} />
-            <GoalCard units={units} refreshKey={refreshKey} foodSlot={<TodayFood refreshKey={refreshKey} />} />
+            <FoodCard refreshKey={refreshKey} />
+            <CoachMessageCard />
+            <WeekAndSticker refreshKey={refreshKey} />
+            <CommunityPeek units={units} refreshKey={refreshKey} />
           </>
         ) : null}
       </View>
@@ -363,69 +362,3 @@ export default function Today() {
     </Screen>
   );
 }
-
-function TodayCard({
-  workout,
-  status,
-  starting,
-  onStart,
-  onView,
-}: {
-  workout: WorkoutSummary;
-  status: WorkoutStatus | null;
-  starting: boolean;
-  onStart: () => void;
-  /** Opens the finished workout's summary. */
-  onView: (logId: string) => void;
-}) {
-  const { text, space, radius } = useTheme();
-  const router = useRouter();
-  const count = `${workout.exerciseCount} ${workout.exerciseCount === 1 ? 'exercise' : 'exercises'}`;
-  return (
-    <Tile tone="blue" testID={`today-workout-${workout.id}`}>
-      <View style={{ gap: space[2] }}>
-        <Overline>Today’s workout</Overline>
-        <Text style={text('screenTitle')}>{workout.name}</Text>
-        {/* Text on a pastel tile is always ink, never muted. */}
-        <Text style={[text('body'), styles.ink]}>{count}</Text>
-        {workout.programName ? (
-          <View
-            style={[styles.chip, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}
-          >
-            <Text style={[text('caption'), styles.ink]} accessibilityLabel={`Program: ${workout.programName}`}>
-              {workout.programName}
-            </Text>
-          </View>
-        ) : null}
-        {status?.kind === 'done' ? (
-          <Text testID={`done-${workout.id}`} style={text('sectionHeading')}>
-            {`Done ✓ · ${formatLogDuration(status.durationS)}`}
-          </Text>
-        ) : null}
-      </View>
-      {status?.kind === 'done' ? (
-        <Button title="View" testID={`view-log-${workout.id}`} onPress={() => onView(status.logId)} />
-      ) : (
-        <Button
-          title={status?.kind === 'in_progress' ? 'Resume' : 'Start'}
-          testID={`start-${workout.id}`}
-          onPress={onStart}
-          busy={starting}
-        />
-      )}
-      <Button
-        variant="secondary"
-        title="See the plan"
-        testID={`view-workout-${workout.id}`}
-        onPress={() => router.push({ pathname: '/workout/[id]', params: { id: workout.id } })}
-      />
-    </Tile>
-  );
-}
-
-const styles = StyleSheet.create({
-  chip: { alignSelf: 'flex-start', backgroundColor: palette.bg },
-  ink: { color: palette.ink },
-  muted: { color: palette.inkMuted },
-  start: { alignSelf: 'flex-start' },
-});
