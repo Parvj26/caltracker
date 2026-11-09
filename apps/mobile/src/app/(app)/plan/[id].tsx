@@ -15,7 +15,15 @@ import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { workoutStatuses } from '@/lib/active-log-logic';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
-import { fetchLastResults, fetchLogsForDays, readCachedDetail, type LastResults, type LogForDay } from '@/lib/log-api';
+import {
+  fetchLastResults,
+  fetchLogsForDays,
+  readCachedDetail,
+  readCachedTodayLogs,
+  type LastResults,
+  type LogForDay,
+} from '@/lib/log-api';
+import { logsOfWorkout } from '@/lib/plan-cache';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
@@ -52,6 +60,16 @@ async function loadWorkout(id: string): Promise<PlannedWorkout | null> {
   }
 }
 
+/**
+ * The workout's logs as last saved (the Workouts tab's week, else Today's), so without signal a finished or
+ * coach-logged workout still reads Done or in progress and Start is not offered twice.
+ */
+async function savedLogs(workoutId: string): Promise<LogForDay[]> {
+  const fromPlan = logsOfWorkout(await readCachedPlan(), workoutId);
+  if (fromPlan.length > 0) return fromPlan;
+  return (await readCachedTodayLogs(localToday())).filter((l) => l.workoutId === workoutId);
+}
+
 /** Tap a workout on the Workouts tab: what it holds, the coach's note, last time per exercise, and Start. */
 export default function PlanPreview() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,9 +94,11 @@ export default function PlanPreview() {
       }
       setLoaded({ kind: 'ok', workout: w });
       const ids = w.doc.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId));
-      // Both only decorate the screen: they wait quietly when there is no signal.
+      // Last time only decorates the screen; the logs fall back to the saved copy so Start isn't offered twice.
       void fetchLastResults(ids).then(setLast, () => setLast(null));
-      void fetchLogsForDays(w.scheduledOn, w.scheduledOn).then(setLogs, () => undefined);
+      void fetchLogsForDays(w.scheduledOn, w.scheduledOn)
+        .catch(() => savedLogs(w.doc.id))
+        .then(setLogs, () => undefined);
     } catch {
       setLoaded((l) => (l.kind === 'ok' ? l : { kind: 'failed' }));
     }

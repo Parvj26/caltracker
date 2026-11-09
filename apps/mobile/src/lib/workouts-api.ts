@@ -2,9 +2,10 @@
 // RLS already limits workouts to the signed-in client's own (and only while they are still a client); the
 // client_id filter also keeps library workouts out if a coach ever signs in to the phone app.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WORKOUT_TREE_SELECT, parseWorkoutDocLenient, workoutRowToDoc } from '@caltracker/shared';
+import { WORKOUT_TREE_SELECT, workoutRowToDoc } from '@caltracker/shared';
 import type { IsoDate, Units, WorkoutDoc, WorkoutTreeRow } from '@caltracker/shared';
 import { todayCacheKey } from './device-cache-keys';
+import { parseCachedPlan, type CachedPlan } from './plan-cache';
 import { supabase } from './supabase';
 import { programDayOf, type PlannedWorkout } from './workouts-plan';
 import { WORKOUT_SUMMARY_SELECT, resolveVideoUrls, toWorkoutSummary, type WorkoutSummary, type WorkoutSummaryRow } from './workouts';
@@ -182,12 +183,12 @@ export async function fetchPlannedWorkout(id: string): Promise<PlannedWorkout | 
   return data ? toPlanned(data) : null;
 }
 
-/** What the Workouts tab keeps on the phone: this week's plan and Coming up, as last read. */
-export type CachedPlan = { weekStart: IsoDate; week: PlannedWorkout[]; comingUp: PlannedWorkout[] };
+export type { CachedPlan } from './plan-cache';
 
 // Under the Today prefix, so Sign out forgets it (device-cache-keys).
 const planKey = (userId: string) => todayCacheKey('workoutsPlan', userId);
 
+/** Saves this week's plan, Coming up and the week's logs (see plan-cache.ts). */
 export async function cachePlan(plan: CachedPlan): Promise<void> {
   try {
     await AsyncStorage.setItem(planKey(await myId()), JSON.stringify(plan));
@@ -196,25 +197,10 @@ export async function cachePlan(plan: CachedPlan): Promise<void> {
   }
 }
 
-function validPlanned(v: unknown): PlannedWorkout | null {
-  const p = v as Partial<PlannedWorkout> | null;
-  if (typeof p !== 'object' || p === null || typeof p.scheduledOn !== 'string') return null;
-  const doc = parseWorkoutDocLenient(p.doc);
-  if (!doc.success) return null;
-  const day = p.programDay;
-  const programDay = day && typeof day.week === 'number' && typeof day.day === 'number' ? { week: day.week, day: day.day } : null;
-  return { doc: doc.data, scheduledOn: p.scheduledOn, programName: typeof p.programName === 'string' ? p.programName : null, programDay };
-}
-
 /** The saved plan, or null when there is none or it is unreadable. */
 export async function readCachedPlan(): Promise<CachedPlan | null> {
   try {
-    const raw = await AsyncStorage.getItem(planKey(await myId()));
-    if (raw === null) return null;
-    const v = JSON.parse(raw) as { weekStart?: unknown; week?: unknown; comingUp?: unknown };
-    if (typeof v.weekStart !== 'string' || !Array.isArray(v.week) || !Array.isArray(v.comingUp)) return null;
-    const list = (xs: unknown[]) => xs.map(validPlanned).filter((x): x is PlannedWorkout => x !== null);
-    return { weekStart: v.weekStart, week: list(v.week), comingUp: list(v.comingUp) };
+    return parseCachedPlan(await AsyncStorage.getItem(planKey(await myId())));
   } catch {
     return null;
   }

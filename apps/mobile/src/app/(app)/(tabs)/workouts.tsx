@@ -8,6 +8,7 @@ import { ResumeBanner } from '@/components/log/resume-banner';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import { fetchLogsForDays, type LogForDay } from '@/lib/log-api';
+import { logsForWeek } from '@/lib/plan-cache';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { useStartWorkout } from '@/lib/use-start-workout';
@@ -41,18 +42,27 @@ async function loadWeek(from: IsoDate, today: IsoDate): Promise<WeekData> {
   const to = addDays(from, 6);
   const thisWeek = from === startOfWeek(today);
   try {
-    const [week, logs, comingUp] = await Promise.all([
+    const [week, freshLogs, comingUp] = await Promise.all([
       fetchPlannedBetween(from, to),
-      // The ✓ marks are a bonus: the week still shows when they can't be read.
-      fetchLogsForDays(from, to).catch(() => [] as LogForDay[]),
+      // The ✓ marks must survive a failed read: then the logs saved with the plan are used (null = not read).
+      fetchLogsForDays(from, to).catch(() => null),
       fetchComingUp(today),
     ]);
-    if (thisWeek) void cachePlan({ weekStart: from, week, comingUp });
+    const cached = freshLogs === null ? await readCachedPlan() : null;
+    const logs = logsForWeek(freshLogs, cached, from);
+    if (thisWeek) void cachePlan({ weekStart: from, week, comingUp, logs });
     return { weekStart: from, week, logs, comingUp, offline: false };
   } catch (e) {
     const cached = await readCachedPlan();
     if (!cached || cached.weekStart !== from) throw e;
-    return { weekStart: from, week: cached.week, logs: [], comingUp: cached.comingUp.filter((w) => w.scheduledOn > today), offline: true };
+    // The saved logs keep Done ✓ and Resume, so a finished workout is never offered Start again.
+    return {
+      weekStart: from,
+      week: cached.week,
+      logs: cached.logs,
+      comingUp: cached.comingUp.filter((w) => w.scheduledOn > today),
+      offline: true,
+    };
   }
 }
 
