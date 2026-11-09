@@ -1,5 +1,5 @@
 begin;
-select plan(79);
+select plan(80);
 
 -- Fixtures (as postgres)
 select tests.create_user('food-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -28,6 +28,10 @@ select ok(not has_column_privilege('authenticated', 'public.meals', 'client_id',
   and not has_column_privilege('authenticated', 'public.meals', 'client_id', 'update')
   and not has_column_privilege('authenticated', 'public.meals', 'workspace_id', 'update'),
   'nobody sets a meal''s client, or moves it to another workspace');
+select ok(has_column_privilege('authenticated', 'public.meals', 'coach_meal_id', 'insert')
+  and has_column_privilege('authenticated', 'public.meals', 'coach_meal_id', 'update')
+  and not has_column_privilege('anon', 'public.meals', 'coach_meal_id', 'insert'),
+  'a client may link their meal to a coach meal; anon may not');
 
 -- Client A1 logs meals
 select tests.act_as(:'a1');

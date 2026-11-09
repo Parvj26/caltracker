@@ -483,6 +483,74 @@ export type Database = {
           },
         ]
       }
+      coach_meals: {
+        Row: {
+          calories: number | null
+          carbs_g: number | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          fat_g: number | null
+          how_to: string
+          id: string
+          ingredients: string
+          name: string
+          photo_height: number | null
+          photo_path: string | null
+          photo_thumb_path: string | null
+          photo_width: number | null
+          protein_g: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          fat_g?: number | null
+          how_to?: string
+          id?: string
+          ingredients?: string
+          name: string
+          photo_height?: number | null
+          photo_path?: string | null
+          photo_thumb_path?: string | null
+          photo_width?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          fat_g?: number | null
+          how_to?: string
+          id?: string
+          ingredients?: string
+          name?: string
+          photo_height?: number | null
+          photo_path?: string | null
+          photo_thumb_path?: string | null
+          photo_width?: number | null
+          protein_g?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_meals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communities: {
         Row: {
           activity_at: string
@@ -1452,6 +1520,7 @@ export type Database = {
           calories: number | null
           carbs_g: number | null
           client_id: string
+          coach_meal_id: string | null
           created_at: string
           eaten_at: string
           eaten_on: string
@@ -1471,6 +1540,7 @@ export type Database = {
           calories?: number | null
           carbs_g?: number | null
           client_id?: string
+          coach_meal_id?: string | null
           created_at?: string
           eaten_at?: string
           eaten_on: string
@@ -1490,6 +1560,7 @@ export type Database = {
           calories?: number | null
           carbs_g?: number | null
           client_id?: string
+          coach_meal_id?: string | null
           created_at?: string
           eaten_at?: string
           eaten_on?: string
@@ -1506,6 +1577,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "meals_coach_meal_fk"
+            columns: ["workspace_id", "coach_meal_id"]
+            isOneToOne: false
+            referencedRelation: "coach_meals"
+            referencedColumns: ["workspace_id", "id"]
+          },
           {
             foreignKeyName: "meals_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -2467,6 +2545,10 @@ export type Database = {
         Args: { p_author_id: string; p_card: Json; p_workspace_id: string }
         Returns: Json
       }
+      can_access_coach_meal_photo: {
+        Args: { p_name: string; p_write: boolean }
+        Returns: boolean
+      }
       can_access_meal_photo: {
         Args: { p_name: string; p_write: boolean }
         Returns: boolean
@@ -2516,6 +2598,13 @@ export type Database = {
           finished_at: string
           position: number
           set_type: Database["public"]["Enums"]["set_type"]
+        }[]
+      }
+      coach_meal_log_counts: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          coach_meal_id: string
+          logged: number
         }[]
       }
       coach_save_workout_log: {
