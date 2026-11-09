@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -84,6 +84,19 @@ export function Screen({
     };
   }, [scrollTo]);
 
+  // On iOS the keyboard covers the home indicator, so a footer drops its bottom inset while the keyboard is up.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  const hasFooter = Boolean(footer);
+  useEffect(() => {
+    if (!hasFooter || Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [hasFooter]);
+
   const value = useMemo(() => reveal, [reveal]);
 
   return (
@@ -110,7 +123,7 @@ export function Screen({
               {children}
             </View>
           </ScrollView>
-          {footer ? <View style={[styles.footer, !inTabs && { paddingBottom: space[3] + bottomInset }]}>{footer}</View> : null}
+          {footer ? <View style={[styles.footer, !inTabs && { paddingBottom: space[3] + (keyboardUp ? 0 : bottomInset) }]}>{footer}</View> : null}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </RevealContext.Provider>
