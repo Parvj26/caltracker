@@ -49,6 +49,7 @@ import {
 } from './active-log-logic';
 import { fetchInProgressLog, fetchLog, saveLog } from './log-api';
 import { cancelReminder, ensurePermission, initNotifications, onReminderTapped, scheduleReminder } from './log-notifications';
+import { registerDevice } from './push';
 import { adoptCoachCopy } from './coach-watch';
 import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
 import { createLogSync, type LogSync, type SyncStatus } from './log-sync';
@@ -370,7 +371,10 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
         if (next !== existing) {
           await me.store.save({ log: next, lastSyncedRevision: 0 });
           me.sync.push();
-          void ensurePermission(); // asked once, the first time a workout starts
+          // Asked once, the first time a workout starts; allowing it also turns on push for this iPhone.
+          void ensurePermission().then((ok) => {
+            if (ok) void registerDevice();
+          });
         }
         if (current.current === me) setLog(next);
         return next;

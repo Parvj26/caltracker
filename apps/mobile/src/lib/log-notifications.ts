@@ -1,4 +1,4 @@
-// Local notifications and haptics for logging. Local only: no push tokens, no server.
+// Local notifications and haptics for logging. Push notifications (APNs, from the server) are in push.ts.
 //   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick.
 // Fixed identifiers, so scheduling again replaces the earlier one and cancelling needs no stored id.
 // Every call swallows errors: a notification is never worth breaking the workout over.
@@ -28,14 +28,14 @@ export function initNotifications(): void {
   });
 }
 
-/** Asks for permission the first time only (the system never asks twice). True when allowed. */
+/** Asks for permission (alerts, sounds and the app-icon badge, used by push too) the first time only. True when allowed. */
 export async function ensurePermission(): Promise<boolean> {
   try {
     const current = await Notifications.getPermissionsAsync();
     if (current.granted) return true;
     if (!current.canAskAgain) return false;
     const asked = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowSound: true, allowBadge: false },
+      ios: { allowAlert: true, allowSound: true, allowBadge: true },
     });
     return asked.granted;
   } catch (e) {

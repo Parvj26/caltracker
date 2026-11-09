@@ -5,13 +5,15 @@ import { MessagesProvider } from '@/lib/use-messages';
 import { ActiveLogProvider } from '@/lib/use-active-log';
 import { CommunityProvider } from '@/lib/use-community';
 import { FoodProvider } from '@/lib/use-food';
+import { PushProvider } from '@/lib/use-push';
 import { palette } from '@/theme/theme';
 
 /**
  * Signed-in area. With no coach (never invited, or removed) only the "Ask your coach" screen exists;
  * with a coach, the tabs and the workout detail. When a coach removes the client, the next foreground
  * check clears `workspace` and the guards move them back to the "Ask your coach" screen.
- * The active workout (ActiveLogProvider) belongs to the signed-in user, so it wraps every screen here.
+ * The active workout (ActiveLogProvider) belongs to the signed-in user, so it wraps every screen here. So does
+ * PushProvider (device registration, tapped pushes, the app-icon badge), which waits for the session.
  *
  * Each guard names where to go when it closes (Today after joining a coach, "Ask your coach" after removal).
  * Left to itself the router redirects to the bare tab group, which doesn't pick Today.
@@ -25,6 +27,7 @@ export default function AppLayout() {
     <MessagesProvider>
     <CommunityProvider>
     <FoodProvider>
+    <PushProvider>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
@@ -45,6 +48,7 @@ export default function AppLayout() {
         <Stack.Screen name="home" />
       </Stack.Protected>
     </Stack>
+    </PushProvider>
     </FoodProvider>
     </CommunityProvider>
     </MessagesProvider>
