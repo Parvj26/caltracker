@@ -1,9 +1,12 @@
 // Reads for the client's Today, Workouts and workout detail screens. Read only: nothing here writes a workout.
 // RLS already limits workouts to the signed-in client's own (and only while they are still a client); the
 // client_id filter also keeps library workouts out if a coach ever signs in to the phone app.
-import { WORKOUT_TREE_SELECT, workoutRowToDoc } from '@caltracker/shared';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WORKOUT_TREE_SELECT, parseWorkoutDocLenient, workoutRowToDoc } from '@caltracker/shared';
 import type { IsoDate, Units, WorkoutDoc, WorkoutTreeRow } from '@caltracker/shared';
+import { todayCacheKey } from './device-cache-keys';
 import { supabase } from './supabase';
+import { programDayOf, type PlannedWorkout } from './workouts-plan';
 import { WORKOUT_SUMMARY_SELECT, resolveVideoUrls, toWorkoutSummary, type WorkoutSummary, type WorkoutSummaryRow } from './workouts';
 
 /** What the client sees when a read fails: plain words, never the server's message. */
@@ -116,4 +119,103 @@ export async function fetchMyCoachName(): Promise<string | null> {
   const { data, error } = await supabase.rpc('get_my_coach');
   if (error) return null; // Only decorates the welcome card; never block the screen on it.
   return data[0]?.coach_name ?? null;
+}
+
+// ---- The Workouts tab's plan (whole workouts, with their program week and day) -------------------------------
+
+/** A whole workout plus the program day it was copied for and its assignment (name and start). */
+const PLANNED_SELECT = `${WORKOUT_TREE_SELECT}, planned_on, program_assignments(program_name, start_date)`;
+
+type PlannedRow = WorkoutTreeRow & {
+  planned_on: string | null;
+  program_assignments: { program_name: string; start_date: string } | null;
+};
+
+function toPlanned(row: PlannedRow): PlannedWorkout {
+  const scheduledOn = row.scheduled_on ?? '';
+  const assignment = row.program_assignments;
+  return {
+    doc: workoutRowToDoc(row),
+    scheduledOn,
+    programName: assignment?.program_name ?? null,
+    // A copy moved to another day still stands for its program day (planned_on).
+    programDay: assignment ? programDayOf(assignment.start_date, row.planned_on ?? scheduledOn) : null,
+  };
+}
+
+function planned(data: unknown): PlannedWorkout[] {
+  // Built by concatenation, so supabase-js cannot infer the shape; PlannedRow describes it.
+  return (data as PlannedRow[]).map(toPlanned);
+}
+
+function plannedQuery(clientId: string) {
+  return supabase.from('workouts').select(PLANNED_SELECT).eq('client_id', clientId);
+}
+
+/** The client's whole workouts from `from` to `to` inclusive, by date then name. */
+export async function fetchPlannedBetween(from: IsoDate, to: IsoDate): Promise<PlannedWorkout[]> {
+  const { data, error } = await plannedQuery(await myId())
+    .gte('scheduled_on', from)
+    .lte('scheduled_on', to)
+    .order('scheduled_on')
+    .order('name');
+  if (error) throw failed('planned between', error);
+  return planned(data);
+}
+
+/** The next `limit` workouts after `after` (exclusive): the Workouts tab's "Coming up". */
+export async function fetchComingUp(after: IsoDate, limit = 3): Promise<PlannedWorkout[]> {
+  const { data, error } = await plannedQuery(await myId())
+    .gt('scheduled_on', after)
+    .order('scheduled_on')
+    .order('name')
+    .limit(limit);
+  if (error) throw failed('coming up', error);
+  return planned(data);
+}
+
+/** One of the client's workouts for the Preview, or null when missing or not theirs. */
+export async function fetchPlannedWorkout(id: string): Promise<PlannedWorkout | null> {
+  if (!UUID.test(id)) return null;
+  const { data, error } = await plannedQuery(await myId()).eq('id', id).maybeSingle();
+  if (error) throw failed('planned workout', error);
+  return data ? toPlanned(data) : null;
+}
+
+/** What the Workouts tab keeps on the phone: this week's plan and Coming up, as last read. */
+export type CachedPlan = { weekStart: IsoDate; week: PlannedWorkout[]; comingUp: PlannedWorkout[] };
+
+// Under the Today prefix, so Sign out forgets it (device-cache-keys).
+const planKey = (userId: string) => todayCacheKey('workoutsPlan', userId);
+
+export async function cachePlan(plan: CachedPlan): Promise<void> {
+  try {
+    await AsyncStorage.setItem(planKey(await myId()), JSON.stringify(plan));
+  } catch {
+    // the copy on the phone is a convenience
+  }
+}
+
+function validPlanned(v: unknown): PlannedWorkout | null {
+  const p = v as Partial<PlannedWorkout> | null;
+  if (typeof p !== 'object' || p === null || typeof p.scheduledOn !== 'string') return null;
+  const doc = parseWorkoutDocLenient(p.doc);
+  if (!doc.success) return null;
+  const day = p.programDay;
+  const programDay = day && typeof day.week === 'number' && typeof day.day === 'number' ? { week: day.week, day: day.day } : null;
+  return { doc: doc.data, scheduledOn: p.scheduledOn, programName: typeof p.programName === 'string' ? p.programName : null, programDay };
+}
+
+/** The saved plan, or null when there is none or it is unreadable. */
+export async function readCachedPlan(): Promise<CachedPlan | null> {
+  try {
+    const raw = await AsyncStorage.getItem(planKey(await myId()));
+    if (raw === null) return null;
+    const v = JSON.parse(raw) as { weekStart?: unknown; week?: unknown; comingUp?: unknown };
+    if (typeof v.weekStart !== 'string' || !Array.isArray(v.week) || !Array.isArray(v.comingUp)) return null;
+    const list = (xs: unknown[]) => xs.map(validPlanned).filter((x): x is PlannedWorkout => x !== null);
+    return { weekStart: v.weekStart, week: list(v.week), comingUp: list(v.comingUp) };
+  } catch {
+    return null;
+  }
 }

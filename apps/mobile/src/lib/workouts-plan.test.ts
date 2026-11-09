@@ -52,7 +52,7 @@ const block = (kind: WorkoutBlockDoc['kind'], exercises: WorkoutExerciseDoc[]): 
 });
 
 const doc = (blocks: WorkoutBlockDoc[]): WorkoutDoc =>
-  ({ id: uid(), name: 'Upper A', notes: null, sections: [], blocks }) as unknown as WorkoutDoc;
+  ({ id: uid(), name: 'Upper A', notes: null, sections: [], blocks });
 
 describe('programDayOf', () => {
   it('counts weeks and days from the assignment start', () => {
@@ -86,7 +86,7 @@ describe('planTotals', () => {
     expect(planTotals(doc([block('straight', [ex([set({ restSeconds: 120 }), set({ restSeconds: 120 }), set({ restSeconds: 120 }), set({ restSeconds: 120 })])])])).minutes).toBe(10);
     // A timed set uses its target: 3 × (300 + 60) + 60 = 1140 s = 19 min → 20.
     const timed = ex([1, 2, 3].map(() => set({ targetRepsMin: null, targetRepsMax: null, targetWeightKg: null, targetDurationS: 300, restSeconds: 60 })), {
-      trackingType: 'duration',
+      trackingType: 'time',
     });
     expect(planTotals(doc([block('straight', [timed])])).minutes).toBe(20);
   });
@@ -147,7 +147,7 @@ describe('weekStrip', () => {
 describe('firstSelectedDay', () => {
   it('picks today in this week, else the first workout day, else Monday', () => {
     expect(firstSelectedDay('2026-11-09', '2026-11-12', [])).toBe('2026-11-12');
-    expect(firstSelectedDay('2026-11-16', '2026-11-12', [{ id: 'x', scheduledOn: '2026-11-18' }])).toBe('2026-11-18');
+    expect(firstSelectedDay('2026-11-16', '2026-11-12', [{ scheduledOn: '2026-11-18' }])).toBe('2026-11-18');
     expect(firstSelectedDay('2026-11-16', '2026-11-12', [])).toBe('2026-11-16');
   });
 });
