@@ -1,22 +1,28 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
-import { addDays, dailyTotals, foodDayLabel, localToday } from '@caltracker/shared';
-import { LogMealSheet, type LogChoice } from '@/components/food/log-meal-sheet';
-import { MacroBars } from '@/components/food/macro-bars';
-import { MealRow } from '@/components/food/meal-row';
-import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import { addDays, dailyTotals, dayStrip, frequentMeals, kcalCard, localToday, shortDayLabel, type IsoDate } from '@caltracker/shared';
+import { DayStrip } from '@/components/food/day-strip';
+import { font, foodText } from '@/components/food/food-type';
+import { CameraIcon, PencilIcon } from '@/components/food/icons';
+import { KcalCard } from '@/components/food/kcal-card';
+import { LogAgainChips } from '@/components/food/log-again-chips';
+import { MealCard } from '@/components/food/meal-card';
+import { ErrorText, Screen, TextButton } from '@/components/ui';
 import { mealPhotoUrls } from '@/lib/food-api';
-import { clampDay, msUntilMidnight } from '@/lib/food-logic';
+import { msUntilMidnight } from '@/lib/food-logic';
 import { PhotoError } from '@/lib/compress-photo';
 import { photoParams, pickMealPhoto } from '@/lib/pick-meal-photo';
 import { useFood } from '@/lib/use-food';
-import { palette, pressedOpacity, radius, space } from '@/theme/theme';
+import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
+/** How many weeks the strip pages back (the phone keeps 90 days of meals for the dots). */
+const MAX_WEEKS_BACK = 12;
+
 /**
- * Food: one day's totals against the coach's targets, the day's meals, and "Log a meal" (take a photo, choose one,
- * or type the macros). Works with no signal: meals are queued on the phone and saved when back online.
+ * Food: a 7-day strip, the day's kcal card against the coach's targets, Snap a photo / Type it in, "Log again in one
+ * tap", and the day's meals. Works with no signal: meals are queued on the phone and saved when back online.
  */
 export default function FoodScreen() {
   const { text } = useTheme();
@@ -24,7 +30,7 @@ export default function FoodScreen() {
   const food = useFood();
   const [today, setToday] = useState(() => localToday());
   const [day, setDay] = useState(today);
-  const [sheet, setSheet] = useState(false);
+  const [weeksBack, setWeeksBack] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,9 +68,11 @@ export default function FoodScreen() {
 
   const meals = useMemo(() => food?.mealsOn(day) ?? [], [food, day]);
   const totals = useMemo(() => dailyTotals(meals.map((m) => m.macros)), [meals]);
+  const strip = useMemo(() => dayStrip(today, food?.mealDays ?? new Set<IsoDate>(), weeksBack), [today, food?.mealDays, weeksBack]);
+  const again = useMemo(() => frequentMeals(food?.history ?? [], today), [food?.history, today]);
 
   // Links for the stored photos not yet linked.
-  const missing = meals.flatMap((m) => (m.photo && !m.localPhoto && !urls[m.photo.thumbPath] ? [m.photo.thumbPath, m.photo.path] : []));
+  const missing = meals.flatMap((m) => (m.photo && !m.localPhoto && !urls[m.photo.thumbPath] ? [m.photo.thumbPath] : []));
   const missingKey = missing.join('|');
   useEffect(() => {
     if (!missingKey) return;
@@ -75,16 +83,11 @@ export default function FoodScreen() {
     };
   }, [missingKey]);
 
-  async function pick(choice: LogChoice) {
-    setSheet(false);
+  async function snap() {
     setError(null);
-    if (choice === 'macros') {
-      router.push({ pathname: '/food/meal', params: { day } });
-      return;
-    }
     setBusy(true);
     try {
-      const picked = await pickMealPhoto(choice);
+      const picked = await pickMealPhoto('camera');
       if (picked) router.push({ pathname: '/food/meal', params: { day, ...photoParams(picked) } });
     } catch (e) {
       setError(e instanceof PhotoError ? e.message : "Couldn't prepare that photo. Please try another.");
@@ -95,7 +98,16 @@ export default function FoodScreen() {
 
   if (!food) return null;
   const status = food.statusOf(day);
-  const atToday = day >= today;
+  const first = strip[0]?.day ?? today;
+  const last = strip[strip.length - 1]?.day ?? today;
+  const weekTitle = weeksBack === 0 ? 'Last 7 days' : `${shortDayLabel(first, today)} – ${shortDayLabel(last, today)}`;
+
+  function pageWeek(by: 1 | -1) {
+    const next = Math.min(MAX_WEEKS_BACK, Math.max(0, weeksBack + by));
+    setWeeksBack(next);
+    // Show the newest day of the week paged to.
+    setDay(addDays(today, -7 * next));
+  }
 
   return (
     <Screen
@@ -106,25 +118,49 @@ export default function FoodScreen() {
         void food.loadDay(day).finally(() => setRefreshing(false));
       }}
     >
-      <Text style={text('screenTitle')} accessibilityRole="header">
+      <Text style={[foodText.title, styles.titlePad]} accessibilityRole="header">
         Food
       </Text>
 
-      <View style={styles.switcher}>
-        <DayArrow label="Previous day" glyph="‹" testID="food-prev-day" onPress={() => setDay((d) => addDays(d, -1))} />
-        <Text style={[text('sectionHeading'), styles.dayLabel]} accessibilityRole="header" testID="food-day">
-          {foodDayLabel(day, today)}
-        </Text>
-        <DayArrow label="Next day" glyph="›" testID="food-next-day" disabled={atToday} onPress={() => setDay((d) => clampDay(addDays(d, 1), today))} />
-      </View>
+      <DayStrip
+        days={strip}
+        selected={day}
+        title={weekTitle}
+        onPick={setDay}
+        onOlder={() => pageWeek(1)}
+        onNewer={weeksBack > 0 ? () => pageWeek(-1) : null}
+        canGoOlder={weeksBack < MAX_WEEKS_BACK}
+      />
       {status === 'offline' ? <Text style={text('caption')}>Showing your saved meals. They update when you’re online.</Text> : null}
 
-      <Card>
-        <MacroBars totals={totals} targets={food.targets} />
-      </Card>
+      <KcalCard card={kcalCard(totals, food.targets, day, today)} coachName={food.coachName} />
 
-      <Button title="Log a meal" testID="food-log-meal" busy={busy} onPress={() => setSheet(true)} />
+      <View style={styles.bigRow}>
+        <BigButton
+          title="Snap a photo"
+          testID="food-snap"
+          ink
+          disabled={busy}
+          icon={<CameraIcon color={white} />}
+          onPress={() => void snap()}
+        />
+        <BigButton
+          title="Type it in"
+          testID="food-type-it"
+          icon={<PencilIcon />}
+          onPress={() => router.push({ pathname: '/food/meal', params: { day } })}
+        />
+      </View>
       {error ? <ErrorText testID="food-error">{error}</ErrorText> : null}
+
+      <LogAgainChips
+        items={again}
+        onPick={(item) => {
+          setWeeksBack(0);
+          setDay(today);
+          void food.logAgain(item);
+        }}
+      />
 
       {food.failed.map((op) => (
         <View key={op.opId} style={styles.failedBox} testID="food-failed">
@@ -138,46 +174,69 @@ export default function FoodScreen() {
         </View>
       ))}
 
-      <View>
-        {meals.length === 0 ? (
-          <Text style={text('body')} testID="food-empty">
-            {status === 'loading' ? 'Loading…' : day === today ? 'No meals yet today.' : 'No meals logged this day.'}
-          </Text>
-        ) : (
-          meals.map((m) => (
-            <MealRow key={m.id} meal={m} urls={urls} onPress={() => router.push({ pathname: '/food/meal', params: { id: m.id, day: m.eatenOn } })} />
-          ))
-        )}
-      </View>
-
-      <LogMealSheet visible={sheet} onPick={(c) => void pick(c)} onClose={() => setSheet(false)} />
+      <Text style={[foodText.heading, styles.titlePad]} accessibilityRole="header" testID="food-day">
+        {day === today ? 'Today’s meals' : `Meals on ${shortDayLabel(day, today)}`}
+      </Text>
+      {meals.length === 0 ? (
+        <Text style={[text('body'), styles.titlePad]} testID="food-empty">
+          {status === 'loading' ? 'Loading…' : day === today ? 'No meals yet today.' : 'No meals logged this day.'}
+        </Text>
+      ) : (
+        meals.map((m) => (
+          <MealCard key={m.id} meal={m} urls={urls} onPress={() => router.push({ pathname: '/food/meal', params: { id: m.id, day: m.eatenOn } })} />
+        ))
+      )}
     </Screen>
   );
 }
 
-function DayArrow({ label, glyph, onPress, disabled = false, testID }: { label: string; glyph: string; onPress: () => void; disabled?: boolean; testID: string }) {
-  const { text } = useTheme();
+function BigButton({
+  title,
+  icon,
+  onPress,
+  ink = false,
+  disabled = false,
+  testID,
+}: {
+  title: string;
+  icon: ReactNode;
+  onPress: () => void;
+  ink?: boolean;
+  disabled?: boolean;
+  testID: string;
+}) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={title}
       accessibilityState={{ disabled }}
       testID={testID}
-      hitSlop={space[2]}
-      style={({ pressed }) => [styles.arrow, disabled && styles.disabled, pressed && { opacity: pressedOpacity }]}
+      style={({ pressed }) => [styles.big, ink ? styles.bigInk : styles.bigPink, (pressed || disabled) && { opacity: pressedOpacity }]}
     >
-      <Text style={text('screenTitle')}>{glyph}</Text>
+      {icon}
+      <Text style={[font(800, 16), ink && { color: white }]}>{title}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  switcher: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dayLabel: { flex: 1, textAlign: 'center' },
-  arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: palette.surface },
-  disabled: { opacity: 0.3 },
+  titlePad: { paddingHorizontal: 4 },
+  bigRow: { flexDirection: 'row', gap: 10 },
+  big: {
+    flex: 1,
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: palette.ink,
+  },
+  bigInk: { backgroundColor: palette.ink },
+  bigPink: { backgroundColor: palette.drop },
   failedBox: { gap: space[2], padding: space[3], borderRadius: radius.input, backgroundColor: palette.drop },
   actions: { flexDirection: 'row', gap: space[4] },
 });

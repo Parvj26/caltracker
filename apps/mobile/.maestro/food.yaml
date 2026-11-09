@@ -1,6 +1,6 @@
-# Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank), log a meal by macros (Lunch,
-# 650 kcal, 42 g protein), see it in today's list and the totals against the targets, see the kcal hint for a meal
-# without calories, edit the meal, then delete it. Photos need the camera or the library, so they are not covered.
+# Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank), type in a meal (Maestro toast,
+# 300 kcal, 12 g protein), see it under Today's meals and in the kcal card, log it again from "Log again in one tap",
+# look at yesterday in the day strip, edit a meal, then delete both. Photos need the camera, so they are not covered.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -19,32 +19,37 @@ env:
     id: tab-food
 - assertVisible:
     id: food-day
-    text: Today
+    text: 'Today’s meals'
 - extendedWaitUntil:
     visible: 'No meals yet today.'
     timeout: 10000
 - assertVisible:
-    id: food-total-calories
-    text: '0 of 2,000 kcal'
+    id: food-kcal-caption
+    text: 'kcal left today'
+- assertVisible:
+    id: food-kcal-headline
+    text: '2,000'
+- assertVisible:
+    id: food-targets-by
+    text: 'Targets set by .*'
 
-# Log by macros.
+# Type it in.
 - tapOn:
-    id: food-log-meal
+    id: food-type-it
 - tapOn:
-    id: log-meal-macros
-- tapOn:
-    id: meal-name-Lunch
+    id: meal-name
+- inputText: 'Maestro toast'
 - tapOn:
     id: meal-protein
-- inputText: '42'
-# No calories yet: the hint works them out from the protein (42 x 4).
+- inputText: '12'
+# No calories yet: the hint works them out from the protein (12 x 4).
 - scrollUntilVisible:
     element:
       id: meal-kcal-hint
-- assertVisible: '≈ 168 kcal from macros'
+- assertVisible: '≈ 48 kcal from macros'
 - tapOn:
     id: meal-calories
-- inputText: '650'
+- inputText: '300'
 - hideKeyboard
 - scrollUntilVisible:
     element:
@@ -52,26 +57,44 @@ env:
 - tapOn:
     id: meal-save
 - extendedWaitUntil:
-    visible: 'Lunch.*'
+    visible: 'Maestro toast, .*'
     timeout: 10000
-- assertVisible: 'Lunch, .*, 650 kcal · P 42 g'
+- assertVisible: 'Maestro toast, .*, 300 kcal · 12 P'
 - assertVisible:
-    id: food-total-calories
-    text: '650 of 2,000 kcal'
+    id: food-kcal-headline
+    text: '1,700'
 - assertVisible:
-    id: food-total-protein
-    text: '42 of 150 g'
+    id: food-bar-protein
+    text: '12 / 150 g · 138 left'
 - extendedWaitUntil:
     notVisible: 'Saving…'
     timeout: 20000
 
-# Edit it.
-- tapOn: 'Lunch.*'
+# Log it again in one tap: two cards.
+- extendedWaitUntil:
+    visible:
+      id: 'food-again-Maestro toast'
+    timeout: 10000
+- tapOn:
+    id: 'food-again-Maestro toast'
+- extendedWaitUntil:
+    visible:
+      id: food-kcal-headline
+      text: '1,400'
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible: 'Saving…'
+    timeout: 20000
+
+# Edit one.
+- tapOn:
+    text: 'Maestro toast, .*'
+    index: 0
 - assertVisible: 'Edit meal'
 - tapOn:
     id: meal-calories
 - eraseText: 5
-- inputText: '700'
+- inputText: '350'
 - hideKeyboard
 - scrollUntilVisible:
     element:
@@ -80,31 +103,41 @@ env:
     id: meal-save
 - extendedWaitUntil:
     visible:
-      id: food-total-calories
-      text: '700 of 2,000 kcal'
+      id: food-kcal-headline
+      text: '1,350'
     timeout: 10000
 
-# Yesterday is empty, and there is no day after today.
-- tapOn:
-    id: food-prev-day
-- assertVisible:
-    id: food-day
-    text: Yesterday
-- assertVisible: 'No meals logged this day.'
-- tapOn:
-    id: food-next-day
-- assertVisible:
-    id: food-day
-    text: Today
-
-# Delete it.
-- tapOn: 'Lunch.*'
+# Yesterday in the strip is empty; today is the last day (the strip's other six days, oldest first, end with yesterday).
 - scrollUntilVisible:
     element:
-      id: meal-delete
+      id: food-day-today
+    direction: UP
 - tapOn:
-    id: meal-delete
-- tapOn: Delete
+    id: 'food-day-\d{4}-\d{2}-\d{2}'
+    index: 5
+- assertVisible:
+    id: food-day
+    text: 'Meals on .*'
+- assertVisible: 'No meals logged this day.'
+- tapOn:
+    id: food-day-today
+- assertVisible:
+    id: food-day
+    text: 'Today’s meals'
+
+# Delete both.
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          text: 'Maestro toast, .*'
+          index: 0
+      - scrollUntilVisible:
+          element:
+            id: meal-delete
+      - tapOn:
+          id: meal-delete
+      - tapOn: Delete
 - extendedWaitUntil:
     visible: 'No meals yet today.'
     timeout: 10000
