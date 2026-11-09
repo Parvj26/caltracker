@@ -22,19 +22,21 @@ barcodes and photo calorie estimates also stay out.
 3. **"Log again in one tap".** Up to 3 chips: the client's own most-logged meals in the last 28 days. A meal counts
    when it has a name and at least one macro (photo-only meals are left out). Meals are the same "kind" when the
    name (normalised: case, accents, spacing) and all four macros are equal, so a "Breakfast" logged with different
-   numbers each day never collapses into one chip. Most logged first, then most recent. One tap creates a new meal
+   numbers each day never collapses into one chip. Most logged first, then most recent. **PO ruling 2026-11-09:** a meal logged once qualifies; the top 3 show. One tap creates a new meal
    now (today, current time) with that name, macros and coach link; the photo and note are not copied. Hidden
    when there are none.
 4. **Meal-name presets stay buttons, no schema change.** Breakfast / Lunch / Dinner / Snack fill the name only when
    the name box is empty; tapping one when a name is typed does nothing to the name (the button still shows as
    chosen only when the name equals it).
 5. **Day strip.** Seven days ending today (today last, dark). A ● under a day with at least one meal (server or
-   queued). Tap a day to view it. No future day is ever shown; days older than 6 days back are not reachable on
-   the phone in this version (the coach still sees them on the web).
+   queued). Tap a day to view it. No future day is ever shown. **PO ruling 2026-11-09:** ‹ › week arrows above the
+   strip page back a week at a time (and forward again up to the week ending today; future days stay unreachable).
+   The title reads "Last 7 days", or the range ("Tue 27 Oct – Mon 2 Nov") on an earlier week. Paging stops 12 weeks
+   back, inside the 90 days of history the phone keeps for the dots.
 6. **Kcal card.** With a calorie target: "860 kcal left today" (or "120 kcal over today"; on an earlier day "… left
    on Tue 3 Nov"). Bars for protein, carbs, fat: "96 / 170 g · 74 left" (a macro with no target shows "96 g").
-   Footer "Targets set by <coach first name>". With no targets at all: "1,240 kcal today", plain totals, footer
-   "Your coach hasn't set targets yet". With a protein/carbs/fat target but no calorie target: "1,240 kcal today".
+   Footer "Targets set by <coach first name>". With no targets at all (**PO ruling 2026-11-09**): totals only,
+   "1,240 kcal today", each bar shows its grams ("96 g") with no fill, footer "Your coach hasn't set targets yet". With a protein/carbs/fat target but no calorie target: "1,240 kcal today".
 7. **Coach meals visible to all current clients** of the workspace; only coaches of the workspace write them.
    Removing is a soft delete (`deleted_at`): the meal disappears for clients and from the coach list, but meals
    already logged from it keep their link and their own copied numbers.
@@ -130,3 +132,13 @@ logged stay.").
 - Vitest: unchanged exercise search suite plus new smart-search, meal search/filter/frequent, kcal card, day strip
   and coach-meal tests; mobile queue/send/logic tests for `coachMealId` (and old queued items without it).
 - Playwright `apps/web/e2e/coach-meals.spec.ts`; Maestro `food.yaml` updated and `coach-meals.yaml` added.
+
+## Build notes (2026-11-09)
+
+- The Coach tab button (decision 11) is built separately once the Coach tab redesign lands. Until then the phone's
+  Meals from <coach> screens exist (`/coach-meals`) but are reached only by link; coach meals still show in Log a
+  meal search with the "From <coach>" tag.
+- The phone keeps the 90-day meal history and the coach meal list inside its saved food copy (cleared on Sign out
+  with the rest of the food log), so search, "log again" and Meals from <coach> work with no signal.
+- Log a meal keeps the optional note field from the first food version (not in the mockup), so nothing a client
+  could already do goes away.
