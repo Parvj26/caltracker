@@ -59,7 +59,8 @@ describe('saveCoachMeal', () => {
     const update = calls.find((c) => c.op === 'update');
     expect(update?.payload).toMatchObject({ calories: 500 });
     expect(update?.payload).not.toHaveProperty('workspace_id');
-    expect(update?.filters).toMatchObject({ id: MEAL, workspace_id: WS });
+    // A removed meal is never edited back to life.
+    expect(update?.filters).toMatchObject({ id: MEAL, workspace_id: WS, deleted_at: null });
 
     respond = (c) => (c.op === 'insert' ? { error: { code: '23505', message: 'duplicate' } } : { data: [] });
     await expect(saveCoachMeal(base)).resolves.toEqual({ error: "This meal can't be changed any more." });

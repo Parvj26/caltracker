@@ -68,7 +68,13 @@ export async function saveCoachMeal(input: CoachMealInput): Promise<CoachMealOut
   const supabase = await createServerSupabase();
   const inserted = await supabase.from('coach_meals').insert({ id: input.id, workspace_id: workspaceId, ...fields });
   if (inserted.error?.code === '23505') {
-    const updated = await supabase.from('coach_meals').update(fields).eq('id', input.id).eq('workspace_id', workspaceId).select('id');
+    const updated = await supabase
+      .from('coach_meals')
+      .update(fields)
+      .eq('id', input.id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .select('id');
     if (updated.error) return { error: SAVE_FAILED };
     if (updated.data.length === 0) return { error: "This meal can't be changed any more." };
   } else if (inserted.error) {
