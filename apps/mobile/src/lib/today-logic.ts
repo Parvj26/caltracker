@@ -8,7 +8,6 @@ import {
   diffDays,
   formatMacro,
   isoWeekday,
-  topReactionsLine,
   type IsoDate,
   type MacroTargets,
   type MealMacros,
@@ -63,21 +62,12 @@ export function unreadLabel(count: number): string | null {
 
 // ---- Community ---------------------------------------------------------------------------------------------
 
-export type PostPreview = {
-  id: string;
-  author: string;
-  snippet: string;
-  /** The top reactions and the comment count, e.g. "❤️ 2 · 🔥 1 · 1 comment"; '' with neither. */
-  stats: string;
-  /** The first photo's thumbnail path, if any. */
-  thumbPath: string | null;
-  /** Sticker art for a shared card without a photo. */
-  stickerKey: string | null;
-};
+/** Who posted and what, for the Today Community line. */
+export type PostPreview = { author: string; snippet: string };
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
-/** One row in the Today community card. */
+/** The newest post, as the Today Community line reads it. */
 export function postPreview(post: FeedPost, ctx: { me: string; coaches: ReadonlySet<string>; units: Units }): PostPreview {
   const mine = post.authorId === ctx.me;
   // A card's headline is a sentence about the poster ("You lifted 1,540 lb — …"); older workout cards have the
@@ -87,10 +77,7 @@ export function postPreview(post: FeedPost, ctx: { me: string; coaches: Readonly
   const cardLine = card ? (card.badge && post.card?.kind === 'workout' ? `${card.badge} · ${card.title}` : card.title) : null;
   const snippet = body || (cardLine ?? (post.images.length > 0 ? 'Shared a photo' : ''));
   const author = mine ? 'You' : ctx.coaches.has(post.authorId) ? `${post.authorName} · Coach` : post.authorName;
-  const stats = [topReactionsLine(post.reactions) || null, post.commentCount > 0 ? plural(post.commentCount, 'comment') : null]
-    .filter(Boolean)
-    .join(' · ');
-  return { id: post.id, author, snippet, stats, thumbPath: post.images[0]?.thumbPath ?? null, stickerKey: card?.stickerKey ?? null };
+  return { author, snippet };
 }
 
 

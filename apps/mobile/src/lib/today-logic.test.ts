@@ -70,24 +70,13 @@ describe('community', () => {
   });
   const ctx = { me: 'me', coaches: new Set(['coach']), units: 'lb' as const };
 
-  it('shows the author (marking the coach and me), the words and the top reactions and comments', () => {
-    const p = postPreview(
-      post({
-        reactions: [
-          { userId: 'me', reaction: 'fire', createdAt: '2026-11-06T10:00:00Z', name: 'Me' },
-          { userId: 'me', reaction: 'heart', createdAt: '2026-11-06T10:01:00Z', name: 'Me' },
-          { userId: 'kim', reaction: 'heart', createdAt: '2026-11-06T10:02:00Z', name: 'Kim' },
-        ],
-        commentCount: 1,
-        images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }),
-      ctx,
-    );
-    expect(p).toEqual({ id: 'p1', author: 'Smoke Coach · Coach', snippet: 'Happy Diwali', stats: '❤️ 2 · 🔥 1 · 1 comment', thumbPath: 'a-thumb.webp', stickerKey: null });
-    expect(postPreview(post({ authorId: 'me', commentCount: 2 }), ctx)).toMatchObject({ author: 'You', stats: '2 comments' });
-    expect(postPreview(post({ authorId: 'vk', authorName: 'VK' }), ctx)).toMatchObject({ author: 'VK', stats: '' });
+  it('names the author (marking the coach and me) with the words, and nothing else', () => {
+    expect(postPreview(post({ commentCount: 1 }), ctx)).toEqual({ author: 'Smoke Coach · Coach', snippet: 'Happy Diwali' });
+    expect(postPreview(post({ authorId: 'me' }), ctx)).toEqual({ author: 'You', snippet: 'Happy Diwali' });
+    expect(postPreview(post({ authorId: 'vk', authorName: 'VK' }), ctx)).toEqual({ author: 'VK', snippet: 'Happy Diwali' });
   });
 
-  it('describes a shared card without words, with its sticker', () => {
+  it('describes a shared card without words', () => {
     const lion = STICKERS.find((s) => s.kind === 'ladder')!.key;
     const p = postPreview(
       post({
@@ -98,7 +87,10 @@ describe('community', () => {
     );
     // An older card (no volume stored): the label and the workout's name.
     expect(p.snippet).toBe('Workout done · Lower Body');
-    expect(p.stickerKey).toBe(lion);
+  });
+
+  it('says a photo-only post was a photo', () => {
+    expect(postPreview(post({ body: '', images: [{ id: 'i', path: 'a.webp', thumbPath: 'a-thumb.webp', width: 1, height: 1 }] }), ctx).snippet).toBe('Shared a photo');
   });
 
   it('uses the card sentence, about the poster, when the card has one', () => {

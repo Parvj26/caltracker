@@ -6,9 +6,8 @@ import { todayCacheKey } from './device-cache-keys';
 import { loadLatestPosts, type FeedPost } from './community-api';
 import { supabase } from './supabase';
 
-/** Read a few more than shown, so a blocked member's post doesn't leave the card short. */
+/** Today shows the newest post only; a few more are read so a blocked member's post doesn't leave it empty. */
 const POSTS_READ = 6;
-export const POSTS_SHOWN = 2;
 
 const key = todayCacheKey;
 
@@ -52,12 +51,12 @@ export async function readCachedPosts(userId: string, communityId: string): Prom
 }
 
 /**
- * The newest posts by time, pinned or not, without anyone I blocked. A pinned post is not moved to the top here (Today
+ * The newest post by time (a list of at most one), pinned or not, without anyone I blocked. A pinned post is not moved to the top here (Today
  * shows what is new; the Community screen shows pins first). Throws when the server can't be reached.
  */
 export async function fetchLatestPosts(userId: string, communityId: string, blocked: ReadonlySet<string>): Promise<FeedPost[]> {
   // Already newest first (loadLatestPosts orders by time only).
-  const posts = withoutBlocked(await loadLatestPosts(communityId, POSTS_READ), blocked).slice(0, POSTS_SHOWN);
+  const posts = withoutBlocked(await loadLatestPosts(communityId, POSTS_READ), blocked).slice(0, 1);
   writeJson(key(`posts.${communityId}`, userId), posts);
   return posts;
 }
