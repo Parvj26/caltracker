@@ -16,11 +16,12 @@ describe('textStyle', () => {
     expect(textStyle('screenTitle', 'tablet').fontSize).toBe(24);
   });
 
-  it('makes the hand note Caveat, magenta and tilted', () => {
+  it('makes the note easy to read: the app font, bold, deep magenta, not tilted', () => {
     const hand = textStyle('hand', 'phone');
-    expect(hand.fontFamily).toBe('Caveat_700Bold');
-    expect(hand.color).toBe('#E0408A');
-    expect(hand.transform).toEqual([{ rotate: '-3deg' }]);
+    expect(hand.fontFamily).toBe('BricolageGrotesque_700Bold');
+    expect(hand.fontSize).toBe(17);
+    expect(hand.color).toBe('#B32C6C');
+    expect(hand.transform).toBeUndefined();
   });
 
   it('mutes captions', () => {

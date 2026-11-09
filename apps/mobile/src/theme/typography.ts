@@ -12,7 +12,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export function textStyle(role: TypeRole, device: Device): TextStyle {
   const t = typeScale[role];
   const fontSize = t.size[device];
-  const color = t.family === 'hand' ? palette.magenta : t.muted ? palette.inkMuted : palette.ink;
+  const color = role === 'hand' ? palette.magentaDeep : t.muted ? palette.inkMuted : palette.ink;
   return {
     fontFamily: fontFamilyFor(t.family, t.weight),
     fontSize,

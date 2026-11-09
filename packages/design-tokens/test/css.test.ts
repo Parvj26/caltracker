@@ -31,11 +31,11 @@ describe('toCssVariables shape tokens', () => {
     expect(css).toContain('--ct-button-min-height:48px;');
     expect(css).toContain('--ct-tap-min:44px;');
   });
-  it('emits type weights, tracking and the hand rotation', () => {
+  it('emits type weights and tracking, and no hand rotation', () => {
     expect(css).toContain('--ct-weight-body:500;');
     expect(css).toContain('--ct-weight-button:800;');
     expect(css).toContain('--ct-tracking-screen-title:-0.02em;');
     expect(css).toContain('--ct-tracking-button:0.03em;');
-    expect(css).toContain('--ct-rotate-hand:-3deg;');
+    expect(css).not.toContain('--ct-rotate-hand');
   });
 });
