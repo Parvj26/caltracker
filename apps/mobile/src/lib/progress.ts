@@ -14,7 +14,7 @@ import {
   measurementSeries,
 } from '@caltracker/shared';
 import { addDays } from '@caltracker/shared';
-import type { BuiltInMetricKey, ChartRange, IsoDate, OverviewMetric, Units } from '@caltracker/shared';
+import type { BuiltInMetricKey, IsoDate, OverviewMetric, OverviewPeriod, Units } from '@caltracker/shared';
 
 export type CustomMetricRow = { id: string; name: string; unit_label: string; min: number; max: number };
 
@@ -80,20 +80,29 @@ export type ProgressModel = {
 
 export const customKey = (id: string) => `custom:${id}`;
 
-export function buildProgress(data: ProgressRows, range: ChartRange, units: Units, today: IsoDate): ProgressModel {
+/** Days back each chart range reaches (null: all), the same periods as the coach's Body overview. */
+const PERIOD_DAYS: Record<OverviewPeriod, number | null> = { '4w': 28, '3m': 91, '1y': 365, all: null };
+
+/**
+ * `range` limits the charts; `latestPeriod` is the time the latest numbers' change is measured over (3 months unless
+ * the screen lets the client choose).
+ */
+export function buildProgress(data: ProgressRows, range: OverviewPeriod, units: Units, today: IsoDate, latestPeriod: OverviewPeriod = '3m'): ProgressModel {
   const customByKey = new Map(data.customs.map((c) => [customKey(c.id), c]));
   const keys = [...BUILT_IN_METRIC_KEYS, ...data.customs.map((c) => customKey(c.id))];
   const nameOf = (key: string) =>
     Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey].label : (customByKey.get(key)?.name ?? 'Measure');
   const format = (key: string, v: number) => formatMetric(key, v, units, customByKey.get(key));
 
-  const chartsFor = (r: ChartRange): ChartModel[] =>
+  const chartsFor = (r: OverviewPeriod): ChartModel[] =>
     keys.flatMap((key) => {
       const rows = data.scans.flatMap((s) =>
         s.values[key] !== undefined ? [{ measured_on: s.measuredOn, value: s.values[key], createdAt: s.createdAt }] : [],
       );
-      const series = measurementSeries(rows, r, today);
-      if (series.length === 0) return [];
+      const days = PERIOD_DAYS[r];
+      const from = days === null ? null : addDays(today, -days);
+      const series = measurementSeries(rows, 'all', today).filter((p) => from === null || p.date >= from);
+      if (series.length < 2) return [];
       const last = series[series.length - 1];
       const change = changeSince(series, key, units, today);
       const title = nameOf(key);
@@ -139,7 +148,7 @@ export function buildProgress(data: ProgressRows, range: ChartRange, units: Unit
     : null;
 
   // The same numbers and 3-month change the coach sees on the client's Overview (shared bodyOverview).
-  const latest = bodyOverview(data.scans, '3m', today).flatMap((m): LatestModel[] =>
+  const latest = bodyOverview(data.scans, latestPeriod, today).flatMap((m): LatestModel[] =>
     m.latest
       ? [
           {

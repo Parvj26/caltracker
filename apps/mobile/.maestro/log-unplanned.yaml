@@ -19,6 +19,12 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-workouts
+# The button sits below the week, the day's card and Coming up, so it may be off screen.
+- scrollUntilVisible:
+    element:
+      id: log-unplanned
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: log-unplanned
 - assertVisible:

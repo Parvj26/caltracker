@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   EQUIPMENT_CHIPS,
+  muscleChipsOf,
   EXERCISE_ALIASES,
   EXERCISE_INDEX_COLUMNS,
   MUSCLE_CHIPS,
@@ -421,5 +422,16 @@ describe('exerciseIndexRowFromDb', () => {
 
   it('marks custom exercises and allows no photo', () => {
     expect(exerciseIndexRowFromDb({ ...db, source: 'custom', image_paths: [] })).toMatchObject({ source: 'custom', imagePath: null });
+  });
+});
+
+describe('muscleChipsOf', () => {
+  it('maps primary muscles to chips in the pickers’ order, once each', () => {
+    expect(muscleChipsOf(['triceps', 'chest', 'biceps'])).toEqual(['Chest', 'Arms']);
+  });
+
+  it('skips muscles with no chip', () => {
+    expect(muscleChipsOf(['unknown', 'abdominals'])).toEqual(['Core']);
+    expect(muscleChipsOf([])).toEqual([]);
   });
 });
