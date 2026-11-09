@@ -32,6 +32,11 @@ describe('keysToForget', () => {
     expect(keysToForget(food, 'u1')).toEqual(['caltracker.food.u1.w1']);
   });
 
+  it('forgets this user’s older Progress copies (body and strength), not another user’s', () => {
+    const old = ['caltracker.progress.u1', 'caltracker.strength.u1', 'caltracker.progress.u2', 'caltracker.strength.u2'];
+    expect(keysToForget(old, 'u1')).toEqual(['caltracker.progress.u1', 'caltracker.strength.u1']);
+  });
+
   it('still forgets the Today copies when the user is unknown', () => {
     expect(keysToForget(keys, null)).toEqual(keys.filter((k) => k.startsWith('caltracker.today.')));
   });

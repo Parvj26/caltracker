@@ -23,11 +23,14 @@ export function keysToForget(allKeys: readonly string[], userId: string | null):
   const album = userId ? albumCachePrefix(userId) : null;
   const food = userId ? foodCachePrefix(userId) : null;
   const progress = userId ? progressCachePrefix(userId) : null;
+  // The body copy (body-api) and the strength copy older versions saved.
+  const exact = userId ? new Set([`caltracker.progress.${userId}`, `caltracker.strength.${userId}`]) : new Set<string>();
   return allKeys.filter(
     (k) =>
       k.startsWith(TODAY_CACHE_PREFIX) ||
       (album !== null && (k === album || k.startsWith(`${album}.`))) ||
       (food !== null && k.startsWith(food)) ||
-      (progress !== null && k.startsWith(progress)),
+      (progress !== null && k.startsWith(progress)) ||
+      exact.has(k),
   );
 }
