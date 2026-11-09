@@ -10,19 +10,24 @@ export const todayCacheKey = (what: string, userId: string) => `${TODAY_CACHE_PR
 /** This user's saved food log copies (one per coach): `caltracker.food.<userId>.<workspaceId>`. Not the send queue. */
 export const foodCachePrefix = (userId: string) => `caltracker.food.${userId}.`;
 
+/** This user's Progress copies (training summary per coach, the remembered exercise): `caltracker.progressHub.<userId>.…`. */
+export const progressCachePrefix = (userId: string) => `caltracker.progressHub.${userId}.`;
+
 /**
  * The saved keys Sign out removes: this user's sticker book copies (one per coach, plus the older single copy), their
- * food log copies, and
+ * food log copies, their Progress copies, and
  * every Today copy on the phone, whoever it belongs to (they only decorate Today, and a shared phone must not keep
  * the last account's name or posts).
  */
 export function keysToForget(allKeys: readonly string[], userId: string | null): string[] {
   const album = userId ? albumCachePrefix(userId) : null;
   const food = userId ? foodCachePrefix(userId) : null;
+  const progress = userId ? progressCachePrefix(userId) : null;
   return allKeys.filter(
     (k) =>
       k.startsWith(TODAY_CACHE_PREFIX) ||
       (album !== null && (k === album || k.startsWith(`${album}.`))) ||
-      (food !== null && k.startsWith(food)),
+      (food !== null && k.startsWith(food)) ||
+      (progress !== null && k.startsWith(progress)),
   );
 }
