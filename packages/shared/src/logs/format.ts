@@ -77,6 +77,15 @@ export function formatLogDuration(seconds: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** formatLogDuration for a narrow stat tile: "53 min", "1h", "4h 10m". */
+export function formatLogDurationShort(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
 /**
  * A workout's total volume (logVolumeKg) in the viewer's units, as a whole number with thousands grouped:
  * "8,420 lb lifted". Rounded once, from the unrounded conversion. The grouping is a regex rather than

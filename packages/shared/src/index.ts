@@ -228,6 +228,7 @@ export {
   coachLine,
   formatLastResult,
   formatLogDuration,
+  formatLogDurationShort,
   formatLogSetTarget,
   formatLogVolume,
   formatResult,

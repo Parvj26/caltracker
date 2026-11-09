@@ -5,6 +5,7 @@ import {
   logDurationS,
   logVolumeKg,
   formatLogDuration,
+  formatLogDurationShort,
   formatLogVolume,
   liftsImprovedBetween,
   localDateOf,
@@ -157,7 +158,7 @@ export function monthSummary(logs: readonly HistoryLog[], prs: readonly PrEvent[
   return {
     title: `${MONTHS[Number(month.slice(5, 7)) - 1] ?? ''} so far`,
     workouts: mine.length,
-    time: mine.length === 0 ? '0 min' : formatLogDuration(seconds),
+    time: mine.length === 0 ? '0 min' : formatLogDurationShort(seconds),
     prs: liftsImprovedBetween(prs, `${month}-01`, today, timeZone),
   };
 }
