@@ -25,50 +25,26 @@ env:
     visible: 'E2E Sections'
     timeout: 20000
 
-# ---- Preview ----
-- tapOn: 'Preview'
+# ---- Preview (the Workouts tab's Preview screen, opened from Today) ----
+- tapOn:
+    id: 'view-workout-.*'
 - extendedWaitUntil:
     visible:
-      id: preview-section-0
+      id: plan-section-0
       text: 'Upper'
     timeout: 20000
-- extendedWaitUntil:
-    visible:
-      id: preview-equipment
-    timeout: 20000
-- assertVisible: 'Equipment'
-# Each exercise is one line with its set count; the button's label (what Maestro matches on iOS) says it in words.
-- assertVisible: 'Pullups, 3 sets: .*'
-- assertVisible: 'Pushups, 2 sets: .*'
-- assertVisible:
-    id: 'preview-count-.*'
-    text: '×3'
-- assertVisible:
-    id: 'preview-count-.*'
-    text: '×2'
-- assertNotVisible: '8 reps'
+- assertVisible: 'Pullups.*'
+- assertVisible: 'Pushups.*'
 - takeScreenshot: sections-01-preview
-# Tapping the line shows each set.
-- tapOn: 'Pullups, 3 sets: .*'
-- extendedWaitUntil:
-    visible: '8 reps'
-    timeout: 5000
-- takeScreenshot: sections-02-preview-expanded
 - scrollUntilVisible:
-    element: 'Barbell Squat or Dumbbell Bicep Curl'
+    element:
+      id: 'plan-pick-one-.*'
     direction: DOWN
     timeout: 10000
 - assertVisible:
-    id: 'preview-pick-one-.*'
+    id: 'plan-pick-one-.*'
     text: 'Pick one'
 - takeScreenshot: sections-03-preview-pick-one
-# The Finisher heading may have scrolled off the top by now.
-- scrollUntilVisible:
-    element:
-      id: preview-section-1
-      text: 'Finisher'
-    direction: UP
-    timeout: 10000
 - scrollUntilVisible:
     element:
       id: back

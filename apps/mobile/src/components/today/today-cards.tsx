@@ -55,8 +55,8 @@ const TILE_GAP = 6;
  */
 export const COACH_CHAT_HREF = '/coach/chat' as Href;
 
-/** Where Preview goes: the workout's plan. (The Workouts redesign's Preview screen replaces this once it is on main.) */
-export const previewHref = (id: string): Href => ({ pathname: '/workout/[id]', params: { id } });
+/** Where Preview goes: the Workouts tab's Preview screen (plan, totals and a sticky Start). */
+export const previewHref = (id: string): Href => ({ pathname: '/plan/[id]', params: { id } });
 
 /** A big bordered card with a hard ink shadow (the workout, rest day and new-client coach cards). */
 export function Hero({ tone, children, testID }: { tone: 'lime' | 'blue' | 'drop'; children: ReactNode; testID?: string }) {

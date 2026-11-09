@@ -32,34 +32,14 @@ env:
 - assertNotVisible: 'Your first workout is coming!'
 - assertNotVisible:
     id: units-kg
-- tapOn: 'Preview'
-# The exercise row is one button whose label is the name, the set count and the set summary.
+# Today's Preview opens the same Preview screen as the Workouts tab: the plan and a sticky Start.
+- tapOn:
+    id: 'view-workout-.*'
 - extendedWaitUntil:
     visible: 'Barbell Squat.*'
     timeout: 20000
-# What to bring: the squat's barbell, as a chip under the title.
-- extendedWaitUntil:
-    visible:
-      id: preview-equipment
-    timeout: 20000
-- assertVisible: 'Barbell'
-# Collapsed, the sets read as one line (weight first, drops not counted): one set. On screen it says
-# "132 lb × 8, ↓ To failure"; the button's label, which Maestro matches on iOS, says the arrow as a word.
-# New accounts start in pounds (US launch): the coach's 60 kg target shows as 132 lb to this client.
-- assertVisible: 'Barbell Squat, 1 set: 132 lb × 8, drop to failure'
-- assertNotVisible:
-    id: drop-set
-# Tapping the exercise shows each set.
-- tapOn:
-    id: 'preview-expand-.*'
-- assertVisible: '8 reps · 132 lb'
-# The drop row's label is read as "Drop set" (iOS shows the accessibility label, not the ↳ glyph).
 - assertVisible:
-    id: drop-set
-- assertVisible: 'Drop set'
-- assertVisible: 'To failure'
-# Read only in phase 2: there is no Start button.
-- assertNotVisible: 'Start'
+    id: plan-start
 - tapOn:
     id: back
 - tapOn:
