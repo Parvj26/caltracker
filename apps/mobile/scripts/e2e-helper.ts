@@ -783,7 +783,6 @@ async function communityCleanup(): Promise<void> {
   if (buddy) await admin.auth.admin.deleteUser(buddy);
 }
 
-/** Deletes every meal (and meal photo) and the targets of the seed demo client. Nobody else's. */
 /** Removes every shared meal of Demo Coaching (client meals logged from them keep their numbers; the link clears). */
 export async function cleanupCoachMeals(): Promise<void> {
   const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
@@ -810,6 +809,7 @@ export async function seedCoachMeals(): Promise<void> {
   if (error) throw error;
 }
 
+/** Deletes every meal (and meal photo) and the targets of the seed demo client. Nobody else's. */
 export async function cleanupFood(email: string): Promise<void> {
   if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-food only clears ${DEMO_CLIENT}`);
   const id = await findUserId(DEMO_CLIENT);
