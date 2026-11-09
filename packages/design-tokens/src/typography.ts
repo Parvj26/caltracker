@@ -28,5 +28,6 @@ export const typeScale: Record<TypeRole, TypeStyle> = {
   body: { family: 'sans', weight: 500, size: same(15) },
   caption: { family: 'sans', weight: 500, size: same(12), muted: true },
   button: { family: 'sans', weight: 800, size: { phone: 15, tablet: 16, web: 16 }, trackingEm: 0.03 },
-  hand: { family: 'hand', weight: 700, size: same(20), rotateDeg: -3 },
+  // Coach and app notes: the app font in bold, not handwriting, so they are easy to read (PO, 2026-11-09).
+  hand: { family: 'sans', weight: 700, size: same(17) },
 };
