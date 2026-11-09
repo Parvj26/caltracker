@@ -39,7 +39,7 @@ export default function History() {
   const back = () => (router.canGoBack() ? router.back() : router.replace('/workouts'));
 
   return (
-    <Screen refreshing={false} onRefresh={() => setRefreshKey((k) => k + 1)}>
+    <Screen refreshing={history.refreshing} onRefresh={() => setRefreshKey((k) => k + 1)}>
       <View style={[styles.row, { gap: space[2] }]}>
         <Pressable
           testID="back"
