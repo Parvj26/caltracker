@@ -19,19 +19,27 @@ export type TrackedCount = {
 };
 export type TrainingSummary = { last7: TrackedCount; last30: TrackedCount; nextWeek: number };
 
-function count(workouts: HomeWorkout[], addedOn: IsoDate[], today: IsoDate, days: number): TrackedCount {
-  const from = addDays(today, -(days - 1));
+/**
+ * Planned workouts from `from` to `to` (inclusive) and how many are done, plus the workouts the client added
+ * themselves in that window. Only days up to `today` count, and one planned for today only once done (today isn't over).
+ */
+export function trackedCount(workouts: readonly HomeWorkout[], addedOn: readonly IsoDate[], from: IsoDate, to: IsoDate, today: IsoDate): TrackedCount {
+  const end = to < today ? to : today;
   let tracked = 0;
   let planned = 0;
   for (const w of workouts) {
-    if (w.scheduledOn < from || w.scheduledOn > today) continue;
+    if (w.scheduledOn < from || w.scheduledOn > end) continue;
     const isDone = workoutStatus(w).kind === 'done';
     if (w.scheduledOn === today && !isDone) continue;
     planned += 1;
     if (isDone) tracked += 1;
   }
-  const added = addedOn.filter((d) => d >= from && d <= today).length;
+  const added = addedOn.filter((d) => d >= from && d <= end).length;
   return { tracked, planned, added };
+}
+
+function count(workouts: HomeWorkout[], addedOn: IsoDate[], today: IsoDate, days: number): TrackedCount {
+  return trackedCount(workouts, addedOn, addDays(today, -(days - 1)), today, today);
 }
 
 /**
