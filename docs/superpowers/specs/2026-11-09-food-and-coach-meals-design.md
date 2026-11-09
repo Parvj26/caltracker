@@ -135,9 +135,8 @@ logged stay.").
 
 ## Build notes (2026-11-09)
 
-- The Coach tab button (decision 11) is built separately once the Coach tab redesign lands. Until then the phone's
-  Meals from <coach> screens exist (`/coach-meals`) but are reached only by link; coach meals still show in Log a
-  meal search with the "From <coach>" tag.
+- The Coach tab button (decision 11) was built as its own step after the Coach tab redesign landed: yellow, between
+  Message and Community, the count badge capped at "99+", hidden when the coach shares no meals.
 - The phone keeps the 91-day meal history and the coach meal list inside its saved food copy (cleared on Sign out
   with the rest of the food log), so search, "log again" and Meals from <coach> work with no signal.
 - Log a meal keeps the optional note field from the first food version (not in the mockup), so nothing a client
