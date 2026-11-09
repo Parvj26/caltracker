@@ -48,6 +48,13 @@ describe('rest day', () => {
   it('uses the date further out', () => {
     expect(nextUpDay('2026-11-17', '2026-11-10')).toBe('Tue 17 Nov');
   });
+
+  it('switches from weekday to date between 6 and 7 days ahead', () => {
+    // 6 days ahead is still this coming week; 7 days ahead is the same weekday as today, so it needs the date.
+    expect(nextUpDay('2026-11-16', '2026-11-10')).toBe('Monday');
+    expect(nextUpDay('2026-11-17', '2026-11-10')).toBe('Tue 17 Nov');
+    expect(nextUpDay('2026-11-11', '2026-11-10')).toBe('Wednesday');
+  });
 });
 
 describe('food card', () => {
