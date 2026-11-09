@@ -1,8 +1,10 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
+import { NotificationsRow } from '@/components/settings/notifications-row';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -51,7 +53,7 @@ export function TodayHeader({
   );
 }
 
-/** A small settings sheet. For now it only signs out; profile settings can join it later. */
+/** A small settings sheet: Notifications and Sign out; profile settings can join it later. */
 function SettingsSheet({
   visible,
   workspaceName,
@@ -64,6 +66,7 @@ function SettingsSheet({
   onSignOut: () => void;
 }) {
   const { text, space } = useTheme();
+  const router = useRouter();
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
@@ -71,6 +74,12 @@ function SettingsSheet({
           <Text style={text('screenTitle')} accessibilityRole="header">
             Settings
           </Text>
+          <NotificationsRow
+            onPress={() => {
+              onClose();
+              router.push('/notifications');
+            }}
+          />
           {workspaceName ? <Text style={text('body')} testID="settings-workspace">{`Coached by ${workspaceName}`}</Text> : null}
           <Button
             variant="secondary"

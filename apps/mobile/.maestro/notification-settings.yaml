@@ -1,0 +1,61 @@
+# Settings (gear on Today) -> Notifications: a switch stays off after leaving and coming back, and a new quiet-hours
+# start shows on the Settings row. The demo client starts with default settings (notification_prefs has no row).
+# Run via `pnpm --filter mobile e2e .maestro/notification-settings.yaml`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: today-settings
+- extendedWaitUntil:
+    visible: 'On · Quiet 10 PM – 7 AM'
+    timeout: 10000
+- tapOn:
+    id: settings-notifications
+- assertVisible: 'Notifications'
+- assertNotVisible:
+    id: notifications-off-banner
+# Meal comments don't exist yet: no switch for them.
+- assertNotVisible: 'Comments on your meals'
+- tapOn:
+    id: notif-switch-message
+- tapOn:
+    id: notifications-settings-back
+- tapOn:
+    id: today-settings
+- tapOn:
+    id: settings-notifications
+- assertVisible:
+    id: notif-switch-message
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: notif-time-quietStart
+    direction: DOWN
+- tapOn:
+    id: notif-time-quietStart
+- tapOn: '11:00 PM'
+- tapOn:
+    id: notifications-settings-back
+- tapOn:
+    id: today-settings
+- assertVisible: 'On · Quiet 11 PM – 7 AM'
+# Put the defaults back for the next run.
+- tapOn:
+    id: settings-notifications
+- tapOn:
+    id: notif-switch-message
+- scrollUntilVisible:
+    element:
+      id: notif-time-quietStart
+    direction: DOWN
+- tapOn:
+    id: notif-time-quietStart
+- tapOn: '10:00 PM'
