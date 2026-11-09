@@ -99,12 +99,13 @@ export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDel
 }
 
 const styles = StyleSheet.create({
-  row: { maxWidth: '82%', gap: space[1] },
+  row: { maxWidth: '78%', gap: space[1] },
   rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   rowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
-  bubble: { borderRadius: radius.card, paddingHorizontal: space[3.5], paddingVertical: space[2.5], gap: space[2] },
-  bubbleMine: { backgroundColor: palette.ink },
-  bubbleTheirs: { backgroundColor: palette.surface },
+  // The corner nearest the sender is tucked in (client right, coach left), as in the approved chat mockup.
+  bubble: { borderRadius: 18, paddingHorizontal: space[3], paddingVertical: space[2.5], gap: space[2] },
+  bubbleMine: { backgroundColor: palette.ink, borderBottomRightRadius: 6 },
+  bubbleTheirs: { backgroundColor: palette.surface, borderBottomLeftRadius: 6 },
   bubbleFailed: { borderWidth: 2, borderColor: palette.magenta },
   mineText: { color: white },
   photos: { gap: space[1] },

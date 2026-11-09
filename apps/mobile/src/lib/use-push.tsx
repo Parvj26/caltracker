@@ -1,7 +1,7 @@
 // Push notifications for the signed-in client: keeps this iPhone registered, opens tapped pushes and keeps the
 // app-icon badge in step with unread coach messages and comment notifications. Mounted in the signed-in (app)
 // layout, inside the messages and community providers it reads the unread counts from.
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { isEnabled, type PushPrefs } from '@caltracker/shared';
@@ -10,7 +10,7 @@ import { setStillTrainingEnabled } from './log-notifications';
 import { loadPrefs, savePrefs } from './notification-prefs';
 import type { PrefsSource } from './notification-settings-logic';
 import { onPushTapped, onTokenChanged, osPermission, registerDevice, requestPushPermission, setBadge, type PushPermission } from './push';
-import { badgeTotal, tapTarget, unreadCommentCount } from './push-logic';
+import { badgeTotal, openPushTarget, tapTarget, unreadCommentCount } from './push-logic';
 import { useSession } from './session';
 import { useCommunity } from './use-community';
 import { useUnreadCount } from './use-messages';
@@ -92,13 +92,21 @@ export function PushProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, refreshPermission]);
 
+  // Read when a push is tapped, so the listener isn't re-subscribed on every screen change.
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  pathRef.current = pathname;
+
   useEffect(() => {
     if (!userId) return;
     return onPushTapped((data) => {
       void revealedLogIds(userId).then((ids) => {
         const target = tapTarget(data, new Set(ids));
         // Only routes isPushRoute allows (or the reveal of one) reach here: tapTarget checks.
-        if (target) router.push(target);
+        if (!target) return;
+        const how = openPushTarget(target, pathRef.current);
+        if (how === 'navigate') router.navigate(target);
+        else if (how === 'push') router.push(target);
       });
     });
   }, [userId, router]);
