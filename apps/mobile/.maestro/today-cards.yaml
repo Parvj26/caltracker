@@ -1,5 +1,5 @@
-# The Today tab: the date and "Hi <name>" header, the coach row, the sticker and PR tiles (each opens its own
-# screen), and Sign out behind the gear.
+# The Today tab: the date and "Hi <name>" header, the latest coach message (opens the chat), the This week and
+# Newest sticker tiles (each opens its own screen), the Community line, and Sign out behind the gear.
 # Run via `pnpm --filter mobile e2e .maestro/today-cards.yaml` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -17,27 +17,29 @@ env:
 - assertVisible: 'Hi .*'
 - assertVisible:
     id: today-settings
-# The coach row opens the Coach tab.
+# The latest coach message opens the chat.
 - extendedWaitUntil:
     visible:
       id: today-coach
     timeout: 20000
 - tapOn:
     id: today-coach
-- assertVisible:
-    id: coach-name
+- extendedWaitUntil:
+    visible:
+      id: coach-composer-input
+    timeout: 20000
 - tapOn:
     id: tab-today
-# The sticker tile shows the zoo book's progress and opens it.
+# This week shows done of planned; the sticker tile opens the zoo book.
 - scrollUntilVisible:
     element:
       id: today-sticker
     direction: DOWN
 - extendedWaitUntil:
-    visible: '.*Zoo \d+ of \d+.*'
+    visible: 'This week: .*'
     timeout: 20000
 - assertVisible:
-    id: today-prs
+    id: today-food
 - takeScreenshot: today-cards-phone
 - tapOn:
     id: today-sticker

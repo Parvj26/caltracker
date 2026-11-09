@@ -1,0 +1,54 @@
+# The Preview screen (plan/[id]), opened from the Workouts tab and from Today: the exercise's set summary in pounds,
+# and Start for today's workout. Keeps the Preview checks calendar.yaml and log-sections.yaml had for the old
+# workout detail, as far as the Preview screen shows them (it has no equipment chip, set-by-set rows or drop-set
+# label; a future day's "You can start this on …" needs a helper that assigns a later day).
+# Run via `pnpm --filter mobile e2e .maestro/workouts-preview.yaml` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible: 'E2E Upper'
+    timeout: 20000
+# From the Workouts tab.
+- tapOn:
+    id: tab-workouts
+- tapOn:
+    id: 'preview-.*'
+- extendedWaitUntil:
+    visible: 'Barbell Squat.*'
+    timeout: 20000
+# The exercise row is one button whose label is the name and the plan line. New accounts start in pounds (US
+# launch): the coach's 60 kg target shows as 132 lb to this client.
+- assertVisible: 'Barbell Squat, .*132 lb.*'
+# Today's workout can be started from here.
+- assertVisible:
+    id: plan-start
+    text: 'Start workout'
+- tapOn:
+    id: back
+# From Today: the workout card's Preview opens the same screen.
+- tapOn:
+    id: tab-today
+- tapOn:
+    id: 'view-workout-.*'
+- extendedWaitUntil:
+    visible: 'Barbell Squat, .*132 lb.*'
+    timeout: 20000
+- assertVisible:
+    id: plan-start
+- tapOn:
+    id: back
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

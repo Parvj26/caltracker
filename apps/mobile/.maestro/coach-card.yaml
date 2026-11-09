@@ -51,7 +51,8 @@ env:
 - extendedWaitUntil:
     visible: ${BIO}
     timeout: 20000
-- assertVisible: 'Meet your coach'
+- assertVisible:
+    id: today-new-coach
 - assertVisible: 'Demo Coach'
 - takeScreenshot: profile-phone
 - runScript:

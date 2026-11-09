@@ -1,6 +1,7 @@
 // Pure helpers for the client's calendar screens. No Supabase client here, so they run in unit tests;
 // the fetchers live in ./workouts-api.ts.
 import { demoUrl } from './demo-link';
+import { programDayOf, type ProgramDay } from './workouts-plan';
 import { addDays, countExercises, groupDropSets, isoWeekday, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
@@ -9,17 +10,23 @@ export type WorkoutSummary = {
   scheduledOn: IsoDate;
   exerciseCount: number;
   programName: string | null;
+  /** The program week and day this workout stands for; null for a one-off (and when not read, as offline). */
+  programDay?: ProgramDay | null;
 };
 
-/** PostgREST select for a calendar card: name, date, program and exercise count (no sets; a pick-one group counts once). */
+/**
+ * PostgREST select for a calendar card: name, date, program (with its week and day) and exercise count (no sets; a
+ * pick-one group counts once).
+ */
 export const WORKOUT_SUMMARY_SELECT =
-  'id, name, scheduled_on, program_assignments(program_name), workout_blocks(kind, workout_exercises(count))';
+  'id, name, scheduled_on, planned_on, program_assignments(program_name, start_date), workout_blocks(kind, workout_exercises(count))';
 
 export type WorkoutSummaryRow = {
   id: string;
   name: string;
   scheduled_on: string | null;
-  program_assignments: { program_name: string } | null;
+  planned_on?: string | null;
+  program_assignments: { program_name: string; start_date?: string } | null;
   workout_blocks: Array<{ kind: BlockKind; workout_exercises: Array<{ count: number }> }>;
 };
 
@@ -32,6 +39,10 @@ export function toWorkoutSummary(row: WorkoutSummaryRow): WorkoutSummary {
       row.workout_blocks.map((b) => ({ kind: b.kind, exercises: b.workout_exercises.reduce((m, e) => m + Number(e.count), 0) })),
     ),
     programName: row.program_assignments?.program_name ?? null,
+    // A copy moved to another day still stands for its program day (planned_on).
+    programDay: row.program_assignments?.start_date
+      ? programDayOf(row.program_assignments.start_date, row.planned_on ?? row.scheduled_on)
+      : null,
   };
 }
 
