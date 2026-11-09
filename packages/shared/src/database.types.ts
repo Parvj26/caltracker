@@ -2043,6 +2043,24 @@ export type Database = {
           },
         ]
       }
+      push_sender_state: {
+        Row: {
+          apns_jwt: string | null
+          apns_jwt_issued_at: string | null
+          id: number
+        }
+        Insert: {
+          apns_jwt?: string | null
+          apns_jwt_issued_at?: string | null
+          id?: number
+        }
+        Update: {
+          apns_jwt?: string | null
+          apns_jwt_issued_at?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
       sticker_awards: {
         Row: {
           client_id: string
@@ -2616,6 +2634,32 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      claim_push_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body: string | null
+          claimed_until: string | null
+          created_at: string
+          data: Json
+          group_key: string
+          id: string
+          last_error: string | null
+          not_before: string
+          outcome: string | null
+          sent_at: string | null
+          title: string | null
+          type: string
+          user_id: string
+          workspace_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       client_today: {
         Args: { p_client: string; p_workspace: string }
         Returns: string
@@ -2701,6 +2745,10 @@ export type Database = {
         Returns: string
       }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
+      finish_push_batch: {
+        Args: { p_dead_tokens: string[]; p_results: Json }
+        Returns: undefined
+      }
       get_invite_preview: {
         Args: { token: string }
         Returns: {
@@ -2829,6 +2877,31 @@ export type Database = {
           primary_muscles: string[]
           session: number
           set_type: Database["public"]["Enums"]["set_type"]
+        }[]
+      }
+      push_badge_count: { Args: { p_user: string }; Returns: number }
+      push_dispatch: { Args: { p_job: string }; Returns: undefined }
+      push_reminder_candidates: {
+        Args: never
+        Returns: {
+          last_reminder_at: string
+          prefs: Json
+          time_zone: string
+          user_id: string
+          workout_count: number
+          workout_id: string
+          workout_name: string
+          workspace_id: string
+        }[]
+      }
+      push_user_context: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          badge: number
+          prefs: Json
+          time_zone: string
+          tokens: string[]
+          user_id: string
         }[]
       }
       queue_live_sync: { Args: { p_program_id: string }; Returns: undefined }
