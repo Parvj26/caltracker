@@ -418,7 +418,7 @@ export type { BuiltInMetricKey, CustomMetricDef, MetricDef } from './body/metric
 export { CHART_RANGES, CHART_RANGE_LABELS, changeSince, formatShortDate, measurementSeries } from './body/series';
 export type { ChartRange, SeriesPoint } from './body/series';
 export { SCAN_DUE_DAYS, isScanDue } from './body/due';
-export { ageLabel, latestUpdates, trainingSummary } from './coach-home/client-overview';
+export { ageLabel, latestUpdates, trackedCount, trainingSummary } from './coach-home/client-overview';
 export type { ClientUpdate, ClientUpdateKind, TrackedCount, TrainingSummary } from './coach-home/client-overview';
 export {
   DOCUMENT_MAX_BYTES,
@@ -549,4 +549,27 @@ export {
   weekDays,
 } from './food/food';
 export type { DailyTotals, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt } from './food/food';
+export { currentProgramLabel, thisWeekSummary, weekSentence } from './progress/week';
+export type { ProgramAssignmentLite, WeekCounts, WeekSummary } from './progress/week';
+export { CONSISTENCY_WEEKS, consistencyTile, consistencyWeeks, monthCalendar, plannedDonePercent } from './progress/consistency';
+export type { CalendarDay, ConsistencyWeek, WeekState } from './progress/consistency';
+export {
+  MOST_TRAINED_DAYS,
+  STRENGTH_RANGES,
+  STRENGTH_RANGE_LABELS,
+  bestsList,
+  bestsTile,
+  exerciseSessions,
+  mostTrained,
+  pointsInRange,
+  sessionRows,
+  strengthHeadline,
+  strengthPickerSections,
+  strengthTile,
+} from './progress/strength';
+export type { PickerItem, PickerSection, StrengthExerciseLite, StrengthRange, StrengthSession } from './progress/strength';
+export { WEIGHT_TREND_HALF_LIFE_DAYS, bodyTile, smoothedTrend, weightTrendSummary } from './progress/body';
+export { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, foodTile } from './progress/food';
+export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, ProteinDayState } from './progress/food';
+export { lifetimeAnimalLine, zooTile } from './progress/zoo';
 export * from './analytics/index';
