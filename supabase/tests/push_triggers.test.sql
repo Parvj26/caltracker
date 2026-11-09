@@ -1,6 +1,6 @@
 -- Push notifications: what puts a push in the outbox (plan Task 5).
 begin;
-select plan(33);
+select plan(36);
 
 -- Live Sync runs at commit; fire queued syncs the way a commit would (see live_sync.test.sql).
 create or replace function tests.flush() returns void language plpgsql as $$
@@ -87,6 +87,24 @@ update public.workouts set notes = 'Tomorrow' where id = :'sam_tomorrow';
 reset role;
 select is(tests.pending(:'sam', 'workout_changed'), 1, 'editing tomorrow''s workout enqueues nothing');
 
+-- Today's workout moved to another day, or deleted, before its pending change went out: the push is dropped.
+select tests.act_as(:'coach');
+update public.workouts set scheduled_on = :'today'::date + 3 where id = :'sam_today';
+reset role;
+select is(tests.pending(:'sam', 'workout_changed'), 0, 'moving today''s workout off today drops its pending change');
+select tests.act_as(:'coach');
+update public.workouts set scheduled_on = :'today' where id = :'sam_today';
+reset role;
+select is(tests.pending(:'sam', 'workout_changed'), 1, 'moving a workout onto today is a change of today''s plan');
+select tests.act_as(:'coach');
+insert into public.workouts (workspace_id, client_id, scheduled_on, name) values (:'ws', :'sam', :'today', 'Extra')
+  returning id as sam_extra \gset
+update public.workouts set notes = 'Changed' where id = :'sam_extra';
+delete from public.workouts where id = :'sam_extra';
+reset role;
+select is((select count(*)::int from public.push_outbox where group_key = 'workout_changed:' || :'sam_extra'), 0,
+  'deleting today''s workout drops its pending change');
+
 -- Links only (the library workout's deletion sets source_workout_id null): nothing.
 select tests.claims(:'coach');
 update public.workouts set source_workout_id = null where id = :'kim_today';
@@ -95,13 +113,14 @@ select is(tests.pending(:'kim', 'workout_changed'), 0, 'an update that only move
 update public.workouts set source_workout_id = :'lib' where id = :'kim_today';
 
 -- Live Sync: a library edit refreshes the copies after today and leaves today's as the clients have them.
+select count(*)::int as changed_before from public.push_outbox where type = 'workout_changed' \gset
 select tests.act_as(:'coach');
 update public.workouts set notes = 'Library v2' where id = :'lib';
 reset role;
 select tests.flush();
 select is((select notes from public.workouts where assignment_id = :'asg_kim' and scheduled_on = :'today'::date + 1), 'Library v2',
   '(Live Sync refreshed kim''s copy for tomorrow)');
-select is((select count(*)::int from public.push_outbox where type = 'workout_changed'), 1,
+select is((select count(*)::int from public.push_outbox where type = 'workout_changed'), :changed_before,
   'live sync adds no "Today''s workout changed" (today''s copy is left alone, other days never push)');
 
 -- A done workout: its plan can't change; a save that only stamps it pushes nothing.
