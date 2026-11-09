@@ -27,7 +27,7 @@ export type MealPhotoExt = 'webp' | 'jpg';
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /** "1,234" or "1,234.5": grouped thousands without depending on the engine's locale data. */
-function group(n: number): string {
+export function group(n: number): string {
   const [whole, frac] = String(Math.abs(n)).split('.') as [string, string | undefined];
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${n < 0 ? '−' : ''}${grouped}${frac ? `.${frac}` : ''}`;
@@ -205,4 +205,63 @@ export function mealMacroLine(m: MealMacros): string {
   return MACRO_KEYS.filter((k) => m[k] !== null)
     .map((k) => (k === 'calories' ? formatMacro(k, m[k]!) : `${MACRO_SHORT[k]} ${formatMacro(k, m[k]!)}`))
     .join(' · ');
+}
+
+export type KcalCard = {
+  /** The big number: kcal left or over (with a calorie target), otherwise the day's total. */
+  headline: string;
+  /** The words after it: "kcal left today", "kcal over on Tue 3 Nov", "kcal today". */
+  caption: string;
+  bars: Array<{ key: 'protein' | 'carbs' | 'fat'; text: string; fraction: number | null }>;
+  /** Any target set (the screen then says who set them, otherwise "Your coach hasn't set targets yet"). */
+  hasTargets: boolean;
+};
+
+/** The Food tab's lime card for one day. */
+export function kcalCard(totals: DailyTotals, targets: MacroTargets | null, day: IsoDate, today: IsoDate): KcalCard {
+  const when = day === today ? 'today' : `on ${shortDayLabel(day, today)}`;
+  const kcalTarget = targets?.calories ?? null;
+  let headline: string;
+  let caption: string;
+  if (kcalTarget === null) {
+    headline = group(totals.calories);
+    caption = `kcal ${when}`;
+  } else {
+    const diff = Math.round(kcalTarget - totals.calories);
+    headline = group(Math.abs(diff));
+    caption = diff < 0 ? `kcal over ${when}` : `kcal left ${when}`;
+  }
+  const bars = (['protein', 'carbs', 'fat'] as const).map((key) => {
+    const total = totals[key];
+    const target = targets?.[key] ?? null;
+    if (target === null) return { key, text: `${group(total)} g`, fraction: null };
+    const p = macroProgress(total, target);
+    const diff = round1(Math.abs(target - total));
+    return {
+      key,
+      text: `${group(total)} / ${group(target)} g · ${group(diff)} ${total > target ? 'over' : 'left'}`,
+      fraction: p.fraction ?? (total > 0 ? 1 : 0),
+    };
+  });
+  return { headline, caption, bars, hasTargets: hasAnyTarget(targets) };
+}
+
+export type StripDay = { day: IsoDate; dow: string; num: number; hasMeals: boolean; isToday: boolean };
+
+/**
+ * Seven days for the Food tab's strip, oldest first. `weeksBack` 0 ends today; 1 is the seven days before that, and so
+ * on (the strip's back arrow). Never a day after today.
+ */
+export function dayStrip(today: IsoDate, mealDays: ReadonlySet<IsoDate>, weeksBack = 0): StripDay[] {
+  const end = addDays(today, -7 * Math.max(0, Math.floor(weeksBack)));
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = addDays(end, i - 6);
+    return {
+      day,
+      dow: WEEKDAYS[isoWeekday(day) - 1] as string,
+      num: Number(day.slice(8, 10)),
+      hasMeals: mealDays.has(day),
+      isToday: day === today,
+    };
+  });
 }
