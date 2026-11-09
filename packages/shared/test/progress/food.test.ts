@@ -44,11 +44,24 @@ describe('foodPeriodSummary', () => {
 
   it('marks each day hit, under, nothing logged, or still to come', () => {
     const s = foodPeriodSummary(meals, targets, days, today);
-    expect(s.proteinDays!.map((d) => d.state)).toEqual(['hit', 'under', 'under', 'none', 'future', 'future', 'future']);
+    expect(s.proteinDays!.map((d) => d.state)).toEqual(['hit', 'under', 'none', 'none', 'future', 'future', 'future']);
     expect(s.proteinDays![0]).toMatchObject({ dow: 'Mon', label: 'Mon: protein target hit' });
     expect(s.proteinDays![1]!.label).toBe('Tue: logged, under target');
     expect(s.proteinDays![3]!.label).toBe('Thu: nothing logged');
-    expect(s).toMatchObject({ hitDays: 1, sentence: 'Hit on 1 of 3 days logged.' });
+    expect(s).toMatchObject({ hitDays: 1, sentence: 'Hit on 1 of 2 days logged. Nice.' });
+  });
+
+  it('judges only days with protein entered: a day of calories only is not under target', () => {
+    const s = foodPeriodSummary([meal('2026-11-02', 2000, null), meal('2026-11-03', 2000, 160)], targets, days, today);
+    expect(s.proteinDays!.slice(0, 2).map((d) => d.state)).toEqual(['none', 'hit']);
+    expect(s.proteinDays![0]!.label).toBe('Mon: no protein logged');
+    expect(s.sentence).toBe('Hit on 1 of 1 day logged. Nice.');
+  });
+
+  it('shows averages only when the protein target is 0', () => {
+    const s = foodPeriodSummary(meals, { ...targets, protein: 0 }, days, today);
+    expect(s.proteinDays).toBeNull();
+    expect(s.hitDays).toBe(0);
   });
 
   it('cheers when the target was hit on most logged days', () => {
@@ -71,5 +84,6 @@ describe('foodTile', () => {
     expect(foodTile({ hitDays: 0, loggedDays: 2, mealCount: 5, hasProteinTarget: false })).toEqual({ value: '5 meals', sub: 'logged this week' });
     expect(foodTile({ hitDays: 0, loggedDays: 1, mealCount: 1, hasProteinTarget: false })).toEqual({ value: '1 meal', sub: 'logged this week' });
     expect(foodTile({ hitDays: 0, loggedDays: 0, mealCount: 0, hasProteinTarget: true })).toEqual({ value: 'No meals yet', sub: 'this week' });
+    expect(foodTile({ hitDays: 0, loggedDays: 0, mealCount: 2, hasProteinTarget: true })).toEqual({ value: '2 meals', sub: 'logged this week' });
   });
 });

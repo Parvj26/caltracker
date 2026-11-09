@@ -95,7 +95,7 @@ export default function ProgressScreen() {
         key: 'food',
         title: 'Food',
         ...(foodWeek
-          ? foodTile({ hitDays: foodWeek.hitDays, loggedDays: foodWeek.loggedDays, mealCount: foodWeek.mealCount, hasProteinTarget: foodWeek.proteinDays !== null })
+          ? foodTile({ hitDays: foodWeek.hitDays, loggedDays: foodWeek.proteinLoggedDays, mealCount: foodWeek.mealCount, hasProteinTarget: foodWeek.proteinDays !== null })
           : loading),
         href: '/progress-detail/food',
         tone: 'bg',
