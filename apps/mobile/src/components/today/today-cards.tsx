@@ -48,6 +48,7 @@ const HERO_SHADOW = 4;
 const STICKER = 48;
 /** Between the lines of the small tiles (6 pt, as on the boards). */
 const TILE_GAP = 6;
+const ADD_MEAL_HEIGHT = tapTarget.min - 4;
 
 /**
  * The coach chat. The Coach tab redesign (feature/coach-tab-redesign, merging before this) makes /coach the coach's
@@ -157,7 +158,15 @@ export function RestCard({ next, today, onLogAnyway }: { next: WorkoutSummary | 
               {next.name}
             </Text>
           </View>
-          <Button variant="secondary" title="Preview" testID="today-next-preview" onPress={() => router.push(previewHref(next.id))} />
+          <Pressable
+            testID="today-next-preview"
+            onPress={() => router.push(previewHref(next.id))}
+            accessibilityRole="button"
+            accessibilityLabel={`Preview ${next.name}`}
+            style={({ pressed }) => [styles.smallButton, { paddingHorizontal: space[3.5] }, pressed && styles.pressed]}
+          >
+            <Text style={text('sectionHeading')}>Preview</Text>
+          </Pressable>
         </View>
       ) : null}
       <View style={styles.start}>
@@ -193,6 +202,8 @@ export function FoodCard({ refreshKey }: { refreshKey: number }) {
           onPress={() => router.push({ pathname: '/food/meal', params: { day: today } })}
           accessibilityRole="button"
           accessibilityLabel="Add meal"
+          // 40 pt on screen as on the board; the slop makes the tap area 44.
+          hitSlop={2}
           style={({ pressed }) => [styles.addMeal, { paddingHorizontal: space[3.5] }, pressed && styles.pressed]}
         >
           <Text style={text('sectionHeading')}>+ Add meal</Text>
@@ -321,8 +332,8 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
         <Overline>Newest sticker</Overline>
         {newest ? (
           <View style={[styles.row, { gap: space[2] }]}>
-            <View style={styles.tilt}>
-              <Sticker stickerKey={newest.key} size={STICKER} shiny={newest.shiny} variant="sm" />
+            <View style={[styles.stickerBox, styles.tilt]}>
+              <Sticker stickerKey={newest.key} size={STICKER - 8} shiny={newest.shiny} variant="sm" />
             </View>
             <Text style={[text('sectionHeading'), styles.flex]} numberOfLines={2} testID="today-sticker-name">
               {newest.name}
@@ -360,8 +371,16 @@ export function CommunityPeek({ units, refreshKey }: { units: Units; refreshKey:
     return newest ? communityHeadline(postPreview(newest, { me, coaches, units })) : 'No posts yet. Say hello!';
   }, [posts.data, me, blocked, coaches, units]);
 
-  // No community to show (not loaded, none, or taken out by the coach): the Community screen explains.
-  if (!ready || removed || !community) return null;
+  // No community (none, or taken out by the coach): nothing here; the Community screen explains.
+  if (ready && (removed || !community)) return null;
+  // Still loading: the line's shape, so the page doesn't jump when it arrives.
+  if (!ready || !community) {
+    return (
+      <View testID="today-community-loading" style={[styles.row, styles.quiet, styles.peek, { paddingHorizontal: space[4] }]}>
+        <Text style={[text('sectionHeading'), styles.flex]}>Community</Text>
+      </View>
+    );
+  }
   const badge = newCountLabel(unread);
   const line = headline ? `Community · ${headline}` : 'Community';
 
@@ -418,7 +437,7 @@ const styles = StyleSheet.create({
   quiet: { borderWidth: borderWidth.card, borderColor: palette.border },
   cardTitle: { fontSize: 18 },
   addMeal: {
-    minHeight: tapTarget.min,
+    minHeight: ADD_MEAL_HEIGHT,
     borderRadius: 14,
     borderWidth: borderWidth.card,
     borderColor: palette.ink,
@@ -437,6 +456,26 @@ const styles = StyleSheet.create({
   weekTile: { backgroundColor: palette.celebrateBg },
   weekBig: { fontSize: 22 },
   tilt: { transform: [{ rotate: '-4deg' }] },
+  stickerBox: {
+    width: STICKER,
+    height: STICKER,
+    borderRadius: 12,
+    backgroundColor: palette.drop,
+    borderWidth: borderWidth.card,
+    borderColor: palette.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  smallButton: {
+    minHeight: tapTarget.min,
+    borderRadius: 14,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.ink,
+    backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   peek: { minHeight: 56, borderRadius: 18 },
   newBadge: { backgroundColor: palette.ink, borderRadius: radius.pill },
   newText: { color: white, fontSize: 12 },
