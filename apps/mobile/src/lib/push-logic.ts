@@ -36,12 +36,24 @@ const LOG_SUMMARY = /^\/log\/([0-9a-f-]{36})\/summary$/i;
 export function tapTarget(data: unknown, revealed: ReadonlySet<string>): string | null {
   if (!isObj(data) || data.kind === 'reminder' || !isPushRoute(data.route)) return null;
   const route = data.route;
-  if (data.type === 'message' && route === '/coach') return '/coach/chat';
+  if (data.type === 'message' && route === '/coach') return CHAT;
   if (data.type === 'coach_logged') {
     const logId = LOG_SUMMARY.exec(route)?.[1];
     if (logId && !revealed.has(logId)) return `/log/${logId}/reveal?coach=1`;
   }
   return route;
+}
+
+/** The chat a message push opens (the Coach tab's stack keeps the profile underneath it). */
+const CHAT = '/coach/chat';
+
+/**
+ * How to open a tapped push's target from the current screen: the chat is moved to (navigate), never stacked a second
+ * time, and nothing happens when it is already open; every other target is pushed.
+ */
+export function openPushTarget(target: string, currentPath: string): 'navigate' | 'push' | null {
+  if (target !== CHAT) return 'push';
+  return currentPath === CHAT ? null : 'navigate';
 }
 
 /** "Later" on the Today card hides it this long. */
