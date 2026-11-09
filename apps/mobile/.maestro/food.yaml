@@ -1,6 +1,6 @@
 # Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank), type in a meal (Maestro toast,
 # 300 kcal, 12 g protein), see it under Today's meals and in the kcal card, log it again from "Log again in one tap",
-# look at yesterday in the day strip, edit a meal, then delete both. Photos need the camera, so they are not covered.
+# find it with "Search your meals" and Use it, edit a meal, look at yesterday in the day strip, then delete all three. Photos need the camera, so they are not covered.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -86,6 +86,32 @@ env:
     notVisible: 'Saving…'
     timeout: 20000
 
+# Search your meals: "toa" finds it; Use fills the form.
+- tapOn:
+    id: food-type-it
+- tapOn:
+    id: meal-search
+- inputText: 'toa'
+- tapOn:
+    id: 'meal-use-Maestro toast'
+- assertVisible:
+    id: meal-name
+    text: 'Maestro toast'
+- assertVisible:
+    id: meal-calories
+    text: '300'
+- hideKeyboard
+- tapOn:
+    id: meal-save
+- extendedWaitUntil:
+    visible:
+      id: food-kcal-headline
+      text: '1,100'
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible: 'Saving…'
+    timeout: 20000
+
 # Edit one.
 - tapOn:
     text: 'Maestro toast, .*'
@@ -104,7 +130,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: food-kcal-headline
-      text: '1,350'
+      text: '1,050'
     timeout: 10000
 
 # Yesterday in the strip is empty; today is the last day (the strip's other six days, oldest first, end with yesterday).
@@ -125,9 +151,9 @@ env:
     id: food-day
     text: 'Today’s meals'
 
-# Delete both.
+# Delete all three.
 - repeat:
-    times: 2
+    times: 3
     commands:
       - tapOn:
           text: 'Maestro toast, .*'

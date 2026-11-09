@@ -8,34 +8,49 @@ import {
   MEAL_NAME_MAX,
   MEAL_NAME_PRESETS,
   MEAL_NOTE_MAX,
-  foodDayLabel,
   kcalHint,
   localToday,
   mealProblems,
+  mealSearchItems,
+  shortDayLabel,
   parseMacroInput,
   photoDisplaySize,
   type MacroKey,
   type MealMacros,
+  type MealSearchItem,
 } from '@caltracker/shared';
+import { FoodInput } from '@/components/food/food-input';
+import { font, foodText, inkShadow } from '@/components/food/food-type';
+import { CameraIcon } from '@/components/food/icons';
+import { MealSearch } from '@/components/food/meal-search';
 import { SharpPhoto } from '@/components/photo/sharp-photo';
-import { Button, ErrorText, Screen, TextButton, TextField } from '@/components/ui';
+import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { PhotoError } from '@/lib/compress-photo';
 import { defaultMinutes, minutesOf, savedTime, stepMinutes, timeLabel, type PhotoChoice } from '@/lib/food-logic';
 import { mealPhotoUrls } from '@/lib/food-api';
 import { photoUri } from '@/lib/outbox-files';
 import { photoFromParams, pickMealPhoto, type PickedMealPhoto } from '@/lib/pick-meal-photo';
+import { draftFromParams, presetName } from '@/lib/meal-prefill';
 import { useFood } from '@/lib/use-food';
-import { palette, pressedOpacity, radius, space } from '@/theme/theme';
+import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const PREVIEW = 220;
 const UNIT: Record<MacroKey, string> = { calories: 'kcal', protein: 'g', carbs: 'g', fat: 'g' };
+const toMacroText = (m: MealMacros | null | undefined): Record<MacroKey, string> => ({
+  calories: toText(m?.calories ?? null),
+  protein: toText(m?.protein ?? null),
+  carbs: toText(m?.carbs ?? null),
+  fat: toText(m?.fat ?? null),
+});
 const toText = (n: number | null) => (n === null ? '' : String(n));
 
 /**
- * Log or edit a meal: a photo (optional), a name (chips or free text), the time, the macros (any of them) and a note.
- * Saving queues the meal on the phone and returns to Food at once; it is sent when there is signal.
+ * Log or edit a meal: search your meals and your coach's (new meals only), or fill it in: a name (Breakfast / Lunch /
+ * Dinner / Snack fill an empty name), the time, the macros (any of them), an optional photo and a note. Opened from a
+ * coach meal (`?coachMealId=`) it starts filled in with that meal. Saving queues the meal on the phone and returns
+ * to Food at once; it is sent when there is signal.
  */
 export default function MealScreen() {
   const { text } = useTheme();
@@ -53,12 +68,26 @@ export default function MealScreen() {
   const [minutes, setMinutes] = useState(() => (before ? minutesOf(before.eatenAt) : defaultMinutes(day, today)));
   // Whether the person moved the time: an untouched new meal is saved at the moment of saving (see savedTime).
   const [timeTouched, setTimeTouched] = useState(false);
-  const [macroText, setMacroText] = useState<Record<MacroKey, string>>(() => ({
-    calories: toText(before?.macros.calories ?? null),
-    protein: toText(before?.macros.protein ?? null),
-    carbs: toText(before?.macros.carbs ?? null),
-    fat: toText(before?.macros.fat ?? null),
-  }));
+  const [macroText, setMacroText] = useState<Record<MacroKey, string>>(() => toMacroText(before?.macros));
+  // The coach meal this was logged from (kept even when the copied numbers are changed before saving).
+  const [coachMealId, setCoachMealId] = useState<string | null>(before?.coachMealId ?? null);
+  const [showTime, setShowTime] = useState(false);
+  // Prefill once, when the coach meal list is there (it loads from the phone's copy a moment after opening).
+  const [prefilled, setPrefilled] = useState(false);
+  const coachMeals = food?.coachMeals;
+  useEffect(() => {
+    if (before || prefilled || !coachMeals) return;
+    const d = draftFromParams(params, coachMeals, today, new Date());
+    if (d.name === undefined) return;
+    setPrefilled(true);
+    setName(d.name);
+    setMacroText(toMacroText(d.macros));
+    setCoachMealId(d.coachMealId ?? null);
+  }, [before, prefilled, coachMeals, params, today]);
+  const searchItems = useMemo(
+    () => (food ? mealSearchItems(food.history, food.coachMeals, today) : []),
+    [food, today],
+  );
   const [picked, setPicked] = useState<PickedMealPhoto | null>(() => photoFromParams(params));
   const [removedPhoto, setRemovedPhoto] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
@@ -90,6 +119,14 @@ export default function MealScreen() {
   }, [macroText]);
   const hint = kcalHint(parsed.macros);
 
+  function use(item: MealSearchItem) {
+    // Fills the name, numbers and coach link; the time and photo stay as they are.
+    setName(item.name);
+    setMacroText(toMacroText(item.macros));
+    setCoachMealId(item.coachMealId);
+    setProblems([]);
+  }
+
   if (!food) return null;
   if (params.id && !before) {
     return (
@@ -109,6 +146,14 @@ export default function MealScreen() {
           size: { width: stored.width, height: stored.height },
         }
       : null;
+
+  function askPhoto() {
+    Alert.alert('Add a photo', undefined, [
+      { text: 'Take photo', onPress: () => void addPhoto('camera') },
+      { text: 'Choose photo', onPress: () => void addPhoto('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
 
   async function addPhoto(source: 'camera' | 'library') {
     setProblems([]);
@@ -133,7 +178,7 @@ export default function MealScreen() {
     setBusy(true);
     completeMeal({ variant: hasPhoto ? 'photo' : 'macros' });
     void food
-      .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day, minutes, openedOn: today }), name, note, macros: parsed.macros }, choice)
+      .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day, minutes, openedOn: today }), name, note, macros: parsed.macros, coachMealId }, choice)
       .finally(() => router.back());
   }
 
@@ -152,15 +197,125 @@ export default function MealScreen() {
     ]);
   }
 
+  const timeText = `${day === today ? '' : `${shortDayLabel(day, today)}, `}${timeLabel(minutes).toUpperCase()}`;
+
   return (
-    <Screen>
-      <View style={styles.row}>
-        <TextButton title="Cancel" testID="meal-cancel" onPress={() => router.back()} />
+    <Screen
+      footer={
+        <View style={styles.footer}>
+          <Pressable
+            onPress={save}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Save meal"
+            accessibilityState={{ disabled: busy, busy }}
+            testID="meal-save"
+            style={({ pressed }) => [styles.save, inkShadow, (pressed || busy) && { opacity: pressedOpacity }]}
+          >
+            <Text style={font(800, 17)}>Save meal</Text>
+          </Pressable>
+        </View>
+      }
+    >
+      <View style={styles.header}>
+        <View style={styles.side}>
+          <TextButton title="Cancel" testID="meal-cancel" onPress={() => router.back()} />
+        </View>
+        <Text style={[font(800, 20), styles.headerTitle]} accessibilityRole="header">
+          {before ? 'Edit meal' : 'Log a meal'}
+        </Text>
+        <View style={styles.side} />
       </View>
-      <Text style={text('screenTitle')} accessibilityRole="header">
-        {before ? 'Edit meal' : 'Log a meal'}
-      </Text>
-      <Text style={text('caption')}>{foodDayLabel(day, today)}</Text>
+
+      {!before ? (
+        <>
+          <MealSearch items={searchItems} today={today} coachName={food.coachName} onUse={use} />
+          <Text style={[font(700, 13), foodText.muted, styles.center]}>or fill it in</Text>
+        </>
+      ) : null}
+
+      <View style={styles.group}>
+        <Text style={font(800, 14)}>What did you eat?</Text>
+        <FoodInput
+          testID="meal-name"
+          accessibilityLabel="What did you eat?"
+          value={name}
+          onChangeText={setName}
+          maxLength={MEAL_NAME_MAX}
+          placeholder="e.g. Chicken and rice"
+          style={[font(500, 17), styles.nameInput]}
+        />
+      </View>
+
+      <View style={styles.group}>
+        <Text style={font(800, 14)}>Meal</Text>
+        <View style={styles.presets}>
+          {MEAL_NAME_PRESETS.map((p) => {
+            const selected = name.trim() === p;
+            return (
+              <Pressable
+                key={p}
+                onPress={() => setName((n) => presetName(n, p))}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                testID={`meal-name-${p}`}
+                style={({ pressed }) => [styles.preset, selected && styles.presetOn, pressed && { opacity: pressedOpacity }]}
+              >
+                <Text style={[font(700, 14), selected && styles.onInk]}>{p}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
+          onPress={() => setShowTime((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={`Time: ${timeText}. Change`}
+          testID="meal-time-change"
+          style={styles.timeLine}
+        >
+          <Text style={[font(500, 13), foodText.muted]}>
+            Time: <Text testID="meal-time">{timeText}</Text> · <Text style={styles.underline}>Change</Text>
+          </Text>
+        </Pressable>
+        {showTime ? (
+          <View style={styles.timeRow}>
+            <Stepper glyph="−" label="15 minutes earlier" testID="meal-time-earlier" onPress={() => {
+                setTimeTouched(true);
+                setMinutes((m) => stepMinutes(m, -1));
+              }} />
+            <Text style={[font(800, 16), styles.time]} accessibilityLiveRegion="polite">
+              {timeLabel(minutes).toUpperCase()}
+            </Text>
+            <Stepper glyph="+" label="15 minutes later" testID="meal-time-later" onPress={() => {
+                setTimeTouched(true);
+                setMinutes((m) => stepMinutes(m, 1));
+              }} />
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.grid}>
+        {MACRO_KEYS.map((k) => (
+          <View key={k} style={styles.macroBox}>
+            <Text style={font(800, 13)}>{`${MACRO_NAMES[k]} (${UNIT[k]})`}</Text>
+            <FoodInput
+              testID={`meal-${k}`}
+              accessibilityLabel={`${MACRO_NAMES[k]} (${UNIT[k]})`}
+              value={macroText[k]}
+              onChangeText={(v) => setMacroText((t) => ({ ...t, [k]: v }))}
+              keyboardType="decimal-pad"
+              placeholder="—"
+              style={[font(800, 20), styles.macroInput]}
+            />
+          </View>
+        ))}
+      </View>
+      <Text style={[font(500, 13), foodText.muted, styles.pad]}>Only know some numbers? That's fine, fill in what you have.</Text>
+      {hint ? (
+        <Text style={[font(700, 13), styles.pad]} testID="meal-kcal-hint">
+          {hint}
+        </Text>
+      ) : null}
 
       {photoShown ? (
         <View style={styles.photoBlock}>
@@ -172,7 +327,7 @@ export default function MealScreen() {
             testID="meal-editor-photo"
           />
           <View style={styles.actions}>
-            <TextButton title="Change photo" testID="meal-change-photo" onPress={() => void addPhoto('library')} />
+            <TextButton title="Change photo" testID="meal-change-photo" onPress={askPhoto} />
             <TextButton
               title="Remove photo"
               testID="meal-remove-photo"
@@ -184,72 +339,31 @@ export default function MealScreen() {
           </View>
         </View>
       ) : (
-        <View style={styles.actions}>
-          <TextButton title="Take photo" testID="meal-take-photo" onPress={() => void addPhoto('camera')} />
-          <TextButton title="Choose photo" testID="meal-choose-photo" onPress={() => void addPhoto('library')} />
-        </View>
+        <Pressable
+          onPress={askPhoto}
+          accessibilityRole="button"
+          accessibilityLabel="Add a photo (optional)"
+          testID="meal-add-photo"
+          style={({ pressed }) => [styles.addPhoto, pressed && { opacity: pressedOpacity }]}
+        >
+          <CameraIcon />
+          <Text style={font(700, 15)}>Add a photo (optional)</Text>
+        </Pressable>
       )}
 
-      <View style={{ gap: space[2] }}>
-        <Text style={text('sectionHeading')}>Name</Text>
-        <View style={styles.chips}>
-          {MEAL_NAME_PRESETS.map((p) => {
-            const selected = name.trim() === p;
-            return (
-              <Pressable
-                key={p}
-                onPress={() => setName(selected ? '' : p)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                testID={`meal-name-${p}`}
-                style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && { opacity: pressedOpacity }]}
-              >
-                <Text style={text('caption')}>{p}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <TextField label="Or type a name" testID="meal-name" value={name} onChangeText={setName} maxLength={MEAL_NAME_MAX} placeholder="Optional" />
+      <View style={styles.group}>
+        <Text style={font(800, 14)}>Note (optional)</Text>
+        <FoodInput
+          testID="meal-note"
+          accessibilityLabel="Note"
+          value={note}
+          onChangeText={setNote}
+          maxLength={MEAL_NOTE_MAX}
+          multiline
+          placeholder="Anything your coach should know"
+          style={[font(500, 15), styles.noteInput]}
+        />
       </View>
-
-      <View style={{ gap: space[2] }}>
-        <Text style={text('sectionHeading')}>Time</Text>
-        <View style={styles.timeRow}>
-          <Stepper glyph="−" label="15 minutes earlier" testID="meal-time-earlier" onPress={() => {
-              setTimeTouched(true);
-              setMinutes((m) => stepMinutes(m, -1));
-            }} />
-          <Text style={[text('sectionHeading'), styles.time]} testID="meal-time" accessibilityLiveRegion="polite">
-            {timeLabel(minutes)}
-          </Text>
-          <Stepper glyph="+" label="15 minutes later" testID="meal-time-later" onPress={() => {
-              setTimeTouched(true);
-              setMinutes((m) => stepMinutes(m, 1));
-            }} />
-        </View>
-      </View>
-
-      <View style={{ gap: space[3] }}>
-        <Text style={text('sectionHeading')}>Macros (optional)</Text>
-        {MACRO_KEYS.map((k) => (
-          <TextField
-            key={k}
-            label={`${MACRO_NAMES[k]} (${UNIT[k]})`}
-            testID={`meal-${k}`}
-            value={macroText[k]}
-            onChangeText={(v) => setMacroText((t) => ({ ...t, [k]: v }))}
-            keyboardType="decimal-pad"
-            placeholder="—"
-          />
-        ))}
-        {hint ? (
-          <Text style={text('caption')} testID="meal-kcal-hint">
-            {hint}
-          </Text>
-        ) : null}
-      </View>
-
-      <TextField label="Note" testID="meal-note" value={note} onChangeText={setNote} maxLength={MEAL_NOTE_MAX} multiline placeholder="Optional" />
 
       {problems.map((p) => (
         <ErrorText key={p} testID="meal-problem">
@@ -257,7 +371,6 @@ export default function MealScreen() {
         </ErrorText>
       ))}
 
-      <Button title="Save meal" testID="meal-save" busy={busy} onPress={save} />
       {before ? <TextButton title="Delete meal" testID="meal-delete" onPress={confirmDelete} /> : null}
     </Screen>
   );
@@ -279,22 +392,49 @@ function Stepper({ glyph, label, onPress, testID }: { glyph: string; label: stri
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row' },
-  photoBlock: { alignItems: 'center', gap: space[2] },
-  actions: { flexDirection: 'row', gap: space[4], justifyContent: 'center' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  chip: {
-    borderWidth: 2,
-    borderColor: palette.ink,
-    borderRadius: radius.pill,
-    paddingHorizontal: space[3],
-    paddingVertical: space[2],
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  side: { width: 64 },
+  headerTitle: { flex: 1, textAlign: 'center' },
+  center: { textAlign: 'center' },
+  pad: { paddingHorizontal: 4 },
+  group: { gap: 6 },
+  nameInput: { minHeight: 52, borderRadius: 14, borderWidth: 2, borderColor: palette.ink, paddingHorizontal: 14, backgroundColor: palette.bg },
+  presets: { flexDirection: 'row', gap: 6 },
+  preset: {
+    flex: 1,
     minHeight: 44,
-    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: palette.ink,
     backgroundColor: palette.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipOn: { backgroundColor: palette.lime },
+  presetOn: { backgroundColor: palette.ink, borderWidth: 2 },
+  onInk: { color: white },
+  timeLine: { minHeight: 32, justifyContent: 'center' },
+  underline: { textDecorationLine: 'underline' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   time: { minWidth: 96, textAlign: 'center' },
   stepper: { width: 48, height: 48, borderRadius: radius.pill, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  macroBox: { flexBasis: '47%', flexGrow: 1, gap: 6, padding: 12, borderRadius: 16, backgroundColor: palette.surface },
+  macroInput: { minHeight: 44, borderRadius: 12, borderWidth: 1.5, borderColor: palette.ink, paddingHorizontal: 12, backgroundColor: palette.bg },
+  addPhoto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: palette.ink,
+    backgroundColor: palette.bg,
+  },
+  photoBlock: { alignItems: 'center', gap: space[2] },
+  actions: { flexDirection: 'row', gap: space[4], justifyContent: 'center' },
+  noteInput: { minHeight: 72, borderRadius: 14, borderWidth: 1.5, borderColor: palette.ink, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: palette.bg, textAlignVertical: 'top' },
+  footer: { paddingTop: space[2] },
+  save: { minHeight: 56, borderRadius: 18, borderWidth: 2, borderColor: palette.ink, backgroundColor: palette.lime, alignItems: 'center', justifyContent: 'center' },
 });
