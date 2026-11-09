@@ -217,6 +217,19 @@ export function PostItem({
   );
 
   const pill = [styles.pill, { borderRadius: radius.pill, paddingHorizontal: space[3], gap: space[1] }];
+  // An on-screen way to react in the feed (press and hold isn't available to everyone, e.g. VoiceOver).
+  const reactionPill = (
+    <Pressable
+      testID="reaction-pill"
+      accessibilityRole="button"
+      accessibilityLabel={`${reactionCountLabel(reactionTotal)}. Add a reaction`}
+      accessibilityHint="Or press and hold the post"
+      onPress={reactions.openPicker}
+      style={({ pressed }) => [pill, pressed && { opacity: pressedOpacity }]}
+    >
+      <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '☺+ React'}</Text>
+    </Pressable>
+  );
 
   return (
     // Tap a feed post to open it; press and hold anywhere to react (the reaction button does the same, for screen
@@ -269,30 +282,24 @@ export function PostItem({
 
       {detail ? reactions.bar : null}
       {pinned ? (
-        <Pressable
-          testID="comments-button"
-          accessibilityRole="button"
-          accessibilityLabel={`${reactionCountLabel(reactionTotal)}, ${commentCountLabel(post.commentCount)}. Opens the post.`}
-          onPress={onOpenComments}
-          style={({ pressed }) => [styles.countsLine, pressed && { opacity: pressedOpacity }]}
-        >
-          <Text style={[text('sectionHeading'), styles.counts]}>
-            {reactionCountLabel(reactionTotal)} · {commentCountLabel(post.commentCount)}
-          </Text>
-        </Pressable>
+        <View style={[styles.row, styles.wrap, { gap: space[2] }]}>
+          {reactionPill}
+          <Pressable
+            testID="comments-button"
+            accessibilityRole="button"
+            accessibilityLabel={`${reactionCountLabel(reactionTotal)}, ${commentCountLabel(post.commentCount)}. Opens the post.`}
+            onPress={onOpenComments}
+            style={({ pressed }) => [styles.countsLine, pressed && { opacity: pressedOpacity }]}
+          >
+            <Text style={[text('sectionHeading'), styles.counts]}>
+              {reactionCountLabel(reactionTotal)} · {commentCountLabel(post.commentCount)}
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
       {variant === 'feed' ? (
         <View style={[styles.row, { gap: space[2] }]}>
-          <Pressable
-            testID="reaction-pill"
-            accessibilityRole="button"
-            accessibilityLabel={`${reactionCountLabel(reactionTotal)}. Add a reaction`}
-            accessibilityHint="Or press and hold the post"
-            onPress={reactions.openPicker}
-            style={({ pressed }) => [pill, pressed && { opacity: pressedOpacity }]}
-          >
-            <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '☺+ React'}</Text>
-          </Pressable>
+          {reactionPill}
           <Pressable
             testID="comments-button"
             accessibilityRole="button"
