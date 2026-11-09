@@ -1,0 +1,51 @@
+# The Today card asking for notifications: it shows while iOS has never asked, "Turn on notifications" brings up the
+# system alert, and once answered the card is gone. "Later" hides it (also after a relaunch) for 7 days.
+# Run via `pnpm --filter mobile e2e .maestro/push-permission.yaml`. The demo client has workouts, so Today is not the
+# first-time welcome.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+# 1. Allow.
+- launchApp:
+    clearState: true
+    permissions: { notifications: unset }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible:
+      id: push-card
+    timeout: 20000
+- assertVisible: 'Never miss a workout'
+- assertVisible: 'You can change these anytime in Settings.'
+- takeScreenshot: push-card-phone
+- tapOn:
+    id: push-card-allow
+- tapOn: 'Allow'
+- assertNotVisible:
+    id: push-card
+# 2. Later, and it stays hidden after a relaunch.
+- launchApp:
+    clearState: true
+    permissions: { notifications: unset }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- extendedWaitUntil:
+    visible:
+      id: push-card
+    timeout: 20000
+- tapOn:
+    id: push-card-later
+- assertNotVisible:
+    id: push-card
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: today-date
+    timeout: 20000
+- assertNotVisible:
+    id: push-card

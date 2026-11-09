@@ -70,6 +70,28 @@ Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is mis
    - What happened to a client's notifications: `select type, outcome, title, body, attempts, last_error, not_before, sent_at from public.push_outbox where user_id = '<client id>' order by created_at desc limit 20;` (`outcome`: sent, disabled = switched off, no_device = no registered iPhone, expired = a day-bound one quiet hours pushed to the next day, failed = 5 tries; no outcome yet = waiting, e.g. quiet hours). Devices: `select user_id, app_version, updated_at from public.push_devices;`
    - Rotate the shared secret like the award one: `supabase secrets set SEND_PUSH_SECRET=…`, then `select vault.update_secret(id, '<new secret>') from vault.secrets where name = 'send_push_secret';`. Rotate the Apple key: make a new key, set `APNS_KEY_P8` and `APNS_KEY_ID`, then revoke the old key in Apple Developer.
 
+### Push notifications: check on the phone (TestFlight build, staging)
+
+Do this once the step 8 secrets are set and a TestFlight build from this branch is on the phone (a locally built Debug app gets sandbox tokens, which the production sender rejects). Use a client account of a test coach.
+
+1. Open the app, go to Today: the pink **Never miss a workout** card shows. Tap **Turn on notifications** -> **Allow**. The card goes away. In the SQL Editor `select user_id, app_version, updated_at from public.push_devices;` shows one row for the client.
+2. Settings (gear) shows **Notifications · On · Quiet 10 PM – 7 AM**. Open it: no "off on this iPhone" banner; there is no "Comments on your meals" switch.
+3. As the coach (web, staging), with the phone locked, each of these arrives within about a minute, with this text and nothing of the content:
+   - assign a program -> "New workout assigned / Luis assigned you <program>." Tap opens Workouts.
+   - edit a workout scheduled today -> "Today's workout changed / Luis updated <workout>." (about 2 minutes later). Tap opens that workout. Editing a workout on another day sends nothing.
+   - set the client's reminder time (phone: Settings -> Notifications -> Reminder time) to the next half hour, with a workout today not started -> "Today: <workout> / Your workout is ready. Tap to start." (within 15 minutes of that time).
+   - coach-log a session and finish it -> "Luis logged your session / Your sticker is waiting." Tap opens the sticker reveal the first time.
+   - send a message -> "Message from Luis / Luis sent you a message." (three quickly -> "Luis sent you 3 messages."). Tap opens the Coach chat. The app-icon badge shows the unread count and clears after reading the chat.
+   - comment on a workout log -> "Comment on your workout / Luis commented on <workout>." Tap opens the summary.
+   - change food targets -> "New food targets / Luis updated your daily targets." Tap opens Food.
+   - post in the community -> "Community / Luis posted in <community>." Tap opens the post.
+   - another member reacts to the client's post twice (two people) -> after about 5 minutes one "Sam and 1 other reacted to your post." A reaction taken back within 5 minutes sends nothing.
+4. Switch **Messages** off, send a message: nothing arrives (`push_outbox.outcome = 'disabled'`). Switch it back on.
+5. Quiet hours: set From to the current half hour; send a message: nothing until the To time, then it arrives.
+6. **Still training?** off: tick a set, leave the app 20 minutes: no reminder. On again: the reminder returns.
+7. Sign out: the `push_devices` row is gone; messages to that account no longer reach the phone. Sign in as another client: the row now belongs to them.
+8. In iPhone Settings turn CalTracker's notifications off, reopen the app: Settings -> Notifications shows the yellow "Notifications are off for CalTracker on this iPhone." banner; **Open iPhone Settings** goes there.
+
 ## Deploy
 
 - Merge a pull request to `main`: the CI workflow runs on the push, and when it finishes green the Deploy staging workflow starts by itself (`workflow_run` trigger, checking out the exact commit CI passed on). If CI is red, nothing is deployed and staging is not migrated. Fix forward with a new pull request.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeTotal, pushDataOf, tapTarget, unreadCommentCount } from './push-logic';
+import { PUSH_CARD_SNOOZE_MS, badgeTotal, pushCardText, pushCardSnoozeKey, pushDataOf, showPushCard, tapTarget, unreadCommentCount } from './push-logic';
 
 const L = '0b6f1c2e-6d0a-4a51-9f3e-2a7c1d9e8b40';
 
@@ -43,4 +43,30 @@ describe('pushDataOf', () => {
   it('keeps local notification data as it is', () =>
     expect(pushDataOf({ kind: 'reminder', logId: L }, null)).toEqual({ kind: 'reminder', logId: L }));
   it('null when there is nothing', () => expect(pushDataOf(undefined, undefined)).toBeNull());
+});
+
+describe('showPushCard', () => {
+  it('shows only while undetermined', () => {
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0, firstTime: false })).toBe(true);
+    expect(showPushCard({ permission: 'granted', snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
+    expect(showPushCard({ permission: 'denied', snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
+    expect(showPushCard({ permission: null, snoozedUntil: null, now: 0, firstTime: false })).toBe(false);
+  });
+  it('Later hides it for 7 days', () => {
+    expect(PUSH_CARD_SNOOZE_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS - 1, firstTime: false })).toBe(false);
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: PUSH_CARD_SNOOZE_MS, now: PUSH_CARD_SNOOZE_MS, firstTime: false })).toBe(true);
+  });
+  it('never on the first-time welcome', () =>
+    expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0, firstTime: true })).toBe(false));
+  it('snooze key per user', () => expect(pushCardSnoozeKey('u1')).toBe('caltracker.pushCardSnoozedUntil.u1'));
+});
+
+describe('pushCardText', () => {
+  it('names the coach by first name', () =>
+    expect(pushCardText('Luis Bueno')).toBe('Get a ping when Luis assigns a workout or sends you a message.'));
+  it('"your coach" when the name is unknown', () => {
+    expect(pushCardText(null)).toBe('Get a ping when your coach assigns a workout or sends you a message.');
+    expect(pushCardText('  ')).toBe('Get a ping when your coach assigns a workout or sends you a message.');
+  });
 });

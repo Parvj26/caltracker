@@ -41,3 +41,30 @@ export function tapTarget(data: unknown, revealed: ReadonlySet<string>): string 
   }
   return route;
 }
+
+/** "Later" on the Today card hides it this long. */
+export const PUSH_CARD_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Where this phone keeps when the Today card may show again, per user. */
+export const pushCardSnoozeKey = (userId: string) => `caltracker.pushCardSnoozedUntil.${userId}`;
+
+/**
+ * The Today card asking for notifications: only while iOS has never asked (after that only iPhone Settings can turn
+ * them on, which Settings -> Notifications explains), not while snoozed with "Later", and not on the first-time
+ * welcome (one thing at a time).
+ */
+export function showPushCard(s: {
+  permission: 'granted' | 'denied' | 'undetermined' | null;
+  snoozedUntil: number | null;
+  now: number;
+  firstTime: boolean;
+}): boolean {
+  if (s.permission !== 'undetermined' || s.firstTime) return false;
+  return s.snoozedUntil === null || s.now >= s.snoozedUntil;
+}
+
+/** The Today card's line, naming the coach by first name ("your coach" when unknown). */
+export function pushCardText(coachName: string | null): string {
+  const first = coachName?.trim().split(/\s+/)[0] || 'your coach';
+  return `Get a ping when ${first} assigns a workout or sends you a message.`;
+}
