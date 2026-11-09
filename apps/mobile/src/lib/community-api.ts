@@ -15,6 +15,7 @@ import {
   type ReactionRow,
   type ReportReason,
 } from '@caltracker/shared';
+import { POST_SELECT, PREVIEW_COMMENTS, feedQuery } from './community-feed-query';
 import { postErrorMessage } from './community-share';
 import { supabase } from './supabase';
 import type { PreparedPhoto } from './community-photo';
@@ -25,7 +26,7 @@ const SIGNED_URL_SECONDS = 60 * 60;
 
 export type CommunityInfo = { id: string; workspaceId: string; name: string };
 export type FeedImage = { id: string; path: string; thumbPath: string; width: number; height: number };
-export type FeedComment = { id: string; authorId: string; authorName: string; body: string; createdAt: string; reactions: ReactionRow[] };
+export type FeedComment = { id: string; authorId: string; authorName: string; authorAvatarPath: string | null; body: string; createdAt: string; reactions: ReactionRow[] };
 export type FeedPost = {
   id: string;
   authorId: string;
@@ -35,11 +36,16 @@ export type FeedPost = {
   card: CommunityCard | null;
   createdAt: string;
   pinnedAt: string | null;
+  /** Who pinned it (a coach), when pinned. */
+  pinnedBy: string | null;
   images: FeedImage[];
   /** Reactions to the post itself (not its comments). */
   reactions: ReactionRow[];
   commentCount: number;
+  /** The newest few comments, for the preview under a post in the feed (empty elsewhere). */
+  recentComments: PreviewComment[];
 };
+export type PreviewComment = { id: string; authorId: string; authorName: string; authorAvatarPath: string | null; body: string; createdAt: string };
 
 /** Friendly errors: no signal reads differently from a refusal. */
 export class CommunityError extends Error {}
@@ -75,11 +81,7 @@ export async function coachIds(communityId: string): Promise<Set<string>> {
   return new Set((data ?? []).map((m) => m.user_id));
 }
 
-const POST_SELECT = `id, author_id, body, card, created_at, pinned_at,
-  author:profiles(first_name, last_name, avatar_path),
-  images:community_post_images(id, position, path, thumb_path, width, height),
-  reactions:community_reactions(user_id, comment_id, reaction, created_at, reactor:profiles(first_name, last_name)),
-  comments:community_comments(count)`;
+
 
 const REACTION_SELECT = 'user_id, reaction, created_at, reactor:profiles(first_name, last_name)';
 type ReactionSelect = { user_id: string; reaction: string; created_at: string; reactor: { first_name: string; last_name: string } | null };
@@ -107,10 +109,12 @@ type PostRow = {
   card: unknown;
   created_at: string;
   pinned_at: string | null;
+  pinned_by: string | null;
   author: { first_name: string; last_name: string; avatar_path: string | null } | null;
   images: { id: string; position: number; path: string; thumb_path: string; width: number; height: number }[];
   reactions: (ReactionSelect & { comment_id: string | null })[];
   comments: { count: number }[];
+  recent?: { id: string; author_id: string; body: string; created_at: string; author: { first_name: string; last_name: string; avatar_path: string | null } | null }[];
 };
 
 export function toFeedPost(p: PostRow): FeedPost {
@@ -123,17 +127,27 @@ export function toFeedPost(p: PostRow): FeedPost {
     card: parseCard(p.card),
     createdAt: p.created_at,
     pinnedAt: p.pinned_at,
+    pinnedBy: p.pinned_by,
     images: [...p.images].sort((a, b) => a.position - b.position).map((i) => ({ id: i.id, path: i.path, thumbPath: i.thumb_path, width: i.width, height: i.height })),
     reactions: toReactionRows(p.reactions.filter((r) => r.comment_id === null)),
     commentCount: p.comments[0]?.count ?? 0,
+    recentComments: (p.recent ?? []).map((c) => ({
+      id: c.id,
+      authorId: c.author_id,
+      authorName: memberName(c.author ? { firstName: c.author.first_name, lastName: c.author.last_name } : null),
+      authorAvatarPath: c.author?.avatar_path ?? null,
+      body: c.body,
+      createdAt: c.created_at,
+    })),
   };
 }
 
-/** The newest posts plus every pinned one. */
+
+/** The newest posts plus every pinned one, each with its newest comments. */
 export async function loadFeed(communityId: string): Promise<FeedPost[]> {
   const [latest, pinned] = await Promise.all([
-    supabase.from('community_posts').select(POST_SELECT).eq('community_id', communityId).order('created_at', { ascending: false }).limit(FEED_SIZE),
-    supabase.from('community_posts').select(POST_SELECT).eq('community_id', communityId).not('pinned_at', 'is', null),
+    feedQuery(supabase, communityId).order('created_at', { ascending: false }).limit(FEED_SIZE),
+    feedQuery(supabase, communityId).not('pinned_at', 'is', null),
   ]);
   if (latest.error) fail(latest.error, 'Couldn’t load the community.');
   if (pinned.error) fail(pinned.error, 'Couldn’t load the community.');
@@ -152,6 +166,23 @@ export async function loadLatestPosts(communityId: string, limit: number): Promi
     .limit(limit);
   if (error) fail(error, 'Couldn’t load the community.');
   return ((data ?? []) as unknown as PostRow[]).map(toFeedPost);
+}
+
+/** Active members of the community (coaches included); null when it can't be read right now. */
+export async function memberCount(communityId: string): Promise<number | null> {
+  const { count, error } = await supabase
+    .from('community_members')
+    .select('user_id', { count: 'exact', head: true })
+    .eq('community_id', communityId)
+    .is('removed_at', null);
+  return error ? null : count;
+}
+
+/** My own name and photo path, for the "share a win" box. */
+export async function myProfile(): Promise<{ name: string; avatarPath: string | null } | null> {
+  const { data, error } = await supabase.from('profiles').select('first_name, last_name, avatar_path').eq('id', await myId()).maybeSingle();
+  if (error || !data) return null;
+  return { name: memberName({ firstName: data.first_name, lastName: data.last_name }), avatarPath: data.avatar_path };
 }
 
 /** Whether I already shared this workout to the community (as a workout card). */
@@ -176,7 +207,7 @@ export async function loadPost(postId: string): Promise<FeedPost | null> {
 export async function loadComments(postId: string): Promise<FeedComment[]> {
   const { data, error } = await supabase
     .from('community_comments')
-    .select(`id, author_id, body, created_at, author:profiles(first_name, last_name), reactions:community_reactions(${REACTION_SELECT})`)
+    .select(`id, author_id, body, created_at, author:profiles(first_name, last_name, avatar_path), reactions:community_reactions(${REACTION_SELECT})`)
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
   if (error) fail(error, 'Couldn’t load the comments.');
@@ -184,6 +215,7 @@ export async function loadComments(postId: string): Promise<FeedComment[]> {
     id: c.id,
     authorId: c.author_id,
     authorName: memberName(c.author ? { firstName: c.author.first_name, lastName: c.author.last_name } : null),
+    authorAvatarPath: c.author?.avatar_path ?? null,
     body: c.body,
     createdAt: c.created_at,
     reactions: toReactionRows(c.reactions),
@@ -360,4 +392,4 @@ export async function namesOf(ids: string[]): Promise<Record<string, string>> {
   return out;
 }
 
-export { myId };
+export { myId, PREVIEW_COMMENTS };
