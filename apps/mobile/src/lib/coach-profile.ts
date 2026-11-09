@@ -1,7 +1,10 @@
-// The client's coach card (photo, name, business, bio), kept on the phone so it shows without signal.
+// The client's coach card (photo, name, business, bio, when they joined, the goal the coach set), kept on the phone so it shows without signal.
 // Pure logic with injected fetch/sign functions so it can be unit tested; the network side is coach-profile-api.ts.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { thumbPathOf } from '@caltracker/shared';
+
+/** The goal the coach set on the client's Overview; targetDate (YYYY-MM-DD) drives the countdown. */
+export type CoachGoal = { goal: string; targetDate: string | null };
 
 export type CoachRecord = {
   name: string;
@@ -10,6 +13,10 @@ export type CoachRecord = {
   /** Storage path of the full photo ({coach id}/avatar.webp or .jpg), or null when there is none. */
   avatarPath: string | null;
   updatedAt: string | null;
+  /** When the client joined the coach's workspace. Optional: copies saved before it was kept have none. */
+  joinedAt?: string | null;
+  /** Optional like joinedAt. */
+  goal?: CoachGoal | null;
 };
 
 export type CoachProfile = {
@@ -18,6 +25,8 @@ export type CoachProfile = {
   bio: string;
   /** A short-lived signed link to the thumbnail, or null (show initials). */
   avatarUrl: string | null;
+  joinedAt: string | null;
+  goal: CoachGoal | null;
 };
 
 const key = (userId: string) => `caltracker.coach.${userId}`;
@@ -28,10 +37,18 @@ export function withVersion(url: string, updatedAt: string | null): string {
   return `${url}${url.includes('?') ? '&' : '?'}v=${Number.isNaN(version) ? 0 : version}`;
 }
 
+function isGoal(v: unknown): v is CoachGoal {
+  if (typeof v !== 'object' || v === null) return false;
+  const g = v as Record<string, unknown>;
+  return typeof g.goal === 'string' && (g.targetDate === null || typeof g.targetDate === 'string');
+}
+
 function isRecord(v: unknown): v is CoachRecord {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
   return (
+    (r.joinedAt === undefined || r.joinedAt === null || typeof r.joinedAt === 'string') &&
+    (r.goal === undefined || r.goal === null || isGoal(r.goal)) &&
     typeof r.name === 'string' &&
     typeof r.businessName === 'string' &&
     typeof r.bio === 'string' &&
@@ -60,7 +77,14 @@ async function toProfile(record: CoachRecord, signUrl: (path: string) => Promise
       avatarUrl = null; // initials show instead
     }
   }
-  return { name: record.name, businessName: record.businessName, bio: record.bio, avatarUrl };
+  return {
+    name: record.name,
+    businessName: record.businessName,
+    bio: record.bio,
+    avatarUrl,
+    joinedAt: record.joinedAt ?? null,
+    goal: record.goal ?? null,
+  };
 }
 
 /**

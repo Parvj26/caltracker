@@ -85,4 +85,25 @@ describe('loadCoachProfile', () => {
     expect(p?.avatarUrl).toBeNull();
     expect(p?.name).toBe('Mia Coach');
   });
+
+  it('carries when the client joined and their goal, also from the saved copy', async () => {
+    const full = { ...record, joinedAt: '2026-11-03T10:00:00.000Z', goal: { goal: 'Squat 100 kg', targetDate: '2027-03-01' } };
+    expect(await loadCoachProfile('me', { fetchFresh: () => Promise.resolve(full), signUrl: sign })).toMatchObject({
+      joinedAt: full.joinedAt,
+      goal: full.goal,
+    });
+    const offline = await loadCoachProfile('me', { fetchFresh: () => Promise.reject(new Error('offline')), signUrl: sign });
+    expect(offline).toMatchObject({ joinedAt: full.joinedAt, goal: full.goal });
+  });
+
+  it('reads a copy saved before the join date and goal were kept as having neither', async () => {
+    store.set('caltracker.coach.me', JSON.stringify(record));
+    const p = await loadCoachProfile('me', { fetchFresh: () => Promise.reject(new Error('offline')), signUrl: sign });
+    expect(p).toMatchObject({ name: 'Mia Coach', joinedAt: null, goal: null });
+  });
+
+  it('ignores a saved copy whose goal is malformed', async () => {
+    store.set('caltracker.coach.me', JSON.stringify({ ...record, goal: { goal: 3 } }));
+    expect(await loadCoachProfile('me', { fetchFresh: () => Promise.reject(new Error('offline')), signUrl: sign })).toBeNull();
+  });
 });

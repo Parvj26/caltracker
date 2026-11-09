@@ -19,7 +19,9 @@ describe('unreadCommentCount', () => {
 });
 
 describe('tapTarget', () => {
-  it('opens a valid route', () => expect(tapTarget({ route: '/coach', type: 'message' }, new Set())).toBe('/coach'));
+  it('opens a valid route', () => expect(tapTarget({ route: '/food', type: 'meal_comment' }, new Set())).toBe('/food'));
+  it('a message opens the chat itself, not the coach profile', () =>
+    expect(tapTarget({ route: '/coach', type: 'message' }, new Set())).toBe('/coach/chat'));
   it('ignores foreign routes', () => expect(tapTarget({ route: 'https://x.y' }, new Set())).toBeNull());
   it('ignores the local still-training reminder', () => expect(tapTarget({ kind: 'reminder', logId: L }, new Set())).toBeNull());
   it('ignores anything that is not an object', () => {

@@ -31,10 +31,12 @@ const LOG_SUMMARY = /^\/log\/([0-9a-f-]{36})\/summary$/i;
 /**
  * Where a tapped push opens, or null to ignore it (not one of ours, or the local still-training reminder, which
  * log-notifications handles). "Coach logged your session" opens the sticker reveal the first time on this phone.
+ * A message opens the chat (/coach/chat): the server's route is the Coach tab, whose first screen is the profile.
  */
 export function tapTarget(data: unknown, revealed: ReadonlySet<string>): string | null {
   if (!isObj(data) || data.kind === 'reminder' || !isPushRoute(data.route)) return null;
   const route = data.route;
+  if (data.type === 'message' && route === '/coach') return '/coach/chat';
   if (data.type === 'coach_logged') {
     const logId = LOG_SUMMARY.exec(route)?.[1];
     if (logId && !revealed.has(logId)) return `/log/${logId}/reveal?coach=1`;
