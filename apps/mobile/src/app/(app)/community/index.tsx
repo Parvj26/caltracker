@@ -35,13 +35,18 @@ export default function CommunityScreen() {
   const [profile, setProfile] = useState<{ name: string; avatarPath: string | null } | null>(null);
   const [coachNames, setCoachNames] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
+  // The member count and my photo are extras (the feed shows without them), fetched on arrival and pull to refresh
+  // only, not on every live change.
+  const loadExtras = useCallback(() => {
     if (!community) return;
-    // The member count and my photo are extras: the feed shows without them.
     void memberCount(community.id).then((n) => n !== null && setMembers(n));
     void myProfile()
       .then((p) => p && setProfile(p))
       .catch(() => undefined);
+  }, [community]);
+
+  const load = useCallback(async () => {
+    if (!community) return;
     try {
       setPosts(await loadFeed(community.id));
       setError(null);
@@ -67,7 +72,8 @@ export default function CommunityScreen() {
     useCallback(() => {
       void refresh();
       void load();
-    }, [refresh, load]),
+      loadExtras();
+    }, [refresh, load, loadExtras]),
   );
 
   useLive(
@@ -114,6 +120,7 @@ export default function CommunityScreen() {
       refreshing={refreshing}
       onRefresh={() => {
         setRefreshing(true);
+        loadExtras();
         void Promise.all([refresh(), load()]).finally(() => setRefreshing(false));
       }}
     >
