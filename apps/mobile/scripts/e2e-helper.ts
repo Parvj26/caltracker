@@ -22,6 +22,8 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans and goal
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-food-targets client@demo.local   targets 2,000 kcal and 150 g protein
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-food client@demo.local   delete the demo client's meals and targets
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-coach-meals client@demo.local   the seed coach shares "Protein oats" (450 kcal, 35/52/11 g)
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-coach-meals client@demo.local   remove the Demo Coaching shared meals
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-coach-post "<text>"   the demo coach posts in the community
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-buddy-post "<text>"   a second demo client (buddy) posts
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts community-cleanup -   delete "E2E " posts, reports, blocks and the buddy
@@ -781,6 +783,32 @@ async function communityCleanup(): Promise<void> {
   if (buddy) await admin.auth.admin.deleteUser(buddy);
 }
 
+/** Removes every shared meal of Demo Coaching (client meals logged from them keep their numbers; the link clears). */
+export async function cleanupCoachMeals(): Promise<void> {
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  const del = await admin.from('coach_meals').delete().eq('workspace_id', ws.id);
+  if (del.error) throw del.error;
+}
+
+/** The seed coach shares one meal with every client: Protein oats, 450 kcal, 35 g protein, 52 g carbs, 11 g fat. */
+export async function seedCoachMeals(): Promise<void> {
+  await cleanupCoachMeals();
+  const { data: ws, error: wsErr } = await admin.from('workspaces').select('id').eq('name', 'Demo Coaching').single();
+  if (wsErr) throw wsErr;
+  const { error } = await admin.from('coach_meals').insert({
+    workspace_id: ws.id,
+    name: 'Protein oats',
+    calories: 450,
+    protein_g: 35,
+    carbs_g: 52,
+    fat_g: 11,
+    ingredients: '60 g rolled oats\n1 scoop whey (30 g)\n200 ml almond milk\nHandful of berries',
+    how_to: 'Microwave oats and milk for 2 minutes, stir in the whey, top with berries.',
+  });
+  if (error) throw error;
+}
+
 /** Deletes every meal (and meal photo) and the targets of the seed demo client. Nobody else's. */
 export async function cleanupFood(email: string): Promise<void> {
   if (email.toLowerCase() !== DEMO_CLIENT) throw new Error(`cleanup-food only clears ${DEMO_CLIENT}`);
@@ -836,6 +864,8 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'cleanup-scans') await cleanupScans(email);
   else if (action === 'seed-food-targets') await seedFoodTargets(email);
   else if (action === 'cleanup-food') await cleanupFood(email);
+  else if (action === 'seed-coach-meals') await seedCoachMeals();
+  else if (action === 'cleanup-coach-meals') await cleanupCoachMeals();
   else if (action === 'community-coach-post') await communityPost((await demoCommunity()).coachId, email);
   else if (action === 'community-buddy-post') await communityPost(await buddyId(), email);
   else if (action === 'community-cleanup') await communityCleanup();

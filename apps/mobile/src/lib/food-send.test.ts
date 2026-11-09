@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FoodOp } from './food-queue';
-import { GONE, SAVE_REFUSED, sendFoodOpWith, type FoodBackend } from './food-send';
+import { GONE, SAVE_REFUSED, mealFields, sendFoodOpWith, type FoodBackend } from './food-send';
+import { parseFoodQueue } from './food-queue';
 import { OutboxSendError } from './outbox';
 
 const photo = { path: 'ws/me/m-p2.webp', thumbPath: 'ws/me/m-p2-thumb.webp', width: 10, height: 10 };
@@ -18,6 +19,7 @@ const save = (over: Partial<FoodOp & { kind: 'save' }> = {}): FoodOp => ({
     note: '',
     macros: { calories: 500, protein: null, carbs: null, fat: null },
     photo,
+    coachMealId: null,
   },
   localPhoto: { id: 'p2', fullUri: 'p2.webp', thumbUri: 'p2-thumb.webp', ext: 'webp' },
   dropPaths: ['ws/me/m-p1.webp', 'ws/me/m-p1-thumb.webp'],
@@ -75,5 +77,19 @@ describe('sendFoodOpWith', () => {
     const { db, calls } = fakeDb();
     await sendFoodOpWith(db, { opId: 'd', createdAt: '', state: 'sending', kind: 'delete', mealId: 'm', dropPaths: ['a.webp'] });
     expect(calls).toEqual(['delete m', 'remove a.webp']);
+  });
+});
+
+describe('mealFields', () => {
+  it('sends the coach link', () => {
+    const op = save() as FoodOp & { kind: 'save' };
+    expect(mealFields({ ...op, meal: { ...op.meal, coachMealId: 'c1' } }).coach_meal_id).toBe('c1');
+  });
+  it('sends no link for a save queued by the previous app version', () => {
+    const op = save() as FoodOp & { kind: 'save' };
+    const oldMeal: Record<string, unknown> = { ...op.meal };
+    delete oldMeal.coachMealId;
+    const [parsed] = parseFoodQueue(JSON.stringify([{ ...op, meal: oldMeal }]));
+    expect(parsed?.kind === 'save' && mealFields(parsed).coach_meal_id).toBeNull();
   });
 });

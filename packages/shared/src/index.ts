@@ -389,6 +389,8 @@ export type {
   SearchFilters,
   SearchHit,
 } from './exercises/search';
+export { buildSmartIndex, smartMatch } from './search/smart-search';
+export type { SmartDoc, SmartHit, SmartIndex } from './search/smart-search';
 export {
   BIO_MAX_LENGTH,
   BUSINESS_NAME_MAX_LENGTH,
@@ -531,11 +533,13 @@ export {
   MEAL_NOTE_MAX,
   MEAL_PHOTO_BUCKET,
   dailyTotals,
+  dayStrip,
   foodDayLabel,
   formatMacro,
   formatMealTime,
   hasAnyMacro,
   hasAnyTarget,
+  kcalCard,
   kcalFromMacros,
   kcalHint,
   macroProgress,
@@ -549,7 +553,24 @@ export {
   todayFoodSummary,
   weekDays,
 } from './food/food';
-export type { DailyTotals, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt } from './food/food';
+export type { DailyTotals, KcalCard, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt, StripDay } from './food/food';
+export {
+  COACH_MEAL_CHIPS,
+  filterCoachMeals,
+  frequentMeals,
+  mealSearchItems,
+  mealSearchMeta,
+  searchMeals,
+} from './food/meal-search';
+export type { CoachMeal, CoachMealChip, CoachMealPhoto, HistoryMeal, MealSearchItem } from './food/meal-search';
+export {
+  COACH_MEAL_LIMITS,
+  COACH_MEAL_PHOTO_BUCKET,
+  chipMacroLine,
+  coachMealPhotoPaths,
+  coachMealProblems,
+  compactMacroLine,
+} from './food/coach-meals';
 export { currentProgramLabel, thisWeekSummary, weekSentence } from './progress/week';
 export type { ProgramAssignmentLite, WeekCounts, WeekSummary } from './progress/week';
 export { CONSISTENCY_WEEKS, consistencyTile, consistencyWeeks, monthCalendar, plannedDonePercent } from './progress/consistency';

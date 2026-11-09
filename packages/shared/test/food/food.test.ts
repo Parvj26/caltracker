@@ -4,6 +4,8 @@ import {
   MEAL_NAME_MAX,
   MEAL_NOTE_MAX,
   dailyTotals,
+  dayStrip,
+  kcalCard,
   foodDayLabel,
   formatMacro,
   formatMealTime,
@@ -235,5 +237,63 @@ describe('mealMacroLine', () => {
     expect(mealMacroLine({ calories: 650, protein: 42, carbs: null, fat: 12.5 })).toBe('650 kcal · P 42 g · F 12.5 g');
     expect(mealMacroLine({ calories: null, protein: null, carbs: 80, fat: null })).toBe('C 80 g');
     expect(mealMacroLine({ calories: null, protein: null, carbs: null, fat: null })).toBe('');
+  });
+});
+
+describe('kcalCard', () => {
+  const totals = (calories: number, protein = 96, carbs = 120, fat = 40) => ({
+    ...dailyTotals([{ calories, protein, carbs, fat }]),
+  });
+  const targets = { calories: 2100, protein: 170, carbs: 220, fat: 70 };
+
+  it('says what is left today', () => {
+    const c = kcalCard(totals(1240), targets, '2026-11-09', '2026-11-09');
+    expect([c.headline, c.caption, c.hasTargets]).toEqual(['860', 'kcal left today', true]);
+    expect(c.bars[0]).toMatchObject({ key: 'protein', text: '96 / 170 g · 74 left' });
+    expect(c.bars[0]?.fraction).toBeCloseTo(0.565, 3);
+    expect(c.bars.map((b) => b.key)).toEqual(['protein', 'carbs', 'fat']);
+  });
+  it('says how far over', () => {
+    const c = kcalCard(totals(2220, 180), targets, '2026-11-09', '2026-11-09');
+    expect([c.headline, c.caption]).toEqual(['120', 'kcal over today']);
+    expect(c.bars[0]).toMatchObject({ text: '180 / 170 g · 10 over', fraction: 1 });
+  });
+  it('names an earlier day', () => {
+    expect(kcalCard(totals(1240), targets, '2026-11-03', '2026-11-09').caption).toBe('kcal left on Tue 3 Nov');
+    expect(kcalCard(totals(1240), null, '2026-11-03', '2026-11-09').caption).toBe('kcal on Tue 3 Nov');
+  });
+  it('shows plain totals with no targets', () => {
+    const c = kcalCard(totals(1240), null, '2026-11-09', '2026-11-09');
+    expect([c.headline, c.caption, c.hasTargets]).toEqual(['1,240', 'kcal today', false]);
+    expect(c.bars[0]).toEqual({ key: 'protein', text: '96 g', fraction: null });
+  });
+  it('shows calories as a total without a calorie target', () => {
+    const c = kcalCard(totals(1240), { calories: null, protein: 170, carbs: null, fat: null }, '2026-11-09', '2026-11-09');
+    expect([c.headline, c.caption, c.hasTargets]).toEqual(['1,240', 'kcal today', true]);
+    expect(c.bars[0]?.text).toBe('96 / 170 g · 74 left');
+    expect(c.bars[1]).toEqual({ key: 'carbs', text: '120 g', fraction: null });
+  });
+});
+
+describe('dayStrip', () => {
+  it('shows the seven days ending today', () => {
+    const s = dayStrip('2026-11-09', new Set(['2026-11-03', '2026-11-08']));
+    expect(s).toHaveLength(7);
+    expect(s[0]).toEqual({ day: '2026-11-03', dow: 'Tue', num: 3, hasMeals: true, isToday: false });
+    expect(s[5]?.hasMeals).toBe(true);
+    expect(s[4]?.hasMeals).toBe(false);
+    expect(s[6]).toEqual({ day: '2026-11-09', dow: 'Mon', num: 9, hasMeals: false, isToday: true });
+  });
+  it('crosses month and year boundaries', () => {
+    expect(dayStrip('2026-03-02', new Set()).map((d) => d.day)).toEqual([
+      '2026-02-24', '2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02',
+    ]);
+    expect(dayStrip('2027-01-02', new Set()).map((d) => d.num)).toEqual([27, 28, 29, 30, 31, 1, 2]);
+  });
+  it('pages back whole weeks, never forward past today', () => {
+    const s = dayStrip('2026-11-09', new Set(), 1);
+    expect(s[0]?.day).toBe('2026-10-27');
+    expect(s[6]).toMatchObject({ day: '2026-11-02', isToday: false });
+    expect(dayStrip('2026-11-09', new Set(), -3)[6]?.day).toBe('2026-11-09');
   });
 });

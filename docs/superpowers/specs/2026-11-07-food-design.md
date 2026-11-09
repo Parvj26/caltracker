@@ -75,5 +75,6 @@ are on main.
 
 ## Not in this version
 
-Meal comments (use Reply about this meal), food search or barcodes, photo calorie estimates, water, coach editing
+Meal comments (use Reply about this meal), ~~food search~~ (searching your own and your coach's meals added on
+2026-11-09, see `2026-11-09-food-and-coach-meals-design.md`; a food database stays out), barcodes, photo calorie estimates, water, coach editing
 a client's meals, notifications about meals, a coach-wide food overview.

@@ -17,6 +17,7 @@ const NAV = [
   { href: '/workouts', label: 'Workouts', icon: 'workouts' },
   { href: '/programs', label: 'Programs', icon: 'programs' },
   { href: '/exercises', label: 'Exercises', icon: 'exercises' },
+  { href: '/meals', label: 'Meals', icon: 'meals' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/community', label: 'Community', icon: 'community' },
 ] as const;

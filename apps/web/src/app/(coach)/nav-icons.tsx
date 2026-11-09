@@ -39,6 +39,12 @@ export const NAV_ICONS = {
       <path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H19M9 8.5h6" />
     </Icon>
   ),
+  meals: (
+    <Icon>
+      <path d="M3.5 12h17a8.5 8.5 0 0 1-17 0Z" />
+      <path d="M9 8.5c0-1.5 1-2 1-3.5M13 8.5c0-1.5 1-2 1-3.5" />
+    </Icon>
+  ),
   activity: (
     <Icon>
       <path d="M3 12h4l3-7 4 14 3-7h4" />

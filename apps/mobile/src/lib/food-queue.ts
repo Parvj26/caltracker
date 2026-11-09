@@ -25,6 +25,8 @@ export type MealRecord = {
   note: string;
   macros: MealMacros;
   photo: StoredPhoto | null;
+  /** The coach meal this was logged from (its numbers are copied, never referenced). */
+  coachMealId: string | null;
 };
 
 /** A photo still on the phone, waiting to be uploaded to `meal.photo`'s paths. */
@@ -72,11 +74,18 @@ function isOp(e: unknown): e is FoodOp {
   return typeof m.id === 'string' && typeof m.workspaceId === 'string' && typeof m.eatenAt === 'string' && typeof m.eatenOn === 'string' && isObj(m.macros);
 }
 
+/** A save queued by an app version before coach meals has no coachMealId: it reads as not linked. */
+function withDefaults(op: FoodOp): FoodOp {
+  if (op.kind !== 'save') return op;
+  const link: unknown = (op.meal as { coachMealId?: unknown }).coachMealId;
+  return { ...op, meal: { ...op.meal, coachMealId: typeof link === 'string' ? link : null } };
+}
+
 export function parseFoodQueue(raw: string | null): FoodOp[] {
   if (raw === null) return [];
   try {
     const value: unknown = JSON.parse(raw);
-    return Array.isArray(value) ? value.filter(isOp) : [];
+    return Array.isArray(value) ? value.filter(isOp).map(withDefaults) : [];
   } catch {
     return [];
   }

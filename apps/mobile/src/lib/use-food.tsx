@@ -5,12 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import type { IsoDate, MacroTargets } from '@caltracker/shared';
-import { fetchMealsOn, fetchTargets, readFoodCache, sendFoodOp } from './food-api';
-import { applyFoodOps, buildDeleteOp, buildSaveOp, type MealDraft, type PhotoChoice, type ShownMeal } from './food-logic';
+import { localDateOf, localToday, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealSearchItem } from '@caltracker/shared';
+import { fetchCoachMealsCached, fetchMealHistory, fetchMealsOn, fetchTargets, readFoodCache, sendFoodOp } from './food-api';
+import { applyFoodOps, buildDeleteOp, buildSaveOp, historySince, historyWithOps, logAgainOp, mealDaysOf, type MealDraft, type PhotoChoice, type ShownMeal } from './food-logic';
 import { createFoodQueue, type FoodOp, type FoodQueue, type LocalMealPhoto, type MealRecord } from './food-queue';
 import { deletePhotoFiles, persistPhoto } from './outbox-files';
 import { useSession } from './session';
+import { useCoachProfile } from './use-coach-profile';
+
 
 type DayState = { meals: MealRecord[]; status: 'loading' | 'ready' | 'offline' };
 
@@ -28,6 +30,17 @@ type FoodState = {
   discard: (opId: string) => void;
   /** Saves and deletes the server refused, waiting for Retry or Discard. */
   failed: FoodOp[];
+  /** The last 90 days of meals (server + queue), for search, "log again" and the strip. */
+  history: HistoryMeal[];
+  /** Days with at least one meal (server or queued). */
+  mealDays: ReadonlySet<IsoDate>;
+  /** The coach's live shared meals (the saved copy offline). */
+  coachMeals: CoachMeal[];
+  /** The coach's first name, null until known. */
+  coachName: string | null;
+  /** Logs a meal like `item` now, in one tap. */
+  logAgain: (item: MealSearchItem) => Promise<void>;
+  loadCoachMeals: () => Promise<void>;
 };
 
 const FoodContext = createContext<FoodState | null>(null);
@@ -56,6 +69,10 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
   const [days, setDays] = useState<Record<IsoDate, DayState>>({});
   const [targets, setTargets] = useState<MacroTargets | null>(null);
   const [ops, setOps] = useState<FoodOp[]>([]);
+  const [history, setHistory] = useState<HistoryMeal[]>([]);
+  const [coachMeals, setCoachMeals] = useState<CoachMeal[]>([]);
+  const coach = useCoachProfile();
+  const coachName = coach ? (coach.name.trim().split(/\s+/)[0] ?? null) : null;
   const boxRef = useRef<FoodQueue | null>(null);
   const loadedDays = useRef(new Set<IsoDate>());
 
@@ -71,6 +88,22 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
     [me, workspaceId],
   );
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      setHistory(await fetchMealHistory(me, workspaceId, historySince(localToday())));
+    } catch {
+      // the saved copy stays
+    }
+  }, [me, workspaceId]);
+
+  const loadCoachMeals = useCallback(async () => {
+    try {
+      setCoachMeals(await fetchCoachMealsCached(me, workspaceId));
+    } catch {
+      // offline: the last loaded list stays
+    }
+  }, [me, workspaceId]);
+
   useEffect(() => {
     const box = createFoodQueue({
       storage: AsyncStorage,
@@ -82,6 +115,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
         deletePhotoFiles(localFiles(op));
         // The saved copy replaces the queued one: read its day again (and the day it moved from, if any).
         for (const day of loadedDays.current) void refreshDay(day);
+        void refreshHistory();
       },
       onRemoved: (op) => deletePhotoFiles(localFiles(op)),
     });
@@ -91,7 +125,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       box.stop();
       boxRef.current = null;
     };
-  }, [me, workspaceId, refreshDay]);
+  }, [me, workspaceId, refreshDay, refreshHistory]);
 
   // The saved copy first, so the tab works with no signal.
   useEffect(() => {
@@ -99,6 +133,8 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
     void readFoodCache(me, workspaceId).then((c) => {
       if (!alive) return;
       setTargets((t) => t ?? c.targets);
+      setHistory((h) => (h.length > 0 ? h : c.history));
+      setCoachMeals((m) => (m.length > 0 ? m : c.coachMeals));
       setDays((d) => {
         const next = { ...d };
         for (const [day, meals] of Object.entries(c.days)) if (!next[day]) next[day] = { meals, status: 'loading' };
@@ -127,16 +163,33 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
         fetchTargets(me, workspaceId)
           .then(setTargets)
           .catch(() => undefined),
+        refreshHistory(),
+        loadCoachMeals(),
       ]);
     },
-    [me, workspaceId, refreshDay],
+    [me, workspaceId, refreshDay, refreshHistory, loadCoachMeals],
   );
 
   const value = useMemo<FoodState>(() => {
     const server = Object.values(days).flatMap((d) => d.meals);
     const shown = applyFoodOps(server, ops);
     const byId = new Map(shown.map((m) => [m.id, m]));
+    const shownHistory = historyWithOps(history, ops);
     return {
+      history: shownHistory,
+      mealDays: mealDaysOf([...shownHistory, ...shown]),
+      coachMeals,
+      coachName,
+      loadCoachMeals,
+      async logAgain(item) {
+        const box = boxRef.current;
+        if (!box) return;
+        const now = new Date();
+        await box.enqueue(
+          logAgainOp(item, { opId: randomUUID(), mealId: randomUUID(), userId: me, workspaceId, now: now.toISOString() }, localDateOf(now), now),
+        );
+        void box.flush();
+      },
       targets,
       mealsOn: (day) => sortByTime(shown.filter((m) => m.eatenOn === day)),
       statusOf: (day) => days[day]?.status ?? 'loading',
@@ -169,7 +222,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       retry: (opId) => void boxRef.current?.retry(opId),
       discard: (opId) => void boxRef.current?.remove(opId),
     };
-  }, [days, ops, targets, loadDay, me, workspaceId]);
+  }, [days, ops, targets, loadDay, me, workspaceId, history, coachMeals, coachName, loadCoachMeals]);
 
   return <FoodContext.Provider value={value}>{children}</FoodContext.Provider>;
 }

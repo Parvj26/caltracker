@@ -46,6 +46,8 @@ export default function AppLayout() {
         <Stack.Screen name="zoo" />
         <Stack.Screen name="progress-detail" />
         <Stack.Screen name="food/meal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="coach-meals/index" />
+        <Stack.Screen name="coach-meals/[id]" />
         <Stack.Screen name="notifications" />
       </Stack.Protected>
       <Stack.Protected guard={!hasCoach} redirectTo={landing}>
