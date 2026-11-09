@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { historyRow, monthSummary, parseHistoryCache, type HistoryLog } from './workout-history';
+import { historyLogFromRow, historyRow, monthSummary, parseHistoryCache, type HistoryLog, type HistoryLogRow } from './workout-history';
 
 const log = (over: Partial<HistoryLog> = {}): HistoryLog => ({
   id: 'l1',
@@ -8,6 +8,7 @@ const log = (over: Partial<HistoryLog> = {}): HistoryLog => ({
   durationS: 52 * 60,
   volumeKg: 4463.4,
   loggedByCoach: false,
+  loggedBy: null,
   pr: true,
   ...over,
 });
@@ -25,7 +26,9 @@ describe('historyRow', () => {
   });
 
   it('says who logged it when the coach did, and leaves out zero weight', () => {
-    expect(historyRow(log({ loggedByCoach: true, volumeKg: 0 }), 'kg', 'Luis', 'UTC').meta).toBe('Logged by Luis · 52 min');
+    expect(historyRow(log({ loggedByCoach: true, loggedBy: 'k', volumeKg: 0 }), 'kg', { id: 'k', firstName: 'Luis' }, 'UTC').meta).toBe(
+      'Logged by Luis · 52 min',
+    );
     expect(historyRow(log({ loggedByCoach: true, volumeKg: 0 }), 'kg', null, 'UTC').meta).toBe('Logged by your coach · 52 min');
   });
 
@@ -61,5 +64,70 @@ describe('parseHistoryCache', () => {
     expect(parseHistoryCache('{"logs":[{"id":1}]}')).toBeNull();
     expect(parseHistoryCache('nope')).toBeNull();
     expect(parseHistoryCache(null)).toBeNull();
+  });
+});
+
+describe('historyLogFromRow', () => {
+  const row = (over: Partial<HistoryLogRow> = {}): HistoryLogRow => ({
+    id: 'l1',
+    name: 'Upper B',
+    started_at: '2026-11-06T17:00:00Z',
+    finished_at: '2026-11-06T17:52:00Z',
+    last_activity_at: '2026-11-06T17:52:00Z',
+    logged_by: 'c1',
+    log_blocks: [
+      {
+        id: 'b1',
+        kind: 'straight',
+        picked_exercise_id: null,
+        log_exercises: [
+          {
+            id: 'e1',
+            exercises: { tracking_type: 'weight_reps' },
+            log_sets: [
+              { set_type: 'warmup', actual_reps: 10, actual_weight_kg: 20, completed_at: '2026-11-06T17:05:00Z' },
+              { set_type: 'normal', actual_reps: 8, actual_weight_kg: '60.5', completed_at: '2026-11-06T17:10:00Z' },
+              { set_type: 'normal', actual_reps: 8, actual_weight_kg: 60, completed_at: null },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'b2',
+        kind: 'choice',
+        picked_exercise_id: 'e3',
+        log_exercises: [
+          { id: 'e2', exercises: { tracking_type: 'weight_reps' }, log_sets: [{ set_type: 'normal', actual_reps: 10, actual_weight_kg: 100, completed_at: '2026-11-06T17:20:00Z' }] },
+          { id: 'e3', exercises: { tracking_type: 'weight_reps' }, log_sets: [{ set_type: 'normal', actual_reps: 5, actual_weight_kg: 10, completed_at: '2026-11-06T17:20:00Z' }] },
+        ],
+      },
+    ],
+    ...over,
+  });
+
+  it('sums duration and volume with the shared rules (done non-warm-up sets of the picked option)', () => {
+    expect(historyLogFromRow(row(), 'c1', new Set(['l1']))).toEqual({
+      id: 'l1',
+      name: 'Upper B',
+      finishedAt: '2026-11-06T17:52:00Z',
+      durationS: 52 * 60,
+      volumeKg: 534,
+      loggedByCoach: false,
+      loggedBy: 'c1',
+      pr: true,
+    });
+  });
+
+  it('marks a coach-logged workout and skips an unfinished one', () => {
+    expect(historyLogFromRow(row({ logged_by: 'coach' }), 'c1', new Set())).toMatchObject({ loggedByCoach: true, loggedBy: 'coach', pr: false });
+    expect(historyLogFromRow(row({ finished_at: null }), 'c1', new Set())).toBeNull();
+  });
+});
+
+describe('who logged it', () => {
+  it('names the coach only when they are the client’s current coach', () => {
+    const coached = log({ loggedByCoach: true, loggedBy: 'coach-1', volumeKg: 0 });
+    expect(historyRow(coached, 'kg', { id: 'coach-1', firstName: 'Luis' }, 'UTC').meta).toBe('Logged by Luis · 52 min');
+    expect(historyRow(coached, 'kg', { id: 'coach-2', firstName: 'Ana' }, 'UTC').meta).toBe('Logged by your coach · 52 min');
   });
 });

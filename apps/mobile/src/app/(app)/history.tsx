@@ -7,10 +7,8 @@ import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { fetchHistory, readCachedHistory } from '@/lib/history-api';
 import { useSession } from '@/lib/session';
 import { useCachedLoad } from '@/lib/use-cached-load';
-import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useUnits } from '@/lib/use-units';
-import { historyRow, monthSummary, type HistoryRow } from '@/lib/workout-history';
-import { coachFirstName } from '@/lib/workouts-plan';
+import { historyRow, monthSummary, type CurrentCoach, type HistoryRow } from '@/lib/workout-history';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -24,7 +22,9 @@ export default function History() {
   const userId = session?.user.id ?? null;
   const workspaceId = workspace?.workspaceId ?? null;
   const units = useUnits() ?? 'lb';
-  const coach = coachFirstName(useCoachProfile()?.name);
+  // The phone can't read the coach's user id yet (get_my_coach returns only the name), so a coach-logged workout
+  // reads "Logged by your coach" rather than naming someone who may not have logged it.
+  const coach: CurrentCoach | null = null;
   const [refreshKey, setRefreshKey] = useState(0);
   const history = useCachedLoad(
     userId && workspaceId ? `${userId}.${workspaceId}` : null,
