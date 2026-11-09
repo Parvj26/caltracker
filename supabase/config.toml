@@ -403,3 +403,9 @@ import_map = "./functions/deno.json"
 [functions.award-workout]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+# Called only by the pg_cron push jobs (public.push_dispatch), which have no JWT and send the x-push-secret header
+# instead (checked in the function against SEND_PUSH_SECRET). So the gateway check is off here.
+[functions.send-push]
+verify_jwt = false
+import_map = "./functions/deno.json"

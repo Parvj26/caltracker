@@ -1,5 +1,6 @@
-// Local notifications and haptics for logging. Local only: no push tokens, no server.
-//   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick.
+// Local notifications and haptics for logging. Push notifications (APNs, from the server) are in push.ts.
+//   * Reminder: "Still training?" REMINDER_DELAY_MS after the last ticked set, re-scheduled on every tick, unless the
+//     client switched it off (setStillTrainingEnabled).
 // Fixed identifiers, so scheduling again replaces the earlier one and cancelling needs no stored id.
 // Every call swallows errors: a notification is never worth breaking the workout over.
 import { REMINDER_DELAY_MS } from '@caltracker/shared';
@@ -28,14 +29,14 @@ export function initNotifications(): void {
   });
 }
 
-/** Asks for permission the first time only (the system never asks twice). True when allowed. */
+/** Asks for permission (alerts, sounds and the app-icon badge, used by push too) the first time only. True when allowed. */
 export async function ensurePermission(): Promise<boolean> {
   try {
     const current = await Notifications.getPermissionsAsync();
     if (current.granted) return true;
     if (!current.canAskAgain) return false;
     const asked = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowSound: true, allowBadge: false },
+      ios: { allowAlert: true, allowSound: true, allowBadge: true },
     });
     return asked.granted;
   } catch (e) {
@@ -56,7 +57,16 @@ function cancel(identifier: string): void {
   Notifications.cancelScheduledNotificationAsync(identifier).catch(warn(`cancel ${identifier}`));
 }
 
+/** The client's "Still training?" switch (Settings -> Notifications). Off cancels it and stops scheduling it. */
+let stillTrainingOn = true;
+
+export function setStillTrainingEnabled(on: boolean): void {
+  stillTrainingOn = on;
+  if (!on) cancelReminder();
+}
+
 export function scheduleReminder(name: string, logId: string): void {
+  if (!stillTrainingOn) return;
   const data: NotificationData = { kind: 'reminder', logId };
   schedule(REMINDER_ID, REMINDER_DELAY_MS / 1000, {
     body: `Still training? 💪 Tap to finish your ${name} workout.`,
