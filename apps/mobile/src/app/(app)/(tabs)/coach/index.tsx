@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { badgeLabel, localDateOf } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { BigButton } from '@/components/coach/big-button';
+import { CoachMealsButton } from '@/components/coach/coach-meals-button';
 import { ChatIcon, PeopleIcon } from '@/components/coach/icons';
 import { coachFirstName, coachSinceLabel, goalCountdown } from '@/lib/coach-tab';
 import { useCoachProfile } from '@/lib/use-coach-profile';
@@ -18,7 +19,7 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 /**
  * The Coach tab's first screen: who the coach is (photo, name, business, since when, their bio), the goal they set,
- * and big buttons to message them and to open the community. Every line comes from real data and hides when empty.
+ * and big buttons to message them, to open the meals they share and to open the community. Every line comes from real data and hides when empty.
  */
 export default function CoachProfileScreen() {
   const { text } = useTheme();
@@ -80,10 +81,7 @@ export default function CoachProfileScreen() {
             badge={unread ? `${unread} new` : null}
             onPress={() => router.push('/coach/chat')}
           />
-          {/*
-            TODO(meals): "Meals from <first name> · N" (yellow, palette.celebrateBg, between Message and Community)
-            comes with the coach-meals branch. Its slot is here; it is not built on this branch.
-          */}
+          <CoachMealsButton firstName={first} />
           {community.community ? (
             <BigButton
               testID="open-community"
