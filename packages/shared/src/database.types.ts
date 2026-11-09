@@ -2047,16 +2047,19 @@ export type Database = {
         Row: {
           apns_jwt: string | null
           apns_jwt_issued_at: string | null
+          apns_key_id: string | null
           id: number
         }
         Insert: {
           apns_jwt?: string | null
           apns_jwt_issued_at?: string | null
+          apns_key_id?: string | null
           id?: number
         }
         Update: {
           apns_jwt?: string | null
           apns_jwt_issued_at?: string | null
+          apns_key_id?: string | null
           id?: number
         }
         Relationships: []

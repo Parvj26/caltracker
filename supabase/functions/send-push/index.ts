@@ -86,17 +86,21 @@ function senderStateStore(admin: SupabaseClient): JwtStore {
     async get() {
       const { data, error } = await admin
         .from('push_sender_state')
-        .select('apns_jwt, apns_jwt_issued_at')
+        .select('apns_jwt, apns_jwt_issued_at, apns_key_id')
         .eq('id', 1)
         .maybeSingle();
       if (error) logFailure('read jwt', error);
-      if (!data?.apns_jwt || !data.apns_jwt_issued_at) return null;
-      return { jwt: data.apns_jwt as string, issuedAt: new Date(data.apns_jwt_issued_at as string) };
+      if (!data?.apns_jwt || !data.apns_jwt_issued_at || !data.apns_key_id) return null;
+      return {
+        jwt: data.apns_jwt as string,
+        issuedAt: new Date(data.apns_jwt_issued_at as string),
+        keyId: data.apns_key_id as string,
+      };
     },
-    async put(jwt, issuedAt) {
+    async put(jwt, issuedAt, keyId) {
       const { error } = await admin
         .from('push_sender_state')
-        .upsert({ id: 1, apns_jwt: jwt, apns_jwt_issued_at: issuedAt.toISOString() });
+        .upsert({ id: 1, apns_jwt: jwt, apns_jwt_issued_at: issuedAt.toISOString(), apns_key_id: keyId });
       if (error) logFailure('store jwt', error);
     },
   };

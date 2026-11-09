@@ -11,12 +11,14 @@
 create extension if not exists pg_net with schema extensions;
 create extension if not exists pg_cron with schema pg_catalog;
 
--- 1. Sender state: the cached APNs provider token (Apple throttles re-signing) -------------------------------------
+-- 1. Sender state: the cached APNs provider token (Apple throttles re-signing) and the key id that signed it, so a
+-- rotated key (new APNS_KEY_ID) never reuses the old key's token. ---------------------------------------------------
 
 create table public.push_sender_state (
   id smallint primary key default 1 check (id = 1),
   apns_jwt text,
-  apns_jwt_issued_at timestamptz
+  apns_jwt_issued_at timestamptz,
+  apns_key_id text
 );
 revoke all on table public.push_sender_state from anon, authenticated, service_role;
 grant select, insert, update, delete on public.push_sender_state to service_role;
