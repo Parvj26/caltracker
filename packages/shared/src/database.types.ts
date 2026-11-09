@@ -1563,6 +1563,36 @@ export type Database = {
           },
         ]
       }
+      notification_prefs: {
+        Row: {
+          disabled: string[]
+          quiet_enabled: boolean
+          quiet_end: string
+          quiet_start: string
+          reminder_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          disabled?: string[]
+          quiet_enabled?: boolean
+          quiet_end?: string
+          quiet_start?: string
+          reminder_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          disabled?: string[]
+          quiet_enabled?: boolean
+          quiet_end?: string
+          quiet_start?: string
+          reminder_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nutrition_targets: {
         Row: {
           calories: number | null
@@ -1917,6 +1947,95 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "programs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_devices: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          platform?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_outbox: {
+        Row: {
+          attempts: number
+          body: string | null
+          claimed_until: string | null
+          created_at: string
+          data: Json
+          group_key: string
+          id: string
+          last_error: string | null
+          not_before: string
+          outcome: string | null
+          sent_at: string | null
+          title: string | null
+          type: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          body?: string | null
+          claimed_until?: string | null
+          created_at?: string
+          data?: Json
+          group_key: string
+          id?: string
+          last_error?: string | null
+          not_before?: string
+          outcome?: string | null
+          sent_at?: string | null
+          title?: string | null
+          type: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          body?: string | null
+          claimed_until?: string | null
+          created_at?: string
+          data?: Json
+          group_key?: string
+          id?: string
+          last_error?: string | null
+          not_before?: string
+          outcome?: string | null
+          sent_at?: string | null
+          title?: string | null
+          type?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_outbox_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2728,6 +2847,10 @@ export type Database = {
         }[]
       }
       reclaim_workout_log: { Args: { p_log_id: string }; Returns: Json }
+      register_push_device: {
+        Args: { p_app_version: string; p_token: string }
+        Returns: undefined
+      }
       remove_client: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
@@ -2806,6 +2929,7 @@ export type Database = {
         Args: { p_assignment_id: string; p_from_date: string }
         Returns: number
       }
+      unregister_push_device: { Args: { p_token: string }; Returns: undefined }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
       uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }
