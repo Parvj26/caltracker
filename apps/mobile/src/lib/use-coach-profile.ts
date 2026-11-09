@@ -5,20 +5,22 @@ import { useSession } from './session';
 
 /** The client's coach (photo, name, business, bio). Null until known or when there is no coach; works offline. */
 export function useCoachProfile(): CoachProfile | null {
-  const userId = useSession().session?.user.id ?? null;
+  const { session, workspace } = useSession();
+  const userId = session?.user.id ?? null;
+  const workspaceId = workspace?.workspaceId ?? null;
   // Tagged with the user it belongs to, so a different user never sees the previous user's coach.
   const [state, setState] = useState<{ userId: string; profile: CoachProfile | null } | null>(null);
 
   useEffect(() => {
     if (!userId) return;
     let alive = true;
-    void loadCoachProfile(userId, { fetchFresh: fetchCoachRecord, signUrl: signAvatar }).then((p) => {
+    void loadCoachProfile(userId, { fetchFresh: () => fetchCoachRecord(workspaceId), signUrl: signAvatar }).then((p) => {
       if (alive) setState({ userId, profile: p });
     });
     return () => {
       alive = false;
     };
-  }, [userId]);
+  }, [userId, workspaceId]);
 
   return state && state.userId === userId ? state.profile : null;
 }

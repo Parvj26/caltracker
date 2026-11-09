@@ -9,7 +9,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-import { loadCoachProfile, withVersion, type CoachRecord } from './coach-profile';
+import { joinedAtIn, loadCoachProfile, withVersion, type CoachRecord } from './coach-profile';
 
 const record: CoachRecord = {
   name: 'Mia Coach',
@@ -31,6 +31,19 @@ describe('withVersion', () => {
       `https://x/a?token=t&v=${Date.parse('2026-11-05T10:00:00.000Z')}`,
     );
     expect(withVersion('https://x/a', null)).toBe('https://x/a?v=0');
+  });
+});
+
+describe('joinedAtIn', () => {
+  const rows = [
+    { workspace_id: 'w-old', created_at: '2025-01-01T00:00:00.000Z' },
+    { workspace_id: 'w-now', created_at: '2026-11-03T10:00:00.000Z' },
+  ];
+  it("takes the membership row of the coach's workspace", () => expect(joinedAtIn(rows, 'w-now')).toBe('2026-11-03T10:00:00.000Z'));
+  it('is null without a matching row or a known workspace', () => {
+    expect(joinedAtIn(rows, 'w-other')).toBeNull();
+    expect(joinedAtIn(rows, null)).toBeNull();
+    expect(joinedAtIn([{ workspace_id: 'w-now', created_at: null }], 'w-now')).toBeNull();
   });
 });
 

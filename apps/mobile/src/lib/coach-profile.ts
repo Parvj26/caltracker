@@ -29,6 +29,18 @@ export type CoachProfile = {
   goal: CoachGoal | null;
 };
 
+/**
+ * When the client joined the coach's workspace (the one the app is signed into, whose owner get_my_coach_profile
+ * returns): that workspace's membership row, never another one; null when it is unknown.
+ */
+export function joinedAtIn(
+  rows: ReadonlyArray<{ workspace_id: string; created_at: string | null }>,
+  workspaceId: string | null,
+): string | null {
+  if (!workspaceId) return null;
+  return rows.find((r) => r.workspace_id === workspaceId)?.created_at ?? null;
+}
+
 const key = (userId: string) => `caltracker.coach.${userId}`;
 
 /** `?v=` changes with the profile's updated_at, so a replaced photo is never served from the image cache. */
