@@ -134,14 +134,15 @@ export default function CoachMealsScreen() {
           {rows.map((row) => (
             <View key={row.map((m) => m.id).join('|')} style={styles.gridRow}>
               {row.map((m) => (
-                <CoachMealTile
-                  key={m.id}
-                  meal={m}
-                  photoUrl={m.photo ? urls[m.photo.thumbPath] : undefined}
-                  onPress={() => router.push({ pathname: '/coach-meals/[id]', params: { id: m.id } })}
-                />
+                <View key={m.id} style={styles.cell}>
+                  <CoachMealTile
+                    meal={m}
+                    photoUrl={m.photo ? urls[m.photo.thumbPath] : undefined}
+                    onPress={() => router.push({ pathname: '/coach-meals/[id]', params: { id: m.id } })}
+                  />
+                </View>
               ))}
-              {row.length === 1 ? <View style={styles.flex} /> : null}
+              {row.length === 1 ? <View style={styles.cell} /> : null}
             </View>
           ))}
         </View>
@@ -160,6 +161,8 @@ const styles = StyleSheet.create({
   chip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: palette.ink, backgroundColor: palette.bg, justifyContent: 'center' },
   chipOn: { backgroundColor: palette.ink, borderWidth: 2 },
   onInk: { color: white },
+  // Equal cells (the tile's border sat outside its flex share, so a lone tile came out wider than the spacer).
+  cell: { flex: 1 },
   grid: { gap: 10 },
   gridRow: { flexDirection: 'row', gap: 10 },
 });
