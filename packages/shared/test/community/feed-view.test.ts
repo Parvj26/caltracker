@@ -25,6 +25,17 @@ describe('filterFeed', () => {
   it('keeps only posts carrying a shared card for Wins', () => {
     expect(filterFeed(posts, 'wins', coaches).map((p) => p.id)).toEqual(['2', '4']);
   });
+  it('keeps posts by any of several coaches', () => {
+    const two = [post('1', 'luis'), post('2', 'sam'), post('3', 'ana')];
+    expect(filterFeed(two, 'coach', new Set(['luis', 'ana'])).map((p) => p.id)).toEqual(['1', '3']);
+  });
+  it('keeps nothing for the coach filter when no coach is known', () => {
+    expect(filterFeed(posts, 'coach', new Set())).toEqual([]);
+  });
+  it('treats a missing card as no win', () => {
+    const loose = [{ id: 'u', authorId: 'sam', card: undefined }, post('c', 'sam', { kind: 'workout' })];
+    expect(filterFeed(loose, 'wins', coaches).map((p) => p.id)).toEqual(['c']);
+  });
   it('does not change the input', () => {
     filterFeed(posts, 'wins', coaches);
     expect(posts).toHaveLength(4);
@@ -56,6 +67,14 @@ describe('commentPreview', () => {
   });
   it('takes a custom size', () => {
     expect(commentPreview(comments, new Set(), 1).map((x) => x.id)).toEqual(['b']);
+  });
+  it('breaks a tie on the same time by id, and stays in reading order', () => {
+    const same = [c('a', 'sam', '2026-11-05T10:00:00Z'), c('c', 'maya', '2026-11-05T10:00:00Z'), c('b', 'luis', '2026-11-05T10:00:00Z')];
+    expect(commentPreview(same, new Set()).map((x) => x.id)).toEqual(['b', 'c']);
+    expect(commentPreview([...same].reverse(), new Set()).map((x) => x.id)).toEqual(['b', 'c']);
+  });
+  it('shows them all when there are fewer than the maximum', () => {
+    expect(commentPreview(comments, new Set(), 10).map((x) => x.id)).toEqual(['a', 'c', 'b']);
   });
   it('is empty without comments', () => {
     expect(commentPreview([], new Set())).toEqual([]);
