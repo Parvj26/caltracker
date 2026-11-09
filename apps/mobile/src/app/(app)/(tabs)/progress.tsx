@@ -151,8 +151,6 @@ export default function ProgressScreen() {
       {model.goal ? (
         <View
           testID="progress-goal"
-          accessible
-          accessibilityLabel={`Goal set by ${coachName}: ${model.goal.text}.${model.goal.countdown ? ` ${model.goal.countdown}.` : ''}`}
           style={[styles.goal, { borderRadius: radius.card - 2, padding: space[3], gap: space[2.5] }]}
         >
           <View style={styles.flex}>
@@ -160,6 +158,11 @@ export default function ProgressScreen() {
             <Text style={text('sectionHeading')} testID="goal-text">
               {model.goal.text}
             </Text>
+            {model.goal.date ? (
+              <Text style={text('caption')} testID="goal-date">
+                {`Target date ${model.goal.date}`}
+              </Text>
+            ) : null}
           </View>
           {model.goal.countdown ? (
             <Text testID="goal-countdown" style={[text('sectionHeading'), styles.small, styles.chip, { borderRadius: radius.pill, paddingHorizontal: space[2.5] }]}>

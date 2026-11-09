@@ -28,6 +28,9 @@ env:
     id: goal-countdown
     text: '[0-9]+ days to go'
 - assertVisible:
+    id: goal-date
+    text: 'Target date .+'
+- assertVisible:
     id: progress-week
 - takeScreenshot: progress-overview
 # The Body tile opens Body: latest numbers in lb: 80 kg = 176.4 lb (−4.4 lb from 82 kg), 19% body fat, 36 kg = 79.4 lb

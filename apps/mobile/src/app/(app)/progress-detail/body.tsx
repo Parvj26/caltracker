@@ -285,6 +285,23 @@ export default function BodyScreen() {
               </InkCard>
             ))}
 
+            {data && data.scans.length > 0 && model.charts.length === 0 && model.hiddenByRange === 0 ? (
+              <Text style={text('body')} testID="progress-more">
+                Add another entry to see a trend.
+              </Text>
+            ) : null}
+
+            {model.hiddenByRange > 0 ? (
+              <View style={{ gap: space[1] }}>
+                <Text style={text('body')} testID="progress-hidden">
+                  {model.charts.length === 0
+                    ? 'Not enough entries in this range for a chart.'
+                    : `${model.hiddenByRange} more ${model.hiddenByRange === 1 ? 'measure has' : 'measures have'} older entries outside this range.`}
+                </Text>
+                <TextButton testID="show-all" title="Show all" onPress={() => setRange('all')} />
+              </View>
+            ) : null}
+
             {model.history.length > 0 ? (
               <View style={{ gap: space[1] }}>
                 <Text style={text('sectionHeading')} accessibilityRole="header">
