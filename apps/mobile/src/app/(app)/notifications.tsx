@@ -6,7 +6,7 @@ import { DEFAULT_PUSH_PREFS, withType, type PushPrefs } from '@caltracker/shared
 import { ChevronIcon } from '@/components/settings/icons';
 import { TimeOptionsSheet } from '@/components/settings/time-options-sheet';
 import { Button, ErrorText, Screen } from '@/components/ui';
-import { clockLabel, settingsSections, type SettingsRow, type TimeField } from '@/lib/notification-settings-logic';
+import { clockLabel, prefsEditable, prefsNote, settingsSections, type SettingsRow, type TimeField } from '@/lib/notification-settings-logic';
 import { usePush } from '@/lib/use-push';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -25,7 +25,9 @@ const TIME_TITLES: Record<TimeField, string> = {
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const { text, space, radius } = useTheme();
-  const { permission, requestPermission, prefs, updatePrefs } = usePush();
+  const { permission, requestPermission, prefs, prefsSource, updatePrefs } = usePush();
+  const editable = prefsEditable(prefsSource);
+  const note = prefsNote(prefsSource);
   const [editing, setEditing] = useState<TimeField | null>(null);
   const [error, setError] = useState<string | null>(null);
   const current = prefs ?? DEFAULT_PUSH_PREFS;
@@ -78,6 +80,11 @@ export default function NotificationsSettingsScreen() {
       ) : null}
 
       {error ? <ErrorText testID="notifications-error">{error}</ErrorText> : null}
+      {note ? (
+        <Text style={text('caption')} testID="notifications-prefs-note">
+          {note}
+        </Text>
+      ) : null}
 
       {settingsSections(current).map((section) => (
         <View key={section.title} style={{ gap: space[1] }}>
@@ -90,6 +97,7 @@ export default function NotificationsSettingsScreen() {
                 key={row.kind === 'switch' ? row.type : row.kind === 'time' ? row.field : 'quiet'}
                 row={row}
                 last={i === section.rows.length - 1}
+                disabled={!editable}
                 onToggle={() => toggle(row)}
                 onTime={(field) => setEditing(field)}
               />
@@ -119,11 +127,13 @@ export default function NotificationsSettingsScreen() {
 function SettingsRowView({
   row,
   last,
+  disabled,
   onToggle,
   onTime,
 }: {
   row: SettingsRow;
   last: boolean;
+  disabled: boolean;
   onToggle: () => void;
   onTime: (field: TimeField) => void;
 }) {
@@ -141,8 +151,10 @@ function SettingsRowView({
         testID={`notif-time-${row.field}`}
         accessibilityRole="button"
         accessibilityLabel={`${row.label}, ${clockLabel(row.value)}`}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={() => onTime(row.field)}
-        style={({ pressed }) => [...frame, pressed && styles.pressed]}
+        style={({ pressed }) => [...frame, (pressed || disabled) && styles.pressed]}
       >
         {label}
         <Text style={text('sectionHeading')}>{clockLabel(row.value)}</Text>
@@ -155,9 +167,10 @@ function SettingsRowView({
       testID={row.kind === 'switch' ? `notif-switch-${row.type}` : 'notif-switch-quiet'}
       accessibilityRole="switch"
       accessibilityLabel={row.label}
-      accessibilityState={{ checked: row.on }}
+      accessibilityState={{ checked: row.on, disabled }}
+      disabled={disabled}
       onPress={onToggle}
-      style={({ pressed }) => [...frame, pressed && styles.pressed]}
+      style={({ pressed }) => [...frame, (pressed || disabled) && styles.pressed]}
     >
       {label}
       <View style={[styles.track, row.on ? styles.trackOn : styles.trackOff]}>

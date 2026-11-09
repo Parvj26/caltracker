@@ -17,6 +17,7 @@ import {
   type SetType,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import type { WorkoutComment } from './coach-tab';
 import type { SaveLogResult } from './log-sync';
 import { supabase } from './supabase';
 
@@ -149,6 +150,31 @@ export async function fetchComments(logId: string): Promise<LogComment[]> {
     .order('created_at');
   if (error) throw failed('comments', error);
   return data.map((c) => ({ id: c.id, authorId: c.author_id, body: c.body, createdAt: c.created_at }));
+}
+
+/** The coach's latest comments on any of the client's workouts, newest first, for the chat (RLS: own logs only). */
+export async function fetchMyWorkoutComments(limit = 50): Promise<WorkoutComment[]> {
+  const me = await myId();
+  const { data, error } = await supabase
+    .from('workout_log_comments')
+    .select('id, log_id, author_id, body, created_at, workout_logs(name, started_at, finished_at)')
+    .eq('client_id', me)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw failed('workout comments', error);
+  return data.flatMap((c) =>
+    // A client never comments; the check keeps the card to the coach's words whatever the data says.
+    c.workout_logs && c.author_id !== me
+      ? [{
+          id: c.id,
+          logId: c.log_id,
+          body: c.body,
+          createdAt: c.created_at,
+          workoutName: c.workout_logs.name,
+          workoutAt: c.workout_logs.finished_at ?? c.workout_logs.started_at,
+        }]
+      : [],
+  );
 }
 
 export type LogForDay = {

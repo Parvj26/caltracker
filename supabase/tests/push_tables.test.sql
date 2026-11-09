@@ -1,6 +1,6 @@
 -- Push notifications: device, preference and outbox tables (spec docs/superpowers/specs/2026-11-09-client-push-notifications-design.md).
 begin;
-select plan(34);
+select plan(36);
 
 select tests.create_user('pt-coach@t.local', 'Luis Bueno') as coach \gset
 select tests.create_workspace('PT Coaching', :'coach') as ws \gset
@@ -114,6 +114,17 @@ select is((select count(distinct not_before)::int || '/' || count(*)::int from p
 insert into public.push_outbox (user_id, workspace_id, type, group_key) values (:'sam', :'ws', 'daily_reminder', 'daily_reminder:2026-11-09');
 select throws_ok(format($$insert into public.push_outbox (user_id, workspace_id, type, group_key)
   values (%L, %L, 'daily_reminder', 'daily_reminder:2026-11-09')$$, :'sam', :'ws'), '23505', null, 'one daily reminder per key');
+
+-- A row the sender gave up on (5 attempts, outcome failed, sent_at still null) is dead: it must not swallow the
+-- next change (dedupe) or lend it its old send time (grouping).
+update public.push_outbox set attempts = 5, outcome = 'failed', not_before = now() - interval '1 day'
+where group_key = 'food_targets';
+select private.push_enqueue(:'sam', :'ws', 'food_targets', 'food_targets', '{"n":3}', interval '1 minute', true);
+select is((select array_agg(data->>'n' order by created_at, data->>'n') from public.push_outbox
+           where group_key = 'food_targets' and attempts < 5), array['3'],
+  'a failed row does not swallow the next one');
+select ok((select not_before > now() from public.push_outbox where group_key = 'food_targets' and attempts < 5),
+  'nor lend it its old send time');
 
 select * from finish();
 rollback;

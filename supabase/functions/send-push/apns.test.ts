@@ -1,5 +1,5 @@
 import { assert, assertEquals } from '@std/assert';
-import { type ApnsConfig, type ApnsPayload, apnsConfigFromEnv, createApnsClient, type JwtStore } from './apns.ts';
+import { APNS_TIMEOUT_MS, type ApnsConfig, type ApnsPayload, apnsConfigFromEnv, createApnsClient, type JwtStore } from './apns.ts';
 
 async function throwawayKey() {
   const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -22,15 +22,21 @@ const baseCfg: ApnsConfig = { keyP8: pem, keyId: 'KEY123', teamId: '88L5M6CC34',
 const T0 = new Date('2026-11-09T10:00:00Z');
 
 type Call = [string, RequestInit & { headers: Record<string, string>; body: string }];
-function setup(responses: Array<Response | Error>, opts: { env?: 'sandbox' | 'production'; stored?: { jwt: string; issuedAt: Date } | null; now?: () => Date } = {}) {
+type Stored = { jwt: string; issuedAt: Date; keyId?: string };
+function setup(responses: Array<Response | Error>, opts: { env?: 'sandbox' | 'production'; stored?: Stored | null; now?: () => Date } = {}) {
   const calls: Call[] = [];
-  const puts: Array<[string, Date]> = [];
-  let stored = opts.stored ?? null;
+  const puts: Array<[string, Date, string]> = [];
+  const gets = { count: 0 };
+  // A stored JWT without a key id is taken as signed with the current key.
+  let stored = opts.stored ? { keyId: baseCfg.keyId, ...opts.stored } : null;
   const store: JwtStore = {
-    get: () => Promise.resolve(stored),
-    put: (jwt, at) => {
-      puts.push([jwt, at]);
-      stored = { jwt, issuedAt: at };
+    get: () => {
+      gets.count++;
+      return Promise.resolve(stored as { jwt: string; issuedAt: Date; keyId: string } | null);
+    },
+    put: (jwt, at, keyId) => {
+      puts.push([jwt, at, keyId]);
+      stored = { jwt, issuedAt: at, keyId };
       return Promise.resolve();
     },
   };
@@ -41,7 +47,7 @@ function setup(responses: Array<Response | Error>, opts: { env?: 'sandbox' | 'pr
     return r instanceof Error ? Promise.reject(r) : Promise.resolve(r.clone());
   }) as unknown as typeof fetch;
   const client = createApnsClient({ cfg: { ...baseCfg, env: opts.env ?? 'sandbox' }, store, fetch: fetchMock, now: opts.now ?? (() => T0) });
-  return { client, calls, puts };
+  return { client, calls, puts, gets };
 }
 const ok = () => new Response(null, { status: 200 });
 const err = (status: number, reason: string) => new Response(JSON.stringify({ reason }), { status });
@@ -112,6 +118,54 @@ Deno.test('ExpiredProviderToken twice: does not loop', async () => {
   assertEquals(r.kind, 'retry');
 });
 
+Deno.test('one JWT per run: the store is read once however many devices', async () => {
+  const { client, calls, puts, gets } = setup([ok()], { stored: { jwt: 'j.w.t', issuedAt: T0 } });
+  await Promise.all([client.send(TOKEN, payload), client.send(TOKEN, payload), client.send(TOKEN, payload)]);
+  await client.send(TOKEN, payload);
+  assertEquals(calls.length, 4);
+  assertEquals(gets.count, 1);
+  assertEquals(puts.length, 0);
+});
+
+Deno.test('signs once per run when nothing is stored', async () => {
+  const { client, puts } = setup([ok()]);
+  await Promise.all([client.send(TOKEN, payload), client.send(TOKEN, payload)]);
+  assertEquals(puts.length, 1);
+});
+
+Deno.test('ExpiredProviderToken on several devices at once: one shared re-sign', async () => {
+  const { client, calls, puts } = setup([err(403, 'ExpiredProviderToken'), err(403, 'ExpiredProviderToken'), ok()], {
+    stored: { jwt: 'old.jwt.x', issuedAt: T0 },
+  });
+  const r = await Promise.all([client.send(TOKEN, payload), client.send(TOKEN, payload)]);
+  assertEquals(r.map((x) => x.kind), ['ok', 'ok']);
+  assertEquals(calls.length, 4);
+  assertEquals(puts.length, 1);
+  assertEquals(calls[2]![1].headers.authorization, calls[3]![1].headers.authorization);
+});
+
+Deno.test('InvalidProviderToken: throws the cached JWT away, re-signs and retries once', async () => {
+  const { client, calls, puts } = setup([err(403, 'InvalidProviderToken'), ok()], { stored: { jwt: 'old.jwt.x', issuedAt: T0 } });
+  assertEquals(await client.send(TOKEN, payload), { kind: 'ok' });
+  assertEquals(calls.length, 2);
+  assertEquals(puts.length, 1);
+  assert(calls[1]![1].headers.authorization !== 'bearer old.jwt.x');
+});
+
+Deno.test('InvalidProviderToken twice: retried later, not given up at once', async () => {
+  const { client, calls } = setup([err(403, 'InvalidProviderToken')], { stored: { jwt: 'old.jwt.x', issuedAt: T0 } });
+  assertEquals((await client.send(TOKEN, payload)).kind, 'retry');
+  assertEquals(calls.length, 2);
+});
+
+Deno.test('a JWT signed with another key (key rotated) is not reused', async () => {
+  const { client, calls, puts } = setup([ok()], { stored: { jwt: 'old.jwt.x', issuedAt: T0, keyId: 'OLDKEY' } });
+  await client.send(TOKEN, payload);
+  assertEquals(puts.length, 1);
+  assertEquals(puts[0]![2], 'KEY123');
+  assert(calls[0]![1].headers.authorization !== 'bearer old.jwt.x');
+});
+
 const mappings: Array<[string, Response | Error, string]> = [
   ['200', ok(), 'ok'],
   ['410 Unregistered', err(410, 'Unregistered'), 'invalid_token'],
@@ -131,6 +185,22 @@ for (const [name, res, kind] of mappings) {
     if (r.kind === 'invalid_token') assert(r.reason.length > 0);
   });
 }
+
+Deno.test('each request gives up after a timeout (10 s by default) and is retried later', async () => {
+  assertEquals(APNS_TIMEOUT_MS, 10_000);
+  let signal: AbortSignal | null | undefined;
+  const hanging = ((_url: string, init: RequestInit) => {
+    signal = init.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new Error('aborted')));
+    });
+  }) as unknown as typeof fetch;
+  const store: JwtStore = { get: () => Promise.resolve({ jwt: 'j.w.t', issuedAt: T0, keyId: baseCfg.keyId }), put: () => Promise.resolve() };
+  const client = createApnsClient({ cfg: baseCfg, store, fetch: hanging, now: () => T0, timeoutMs: 20 });
+  const r = await client.send(TOKEN, payload);
+  assert(signal instanceof AbortSignal, 'the request carries an abort signal');
+  assertEquals(r.kind, 'retry');
+});
 
 Deno.test('apnsConfigFromEnv: null when a secret is missing or APNS_ENV is wrong', () => {
   const full: Record<string, string> = {

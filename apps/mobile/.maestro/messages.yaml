@@ -1,5 +1,5 @@
-# Chat with the coach: the coach writes, the client opens the Coach tab (the unread badge shows, then clears),
-# sees the message, replies, and the reply appears with a time (not "Sending…"). The helper confirms the server
+# Chat with the coach: the coach writes, the client opens the Coach tab (the coach's profile) and taps Message (the
+# unread badge shows, then clears once the chat is open), sees the message, replies, and the reply appears with a time (not "Sending…"). The helper confirms the server
 # stored the reply once and that the coach's message was marked read.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -22,11 +22,21 @@ env:
 - tapOn:
     id: tab-coach
 - extendedWaitUntil:
+    visible:
+      id: coach-name
+    timeout: 20000
+- tapOn:
+    id: coach-open-chat
+- extendedWaitUntil:
     visible: 'Hi from your coach, ready for Monday?'
     timeout: 20000
 - assertVisible:
-    id: coach-name
+    id: coach-chat-name
 - assertVisible: 'Today'
+# The approved quick replies sit above the composer.
+- assertVisible: 'Done for today'
+- assertVisible: 'Can we swap a day?'
+- assertVisible: 'Something hurts'
 - tapOn:
     id: coach-composer-input
 - inputText: 'Yes, see you Monday'

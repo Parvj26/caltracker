@@ -124,11 +124,10 @@ export function onPushTapped(open: (data: Record<string, unknown>) => void): () 
   };
 }
 
-let lastBadge: number | null = null;
-
-/** Sets the app-icon badge (skipped when unchanged). */
+/**
+ * Sets the app-icon badge. Never skipped as unchanged: a push sets the badge from the server while the app is in the
+ * background, so the app's last value says nothing about what the icon shows now.
+ */
 export function setBadge(n: number): void {
-  if (n === lastBadge) return;
-  lastBadge = n;
   Notifications.setBadgeCountAsync(n).catch(warn('badge'));
 }

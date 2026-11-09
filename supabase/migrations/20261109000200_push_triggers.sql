@@ -89,6 +89,25 @@ revoke execute on function private.push_on_workout_change() from public, anon, a
 create trigger workouts_push_changed after update on public.workouts
   for each row execute function private.push_on_workout_change();
 
+-- A workout moved off its day or deleted before its "Today's workout changed" went out: that push no longer makes
+-- sense, so it is dropped (whoever made the change).
+create function private.push_drop_workout_changed() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'UPDATE' and (new.scheduled_on is not distinct from old.scheduled_on
+     or new.scheduled_on = private.push_client_today(new.client_id, new.workspace_id)) then
+    return null; -- moved onto today: push_on_workout_change has just queued it
+  end if;
+  delete from public.push_outbox o
+  where o.user_id = old.client_id and o.type = 'workout_changed' and o.group_key = 'workout_changed:' || old.id
+    and o.sent_at is null;
+  return null;
+end;
+$$;
+revoke execute on function private.push_drop_workout_changed() from public, anon, authenticated, service_role;
+create trigger workouts_push_drop_changed after update of scheduled_on or delete on public.workouts
+  for each row when (old.client_id is not null) execute function private.push_drop_workout_changed();
+
 -- 2. Logs -----------------------------------------------------------------------------------------------------------
 
 -- The coach finished logging a session for the client (not the hourly auto-finish; not the client's own log).

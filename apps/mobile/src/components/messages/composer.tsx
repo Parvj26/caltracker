@@ -1,7 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { borderWidth } from '@caltracker/design-tokens';
 import { MAX_PHOTOS } from '@caltracker/shared';
+import { CameraIcon } from '@/components/coach/icons';
 import { PhotoError, compressPhoto } from '@/lib/compress-photo';
 import type { OutboxPhoto } from '@/lib/outbox';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
@@ -10,8 +12,15 @@ import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 
 const BODY_MAX = 4000;
 
-/** The reply box: 📷 adds up to 4 photos (shrunk on the phone) shown as removable thumbnails, then Send. */
-export function Composer({ onSend }: { onSend: (draft: { body: string; photos: OutboxPhoto[] }) => void }) {
+/**
+ * The reply box: one-tap quick replies (each sends its words as a message), then the camera button (up to 4 photos,
+ * shrunk on the phone, shown as removable thumbnails), the text box and Send.
+ */
+export function Composer({ onSend, placeholder = 'Write a message', quickReplies = [] }: {
+  onSend: (draft: { body: string; photos: OutboxPhoto[] }) => void;
+  placeholder?: string;
+  quickReplies?: readonly string[];
+}) {
   const { text } = useTheme();
   const [body, setBody] = useState('');
   // Starts when the client begins typing, so opening the Coach tab is not counted as a message given up.
@@ -55,7 +64,30 @@ export function Composer({ onSend }: { onSend: (draft: { body: string; photos: O
     setError(null);
   }
 
+  function sendQuick(reply: string) {
+    completeMessage();
+    onSend({ body: reply, photos: [] });
+  }
+
   return (
+    <View>
+      {quickReplies.length > 0 ? (
+        <View style={styles.chips}>
+          {quickReplies.map((reply) => (
+            <Pressable
+              key={reply}
+              testID="coach-quick-reply"
+              accessibilityRole="button"
+              accessibilityLabel={reply}
+              accessibilityHint="Sends this message"
+              onPress={() => sendQuick(reply)}
+              style={({ pressed }) => [styles.chip, pressed && { opacity: pressedOpacity }]}
+            >
+              <Text style={[text('sectionHeading'), styles.chipText]}>{reply}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     <View style={styles.wrap}>
       {photos.length > 0 ? (
         <View style={styles.thumbs}>
@@ -85,12 +117,12 @@ export function Composer({ onSend }: { onSend: (draft: { body: string; photos: O
           onPress={() => void pick()}
           style={({ pressed }) => [styles.photoButton, (busy || photos.length >= MAX_PHOTOS) && styles.disabled, pressed && { opacity: pressedOpacity }]}
         >
-          <Text style={text('sectionHeading')}>📷</Text>
+          <CameraIcon />
         </Pressable>
         <TextInput
           testID="coach-composer-input"
           accessibilityLabel="Message"
-          placeholder="Write a message"
+          placeholder={placeholder}
           placeholderTextColor={palette.inkMuted}
           multiline
           maxLength={BODY_MAX}
@@ -111,16 +143,48 @@ export function Composer({ onSend }: { onSend: (draft: { body: string; photos: O
         </Pressable>
       </View>
     </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space[2], paddingHorizontal: space[4], paddingVertical: space[2.5], backgroundColor: palette.bg, borderTopWidth: 1, borderTopColor: palette.border },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingHorizontal: space[4], paddingBottom: space[2] },
+  chip: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: space[3],
+    borderRadius: radius.pill,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.ink,
+    backgroundColor: palette.bg,
+  },
+  chipText: { fontSize: 14 },
+  wrap: { gap: space[2], paddingHorizontal: space[3], paddingVertical: space[2], backgroundColor: palette.bg, borderTopWidth: borderWidth.card, borderTopColor: palette.border },
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
-  photoButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, maxHeight: 132, minHeight: 44, backgroundColor: palette.surface, borderRadius: radius.input, paddingHorizontal: space[3.5], paddingTop: space[3], paddingBottom: space[3] },
-  send: { minHeight: 44, minWidth: 64, paddingHorizontal: space[3.5], borderRadius: radius.button, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
-  sendText: { color: white },
+  photoButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
+  input: {
+    flex: 1,
+    maxHeight: 132,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.ink,
+    paddingHorizontal: space[3.5],
+    paddingTop: space[3],
+    paddingBottom: space[3],
+  },
+  send: {
+    minHeight: 44,
+    minWidth: 64,
+    paddingHorizontal: space[4],
+    borderRadius: 22,
+    borderWidth: borderWidth.card,
+    borderColor: palette.ink,
+    backgroundColor: palette.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendText: { color: palette.ink },
   disabled: { opacity: 0.4 },
   thumbs: { flexDirection: 'row', gap: space[2] },
   thumb: { width: 64, height: 64 },
