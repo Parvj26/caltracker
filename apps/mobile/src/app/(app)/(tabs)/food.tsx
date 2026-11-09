@@ -10,15 +10,13 @@ import { LogAgainChips } from '@/components/food/log-again-chips';
 import { MealCard } from '@/components/food/meal-card';
 import { ErrorText, Screen, TextButton } from '@/components/ui';
 import { mealPhotoUrls } from '@/lib/food-api';
-import { msUntilMidnight } from '@/lib/food-logic';
+import { MAX_WEEKS_BACK, msUntilMidnight } from '@/lib/food-logic';
 import { PhotoError } from '@/lib/compress-photo';
 import { photoParams, pickMealPhoto } from '@/lib/pick-meal-photo';
 import { useFood } from '@/lib/use-food';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
-/** How many weeks the strip pages back (the phone keeps 90 days of meals for the dots). */
-const MAX_WEEKS_BACK = 12;
 
 /**
  * Food: a 7-day strip, the day's kcal card against the coach's targets, Snap a photo / Type it in, "Log again in one

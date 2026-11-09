@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { historyWithOps, logAgainOp, mealDaysOf, msUntilMidnight, savedTime, FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
+import { dayStrip } from '@caltracker/shared';
+import { MAX_WEEKS_BACK, historySince, historyWithOps, logAgainOp, mealDaysOf, msUntilMidnight, savedTime, FOOD_CACHE_DAYS, emptyFoodCache, parseFoodCache, withDay, withTargets, applyFoodOps, buildDeleteOp, buildSaveOp, clampDay, defaultMinutes, mealInstant, minutesOf, stepMinutes, timeLabel } from './food-logic';
 import type { FoodOp, MealRecord } from './food-queue';
 
 const none = { calories: null, protein: null, carbs: null, fat: null };
@@ -204,5 +205,13 @@ describe('history', () => {
     expect(c.days['2026-11-07']?.[0]?.coachMealId).toBeNull();
     expect(c.history).toEqual([]);
     expect(c.coachMeals).toEqual([]);
+  });
+});
+
+describe('strip paging and history window', () => {
+  it('the oldest day the strip can page to is inside the fetched history, so it gets its dot', () => {
+    const today = '2026-11-09';
+    const oldest = dayStrip(today, new Set(), MAX_WEEKS_BACK)[0]?.day ?? today;
+    expect(oldest >= historySince(today)).toBe(true);
   });
 });

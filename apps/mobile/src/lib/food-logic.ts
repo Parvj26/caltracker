@@ -1,7 +1,7 @@
 // What the Food tab shows and writes, worked out on the phone: the server's meals with the queued saves and deletes
 // applied on top, the operations a save or delete becomes, and the meal-time picker's steps. No network, no React.
 // The macro maths (totals, targets, hints) lives in @caltracker/shared.
-import { MACRO_KEYS, localDateOf, mealPhotoPaths, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealMacros, type MealSearchItem } from '@caltracker/shared';
+import { MACRO_KEYS, addDays, localDateOf, mealPhotoPaths, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealMacros, type MealSearchItem } from '@caltracker/shared';
 import type { FoodOp, LocalMealPhoto, MealRecord, StoredPhoto } from './food-queue';
 
 export type ShownMeal = MealRecord & { pending: 'sending' | 'failed' | null; localPhoto: LocalMealPhoto | null; opId: string | null };
@@ -68,6 +68,16 @@ export function buildSaveOp(before: MealRecord | null, draft: MealDraft, photo: 
     localPhoto,
     dropPaths: pathsOf(before?.photo).filter((p) => !keep.has(p)),
   };
+}
+
+/** How many weeks the Food tab's strip pages back. */
+export const MAX_WEEKS_BACK = 12;
+/** Days of meals the phone keeps for search, "log again" and the strip's dots: every day the strip can reach. */
+export const HISTORY_DAYS = MAX_WEEKS_BACK * 7 + 7;
+
+/** The first day of the kept history (today included in the count). */
+export function historySince(today: IsoDate): IsoDate {
+  return addDays(today, -(HISTORY_DAYS - 1));
 }
 
 /** "Log again in one tap": a new meal now, with the name, numbers and coach link. No photo, no note. */

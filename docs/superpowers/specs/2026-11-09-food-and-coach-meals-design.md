@@ -32,7 +32,7 @@ barcodes and photo calorie estimates also stay out.
    queued). Tap a day to view it. No future day is ever shown. **PO ruling 2026-11-09:** ‹ › week arrows above the
    strip page back a week at a time (and forward again up to the week ending today; future days stay unreachable).
    The title reads "Last 7 days", or the range ("Tue 27 Oct – Mon 2 Nov") on an earlier week. Paging stops 12 weeks
-   back, inside the 90 days of history the phone keeps for the dots.
+   back; the phone keeps 91 days of meals so every reachable day gets its dot.
 6. **Kcal card.** With a calorie target: "860 kcal left today" (or "120 kcal over today"; on an earlier day "… left
    on Tue 3 Nov"). Bars for protein, carbs, fat: "96 / 170 g · 74 left" (a macro with no target shows "96 g").
    Footer "Targets set by <coach first name>". With no targets at all (**PO ruling 2026-11-09**): totals only,
@@ -138,7 +138,7 @@ logged stay.").
 - The Coach tab button (decision 11) is built separately once the Coach tab redesign lands. Until then the phone's
   Meals from <coach> screens exist (`/coach-meals`) but are reached only by link; coach meals still show in Log a
   meal search with the "From <coach>" tag.
-- The phone keeps the 90-day meal history and the coach meal list inside its saved food copy (cleared on Sign out
+- The phone keeps the 91-day meal history and the coach meal list inside its saved food copy (cleared on Sign out
   with the rest of the food log), so search, "log again" and Meals from <coach> work with no signal.
 - Log a meal keeps the optional note field from the first food version (not in the mockup), so nothing a client
   could already do goes away.

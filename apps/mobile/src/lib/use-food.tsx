@@ -5,16 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { addDays, localDateOf, localToday, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealSearchItem } from '@caltracker/shared';
+import { localDateOf, localToday, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealSearchItem } from '@caltracker/shared';
 import { fetchCoachMealsCached, fetchMealHistory, fetchMealsOn, fetchTargets, readFoodCache, sendFoodOp } from './food-api';
-import { applyFoodOps, buildDeleteOp, buildSaveOp, historyWithOps, logAgainOp, mealDaysOf, type MealDraft, type PhotoChoice, type ShownMeal } from './food-logic';
+import { applyFoodOps, buildDeleteOp, buildSaveOp, historySince, historyWithOps, logAgainOp, mealDaysOf, type MealDraft, type PhotoChoice, type ShownMeal } from './food-logic';
 import { createFoodQueue, type FoodOp, type FoodQueue, type LocalMealPhoto, type MealRecord } from './food-queue';
 import { deletePhotoFiles, persistPhoto } from './outbox-files';
 import { useSession } from './session';
 import { useCoachProfile } from './use-coach-profile';
 
-/** How far back search and "log again" look. */
-const HISTORY_DAYS = 90;
 
 type DayState = { meals: MealRecord[]; status: 'loading' | 'ready' | 'offline' };
 
@@ -92,7 +90,7 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
 
   const refreshHistory = useCallback(async () => {
     try {
-      setHistory(await fetchMealHistory(me, workspaceId, addDays(localToday(), -(HISTORY_DAYS - 1))));
+      setHistory(await fetchMealHistory(me, workspaceId, historySince(localToday())));
     } catch {
       // the saved copy stays
     }
