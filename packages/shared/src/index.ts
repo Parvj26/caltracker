@@ -459,6 +459,17 @@ export type { CardText } from './community/cards';
 export { canBlock, canDelete, canPin, canReport, initialsOf, memberName, postAge, sortFeed, withoutBlocked } from './community/feed';
 export type { FeedPostLike, Viewer } from './community/feed';
 export {
+  coachFilterLabel,
+  commentCountLabel,
+  commentPreview,
+  communitySubtitle,
+  filterFeed,
+  pinnedByLabel,
+  reactionCountLabel,
+  viewAllCommentsLabel,
+} from './community/feed-view';
+export type { FeedFilter } from './community/feed-view';
+export {
   REACTIONS,
   applyReactionChange,
   groupedReactionText,
