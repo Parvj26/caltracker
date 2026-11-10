@@ -1,0 +1,68 @@
+/* The public legal pages (account-canvas Privacy board). Colours only via var(--ct-*). */
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+
+.header {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-4);
+  padding: var(--ct-space-4-5) 32px;
+  border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+}
+.brand {
+  flex: 1;
+  font-size: 20px;
+  font-weight: var(--ct-weight-screen-title);
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+.nav { display: flex; gap: var(--ct-space-4); }
+.nav a,
+.main a { color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+.nav a { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-size: var(--ct-size-body); }
+.nav a:hover,
+.main a:hover { color: var(--ct-magenta-deep); }
+
+.main {
+  width: 100%;
+  max-width: 760px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 40px var(--ct-space-6) 64px;
+}
+.main p { margin: 0; font-size: 16px; font-weight: var(--ct-weight-body); line-height: 1.55; }
+
+.heading { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.title { margin: 0; font-size: 40px; font-weight: var(--ct-weight-screen-title); }
+.main .updated { font-size: 14px; font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-4) var(--ct-space-4-5);
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-drop);
+}
+.main .summary p { font-size: var(--ct-size-body); line-height: 1.5; }
+.main .summaryTitle { font-size: 16px; font-weight: var(--ct-weight-screen-title); }
+
+.section { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.sectionTitle { margin: 0; font-size: 22px; font-weight: var(--ct-weight-screen-title); }
+
+@media (max-width: 599.98px) {
+  .header { padding: var(--ct-space-3-5) var(--ct-space-4); }
+  .main { padding: var(--ct-space-6) var(--ct-space-4) 48px; }
+  .title { font-size: 32px; }
+}

@@ -1,3 +1,4 @@
+import { LegalLinks } from '@/components/legal-links';
 import { AuthShell, ErrorText } from '@/components/ui';
 import { SignInForm } from './sign-in-form';
 import styles from './sign-in.module.css';
@@ -12,6 +13,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         </ErrorText>
       ) : null}
       <SignInForm />
+      <LegalLinks className={styles.legal} />
     </AuthShell>
   );
 }

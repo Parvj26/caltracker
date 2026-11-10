@@ -7,6 +7,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // The tab and home-screen icons must load without a session (they're requested on the sign-in page).
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).*)'],
+  // The tab and home-screen icons must load without a session (they're requested on the sign-in page), and so must the
+  // public privacy policy and terms. Those two are left out by exact path (`$`), so /privacy-x or /terms/x still need one.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|privacy$|terms$).*)'],
 };
