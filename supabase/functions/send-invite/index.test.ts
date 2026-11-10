@@ -342,7 +342,7 @@ t('coach of A cannot invite into workspace B (403)', async () => {
 });
 
 // Admins (admin dashboard, "Resend invite"). The caller's admin_can_invite RPC is mocked here: a real aal2 session
-// needs TOTP sign-in, and admin_can_invite itself (roles, aal2, audit) is covered by
+// needs TOTP sign-in, and admin_can_invite itself (roles, aal2, which emails, audit) is covered by
 // supabase/tests/admin_invite_check.test.sql. Everything else (is_coach_of, the tables) is the real local stack.
 type RpcResult = { data: unknown; error: { code: string; message: string } | null };
 function adminRpcMocked(result: RpcResult, calls: unknown[]) {
@@ -444,7 +444,7 @@ t('aal1 admin is refused 403', async () => {
   assertEquals(sent.length, 0);
 });
 
-t('admin check failing for another reason is 500', async () => {
+t('admin check failing for another reason is still 403 for a non-coach', async () => {
   const { wsB } = await setup();
   const support = await makeUser('support', 'Sue', 'Port');
   const { mailer, sent } = fakeMailer();
@@ -453,7 +453,7 @@ t('admin check failing for another reason is 500', async () => {
     { workspaceId: wsB, invites: [{ email: 'x@x.com', firstName: 'X' }] },
     await jwtFor(support.email),
   );
-  assertEquals(res.status, 500);
+  assertEquals(res.status, 403);
   await res.body?.cancel();
   assertEquals(sent.length, 0);
 });

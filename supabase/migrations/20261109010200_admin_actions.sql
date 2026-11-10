@@ -99,19 +99,28 @@ begin
 end;
 $$;
 
--- For actions done outside SQL: the admin site writes the audit row first, then acts.
+-- For actions done outside SQL: the admin site writes the audit row first, then acts. Only password_reset: a resend
+-- is audited by admin_can_invite (send-invite), so it is never logged twice. p_target is a user or null; p_details
+-- is at most 2 KB.
 create function public.admin_log_action(p_action text, p_target uuid, p_details jsonb) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   perform private.admin_require('support');
-  if p_action is null or p_action not in ('password_reset', 'resend_invite') then
+  if p_action is null or p_action not in ('password_reset') then
     raise exception 'admin: unknown action' using errcode = '22023';
+  end if;
+  if p_target is not null and not exists (select 1 from auth.users u where u.id = p_target) then
+    raise exception 'admin: target is not a user' using errcode = '22023';
+  end if;
+  if octet_length(coalesce(p_details, '{}'::jsonb)::text) > 2048 then
+    raise exception 'admin: details too large' using errcode = '22023';
   end if;
   perform private.admin_audit(p_action, p_target, p_details);
 end;
 $$;
 
--- Queues a 'test' push for the user (send-push sends it at once, ignoring preferences and quiet hours).
+-- Queues a 'test' push for the user (send-push sends it at once, ignoring preferences and quiet hours). At most one
+-- a minute per user, so a double-click (or a script) can't spam their phone.
 create function public.admin_send_test_push(p_user_id uuid) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -120,6 +129,14 @@ begin
   perform private.admin_require('support');
   if not exists (select 1 from auth.users u where u.id = p_user_id) then
     raise exception 'admin: no such user' using errcode = 'P0002';
+  end if;
+  -- Serialise concurrent calls for this user so both can't pass the check.
+  perform pg_advisory_xact_lock(hashtextextended('admin_send_test_push:' || p_user_id::text, 0));
+  if exists (
+    select 1 from public.push_outbox o
+    where o.user_id = p_user_id and o.type = 'test' and o.created_at > now() - interval '60 seconds'
+  ) then
+    raise exception 'admin: test notification already sent, wait a minute';
   end if;
   v_id := gen_random_uuid();
   insert into public.push_outbox (id, user_id, workspace_id, type, group_key)

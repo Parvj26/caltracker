@@ -1,7 +1,7 @@
 -- Admin support actions, the test notification and "View as" data
 -- (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(57);
+select plan(63);
 
 select tests.create_user('aa-owner@t.local', 'Olive Owner') as owner \gset
 select tests.create_user('aa-support@t.local', 'Sue Port') as support \gset
@@ -103,23 +103,46 @@ select results_eq($$select target_user_id, details - 'invite_id' from public.adm
 -- test push row inserted.
 select tests.act_as_aal(:'support', 'aal2');
 select public.admin_send_test_push(:'lee') as push_id \gset
+select throws_ok(format('select public.admin_send_test_push(%L)', :'lee'), 'P0001',
+  'admin: test notification already sent, wait a minute', 'a second test push within 60 seconds is refused');
 reset role;
+select is((select count(*)::int from public.push_outbox where user_id = :'lee' and type = 'test'), 1,
+  'the refused second test push queued nothing');
+-- A minute later another one is fine.
+update public.push_outbox set created_at = now() - interval '61 seconds' where id = :'push_id';
+select tests.act_as_aal(:'support', 'aal2');
+select public.admin_send_test_push(:'lee') as push_id2 \gset
+reset role;
+update public.push_outbox set created_at = now() where id = :'push_id';
+delete from public.push_outbox where id = :'push_id2';
+select set_config('request.jwt.claims', '', true);
+-- (the audit log is append-only, so the second send's audit row stays; it is counted below)
 select results_eq(format('select user_id, workspace_id, type, sent_at from public.push_outbox where id = %L', :'push_id'),
   format($$values (%L::uuid, %L::uuid, 'test'::text, null::timestamptz)$$, :'lee', :'ws'), 'test push row inserted');
-select results_eq($$select target_user_id, details->>'push_id' from public.admin_audit_log where action = 'send_test_push'$$,
-  format($$values (%L::uuid, %L::text)$$, :'lee', :'push_id'), 'send_test_push writes one audit row');
+select results_eq($$select target_user_id, details->>'push_id' from public.admin_audit_log where action = 'send_test_push' order by id limit 1$$,
+  format($$values (%L::uuid, %L::text)$$, :'lee', :'push_id'), 'send_test_push writes an audit row with the push id');
 select throws_ok($$insert into public.push_outbox (user_id, type, group_key) values (gen_random_uuid(), 'nope', 'x')$$,
   '23514', null, 'other unknown types are still refused');
 
--- log_action: only password_reset and resend_invite.
+-- log_action: only password_reset (a resend is audited by admin_can_invite, once).
 select tests.act_as_aal(:'support', 'aal2');
+select throws_ok(format('select public.admin_log_action(%L, %L, %L)', 'resend_invite', :'lee', '{}'), '22023',
+  'admin: unknown action', 'log_action no longer accepts resend_invite');
+select throws_ok(format('select public.admin_log_action(%L, %L, %L)', 'password_reset', gen_random_uuid(), '{}'), '22023',
+  'admin: target is not a user', 'log_action rejects a target that is not a user');
+select throws_ok(format('select public.admin_log_action(%L, %L, %L)', 'password_reset', :'lee',
+    jsonb_build_object('note', repeat('x', 2100))), '22023',
+  'admin: details too large', 'log_action rejects details over 2 KB');
+select lives_ok(format('select public.admin_log_action(%L, null, %L)', 'password_reset', '{"email": "nobody@t.local"}'),
+  'log_action accepts no target');
 select lives_ok(format('select public.admin_log_action(%L, %L, %L)', 'password_reset', :'lee', '{"email": "aa-lee@t.local"}'),
   'support logs a password reset');
 select throws_ok(format('select public.admin_log_action(%L, %L, %L)', 'drop_everything', :'lee', '{}'), '22023',
   'admin: unknown action', 'log_action rejects unknown action');
 reset role;
-select results_eq($$select target_user_id, details from public.admin_audit_log where action = 'password_reset'$$,
-  format($$values (%L::uuid, '{"email": "aa-lee@t.local"}'::jsonb)$$, :'lee'), 'password_reset writes one audit row');
+select results_eq($$select target_user_id, details from public.admin_audit_log where action = 'password_reset' order by id$$,
+  format($$values (null::uuid, '{"email": "nobody@t.local"}'::jsonb), (%L::uuid, '{"email": "aa-lee@t.local"}'::jsonb)$$, :'lee'),
+  'password_reset writes one audit row per call; refused calls write none');
 
 -- view as snapshot keys: a client with data.
 select tests.act_as_aal(:'support', 'aal2');
@@ -155,8 +178,8 @@ select ok((:'snap_removed'::jsonb->'today'->>'date') is not null, 'snapshot for 
 
 -- each action wrote one audit row with the right action.
 select results_eq('select action, count(*)::int from public.admin_audit_log group by action order by action',
-  $$values ('cancel_invite'::text, 1), ('log_timeline_view', 1), ('password_reset', 1), ('remove_client', 1),
-    ('send_test_push', 1), ('view_as_snapshot', 2)$$,
+  $$values ('cancel_invite'::text, 1), ('log_timeline_view', 1), ('password_reset', 2), ('remove_client', 1),
+    ('send_test_push', 2), ('view_as_snapshot', 2)$$,
   'each action writes one audit row with the right action');
 select results_eq($$select target_user_id from public.admin_audit_log where action = 'log_timeline_view'$$,
   format($$values (%L::uuid)$$, :'lee'), 'the timeline view is logged against the client');

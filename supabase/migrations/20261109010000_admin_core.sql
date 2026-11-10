@@ -135,7 +135,7 @@ begin
 end;
 $$;
 
--- Adds an admin or changes their role, by account email (any case). Returns their user id.
+-- Adds an admin or changes their role, by account email (any case; confirmed accounts only). Returns their user id.
 create function public.admin_set_admin(p_email text, p_role public.admin_role) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -148,7 +148,8 @@ begin
     raise exception 'admin: role is required' using errcode = '22023';
   end if;
 
-  select u.id, u.email into v_user, v_email from auth.users u where lower(u.email) = lower(btrim(p_email));
+  select u.id, u.email into v_user, v_email from auth.users u
+  where lower(u.email) = lower(btrim(p_email)) and u.email_confirmed_at is not null;
   if v_user is null then
     raise exception 'admin: no account with that email' using errcode = 'P0002';
   end if;

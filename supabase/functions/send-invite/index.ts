@@ -141,9 +141,11 @@ export function createHandler(deps: HandlerDeps) {
           p_emails: [...new Set(invites.map((i) => i.email))],
         },
       );
-      if (adminError?.code === '42501') return json({ error: 'Forbidden' }, 403);
-      if (adminError) return json({ error: 'Could not verify permissions' }, 500);
-      if (canInvite !== true) return json({ error: 'Forbidden' }, 403);
+      // Any failure refuses: a non-coach gets 403 whatever went wrong. Unexpected errors are logged here.
+      if (adminError && adminError.code !== '42501') {
+        console.error('send-invite: admin_can_invite failed', adminError.code, adminError.message);
+      }
+      if (adminError || canInvite !== true) return json({ error: 'Forbidden' }, 403);
       const { data: owner, error: ownerError } = await admin
         .from('workspace_members')
         .select('user_id')

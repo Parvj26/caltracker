@@ -1,12 +1,13 @@
 -- Admin roles, audit log and admin management (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(49);
+select plan(50);
 
 select tests.create_user('ac-owner@t.local', 'Olive Owner') as owner \gset
 select tests.create_user('ac-support@t.local', 'Sue Port') as support \gset
 select tests.create_user('ac-ro@t.local', 'Rita Reader') as ro \gset
 select tests.create_user('ac-nobody@t.local', 'No Body') as nobody \gset
 select tests.create_user('ac-new@t.local', 'Ned New') as newbie \gset
+select tests.create_user('ac-unconfirmed@t.local', 'Una Confirmed', false) as unconfirmed \gset
 -- Bootstrap is a plain SQL insert (docs/runbooks/admin.md), never a migration.
 insert into public.admin_users (user_id, role)
 values (:'owner', 'owner'), (:'support', 'support'), (:'ro', 'readonly');
@@ -103,6 +104,8 @@ select results_eq('select email, first_name, last_name, role::text from public.a
   'owner lists every admin with name, email and role');
 select throws_ok(format('select public.admin_set_admin(%L, %L)', 'ghost@t.local', 'support'), 'P0002',
   'admin: no account with that email', 'an unknown email is refused');
+select throws_ok(format('select public.admin_set_admin(%L, %L)', 'ac-unconfirmed@t.local', 'support'), 'P0002',
+  'admin: no account with that email', 'an account whose email is not confirmed is refused');
 select lives_ok(format('select public.admin_set_admin(%L, %L)', 'ac-new@t.local', 'readonly'), 'owner changes Ned to readonly');
 reset role;
 select is((select role::text from public.admin_users where user_id = :'newbie'), 'readonly', 'the role was updated');
