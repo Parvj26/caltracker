@@ -2712,6 +2712,16 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      account_deletion_info: {
+        Args: { p_user: string }
+        Returns: {
+          client_name: string
+          coach_email: string
+          coach_first_name: string
+          is_coach: boolean
+          workspace_name: string
+        }[]
+      }
       admin_audit: {
         Args: { p_limit?: number }
         Returns: {
@@ -3261,6 +3271,13 @@ export type Database = {
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
+      storage_objects_for_user: {
+        Args: { p_user: string }
+        Returns: {
+          bucket_id: string
+          name: string
+        }[]
+      }
       take_over_workout_log: { Args: { p_log_id: string }; Returns: Json }
       unassign_program: {
         Args: { p_assignment_id: string; p_from_date: string }
