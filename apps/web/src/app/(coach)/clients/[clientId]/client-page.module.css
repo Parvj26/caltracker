@@ -15,6 +15,12 @@
 
 /* Tabs: a row of links that scrolls sideways when it doesn't fit (never wraps under itself). */
 .tabs { overflow-x: auto; border-bottom: var(--ct-border-width-card) solid var(--ct-border); }
+/* More tabs off one edge (client-tabs.tsx sets the attributes): that edge fades out, a hint that the strip scrolls. */
+.tabs[data-more-after] { mask-image: linear-gradient(to right, black calc(100% - 48px), transparent); }
+.tabs[data-more-before] { mask-image: linear-gradient(to left, black calc(100% - 48px), transparent); }
+.tabs[data-more-before][data-more-after] {
+  mask-image: linear-gradient(to right, transparent, black 48px, black calc(100% - 48px), transparent);
+}
 .tabList { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .tab {
   display: inline-flex;
