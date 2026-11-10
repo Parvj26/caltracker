@@ -29,7 +29,15 @@ export function retryDelayMs(attempt: number): number {
   return RETRY_MINUTES[i]! * 60_000;
 }
 
-export type SenderRow = OutboxRowInput & { attempts: number };
+/** An admin's "Send test notification" (public.admin_send_test_push). Not a client-facing type, so not in shared. */
+export const TEST_PUSH = {
+  title: 'CalTracker',
+  body: 'Test notification from CalTracker support',
+  route: '/today',
+} as const;
+
+type TestRowInput = Omit<OutboxRowInput, 'type'> & { type: 'test' };
+export type SenderRow = (OutboxRowInput | TestRowInput) & { attempts: number };
 
 export type UserContext = { prefs: PushPrefs; timeZone: string; badge: number; tokens: string[] };
 
@@ -65,7 +73,29 @@ export function planBatch(
   const results: FinishResult[] = [];
   const sends: PlannedSend[] = [];
   const attempts = new Map(rows.map((r) => [r.id, r.attempts]));
-  const { groups, invalid } = groupOutbox(rows);
+
+  // Test pushes go out at once, one each, whatever the preferences and quiet hours: support is checking delivery.
+  const clientRows: (OutboxRowInput & { attempts: number })[] = [];
+  for (const r of rows) {
+    if (r.type !== 'test') {
+      clientRows.push(r);
+      continue;
+    }
+    const user = ctx.get(r.userId);
+    if (!user || user.tokens.length === 0) {
+      results.push({ id: r.id, outcome: 'no_device' });
+      continue;
+    }
+    sends.push({
+      ids: [r.id],
+      groupKey: r.groupKey,
+      attempts: r.attempts,
+      tokens: user.tokens,
+      payload: { title: TEST_PUSH.title, body: TEST_PUSH.body, badge: user.badge, route: TEST_PUSH.route, type: 'test' },
+    });
+  }
+
+  const { groups, invalid } = groupOutbox(clientRows);
   for (const id of invalid) results.push({ id, outcome: 'failed', error: 'invalid data' });
 
   for (const group of groups) {

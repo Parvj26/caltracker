@@ -34,6 +34,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_id: string
+          at: string
+          details: Json
+          id: number
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          at?: string
+          details?: Json
+          id?: never
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          at?: string
+          details?: Json
+          id?: never
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      admin_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          role?: Database["public"]["Enums"]["admin_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       award_catchup_attempts: {
         Row: {
           attempts: number
@@ -2664,6 +2712,129 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      admin_audit: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          admin_id: string
+          admin_name: string
+          at: string
+          details: Json
+          id: number
+          target_name: string
+          target_user_id: string
+        }[]
+      }
+      admin_can_invite: {
+        Args: { p_emails?: string[]; p_workspace_id: string }
+        Returns: boolean
+      }
+      admin_cancel_invite: { Args: { p_invite_id: string }; Returns: undefined }
+      admin_client: { Args: { p_user_id: string }; Returns: Json }
+      admin_coach: { Args: { p_user_id: string }; Returns: Json }
+      admin_coaches: {
+        Args: never
+        Returns: {
+          clients: number
+          created_at: string
+          health: string
+          last_active: string
+          messages_7d: number
+          name: string
+          programs_assigned_7d: number
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      admin_invite_log: {
+        Args: { p_limit?: number; p_user_id?: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          expires_at: string
+          first_name: string
+          id: string
+          last_name: string
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      admin_list_admins: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          first_name: string
+          last_name: string
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }[]
+      }
+      admin_log_action: {
+        Args: { p_action: string; p_details: Json; p_target: string }
+        Returns: undefined
+      }
+      admin_log_timeline_view: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      admin_me: {
+        Args: never
+        Returns: {
+          email: string
+          role: Database["public"]["Enums"]["admin_role"]
+        }[]
+      }
+      admin_needs_attention: {
+        Args: never
+        Returns: {
+          action: string
+          invite_id: string
+          kind: string
+          name: string
+          since: string
+          user_id: string
+        }[]
+      }
+      admin_overview: { Args: never; Returns: Json }
+      admin_people: {
+        Args: never
+        Returns: {
+          coach_name: string
+          email: string
+          kind: string
+          name: string
+          user_id: string
+        }[]
+      }
+      admin_push_log: {
+        Args: { p_limit?: number; p_user_id?: string }
+        Returns: {
+          at: string
+          attempts: number
+          id: string
+          last_error: string
+          name: string
+          outcome: string
+          sent_at: string
+          type: string
+          user_id: string
+        }[]
+      }
+      admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
+      admin_remove_client: { Args: { p_user_id: string }; Returns: undefined }
+      admin_send_test_push: { Args: { p_user_id: string }; Returns: string }
+      admin_set_admin: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["admin_role"]
+        }
+        Returns: string
+      }
+      admin_view_as_snapshot: { Args: { p_user_id: string }; Returns: Json }
       apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {
@@ -3105,6 +3276,7 @@ export type Database = {
       workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }
     Enums: {
+      admin_role: "readonly" | "support" | "owner"
       block_kind: "straight" | "superset" | "choice"
       log_status: "in_progress" | "completed" | "discarded"
       member_role: "owner" | "staff" | "client"
@@ -3245,6 +3417,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      admin_role: ["readonly", "support", "owner"],
       block_kind: ["straight", "superset", "choice"],
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],

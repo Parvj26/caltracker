@@ -82,6 +82,19 @@ begin
 end;
 $$;
 
+-- Like act_as, with the JWT's authenticator assurance level: 'aal1' = password only, 'aal2' = two-step done.
+-- The admin_* functions need aal2.
+create or replace function tests.act_as_aal(user_id uuid, aal text)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', user_id, 'role', 'authenticated', 'aal', aal)::text, true);
+  set local role authenticated;
+end;
+$$;
+
 create or replace function tests.act_as_anon()
 returns void
 language plpgsql
