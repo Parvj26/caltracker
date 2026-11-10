@@ -28,7 +28,7 @@ export default function AppLayout() {
     <CommunityProvider>
     <FoodProvider>
     <PushProvider>
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
+    <Stack screenOptions={{ headerShown: false, fullScreenGestureEnabled: true, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Protected guard={hasCoach} redirectTo={landing}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="workout/[id]" />
