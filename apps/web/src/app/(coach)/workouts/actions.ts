@@ -93,7 +93,11 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
   const copy = WorkoutDoc.safeParse(duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()));
   if (!copy.success) return { ok: false, error: 'Open this workout, fix the highlighted fields and save it, then copy it.' };
 
-  const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy.data });
+  // A copy is not the coach choosing measurements again, so it doesn't change what new exercises start with.
+  const { data, error } = await supabase.rpc('save_workout', {
+    p_workspace_id: workspaceId,
+    p_doc: { ...copy.data, rememberChoices: false },
+  });
   if (error) {
     if (error.code === '23514') return { ok: false, error: error.message };
     return { ok: false, error: "Couldn't copy. Please try again." };

@@ -4,6 +4,7 @@ import { MAX_SUBSTITUTES, SET_TYPES, WorkoutSetDoc, WorkoutSubstituteDoc, substi
 import type { BlockKind, SetType, WorkoutDoc } from './schema';
 import { sectionsFromBlocks } from './sections';
 import { fitSetTargets } from './targets';
+import { effectiveTrackingType } from './measurements';
 import { validTempo } from './tempo';
 
 /**
@@ -145,7 +146,7 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
       sectionId: b.section_id,
       kind: b.kind,
       exercises: byPosition(b.workout_exercises).map((e) => {
-        const trackingType = toTrackingType(e.tracking_type ?? e.exercises?.tracking_type ?? 'weight_reps');
+        const trackingType = effectiveTrackingType(e.tracking_type, e.exercises?.tracking_type);
         return {
           id: e.id,
           exerciseId: e.exercise_id,

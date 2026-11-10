@@ -162,6 +162,17 @@ describe('logRowToDoc', () => {
     expect(got).toMatchObject({ trackingType: 'reps_time', eachSide: true, tempo: '3-1-X-0' });
   });
 
+  it('ignores an override on a distance exercise', () => {
+    const ex = row.log_blocks.find((b) => b.position === 1)!.log_exercises[0]!;
+    const withOpts = {
+      ...row,
+      log_blocks: row.log_blocks.map((b) =>
+        b.position !== 1 ? b : { ...b, log_exercises: b.log_exercises.map((e) => (e.id !== ex.id ? e : { ...e, tracking_type: 'time' as const, exercises: { name: 'Run', tracking_type: 'distance' as const } })) },
+      ),
+    };
+    expect(logRowToDoc(withOpts).blocks[1]!.exercises.find((e) => e.id === ex.id)!.trackingType).toBe('distance');
+  });
+
   it('selects the new log exercise columns', () => {
     expect(LOG_TREE_SELECT).toContain('tracking_type, each_side, tempo');
   });

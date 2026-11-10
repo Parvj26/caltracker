@@ -140,6 +140,11 @@ describe('workoutRowToDoc', () => {
     expect(WorkoutDoc.safeParse(doc).success).toBe(true);
   });
 
+  it('ignores an override on a distance exercise (distance keeps its kind)', () => {
+    const r = row({ tracking_type: 'time', exercises: { name: 'Run', tracking_type: 'distance' } });
+    expect(workoutRowToDoc(r).blocks[0]!.exercises[0]!.trackingType).toBe('distance');
+  });
+
   it('falls back to the library kind (dropping time) on a row from before, or with none', () => {
     const ex = workoutRowToDoc(row({})).blocks[0]!.exercises[0]!;
     expect(ex).toMatchObject({ trackingType: 'weight_reps', eachSide: false, tempo: null });

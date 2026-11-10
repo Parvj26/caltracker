@@ -1,7 +1,7 @@
-import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
 import { sectionsFromBlocks } from '../workouts/sections';
+import { effectiveTrackingType } from '../workouts/measurements';
 import { validTempo } from '../workouts/tempo';
 import { parseLogSubstituteOptionLenient } from './schema';
 import type { LogSubstituteOption } from './schema';
@@ -136,7 +136,7 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
         id: e.id,
         exerciseId: e.exercise_id,
         exerciseName: e.exercises?.name ?? '',
-        trackingType: toTrackingType(e.tracking_type ?? e.exercises?.tracking_type ?? 'weight_reps'),
+        trackingType: effectiveTrackingType(e.tracking_type, e.exercises?.tracking_type),
         plannedWorkoutExerciseId: e.planned_workout_exercise_id,
         swappedFromExerciseId: e.swapped_from_exercise_id,
         note: e.note,

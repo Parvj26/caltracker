@@ -4,7 +4,7 @@
 // picked others for this workout (workout_exercises.tracking_type). Every non-empty pick of the three is one type,
 // so everything that reads a tracking type (validation, logging, formatting) follows the pick with no other change.
 // Distance exercises keep their kind: distance can't be picked, and their measurements can't be changed.
-import { FALLBACK_TRACKING_TYPE, isTrackingType } from '../exercises/tracking';
+import { FALLBACK_TRACKING_TYPE, isTrackingType, toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { distanceUnitFor } from '../units/units';
 import type { Units } from '../units/units';
@@ -114,6 +114,16 @@ export function exerciseBadges(ex: BadgeSource): { badges: string[]; help: strin
     help.push(`Tempo: seconds down, pause, up, pause.${tempo.includes('X') ? ' X means explosive.' : ''}`);
   }
   return { badges, help: help.length > 0 ? help.join(' ') : null };
+}
+
+/**
+ * What a workout or log exercise measures: its own pick (`override`, the row's tracking_type) or else the library
+ * kind. A distance exercise always keeps its kind, whatever the row says.
+ */
+export function effectiveTrackingType(override: unknown, library: unknown): TrackingType {
+  const lib = toTrackingType(library ?? 'weight_reps');
+  if (lib === 'distance' || override === null || override === undefined) return lib;
+  return toTrackingType(override);
 }
 
 /** The workspace's last choice for an exercise (exercise_prefs): null trackingType means the library kind. */

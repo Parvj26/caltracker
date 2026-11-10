@@ -166,6 +166,7 @@ export {
   MEASUREMENT_NAMES,
   applyExercisePrefs,
   canPickMeasurements,
+  effectiveTrackingType,
   exerciseBadges,
   measurementsLabel,
   measurementsOf,
