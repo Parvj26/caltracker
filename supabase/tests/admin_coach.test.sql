@@ -1,5 +1,5 @@
 begin;
-select plan(79);
+select plan(83);
 
 -- Admin "Add coach" and "Delete coach" (migration 20261110004000_admin_coach.sql). The admin-coach Edge Function
 -- checks owner + aal2 with admin_require_owner (the caller's JWT), then calls the service-role functions with the
@@ -58,15 +58,42 @@ select is((select array_agg(id::text order by id::text collate "C") from storage
         'message-images', 'scan-attachments']::text[],
   'the bucket list is the reviewed one (a new bucket with workspace folders must be added to admin_coach_delete_files)');
 
+-- A foreign key that refuses (restrict / no action) to lose a workspace row would make the workspace delete fail
+-- whenever a row in ANOTHER workspace points at it. Each one must be checked by private.admin_delete_coach_blocker,
+-- which refuses clearly (before any file is removed) instead. Reviewed list, then: the blocker names each table.
+select is(
+  (select array_agg(k order by k collate "C") from (
+   select format('%s(%s)>%s', c.conrelid::regclass,
+      (select string_agg(a.attname, ',' order by a.attnum) from pg_attribute a
+       where a.attrelid = c.conrelid and a.attnum = any(c.conkey)), c.confrelid::regclass) as k
+   from pg_constraint c
+   where c.contype = 'f' and c.confdeltype in ('r', 'a')
+     and exists (select 1 from information_schema.columns x
+                 where x.table_schema = 'public' and x.column_name = 'workspace_id'
+                   and to_regclass('public.' || quote_ident(x.table_name)) = c.confrelid)) y),
+  array['log_exercises(exercise_id)>exercises', 'workout_exercises(exercise_id)>exercises',
+        'workout_substitutes(exercise_id)>exercises']::text[] collate "C",
+  'every restrict / no-action key into a workspace table is on the reviewed list');
+select is(
+  (select array_agg(c.conrelid::regclass::text order by c.conrelid::regclass::text)
+   from pg_constraint c
+   where c.contype = 'f' and c.confdeltype in ('r', 'a')
+     and exists (select 1 from information_schema.columns x
+                 where x.table_schema = 'public' and x.column_name = 'workspace_id'
+                   and to_regclass('public.' || quote_ident(x.table_name)) = c.confrelid)
+     and position(format('public.%s ', c.conrelid::regclass::text)
+                  in pg_get_functiondef('private.admin_delete_coach_blocker(uuid, uuid)'::regprocedure)) = 0),
+  null, 'the delete blocker checks every one of them');
+
 -- ---------- Structure and grants ----------
 select ok((select c.relrowsecurity from pg_class c where c.oid = 'public.closed_workspace_clients'::regclass),
   'closed_workspace_clients has RLS');
 select is((select count(*)::int from pg_policies where schemaname = 'public' and tablename = 'closed_workspace_clients'),
   0, 'closed_workspace_clients has no policies (functions only)');
-select table_privs_are('public', 'closed_workspace_clients', 'authenticated', array[]::text[],
-  'authenticated has no privileges on closed_workspace_clients');
-select table_privs_are('public', 'closed_workspace_clients', 'anon', array[]::text[],
-  'anon has no privileges on closed_workspace_clients');
+select ok(not bool_or(has_table_privilege(r, 'public.closed_workspace_clients', p)),
+  'anon, authenticated and the service role have no table privileges on closed_workspace_clients')
+from unnest(array['anon', 'authenticated', 'service_role']) r
+cross join unnest(array['select', 'insert', 'update', 'delete', 'truncate', 'references', 'trigger']) p;
 
 select ok(
   bool_and(has_function_privilege('service_role', f, 'execute'))
@@ -350,6 +377,28 @@ select throws_ok(format('select public.admin_delete_coach(%L, %L, %L)', :'owner'
 reset role;
 select set_config('request.jwt.claims', '', true);
 delete from public.admin_users where user_id = :'sam';
+-- Maya's workout lists Sam's custom exercise as a substitute (on delete restrict): refused before anything goes.
+select tests.create_exercise(:'sam_ws', 'AC Sam swing') as sam_ex \gset
+select tests.create_workout(:'ws2', 'AC Maya day') as maya_workout \gset
+select we.id as maya_we from public.workout_exercises we join public.workout_blocks b on b.id = we.block_id
+where b.workout_id = :'maya_workout' \gset
+insert into public.workout_substitutes (workout_exercise_id, position, exercise_id, sets)
+values (:'maya_we', 0, :'sam_ex', jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'setType', 'normal',
+  'targetRepsMin', 8, 'targetRepsMax', 8, 'targetWeightKg', 20, 'targetDurationS', null, 'targetDistanceM', null,
+  'toFailure', false, 'restSeconds', 90, 'note', null)));
+select tests.act_as_aal(:'owner', 'aal2');
+select is(public.admin_coach_delete_preview(:'sam_ws') ->> 'blocker',
+  'Another workspace uses this coach''s custom exercises, so it can''t be deleted. Ask a developer.',
+  'a substitute in another workspace using its custom exercise blocks the delete');
+reset role;
+select set_config('request.jwt.claims', '', true);
+set local role service_role;
+select throws_ok(format('select public.admin_delete_coach(%L, %L, %L)', :'owner', :'sam_ws', 'Sam Fit Coaching'), '55000',
+  null, 'and the delete itself refuses it');
+reset role;
+select set_config('request.jwt.claims', '', true);
+delete from public.workout_substitutes where workout_exercise_id = :'maya_we';
+delete from public.workouts where id = :'maya_workout';
 select is((select count(*)::int from public.workspaces where id in (:'ws', :'sam_ws')), 2, 'refusals change nothing');
 select is((select count(*) from public.admin_audit_log), (select n from audit_before), 'refusals write no audit row');
 
@@ -391,10 +440,10 @@ select is((select count(*)::int from public.workout_logs where id = :'kay_old_lo
   'Kay keeps her log in Maya''s workspace');
 select is((select count(*)::int from public.past_clients where workspace_id = :'ws2' and user_id = :'kay'), 1,
   'Kay keeps her past-client record with Maya');
-select results_eq(
-  'select user_id, email, first_name, last_name, workspace_name from public.closed_workspace_clients order by email',
-  format($$values (%L::uuid, 'ac-kay@t.local'::text, 'Kay'::text, 'Client'::text, 'Luis Bueno Coaching'::text),
-                  (%L::uuid, 'ac-vic@t.local', 'Vic', 'Client', 'Luis Bueno Coaching')$$, :'kay', :'vic'),
+select set_eq(
+  'select user_id, first_name, last_name, workspace_name from public.closed_workspace_clients',
+  format($$values (%L::uuid, 'Kay'::text, 'Client'::text, 'Luis Bueno Coaching'::text),
+                  (%L::uuid, 'Vic', 'Client', 'Luis Bueno Coaching')$$, :'kay', :'vic'),
   'both clients are recorded as clients of a closed workspace');
 
 -- The coaches: still there until the Edge Function deletes them; Olga keeps Maya's membership.
@@ -413,11 +462,15 @@ select is((select count(*) from public.admin_audit_log), (select n from audit_be
 select results_eq(
   format($$select admin_id, target_user_id, details ->> 'workspace_name', details -> 'counts' -> 'clients',
     details -> 'counts' -> 'programs', details -> 'counts' -> 'workouts', details -> 'counts' -> 'shared_meals',
-    details -> 'deleted_account_ids'
+    details -> 'deleted_account_ids', details -> 'client_ids'
     from public.admin_audit_log where action = 'delete_coach'$$),
-  format($$values (%L::uuid, %L::uuid, 'Luis Bueno Coaching'::text, '2'::jsonb, '1'::jsonb, '1'::jsonb, '1'::jsonb, %L::jsonb)$$,
-    :'owner', :'coach', jsonb_build_array(:'coach', :'stan')),
-  'delete_coach is audited with the workspace name, counts and deleted accounts');
+  format($$values (%L::uuid, %L::uuid, 'Luis Bueno Coaching'::text, '2'::jsonb, '1'::jsonb, '1'::jsonb, '1'::jsonb, %L::jsonb,
+    %L::jsonb)$$,
+    :'owner', :'coach', jsonb_build_array(:'coach', :'stan'), jsonb_build_array(:'kay', :'vic')),
+  'delete_coach is audited with the workspace name, counts, deleted accounts and the clients');
+
+-- Vic changes her email after the delete: inviting her again goes by her current address.
+update auth.users set email = 'ac-vic-new@t.local' where id = :'vic';
 
 -- The Edge Function's next step works: deleting the coaches' accounts.
 select lives_ok(format('delete from auth.users where id in (%L, %L)', :'coach', :'stan'),
@@ -430,7 +483,9 @@ select tests.act_as_aal(:'owner', 'aal2');
 select results_eq(format('select kind, coach_name from public.admin_people() where user_id = %L', :'vic'),
   $$values ('client'::text, null::text)$$, 'Vic is listed as a client with no coach (Clients page: "No coach")');
 select tests.act_as_aal(:'support', 'aal2');
-select ok(public.admin_can_invite(:'ws2', array['ac-vic@t.local']), 'support can invite Vic to another coach');
+select ok(public.admin_can_invite(:'ws2', array['ac-vic-new@t.local']), 'support can invite Vic to another coach');
+select ok(not public.admin_can_invite(:'ws2', array['ac-vic@t.local']),
+  'by her current email only (the old address is no longer hers)');
 select tests.act_as(:'vic');
 select results_eq('select workspace_name from public.my_removal()', $$values ('Luis Bueno Coaching'::text)$$,
   'the phone tells Vic which coach closed');

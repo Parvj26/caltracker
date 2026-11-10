@@ -19,15 +19,14 @@
 
 create table public.closed_workspace_clients (
   -- Deleting the account (the in-app "delete my account") erases this record too.
+  -- No email copy: the invite check and the client email use the account's current address (auth.users).
   user_id uuid primary key references auth.users on delete cascade,
-  email text not null,
   first_name text not null default '',
   last_name text not null default '',
   workspace_name text not null,
   joined_at timestamptz,
   closed_at timestamptz not null default now()
 );
-create index closed_workspace_clients_email_idx on public.closed_workspace_clients (lower(email));
 -- Read and written only by the security definer functions below.
 revoke all on table public.closed_workspace_clients from public, anon, authenticated, service_role;
 alter table public.closed_workspace_clients enable row level security;
@@ -99,11 +98,14 @@ language sql stable security definer set search_path = '' as $$
     when exists (select 1 from public.workspace_members m join public.admin_users a on a.user_id = m.user_id
                  where m.workspace_id = p_ws and m.role in ('owner', 'staff'))
       then 'A coach in this workspace is a CalTracker admin. Remove them on the Admins page first.'
-    -- Workouts and logs refuse to lose an exercise (on delete restrict). Another workspace can't normally use this
-    -- workspace's custom exercises; refuse clearly instead of failing on the foreign key if one ever does.
+    -- Workouts, substitutes and logs refuse to lose an exercise (on delete restrict). Another workspace can't normally
+    -- use this workspace's custom exercises; refuse clearly (before any file is removed) instead of failing on the
+    -- foreign key if one ever does. supabase/tests/admin_coach.test.sql checks every such key is covered here.
     when exists (select 1 from public.workout_exercises we join public.workout_blocks b on b.id = we.block_id
                  join public.workouts w on w.id = b.workout_id join public.exercises e on e.id = we.exercise_id
                  where e.workspace_id = p_ws and w.workspace_id <> p_ws)
+      or exists (select 1 from public.workout_substitutes s join public.exercises e on e.id = s.exercise_id
+                 where e.workspace_id = p_ws and s.workspace_id <> p_ws)
       or exists (select 1 from public.log_exercises le join public.log_blocks b on b.id = le.block_id
                  join public.workout_logs l on l.id = b.log_id join public.exercises e on e.id = le.exercise_id
                  where e.workspace_id = p_ws and l.workspace_id <> p_ws)
@@ -269,20 +271,20 @@ begin
   v_counts := private.admin_workspace_counts(p_workspace_id);
   v_accounts := private.admin_workspace_accounts_to_delete(p_workspace_id);
 
-  insert into public.closed_workspace_clients (user_id, email, first_name, last_name, workspace_name, joined_at)
-  select m.user_id, lower(btrim(u.email)), coalesce(p.first_name, ''), coalesce(p.last_name, ''), v_name, m.created_at
+  insert into public.closed_workspace_clients (user_id, first_name, last_name, workspace_name, joined_at)
+  select m.user_id, coalesce(p.first_name, ''), coalesce(p.last_name, ''), v_name, m.created_at
   from public.workspace_members m
-  join auth.users u on u.id = m.user_id
   left join public.profiles p on p.id = m.user_id
   where m.workspace_id = p_workspace_id and m.role = 'client'
   on conflict (user_id) do update
-    set email = excluded.email, first_name = excluded.first_name, last_name = excluded.last_name,
+    set first_name = excluded.first_name, last_name = excluded.last_name,
         workspace_name = excluded.workspace_name, joined_at = excluded.joined_at, closed_at = now();
 
-  select coalesce(jsonb_agg(jsonb_build_object('user_id', c.user_id, 'email', c.email, 'first_name', c.first_name)
-           order by c.email), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('user_id', c.user_id, 'email', lower(btrim(u.email)),
+           'first_name', c.first_name) order by lower(btrim(u.email))), '[]'::jsonb)
   into v_clients
   from public.closed_workspace_clients c
+  join auth.users u on u.id = c.user_id
   join public.workspace_members m on m.user_id = c.user_id and m.workspace_id = p_workspace_id and m.role = 'client';
 
   perform private.admin_audit_as(p_admin_id, 'delete_coach', v_owner, jsonb_build_object(
@@ -390,7 +392,8 @@ begin
       select 1 from unnest(v_emails) e
       where not exists (select 1 from public.client_invites i where lower(i.email::text) = e)
         and not exists (select 1 from public.past_clients pc where lower(pc.email) = e)
-        and not exists (select 1 from public.closed_workspace_clients c where lower(c.email) = e)
+        and not exists (select 1 from public.closed_workspace_clients c join auth.users u on u.id = c.user_id
+                        where lower(u.email) = e)
     )
   then
     return false;

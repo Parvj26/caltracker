@@ -558,7 +558,6 @@ export type Database = {
       closed_workspace_clients: {
         Row: {
           closed_at: string
-          email: string
           first_name: string
           joined_at: string | null
           last_name: string
@@ -567,7 +566,6 @@ export type Database = {
         }
         Insert: {
           closed_at?: string
-          email: string
           first_name?: string
           joined_at?: string | null
           last_name?: string
@@ -576,7 +574,6 @@ export type Database = {
         }
         Update: {
           closed_at?: string
-          email?: string
           first_name?: string
           joined_at?: string | null
           last_name?: string
