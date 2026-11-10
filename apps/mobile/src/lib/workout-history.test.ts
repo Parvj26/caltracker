@@ -122,6 +122,33 @@ describe('historyLogFromRow', () => {
     expect(historyLogFromRow(row({ logged_by: 'coach' }), 'c1', new Set())).toMatchObject({ loggedByCoach: true, loggedBy: 'coach', pr: false });
     expect(historyLogFromRow(row({ finished_at: null }), 'c1', new Set())).toBeNull();
   });
+
+  it('reads what the workout measured (log_exercises.tracking_type) over the library kind for volume', () => {
+    const one = (tracking_type: HistoryLogRow['log_blocks'][number]['log_exercises'][number]['tracking_type'], library: 'time' | 'weight_reps') =>
+      row({
+        log_blocks: [
+          {
+            id: 'b1',
+            kind: 'straight',
+            picked_exercise_id: null,
+            log_exercises: [
+              {
+                id: 'e1',
+                tracking_type,
+                exercises: { tracking_type: library },
+                log_sets: [{ set_type: 'normal', actual_reps: 10, actual_weight_kg: 20, completed_at: '2026-11-06T17:10:00Z' }],
+              },
+            ],
+          },
+        ],
+      });
+    // A plank picked as weight, reps and time counts weight × reps; picked as weight only it does not.
+    expect(historyLogFromRow(one('weight_reps_time', 'time'), 'c1', new Set())?.volumeKg).toBe(200);
+    expect(historyLogFromRow(one('weight', 'weight_reps'), 'c1', new Set())?.volumeKg).toBe(0);
+    // Older selects (and the library kind) still work.
+    expect(historyLogFromRow(one(null, 'weight_reps'), 'c1', new Set())?.volumeKg).toBe(200);
+    expect(historyLogFromRow(one(undefined, 'time'), 'c1', new Set())?.volumeKg).toBe(0);
+  });
 });
 
 describe('who logged it', () => {
