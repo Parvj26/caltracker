@@ -15,6 +15,8 @@ How to read this list:
 - [x] Usage tracking (PostHog) on staging
 
 ## 1. Decisions needed from you first
+- [x] **Privacy policy names "CalTracker" only** (no personal name), contact support@caltracker.app. Decided 2026-11-10.
+- [ ] **Optional: register a business** if you want your name off Apple's App Store "Seller" line. Form an LLC or similar (~$50–300), get a free D-U-N-S number (1–2 weeks), then ask Apple to convert the developer account to Organization.
 - [ ] **Production database region.** Staging is East US. Same, or closer to where Luis's clients live?
 - [ ] **Who gets the daily error email?** For example, just you, or you and Luis.
 - [ ] **Client deletes their account:** should Luis get an email telling him?
