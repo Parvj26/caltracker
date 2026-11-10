@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { requireCoach } from '@/lib/auth';
 import { getWorkoutDoc } from '@/lib/page-data';
+import { createServerSupabase } from '@/lib/supabase/server';
+import { loadExercisePrefs } from '@/lib/workouts';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteWorkout } from './delete-workout';
@@ -17,7 +19,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function WorkoutPage({ params }: { params: Promise<{ id: string }> }) {
   const { units, workspaceId } = await requireCoach();
   const { id } = await params;
-  const loaded = await getWorkoutDoc(id);
+  const [loaded, prefs] = await Promise.all([
+    getWorkoutDoc(id),
+    createServerSupabase().then((s) => loadExercisePrefs(s, workspaceId)),
+  ]);
   // A client's calendar copy is edited from that client's calendar, not from the library.
   if (!loaded || loaded.clientId !== null) notFound();
 
@@ -33,7 +38,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         </div>
       </header>
       {/* key: opening a different workout starts a fresh builder. */}
-      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} workspaceId={workspaceId} mode="library" />
+      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} workspaceId={workspaceId} mode="library" initialPrefs={prefs} />
     </div>
   );
 }
