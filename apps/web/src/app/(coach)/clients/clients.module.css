@@ -235,6 +235,8 @@
 .searchInput:focus-visible { outline: none; }
 /* Takes the room between search and Sort and wraps its own chips, so Sort stays at the end of the row. */
 .filters { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); flex: 1 1 0; min-width: 0; }
+/* On a phone the search box takes its own row, so the chips are not squeezed past the screen edge. */
+@media (max-width: 599.98px) { .searchField { flex-basis: 100%; } }
 .filterChip {
   display: inline-flex;
   align-items: center;

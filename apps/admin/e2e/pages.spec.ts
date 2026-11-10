@@ -185,3 +185,28 @@ test('coaches table and coach page', async ({ page }) => {
   await expect(page.getByRole('link', { name: `Parv J${t}` })).toBeVisible();
   await expect(page.getByText('MEALS SHARED')).toBeVisible();
 });
+
+test('clients are grouped by coach, with removed clients under No coach', async ({ page }) => {
+  const t = tag();
+  const coach = await seedCoach('Luis', `Bueno${t}`, `Grouped Coaching ${t}`);
+  const kept = await seedClient(coach.workspaceId, 'Gina', `G${t}`);
+  const removed = await seedClient(coach.workspaceId, 'Rory', `R${t}`);
+  // Removed as the coach would: a past-client record, then the membership goes.
+  sql(`insert into public.past_clients (workspace_id, user_id, email, first_name, last_name)
+       values (${lit(coach.workspaceId)}, ${lit(removed.id)}, ${lit(removed.email)}, 'Rory', ${lit(`R${t}`)})`);
+  sql(`delete from public.workspace_members where workspace_id = ${lit(coach.workspaceId)} and user_id = ${lit(removed.id)}`);
+  const owner = await createUser({ role: 'owner', enrolled: true });
+  await signInAdmin(page, owner);
+  await page.goto('/clients');
+
+  const panel = page.getByRole('region', { name: `Luis Bueno${t}` });
+  await expect(panel).toContainText('1 client');
+  await expect(panel.getByRole('columnheader')).toHaveText(['CLIENT', 'EMAIL']);
+  await expect(panel.getByRole('row', { name: new RegExp(`Gina G${t}`) })).toContainText(kept.email);
+  await expect(panel.getByText(`Rory R${t}`)).toHaveCount(0);
+
+  const noCoach = page.getByRole('region', { name: 'No coach' });
+  await expect(noCoach).toContainText('Removed or their coach was deleted');
+  await noCoach.getByRole('link', { name: `Rory R${t}` }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${removed.id}$`));
+});
