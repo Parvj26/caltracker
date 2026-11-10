@@ -5,7 +5,7 @@ import { purgeStorage as defaultPurgeStorage, type StorageObject } from '../_sha
 import { renderWorkspaceClosedEmail } from './email.ts';
 
 // Admin site "Add coach" and "Delete coach" (owner admins only, two-step sign-in). The admin site has no service-role
-// key: it calls this function with the admin's JWT, as it does send-invite. Migration 20261110003000_admin_coach.sql.
+// key: it calls this function with the admin's JWT, as it does send-invite. Migration 20261110004000_admin_coach.sql.
 //
 // POST { action: 'create', email, firstName, lastName, workspaceName }
 //   200 { created: true, userId, workspaceId }

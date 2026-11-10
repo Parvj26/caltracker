@@ -1,7 +1,7 @@
 begin;
 select plan(79);
 
--- Admin "Add coach" and "Delete coach" (migration 20261110003000_admin_coach.sql). The admin-coach Edge Function
+-- Admin "Add coach" and "Delete coach" (migration 20261110004000_admin_coach.sql). The admin-coach Edge Function
 -- checks owner + aal2 with admin_require_owner (the caller's JWT), then calls the service-role functions with the
 -- admin's id. This file proves the database half: who may call what, that creating makes the workspace and the owner
 -- membership, and that deleting removes every row of the workspace in every table while client accounts, their rows
