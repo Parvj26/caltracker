@@ -89,7 +89,12 @@ export function WorkoutSheet({
     close();
   }
 
-  const ask = () => new Promise<Choice>((resolve) => setAsking(() => resolve));
+  // The builder calls saveWith inside a transition, and React holds a transition's updates until it finishes, which
+  // would never happen while this waits for the answer. Yielding once first makes the update an ordinary one.
+  const ask = async () => {
+    await Promise.resolve();
+    return new Promise<Choice>((resolve) => setAsking(() => resolve));
+  };
   function answer(c: Choice) {
     asking?.(c);
     setAsking(null);
