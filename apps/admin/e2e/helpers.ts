@@ -111,11 +111,49 @@ export async function signInAdmin(page: Page, user: TestUser) {
   await expect(page).toHaveURL(/\/overview$/);
 }
 
-/** Audit rows written for a target user (or by an admin), newest first. */
-export function auditActions(o: { adminId?: string; targetId?: string }): string[] {
-  const where = [o.adminId ? `admin_id = ${lit(o.adminId)}` : null, o.targetId ? `target_user_id = ${lit(o.targetId)}` : null]
+/**
+ * Audit rows written for a target user (or by an admin), newest first. Timeline views are left out unless asked for:
+ * every render of a client page logs one (each render asks PostHog).
+ */
+export function auditActions(o: { adminId?: string; targetId?: string; withTimelineViews?: boolean }): string[] {
+  const where = [
+    o.adminId ? `admin_id = ${lit(o.adminId)}` : null,
+    o.targetId ? `target_user_id = ${lit(o.targetId)}` : null,
+    o.withTimelineViews ? null : `action <> 'log_timeline_view'`,
+  ]
     .filter(Boolean)
     .join(' and ');
   const out = sql(`select action from public.admin_audit_log where ${where || 'true'} order by id desc`);
   return out === '' ? [] : out.split('\n');
+}
+
+/** A short random tag for unique names in parallel runs (letters only, so smart search treats it as one word). */
+export function tag(): string {
+  return Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+}
+
+export type Coach = TestUser & { workspaceId: string; workspaceName: string };
+
+/** A coach (plain account, not an admin) who owns a new workspace. */
+export async function seedCoach(firstName: string, lastName: string, workspaceName: string): Promise<Coach> {
+  const user = await createUser({ firstName, lastName });
+  const workspaceId = sql(`insert into public.workspaces (name) values (${lit(workspaceName)}) returning id`).split('\n')[0]!;
+  sql(`insert into public.workspace_members (workspace_id, user_id, role) values (${lit(workspaceId)}, ${lit(user.id)}, 'owner')`);
+  return { ...user, workspaceId, workspaceName };
+}
+
+/** A client of the workspace (a confirmed account with a membership, as after accepting an invite). */
+export async function seedClient(workspaceId: string, firstName: string, lastName: string): Promise<TestUser> {
+  const user = await createUser({ firstName, lastName });
+  sql(`insert into public.workspace_members (workspace_id, user_id, role) values (${lit(workspaceId)}, ${lit(user.id)}, 'client')`);
+  return user;
+}
+
+/** An invite that expired yesterday (sent 3 days ago, so the resend cooldown has passed). Returns its id. */
+export function seedExpiredInvite(coach: Coach, email: string, firstName: string, lastName: string): string {
+  return sql(
+    `insert into public.client_invites (workspace_id, email, first_name, last_name, token_hash, sent_at, expires_at, created_by)
+     values (${lit(coach.workspaceId)}, ${lit(email)}, ${lit(firstName)}, ${lit(lastName)},
+       md5(random()::text), now() - interval '3 days', now() - interval '1 day', ${lit(coach.id)}) returning id`,
+  ).split('\n')[0]!;
 }
