@@ -366,7 +366,7 @@ export type Database = {
           accepted_at: string | null
           accepted_by: string | null
           created_at: string | null
-          created_by: string
+          created_by: string | null
           email: string
           expires_at: string
           first_name: string
@@ -381,7 +381,7 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           email: string
           expires_at?: string
           first_name?: string
@@ -396,7 +396,7 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           email?: string
           expires_at?: string
           first_name?: string

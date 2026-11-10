@@ -6,13 +6,15 @@
 
 -- 1. Foreign keys that blocked or outlived a deletion -------------------------------------------------------------
 
--- Invites hold the client's name and email: the accepted invite goes with the account. A coach's invites go with
--- the coach (created_by is not null, so set null is impossible).
+-- Invites hold the client's name and email: the accepted invite goes with the client's account. An invite belongs to
+-- the workspace, not to the coach who sent it: deleting a coach (dashboard or script) keeps every invite they sent,
+-- other clients' accepted and pending ones and their plans, with the sender cleared.
 alter table public.client_invites
   drop constraint client_invites_accepted_by_fkey,
   add constraint client_invites_accepted_by_fkey foreign key (accepted_by) references auth.users on delete cascade,
+  alter column created_by drop not null,
   drop constraint client_invites_created_by_fkey,
-  add constraint client_invites_created_by_fkey foreign key (created_by) references auth.users on delete cascade;
+  add constraint client_invites_created_by_fkey foreign key (created_by) references auth.users on delete set null;
 create index if not exists client_invites_accepted_by_idx on public.client_invites (accepted_by);
 create index if not exists client_invites_created_by_idx on public.client_invites (created_by);
 

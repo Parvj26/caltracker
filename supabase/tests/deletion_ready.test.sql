@@ -1,5 +1,5 @@
 begin;
-select plan(49);
+select plan(54);
 
 -- Account deletion (Apple requires it in the app). The delete-account Edge Function removes the client's files
 -- through the Storage API, then deletes the auth user; this file proves the database half: deleting the auth user
@@ -26,7 +26,7 @@ select is(
     'body_measurements(client_id)>auth.users:c', 'body_measurements(entered_by)>auth.users:n',
     'client_documents(client_id)>auth.users:c', 'client_documents(uploaded_by)>auth.users:n',
     'client_goals(client_id)>auth.users:c',
-    'client_invites(accepted_by)>auth.users:c', 'client_invites(created_by)>auth.users:c',
+    'client_invites(accepted_by)>auth.users:c', 'client_invites(created_by)>auth.users:n',
     'client_limitations(client_id)>auth.users:c',
     'client_notes(client_id)>auth.users:c', 'client_notes(created_by)>auth.users:n',
     'client_stats(client_id)>auth.users:c',
@@ -375,6 +375,26 @@ select is((select kay_stickers from after_counts), (select kay_stickers from bef
 select is((select kay_invites from after_counts), (select kay_invites from before_counts), 'Kay keeps her invite record');
 select is((select kay_posts from after_counts), (select kay_posts from before_counts), 'Kay keeps her community post');
 select is((select communities from after_counts), (select communities from before_counts), 'the community remains');
+
+-- ---------- Deleting a coach (dashboard or script) never takes the workspace's invites with them ----------
+-- An invite belongs to the workspace: when the coach who sent it goes, it stays with created_by cleared.
+select tests.create_user('dr-staff@t.local', 'Stan Staff') as stan \gset
+insert into public.workspace_members (workspace_id, user_id, role) values (:'ws', :'stan', 'staff');
+select tests.create_invite(:'ws', 'dr-kay2@t.local', 'Kay Two', :'stan', 'dr-stan-accepted') as stan_accepted \gset
+update public.client_invites set accepted_at = now(), accepted_by = :'kay' where id = :'stan_accepted';
+select tests.create_invite(:'ws', 'dr-new@t.local', 'New Client', :'stan', 'dr-stan-pending') as stan_pending \gset
+insert into public.client_invite_plan_items (invite_id, workspace_id, program_id, start_on)
+values (:'stan_pending', :'ws', :'prog', current_date);
+select lives_ok(format('delete from auth.users where id = %L', :'stan'), 'deleting a staff coach succeeds');
+select is((select count(*)::int from public.client_invites where id in (:'stan_accepted', :'stan_pending')), 2,
+  'the invites the staff coach sent (accepted and pending) stay with the workspace');
+select is((select count(*)::int from public.client_invites
+           where id in (:'stan_accepted', :'stan_pending') and created_by is null), 2,
+  'their sender is cleared');
+select is((select count(*)::int from public.client_invite_plan_items where invite_id = :'stan_pending'), 1,
+  'the pending invite keeps its plan');
+select is((select accepted_by from public.client_invites where id = :'stan_accepted'), :'kay'::uuid,
+  'Kay''s accepted invite still points at Kay');
 
 select * from finish();
 rollback;
