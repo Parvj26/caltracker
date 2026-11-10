@@ -2712,6 +2712,51 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      admin_audit: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          admin_id: string
+          admin_name: string
+          at: string
+          details: Json
+          id: number
+          target_name: string
+          target_user_id: string
+        }[]
+      }
+      admin_client: { Args: { p_user_id: string }; Returns: Json }
+      admin_coach: { Args: { p_user_id: string }; Returns: Json }
+      admin_coaches: {
+        Args: never
+        Returns: {
+          clients: number
+          created_at: string
+          health: string
+          last_active: string
+          messages_7d: number
+          name: string
+          programs_assigned_7d: number
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      admin_invite_log: {
+        Args: { p_limit?: number; p_user_id?: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          expires_at: string
+          first_name: string
+          id: string
+          last_name: string
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
       admin_list_admins: {
         Args: never
         Returns: {
@@ -2728,6 +2773,42 @@ export type Database = {
         Returns: {
           email: string
           role: Database["public"]["Enums"]["admin_role"]
+        }[]
+      }
+      admin_needs_attention: {
+        Args: never
+        Returns: {
+          action: string
+          invite_id: string
+          kind: string
+          name: string
+          since: string
+          user_id: string
+        }[]
+      }
+      admin_overview: { Args: never; Returns: Json }
+      admin_people: {
+        Args: never
+        Returns: {
+          coach_name: string
+          email: string
+          kind: string
+          name: string
+          user_id: string
+        }[]
+      }
+      admin_push_log: {
+        Args: { p_limit?: number; p_user_id?: string }
+        Returns: {
+          at: string
+          attempts: number
+          id: string
+          last_error: string
+          name: string
+          outcome: string
+          sent_at: string
+          type: string
+          user_id: string
         }[]
       }
       admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
