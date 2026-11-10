@@ -30,7 +30,7 @@ export default tseslint.config(
       },
     },
   },
-  ...nextVitals.map((c) => ({ ...c, files: ['apps/web/**/*.{js,jsx,ts,tsx}'] })),
+  ...nextVitals.map((c) => ({ ...c, files: ['apps/web/**/*.{js,jsx,ts,tsx}', 'apps/admin/**/*.{js,jsx,ts,tsx}'] })),
   {
     files: ['**/*.{js,mjs,cjs}'],
     ...tseslint.configs.disableTypeChecked,

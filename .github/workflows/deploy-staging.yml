@@ -1,6 +1,7 @@
 name: Deploy staging
 
-# Deploys migrations, the Edge Functions (send-invite, accept-invite) and the web app to staging.
+# Deploys migrations, the Edge Functions (send-invite, accept-invite), the web app (staging.caltracker.app) and the admin
+# site (admin.caltracker.app, on the staging database until go-live; docs/runbooks/admin.md) to staging.
 # Automatic runs start only after the CI workflow succeeds on a push to main (workflow_run), so a red merge never
 # reaches staging. Manual runs must be started from main.
 # Uses repository secrets (GitHub Environments are not available on this plan). See docs/runbooks/staging.md.
@@ -126,6 +127,16 @@ jobs:
           NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
         run: pnpm --filter web cf:build
 
+      # The admin site, built against the same staging project with the anon key only (no service role). The STAGING tag
+      # shows until NEXT_PUBLIC_APP_ENV is production. Its PostHog settings are Worker secrets, set once by hand.
+      - name: Build admin site for Cloudflare
+        if: steps.newest.outputs.skip != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_ENV: staging
+        run: pnpm --filter admin cf:build
+
       - name: Link Supabase staging project
         if: steps.newest.outputs.skip != 'true'
         run: supabase link --project-ref "$STAGING_SUPABASE_PROJECT_REF"
@@ -159,6 +170,20 @@ jobs:
         run: |
           for attempt in 1 2 3 4 5; do
             if pnpm --filter web cf:deploy; then exit 0; fi
+            echo "::warning::Cloudflare upload attempt $attempt failed; retrying in $((attempt * 10)) s"
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Deploy admin site to Cloudflare Workers
+        if: steps.newest.outputs.skip != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Same retry as the web app (see above).
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if pnpm --filter admin cf:deploy; then exit 0; fi
             echo "::warning::Cloudflare upload attempt $attempt failed; retrying in $((attempt * 10)) s"
             sleep $((attempt * 10))
           done

@@ -17,7 +17,7 @@ The company (today just the PO) needs to see how the business is doing: coaches,
 ## Architecture (option A)
 
 - **New app, `apps/admin`:** Next.js 16 on Cloudflare Workers via OpenNext, set up like `apps/web` and sharing `packages/shared` and `packages/design-tokens`. It never imports from `apps/web`.
-- **Domains:** `admin.caltracker.app` (production) and `admin-staging.caltracker.app` (staging). Each is its own Worker with its own deploy job, triggered only by changes under `apps/admin`, `packages/*` or `supabase/*`.
+- **Domain (PO decision, 2026-11-10, overrides the earlier two-domain plan):** one admin site, `admin.caltracker.app` (Worker `caltracker-admin`). Until go-live it uses the **staging** database and shows a STAGING tag in the header (`NEXT_PUBLIC_APP_ENV` is not `production`); at go-live it is rebuilt against production and the tag goes away. There is no `admin-staging` site. It deploys with the staging deploy workflow.
 - **Database:** the same Supabase project as the rest of the environment. The admin site uses the anon key plus the signed-in admin's session. **No service-role key in the admin site.**
 - **All reads and writes go through `public.admin_*` SECURITY DEFINER functions** (RPC). There are no direct table reads from the admin site. Every function:
   1. calls `private.admin_require(min_role)`, which raises `42501` unless the caller has a row in `admin_users` with a role at or above `min_role` **and** the JWT `aal` claim is `aal2` (two-step done);
@@ -120,7 +120,7 @@ The admin site renders it with simple read-only versions of those screens under 
 
 ## Rollout
 
-1. Staging only: migration, then deploy `admin-staging.caltracker.app` (DNS route like the web Worker), set the `POSTHOG_PERSONAL_KEY` Worker secret, then bootstrap the PO as owner.
+1. Staging database first: migration, then deploy `admin.caltracker.app` (DNS route like the web Worker) built against staging, set the PostHog Worker secrets, then bootstrap the PO as owner.
 2. The PO tries it.
 3. Production when production exists.
 

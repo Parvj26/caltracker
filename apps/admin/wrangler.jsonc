@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  // admin.caltracker.app. Until go-live it is built against the STAGING Supabase project (NEXT_PUBLIC_APP_ENV=staging
+  // shows the STAGING tag); at go-live the build switches to production values. No Cloudflare bindings in app code.
+  "name": "caltracker-admin",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "caltracker-admin" }],
+  "routes": [{ "pattern": "admin.caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" }]
+  // No "vars" here on purpose: a deploy replaces the Worker's plain vars with this file's, which would blank them.
+  // POSTHOG_PROJECT_ID and POSTHOG_PERSONAL_KEY are set once as Worker secrets (they survive deploys); see
+  // docs/runbooks/admin.md.
+}

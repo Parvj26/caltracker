@@ -1,0 +1,42 @@
+'use client';
+
+import { useState } from 'react';
+import { ConfirmAction } from '@/components/confirm-dialog';
+import { SelectField, TextField } from '@/components/ui';
+import styles from '@/components/admin.module.css';
+import { setAdmin } from './actions';
+
+const ROLE_HELP: Record<string, string> = {
+  owner: 'Owner: everything, including adding and removing admins.',
+  support: 'Support: sees everything and can run support actions.',
+  readonly: 'Readonly: sees the pages with emails hidden; no actions.',
+};
+
+/** Add by email, pick a role. The account must already exist (they sign up in the app first). */
+export function AddAdminForm() {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('support');
+  return (
+    <div className={styles.filters}>
+      <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
+      <SelectField label="Role" value={role} onChange={(e) => setRole(e.target.value)} hint={ROLE_HELP[role] ?? ''}>
+        <option value="support">Support</option>
+        <option value="readonly">Readonly</option>
+        <option value="owner">Owner</option>
+      </SelectField>
+      <ConfirmAction
+        label="Add admin"
+        title="Add this admin?"
+        confirmLabel="Add admin"
+        className={styles.actionButton}
+        action={async () => {
+          const result = await setAdmin(email, role);
+          if (result.ok) setEmail('');
+          return result;
+        }}
+      >
+        <p>{email || 'This account'} becomes {role}. They sign in here with their CalTracker password and set up two-step.</p>
+      </ConfirmAction>
+    </div>
+  );
+}

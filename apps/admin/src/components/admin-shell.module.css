@@ -1,0 +1,70 @@
+.shell { display: flex; flex-direction: column; min-height: 100dvh; background: var(--ct-surface-sidebar); }
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-4);
+  background: var(--ct-surface-sidebar);
+  border-bottom: 2px solid var(--ct-border);
+}
+.brand { display: flex; align-items: center; gap: var(--ct-space-2); font-size: 20px; font-weight: 800; padding: 0 10px 4px; }
+.staging {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 2px solid var(--ct-ink);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-tape);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.role { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: var(--ct-ink-muted); padding: 0 10px 8px; }
+.links { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); }
+.link {
+  padding: 10px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ct-ink);
+}
+.link:hover { background: var(--ct-surface); }
+.active { background: var(--ct-lime); border-color: var(--ct-ink); font-weight: 800; }
+.active:hover { background: var(--ct-lime); }
+.spacer { display: none; }
+.who { font-size: 13px; font-weight: 500; color: var(--ct-ink-muted); padding: 8px 10px 0; }
+.signOut {
+  margin: 0 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  color: var(--ct-ink);
+  min-height: 32px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: var(--ct-space-4);
+  background: var(--ct-bg);
+}
+
+@media (min-width: 900px) {
+  .shell { flex-direction: row; }
+  .nav { flex: 0 0 220px; padding: 24px 16px; border-bottom: 0; border-right: 2px solid var(--ct-border); position: sticky; top: 0; height: 100dvh; }
+  .role { padding-bottom: 16px; }
+  .links { flex-direction: column; flex-wrap: nowrap; }
+  .spacer { display: block; flex: 1; }
+  .main { padding: 32px; }
+}
