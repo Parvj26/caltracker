@@ -37,6 +37,8 @@ test('logs: the Person search finds a typo, picking filters the rows, × shows e
   await page.getByRole('link', { name: 'Invites' }).click();
   await expect(page).toHaveURL(new RegExp(`tab=invites&person=${coach.id}`));
   await page.getByRole('link', { name: 'Notifications' }).click();
+  // Wait for the tab to load: × clears the person on the tab it was rendered for.
+  await expect(page).toHaveURL(new RegExp(`tab=notifications&person=${coach.id}`));
   await page.getByRole('button', { name: 'Clear person (show everyone)' }).click();
   await expect(page).not.toHaveURL(/person=/);
   await expect(page.getByRole('row', { name: new RegExp(`Kay K${t}`) })).toBeVisible();
