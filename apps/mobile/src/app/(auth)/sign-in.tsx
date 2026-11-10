@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { AuthShell } from '@/components/auth-shell';
+import { LegalLinks } from '@/components/legal-links';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
@@ -45,6 +46,7 @@ export default function SignIn() {
       {error ? <ErrorText>{error}</ErrorText> : null}
       <Button testID="submit-button" title={busy ? 'Signing in...' : 'Sign in'} onPress={() => void submit()} busy={busy} />
       <TextButton testID="go-sign-up" href="/sign-up" title="Create an account" />
+      <LegalLinks />
     </AuthShell>
   );
 }

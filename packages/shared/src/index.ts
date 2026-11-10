@@ -598,3 +598,5 @@ export { lifetimeAnimalLine, zooTile } from './progress/zoo';
 export * from './analytics/index';
 export * from './push/index';
 export * from './admin/index';
+export { PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL, supportMailto } from './support/support-mailto';
+export type { SupportSurface } from './support/support-mailto';

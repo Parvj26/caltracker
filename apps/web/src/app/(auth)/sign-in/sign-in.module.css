@@ -9,3 +9,14 @@
 }
 
 .lead { margin: 0; }
+
+/* "Privacy · Terms" under the form. */
+.legal { display: flex; justify-content: center; gap: var(--ct-space-4); margin-top: calc(-1 * var(--ct-space-4)); }
+.legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  color: var(--ct-ink-muted);
+}

@@ -77,6 +77,23 @@
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 
 .navItem { position: relative; }
+
+/* "Privacy · Terms" under Sign out. */
+.legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--ct-space-3);
+  padding: var(--ct-space-1) var(--ct-space-2-5) 0;
+}
+.legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  color: var(--ct-ink-muted);
+}
+.legal a:hover { color: var(--ct-ink); }
 .navBadge {
   margin-left: auto;
   min-width: 20px;
@@ -107,6 +124,7 @@
   .nav, .bottom { width: 100%; }
   .navItem { justify-content: center; width: 44px; padding: 0; margin: 0 auto; }
   .navBadge { position: absolute; top: 2px; right: 0; margin: 0; }
+  .legal { flex-direction: column; align-items: center; padding: 0; }
   .navLabel {
     position: absolute;
     width: 1px;

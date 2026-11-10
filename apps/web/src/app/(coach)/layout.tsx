@@ -1,8 +1,10 @@
 import { CoachAvatar } from '@/components/coach-avatar';
+import { LegalLinks } from '@/components/legal-links';
 import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
+import { HelpNavLink } from './help-nav-link';
 import { NAV_ICONS } from './nav-icons';
 import { loadUnreadTotal } from './messages/data';
 import { MessagesNavLink } from './messages-nav-link';
@@ -54,12 +56,14 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         </nav>
         <div className={styles.bottom}>
           <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
+          <HelpNavLink />
           <form action="/auth/sign-out" method="post">
             <button type="submit" data-ph-capture-attribute-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
               {NAV_ICONS.signOut}
               <span className={styles.navLabel}>Sign out</span>
             </button>
           </form>
+          <LegalLinks className={styles.legal} />
         </div>
       </aside>
       <main id="main-content" tabIndex={-1} className={styles.content}>{children}</main>
