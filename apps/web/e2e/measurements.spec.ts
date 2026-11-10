@@ -196,3 +196,24 @@ test('at iPhone width each exercise is one compact table', async ({ page }) => {
   // No sideways scrolling.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test('duplicating a workout copies its measurements but leaves the remembered choices alone', async ({ page }) => {
+  const ex = await customExercise('Hip Thrust');
+  await signInAsCoach(page);
+  const name = await newWorkout(page, ex);
+  workouts.push(`${name} (copy)`);
+  await measurements(page, ex).click();
+  await page.getByRole('dialog', { name: `Measurements for ${ex}` }).getByRole('checkbox', { name: 'Time' }).check();
+  await page.keyboard.press('Escape');
+  await save(page);
+  const exId = exercises[exercises.length - 1]!;
+  // Pretend the coach has since chosen otherwise for this exercise.
+  const { error } = await admin.from('exercise_prefs').update({ tracking_type: null, each_side: true }).eq('exercise_id', exId);
+  if (error) throw error;
+
+  await page.getByRole('button', { name: 'Duplicate workout' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: `${name} (copy)` })).toBeVisible();
+  await expect(measurements(page, ex)).toHaveText('Weight · Reps · Time');
+  const prefs = await admin.from('exercise_prefs').select('tracking_type, each_side').eq('exercise_id', exId).single();
+  expect(prefs.data).toEqual({ tracking_type: null, each_side: true });
+});
