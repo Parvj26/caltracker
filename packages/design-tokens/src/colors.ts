@@ -25,11 +25,13 @@ export const colors: { light: Record<ColorToken, string> } = {
     ink: '#121212',
     inkMuted: 'rgba(18, 18, 18, 0.6)',
     lime: '#C8F169',
-    pink: '#FFC9E3',
+    // 2026-11-09: the PO swapped pink for blue. Token names kept so nothing else changes:
+    // pink = light blue, drop = very light blue, magenta = strong blue, magentaDeep = deep blue.
+    pink: '#B9E3FF',
     blue: '#B9E3FF',
-    drop: '#FFE3F0',
-    magenta: '#E0408A',
-    magentaDeep: '#B32C6C',
+    drop: '#E3F3FF',
+    magenta: '#2F6FE0',
+    magentaDeep: '#1F4FB0',
     amber: '#FFB020',
     celebrateBg: '#FFF8D9',
     tape: '#FFE48A',

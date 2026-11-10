@@ -37,11 +37,11 @@
 | `ink` | `#121212` | Text, primary buttons, icons |
 | `ink-muted` | `#121212` @ 60% | Secondary text |
 | `lime` | `#C8F169` | Completed sets, positive stats, primary-button base shadow |
-| `pink` | `#FFC9E3` | PRs, celebration, unread counts |
+| `pink` | `#B9E3FF` (light blue since 2026-11-09) | PRs, celebration, unread counts |
 | `blue` | `#B9E3FF` | Last-workout / info tiles |
-| `drop` | `#FFE3F0` | Drop-set rows |
-| `magenta` | `#E0408A` | Handwritten notes, Finish button, urgent dots |
-| `magenta-deep` | `#B32C6C` | Finish button base shadow |
+| `drop` | `#E3F3FF` (very light blue) | Drop-set rows |
+| `magenta` | `#2F6FE0` (strong blue) | Handwritten notes, Finish button, urgent dots |
+| `magenta-deep` | `#1F4FB0` (deep blue) | Finish button base shadow |
 | `amber` | `#FFB020` | Warnings (e.g. "program ends Fri") |
 | `celebrate-bg` | `#FFF8D9` | Badge reveal background |
 | `tape` | `#FFE48A` | Sticker-book tape strip |

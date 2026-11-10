@@ -20,7 +20,7 @@ describe('textStyle', () => {
     const hand = textStyle('hand', 'phone');
     expect(hand.fontFamily).toBe('BricolageGrotesque_700Bold');
     expect(hand.fontSize).toBe(17);
-    expect(hand.color).toBe('#B32C6C');
+    expect(hand.color).toBe('#1F4FB0');
     expect(hand.transform).toBeUndefined();
   });
 
