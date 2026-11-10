@@ -57,9 +57,16 @@ export function serviceClient(): SupabaseClient<Database> {
   return createClient<Database>(url, key, { auth: { persistSession: false } });
 }
 
-/** One set row of the builder, e.g. setRow(page, 'Barbell Squat', 'set 1') or 'drop after set 3'. */
+/** One set row of the builder by its place, e.g. setRow(page, 'Barbell Squat', 'set 1') (warm-ups and drops count). */
 export function setRow(page: Page, exercise: string, row: string): Locator {
   return page.getByRole('group', { name: `${exercise} ${row}`, exact: true });
+}
+
+/** Picks a set's type from its letter menu: 'Warm-up', 'Normal', 'Failure' or 'Drop set'. */
+export async function pickSetType(row: Locator, type: 'Warm-up' | 'Normal' | 'Failure' | 'Drop set') {
+  await row.getByRole('button', { name: /^Set type: / }).click();
+  await row.getByRole('menuitemradio', { name: type, exact: true }).click();
+  await expect(row.getByRole('button', { name: `Set type: ${type}`, exact: true })).toBeVisible();
 }
 
 /**

@@ -79,52 +79,162 @@
 .exercise { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .exercise + .exercise { padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .exerciseName { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
-.exerciseFooter, .blockFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
-.exerciseNote { flex: 1 1 240px; display: flex; }
+.blockFooter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+/* "+ Set (copies last set)", then the exercise note on its own line below. */
+.exerciseFooter { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-3); }
+.exerciseNote { align-self: stretch; display: flex; }
 .exerciseNote .input { width: 100%; }
 
 /* ---------- Set rows ---------- */
-/* Wide enough: the caption row and every set row share one grid template (set inline from set-columns.ts), so the
-   captions sit over their inputs. Narrow: the cells wrap and the captions hide; placeholders and names still say
-   what each box is, and each box gets its own small caption above it. The widest row (range reps, weight with its
-   unit, rest, note and both buttons) needs about 966 px. */
-.sets { display: flex; flex-direction: column; gap: var(--ct-space-1); container-type: inline-size; }
-.setRow { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-1) var(--ct-space-2); border-radius: var(--ct-radius-input); }
-.dropRow { background: var(--ct-drop); }
-.setCells, .columnCaptions { display: grid; align-items: center; gap: var(--ct-space-2); }
-.columnCaptions {
-  padding: 0 var(--ct-space-2);
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
-  color: var(--ct-ink-muted);
+/* Each set is a small card (approved editor mockup): its number, the type letter, one box per target with a caption
+   above it, and a × in the top-right corner. Rows wrap on narrow screens; a drop is indented under the set above. */
+.sets { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.setRow {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-3) calc(var(--ct-tap-min) + var(--ct-space-2)) var(--ct-space-3) var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-bg);
 }
-@container (max-width: 969px) {
-  .setCells { display: flex; flex-wrap: wrap; align-items: flex-end; }
-  .columnCaptions { display: none; }
-  .setCells [data-caption] { flex-wrap: wrap; }
-  /* Visual only: each input's accessible name already says what it is. */
-  .setCells [data-caption]::before {
-    content: attr(data-caption) / '';
-    flex: 1 0 100%;
-    font-size: var(--ct-size-caption);
-    font-weight: var(--ct-weight-caption);
-    color: var(--ct-ink-muted);
-  }
-  .dropRow { margin-left: var(--ct-space-6); }
+.dropRow { margin-left: var(--ct-space-6); }
+.setCells { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
+.setLabel {
+  align-self: center;
+  min-width: 20px;
+  margin-top: var(--ct-space-4);
+  font-weight: var(--ct-weight-button);
+  font-variant-numeric: tabular-nums;
 }
-.setLabel { width: 24px; text-align: center; font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
-.dropTag { width: 7rem; font-weight: var(--ct-weight-section-heading); }
-.typeSelect { width: 7rem; cursor: pointer; }
-.reps { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
-.narrow { width: 6rem; text-align: right; font-variant-numeric: tabular-nums; }
-.rangeInput { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
-.unitField { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
-.toggle { min-width: 4.5rem; font-size: var(--ct-size-caption); }
-.check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); cursor: pointer; }
-.check input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
-.noteInput { flex: 1 1 160px; width: 100%; min-width: 8rem; }
-.rowActions { display: flex; gap: var(--ct-space-1); }
+.field { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.fieldCaption { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.fieldBox { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
+.unit { color: var(--ct-ink-muted); }
+.narrow { width: 6rem; min-height: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.removeSet {
+  position: absolute;
+  top: var(--ct-space-1);
+  right: var(--ct-space-1);
+  display: grid;
+  place-items: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.removeSet:hover:not(:disabled) { background: var(--ct-surface); }
+.removeSet:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
 .rowError { padding-left: var(--ct-space-6); }
+
+/* Set type: one letter (W warm-up, N normal, F failure, D drop set), coloured from the design tokens. */
+.typeWrap { position: relative; }
+.kindButton {
+  width: 52px;
+  height: 48px;
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-section-heading);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.kindButton:hover, .kindButtonOpen { border-color: var(--ct-ink); }
+.kindW { background: var(--ct-celebrate-bg); }
+.kindN { background: var(--ct-bg); }
+.kindF { background: var(--ct-danger-bg); color: var(--ct-danger); }
+.kindD { background: var(--ct-drop); }
+.kindMenu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--ct-space-1));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 230px;
+  padding: var(--ct-space-1);
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-ink);
+  box-shadow: var(--ct-shadow-sticker);
+}
+.kindItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-bg);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  cursor: pointer;
+}
+.kindItem:hover:not(:disabled), .kindItem:focus-visible, .kindItemOn { background: color-mix(in srgb, var(--ct-bg) 14%, var(--ct-ink)); }
+.kindItem:focus-visible { outline: 2px solid var(--ct-bg); outline-offset: -2px; }
+.kindItem:disabled { cursor: not-allowed; opacity: 0.5; }
+.kindChip {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+}
+.kindChip.kindF { color: var(--ct-danger); }
+.kindTick { margin-left: auto; }
+
+/* ---------- Exercise header ---------- */
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.iconButton:hover:not(:disabled) { border-color: var(--ct-ink); }
+.iconButton:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
+.swapName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-1);
+  border: 0;
+  border-bottom: 2px dashed var(--ct-ink-muted);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.swapName:hover { border-bottom-color: var(--ct-ink); }
+.addSet {
+  min-height: 48px;
+  padding: 0 var(--ct-space-4);
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.addSetHint { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
 .addRow { display: flex; flex-wrap: wrap; gap: var(--ct-space-3); }
 
