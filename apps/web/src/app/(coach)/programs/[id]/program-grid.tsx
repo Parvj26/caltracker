@@ -131,6 +131,7 @@ export function ProgramGrid({
   const [addingWeek, setAddingWeek] = useState(false);
   // The details as last saved, so "+ Add week" doesn't save half-typed edits.
   const savedDetails = useRef({ name: program.name, description: program.description });
+  const [savedName, setSavedName] = useState(program.name);
   const dndId = useId();
 
   const sensors = useSensors(
@@ -320,6 +321,7 @@ export function ProgramGrid({
         weeks={weeks}
         onSaved={(details, newWeeks, removed, expected) => {
           savedDetails.current = details;
+          setSavedName(details.name);
           setWeeks(newWeeks);
           setSlots((s) => s.filter((x) => x.week <= newWeeks));
           markSaved();
@@ -468,7 +470,7 @@ export function ProgramGrid({
 
       {sheet ? (
         <WorkoutSheet
-          programName={savedDetails.current.name}
+          programName={savedName}
           target={sheet}
           units={units}
           workspaceId={workspaceId}
