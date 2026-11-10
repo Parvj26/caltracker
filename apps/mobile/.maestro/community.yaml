@@ -32,7 +32,8 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Welcome to the group!.*'
     timeout: 15000
-- assertVisible: 'Demo Coach'
+# The author row reads "<name>, coach, <age>" as one element.
+- assertVisible: 'Demo Coach, coach, .*'
 - assertVisible:
     id: coach-badge
 - assertVisible:

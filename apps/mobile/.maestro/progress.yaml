@@ -87,7 +87,8 @@ env:
     id: date-prev
 - tapOn:
     id: date-next
-- assertVisible: 'Today.*'
+# The date reads "Date <day>, today" to VoiceOver (the screen shows "Today, <day>").
+- assertVisible: 'Date .*, today'
 # A weight that is out of range is refused in plain words.
 - tapOn:
     id: weight-input
