@@ -722,10 +722,10 @@ describe('measurements: chosen columns, each side and tempo', () => {
       weight: ['weight'],
       weight_reps: ['weight', 'reps'],
     }[trackingType] as Array<keyof typeof fields>;
-    const targets = Object.assign(
+    const targets: Record<string, unknown> = Object.assign(
       { targetWeightKg: null, targetRepsMin: null, targetRepsMax: null, targetDurationS: null },
       ...uses.map((u) => fields[u]),
-    );
+    ) as Record<string, unknown>;
     const workout = WorkoutDoc.parse({
       id: uuid(),
       name: 'Measured',

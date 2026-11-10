@@ -419,7 +419,7 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
   const fields = fieldsFor(ex);
   const eachSide = ex.eachSide === true;
   // The headings are the shared set columns' ("LB EACH | REPS EACH | TIME"), one per field logged.
-  const headings = new Map(setColumns(ex.trackingType, units, { eachSide }).map((c) => [c.field as StepField, c.heading]));
+  const headings = new Map(setColumns(ex.trackingType, units, { eachSide }).map((c) => [c.field, c.heading]));
   const indexes = setIndexes ?? ex.sets.map((_, i) => i);
   return indexes.map((si) => {
     const set = ex.sets[si];
