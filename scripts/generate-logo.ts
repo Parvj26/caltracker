@@ -9,7 +9,7 @@ import sharp from 'sharp';
 
 const LIME = '#C8F169';
 const INK = '#121212';
-const PINK = '#FFC9E3';
+const PINK = '#B9E3FF'; // the dot: blue since 2026-11-09 (name kept)
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
