@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   SendInvitesRequest,
   type SendInvitesResponse,
+  selfInviteMessage,
 } from '@caltracker/shared';
 import { renderInviteEmail } from './email.ts';
 import { upgradeLegacyInvites } from './legacy.ts';
@@ -104,6 +105,7 @@ export function createHandler(deps: HandlerDeps) {
     if (userError || !userData.user)
       return json({ error: 'Unauthorized' }, 401);
     const userId = userData.user.id;
+    const callerEmail = userData.user.email?.toLowerCase();
 
     let raw: unknown;
     try {
@@ -204,6 +206,9 @@ export function createHandler(deps: HandlerDeps) {
       const { email, firstName, lastName } = invite;
       try {
         if (memberships.some((m) => m.role === 'owner' || m.role === 'staff')) {
+          // Inviting yourself: point at the +client address that reaches the same inbox.
+          if (callerEmail && email === callerEmail)
+            return { email, status: 'is_coach', message: selfInviteMessage(callerEmail) };
           return { email, status: 'is_coach' };
         }
         const clientOf = memberships.find((m) => m.role === 'client');
