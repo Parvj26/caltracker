@@ -40,6 +40,7 @@ export function ConfirmAction({
   children,
   look = 'button',
   className,
+  disabled = false,
 }: {
   label: string;
   title: string;
@@ -48,6 +49,8 @@ export function ConfirmAction({
   children?: ReactNode;
   look?: 'button' | 'link';
   className?: string | undefined;
+  /** The opening button is disabled (say why next to it). */
+  disabled?: boolean;
 }) {
   const report = useContext(StatusContext);
   const router = useRouter();
@@ -79,7 +82,7 @@ export function ConfirmAction({
 
   return (
     <>
-      <button type="button" onClick={open} className={className ?? (look === 'link' ? styles.linkButton : styles.actionButton)}>
+      <button type="button" onClick={open} disabled={disabled} className={className ?? (look === 'link' ? styles.linkButton : styles.actionButton)}>
         {label}
       </button>
       {ownMessage ? <p role="status" className={styles.status}>✓ {ownMessage}</p> : null}

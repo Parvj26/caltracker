@@ -243,3 +243,4 @@
 .personFilterClear:hover, .personFilterClear:focus-visible { background: var(--ct-surface); }
 .searchResultActive { background: var(--ct-surface); }
 li.searchResult { cursor: pointer; }
+.actionButton:disabled, .linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
