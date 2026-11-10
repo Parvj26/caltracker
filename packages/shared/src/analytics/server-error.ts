@@ -40,14 +40,24 @@ function errorType(error: unknown, given: boolean): string {
   }
 }
 
+/** A code the server-error event accepts: snake_case, at most 40 characters. */
+export function isValidServerErrorCode(code: unknown): code is string {
+  return typeof code === 'string' && code.length <= 40 && CODE_PATTERN.test(code);
+}
+
+/** A `where` the server-error event accepts: `action:<route>` or `fn:<function>`. */
+export function isValidServerErrorWhere(where: unknown): where is string {
+  return typeof where === 'string' && WHERE_PATTERN.test(where);
+}
+
 /** True for codes that mean the server failed (`server_error` or `*_failed`), not a validation mistake. */
 export function isServerFailureCode(code: string): boolean {
   return code === 'server_error' || /^[a-z0-9_]+_failed$/.test(code);
 }
 
 export function buildServerErrorEvent(input: ServerErrorInput): ServerErrorEvent {
-  const code = typeof input.code === 'string' && input.code.length <= 40 && CODE_PATTERN.test(input.code) ? input.code : 'server_error';
-  const where = typeof input.where === 'string' && WHERE_PATTERN.test(input.where) ? input.where : 'unknown';
+  const code = isValidServerErrorCode(input.code) ? input.code : 'server_error';
+  const where = isValidServerErrorWhere(input.where) ? input.where : 'unknown';
   const user = typeof input.distinctId === 'string' && UUID_PATTERN.test(input.distinctId) ? input.distinctId : null;
   const properties: ServerErrorEvent['properties'] = {
     $exception_list: [{ type: errorType(input.error, 'error' in input && input.error !== undefined), value: code }],
