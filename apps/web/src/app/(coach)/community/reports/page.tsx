@@ -38,7 +38,7 @@ export default async function ReportsPage() {
       <header className={styles.titleRow}>
         <div className={styles.titleBlock}>
           <p className={styles.caption}>
-            <Link href="/community">← Community</Link>
+            <Link href="/community" className="tap-inline">← Community</Link>
           </p>
           <h1 className={styles.title}>Reports</h1>
           <p className={styles.caption}>Posts and comments your clients reported. Remove them, or keep them if they’re fine.</p>
