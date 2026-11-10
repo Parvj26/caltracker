@@ -168,3 +168,9 @@
 .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .filters > * { flex: 0 1 260px; }
 .details { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+
+/* Clients page: one light panel per coach, heading with a muted count beside it. */
+.groupPanel { border-color: var(--ct-border); gap: 6px; }
+.groupHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.groupNote { font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); }
+.clientCol { width: 40%; }
