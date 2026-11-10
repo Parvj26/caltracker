@@ -10,6 +10,7 @@ export {
   SendInvitesRequest,
   SendInvitesResponse,
 } from './invites/schema';
+export { clientTestEmail, selfInviteMessage } from './invites/self-invite';
 export type { InviteResultStatus } from './invites/schema';
 export {
   CLIENT_CSV_MAX_ROWS,

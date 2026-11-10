@@ -1,6 +1,7 @@
 import { assert, assertEquals } from '@std/assert';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createHandler } from './index.ts';
+import { selfInviteMessage } from '@caltracker/shared';
 import type { Mailer } from './mailer.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL') ?? 'http://127.0.0.1:54321';
@@ -550,7 +551,24 @@ t('email of a coach is is_coach, no row, no email', async () => {
     },
     jwt,
   );
-  assertEquals((await res.json()).results[0].status, 'is_coach');
+  const other = (await res.json()).results[0];
+  assertEquals(other.status, 'is_coach');
+  assertEquals(other.message, undefined);
+  assertEquals((await openInvites(wsA)).length, 0);
+  assertEquals(sent.length, 0);
+});
+
+t('inviting your own coach email suggests the +client address', async () => {
+  const { coachA, wsA, jwt } = await setup();
+  const { mailer, sent } = fakeMailer();
+  const res = await call(
+    handlerWith(mailer),
+    { workspaceId: wsA, invites: [{ email: coachA.email.toUpperCase(), firstName: 'Me' }] },
+    jwt,
+  );
+  const r = (await res.json()).results[0];
+  assertEquals(r.status, 'is_coach');
+  assertEquals(r.message, selfInviteMessage(coachA.email));
   assertEquals((await openInvites(wsA)).length, 0);
   assertEquals(sent.length, 0);
 });
