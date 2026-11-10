@@ -107,6 +107,30 @@ The `deploy` job: build the web app (`cf:build`) first, so a failed build stops 
 
 Between `supabase db push` and the end of `pnpm functions:deploy` (about 1 minute) the database is already new but the OLD send-invite function is still live. Invites sent in that window can fail with "Something went wrong" (the old function writes the old name column); the coach adds those clients again a minute later. (The other direction is covered: the new function still accepts the old dashboard's `fullName` invites for one release, so the few seconds before the new web app is live are fine.) For production deploys, either accept this one-minute gap or deploy during quiet hours.
 
+## Releasing a phone build
+
+The phone reads one row, `public.app_config`, at launch and each time it comes back to the foreground. A phone whose
+build number is below `ios_min_build` shows only the "Let's get you up to date" screen (signed in or out, no way to
+dismiss it) with an **Open TestFlight** button to `ios_update_url`. `ios_latest_build` is shown on that screen as
+"Newest (N)". If the phone can't read the row (offline, error), it never blocks.
+
+1. Upload the build and wait until TestFlight shows it **approved** (Beta App Review) and available to the external
+   **Client** group.
+2. Only then, in the Supabase Dashboard -> SQL Editor of that project (staging or production), run one statement with
+   that build number (here build 4):
+
+   ```sql
+   update public.app_config set ios_latest_build = 4, ios_min_build = 4;
+   ```
+
+   `updated_at` updates by itself. Check with `select * from public.app_config;`.
+
+**Never set `ios_min_build` before the build is approved for the Client group.** Every tester on an older build is
+blocked at once, and TestFlight has nothing newer for them to install. To undo a mistake, set it back:
+`update public.app_config set ios_min_build = 0;` (0 = nobody is blocked).
+
+Only the SQL Editor (postgres) and the service role can change the row; the app can only read it.
+
 ## Create the smoke coach (after the first deploy)
 
 The smoke job needs a real staging coach who has a password.
