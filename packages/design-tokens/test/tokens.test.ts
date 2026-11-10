@@ -19,6 +19,9 @@ describe('colour tokens (design spec section 2)', () => {
       amber: '#FFB020',
       celebrateBg: '#FFF8D9',
       tape: '#FFE48A',
+      danger: '#B3261E',
+      dangerDeep: '#8C1D18',
+      dangerBg: '#FBE9E7',
     });
   });
 });
