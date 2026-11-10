@@ -597,3 +597,4 @@ export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, Protein
 export { lifetimeAnimalLine, zooTile } from './progress/zoo';
 export * from './analytics/index';
 export * from './push/index';
+export * from './admin/index';
