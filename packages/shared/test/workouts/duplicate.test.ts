@@ -20,6 +20,10 @@ describe('copyName', () => {
     expect(copyName(long).endsWith(' (copy)')).toBe(true);
     expect(copyName(`${'a'.repeat(92)} bbbbbbb`, 100)).toBe(`${'a'.repeat(92)} (copy)`);
   });
+  it('can add another suffix, such as the week a copy is for', () => {
+    expect(copyName('Upper', 100, ' (Week 3)')).toBe('Upper (Week 3)');
+    expect(copyName('x'.repeat(100), 100, ' (Week 3)')).toBe(`${'x'.repeat(91)} (Week 3)`);
+  });
 });
 
 describe('duplicateWorkoutDoc', () => {

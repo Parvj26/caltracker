@@ -2,15 +2,18 @@ import type { WorkoutDoc } from './schema';
 
 export const COPY_SUFFIX = ' (copy)';
 
-/** "<name> (copy)", shortening the name (at a word break when it can) so the result still fits `max` characters. */
-export function copyName(name: string, max = 100): string {
+/**
+ * "<name> (copy)", shortening the name (at a word break when it can) so the result still fits `max` characters.
+ * `suffix` replaces " (copy)", e.g. " (Week 3)" for a copy made for one day of a program.
+ */
+export function copyName(name: string, max = 100, suffix = COPY_SUFFIX): string {
   const base = name.trim();
-  if (base.length + COPY_SUFFIX.length <= max) return `${base}${COPY_SUFFIX}`;
-  const room = max - COPY_SUFFIX.length;
+  if (base.length + suffix.length <= max) return `${base}${suffix}`;
+  const room = max - suffix.length;
   const cut = base.slice(0, room);
   const space = cut.lastIndexOf(' ');
   const short = (base[room] === ' ' || space < room / 2 ? cut : cut.slice(0, space)).trimEnd();
-  return `${short}${COPY_SUFFIX}`;
+  return `${short}${suffix}`;
 }
 
 /** A copy of a workout to save as a new one: every row gets a new id and the name becomes "<name> (copy)". */

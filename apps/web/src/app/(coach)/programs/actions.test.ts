@@ -15,6 +15,7 @@ function query(table: string): unknown {
     delete: () => ((call.op = 'delete'), builder),
     eq: (col: string, v: unknown) => ((call.filters[col] = v), builder),
     gt: () => builder,
+    is: (col: string, v: unknown) => ((call.filters[col] = v), builder),
     order: () => builder,
     limit: () => builder,
     maybeSingle: () => builder,
@@ -39,7 +40,8 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/auth', () => ({ requireCoach: () => Promise.resolve({ workspaceId: WS }) }));
 vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => Promise.resolve(supabase) }));
 
-import { addProgramWorkout, copyProgramWeek, duplicateProgram, updateProgram } from './actions';
+import { addStraightBlock, emptyWorkout } from '@caltracker/shared';
+import { addProgramWorkout, copyProgramWeek, duplicateProgram, saveSlotCopy, updateProgram } from './actions';
 
 const WS = '00000000-0000-4000-8000-000000000001';
 const PROGRAM = '00000000-0000-4000-8000-000000000002';
@@ -177,5 +179,46 @@ describe('copyProgramWeek', () => {
       expect((await copyProgramWeek(input)).ok).toBe(false);
     }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('saveSlotCopy ("Just Week N, Day M")', () => {
+  const COPY = '00000000-0000-4000-8000-000000000009';
+  let n = 100;
+  const makeId = () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+  const doc = () =>
+    addStraightBlock(emptyWorkout(makeId, 'Upper'), { id: makeId(), name: 'Bench', trackingType: 'weight_reps' }, makeId);
+
+  it('saves the edits as "<name> (Week N)" with new ids and points only this day at it', async () => {
+    const edited = doc();
+    respond = (call) => {
+      if (call.table === 'program_workouts' && call.op === 'select') return { data: { program_id: PROGRAM, week: 3 } };
+      if (call.rpc === 'save_workout') return { data: COPY };
+      if (call.op === 'update') return { data: [{ id: SLOT }] };
+      return {};
+    };
+    expect(await saveSlotCopy({ slotId: SLOT, doc: edited })).toEqual({ ok: true, id: COPY, name: 'Upper (Week 3)' });
+    const saved = calls.find((c) => c.rpc === 'save_workout')!.payload as { p_doc: { id: string; name: string } };
+    expect(saved.p_doc.name).toBe('Upper (Week 3)');
+    expect(saved.p_doc.id).not.toBe(edited.id);
+    const update = calls.find((c) => c.op === 'update')!;
+    expect(update).toMatchObject({ table: 'program_workouts', payload: { workout_id: COPY }, filters: { id: SLOT, workspace_id: WS } });
+  });
+
+  it('deletes the copy again when the day could not be pointed at it', async () => {
+    respond = (call) => {
+      if (call.table === 'program_workouts' && call.op === 'select') return { data: { program_id: PROGRAM, week: 1 } };
+      if (call.rpc === 'save_workout') return { data: COPY };
+      if (call.op === 'update') return { data: [] };
+      return {};
+    };
+    expect((await saveSlotCopy({ slotId: SLOT, doc: doc() })).ok).toBe(false);
+    expect(calls.find((c) => c.op === 'delete')).toMatchObject({ table: 'workouts', filters: { id: COPY, workspace_id: WS, client_id: null } });
+  });
+
+  it('refuses a day outside the workspace without saving anything', async () => {
+    respond = () => ({ data: null });
+    expect(await saveSlotCopy({ slotId: SLOT, doc: doc() })).toEqual({ ok: false, error: "Couldn't find that day. It may have been removed." });
+    expect(calls.some((c) => c.rpc === 'save_workout')).toBe(false);
   });
 });
