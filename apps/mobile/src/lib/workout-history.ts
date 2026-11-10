@@ -2,6 +2,7 @@
 // duration and unit wording come from @caltracker/shared; this only puts them together.
 import {
   isLoggedByCoach,
+  toTrackingType,
   logDurationS,
   logVolumeKg,
   formatLogDuration,
@@ -39,7 +40,7 @@ export type HistoryLog = {
 export const HISTORY_LOG_SELECT =
   'id, name, started_at, finished_at, last_activity_at, logged_by, ' +
   'log_blocks(id, kind, picked_exercise_id, ' +
-  'log_exercises(id, exercises!log_exercises_exercise_id_fkey(tracking_type), ' +
+  'log_exercises(id, tracking_type, exercises!log_exercises_exercise_id_fkey(tracking_type), ' +
   'log_sets(set_type, actual_reps, actual_weight_kg, completed_at)))';
 
 export type HistoryLogRow = {
@@ -55,6 +56,8 @@ export type HistoryLogRow = {
     picked_exercise_id: string | null;
     log_exercises: Array<{
       id: string;
+      /** What the workout measured when the coach picked other measurements (null: the library kind). */
+      tracking_type?: TrackingType | null;
       exercises: { tracking_type: TrackingType } | null;
       log_sets: Array<{
         set_type: SetType;
@@ -81,7 +84,7 @@ export function historyLogFromRow(row: HistoryLogRow, clientId: string, prLogIds
       pickedExerciseId: b.picked_exercise_id,
       exercises: b.log_exercises.map((e) => ({
         id: e.id,
-        trackingType: e.exercises?.tracking_type ?? 'weight_reps',
+        trackingType: toTrackingType(e.tracking_type ?? e.exercises?.tracking_type ?? 'weight_reps'),
         sets: e.log_sets.map((s) => ({
           setType: s.set_type,
           actualReps: s.actual_reps,
