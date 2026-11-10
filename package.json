@@ -21,8 +21,8 @@
     "posthog:dashboards": "pnpm --filter @caltracker/scripts exec tsx posthog-dashboards.ts",
     "functions:serve": "pnpm functions:sync && supabase functions serve --env-file supabase/functions/.env",
     "functions:test": "pnpm functions:sync && deno test --allow-all --config supabase/functions/deno.json supabase/functions/",
-    "functions:check": "pnpm functions:sync && deno check --config supabase/functions/deno.json supabase/functions/send-invite/index.ts supabase/functions/accept-invite/index.ts supabase/functions/award-workout/index.ts supabase/functions/send-push/index.ts",
-    "functions:deploy": "pnpm functions:sync && supabase functions deploy send-invite accept-invite award-workout send-push",
+    "functions:check": "pnpm functions:sync && deno check --config supabase/functions/deno.json supabase/functions/send-invite/index.ts supabase/functions/accept-invite/index.ts supabase/functions/award-workout/index.ts supabase/functions/send-push/index.ts supabase/functions/delete-account/index.ts",
+    "functions:deploy": "pnpm functions:sync && supabase functions deploy send-invite accept-invite award-workout send-push delete-account",
     "import:exercises": "pnpm --filter @caltracker/scripts exec tsx import-exercises.ts",
     "provision:coach": "pnpm --filter @caltracker/scripts exec tsx provision-coach.ts"
   },
