@@ -3,7 +3,8 @@
 // Without them this is skipped. The apps identify people by their Supabase user id, so that is the distinct id.
 
 export interface PosthogEraser {
-  erase(distinctId: string): Promise<'deleted' | 'not_found'>;
+  /** 'ambiguous': more than one person has this distinct id, so none was deleted (the caller logs it). */
+  erase(distinctId: string): Promise<'deleted' | 'not_found' | 'ambiguous'>;
 }
 
 const TIMEOUT_MS = 8000;
@@ -29,18 +30,22 @@ export function createPosthogEraser(
         await found.body?.cancel();
         throw new Error(`PostHog person lookup responded ${found.status}`);
       }
-      const body = (await found.json()) as { results?: { uuid?: string }[] };
-      const people = (body.results ?? []).map((r) => r.uuid).filter((u): u is string => Boolean(u));
-      if (people.length === 0) return 'not_found';
-      for (const uuid of people) {
-        const res = await fetchFn(`${base}${encodeURIComponent(uuid)}/?delete_events=true`, {
-          method: 'DELETE',
-          headers,
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-        await res.body?.cancel();
-        if (!res.ok) throw new Error(`PostHog person delete responded ${res.status}`);
-      }
+      const body = (await found.json()) as { results?: { uuid?: unknown; distinct_ids?: unknown }[] };
+      // Never trust the query filter alone: only a person whose own distinct ids include this one is a match.
+      const matches = (body.results ?? []).filter(
+        (r): r is { uuid: string; distinct_ids: string[] } =>
+          typeof r.uuid === 'string' && Array.isArray(r.distinct_ids) && r.distinct_ids.includes(distinctId),
+      );
+      if (matches.length === 0) return 'not_found';
+      // Two people claiming one id should not happen; deleting either could erase someone else, so delete none.
+      if (matches.length > 1) return 'ambiguous';
+      const res = await fetchFn(`${base}${encodeURIComponent(matches[0]!.uuid)}/?delete_events=true`, {
+        method: 'DELETE',
+        headers,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      await res.body?.cancel();
+      if (!res.ok) throw new Error(`PostHog person delete responded ${res.status}`);
       return 'deleted';
     },
   };
