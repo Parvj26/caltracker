@@ -1,15 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { loadUnreadTotal } from './messages/data';
 import { useBrowserSupabase, useChanges, useOnWake } from './messages/use-realtime';
 import { NavLink } from './nav-link';
 
 /**
- * The Inbox sidebar item with the unread total. It starts from the server's count and stays right on its own:
- * Realtime events for new messages and for the coach's own reads, and a refetch whenever the window wakes up.
+ * The coach's unread message total. It starts from the server's count and stays right on its own: Realtime events for
+ * new messages and for the coach's own reads, and a refetch whenever the window wakes up.
  */
-export function MessagesNavLink({ userId, workspaceId, initial }: { userId: string; workspaceId: string; initial: number }) {
+export function useUnreadTotal(userId: string, workspaceId: string, initial: number): number {
   const supabase = useBrowserSupabase();
   const [count, setCount] = useState(initial);
   const [seenInitial, setSeenInitial] = useState(initial);
@@ -40,6 +40,14 @@ export function MessagesNavLink({ userId, workspaceId, initial }: { userId: stri
     { onChange: soon, onReady: refetch },
   );
   useOnWake(refetch);
+  return count;
+}
 
+/** The unread total, shared by the Inbox item and the phone menu button (provided by CoachSidebar). */
+export const UnreadTotalContext = createContext(0);
+
+/** The Inbox menu item with the unread total. */
+export function MessagesNavLink() {
+  const count = useContext(UnreadTotalContext);
   return <NavLink href="/messages" label="Inbox" icon="messages" badge={count} />;
 }
