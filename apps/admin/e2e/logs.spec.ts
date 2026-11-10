@@ -14,11 +14,12 @@ test('logs: the Person search finds a typo, picking filters the rows, × shows e
   await page.goto('/logs');
   await expect(page.getByRole('row', { name: new RegExp(`Kay K${t}`) })).toBeVisible();
 
-  // "Luiz" is one letter off. Enter picks the top suggestion and filters straight away (no Filter button).
+  // "Beuno" swaps two letters of "Bueno" (smart search forgives typos only in words of 5+ letters, so not "Luiz").
+  // Enter picks the top suggestion and filters straight away (no Filter button).
   const person = page.getByRole('combobox', { name: 'Person' });
   await expect(person).toHaveAttribute('placeholder', 'Search by name or email');
   await expect(page.getByRole('button', { name: 'Filter' })).toHaveCount(0);
-  await person.fill(`Luiz Bueno${t}`);
+  await person.fill(`Luis Beuno${t}`);
   await expect(page.getByRole('option', { name: new RegExp(`Luis Bueno${t}`) })).toBeVisible();
   await person.press('Enter');
   await expect(page).toHaveURL(new RegExp(`person=${coach.id}`));
