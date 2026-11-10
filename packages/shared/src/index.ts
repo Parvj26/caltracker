@@ -97,6 +97,8 @@ export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises
 export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
+export { SET_KINDS, SET_KIND_NAMES, setKindOf, setKindPatch, singleReps, withSingleReps } from './workouts/set-kinds';
+export type { SetKind } from './workouts/set-kinds';
 export { WORKOUT_TREE_SELECT, workoutRowToDoc } from './workouts/tree';
 export type { WorkoutTreeRow, WorkoutTreeSetRow, WorkoutTreeSubstituteRow } from './workouts/tree';
 export {
@@ -122,12 +124,9 @@ export {
   addChoice,
   addChoiceOption,
   addSection,
-  copyFirstSetToAll,
   DEFAULT_SETS,
   MAX_SETS,
   emptyWorkout,
-  fillDown,
-  hasTargets,
   MAX_BLOCKS,
   moveBlock,
   moveBlockToSection,

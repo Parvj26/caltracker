@@ -27,13 +27,24 @@ describe('groupDropSets', () => {
 });
 
 describe('setLabels', () => {
-  it('labels warm-ups W, numbers normal sets and marks drops', () => {
+  it('labels warm-ups W, numbers normal sets and marks drops D', () => {
     expect(setLabels([s('warmup'), s('normal'), s('normal'), s('drop'), s('normal')])).toEqual([
       'W',
       '1',
       '2',
-      '↳',
+      'D',
       '3',
     ]);
+  });
+
+  it('labels a set to failure F; it still counts, so later sets keep their numbers', () => {
+    expect(
+      setLabels([
+        { setType: 'normal', toFailure: false },
+        { setType: 'normal', toFailure: true },
+        { setType: 'drop', toFailure: true },
+        { setType: 'normal', toFailure: false },
+      ]),
+    ).toEqual(['1', 'F', 'F', '3']);
   });
 });

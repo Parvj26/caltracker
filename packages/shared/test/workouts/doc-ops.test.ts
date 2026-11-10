@@ -150,16 +150,35 @@ describe('block and exercise removal', () => {
 });
 
 describe('sets', () => {
-  it('addSet appends a normal set copying targets and rest of the last non-drop set', () => {
+  it('addSet appends a copy of the last set: type, failure, targets and rest, but not its note', () => {
     let d = base();
     const b = d.blocks[0]!;
     const ex = b.exercises[0]!;
-    d = updateSet(d, b.id, ex.id, ex.sets[2]!.id, { targetRepsMin: 8, targetRepsMax: 10, targetWeightKg: 50, restSeconds: 120 });
-    d = addDrop(d, b.id, ex.id, ex.sets[2]!.id, makeId);
+    d = updateSet(d, b.id, ex.id, ex.sets[2]!.id, {
+      targetRepsMin: 10,
+      targetRepsMax: 10,
+      targetWeightKg: 50,
+      restSeconds: 120,
+      toFailure: true,
+      note: 'slow',
+    });
     const out = valid(addSet(d, b.id, ex.id, makeId));
     const sets = out.blocks[0]!.exercises[0]!.sets;
-    expect(sets).toHaveLength(5);
-    expect(sets[4]).toMatchObject({ setType: 'normal', targetRepsMin: 8, targetWeightKg: 50, restSeconds: 120, toFailure: false });
+    expect(sets).toHaveLength(4);
+    expect(sets[3]).toMatchObject({ setType: 'normal', targetRepsMin: 10, targetRepsMax: 10, targetWeightKg: 50, restSeconds: 120, toFailure: true, note: null });
+    expect(sets[3]!.id).not.toBe(sets[2]!.id);
+  });
+
+  it('addSet after a drop adds another drop (less weight, no rest), and after a warm-up another warm-up', () => {
+    const start = base();
+    const b = start.blocks[0]!;
+    const ex = b.exercises[0]!;
+    const d = updateSet(start, b.id, ex.id, ex.sets[2]!.id, { setType: 'drop', targetWeightKg: 30, targetRepsMin: 8, targetRepsMax: 8 });
+    const out = valid(addSet(d, b.id, ex.id, makeId));
+    expect(out.blocks[0]!.exercises[0]!.sets[3]).toMatchObject({ setType: 'drop', targetWeightKg: 30, targetRepsMax: 8, restSeconds: 0 });
+    let w = updateSet(start, b.id, ex.id, ex.sets[2]!.id, { setType: 'warmup', toFailure: true });
+    w = valid(addSet(w, b.id, ex.id, makeId));
+    expect(w.blocks[0]!.exercises[0]!.sets[3]).toMatchObject({ setType: 'warmup', toFailure: false });
   });
 
   it('addDrop twice after set 2 gives [n, n, d, d, n]', () => {
@@ -174,15 +193,27 @@ describe('sets', () => {
     expect(sets[4]!.id).toBe(ex.sets[2]!.id);
   });
 
-  it('removeSet removes a middle set; removing a parent removes its drops', () => {
+  it('removeSet removes only that row; a drop below it then follows the set above', () => {
     let d = base();
     const b = d.blocks[0]!;
     const ex = b.exercises[0]!;
     const [n1, n2, n3] = ex.sets;
     expect(valid(removeSet(d, b.id, ex.id, n2!.id)).blocks[0]!.exercises[0]!.sets.map((s) => s.id)).toEqual([n1!.id, n3!.id]);
     d = addDrop(d, b.id, ex.id, n2!.id, makeId);
+    const drop = d.blocks[0]!.exercises[0]!.sets[2]!;
     const out = valid(removeSet(d, b.id, ex.id, n2!.id));
-    expect(out.blocks[0]!.exercises[0]!.sets.map((s) => s.id)).toEqual([n1!.id, n3!.id]);
+    expect(out.blocks[0]!.exercises[0]!.sets.map((s) => s.id)).toEqual([n1!.id, drop.id, n3!.id]);
+    expect(out.blocks[0]!.exercises[0]!.sets[1]!.setType).toBe('drop');
+  });
+
+  it('removeSet on set 1 turns a drop that would now come first into a normal set', () => {
+    let d = base();
+    const b = d.blocks[0]!;
+    const ex = b.exercises[0]!;
+    d = addDrop(d, b.id, ex.id, ex.sets[0]!.id, makeId);
+    const drop = d.blocks[0]!.exercises[0]!.sets[1]!;
+    const out = valid(removeSet(d, b.id, ex.id, ex.sets[0]!.id));
+    expect(out.blocks[0]!.exercises[0]!.sets[0]).toMatchObject({ id: drop.id, setType: 'normal' });
   });
 
   it('removeSet removes a lone drop only', () => {
@@ -194,7 +225,7 @@ describe('sets', () => {
     expect(valid(removeSet(d, b.id, ex.id, drop.id)).blocks[0]!.exercises[0]!.sets).toHaveLength(3);
   });
 
-  it('removeSet is a no-op on the last non-drop set', () => {
+  it('removeSet is a no-op on the last set', () => {
     let d = base();
     const b = d.blocks[0]!;
     const ex = b.exercises[0]!;
@@ -202,6 +233,7 @@ describe('sets', () => {
     d = removeSet(d, b.id, ex.id, ex.sets[1]!.id);
     const last = d.blocks[0]!.exercises[0]!.sets[0]!;
     const out = removeSet(d, b.id, ex.id, last.id);
+    expect(out).toBe(d);
     expect(out.blocks[0]!.exercises[0]!.sets).toHaveLength(1);
   });
 
@@ -334,14 +366,15 @@ describe('supersets may be uneven', () => {
     expect(setShowsRest(sb, 5, 0)).toBe(false);
   });
 
-  it('removeSet in a superset removes that set (and its drops) from that exercise only', () => {
+  it('removeSet in a superset removes that row from that exercise only', () => {
     let d = base();
     const sb = d.blocks[1]!;
     const [a, b] = sb.exercises;
     d = addDrop(d, sb.id, a!.id, a!.sets[1]!.id, makeId);
+    const drop = d.blocks[1]!.exercises[0]!.sets[2]!;
     const out = valid(removeSet(d, sb.id, a!.id, a!.sets[1]!.id));
     const [oa, ob] = out.blocks[1]!.exercises;
-    expect(oa!.sets.map((s) => s.id)).toEqual([a!.sets[0]!.id, a!.sets[2]!.id]);
+    expect(oa!.sets.map((s) => s.id)).toEqual([a!.sets[0]!.id, drop.id, a!.sets[2]!.id]);
     expect(ob!.sets.map((s) => s.id)).toEqual(b!.sets.map((s) => s.id));
   });
 
@@ -372,16 +405,19 @@ describe('supersets may be uneven', () => {
 });
 
 describe('updateSet validity', () => {
-  it('a drop changed to normal clears toFailure', () => {
+  it('a normal set or a drop may be to failure; a warm-up never is', () => {
     let d = base();
     const b = d.blocks[0]!;
     const ex = b.exercises[0]!;
+    d = valid(updateSet(d, b.id, ex.id, ex.sets[0]!.id, { toFailure: true }));
+    expect(d.blocks[0]!.exercises[0]!.sets[0]).toMatchObject({ setType: 'normal', toFailure: true });
     d = addDrop(d, b.id, ex.id, ex.sets[0]!.id, makeId);
     const drop = d.blocks[0]!.exercises[0]!.sets[1]!;
     d = valid(updateSet(d, b.id, ex.id, drop.id, { toFailure: true }));
     expect(d.blocks[0]!.exercises[0]!.sets[1]!.toFailure).toBe(true);
-    const out = valid(updateSet(d, b.id, ex.id, drop.id, { setType: 'normal' }));
-    expect(out.blocks[0]!.exercises[0]!.sets[1]).toMatchObject({ setType: 'normal', toFailure: false });
+    const out = valid(updateSet(d, b.id, ex.id, ex.sets[0]!.id, { setType: 'warmup' }));
+    expect(out.blocks[0]!.exercises[0]!.sets[0]).toMatchObject({ setType: 'warmup', toFailure: false });
+    expect(updateSet(out, b.id, ex.id, ex.sets[0]!.id, { toFailure: true }).blocks[0]!.exercises[0]!.sets[0]!.toFailure).toBe(false);
   });
 
   it('refuses to make the first set a drop', () => {

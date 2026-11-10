@@ -50,6 +50,34 @@ function newExercise(ex: ExercisePick, rest: number, rounds: number, makeId: () 
   };
 }
 
+/**
+ * "+ Set": a copy of the exercise's last set (its type, failure flag, targets and rest) with a new id and no note.
+ * A drop copies as a drop (no rest), so a run of drops grows the way the coach expects.
+ */
+function copyOfLast(makeId: () => string, sets: readonly WorkoutSetDoc[], rest: number): WorkoutSetDoc {
+  const last = sets[sets.length - 1];
+  if (!last) return newSet(makeId, rest);
+  return fitKind({ ...last, id: makeId(), note: null, restSeconds: rest });
+}
+
+/** The set rules every edit keeps: a drop has no rest of its own, and a warm-up is never "to failure". */
+function fitKind(s: WorkoutSetDoc): WorkoutSetDoc {
+  if (s.setType === 'drop') return s.restSeconds === 0 ? s : { ...s, restSeconds: 0 };
+  return s.setType === 'warmup' && s.toFailure ? { ...s, toFailure: false } : s;
+}
+
+/**
+ * The sets without one row (the editor shows drops as rows of their own, so removing a set never takes the drops
+ * below it: they then follow the set above). A drop left first becomes a normal set, since a drop must follow one.
+ * Null when the row isn't there or is the only set (an exercise keeps at least one).
+ */
+function withoutRow(sets: readonly WorkoutSetDoc[], setId: string): WorkoutSetDoc[] | null {
+  if (sets.length <= 1 || !sets.some((s) => s.id === setId)) return null;
+  const rest = sets.filter((s) => s.id !== setId);
+  const first = rest[0]!;
+  return first.setType === 'drop' ? [{ ...first, setType: 'normal' }, ...rest.slice(1)] : rest;
+}
+
 const lastNonDrop = (sets: readonly WorkoutSetDoc[]): WorkoutSetDoc | undefined =>
   [...sets].reverse().find((s) => s.setType !== 'drop');
 
@@ -283,7 +311,7 @@ export function setShowsRest(block: WorkoutBlockDoc, exerciseIndex: number, setI
 }
 
 /**
- * Adds a set to one exercise. Supersets may be uneven, so this never touches the other exercises (use addRound for
+ * Adds a copy of the last set to one exercise (see copyOfLast). Supersets may be uneven, so this never touches the other exercises (use addRound for
  * all). On a superset exercise that isn't last, the new set goes straight on (rest 0) when a later exercise has a set
  * in its round, and otherwise takes the block's round rest (the last exercise's last rest), so the client still rests.
  */
@@ -292,14 +320,14 @@ export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: stri
     const i = b.exercises.findIndex((e) => e.id === workoutExerciseId);
     const e = b.exercises[i];
     if (!e || e.sets.length >= MAX_SETS) return b;
-    const from = lastNonDrop(e.sets);
+    const from = e.sets[e.sets.length - 1];
     let rest = from?.restSeconds ?? DEFAULT_REST;
     if (b.kind === 'superset' && i < b.exercises.length - 1) {
       rest = roundHasLaterExercise(b, i, roundCount(e) + 1)
         ? 0
         : (lastNonDrop(b.exercises[b.exercises.length - 1]!.sets)?.restSeconds ?? DEFAULT_REST);
     }
-    const added = { ...e, sets: [...e.sets, newSet(makeId, rest, from)] };
+    const added = { ...e, sets: [...e.sets, copyOfLast(makeId, e.sets, rest)] };
     return { ...b, exercises: b.exercises.map((x, xi) => (xi === i ? added : x)) };
   });
 }
@@ -367,17 +395,11 @@ export function addDrop(
   });
 }
 
-/** Removes one set (and the drops that follow it) from one exercise; never touches the other exercises of a superset. */
+/** Removes one set row from one exercise (see withoutRow); never touches the other exercises of a superset. */
 export function removeSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, setId: string): WorkoutDoc {
-  return mapExercise(doc, blockId, workoutExerciseId, (e) => {
-    const i = e.sets.findIndex((s) => s.id === setId);
-    if (i < 0) return e;
-    if (e.sets[i]!.setType === 'drop') return { ...e, sets: e.sets.filter((s) => s.id !== setId) };
-    if (e.sets.filter((s) => s.setType !== 'drop').length <= 1) return e;
-    let end = i + 1;
-    while (end < e.sets.length && e.sets[end]!.setType === 'drop') end += 1;
-    return { ...e, sets: [...e.sets.slice(0, i), ...e.sets.slice(end)] };
-  });
+  const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === workoutExerciseId);
+  const sets = ex ? withoutRow(ex.sets, setId) : null;
+  return sets ? mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets })) : doc;
 }
 
 export function updateSet(
@@ -390,11 +412,7 @@ export function updateSet(
   const block = doc.blocks.find((b) => b.id === blockId);
   const ex = block?.exercises.find((e) => e.id === workoutExerciseId);
   if (!block || !ex) return doc;
-  const sets = ex.sets.map((s) => {
-    if (s.id !== setId) return s;
-    const next = { ...s, ...patch };
-    return next.setType === 'drop' ? { ...next, restSeconds: 0 } : { ...next, toFailure: false };
-  });
+  const sets = ex.sets.map((s) => (s.id === setId ? fitKind({ ...s, ...patch }) : s));
   if (sets[0]?.setType === 'drop') return doc;
   return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets }));
 }
@@ -502,7 +520,7 @@ export function updateSubstitute(
   );
 }
 
-/** Adds a set to a substitute, copying the targets and rest of its last working set. */
+/** Adds a copy of a substitute's last set, as addSet does for an exercise. */
 export function addSubstituteSet(
   doc: WorkoutDoc,
   blockId: string,
@@ -512,8 +530,8 @@ export function addSubstituteSet(
 ): WorkoutDoc {
   return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
     if (s.sets.length >= MAX_SETS) return s;
-    const from = lastNonDrop(s.sets);
-    return { ...s, sets: [...s.sets, newSet(makeId, from?.restSeconds ?? DEFAULT_REST, from)] };
+    const from = s.sets[s.sets.length - 1];
+    return { ...s, sets: [...s.sets, copyOfLast(makeId, s.sets, from?.restSeconds ?? DEFAULT_REST)] };
   });
 }
 
@@ -536,7 +554,7 @@ export function addSubstituteDrop(
   });
 }
 
-/** Removes one set of a substitute and the drops that follow it; a substitute keeps at least one working set. */
+/** Removes one set row of a substitute, as removeSet does for an exercise; a substitute keeps at least one set. */
 export function removeSubstituteSet(
   doc: WorkoutDoc,
   blockId: string,
@@ -545,17 +563,12 @@ export function removeSubstituteSet(
   setId: string,
 ): WorkoutDoc {
   return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
-    const i = s.sets.findIndex((x) => x.id === setId);
-    if (i < 0) return s;
-    if (s.sets[i]!.setType === 'drop') return { ...s, sets: s.sets.filter((x) => x.id !== setId) };
-    if (s.sets.filter((x) => x.setType !== 'drop').length <= 1) return s;
-    let end = i + 1;
-    while (end < s.sets.length && s.sets[end]!.setType === 'drop') end += 1;
-    return { ...s, sets: [...s.sets.slice(0, i), ...s.sets.slice(end)] };
+    const sets = withoutRow(s.sets, setId);
+    return sets ? { ...s, sets } : s;
   });
 }
 
-/** Same rules as updateSet: a drop has no rest, only drops can be "to failure", the first set is never a drop. */
+/** Same rules as updateSet: a drop has no rest, a warm-up is never "to failure", the first set is never a drop. */
 export function updateSubstituteSet(
   doc: WorkoutDoc,
   blockId: string,
@@ -566,11 +579,7 @@ export function updateSubstituteSet(
 ): WorkoutDoc {
   return mapSubstitute(doc, blockId, workoutExerciseId, substituteId, (s) => {
     if (!s.sets.some((x) => x.id === setId)) return s;
-    const sets = s.sets.map((x) => {
-      if (x.id !== setId) return x;
-      const next = { ...x, ...patch };
-      return next.setType === 'drop' ? { ...next, restSeconds: 0 } : { ...next, toFailure: false };
-    });
+    const sets = s.sets.map((x) => (x.id === setId ? fitKind({ ...x, ...patch }) : x));
     return sets[0]?.setType === 'drop' ? s : { ...s, sets };
   });
 }
@@ -586,50 +595,4 @@ export function substituteSetShowsRest(
   if (!ex) return false;
   const stand = { ...block, exercises: block.exercises.map((e, i) => (i === exerciseIndex ? { ...e, sets: substitute.sets } : e)) };
   return setShowsRest(stand, exerciseIndex, setIndex);
-}
-
-/** True when a set has any target typed in (reps, weight, time or distance): something worth copying. */
-export const hasTargets = (s: WorkoutSetDoc): boolean =>
-  s.targetRepsMin !== null ||
-  s.targetRepsMax !== null ||
-  s.targetWeightKg !== null ||
-  s.targetDurationS !== null ||
-  s.targetDistanceM !== null;
-
-/**
- * "Fill down": copies one normal set's targets (reps, weight, time, distance) to every normal set below it in the
- * same exercise. Warm-ups and drop sets are left alone, as are notes and set types, and other exercises (a superset's
- * partners, a pick-one group's other options) are never touched. Rest is copied only where both sets show a rest
- * box: in a superset an exercise that goes straight on to the next keeps its 0, and an extra round keeps its rest.
- * Returns the same doc when there is nothing to copy from (unknown ids, a warm-up, a drop, or a set with no targets
- * yet, so an empty set 1 never wipes sets the coach already typed).
- */
-export function fillDown(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, fromSetId: string): WorkoutDoc {
-  const block = doc.blocks.find((b) => b.id === blockId);
-  const ei = block ? block.exercises.findIndex((e) => e.id === workoutExerciseId) : -1;
-  const ex = block?.exercises[ei];
-  const from = ex ? ex.sets.findIndex((s) => s.id === fromSetId) : -1;
-  const source = ex?.sets[from];
-  if (!block || !ex || !source || source.setType !== 'normal' || !hasTargets(source)) return doc;
-  const sourceRests = setShowsRest(block, ei, from);
-  const sets = ex.sets.map((s, si) => {
-    if (si <= from || s.setType !== 'normal') return s;
-    return {
-      ...s,
-      targetRepsMin: source.targetRepsMin,
-      targetRepsMax: source.targetRepsMax,
-      targetWeightKg: source.targetWeightKg,
-      targetDurationS: source.targetDurationS,
-      targetDistanceM: source.targetDistanceM,
-      restSeconds: sourceRests && setShowsRest(block, ei, si) ? source.restSeconds : s.restSeconds,
-    };
-  });
-  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, sets }));
-}
-
-/** "Copy set 1 to all sets": fill down from the exercise's first normal set. */
-export function copyFirstSetToAll(doc: WorkoutDoc, blockId: string, workoutExerciseId: string): WorkoutDoc {
-  const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === workoutExerciseId);
-  const first = ex?.sets.find((s) => s.setType === 'normal');
-  return first ? fillDown(doc, blockId, workoutExerciseId, first.id) : doc;
 }

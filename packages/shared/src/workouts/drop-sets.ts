@@ -17,13 +17,16 @@ export function groupDropSets<T extends { setType: SetType }>(sets: readonly T[]
   return groups;
 }
 
-/** Row labels: warm-ups 'W', normal sets numbered from 1, drops '↳'. */
-export function setLabels(sets: readonly { setType: SetType }[]): string[] {
+/**
+ * Row labels, the same letters as the builder's set types: warm-ups 'W', sets to failure 'F', drops 'D', other sets
+ * numbered from 1. A normal set to failure still counts, so the sets after it keep their numbers.
+ */
+export function setLabels(sets: readonly { setType: SetType; toFailure?: boolean }[]): string[] {
   let n = 0;
   return sets.map((s) => {
     if (s.setType === 'warmup') return 'W';
-    if (s.setType === 'drop') return '↳';
-    n += 1;
-    return String(n);
+    if (s.setType !== 'drop') n += 1;
+    if (s.toFailure) return 'F';
+    return s.setType === 'drop' ? 'D' : String(n);
   });
 }
