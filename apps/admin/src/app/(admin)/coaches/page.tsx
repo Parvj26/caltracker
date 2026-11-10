@@ -1,14 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import styles from '@/components/admin.module.css';
+import { ActionStatus } from '@/components/confirm-dialog';
 import { LocalTime } from '@/components/local-time';
 import { PageHeader } from '@/components/page-header';
+import { Panel } from '@/components/panel';
 import { PeopleSearch } from '@/components/people-search';
 import { Pill, type PillTone } from '@/components/pill';
 import { requireAdmin } from '@/lib/admin';
 import { nameOr } from '@/lib/admin-data';
 import { loadPeople } from '@/lib/people';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { AddCoachForm } from './add-coach-form';
+import { DeleteCoachButton } from './delete-coach';
 
 export const metadata: Metadata = { title: 'Coaches' };
 
@@ -21,7 +25,9 @@ const HEALTH: Record<string, { label: string; tone: PillTone }> = {
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 export default async function CoachesPage() {
-  await requireAdmin();
+  const admin = await requireAdmin();
+  // Adding and deleting coaches is for owners only (the database and the admin-coach function refuse anyone else).
+  const isOwner = admin.role === 'owner';
   const supabase = await createServerSupabase();
   const [coaches, people] = await Promise.all([supabase.rpc('admin_coaches'), loadPeople()]);
   if (coaches.error) throw new Error(`Could not load coaches: ${coaches.error.message}`);
@@ -32,6 +38,12 @@ export default async function CoachesPage() {
       <PageHeader title="Coaches" subtitle={`${plural(count, 'coach')} · client limit comes from their plan`}>
         <PeopleSearch people={people} />
       </PageHeader>
+      <ActionStatus>
+      {isOwner ? (
+        <Panel title="Add a coach">
+          <AddCoachForm />
+        </Panel>
+      ) : null}
       <div className={styles.panel}>
         {coaches.data.length === 0 ? (
           <p className={styles.empty}>No coaches yet.</p>
@@ -39,7 +51,7 @@ export default async function CoachesPage() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>COACH</th><th>CLIENTS / LIMIT</th><th>LAST ACTIVE</th><th>THIS WEEK</th><th>HEALTH</th></tr>
+                <tr><th>COACH</th><th>CLIENTS / LIMIT</th><th>LAST ACTIVE</th><th>THIS WEEK</th><th>HEALTH</th>{isOwner ? <th><span className="visually-hidden">Actions</span></th> : null}</tr>
               </thead>
               <tbody>
                 {coaches.data.map((c) => {
@@ -56,6 +68,11 @@ export default async function CoachesPage() {
                       <td><LocalTime iso={c.last_active} kind="ago" /></td>
                       <td>{plural(c.programs_assigned_7d, 'program')} assigned · {plural(c.messages_7d, 'message')}</td>
                       <td><Pill tone={health.tone}>{health.label}</Pill></td>
+                      {isOwner ? (
+                        <td>
+                          {c.role === 'owner' ? <DeleteCoachButton workspaceId={c.workspace_id} workspaceName={c.workspace_name} /> : null}
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -64,6 +81,7 @@ export default async function CoachesPage() {
           </div>
         )}
       </div>
+      </ActionStatus>
     </>
   );
 }

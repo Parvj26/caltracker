@@ -15,7 +15,11 @@ export default defineConfig({
   retries: isCI ? 1 : 0,
   reporter: isCI ? [['list'], ['blob']] : 'list',
   use: { baseURL, trace: 'retain-on-failure' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /last-owner\.spec\.ts/ },
+    // Needs exactly one owner in the database, which the parallel tests above never leave: runs after them, alone.
+    { name: 'last-owner', use: { ...devices['Desktop Chrome'] }, testMatch: /last-owner\.spec\.ts/, dependencies: ['chromium'] },
+  ],
   webServer: [
     {
       // CI builds the app in its own step first, so here it only starts it.

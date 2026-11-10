@@ -51,6 +51,8 @@ test('the coach sidebar has Help & feedback and the legal footer', async ({ page
   const sidebar = page.locator('[data-coach-sidebar]');
   const help = sidebar.getByRole('link', { name: 'Help & feedback' });
   await expect(help).toHaveAttribute('href', /^mailto:support@caltracker\.app\?subject=CalTracker%20help&body=/);
+  // The browser and page are filled in once the menu hydrates (the server renders the link without them).
+  await expect(help).toHaveAttribute('href', /Page%3A%20/);
   const body = new URL((await help.getAttribute('href'))!).searchParams.get('body')!;
   expect(body).toContain('App: Coach website');
   expect(body).toMatch(/Version: \S+/);

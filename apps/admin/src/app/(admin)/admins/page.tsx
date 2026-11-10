@@ -19,13 +19,16 @@ export default async function AdminsPage() {
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.rpc('admin_list_admins');
   if (error) throw new Error(`Could not load admins: ${error.message}`);
+  // The database never lets the last owner go (private.admin_keep_an_owner); the page just doesn't offer it.
+  const owners = data.filter((a) => a.role === 'owner');
+  const lastOwner = owners.length === 1 ? owners[0]! : null;
 
   return (
     <>
       <PageHeader title="Admins" subtitle="Who can use this site" />
       <ActionStatus>
         <Panel title="Add an admin">
-          <AddAdminForm />
+          <AddAdminForm lastOwnerEmail={lastOwner?.email ?? null} />
           <p className={styles.panelNote}>To change someone&apos;s role, add them again with the new role.</p>
         </Panel>
         <div className={styles.panel}>
@@ -42,9 +45,13 @@ export default async function AdminsPage() {
                     <td>{ROLE_LABEL[a.role] ?? a.role}</td>
                     <td><LocalTime iso={a.created_at} kind="date" /></td>
                     <td>
-                      <ConfirmAction look="link" label="Remove" title="Remove this admin?" confirmLabel="Remove" action={removeAdmin.bind(null, a.user_id)}>
-                        <p>{a.email} can no longer use this site. Their past actions stay in the audit log.</p>
-                      </ConfirmAction>
+                      {a.user_id === lastOwner?.user_id ? (
+                        <span className={styles.muted}>Last owner</span>
+                      ) : (
+                        <ConfirmAction look="link" label="Remove" title="Remove this admin?" confirmLabel="Remove" action={removeAdmin.bind(null, a.user_id)}>
+                          <p>{a.email} can no longer use this site. Their past actions stay in the audit log.</p>
+                        </ConfirmAction>
+                      )}
                     </td>
                   </tr>
                 ))}

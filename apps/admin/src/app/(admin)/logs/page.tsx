@@ -4,8 +4,8 @@ import styles from '@/components/admin.module.css';
 import { ActionStatus, ConfirmAction } from '@/components/confirm-dialog';
 import { LocalTime } from '@/components/local-time';
 import { PageHeader } from '@/components/page-header';
+import { PersonFilter } from '@/components/person-filter';
 import { Pill, type PillTone } from '@/components/pill';
-import { Button, SelectField } from '@/components/ui';
 import { requireAdmin } from '@/lib/admin';
 import { UUID } from '@/lib/actions-shared';
 import { nameOr } from '@/lib/admin-data';
@@ -52,16 +52,9 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         <Link href={tabHref('notifications')} aria-current={tab === 'notifications' ? 'page' : undefined} className={`${styles.tab} ${tab === 'notifications' ? styles.tabActive : ''}`}>Notifications</Link>
         <Link href={tabHref('invites')} aria-current={tab === 'invites' ? 'page' : undefined} className={`${styles.tab} ${tab === 'invites' ? styles.tabActive : ''}`}>Invites</Link>
       </div>
-      <form method="get" className={styles.filters}>
-        <input type="hidden" name="tab" value={tab} />
-        <SelectField label="Person" name="person" defaultValue={person ?? ''}>
-          <option value="">Everyone</option>
-          {uniquePeople.map((p) => (
-            <option key={p.user_id} value={p.user_id}>{nameOr(p.name, p.email)}</option>
-          ))}
-        </SelectField>
-        <Button type="submit" variant="secondary">Filter</Button>
-      </form>
+      <div className={styles.filters}>
+        <PersonFilter key={`${tab}-${person ?? ''}`} people={uniquePeople} selectedId={person} baseHref={`/logs?tab=${tab}`} />
+      </div>
 
       <div className={styles.panel}>
         {pushes ? (

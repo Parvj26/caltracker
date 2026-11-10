@@ -10,6 +10,19 @@ import { createServerSupabase } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Audit log' };
 
+type AuditRow = { action: string; target_user_id: string | null; target_name: string | null; details: unknown };
+
+/** The target cell. A coach's page for coach actions; a deleted coach is gone, so just their name (from the row). */
+function auditTarget(r: AuditRow) {
+  if (!r.target_user_id) return '—';
+  const details = (r.details ?? {}) as Record<string, unknown>;
+  if (r.action === 'delete_coach') {
+    return nameOr(r.target_name?.trim() || (typeof details.coach_name === 'string' ? details.coach_name : ''), 'Deleted coach');
+  }
+  const href = r.action === 'add_coach' ? `/coaches/${r.target_user_id}` : `/clients/${r.target_user_id}`;
+  return <Link href={href} className={styles.rowLink}>{nameOr(r.target_name, 'Open')}</Link>;
+}
+
 /** Owners see every admin's actions; support sees their own (the database decides). */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ action?: string; admin?: string }> }) {
   const admin = await requireAdmin('support');
@@ -52,7 +65,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                     <td><LocalTime iso={r.at} kind="datetime" /></td>
                     <td>{nameOr(r.admin_name, 'Unknown admin')}</td>
                     <td>{auditActionLabel(r.action)}</td>
-                    <td>{r.target_user_id ? <Link href={`/clients/${r.target_user_id}`} className={styles.rowLink}>{nameOr(r.target_name, 'Open')}</Link> : '—'}</td>
+                    <td>{auditTarget(r)}</td>
                     <td className={styles.details}>{r.details && Object.keys(r.details).length ? JSON.stringify(r.details) : ''}</td>
                   </tr>
                 ))}
