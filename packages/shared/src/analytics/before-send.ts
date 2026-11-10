@@ -1,3 +1,4 @@
+import { LABEL_PATTERN } from './error-codes';
 import { sanitize } from './sanitize';
 import { scrubUrl } from './scrub-url';
 
@@ -30,6 +31,7 @@ function scrubChain(chain: string): string {
     .replace(/text="(?:[^"\\]|\\.)*"/g, '')
     .replace(/href="(?:[^"\\]|\\.)*"/g, '')
     .replace(/attr__(?!ph-label=)[\w-]+="(?:[^"\\]|\\.)*"/g, '')
+    .replace(/attr__ph-label="((?:[^"\\]|\\.)*)"/g, (whole, label: string) => (LABEL_PATTERN.test(label) ? whole : ''))
     .replace(/attr_id="(?:[^"\\]|\\.)*"/g, '');
 }
 
@@ -40,6 +42,7 @@ function scrubElements(elements: unknown): unknown {
     if (el && typeof el === 'object') {
       for (const [k, v] of Object.entries(el)) {
         if (!KEPT_ELEMENT_KEYS.has(k)) continue;
+        if (k === 'attr__ph-label' && !(typeof v === 'string' && LABEL_PATTERN.test(v))) continue;
         kept[k] = LABEL_KEYS.has(k) && typeof v === 'string' ? normalizeLabel(v) : v;
       }
     }
@@ -79,7 +82,7 @@ export function beforeSend<E extends OutgoingEvent>(input: E): E | null {
     }
     if (!key.startsWith('$')) {
       if (allowed && key in allowed) props[key] = allowed[key];
-      else if (key === 'label' && CLICK_EVENTS.has(input.event) && typeof value === 'string') props[key] = value;
+      else if (key === 'label' && CLICK_EVENTS.has(input.event) && typeof value === 'string' && LABEL_PATTERN.test(value)) props[key] = value;
       continue;
     }
     if (key === '$elements') props[key] = scrubElements(value);

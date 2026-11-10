@@ -9,3 +9,5 @@ export { RageTapDetector } from './rage-tap';
 export { QUICK_UNDO_MS, isQuickUndo } from './quick-undo';
 export { beforeSend } from './before-send';
 export type { OutgoingEvent } from './before-send';
+export { ERROR_CODES, LABEL_PATTERN, errorMessage, isErrorCode } from './error-codes';
+export type { ErrorCode } from './error-codes';
