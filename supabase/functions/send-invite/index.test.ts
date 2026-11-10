@@ -341,6 +341,139 @@ t('coach of A cannot invite into workspace B (403)', async () => {
   assertEquals(sent.length, 0);
 });
 
+// Admins (admin dashboard, "Resend invite"). The caller's admin_can_invite RPC is mocked here: a real aal2 session
+// needs TOTP sign-in, and admin_can_invite itself (roles, aal2, audit) is covered by
+// supabase/tests/admin_invite_check.test.sql. Everything else (is_coach_of, the tables) is the real local stack.
+type RpcResult = { data: unknown; error: { code: string; message: string } | null };
+function adminRpcMocked(result: RpcResult, calls: unknown[]) {
+  return (authHeader: string): SupabaseClient => {
+    const real = createClient(URL_, ANON, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const realRpc = real.rpc.bind(real);
+    const rpc = (fn: string, args?: Record<string, unknown>) => {
+      if (fn !== 'admin_can_invite') return realRpc(fn, args);
+      calls.push(args);
+      return Promise.resolve(result);
+    };
+    return Object.assign(real, { rpc: rpc as unknown as SupabaseClient['rpc'] });
+  };
+}
+function adminHandler(mailer: Mailer, result: RpcResult, calls: unknown[]) {
+  return createHandler({
+    mailer,
+    supabaseAdmin: admin,
+    supabaseUrl: URL_,
+    anonKey: ANON,
+    publicSiteUrl: 'http://site.test',
+    createCallerClient: adminRpcMocked(result, calls),
+  });
+}
+
+t('admin caller can resend for any workspace', async () => {
+  const { coachB, wsB } = await setup();
+  const support = await makeUser('support', 'Sue', 'Port');
+  const { mailer, sent } = fakeMailer();
+  // Bob (coach of B) invited someone; the link expired, so support resends it and also invites a moved client.
+  await call(
+    handlerWith(mailer),
+    { workspaceId: wsB, invites: [{ email: 'stuck@x.com', firstName: 'Stuck', lastName: 'Person' }] },
+    await jwtFor(coachB.email),
+  );
+  await backdateInvite(wsB, 3);
+  const before = (await openInvites(wsB))[0];
+  const calls: unknown[] = [];
+  const res = await call(
+    adminHandler(mailer, { data: true, error: null }, calls),
+    {
+      workspaceId: wsB,
+      invites: [
+        { email: 'stuck@x.com', firstName: 'Stuck', lastName: 'Person' },
+        { email: 'moved@x.com', firstName: 'Moved', lastName: 'Client' },
+      ],
+    },
+    await jwtFor(support.email),
+  );
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).results, [
+    { email: 'stuck@x.com', status: 'resent' },
+    { email: 'moved@x.com', status: 'sent' },
+  ]);
+  assertEquals(calls, [{ p_workspace_id: wsB, p_emails: ['stuck@x.com', 'moved@x.com'] }]);
+  const rows = new Map((await openInvites(wsB)).map((r) => [r.email, r]));
+  assert(rows.get('stuck@x.com')!.token_hash !== before.token_hash, 'the link is renewed');
+  // Same rules as a coach's send: 14-day expiry, and the invite belongs to the workspace owner, not the admin.
+  const diff = new Date(rows.get('moved@x.com')!.expires_at).getTime() - Date.now();
+  assert(Math.abs(diff - 14 * DAY) < 60_000, `expiry off: ${diff}`);
+  assertEquals(rows.get('moved@x.com')!.created_by, coachB.id);
+  assertEquals(sent.length, 3);
+  // The email names the coach, never the support person.
+  assertEquals(sent[1].subject, 'Other Coach invited you to CalTracker');
+  assertEquals(sent[2].subject, 'Other Coach invited you to CalTracker');
+});
+
+t('admin caller still gets the 2-minute cooldown', async () => {
+  const { coachB, wsB } = await setup();
+  const support = await makeUser('support', 'Sue', 'Port');
+  const { mailer, sent } = fakeMailer();
+  const req = { workspaceId: wsB, invites: [{ email: 'fresh@x.com', firstName: 'Fresh' }] };
+  await call(handlerWith(mailer), req, await jwtFor(coachB.email));
+  const before = (await openInvites(wsB))[0];
+  const res = await call(adminHandler(mailer, { data: true, error: null }, []), req, await jwtFor(support.email));
+  const r = (await res.json()).results[0];
+  assertEquals(r.status, 'resent');
+  assert(String(r.message).includes('Already sent'));
+  assertEquals((await openInvites(wsB))[0].token_hash, before.token_hash);
+  assertEquals(sent.length, 1);
+});
+
+t('aal1 admin is refused 403', async () => {
+  const { wsB } = await setup();
+  const support = await makeUser('support', 'Sue', 'Port');
+  const { mailer, sent } = fakeMailer();
+  // admin_can_invite raises 42501 for an admin who skipped two-step.
+  const res = await call(
+    adminHandler(mailer, { data: null, error: { code: '42501', message: 'admin: not authorised' } }, []),
+    { workspaceId: wsB, invites: [{ email: 'x@x.com', firstName: 'X' }] },
+    await jwtFor(support.email),
+  );
+  assertEquals(res.status, 403);
+  await res.body?.cancel();
+  assertEquals((await openInvites(wsB)).length, 0);
+  assertEquals(sent.length, 0);
+});
+
+t('admin check failing for another reason is 500', async () => {
+  const { wsB } = await setup();
+  const support = await makeUser('support', 'Sue', 'Port');
+  const { mailer, sent } = fakeMailer();
+  const res = await call(
+    adminHandler(mailer, { data: null, error: { code: '08006', message: 'connection failure' } }, []),
+    { workspaceId: wsB, invites: [{ email: 'x@x.com', firstName: 'X' }] },
+    await jwtFor(support.email),
+  );
+  assertEquals(res.status, 500);
+  await res.body?.cancel();
+  assertEquals(sent.length, 0);
+});
+
+t('non-coach non-admin still refused 403', async () => {
+  const { wsB } = await setup();
+  const someone = await makeUser('someone', 'Some', 'One');
+  const { mailer, sent } = fakeMailer();
+  // The real admin_can_invite: not an admin, so 42501.
+  const res = await call(
+    handlerWith(mailer),
+    { workspaceId: wsB, invites: [{ email: 'x@x.com', firstName: 'X' }] },
+    await jwtFor(someone.email),
+  );
+  assertEquals(res.status, 403);
+  await res.body?.cancel();
+  assertEquals((await openInvites(wsB)).length, 0);
+  assertEquals(sent.length, 0);
+});
+
 t('missing Authorization header is 401', async () => {
   const { wsA } = await setup();
   const res = await call(handlerWith(fakeMailer().mailer), {

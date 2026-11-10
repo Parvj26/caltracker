@@ -2725,6 +2725,10 @@ export type Database = {
           target_user_id: string
         }[]
       }
+      admin_can_invite: {
+        Args: { p_emails?: string[]; p_workspace_id: string }
+        Returns: boolean
+      }
       admin_cancel_invite: { Args: { p_invite_id: string }; Returns: undefined }
       admin_client: { Args: { p_user_id: string }; Returns: Json }
       admin_coach: { Args: { p_user_id: string }; Returns: Json }

@@ -27,6 +27,8 @@ export interface HandlerDeps {
   now?: () => number;
   /** A resend within this window of the last send changes nothing (default 2 min). */
   resendCooldownMs?: number;
+  /** The caller-scoped client (runs RPCs with the caller's JWT). Injectable for tests. */
+  createCallerClient?: (authHeader: string) => SupabaseClient;
 }
 
 const DEFAULT_BUDGET_MS = 120_000;
@@ -90,10 +92,12 @@ export function createHandler(deps: HandlerDeps) {
       return json({ error: 'Unauthorized' }, 401);
 
     // User-scoped client: identity and coach check run as the caller.
-    const caller = createClient(deps.supabaseUrl, deps.anonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const caller = deps.createCallerClient
+      ? deps.createCallerClient(authHeader)
+      : createClient(deps.supabaseUrl, deps.anonKey, {
+          global: { headers: { Authorization: authHeader } },
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
     const { data: userData, error: userError } = await caller.auth.getUser(
       authHeader.slice('Bearer '.length),
     );
@@ -124,11 +128,37 @@ export function createHandler(deps: HandlerDeps) {
       },
     );
     if (coachError) return json({ error: 'Could not verify permissions' }, 500);
-    if (isCoach !== true) return json({ error: 'Forbidden' }, 403);
+
+    // Not a coach here: an admin (support or above, two-step done) may send for any workspace, with the same rules.
+    // admin_can_invite raises 42501 for anyone else and writes the admin's audit row. The invite is sent as the
+    // workspace owner: their name is in the email and the invite is theirs (created_by), as if they had sent it.
+    let senderId = userId;
+    if (isCoach !== true) {
+      const { data: canInvite, error: adminError } = await caller.rpc(
+        'admin_can_invite',
+        {
+          p_workspace_id: workspaceId,
+          p_emails: [...new Set(invites.map((i) => i.email))],
+        },
+      );
+      if (adminError?.code === '42501') return json({ error: 'Forbidden' }, 403);
+      if (adminError) return json({ error: 'Could not verify permissions' }, 500);
+      if (canInvite !== true) return json({ error: 'Forbidden' }, 403);
+      const { data: owner, error: ownerError } = await admin
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', workspaceId)
+        .eq('role', 'owner')
+        .limit(1)
+        .maybeSingle();
+      if (ownerError) return json({ error: 'Could not verify permissions' }, 500);
+      if (!owner) return json({ error: 'Forbidden' }, 403);
+      senderId = owner.user_id;
+    }
 
     const [{ data: workspace }, { data: profile }] = await Promise.all([
       admin.from('workspaces').select('name').eq('id', workspaceId).single(),
-      admin.from('profiles').select('full_name').eq('id', userId).single(),
+      admin.from('profiles').select('full_name').eq('id', senderId).single(),
     ]);
     const workspaceName = workspace?.name ?? 'CalTracker';
     // The subject names the coach in full ("Sam Lee invited you"); the greeting uses the client's first name.
@@ -232,7 +262,7 @@ export function createHandler(deps: HandlerDeps) {
             token_hash: tokenHash,
             sent_at: sentAt,
             expires_at: expiresAt.toISOString(),
-            created_by: userId,
+            created_by: senderId,
           });
           if (error) throw error;
         }
