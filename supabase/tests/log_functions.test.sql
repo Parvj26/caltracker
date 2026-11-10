@@ -169,7 +169,8 @@ select tests.lg_one(:'lx', :'inst_a1', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
   jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false), tests.lg_set(:'gs2', 'drop', null, null, false, 60)))
   as doc_drop_rest \gset
 select tests.lg_one(:'lx', :'inst_a1', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
-  jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false, 90, true))) as doc_normal_failure \gset
+  jsonb_build_array(tests.lg_set(:'gs', 'warmup', 8, 60, false, 90, true), tests.lg_set(:'gs2', 'normal', 8, 60, false)))
+  as doc_warmup_failure \gset
 select tests.lg_one(:'lx', :'inst_a1', 'in_progress', 1, :'gb', :'ge', :'ex_bi',
   jsonb_build_array(tests.lg_set(:'gs', 'normal', 8, 60, false), tests.lg_set(:'gs', 'normal', 8, 60, false)))
   as doc_dup \gset
@@ -249,8 +250,8 @@ select lives_ok(format('update public.workout_logs set logged_by = null where id
 -- The new set rules are table checks too.
 select throws_ok(format('update public.log_sets set set_type = ''drop'', rest_seconds = 60 where id = %L', :'scratch_set'),
   '23514', null, 'a drop with rest is refused by the table');
-select throws_ok(format('update public.log_sets set to_failure = true where id = %L', :'scratch_set'),
-  '23514', null, 'to failure on a normal set is refused by the table');
+select throws_ok(format('update public.log_sets set set_type = ''warmup'', to_failure = true where id = %L', :'scratch_set'),
+  '23514', null, 'to failure on a warm-up is refused by the table');
 
 -- ---------------------------------------------------------------------------------------------
 -- Insert and re-save
@@ -302,8 +303,8 @@ select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_lead_
   'A drop set must follow a normal or warm-up set.', 'a leading drop is refused');
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_drop_rest'), '23514',
   'A drop set has no rest.', 'a drop with rest is refused');
-select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_normal_failure'), '23514',
-  'Only drop sets can be "to failure".', 'to failure on a normal set is refused');
+select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_warmup_failure'), '23514',
+  'A warm-up can''t be "to failure".', 'to failure on a warm-up is refused');
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', :'doc_dup'), '23514',
   format('Row %s appears twice in the log.', :'gs'), 'a doc with a repeated id is refused');
 select throws_ok(format('select public.save_workout_log(%L::jsonb)', jsonb_set(:'doc_lead_drop'::jsonb, '{revision}', '0')),
