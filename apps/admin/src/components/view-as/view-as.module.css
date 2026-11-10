@@ -1,0 +1,56 @@
+/* A phone-width (390 px) frame holding simple read-only versions of the client's screens. */
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 2px solid var(--ct-ink);
+  border-radius: 14px;
+  background: var(--ct-tape);
+  font-weight: 800;
+}
+.exit { font-weight: 800; color: var(--ct-ink); }
+
+.phone {
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  border: 3px solid var(--ct-ink);
+  border-radius: 32px;
+  background: var(--ct-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 640px;
+}
+.phoneTop { padding: 18px 18px 10px; display: flex; flex-direction: column; gap: 2px; border-bottom: 2px solid var(--ct-border); }
+.phoneName { font-size: 20px; font-weight: 800; }
+.phoneCoach { font-size: 13px; color: var(--ct-ink-muted); font-weight: 500; }
+.screen[hidden] { display: none; }
+.screen { flex: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.screenTitle { margin: 0; font-size: 24px; font-weight: 800; }
+.card { border: 2px solid var(--ct-ink); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.cardTitle { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; }
+.big { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.item { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
+.note { color: var(--ct-ink-muted); font-size: 13px; font-weight: 500; }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--ct-ink); background: var(--ct-surface-sidebar); }
+.tab {
+  min-height: 52px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.tab[aria-selected='true'] { background: var(--ct-lime); font-weight: 800; }
