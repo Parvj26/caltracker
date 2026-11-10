@@ -17,9 +17,10 @@ export function AddAdminForm() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('support');
   return (
+    <>
     <div className={styles.filters}>
       <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
-      <SelectField label="Role" value={role} onChange={(e) => setRole(e.target.value)} hint={ROLE_HELP[role] ?? ''}>
+      <SelectField label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
         <option value="support">Support</option>
         <option value="readonly">Readonly</option>
         <option value="owner">Owner</option>
@@ -38,5 +39,8 @@ export function AddAdminForm() {
         <p>{email || 'This account'} becomes {role}. They sign in here with their CalTracker password and set up two-step.</p>
       </ConfirmAction>
     </div>
+    {/* Below the row, not under the Role box, so the three controls line up. */}
+    <p className={styles.panelNote}>{ROLE_HELP[role] ?? ''}</p>
+    </>
   );
 }
