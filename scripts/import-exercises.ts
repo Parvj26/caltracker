@@ -6,13 +6,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { loadExtras } from './caltracker-extras';
 import { loadManifest, processExerciseImage, verifySha256, type ImageManifest, type ManifestImage } from './exercise-images';
 import {
-  TRACKING_TYPES,
+  LIBRARY_TRACKING_TYPES,
   exerciseImageObjectPath,
   mapFreeExercise,
   thumbPathOf,
   type Database,
   type FreeExercise,
-  type TrackingType,
+  type LibraryTrackingType,
 } from '@caltracker/shared';
 
 type Admin = SupabaseClient<Database>;
@@ -47,14 +47,14 @@ export interface ImportSummary {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-async function loadOverrides(): Promise<Record<string, TrackingType>> {
+async function loadOverrides(): Promise<Record<string, LibraryTrackingType>> {
   const raw: unknown = JSON.parse(
     await readFile(path.join(here, 'exercise-tracking-overrides.json'), 'utf8'),
   );
   if (typeof raw !== 'object' || raw === null) throw new Error('Invalid overrides file');
-  const out: Record<string, TrackingType> = {};
+  const out: Record<string, LibraryTrackingType> = {};
   for (const [id, value] of Object.entries(raw)) {
-    const t = TRACKING_TYPES.find((x) => x === value);
+    const t = LIBRARY_TRACKING_TYPES.find((x) => x === value);
     if (!t) throw new Error(`Invalid tracking type for ${id}: ${String(value)}`);
     out[id] = t;
   }

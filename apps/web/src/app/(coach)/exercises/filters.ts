@@ -10,6 +10,10 @@ export const TRACKING_LABELS = {
   time: 'Time',
   distance: 'Distance',
   weight_time: 'Weight and time',
+  // Only a workout exercise's own measurements use these; a library exercise is always one of the five above.
+  weight: 'Weight only',
+  reps_time: 'Reps and time',
+  weight_reps_time: 'Weight, reps and time',
 } as const;
 
 /** Escapes LIKE wildcards so user input matches literally. */

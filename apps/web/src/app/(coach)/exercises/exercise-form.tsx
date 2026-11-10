@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { CustomExerciseInput, TRACKING_TYPES } from '@caltracker/shared';
+import { CustomExerciseInput, LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
 import { Button, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { createCustomExercise, updateCustomExercise } from './actions';
@@ -12,7 +12,7 @@ import styles from './exercises.module.css';
 
 export type ExerciseFormInitial = {
   name: string;
-  trackingType: (typeof TRACKING_TYPES)[number];
+  trackingType: (typeof LIBRARY_TRACKING_TYPES)[number];
   primaryMuscles: string[];
   equipment: string | null;
   instructions: string[];
@@ -73,7 +73,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
     <form className={styles.form} onSubmit={onSubmit}>
       <TextField label="Name" name="name" defaultValue={initial.name} maxLength={100} />
       <SelectField label="Tracking type" name="trackingType" defaultValue={initial.trackingType}>
-        {TRACKING_TYPES.map((t) => (
+        {LIBRARY_TRACKING_TYPES.map((t) => (
           <option key={t} value={t}>
             {TRACKING_LABELS[t]}
           </option>
