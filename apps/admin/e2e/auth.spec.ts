@@ -6,6 +6,7 @@ test('non-admin sees Not authorised', async ({ page }) => {
   await signInWithPassword(page, user);
   await expect(page).toHaveURL(/\/not-authorised$/);
   await expect(page.getByRole('heading', { name: 'Not authorised' })).toBeVisible();
+  await expect(page.getByText('You have been signed out.')).toBeVisible();
   // Signed out: the admin pages send them back to sign in.
   await page.goto('/overview');
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -55,9 +56,13 @@ test('readonly has no Admins menu', async ({ page }) => {
   await expect(nav.getByText('ADMIN · READONLY')).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Overview' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Admins' })).toHaveCount(0);
-  // And the page itself is refused.
+  // And the page itself is refused, but they stay signed in.
   await page.goto('/admins');
-  await expect(page).toHaveURL(/\/not-authorised$/);
+  await expect(page).toHaveURL(/\/not-authorised\?reason=role$/);
+  await expect(page.getByText("Your admin role can't open that page.")).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Overview' }).click();
+  await expect(page).toHaveURL(/\/overview$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
 });
 
 test('owner sees the Admins menu and the STAGING tag', async ({ page }) => {

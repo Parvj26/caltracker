@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-/** Not an admin, or below the page's role: sign out this browser, then show "Not authorised". */
+/** Not an admin at all: sign out this browser, then show "Not authorised". (A low role stays signed in.) */
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabase();
   await supabase.auth.signOut({ scope: 'local' });

@@ -77,5 +77,5 @@ test('readonly cannot open view as', async ({ page }) => {
   const readonly = await createUser({ role: 'readonly', enrolled: true });
   await signInAdmin(page, readonly);
   await page.goto(`/clients/${client.id}/view-as`);
-  await expect(page).toHaveURL(/\/not-authorised$/);
+  await expect(page).toHaveURL(/\/not-authorised\?reason=role$/);
 });

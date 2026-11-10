@@ -8,7 +8,8 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "caltracker-admin" }],
-  "routes": [{ "pattern": "admin.caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" }],
-  // Plain (non-secret) vars. POSTHOG_PERSONAL_KEY is a Worker secret: wrangler secret put POSTHOG_PERSONAL_KEY --name caltracker-admin
-  "vars": { "POSTHOG_PROJECT_ID": "" }
+  "routes": [{ "pattern": "admin.caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" }]
+  // No "vars" here on purpose: a deploy replaces the Worker's plain vars with this file's, which would blank them.
+  // POSTHOG_PROJECT_ID and POSTHOG_PERSONAL_KEY are set once as Worker secrets (they survive deploys); see
+  // docs/runbooks/admin.md.
 }

@@ -166,7 +166,7 @@ test('readonly sees masked emails and no Fix it buttons', async ({ page }) => {
 
   // Audit log needs support.
   await page.goto('/audit');
-  await expect(page).toHaveURL(/\/not-authorised$/);
+  await expect(page).toHaveURL(/\/not-authorised\?reason=role$/);
 });
 
 test('coaches table and coach page', async ({ page }) => {

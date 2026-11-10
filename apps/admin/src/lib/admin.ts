@@ -36,9 +36,12 @@ const loadAdmin = cache(async (): Promise<AdminContext> => {
   return { userId: auth.user.id, name: displayName(auth.user), role: row.role };
 });
 
-/** The signed-in admin, or a redirect. Anyone below `min` gets "Not authorised". */
+/**
+ * The signed-in admin, or a redirect. An admin below `min` sees "Not authorised" but stays signed in (only
+ * non-admins are signed out, through /auth/denied).
+ */
 export async function requireAdmin(min: AdminRole = 'readonly'): Promise<AdminContext> {
   const admin = await loadAdmin();
-  if (!roleAtLeast(admin.role, min)) redirect('/auth/denied');
+  if (!roleAtLeast(admin.role, min)) redirect('/not-authorised?reason=role');
   return admin;
 }
