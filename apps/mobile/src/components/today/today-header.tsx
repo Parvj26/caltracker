@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
+import { AppVersionLine, HelpLegalSection } from '@/components/settings/help-legal-section';
 import { NotificationsRow } from '@/components/settings/notifications-row';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
@@ -55,7 +56,7 @@ export function TodayHeader({
   );
 }
 
-/** The settings sheet: kg/lb, notifications, who coaches you, and sign out. */
+/** The settings sheet: kg/lb, notifications, who coaches you, help and legal, sign out and the app version. */
 function SettingsSheet({
   visible,
   workspaceName,
@@ -89,6 +90,7 @@ function SettingsSheet({
             }}
           />
           {workspaceName ? <Text style={text('body')} testID="settings-workspace">{`Coached by ${workspaceName}`}</Text> : null}
+          <HelpLegalSection />
           {/* Sign out sits at the very bottom, away from everyday settings. */}
           <View style={styles.flex} />
           <Button
@@ -100,6 +102,7 @@ function SettingsSheet({
               onSignOut();
             }}
           />
+          <AppVersionLine />
         </View>
       </SafeAreaView>
     </Modal>
