@@ -92,6 +92,8 @@ export function auditActionLabel(action: string): string {
     log_timeline_view: 'Opened a timeline',
     view_as_snapshot: 'Opened View as',
     resend_invite: 'Resent an invite',
+    add_coach: 'Added a coach',
+    delete_coach: 'Deleted a coach',
   };
   return labels[action] ?? action;
 }

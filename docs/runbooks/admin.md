@@ -88,7 +88,36 @@ is protected by a password alone (the site still refuses it everything until two
 To change a role, add the same email again with the new role. To remove someone, use **Remove**. The site never lets
 you remove or demote the last owner.
 
-## 6. Switching to production (at go-live)
+## 6. Adding and deleting coaches (owners only)
+
+Both live on the **Coaches** page and are shown only to owners. Support and readonly don't see them, and the database
+and the `admin-coach` Edge Function refuse them anyway. Both go in the **Audit log** (`Added a coach`, `Deleted a coach`).
+
+**Add a coach:** enter first name, last name, email and workspace name, then press **Add coach**. CalTracker creates
+their account and workspace, and Supabase sends them the "You have been invited" email with a link to set a password
+(the same email as `pnpm provision:coach`). Their workspace starts with the standard exercise library. An email that
+already belongs to a coach, staff member, admin or client is refused with a message saying so.
+
+**Delete a coach:** press **Delete coach** on the coach's row. The dialog shows what goes. Type the workspace name
+exactly (same capitals and spaces), then press **Delete coach**. This can't be undone:
+
+- It deletes the workspace and everything in it: programs, workouts, logs, messages, community, meals, custom exercises
+  and their files.
+- It deletes the coach's account, and any staff account that isn't in another workspace. A coach who also coaches in
+  another workspace keeps their account.
+- **Clients keep their accounts.** Each gets the email "Your coach has closed their CalTracker workspace". They show
+  under **No coach** on the Clients page, and another coach can invite them.
+- You can't delete a workspace you belong to, or one whose coach is an admin (remove them on the Admins page first).
+
+If the done message says an email couldn't be sent or a coach account couldn't be removed, the workspace is still
+gone. Ask a developer to check the `admin-coach` function logs (Supabase Dashboard -> Edge Functions -> admin-coach ->
+Logs).
+
+**Setup:** none. The `admin-coach` function deploys with the others, and it uses secrets the project already has for
+`send-invite` (`RESEND_API_KEY`, `PUBLIC_SITE_URL`). The client email comes from `CalTracker <hello@caltracker.app>`. To
+use another sender, set the function secret `NOTICE_FROM_EMAIL`.
+
+## 7. Switching to production (at go-live)
 
 When the production Supabase project exists:
 

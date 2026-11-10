@@ -86,6 +86,23 @@ The design matches the coach website: Bricolage Grotesque, lime accent, ink bord
 - **Restore a removed client:** from `past_clients`.
 - **Send test notification:** inserts a `push_outbox` row of kind `test` for that user.
 
+## Add and delete coaches (PO decision, 2026-11-10)
+
+Owner only, at aal2. Mockups: Coaches, DeleteCoach and ClientEmail (admin-coach canvas).
+
+- The admin site still has no service-role key. Both actions go through the `admin-coach` Edge Function with the
+  admin's JWT. It checks `public.admin_require_owner()` (that is, `private.admin_require('owner')`), then uses the
+  service role for the Auth admin API, Storage, and the service-role-only `admin_*coach*` functions, which write the
+  audit row (`add_coach`, `delete_coach`).
+- **Add:** first name, last name, email and workspace name. Supabase Auth invites the account (set-password email),
+  then a new workspace and an owner membership are created. The exercise library is global, so there is nothing to
+  copy. Emails that belong to a coach, staff member, admin or any existing account (a client) are refused.
+- **Delete (decision A):** the dialog shows counts. The workspace name must be typed exactly. Files are removed first,
+  then the workspace in one transaction, then the coach and staff accounts that are in no other workspace, then one
+  email per client via Resend. A failed email is logged and never fails the delete. Clients keep their accounts and
+  get a `closed_workspace_clients` record, so they count as removed clients (Clients "No coach", `admin_can_invite`,
+  `my_removal`). It is refused for a workspace the caller belongs to, or one whose coach is an admin.
+
 ## View as (read-only)
 
 `admin_view_as_snapshot(user_id)` returns one JSON document holding what the client's Today, Workouts, Food and Progress screens read: today's workout, this week, recent logs, meals, targets, goals, coach meals and bests.

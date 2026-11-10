@@ -33,9 +33,14 @@ export function NavProgress() {
   const hereRef = useRef(here);
   useEffect(() => {
     hereRef.current = here;
-    // Landed somewhere else: forget the tap, or coming back to this address later (Back) would show the bar again.
-    setPendingFrom((from) => (from !== null && from !== here ? null : from));
   }, [here]);
+  // Landed somewhere else: forget the tap, or coming back to that address later (Back) would show the bar again.
+  // (Adjusted while rendering, as React suggests for state that follows a prop.)
+  const [seen, setSeen] = useState(here);
+  if (seen !== here) {
+    setSeen(here);
+    if (pendingFrom !== null && pendingFrom !== here) setPendingFrom(null);
+  }
 
   useEffect(() => {
     // Capture phase: next/link cancels the click's default before it bubbles, so listen on the way down instead.

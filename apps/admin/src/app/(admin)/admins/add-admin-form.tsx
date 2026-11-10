@@ -12,10 +12,16 @@ const ROLE_HELP: Record<string, string> = {
   readonly: 'Readonly: sees the pages with emails hidden; no actions.',
 };
 
-/** Add by email, pick a role. The account must already exist (they sign up in the app first). */
-export function AddAdminForm() {
+/**
+ * Add by email, pick a role. The account must already exist (they sign up in the app first). `lastOwnerEmail` is the
+ * only owner's email when there is just one: giving that email a lower role would leave no owner, so the button is
+ * disabled with a hint (the database refuses it anyway).
+ */
+export function AddAdminForm({ lastOwnerEmail }: { lastOwnerEmail: string | null }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('support');
+  const demotesLastOwner =
+    lastOwnerEmail !== null && role !== 'owner' && email.trim().toLowerCase() === lastOwnerEmail.toLowerCase();
   return (
     <>
     <div className={styles.filters}>
@@ -30,6 +36,7 @@ export function AddAdminForm() {
         title="Add this admin?"
         confirmLabel="Add admin"
         className={styles.actionButton}
+        disabled={demotesLastOwner}
         action={async () => {
           const result = await setAdmin(email, role);
           if (result.ok) setEmail('');
@@ -40,6 +47,7 @@ export function AddAdminForm() {
       </ConfirmAction>
     </div>
     {/* Below the row, not under the Role box, so the three controls line up. */}
+    {demotesLastOwner ? <p className={styles.panelNote}><b>Add another owner first.</b></p> : null}
     <p className={styles.panelNote}>{ROLE_HELP[role] ?? ''}</p>
     </>
   );

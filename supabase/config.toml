@@ -414,3 +414,8 @@ import_map = "./functions/deno.json"
 [functions.delete-account]
 verify_jwt = true
 import_map = "./functions/deno.json"
+
+# Called by the admin site with the signed-in admin's JWT; the function checks owner + two-step (aal2) in the database.
+[functions.admin-coach]
+verify_jwt = true
+import_map = "./functions/deno.json"

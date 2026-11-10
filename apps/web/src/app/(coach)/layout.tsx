@@ -6,6 +6,7 @@ import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
+import { CoachSidebar } from './coach-sidebar';
 import { HelpNavLink } from './help-nav-link';
 import { NAV_ICONS } from './nav-icons';
 import { loadUnreadTotal } from './messages/data';
@@ -44,11 +45,11 @@ export default async function CoachLayout({ children }: { children: React.ReactN
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
-      {/* First thing a keyboard user reaches: jumps past the sidebar to the page itself. */}
+      {/* First thing a keyboard user reaches: jumps past the menu to the page itself. */}
       <a href="#main-content" className={styles.skipLink}>
         Skip to content
       </a>
-      <aside className={styles.sidebar} data-coach-sidebar="">
+      <CoachSidebar userId={coach.userId} workspaceId={coach.workspaceId} initialUnread={unread}>
         <div className={styles.brand}>
           <Logo className={styles.logoFull} />
           <Logo variant="mark" className={styles.logoMark} />
@@ -58,7 +59,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           {NAV.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
-          <MessagesNavLink userId={coach.userId} workspaceId={coach.workspaceId} initial={unread} />
+          <MessagesNavLink />
         </nav>
         <div className={styles.bottom}>
           <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
@@ -71,7 +72,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           </form>
           <LegalLinks className={styles.legal} />
         </div>
-      </aside>
+      </CoachSidebar>
       <main id="main-content" tabIndex={-1} className={styles.content}>{children}</main>
     </div>
     </AnalyticsProvider>

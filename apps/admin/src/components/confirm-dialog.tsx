@@ -23,6 +23,11 @@ export function ActionStatus({ children }: { children: ReactNode }) {
   );
 }
 
+/** The nearest ActionStatus's reporter (null outside one), for actions with their own dialog or form. */
+export function useActionStatus(): Report | null {
+  return useContext(StatusContext);
+}
+
 /**
  * A support action behind a confirm dialog. `action` runs only after Confirm; its fields (children with `name`) are
  * sent as FormData. Errors stay in the dialog; success closes it, reports to the nearest ActionStatus and refreshes.
@@ -35,6 +40,7 @@ export function ConfirmAction({
   children,
   look = 'button',
   className,
+  disabled = false,
 }: {
   label: string;
   title: string;
@@ -43,6 +49,8 @@ export function ConfirmAction({
   children?: ReactNode;
   look?: 'button' | 'link';
   className?: string | undefined;
+  /** The opening button is disabled (say why next to it). */
+  disabled?: boolean;
 }) {
   const report = useContext(StatusContext);
   const router = useRouter();
@@ -74,7 +82,7 @@ export function ConfirmAction({
 
   return (
     <>
-      <button type="button" onClick={open} className={className ?? (look === 'link' ? styles.linkButton : styles.actionButton)}>
+      <button type="button" onClick={open} disabled={disabled} className={className ?? (look === 'link' ? styles.linkButton : styles.actionButton)}>
         {label}
       </button>
       {ownMessage ? <p role="status" className={styles.status}>✓ {ownMessage}</p> : null}
