@@ -27,6 +27,8 @@ env:
   MAILPIT_URL: http://127.0.0.1:54524
   CI_SMTP_PORT: '54525'
   E2E_WEB_PORT: '3300'
+  # The admin site's e2e runs in its own job and stack, on its own port.
+  E2E_ADMIN_PORT: '3400'
   CI_SITE_URL: http://localhost:3300
 
 jobs:
@@ -36,6 +38,7 @@ jobs:
     outputs:
       db: ${{ github.event_name == 'push' || steps.filter.outputs.db == 'true' }}
       e2e: ${{ github.event_name == 'push' || steps.filter.outputs.e2e == 'true' }}
+      admin-e2e: ${{ github.event_name == 'push' || steps.filter.outputs.admin-e2e == 'true' }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -58,6 +61,12 @@ jobs:
             e2e:
               - *shared
               - 'apps/web/**'
+              - 'packages/**'
+              - 'supabase/**'
+              - 'scripts/**'
+            admin-e2e:
+              - *shared
+              - 'apps/admin/**'
               - 'packages/**'
               - 'supabase/**'
               - 'scripts/**'
@@ -234,9 +243,93 @@ jobs:
         if: always()
         run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
 
-  # Required check: passes when every shard passed, or when the PR does not touch the web app (no shards ran).
+  # The admin site's e2e: one runner with its own Supabase stack. Kept apart from the web shards because both suites
+  # start `functions:serve`. Always runs and reports; its steps are skipped when the PR does not touch the admin site.
+  # The required `e2e` check waits for it.
+  admin-e2e:
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      RUN: ${{ needs.changes.outputs.admin-e2e }}
+      # ci-isolate-supabase.sh renames the project, so the database container is supabase_db_<that name>.
+      SUPABASE_DB_CONTAINER: supabase_db_fitness-tracker-ci
+    steps:
+      - name: Nothing to test
+        if: env.RUN != 'true'
+        run: echo "This PR does not change apps/admin, packages, supabase/, scripts/ or shared config, so admin e2e is skipped."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.RUN == 'true'
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        if: env.RUN == 'true'
+        with:
+          version: 2.67.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: env.RUN == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.RUN == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Use the CI project id and ports (never the developers' stacks)
+        if: env.RUN == 'true'
+        run: bash scripts/ci-isolate-supabase.sh
+      - name: Remove a CI stack left over from a cancelled run
+        if: env.RUN == 'true'
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID" || true
+      - name: Start Supabase and seed demo users
+        if: env.RUN == 'true'
+        run: |
+          supabase start -x studio,imgproxy,vector,logflare,supavisor
+          supabase db reset
+          bash scripts/reload-auth-templates.sh
+      - name: Write Edge Function env (invite emails go to the local mail catcher)
+        if: env.RUN == 'true'
+        run: |
+          cat > supabase/functions/.env <<EOF
+          PUBLIC_SITE_URL=$CI_SITE_URL
+          INVITE_FROM_EMAIL=CalTracker <invites@caltracker.app>
+          SMTP_HOST=host.docker.internal
+          SMTP_PORT=$CI_SMTP_PORT
+          EOF
+      - name: Write admin env
+        if: env.RUN == 'true'
+        run: bash apps/admin/scripts/write-local-env.sh
+      - if: env.RUN == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Restore Playwright browsers
+        if: env.RUN == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: env.RUN == 'true'
+        run: pnpm exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+        working-directory: apps/admin
+      # The only build: Playwright's CI web server just runs `next start` on it.
+      - if: env.RUN == 'true'
+        run: pnpm --filter admin build
+      - name: Admin end-to-end tests
+        if: env.RUN == 'true'
+        run: pnpm --filter admin test:e2e
+        env:
+          CI: 'true'
+          E2E_WORKERS: '4'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() && env.RUN == 'true' }}
+        with:
+          name: admin-blob-report
+          if-no-files-found: ignore
+          path: |
+            apps/admin/blob-report
+            apps/admin/test-results
+          retention-days: 7
+      - name: Stop the CI Supabase stack
+        if: always() && env.RUN == 'true'
+        run: supabase stop --no-backup --project-id "$CI_SUPABASE_PROJECT_ID"
+
+  # Required check: passes when every web shard passed (or none were needed) and the admin e2e job passed.
   e2e:
-    needs: [changes, e2e-shard]
+    needs: [changes, e2e-shard, admin-e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -278,4 +371,9 @@ jobs:
         if: needs.changes.outputs.e2e == 'true' && needs.e2e-shard.result != 'success'
         run: |
           echo "::error::One or more e2e shards did not pass (${{ needs.e2e-shard.result }}). See the playwright-report artifact."
+          exit 1
+      - name: Fail unless the admin e2e job passed
+        if: needs.admin-e2e.result != 'success'
+        run: |
+          echo "::error::The admin e2e job did not pass (${{ needs.admin-e2e.result }}). See the admin-blob-report artifact."
           exit 1
