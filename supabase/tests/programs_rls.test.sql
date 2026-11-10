@@ -1,5 +1,5 @@
 begin;
-select plan(53);
+select plan(55);
 
 -- Fixtures (as postgres)
 select tests.create_user('pg-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -146,6 +146,15 @@ reset role;
 select is((select array_agg(week order by week) from public.program_workouts where program_id = :'prog_a6'), array[2::smallint],
   'only the week-2 slot remains');
 select is((select weeks::int from public.programs where id = :'prog_a6'), 4, 'program weeks is now 4');
+
+-- Pointing a day at another library workout
+select tests.act_as(:'coach_a');
+with u as (update public.program_workouts set workout_id = :'lib_a2' where program_id = :'prog_a6' returning 1)
+select is((select count(*)::int from u), 1, 'coach A can point a day at another of their library workouts');
+select throws_ok(format($q$update public.program_workouts set workout_id = %L where program_id = %L$q$, :'lib_b', :'prog_a6'),
+  '42501', null, 'coach A cannot point a day at another workspace''s workout');
+reset role;
+update public.program_workouts set workout_id = :'lib_a1' where program_id = :'prog_a6';
 
 -- Cascades
 delete from public.workouts where id = :'lib_a2';
