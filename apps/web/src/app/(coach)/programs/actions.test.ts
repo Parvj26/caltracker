@@ -194,22 +194,23 @@ describe('saveSlotCopy ("Just Week N, Day M")', () => {
     respond = (call) => {
       if (call.table === 'program_workouts' && call.op === 'select') return { data: { program_id: PROGRAM, week: 3 } };
       if (call.rpc === 'save_workout') return { data: COPY };
-      if (call.op === 'update') return { data: [{ id: SLOT }] };
+      if (call.rpc === 'set_program_slot_workout') return { data: true };
       return {};
     };
     expect(await saveSlotCopy({ slotId: SLOT, doc: edited })).toEqual({ ok: true, id: COPY, name: 'Upper (Week 3)' });
     const saved = calls.find((c) => c.rpc === 'save_workout')!.payload as { p_doc: { id: string; name: string } };
     expect(saved.p_doc.name).toBe('Upper (Week 3)');
     expect(saved.p_doc.id).not.toBe(edited.id);
-    const update = calls.find((c) => c.op === 'update')!;
-    expect(update).toMatchObject({ table: 'program_workouts', payload: { workout_id: COPY }, filters: { id: SLOT, workspace_id: WS } });
+    expect(calls.find((c) => c.rpc === 'set_program_slot_workout')).toMatchObject({
+      payload: { p_slot_id: SLOT, p_workout_id: COPY },
+    });
   });
 
   it('deletes the copy again when the day could not be pointed at it', async () => {
     respond = (call) => {
       if (call.table === 'program_workouts' && call.op === 'select') return { data: { program_id: PROGRAM, week: 1 } };
       if (call.rpc === 'save_workout') return { data: COPY };
-      if (call.op === 'update') return { data: [] };
+      if (call.rpc === 'set_program_slot_workout') return { data: false };
       return {};
     };
     expect((await saveSlotCopy({ slotId: SLOT, doc: doc() })).ok).toBe(false);

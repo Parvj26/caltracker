@@ -440,13 +440,11 @@ export async function saveSlotCopy(input: { slotId: string; doc: unknown }): Pro
     if (error.code === '23514') return { ok: false, error: error.message };
     return { ok: false, error: "Couldn't save. Please try again." };
   }
-  const { data: moved, error: moveError } = await supabase
-    .from('program_workouts')
-    .update({ workout_id: id })
-    .eq('id', input.slotId)
-    .eq('workspace_id', workspaceId)
-    .select('id');
-  if (moveError || moved.length === 0) {
+  const { data: moved, error: moveError } = await supabase.rpc('set_program_slot_workout', {
+    p_slot_id: input.slotId,
+    p_workout_id: id,
+  });
+  if (moveError || !moved) {
     await supabase.from('workouts').delete().eq('id', id).eq('workspace_id', workspaceId).is('client_id', null);
     return { ok: false, error: "Couldn't save. Please try again." };
   }

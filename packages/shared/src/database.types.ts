@@ -3289,6 +3289,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_program_slot_workout: {
+        Args: { p_slot_id: string; p_workout_id: string }
+        Returns: boolean
+      }
       set_program_weeks: {
         Args: { p_program_id: string; p_weeks: number }
         Returns: number
