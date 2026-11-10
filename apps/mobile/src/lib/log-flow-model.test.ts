@@ -288,6 +288,23 @@ describe('start page lists', () => {
 });
 
 describe('set rows', () => {
+  it('a normal set to failure (the builder\'s F) is tagged F but not indented, and keeps its set number', () => {
+    const drop = { targetWeightKg: null, restSeconds: 0 };
+    const sets = [set(), set('normal', { toFailure: true }), set('drop', drop), set()].map((x) => ({ ...x, targetWeightKg: null }));
+    const doc = WorkoutDoc.parse({
+      id: uuid(),
+      name: 'F sets',
+      notes: null,
+      blocks: [{ id: uuid(), kind: 'straight', exercises: [exercise('Hanging Leg Raise', sets, 'reps')] }],
+    });
+    const log = startLogFromWorkout(doc, uuid, NOW);
+    const rows = setRows(log.blocks[0].exercises[0], 'lb', []);
+    expect(rows.map((r) => r.tag)).toEqual(['1', 'F', 'D', '3']);
+    expect(rows.map((r) => r.tagKind)).toEqual(['normal', 'failure', 'drop', 'normal']);
+    expect(rows.map((r) => r.name)).toEqual(['Set 1', 'Set 2 to failure', 'Drop set', 'Set 3']);
+    expect(rows.map((r) => r.indented)).toEqual([false, false, true, false]);
+  });
+
   it('columns follow the tracking type; warm-up W, drop D, failure F', () => {
     const log = mockLog();
     const push = log.blocks[2].exercises[0];
@@ -296,6 +313,7 @@ describe('set rows', () => {
     expect(rows.map((r) => r.tagKind)).toEqual(['warmup', 'normal', 'drop', 'failure']);
     expect(rows[3].cells[0].placeholder).toBe('15');
     expect(rows.map((r) => r.name)).toEqual(['Warm-up 1', 'Set 1', 'Drop set', 'Drop set to failure']);
+    expect(rows.map((r) => r.indented)).toEqual([false, false, true, true]);
     expect(rows[1].cells.map((c) => c.heading)).toEqual(['LB', 'REPS']);
     expect(rows[1].cells.map((c) => c.placeholder)).toEqual(['35', '12']);
     expect(rows[2].cells[0].placeholder).toBe('20');

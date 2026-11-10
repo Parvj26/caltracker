@@ -320,7 +320,9 @@ function ExerciseSection({
               >
                 <Text
                   style={[text('sectionHeading'), styles.setLabel, drop && styles.inkText]}
-                  accessibilityLabel={drop ? 'Drop set' : labels[i] === 'W' ? 'Warm-up' : `Set ${labels[i]}`}
+                  accessibilityLabel={
+                    labels[i] === 'F' ? (drop ? 'Drop set to failure' : 'Set to failure') : drop ? 'Drop set' : labels[i] === 'W' ? 'Warm-up' : `Set ${labels[i]}`
+                  }
                 >
                   {labels[i]}
                 </Text>

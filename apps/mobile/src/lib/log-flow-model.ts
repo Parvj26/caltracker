@@ -341,9 +341,11 @@ export type RowTag = 'normal' | 'warmup' | 'drop' | 'failure';
 export type RowModel = {
   setId: string;
   setIndex: number;
-  /** "1", "W", "D" or "F" (a drop to failure): the first column. */
+  /** "1", "W", "D" or "F" (to failure): the first column, the same letters as the coach's builder. */
   tag: string;
   tagKind: RowTag;
+  /** A drop (to failure or not) sits indented under the set above. */
+  indented: boolean;
   /** "Set 2", "Warm-up 1", "Drop set": for screen readers. */
   name: string;
   done: boolean;
@@ -417,17 +419,27 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
     const values = resolveSetValues(ex, set.id, lastSets);
     const working = ex.sets.slice(0, si + 1).filter((s) => s.setType === 'normal').length;
     const warmups = ex.sets.slice(0, si + 1).filter((s) => s.setType === 'warmup').length;
-    // Only a drop can be "to failure" (the plan's rule), so F is always a drop: indented like D.
+    // F is any set to failure: a normal one (the builder's F) or an older drop to failure, which stays indented.
+    const isDrop = set.setType === 'drop';
     const tagKind: RowTag =
-      set.setType === 'warmup' ? 'warmup' : set.setType !== 'drop' ? 'normal' : set.target.toFailure ? 'failure' : 'drop';
+      set.setType === 'warmup' ? 'warmup' : set.target.toFailure ? 'failure' : isDrop ? 'drop' : 'normal';
     const tag = tagKind === 'warmup' ? 'W' : tagKind === 'drop' ? 'D' : tagKind === 'failure' ? 'F' : String(working);
     const name =
-      tagKind === 'warmup' ? `Warm-up ${warmups}` : tagKind === 'normal' ? `Set ${working}` : tagKind === 'drop' ? 'Drop set' : 'Drop set to failure';
+      tagKind === 'warmup'
+        ? `Warm-up ${warmups}`
+        : tagKind === 'normal'
+          ? `Set ${working}`
+          : tagKind === 'drop'
+            ? 'Drop set'
+            : isDrop
+              ? 'Drop set to failure'
+              : `Set ${working} to failure`;
     return {
       setId: set.id,
       setIndex: si,
       tag,
       tagKind,
+      indented: isDrop,
       name,
       done: set.completedAt !== null,
       // A ticked set shows only what was saved: never the greyed pre-fill.
