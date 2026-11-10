@@ -1,7 +1,7 @@
 begin;
 select plan(37);
 
--- Measurements, Each side and Tempo per workout exercise (20261110002100), and exercise_prefs: the coach's last
+-- Measurements, Each side and Tempo per workout exercise (20261110004100), and exercise_prefs: the coach's last
 -- choice per exercise, readable and writable only by coaches of that workspace.
 select tests.create_user('wm-coach@t.local', 'WM Coach') as coach \gset
 select tests.create_user('wm-other@t.local', 'WM Other Coach') as other \gset

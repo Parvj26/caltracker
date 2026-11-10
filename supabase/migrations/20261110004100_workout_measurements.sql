@@ -2,11 +2,11 @@
 --
 -- workout_exercises.tracking_type: what this exercise measures in this workout when the coach picked other
 --   measurements than the library kind (null: the library kind, as before). Weight / Reps / Time, any non-empty
---   mix, each mix a tracking type (see 20261110002000). Never distance: distance exercises keep their kind.
+--   mix, each mix a tracking type (see 20261110004000). Never distance: distance exercises keep their kind.
 -- workout_exercises.each_side: the weight is per hand and the reps per side. tempo: "3-1-1-0" (0-9 or X).
 -- log_exercises gets the same three, snapshotted from the plan, so a log shows them however the plan changes later.
 -- exercise_prefs: per workspace and exercise, the last measurements and Each side a coach saved for it, to pre-fill
---   the next time it is added. Coaches of the workspace only (RLS, pgTAP in exercise_prefs.test.sql).
+--   the next time it is added. Coaches of the workspace only (RLS, pgTAP in workout_measurements.test.sql).
 --
 -- Older apps never select the new columns: they read the library kind as before (a picked Time column is simply
 -- not shown to them) and their saves, which have no "eachSide" key, leave the columns as they were.

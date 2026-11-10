@@ -30,7 +30,7 @@ async function makeUser(label: string) {
   return { id: data.user.id, token: session.session!.access_token, client: c };
 }
 
-async function makeWorkspace() {
+async function makeWorkspace(trackingType: 'weight_reps' | 'reps' = 'weight_reps') {
   const coach = await makeUser('coach');
   const { data, error } = await admin.from('workspaces').insert({ name: `Award ${uid()}` }).select('id').single();
   if (error) throw error;
@@ -39,7 +39,7 @@ async function makeWorkspace() {
   if (m.error) throw m.error;
   const { data: ex, error: exError } = await admin
     .from('exercises')
-    .insert({ workspace_id: data.id, source: 'custom', name: `Bench ${uid()}`, tracking_type: 'weight_reps' })
+    .insert({ workspace_id: data.id, source: 'custom', name: `Bench ${uid()}`, tracking_type: trackingType })
     .select('id')
     .single();
   if (exError) throw exError;
@@ -59,7 +59,8 @@ async function makeLog(
   clientId: string,
   exerciseId: string,
   sets: Array<{ w: number; r: number }>,
-  opts: { status?: 'completed' | 'in_progress'; minutesAgo?: number } = {},
+  // trackingType: what the plan measured when it differs from the library kind (log_exercises.tracking_type).
+  opts: { status?: 'completed' | 'in_progress'; minutesAgo?: number; trackingType?: 'weight_reps' | 'reps' } = {},
 ) {
   const status = opts.status ?? 'completed';
   const finished = new Date(Date.now() - (opts.minutesAgo ?? 10) * MIN).toISOString();
@@ -86,7 +87,7 @@ async function makeLog(
   if (bErr) throw bErr;
   const { data: le, error: eErr } = await admin
     .from('log_exercises')
-    .insert({ block_id: block.id, position: 0, exercise_id: exerciseId })
+    .insert({ block_id: block.id, position: 0, exercise_id: exerciseId, tracking_type: opts.trackingType ?? null })
     .select('id')
     .single();
   if (eErr) throw eErr;
@@ -165,6 +166,24 @@ function t(name: string, fn: () => Promise<void>) {
     },
   });
 }
+
+t('a reps-only exercise the coach set to weight and reps counts its volume and PRs', async () => {
+  const { ws, exerciseId } = await makeWorkspace('reps');
+  const client = await addClient(ws);
+  const { logId } = await makeLog(ws, client.id, exerciseId, five(60), { trackingType: 'weight_reps' });
+  const award = (await (await call(handlerWith(), { logId }, asUser(client.token))).json()) as AwardResult;
+  assertEquals(award.volumeKg, 3000);
+  assertEquals((await records(client.id)).length > 0, true, 'heaviest / e1RM records are kept');
+});
+
+t('a weight-and-reps exercise the coach set to reps only counts no weight × reps', async () => {
+  const { ws, exerciseId } = await makeWorkspace('weight_reps');
+  const client = await addClient(ws);
+  const { logId } = await makeLog(ws, client.id, exerciseId, five(60), { trackingType: 'reps' });
+  const award = (await (await call(handlerWith(), { logId }, asUser(client.token))).json()) as AwardResult;
+  assertEquals(award.volumeKg, 0);
+  assertEquals(await records(client.id), []);
+});
 
 t('a caller with no valid JWT or secret gets 401', async () => {
   const { ws, exerciseId } = await makeWorkspace();
