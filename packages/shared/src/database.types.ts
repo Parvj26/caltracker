@@ -2725,6 +2725,7 @@ export type Database = {
           target_user_id: string
         }[]
       }
+      admin_cancel_invite: { Args: { p_invite_id: string }; Returns: undefined }
       admin_client: { Args: { p_user_id: string }; Returns: Json }
       admin_coach: { Args: { p_user_id: string }; Returns: Json }
       admin_coaches: {
@@ -2767,6 +2768,14 @@ export type Database = {
           role: Database["public"]["Enums"]["admin_role"]
           user_id: string
         }[]
+      }
+      admin_log_action: {
+        Args: { p_action: string; p_details: Json; p_target: string }
+        Returns: undefined
+      }
+      admin_log_timeline_view: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       admin_me: {
         Args: never
@@ -2812,6 +2821,8 @@ export type Database = {
         }[]
       }
       admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
+      admin_remove_client: { Args: { p_user_id: string }; Returns: undefined }
+      admin_send_test_push: { Args: { p_user_id: string }; Returns: string }
       admin_set_admin: {
         Args: {
           p_email: string
@@ -2819,6 +2830,7 @@ export type Database = {
         }
         Returns: string
       }
+      admin_view_as_snapshot: { Args: { p_user_id: string }; Returns: Json }
       apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {

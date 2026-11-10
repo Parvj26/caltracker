@@ -121,6 +121,34 @@ Deno.test('community rows group into one send with grouped text', () => {
   assertEquals(sends[0]!.payload.route, `/community/${POST}`);
 });
 
+Deno.test('send-push renders the test type', () => {
+  // An admin's "Send test notification": fixed text, sent even at night and with every type switched off.
+  const r = row({ type: 'test', groupKey: 'test:1', data: {}, createdAt: night.toISOString() });
+  const { results, sends } = planBatch([r], ctx({}, { disabled: ['message', 'daily_reminder'] }), night);
+  assertEquals(results, []);
+  assertEquals(sends, [
+    {
+      ids: [r.id],
+      groupKey: 'test:1',
+      attempts: 0,
+      tokens: [TOKEN],
+      payload: {
+        title: 'CalTracker',
+        body: 'Test notification from CalTracker support',
+        badge: 2,
+        route: '/today',
+        type: 'test',
+      },
+    },
+  ]);
+});
+
+Deno.test('a test push to someone with no device', () => {
+  const r = row({ type: 'test', groupKey: 'test:2', data: {} });
+  assertEquals(planBatch([r], ctx({ tokens: [] }), noon).results, [{ id: r.id, outcome: 'no_device' }]);
+  assertEquals(planBatch([r], new Map(), noon).results, [{ id: r.id, outcome: 'no_device' }]);
+});
+
 Deno.test('retryDelayMs', () => {
   assertEquals([1, 2, 3, 4].map(retryDelayMs), [60_000, 300_000, 900_000, 3_600_000]);
   assertEquals(PUSH_MAX_ATTEMPTS, 5);

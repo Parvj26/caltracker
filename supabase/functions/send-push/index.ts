@@ -43,7 +43,7 @@ export interface HandlerDeps {
 type OutboxRow = {
   id: string;
   user_id: string;
-  type: ServerPushType;
+  type: ServerPushType | 'test';
   group_key: string;
   data: unknown;
   created_at: string;
