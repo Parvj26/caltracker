@@ -280,3 +280,52 @@ Deno.test('delete-account: without PostHog configured it is skipped', async () =
     await cleanup();
   }
 });
+
+Deno.test('delete-account: a coach upload that races in during the delete is swept up afterwards', async () => {
+  try {
+    const s = await seed();
+    const token = await jwtFor(s.client.email);
+    const late = `${s.ws}/${s.client.id}/${crypto.randomUUID()}.pdf`;
+    let calls = 0;
+    const { handler } = handlerWith({
+      purgeStorage: async (a, objects) => {
+        calls++;
+        const out = await purgeStorage(a, objects);
+        if (calls === 1) {
+          // The coach uploads an InBody PDF into the client's folder just after the first sweep.
+          const up = await admin.storage
+            .from('scan-attachments')
+            .upload(late, new Blob([new Uint8Array([1])], { type: 'application/pdf' }), { contentType: 'application/pdf' });
+          if (up.error) throw up.error;
+        }
+        return out;
+      },
+    });
+    const res = await handler(post(token));
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    assertEquals(calls, 2, 'a second sweep runs after the account is deleted');
+    assertEquals(await fileExists('scan-attachments', late), false, 'the late upload is gone');
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test('delete-account: a failed second sweep is logged, never a failed deletion', async () => {
+  try {
+    const s = await seed();
+    const token = await jwtFor(s.client.email);
+    let calls = 0;
+    const { handler, sent } = handlerWith({
+      purgeStorage: (a, objects) => (++calls === 1 ? purgeStorage(a, objects) : Promise.reject(new Error('storage down'))),
+    });
+    const res = await handler(post(token));
+    assertEquals(res.status, 200);
+    assertEquals(await res.json(), { deleted: true });
+    assertEquals(calls, 2);
+    assertEquals(await userExists(s.client.id), false);
+    assertEquals(sent.length, 1, 'the coach is still told');
+  } finally {
+    await cleanup();
+  }
+});

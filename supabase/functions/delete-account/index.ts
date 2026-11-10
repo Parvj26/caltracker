@@ -11,7 +11,8 @@ import { createPosthogEraser, type PosthogEraser } from './posthog.ts';
 //   409 { error: 'coach_account', message }      coaches close their account by email instead
 //   500 { error: 'retry' }                       files or account not removed yet; nothing told to the coach
 // Order: who is it → refuse coaches → capture name and coach email → remove files → delete the auth user (the
-// database erases every row with it, migration 20261110000100) → then, best effort, PostHog and the coach's email.
+// database erases every row with it, migration 20261110000100) → then, best effort, a second file sweep, PostHog and
+// the coach's email.
 
 export const COACH_ACCOUNT_MESSAGE =
   "Coach accounts are closed by email. Write to support@caltracker.app and we'll do it for you.";
@@ -92,9 +93,22 @@ export function createHandler(deps: HandlerDeps) {
     }
 
     // The data is gone. From here nothing can fail the deletion.
+
+    // Sweep once more: a coach upload into the client's folders can race in between the first sweep and the delete.
+    try {
+      const { data: late, error: lateError } = await admin.rpc('storage_objects_for_user', { p_user: userId });
+      if (lateError) throw lateError;
+      await purge(admin, (late ?? []) as StorageObject[]);
+    } catch (err) {
+      logFailure('second file sweep', err);
+    }
+
     if (deps.posthog) {
       try {
-        await deps.posthog.erase(userId);
+        const outcome = await deps.posthog.erase(userId);
+        if (outcome === 'ambiguous') {
+          console.error('delete-account: PostHog has more than one person for this user; deleted none (check by hand)');
+        }
       } catch (err) {
         logFailure('PostHog person delete', err);
       }
