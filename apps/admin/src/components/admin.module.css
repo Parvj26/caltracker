@@ -218,3 +218,28 @@
 }
 .confirmInput:focus-visible { outline: none; border-color: var(--ct-ink); }
 .dangerButton { background: var(--ct-danger); box-shadow: 0 var(--ct-base) 0 var(--ct-danger-deep); }
+
+/* Logs: the Person filter (a search box with suggestions). */
+.personFilter { flex: 0 1 360px; }
+.personFilterBox { position: relative; }
+.personFilterInput { width: 100%; padding-right: 44px; }
+.personFilterClear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.personFilterClear:hover, .personFilterClear:focus-visible { background: var(--ct-surface); }
+.searchResultActive { background: var(--ct-surface); }
+li.searchResult { cursor: pointer; }
