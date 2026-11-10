@@ -401,7 +401,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         <AddSectionMenu full={doc.sections.length >= 10} onAdd={(name) => setDoc((d) => addSection(d, name, makeId))} />
       </div>
 
-      <div className={styles.saveBar}>
+      <div className={styles.saveBar} data-bottom-bar="">
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m}>{m}</ErrorText>
         ))}
