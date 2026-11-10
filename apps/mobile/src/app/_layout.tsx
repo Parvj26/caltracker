@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { UpdateGate } from '@/components/update-gate';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { SessionProvider, useSession } from '@/lib/session';
 import { FONT_ASSETS } from '@/theme/fonts';
@@ -63,7 +64,10 @@ export default function RootLayout() {
     <SessionProvider>
       <StatusBar style="dark" />
       <AnalyticsProvider>
-        <RootStack />
+        {/* A build below app_config.ios_min_build sees only the update screen, signed in or out. */}
+        <UpdateGate>
+          <RootStack />
+        </UpdateGate>
       </AnalyticsProvider>
     </SessionProvider>
   );

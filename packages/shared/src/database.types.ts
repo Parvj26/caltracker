@@ -82,6 +82,30 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          id: boolean
+          ios_latest_build: number
+          ios_min_build: number
+          ios_update_url: string
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          ios_latest_build?: number
+          ios_min_build?: number
+          ios_update_url?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          ios_latest_build?: number
+          ios_min_build?: number
+          ios_update_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       award_catchup_attempts: {
         Row: {
           attempts: number
