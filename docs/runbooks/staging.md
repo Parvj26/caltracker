@@ -2,6 +2,8 @@
 
 Staging lives at https://staging.caltracker.app. Web app: Cloudflare Workers (OpenNext adapter). Backend: Supabase project `caltracker-staging` (ref `vfjnnofocxbpnhwpvkva`). Invite emails: Resend, from `invites@caltracker.app`.
 
+Admin site: https://admin.caltracker.app, deployed by the same pipeline against the staging database until go-live. See `docs/runbooks/admin.md`.
+
 Pipeline: `.github/workflows/deploy-staging.yml`. GitHub Environments are not available (private repo, free plan), so everything uses repository secrets: Settings -> Secrets and variables -> Actions.
 
 ## Secrets

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A separate admin website (`admin-staging.caltracker.app`) where admins see:
+**Goal:** A separate admin website (`admin.caltracker.app`; PO decision 2026-11-10: on the staging database with a STAGING tag until go-live, then switched to production) where admins see:
 - business totals;
 - coaches and clients, with account health;
 - notification and invite logs;
@@ -203,7 +203,7 @@ Admins can also run audited support actions, under owner/support/readonly roles 
 ### Task 6: `apps/admin` scaffold, sign-in, two-step and the role gate
 
 **Files:**
-- Create `apps/admin/`: `package.json` (name `admin`, scripts like web's), `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc` (`name: caltracker-admin-staging`, route `admin-staging.caltracker.app` custom domain, vars `POSTHOG_PROJECT_ID`), `tsconfig.json`, `vitest.config.ts`, `playwright.config.ts`, `.env.example`, `scripts/write-local-env.sh`.
+- Create `apps/admin/`: `package.json` (name `admin`, scripts like web's), `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc` (`name: caltracker-admin`, route `admin.caltracker.app` custom domain, no `vars`: the PostHog settings are Worker secrets so a deploy can't blank them; STAGING tag while `NEXT_PUBLIC_APP_ENV` is not `production`), `tsconfig.json`, `vitest.config.ts`, `playwright.config.ts`, `.env.example`, `scripts/write-local-env.sh`.
 - Create `src/proxy.ts`, `src/lib/supabase/{client,server,middleware}.ts` (copied from web, not imported).
 - Create `src/lib/admin.ts`.
 - Create routes `src/app/{layout.tsx,page.tsx,sign-in/,mfa/,not-authorised/}`.
@@ -278,10 +278,10 @@ The `/mfa` page enrolls TOTP when no factor exists (QR code + 6-digit code), oth
 
 **Files:**
 - Modify `.github/workflows/ci.yml`: add `apps/admin/**` to the e2e path filter, plus an `admin-e2e` job, single shard, that the required `e2e` job waits for.
-- Modify `.github/workflows/deploy-staging.yml`: build `pnpm --filter admin cf:build` next to web's build (same `NEXT_PUBLIC_SUPABASE_*` secrets), then deploy with the same 5-try retry loop after web's deploy.
+- Modify `.github/workflows/deploy-staging.yml`: build `pnpm --filter admin cf:build` next to web's build (same `NEXT_PUBLIC_SUPABASE_*` secrets, plus `NEXT_PUBLIC_APP_ENV=staging`), then deploy with the same 5-try retry loop after web's deploy.
 - Create `docs/runbooks/admin.md`, covering:
   - turning on TOTP on the staging project (Auth → MFA);
-  - setting the Worker secret: `wrangler secret put POSTHOG_PERSONAL_KEY --name caltracker-admin-staging`;
+  - setting the Worker secrets: `wrangler secret put POSTHOG_PERSONAL_KEY --name caltracker-admin` (and `POSTHOG_PROJECT_ID`);
   - bootstrapping the owner: `insert into public.admin_users (user_id, role) select id, 'owner' from auth.users where lower(email) = lower('<PO email>');`;
   - adding staff through the Admins page;
   - rotating the PostHog key.
@@ -294,6 +294,6 @@ The `/mfa` page enrolls TOTP when no factor exists (QR code + 6-digit code), oth
 **After merge (coordinator, with the PO's OK for each outward step):**
 1. Turn on TOTP for the staging project.
 2. Set the Worker secret.
-3. Confirm the deploy reached `https://admin-staging.caltracker.app`.
+3. Confirm the deploy reached `https://admin.caltracker.app` (staging database, STAGING tag).
 4. Bootstrap the PO as owner.
 5. The PO signs in and enrolls two-step.

@@ -35,7 +35,7 @@ How to read this list:
 - [ ] **Production deploy pipeline:** the same deploy as staging, pointed at production, which can only be started by hand from `main`.
 - [ ] **Phone app built for production:** the TestFlight build points at the production database.
 - [ ] **Library copy tool:** copies Luis's exercises and programs from staging to production. It runs as a dry run first, then applies after your OK.
-- [ ] **Admin dashboard on production** at `admin.caltracker.app` (being built now, on staging first).
+- [ ] **Admin dashboard on production** at `admin.caltracker.app`: it runs on the staging database until go-live; switch it as in `docs/runbooks/admin.md` ("Switching to production").
 
 ## 3. Accounts and settings (you, with Claude's step-by-step help)
 - [ ] **Supabase:** create project `caltracker-prod` on the **Pro** plan (~$25/month, includes daily backups).
