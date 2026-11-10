@@ -35,6 +35,8 @@ function RootStack() {
       </Stack.Protected>
       <Stack.Screen name="index" />
       <Stack.Screen name="auth/confirmed" />
+      {/* After "Delete my account": stays up while it signs out, then opens sign-in. No swipe back into the app. */}
+      <Stack.Screen name="account-deleted" options={{ gestureEnabled: false }} />
       {/* Reachable signed in or out: it handles both (see the screen). */}
       <Stack.Screen name="invite/[token]" />
     </Stack>
