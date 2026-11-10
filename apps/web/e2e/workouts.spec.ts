@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addSection, pickExercise, serviceClient, setRow, signInAsCoach } from './helpers';
+import { addSection, pickExercise, pickSetType, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Workout library and builder (phase 2 Task 14). The pounds test uses its own coach in its own workspace, so it never
 // changes the shared demo coach's units while other files run alongside it.
@@ -26,27 +26,23 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
 
   await page.getByLabel('Workout name').fill(name);
 
-  // Straight sets: 3 x 8-10 @ 60 kg, then a warm-up first and a drop to failure after set 3.
+  // Straight sets: 3 x 10 @ 60 kg, then a warm-up first and a drop after the last set.
   await pickExercise(page, '+ Exercise', 'Barbell Squat');
 
-  // Each exercise's sets have column captions, and the empty boxes say what goes in them.
+  // Each set has captions over its boxes, and the empty boxes say what goes in them. No per-set notes.
   const squat = page.getByRole('region', { name: 'Barbell Squat' });
-  for (const caption of ['Type', 'Reps', 'Weight', 'Rest', 'Note']) {
-    await expect(squat.getByText(caption, { exact: true })).toBeVisible();
-  }
   const first = setRow(page, 'Barbell Squat', 'set 1');
+  for (const caption of ['Type', 'Reps', 'Weight', 'Rest']) {
+    await expect(first.getByText(caption, { exact: true })).toBeVisible();
+  }
+  await expect(squat.getByRole('textbox', { name: 'Note', exact: true })).toHaveCount(0);
   await expect(first.getByPlaceholder('reps', { exact: true })).toBeVisible();
   await expect(first.getByLabel('Weight (kg)')).toHaveAttribute('placeholder', 'kg');
-  const toggle = first.getByRole('button', { name: '8–10', exact: true });
-  await expect(toggle).toHaveAccessibleDescription('Use a rep range, e.g. 8–10');
-  await expect(toggle).toHaveAttribute('title', 'Use a rep range, e.g. 8–10');
+  await expect(squat.getByRole('button', { name: /^(8–10|Single)$/ })).toHaveCount(0);
 
   for (const n of [1, 2, 3]) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await row.getByRole('button', { name: '8–10', exact: true }).click();
-    await expect(row.getByRole('button', { name: 'Single', exact: true })).toHaveAccessibleDescription('Use one rep count');
-    await row.getByLabel('Min reps').fill('8');
-    await row.getByLabel('Max reps').fill('10');
+    await row.getByLabel('Reps', { exact: true }).fill('10');
     await row.getByLabel('Weight (kg)').fill('60');
   }
   // A kg coach keeps the precision they typed (not rounded to 61.3).
@@ -54,12 +50,13 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await set3Weight.fill('61.25');
   await set3Weight.blur();
   await expect(set3Weight).toHaveValue('61.25');
-  await page.getByRole('button', { name: '+ Set', exact: true }).click();
-  await setRow(page, 'Barbell Squat', 'set 1').getByLabel('Set type').selectOption('warmup');
-  await expect(setRow(page, 'Barbell Squat', 'warm-up set')).toBeVisible();
-  await setRow(page, 'Barbell Squat', 'set 3').getByRole('button', { name: '+ Drop' }).click();
-  const drop = setRow(page, 'Barbell Squat', 'drop after set 3');
-  await drop.getByLabel('To failure').check();
+  // + Set copies the last set (61.25 kg x 10), then that copy becomes a drop: indented, no rest box.
+  await page.getByRole('button', { name: 'Add a set to Barbell Squat', exact: true }).click();
+  await expect(setRow(page, 'Barbell Squat', 'set 4').getByLabel('Weight (kg)')).toHaveValue('61.25');
+  await pickSetType(setRow(page, 'Barbell Squat', 'set 1'), 'Warm-up');
+  const drop = setRow(page, 'Barbell Squat', 'set 4');
+  await pickSetType(drop, 'Drop set');
+  await drop.getByLabel('Weight (kg)').fill('40');
   await expect(drop.getByLabel(/^Rest/)).toHaveCount(0);
 
   // Superset of Pushups + Pullups, 3 rounds by default.
@@ -99,17 +96,13 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
 
   await page.reload();
   await expect(page.getByLabel('Workout name')).toHaveValue(name);
-  await expect(setRow(page, 'Barbell Squat', 'warm-up set').getByLabel('Set type')).toHaveValue('warmup');
-  // After the warm-up was added first, the old set 3 (61.25 kg) is set 2 and its copy (+ Set) is set 3.
-  for (const [n, kg] of [[1, '60'], [2, '61.25'], [3, '61.25']] as const) {
+  await expect(setRow(page, 'Barbell Squat', 'set 1').getByRole('button', { name: 'Set type: Warm-up' })).toBeVisible();
+  for (const [n, kg] of [[2, '60'], [3, '61.25'], [4, '40']] as const) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await expect(row.getByLabel('Min reps')).toHaveValue('8');
-    await expect(row.getByLabel('Max reps')).toHaveValue('10');
+    await expect(row.getByLabel('Reps', { exact: true })).toHaveValue('10');
     await expect(row.getByLabel('Weight (kg)')).toHaveValue(kg);
   }
-  await expect(drop).toBeVisible();
-  await expect(drop.getByText('↳')).toBeVisible();
-  await expect(drop.getByLabel('To failure')).toBeChecked();
+  await expect(drop.getByRole('button', { name: 'Set type: Drop set' })).toBeVisible();
   await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
   for (const ex of ['Pushups', 'Pullups']) {
     for (const n of [1, 2, 3]) await expect(setRow(page, ex, `set ${n}`)).toBeVisible();

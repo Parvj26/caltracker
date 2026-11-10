@@ -1,7 +1,10 @@
 'use client';
 
-import { useId, useState, type InputHTMLAttributes } from 'react';
+import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
+  setKindOf,
+  setKindPatch,
+  singleReps,
   targetFieldsFor,
   distanceUnitFor,
   formatClock,
@@ -14,7 +17,8 @@ import {
 import type { TrackingType, Units, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import { gridTemplate, setColumns } from './set-columns';
+import { Icon } from './icons';
+import { SetTypeMenu } from './set-type-menu';
 import styles from './builder.module.css';
 
 export type SetPatch = Partial<Omit<WorkoutSetDoc, 'id'>>;
@@ -68,109 +72,75 @@ function NumberInput({ label, value, format, parse, onCommit, className, ...rest
 
 type Props = {
   set: WorkoutSetDoc;
-  /** 'W', '1', '2', or '↳' (from setLabels). */
-  label: string;
-  /** Accessible group name, e.g. "Barbell Squat set 1" or "Barbell Squat drop after set 3". */
+  /** The row's place in the exercise, from 1 (every row counts: warm-ups and drops too). */
+  number: number;
+  /** Accessible group name, e.g. "Barbell Squat set 2". */
   name: string;
   trackingType: TrackingType;
   units: Units;
+  /** False in a superset for an exercise that goes straight on to the next one (no rest box). */
   showRest: boolean;
   canRemove: boolean;
+  /** False on the first row: a drop must follow a set. */
+  canDrop: boolean;
   errors: string[];
   onChange: (patch: SetPatch) => void;
-  onAddDrop: (() => void) | null;
   onRemove: () => void;
 };
 
-export function SetRow({ set, label, name, trackingType, units, showRest, canRemove, errors, onChange, onAddDrop, onRemove }: Props) {
+/** One labelled box in a set row: a small caption above it, as in the approved mockup. */
+function Field({ caption, children }: { caption: string; children: ReactNode }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldCaption} aria-hidden="true">
+        {caption}
+      </span>
+      <span className={styles.fieldBox}>{children}</span>
+    </div>
+  );
+}
+
+/**
+ * One set: its number, its type letter (W / N / F / D, see SetTypeMenu), one rep count (or weight, time or distance,
+ * as the exercise's tracking type needs) and rest. A drop is indented under the set above and has no rest of its own.
+ * The × in the corner removes it.
+ */
+export function SetRow({ set, number, name, trackingType, units, showRest, canRemove, canDrop, errors, onChange, onRemove }: Props) {
   const fields = targetFieldsFor(trackingType);
+  const kind = setKindOf(set);
   const isDrop = set.setType === 'drop';
   const distanceUnit = distanceUnitFor(units);
-  const [range, setRange] = useState(
-    set.targetRepsMin !== null && set.targetRepsMax !== null && set.targetRepsMin !== set.targetRepsMax,
-  );
-  const toggleHintId = useId();
-  const toggleHint = range ? 'Use one rep count' : 'Use a rep range, e.g. 8–10';
 
   return (
     <div role="group" aria-label={name} className={cx(styles.setRow, isDrop && styles.dropRow)}>
-      <div className={styles.setCells} style={{ gridTemplateColumns: gridTemplate(setColumns(trackingType, showRest)) }}>
-        <span className={styles.setLabel} aria-hidden="true">{label}</span>
-
-        {isDrop ? (
-          <span className={styles.dropTag}>Drop</span>
-        ) : (
-          <select
-            aria-label="Set type"
-            className={cx(styles.input, styles.typeSelect)}
-            value={set.setType}
-            onChange={(e) => onChange({ setType: e.target.value === 'warmup' ? 'warmup' : 'normal' })}
-          >
-            <option value="normal">Normal</option>
-            <option value="warmup">Warm-up</option>
-          </select>
-        )}
+      <div className={styles.setCells}>
+        <span className={styles.setLabel} aria-hidden="true">
+          {number}
+        </span>
+        <div className={styles.field}>
+          <span className={styles.fieldCaption} aria-hidden="true">
+            Type
+          </span>
+          <SetTypeMenu kind={kind} setName={name} canDrop={canDrop} onPick={(k) => onChange(setKindPatch(k))} />
+        </div>
 
         {fields.includes('reps') ? (
-          <div className={styles.reps} data-caption="Reps">
-            {range ? (
-              <>
-                <NumberInput
-                  label="Min reps"
-                  inputMode="numeric"
-                  placeholder="min"
-                  className={styles.rangeInput}
-                  value={set.targetRepsMin}
-                  format={String}
-                  parse={parseWhole}
-                  onCommit={(n) => onChange({ targetRepsMin: n })}
-                />
-                <span aria-hidden="true">–</span>
-                <NumberInput
-                  label="Max reps"
-                  inputMode="numeric"
-                  placeholder="max"
-                  className={styles.rangeInput}
-                  value={set.targetRepsMax}
-                  format={String}
-                  parse={parseWhole}
-                  onCommit={(n) => onChange({ targetRepsMax: n })}
-                />
-              </>
-            ) : (
-              <NumberInput
-                label="Reps"
-                inputMode="numeric"
-                placeholder="reps"
-                className={styles.narrow}
-                value={set.targetRepsMin ?? set.targetRepsMax}
-                format={String}
-                parse={parseWhole}
-                onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
-              />
-            )}
-            {/* Its label says what it switches to ("8–10" for a range, "Single" for one count), so no aria-pressed. */}
-            <button
-              type="button"
-              className={cx(styles.smallButton, styles.toggle)}
-              title={toggleHint}
-              aria-describedby={toggleHintId}
-              onClick={() => {
-                // Leaving range mode keeps one number: the minimum.
-                if (range) onChange({ targetRepsMax: set.targetRepsMin ?? set.targetRepsMax, targetRepsMin: set.targetRepsMin ?? set.targetRepsMax });
-                setRange(!range);
-              }}
-            >
-              {range ? 'Single' : '8–10'}
-            </button>
-            <span id={toggleHintId} className={styles.visuallyHidden}>
-              {toggleHint}
-            </span>
-          </div>
+          <Field caption="Reps">
+            <NumberInput
+              label="Reps"
+              inputMode="numeric"
+              placeholder={set.toFailure ? 'max' : 'reps'}
+              className={styles.narrow}
+              value={singleReps(set.targetRepsMin, set.targetRepsMax)}
+              format={String}
+              parse={parseWhole}
+              onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
+            />
+          </Field>
         ) : null}
 
         {fields.includes('weight') ? (
-          <label className={styles.unitField} data-caption="Weight">
+          <Field caption="Weight">
             <NumberInput
               label={`Weight (${units})`}
               inputMode="decimal"
@@ -181,12 +151,12 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               parse={parseDecimal}
               onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
             />
-            <span aria-hidden="true">{units}</span>
-          </label>
+            <span className={styles.unit} aria-hidden="true">{units}</span>
+          </Field>
         ) : null}
 
         {fields.includes('duration') ? (
-          <label className={styles.unitField} data-caption="Time">
+          <Field caption="Time">
             <NumberInput
               label="Duration (m:ss)"
               inputMode="numeric"
@@ -197,11 +167,11 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               parse={parseClock}
               onCommit={(n) => onChange({ targetDurationS: n })}
             />
-          </label>
+          </Field>
         ) : null}
 
         {fields.includes('distance') ? (
-          <label className={styles.unitField} data-caption="Distance">
+          <Field caption="Distance">
             <NumberInput
               label={`Distance (${distanceUnit})`}
               inputMode="decimal"
@@ -212,17 +182,14 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               parse={parseDecimal}
               onCommit={(n) => onChange({ targetDistanceM: n === null ? null : toMeters(n, distanceUnit) })}
             />
-            <span aria-hidden="true">{distanceUnit}</span>
-          </label>
+            <span className={styles.unit} aria-hidden="true">{distanceUnit}</span>
+          </Field>
         ) : null}
 
-        {isDrop ? (
-          <label className={styles.check}>
-            <input type="checkbox" checked={set.toFailure} onChange={(e) => onChange({ toFailure: e.target.checked })} />
-            To failure
-          </label>
-        ) : showRest ? (
-          <label className={styles.unitField} data-caption="Rest">
+        {/* A drop goes straight on from the set above, so it has no rest; nor does a superset exercise that runs
+            straight into the next one. */}
+        {showRest && !isDrop ? (
+          <Field caption="Rest">
             <NumberInput
               label="Rest (m:ss)"
               inputMode="numeric"
@@ -233,39 +200,19 @@ export function SetRow({ set, label, name, trackingType, units, showRest, canRem
               parse={parseClock}
               onCommit={(n) => onChange({ restSeconds: n ?? 0 })}
             />
-          </label>
-        ) : (
-          // This exercise has no rest (it runs straight into the next one): keep the column's place.
-          <span />
-        )}
-
-        <input
-          type="text"
-          aria-label="Note"
-          placeholder="Note"
-          maxLength={500}
-          className={cx(styles.input, styles.noteInput)}
-          value={set.note ?? ''}
-          onChange={(e) => onChange({ note: e.target.value === '' ? null : e.target.value })}
-        />
-
-        <div className={styles.rowActions}>
-          {onAddDrop ? (
-            <button type="button" className={styles.smallButton} onClick={onAddDrop}>
-              + Drop
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.smallButton}
-            aria-label={isDrop ? 'Remove drop' : 'Remove set'}
-            disabled={!canRemove}
-            onClick={onRemove}
-          >
-            Remove
-          </button>
-        </div>
+          </Field>
+        ) : null}
       </div>
+      <button
+        type="button"
+        className={styles.removeSet}
+        aria-label={`Remove set ${number}`}
+        title={canRemove ? 'Remove set' : 'An exercise keeps at least one set'}
+        disabled={!canRemove}
+        onClick={onRemove}
+      >
+        <Icon name="close" size={18} />
+      </button>
       {errors.map((message) => (
         <ErrorText key={message} className={styles.rowError}>
           {message}

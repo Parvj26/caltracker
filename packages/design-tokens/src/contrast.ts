@@ -62,5 +62,6 @@ export const CONTRAST_PAIRS: ReadonlyArray<{
   { fg: 'danger', bg: 'bg', min: 4.5, use: 'Delete account link' },
   { fg: 'dangerDeep', bg: 'dangerBg', min: 4.5, use: 'Delete my account button label (off)' },
   { fg: 'white', bg: 'danger', min: 4.5, use: 'Delete my account button label (on)' },
+  { fg: 'danger', bg: 'dangerBg', min: 4.5, use: 'F (failure) set type letter in the workout builder' },
 ];
 

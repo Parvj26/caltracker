@@ -194,7 +194,6 @@ type RowProps = {
  */
 function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, readOnly = false, recent = false, handlers }: RowProps) {
   const { logText: text, space, radius } = useTheme();
-  const indented = row.tagKind === 'drop' || row.tagKind === 'failure';
   const tagged = row.tagKind !== 'normal';
   const id = `${idKey}-${row.setIndex}`;
   const deletable = !disabled && !readOnly && row.deletable;
@@ -214,7 +213,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
         style={[
           styles.row,
           { gap: space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
-          indented && { marginLeft: space[4] },
+          row.indented && { marginLeft: space[4] },
           row.done && styles.rowDone,
           recent && styles.rowRecent,
         ]}

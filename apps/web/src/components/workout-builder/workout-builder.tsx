@@ -9,15 +9,12 @@ import {
   WorkoutDoc,
   addChoice,
   addChoiceOption,
-  addDrop,
   addExerciseToSuperset,
   addRound,
   addSection,
   addSet,
   addStraightBlocks,
   addSuperset,
-  copyFirstSetToAll,
-  fillDown,
   moveBlock,
   moveBlockToSection,
   moveSection,
@@ -31,12 +28,12 @@ import {
   sectionRuns,
   updateSet,
   addSubstitute,
-  addSubstituteDrop,
   addSubstituteSet,
   removeSubstitute,
   removeSubstituteSet,
   updateSubstitute,
   updateSubstituteSet,
+  withSingleReps,
 } from '@caltracker/shared';
 import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
@@ -135,8 +132,9 @@ const formatDay = (date: IsoDate) =>
 
 export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isNew = false }: Props) {
   const router = useRouter();
-  const [doc, setDoc] = useState<WorkoutDoc>(initial);
-  const [savedJson, setSavedJson] = useState(() => JSON.stringify(initial));
+  // One rep count per set: an older range (10–12) shows, and saves, as its top number. Not an unsaved change by itself.
+  const [doc, setDoc] = useState<WorkoutDoc>(() => withSingleReps(initial));
+  const [savedJson, setSavedJson] = useState(() => JSON.stringify(withSingleReps(initial)));
   const [everSaved, setEverSaved] = useState(!isNew);
   const [savedAt, setSavedAt] = useState<number | null>(() =>
     lastNewSave?.id === initial.id && Date.now() - lastNewSave.at < SAVED_CHIP_MS ? lastNewSave.at : null,
@@ -249,10 +247,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         ),
       })),
     onAddSet: (exId) => setDoc((d) => addSet(d, blockId, exId, makeId)),
-    onAddDrop: (exId, setId) => setDoc((d) => addDrop(d, blockId, exId, setId, makeId)),
     onRemoveSet: (exId, setId) => setDoc((d) => removeSet(d, blockId, exId, setId)),
-    onCopyToAll: (exId) => setDoc((d) => copyFirstSetToAll(d, blockId, exId)),
-    onFillDown: (exId, setId) => setDoc((d) => fillDown(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
     onAddSubstitute: (exId) => {
       const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === exId);
@@ -264,7 +259,6 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
       onRemove: () => setDoc((d) => removeSubstitute(d, blockId, exId, subId)),
       onNote: (note) => setDoc((d) => updateSubstitute(d, blockId, exId, subId, { note })),
       onAddSet: () => setDoc((d) => addSubstituteSet(d, blockId, exId, subId, makeId)),
-      onAddDrop: (setId) => setDoc((d) => addSubstituteDrop(d, blockId, exId, subId, setId, makeId)),
       onRemoveSet: (setId) => setDoc((d) => removeSubstituteSet(d, blockId, exId, subId, setId)),
       onUpdateSet: (setId, patch) => setDoc((d) => updateSubstituteSet(d, blockId, exId, subId, setId, patch)),
     }),

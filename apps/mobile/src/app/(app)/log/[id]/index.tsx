@@ -124,7 +124,7 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
   failure: {
     title: 'F · To failure',
     lines: [
-      'A drop set done to failure: keep going until you can’t do another rep with good form.',
+      'Keep going until you can’t do another rep with good form.',
       'Type the reps you got, then tick it.',
     ],
     testID: 'tag-info',

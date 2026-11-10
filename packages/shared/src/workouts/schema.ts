@@ -120,8 +120,8 @@ function checkSets(sets: readonly WorkoutSetDoc[], trackingType: TrackingType, p
         }
       }
     }
-    if (s.toFailure && s.setType !== 'drop') {
-      ctx.addIssue({ code: 'custom', message: 'Only drop sets can be "to failure".', path: [...setPath, 'toFailure'] });
+    if (s.toFailure && s.setType === 'warmup') {
+      ctx.addIssue({ code: 'custom', message: 'A warm-up can\'t be "to failure".', path: [...setPath, 'toFailure'] });
     }
   });
 }

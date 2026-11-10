@@ -286,8 +286,8 @@ select throws_ok(
   format($$insert into public.workout_sets (workout_exercise_id, position, set_type, rest_seconds) values (%L, 20, 'drop', 30)$$, :'lib_a_we'),
   '23514', null, 'a drop set cannot have a rest timer');
 select throws_ok(
-  format($$insert into public.workout_sets (workout_exercise_id, position, set_type, to_failure) values (%L, 20, 'normal', true)$$, :'lib_a_we'),
-  '23514', null, 'only a drop set can be "to failure"');
+  format($$insert into public.workout_sets (workout_exercise_id, position, set_type, to_failure) values (%L, 20, 'warmup', true)$$, :'lib_a_we'),
+  '23514', null, 'a warm-up set cannot be "to failure"');
 select throws_ok(
   format($$insert into public.workout_sets (workout_exercise_id, position, set_type, target_reps_min, target_reps_max) values (%L, 20, 'normal', 10, 8)$$, :'lib_a_we'),
   '23514', null, 'reps min cannot exceed reps max');

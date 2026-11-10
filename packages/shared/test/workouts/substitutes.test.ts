@@ -128,6 +128,11 @@ describe('substitutes in a workout doc', () => {
     cur = addSubstituteSet(cur, b.id, e.id, sub().id, makeId);
     expect(sub().sets).toHaveLength(4);
     expect(sub().sets[3]).toMatchObject({ targetRepsMin: e.sets[2]!.targetRepsMin, setType: 'normal' });
+    // A copy of the last set, failure and all.
+    cur = updateSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[3]!.id, { toFailure: true, targetRepsMax: 12, targetRepsMin: 12 });
+    cur = addSubstituteSet(cur, b.id, e.id, sub().id, makeId);
+    expect(sub().sets[4]).toMatchObject({ setType: 'normal', toFailure: true, targetRepsMax: 12 });
+    cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[4]!.id);
     cur = addSubstituteDrop(cur, b.id, e.id, sub().id, sub().sets[0]!.id, makeId);
     expect(sub().sets[1]!.setType).toBe('drop');
     expect(sub().sets[1]!.restSeconds).toBe(0);
@@ -135,11 +140,10 @@ describe('substitutes in a workout doc', () => {
     expect(updateSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id, { setType: 'drop' })).toBe(before);
     cur = updateSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[2]!.id, { targetWeightKg: 30 });
     expect(sub().sets[2]!.targetWeightKg).toBe(30);
-    cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id); // takes its drop too
-    expect(sub().sets).toHaveLength(3);
+    cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id); // its drop now comes first: a normal set
+    expect(sub().sets).toHaveLength(4);
     expect(sub().sets[0]!.setType).toBe('normal');
-    cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id);
-    cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id);
+    for (let i = 0; i < 3; i++) cur = removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id);
     const last = cur;
     expect(removeSubstituteSet(cur, b.id, e.id, sub().id, sub().sets[0]!.id)).toBe(last);
     expect(valid(cur)).toBe(true);

@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Faster building (spec: docs/superpowers/specs/2026-11-06-coach-faster-building-design.md): several exercises at
-// once with a set count, copy set 1 to all sets, fill down, duplicate a workout or program, copy a program week.
+// once with a set count, duplicate a workout or program, copy a program week. (Copy set 1 / fill down gave way to
+// "+ Set (copies last set)" in the editor redesign: see workout-editor.spec.ts.)
 // Uses only exercises in the CI fixture.
 
 const admin = serviceClient();
@@ -16,7 +17,7 @@ test.afterAll(async () => {
 
 const saved = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
-test('add three exercises at once with 4 sets each, copy set 1 to all sets, fill down, and save', async ({ page }) => {
+test('add three exercises at once with 4 sets each, and save', async ({ page }) => {
   const name = `Fast build ${unique()}`;
   created.workouts.push(name);
   await signInAsCoach(page);
@@ -43,33 +44,11 @@ test('add three exercises at once with 4 sets each, copy set 1 to all sets, fill
   for (const n of [1, 2, 3, 4]) await expect(setRow(page, 'Barbell Squat', `set ${n}`)).toBeVisible();
   await expect(setRow(page, 'Barbell Squat', 'set 5')).toHaveCount(0);
 
-  // Set 1 of the squat: 5 reps at 100 kg, 2:00 rest. A warm-up first stays as it is.
-  await setRow(page, 'Barbell Squat', 'set 1').getByLabel('Set type').selectOption('warmup');
-  const first = setRow(page, 'Barbell Squat', 'set 1');
-  // Nothing to copy yet: the button waits for set 1, so typed sets are never wiped.
-  const copyAll = page.getByRole('button', { name: 'Copy set 1 of Barbell Squat to all sets' });
-  await expect(copyAll).toBeDisabled();
-  await expect(copyAll).toHaveAccessibleDescription('Type set 1 first, then copy it.');
-  await first.getByLabel('Reps', { exact: true }).fill('5');
-  await first.getByLabel('Weight (kg)').fill('100');
-  await first.getByLabel('Rest (m:ss)').fill('2:00');
-  await copyAll.click();
-  for (const n of [2, 3]) {
+  for (const n of [1, 2, 3, 4]) {
     const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await expect(row.getByLabel('Reps', { exact: true })).toHaveValue('5');
-    await expect(row.getByLabel('Weight (kg)')).toHaveValue('100');
-    await expect(row.getByLabel('Rest (m:ss)')).toHaveValue('2:00');
+    await row.getByLabel('Reps', { exact: true }).fill('5');
+    await row.getByLabel('Weight (kg)').fill(n === 3 ? '110' : '100');
   }
-  await expect(setRow(page, 'Barbell Squat', 'warm-up set').getByLabel('Reps', { exact: true })).toHaveValue('');
-
-  // Fill down from set 2 after changing it: only set 3 follows.
-  await setRow(page, 'Barbell Squat', 'set 2').getByLabel('Weight (kg)').fill('110');
-  // Choosing the set only picks it; "Fill" fills.
-  await page.getByLabel('Fill down Barbell Squat from a set').selectOption({ label: 'Set 2 to the sets below' });
-  await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('100');
-  await page.getByRole('button', { name: 'Fill down Barbell Squat', exact: true }).click();
-  await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('110');
-  await expect(setRow(page, 'Barbell Squat', 'set 1').getByLabel('Weight (kg)')).toHaveValue('100');
 
   await page.getByRole('button', { name: 'Save workout' }).click();
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
@@ -77,6 +56,7 @@ test('add three exercises at once with 4 sets each, copy set 1 to all sets, fill
   await page.reload();
   await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('110');
   await expect(setRow(page, 'Barbell Squat', 'set 2').getByLabel('Reps', { exact: true })).toHaveValue('5');
+  await expect(setRow(page, 'Pushups', 'set 4')).toBeVisible();
 });
 
 test('a superset can start with 4 rounds', async ({ page }) => {

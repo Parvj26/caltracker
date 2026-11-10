@@ -1,11 +1,10 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { trackingTypeLabel, formatSetsSummary, setLabels, substituteSetShowsRest } from '@caltracker/shared';
+import { trackingTypeLabel, formatSetsSummary, substituteSetShowsRest } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc, WorkoutSubstituteDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
-import { rowNames } from './block-editor';
-import { gridTemplate, setColumns } from './set-columns';
+import { AddSetButton, rowNames } from './block-editor';
 import { SetRow, type SetPatch } from './set-row';
 import styles from './builder.module.css';
 
@@ -13,7 +12,6 @@ export type SubstituteActions = {
   onRemove: () => void;
   onNote: (note: string | null) => void;
   onAddSet: () => void;
-  onAddDrop: (setId: string) => void;
   onRemoveSet: (setId: string) => void;
   onUpdateSet: (setId: string, patch: SetPatch) => void;
 };
@@ -37,11 +35,8 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
   const hasErrors =
     errors.has(`substitute:${sub.id}`) || sub.sets.some((s) => errors.has(`set:${s.id}`));
   const expanded = open || hasErrors;
-  const labels = setLabels(sub.sets);
   const names = rowNames(sub.sets);
-  const nonDrop = sub.sets.filter((s) => s.setType !== 'drop').length;
   const restShown = sub.sets.map((_, si) => substituteSetShowsRest(block, exerciseIndex, sub, si));
-  const columns = setColumns(sub.trackingType, restShown.some(Boolean));
 
   return (
     <div className={styles.substitute} aria-label={`Substitute: ${sub.exerciseName}`} role="group">
@@ -78,37 +73,25 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
       ))}
       <div id={setsId} hidden={!expanded} className={styles.substituteBody}>
         <div className={styles.sets}>
-          <div className={styles.columnCaptions} style={{ gridTemplateColumns: gridTemplate(columns) }} aria-hidden="true">
-            {columns.map((c) => (
-              <span key={c.key}>{c.caption}</span>
-            ))}
-          </div>
           {sub.sets.map((s, si) => (
             <SetRow
               key={s.id}
               set={s}
-              label={labels[si]!}
+              number={si + 1}
               name={`${sub.exerciseName} (substitute) ${names[si]}`}
               trackingType={sub.trackingType}
               units={units}
               showRest={restShown[si]!}
-              canRemove={s.setType === 'drop' || nonDrop > 1}
+              canRemove={sub.sets.length > 1}
+              canDrop={si > 0}
               errors={errors.get(`set:${s.id}`) ?? []}
               onChange={(patch) => actions.onUpdateSet(s.id, patch)}
-              onAddDrop={s.setType === 'drop' ? null : () => actions.onAddDrop(s.id)}
               onRemove={() => actions.onRemoveSet(s.id)}
             />
           ))}
         </div>
         <div className={styles.exerciseFooter}>
-          <button
-            type="button"
-            className={styles.smallButton}
-            aria-label={`Add a set to substitute ${sub.exerciseName}`}
-            onClick={actions.onAddSet}
-          >
-            + Set
-          </button>
+          <AddSetButton label={`Add a set to substitute ${sub.exerciseName}`} onClick={actions.onAddSet} />
           <label className={styles.exerciseNote}>
             <span className={styles.visuallyHidden}>Note for substitute {sub.exerciseName}</span>
             <input

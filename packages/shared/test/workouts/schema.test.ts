@@ -162,12 +162,17 @@ describe('WorkoutDoc', () => {
     );
   });
 
-  it('rejects to-failure on a non-drop set', () => {
-    const m = messages(doc([block('straight', [exercise([set('normal', { toFailure: true })])])]));
+  it('rejects to-failure on a warm-up', () => {
+    const m = messages(doc([block('straight', [exercise([set('warmup', { toFailure: true }), set()])])]));
     expect(m).toContainEqual({
-      message: 'Only drop sets can be "to failure".',
+      message: 'A warm-up can\'t be "to failure".',
       path: ['blocks', 0, 'exercises', 0, 'sets', 0, 'toFailure'],
     });
+  });
+
+  it('allows to-failure on a normal set (F)', () => {
+    const sets = [set(), set('normal', { toFailure: true })];
+    expect(WorkoutDoc.safeParse(doc([block('straight', [exercise(sets)])])).success).toBe(true);
   });
 
   it('allows to-failure on a drop set', () => {
