@@ -1,7 +1,7 @@
 begin;
-select plan(7);
+select plan(8);
 
--- 20261110004200: award_inputs sends a log exercise's own measurements (so the award function counts what was
+-- 20261110007200: award_inputs sends a log exercise's own measurements (so the award function counts what was
 -- logged), an old doc that swaps the exercise drops the stale override, and a save can skip remembering choices
 -- (Duplicate).
 select tests.create_user('mf-coach@t.local', 'MF Coach') as coach \gset
@@ -52,11 +52,14 @@ select public.save_workout(:'ws', pg_temp.doc(:'ex', '{"trackingType":"weight_re
 select results_eq(format($$select tracking_type::text, each_side from public.exercise_prefs where workspace_id = %L$$, :'ws'),
   $$values ('weight_reps_time'::text, false)$$, 'a normal save that changes them remembers them');
 
--- An old doc (no eachSide) that swaps the exercise: the old exercise's override doesn't carry over.
+-- An old doc (no eachSide) that swaps the exercise: the old exercise's override and Each side don't carry over.
+select public.save_workout(:'ws', pg_temp.doc(:'ex', '{"trackingType":"weight_reps_time","eachSide":true,"tempo":"3-1-1-0"}'));
 select public.save_workout(:'ws', pg_temp.doc(:'ex2', '{"trackingType":"weight_reps"}'));
 select results_eq(format($$select exercise_id, tracking_type::text from public.workout_exercises where id = %L$$, :'e1'),
   format($$values (%L::uuid, null::text)$$, :'ex2'),
   'swapping the exercise from an old doc drops the stale measurements');
+select results_eq(format($$select each_side, tempo from public.workout_exercises where id = %L$$, :'e1'),
+  $$values (false, '3-1-1-0'::text)$$, '...and the stale Each side, keeping the slot''s tempo');
 reset role;
 
 select * from finish();

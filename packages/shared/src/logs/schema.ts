@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isRawObject, mapRawArray, withKnownTrackingType } from '../exercises/lenient';
+import { isRawObject, mapRawArray, withKnownTrackingType, withReadableExerciseOptions } from '../exercises/lenient';
 import { TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from '../workouts/sections';
@@ -191,14 +191,18 @@ export type WorkoutLogDoc = z.output<typeof WorkoutLogDoc>;
 
 /** One substitute option as stored, with an unknown tracking type read as the fallback. */
 export function parseLogSubstituteOptionLenient(raw: unknown) {
-  return LogSubstituteOption.safeParse(isRawObject(raw) ? withKnownTrackingType(raw) : raw);
+  return LogSubstituteOption.safeParse(isRawObject(raw) ? withReadableExerciseOptions(withKnownTrackingType(raw)) : raw);
 }
 
 /** A log saved on the phone or sent by the server, with unknown tracking types read as the fallback. */
 export function parseWorkoutLogDocLenient(raw: unknown) {
   if (!isRawObject(raw)) return WorkoutLogDoc.safeParse(raw);
   const fixed = mapRawArray(raw, 'blocks', (b) =>
-    mapRawArray(b, 'exercises', (e) => mapRawArray(withKnownTrackingType(e), 'substituteOptions', (o) => withKnownTrackingType(o))),
+    mapRawArray(b, 'exercises', (e) =>
+      mapRawArray(withReadableExerciseOptions(withKnownTrackingType(e)), 'substituteOptions', (o) =>
+        withReadableExerciseOptions(withKnownTrackingType(o)),
+      ),
+    ),
   );
   return WorkoutLogDoc.safeParse(fixed);
 }

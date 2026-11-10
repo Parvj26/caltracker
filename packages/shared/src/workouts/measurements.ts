@@ -118,12 +118,13 @@ export function exerciseBadges(ex: BadgeSource): { badges: string[]; help: strin
 
 /**
  * What a workout or log exercise measures: its own pick (`override`, the row's tracking_type) or else the library
- * kind. A distance exercise always keeps its kind, whatever the row says.
+ * kind. A distance exercise always keeps its kind, whatever the row says; an unknown pick reads as the library kind.
  */
 export function effectiveTrackingType(override: unknown, library: unknown): TrackingType {
   const lib = toTrackingType(library ?? 'weight_reps');
-  if (lib === 'distance' || override === null || override === undefined) return lib;
-  return toTrackingType(override);
+  // An override this build doesn't know (a newer server's) reads as the library kind, the closest it can show.
+  if (lib === 'distance' || !isTrackingType(override)) return lib;
+  return override;
 }
 
 /** The workspace's last choice for an exercise (exercise_prefs): null trackingType means the library kind. */

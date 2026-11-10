@@ -3,6 +3,7 @@ import {
   MEASUREMENTS,
   applyExercisePrefs,
   canPickMeasurements,
+  effectiveTrackingType,
   exerciseBadges,
   measurementsLabel,
   measurementsOf,
@@ -206,5 +207,15 @@ describe('weight × reps counting for the new measurements', () => {
     const weightOnly = mkLog([{ trackingType: 'weight', sets: [{ w: 50, r: 10 }] }]);
     expect(logVolumeKg(weightOnly)).toBe(0);
     expect(liftsByExercise(weightOnly).size).toBe(0);
+  });
+});
+
+describe('effectiveTrackingType', () => {
+  it('uses the pick, keeps distance, and reads an unknown pick as the library kind', () => {
+    expect(effectiveTrackingType('weight', 'reps')).toBe('weight');
+    expect(effectiveTrackingType(null, 'time')).toBe('time');
+    expect(effectiveTrackingType(undefined, undefined)).toBe('weight_reps');
+    expect(effectiveTrackingType('weight', 'distance')).toBe('distance');
+    expect(effectiveTrackingType('sled_meters_per_minute', 'time')).toBe('time');
   });
 });

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isRawObject, mapRawArray, withKnownTrackingType } from '../exercises/lenient';
+import { isRawObject, mapRawArray, withKnownTrackingType, withReadableExerciseOptions } from '../exercises/lenient';
 import type { RawObject } from '../exercises/lenient';
 import { FALLBACK_TRACKING_TYPE, TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
@@ -284,8 +284,8 @@ export type WorkoutDoc = z.output<typeof WorkoutDoc>;
 /*
  * Lenient read, for a workout saved on the phone or sent by the server: an exercise or substitute whose tracking
  * type this build doesn't know (a newer server's) reads as FALLBACK_TRACKING_TYPE, keeping only the targets that type
- * uses, instead of failing the parse. Known types read exactly as the strict schema reads them. Writes keep using
- * WorkoutDoc.
+ * uses, instead of failing the parse, and an Each side or Tempo it can't read reads as none. Known types read exactly
+ * as the strict schema reads them. Writes keep using WorkoutDoc.
  */
 const fitRawSets = (o: RawObject): RawObject => mapRawArray(o, 'sets', (s) => fitSetTargets(FALLBACK_TRACKING_TYPE, s as WorkoutSetDoc));
 
@@ -293,7 +293,7 @@ export function parseWorkoutDocLenient(raw: unknown) {
   if (!isRawObject(raw)) return WorkoutDoc.safeParse(raw);
   const fixed = mapRawArray(raw, 'blocks', (b) =>
     mapRawArray(b, 'exercises', (e) =>
-      mapRawArray(withKnownTrackingType(e, fitRawSets), 'substitutes', (sub) => withKnownTrackingType(sub, fitRawSets)),
+      mapRawArray(withReadableExerciseOptions(withKnownTrackingType(e, fitRawSets)), 'substitutes', (sub) => withKnownTrackingType(sub, fitRawSets)),
     ),
   );
   return WorkoutDoc.safeParse(fixed);

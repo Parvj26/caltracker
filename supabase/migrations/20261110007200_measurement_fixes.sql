@@ -1,10 +1,11 @@
--- Fixes to 20261110004100 (per-exercise measurements), from review:
+-- Fixes to 20261110007100 (per-exercise measurements), from review:
 -- 1. award_inputs (from 20261107002000) also sends each log exercise's tracking_type, each_side and tempo, so the
 --    award function reads what the log measured (logRowToDoc prefers it over the library kind): a reps-only
 --    exercise the coach set to weight and reps counts its volume and PRs, and the reverse counts none.
--- 2. save_workout (from 20261110004100): a doc from before measurements (an old open tab) that swaps the exercise
---    no longer keeps the old exercise's measurements; and a doc with "rememberChoices": false (Duplicate) saves
---    without touching exercise_prefs. Otherwise unchanged.
+-- 2. save_workout (from 20261110007100): a doc from before measurements (an old open tab) that swaps the exercise
+--    no longer keeps the old exercise's measurements or Each side (its tempo stays with the slot, as in the
+--    builder); and a doc with "rememberChoices": false (Duplicate) saves without touching exercise_prefs.
+--    Otherwise unchanged.
 
 create or replace function public.award_inputs(p_log_id uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
@@ -226,7 +227,9 @@ begin
           tracking_type = case when v_has_opts then excluded.tracking_type
             when excluded.exercise_id <> public.workout_exercises.exercise_id then null
             else public.workout_exercises.tracking_type end,
-          each_side = case when v_has_opts then excluded.each_side else public.workout_exercises.each_side end,
+          each_side = case when v_has_opts then excluded.each_side
+            when excluded.exercise_id <> public.workout_exercises.exercise_id then false
+            else public.workout_exercises.each_side end,
           tempo = case when v_has_opts then excluded.tempo else public.workout_exercises.tempo end
         where public.workout_exercises.block_id = excluded.block_id
           and (public.workout_exercises.position, public.workout_exercises.exercise_id, public.workout_exercises.note)
