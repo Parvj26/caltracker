@@ -180,4 +180,10 @@ test('a tap on a link shows the loading bar straight away', async ({ page }) => 
   await expect(page.getByTestId('nav-progress')).toBeVisible({ timeout: 1000 });
   await expect(page).toHaveURL(/\/programs$/);
   await expect(page.getByTestId('nav-progress')).toBeHidden();
+  // Going back to the page the tap was made on doesn't bring the bar back.
+  await page.unrouteAll();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByTestId('nav-progress')).toHaveCount(0);
 });

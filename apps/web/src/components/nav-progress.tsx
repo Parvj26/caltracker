@@ -33,6 +33,8 @@ export function NavProgress() {
   const hereRef = useRef(here);
   useEffect(() => {
     hereRef.current = here;
+    // Landed somewhere else: forget the tap, or coming back to this address later (Back) would show the bar again.
+    setPendingFrom((from) => (from !== null && from !== here ? null : from));
   }, [here]);
 
   useEffect(() => {
