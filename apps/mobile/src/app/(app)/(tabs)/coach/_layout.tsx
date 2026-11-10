@@ -6,5 +6,5 @@ import { palette } from '@/theme/theme';
 export const unstable_settings = { initialRouteName: 'index' };
 
 export default function CoachLayout() {
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }} />;
+  return <Stack screenOptions={{ headerShown: false, fullScreenGestureEnabled: true, contentStyle: { backgroundColor: palette.bg } }} />;
 }
