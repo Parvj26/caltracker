@@ -23,6 +23,11 @@ export function ActionStatus({ children }: { children: ReactNode }) {
   );
 }
 
+/** The nearest ActionStatus's reporter (null outside one), for actions with their own dialog or form. */
+export function useActionStatus(): Report | null {
+  return useContext(StatusContext);
+}
+
 /**
  * A support action behind a confirm dialog. `action` runs only after Confirm; its fields (children with `name`) are
  * sent as FormData. Errors stay in the dialog; success closes it, reports to the nearest ActionStatus and refreshes.

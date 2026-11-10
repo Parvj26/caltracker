@@ -174,3 +174,47 @@
 .groupHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
 .groupNote { font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); }
 .clientCol { width: 40%; }
+
+/* Coaches page: Add a coach, and the Delete coach dialog (mockups Coaches.dc.html, DeleteCoach.dc.html). */
+.addCoach { display: flex; flex-direction: column; gap: 12px; }
+.addCoach .filters > * { flex: 1 1 180px; }
+.addCoach .filters > .addCoachButton { flex: 0 0 auto; }
+.dangerLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ct-danger);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dialogWide { width: min(600px, calc(100vw - 32px)); }
+.dialogText { margin: 0; font-size: 15px; line-height: 1.45; }
+.dangerBox {
+  background: var(--ct-danger-bg);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.dangerText { color: var(--ct-danger); font-weight: 800; }
+.dangerList { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.confirmLabel { display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 700; }
+.confirmInput {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--ct-surface);
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ct-ink);
+}
+.confirmInput:focus-visible { outline: none; border-color: var(--ct-ink); }
+.dangerButton { background: var(--ct-danger); box-shadow: 0 var(--ct-base) 0 var(--ct-danger-deep); }

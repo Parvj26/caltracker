@@ -401,3 +401,38 @@ begin
   return true;
 end;
 $$;
+
+-- 6. The Coaches page needs each row's role (Delete coach is on the owner's row) ------------------------------------
+
+-- As in 20261109010100_admin_reads.sql, plus role. The return type changes, so drop and create.
+drop function public.admin_coaches();
+create function public.admin_coaches()
+returns table (user_id uuid, name text, workspace_id uuid, workspace_name text, created_at timestamptz, clients integer,
+  last_active timestamptz, programs_assigned_7d integer, messages_7d integer, health text, role public.member_role)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.admin_require('readonly');
+  return query
+  select x.user_id, x.name, x.workspace_id, x.workspace_name, x.created_at, x.clients, x.last_active,
+    x.programs_assigned_7d, x.messages_7d, private.admin_coach_health(x.last_active), x.role
+  from (
+    select m.user_id, private.admin_name(m.user_id) as name, m.workspace_id, w.name as workspace_name, m.created_at,
+      (select count(*)::integer from public.workspace_members c
+       where c.workspace_id = m.workspace_id and c.role = 'client') as clients,
+      private.admin_coach_last_active(m.user_id, m.workspace_id) as last_active,
+      (select count(*)::integer from public.program_assignments pa
+       where pa.workspace_id = m.workspace_id and pa.created_by = m.user_id
+         and pa.created_at >= now() - interval '7 days') as programs_assigned_7d,
+      (select count(*)::integer from public.messages msg
+       where msg.workspace_id = m.workspace_id and msg.sender_id = m.user_id
+         and msg.created_at >= now() - interval '7 days') as messages_7d,
+      m.role
+    from public.workspace_members m
+    join public.workspaces w on w.id = m.workspace_id
+    where m.role in ('owner', 'staff')
+  ) x
+  order by x.name, x.workspace_name;
+end;
+$$;
+revoke execute on function public.admin_coaches() from public, anon, authenticated;
+grant execute on function public.admin_coaches() to authenticated;

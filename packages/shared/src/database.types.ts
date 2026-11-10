@@ -2821,6 +2821,7 @@ export type Database = {
           messages_7d: number
           name: string
           programs_assigned_7d: number
+          role: Database["public"]["Enums"]["member_role"]
           user_id: string
           workspace_id: string
           workspace_name: string
