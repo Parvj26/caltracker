@@ -13,7 +13,10 @@ export type ColorToken =
   | 'magentaDeep'
   | 'amber'
   | 'celebrateBg'
-  | 'tape';
+  | 'tape'
+  | 'danger'
+  | 'dangerDeep'
+  | 'dangerBg';
 
 // Values copied verbatim from docs/superpowers/specs/2026-11-03-design-system-design.md section 2.
 export const colors: { light: Record<ColorToken, string> } = {
@@ -35,6 +38,10 @@ export const colors: { light: Record<ColorToken, string> } = {
     amber: '#FFB020',
     celebrateBg: '#FFF8D9',
     tape: '#FFE48A',
+    // 2026-11-10: destructive actions only (Delete account), from the approved Delete account board.
+    danger: '#B3261E',
+    dangerDeep: '#8C1D18',
+    dangerBg: '#FBE9E7',
   },
 };
 

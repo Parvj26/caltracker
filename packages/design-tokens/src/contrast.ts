@@ -59,5 +59,8 @@ export const CONTRAST_PAIRS: ReadonlyArray<{
   { fg: 'white', bg: 'ink', min: 15, use: 'Label on a primary button' },
   { fg: 'magenta', bg: 'bg', min: 3, use: 'Handwritten notes (large text only)' },
   { fg: 'white', bg: 'magenta', min: 3, use: 'Finish button label (large bold text only)' },
+  { fg: 'danger', bg: 'bg', min: 4.5, use: 'Delete account link' },
+  { fg: 'dangerDeep', bg: 'dangerBg', min: 4.5, use: 'Delete my account button label (off)' },
+  { fg: 'white', bg: 'danger', min: 4.5, use: 'Delete my account button label (on)' },
 ];
 

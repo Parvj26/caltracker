@@ -45,6 +45,9 @@
 | `amber` | `#FFB020` | Warnings (e.g. "program ends Fri") |
 | `celebrate-bg` | `#FFF8D9` | Badge reveal background |
 | `tape` | `#FFE48A` | Sticker-book tape strip |
+| `danger` | `#B3261E` | Destructive links and borders (Delete account) only |
+| `danger-deep` | `#8C1D18` | Label on the destructive button |
+| `danger-bg` | `#FBE9E7` | Destructive button fill |
 
 ### Dark mode
 Not in Version 1. The app and dashboard are light-only (forced light, ignoring the system setting). Components must read colours only through tokens, never hard-coded values, so dark mode can be added later by supplying a second token set. Text on pastel tiles is always `#121212`.

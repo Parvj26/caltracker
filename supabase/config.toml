@@ -409,3 +409,8 @@ import_map = "./functions/deno.json"
 [functions.send-push]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+# Called by the phone with the signed-in client's JWT; the function deletes only that user.
+[functions.delete-account]
+verify_jwt = true
+import_map = "./functions/deno.json"
