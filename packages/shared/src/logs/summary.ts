@@ -1,3 +1,4 @@
+import { countsWeightTimesReps } from '../workouts/targets';
 import { liveExercises, needsPick } from './flow';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
 
@@ -9,7 +10,7 @@ export const REOPEN_WINDOW_MS = 24 * 60 * 60 * 1000;
 function allSets(log: WorkoutLogDoc): { set: LogSetDoc; weightReps: boolean }[] {
   return log.blocks.flatMap((b) =>
     liveExercises(b).flatMap(({ exercise: e }) =>
-      e.sets.map((set) => ({ set, weightReps: e.trackingType === 'weight_reps' })),
+      e.sets.map((set) => ({ set, weightReps: countsWeightTimesReps(e.trackingType) })),
     ),
   );
 }

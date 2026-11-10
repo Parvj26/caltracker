@@ -81,6 +81,9 @@ export function chooseSubstitute(
       exerciseId: option.exerciseId,
       exerciseName: option.exerciseName,
       trackingType: option.trackingType,
+      // Each side and Tempo belong to the option (the planned exercise's, from the plan; a substitute has none).
+      eachSide: option.eachSide === true,
+      tempo: option.tempo ?? null,
       substituteId,
       swappedFromExerciseId: substituteId === null ? null : planned.exerciseId,
       sets,

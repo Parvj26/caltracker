@@ -142,10 +142,28 @@ describe('logRowToDoc', () => {
       plannedWorkoutExerciseId: id(801),
       swappedFromExerciseId: id(700),
       note: 'Chest to floor.',
+      eachSide: false,
+      tempo: null,
       substituteId: null,
       substituteOptions: [],
     });
     expect(sets).toHaveLength(2);
+  });
+
+  it('reads the plan\'s measurements, Each side and Tempo when the log has them', () => {
+    const ex = row.log_blocks.find((b) => b.position === 1)!.log_exercises[0]!;
+    const withOpts = {
+      ...row,
+      log_blocks: row.log_blocks.map((b) =>
+        b.position !== 1 ? b : { ...b, log_exercises: b.log_exercises.map((e) => (e.id !== ex.id ? e : { ...e, tracking_type: 'reps_time' as const, each_side: true, tempo: '3-1-X-0' })) },
+      ),
+    };
+    const got = logRowToDoc(withOpts).blocks[1]!.exercises.find((e) => e.id === ex.id)!;
+    expect(got).toMatchObject({ trackingType: 'reps_time', eachSide: true, tempo: '3-1-X-0' });
+  });
+
+  it('selects the new log exercise columns', () => {
+    expect(LOG_TREE_SELECT).toContain('tracking_type, each_side, tempo');
   });
 
   it('maps a set into its planned target and what was actually done', () => {

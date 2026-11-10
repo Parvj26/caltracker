@@ -47,6 +47,9 @@ export const LogSubstituteOption = z.object({
   trackingType: TrackingTypeSchema,
   /** The coach's note on that option ("use the blue band"); options saved before notes have none. */
   note: z.string().max(500).nullable().default(null),
+  /** The plan's Each side and Tempo for that option (only the planned exercise has them); older options have none. */
+  eachSide: z.boolean().optional(),
+  tempo: z.string().max(40).nullable().optional(),
   sets: z
     .array(z.object({ setType: z.enum(SET_TYPES), target: LogSetTarget }))
     .min(1)
@@ -69,6 +72,12 @@ export const LogExerciseDoc = z.object({
   plannedWorkoutExerciseId: z.uuid().nullable(),
   swappedFromExerciseId: z.uuid().nullable(),
   note: z.string().max(500).nullable(),
+  /**
+   * The plan's Each side and Tempo ("3-1-1-0"), snapshotted when the log starts. Optional: logs from before them,
+   * and free-added exercises, have neither.
+   */
+  eachSide: z.boolean().optional(),
+  tempo: z.string().max(40).nullable().optional(),
   sets: z.array(LogSetDoc).min(1).max(30),
   /** Logs saved before substitutes have neither. */
   substituteId: z.uuid().nullable().default(null),

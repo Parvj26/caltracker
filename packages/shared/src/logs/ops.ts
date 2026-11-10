@@ -259,7 +259,9 @@ export function swapLogExercise(
       exerciseId: ex.id,
       exerciseName: ex.name,
       trackingType: ex.trackingType,
-      // A free swap takes the exercise off the plan, so the coach's substitutes no longer apply to it.
+      // A free swap takes the exercise off the plan, so the coach's substitutes, Each side and Tempo no longer apply.
+      eachSide: false,
+      tempo: null,
       substituteId: null,
       substituteOptions: [],
       sets: old.sets.map((s) => ({

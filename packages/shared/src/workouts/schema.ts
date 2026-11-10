@@ -5,6 +5,7 @@ import { FALLBACK_TRACKING_TYPE, TRACKING_TYPES } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, sectionRuns } from './sections';
 import { fitSetTargets, targetFieldsFor, trackingTypeLabel } from './targets';
+import { parseTempo } from './tempo';
 
 export const SET_TYPES = ['normal', 'warmup', 'drop'] as const;
 export type SetType = (typeof SET_TYPES)[number];
@@ -47,13 +48,20 @@ export const WorkoutSubstituteDoc = z.object({
 });
 export type WorkoutSubstituteDoc = z.infer<typeof WorkoutSubstituteDoc>;
 
-/** `exerciseName` and `trackingType` are display and validation fields; save_workout does not write them. */
+/**
+ * `exerciseName` is a display field. `trackingType` is what the exercise measures in this workout: the library
+ * exercise's kind unless the coach picked other measurements (save_workout stores it only when it differs from the
+ * library kind). `eachSide` and `tempo` are optional so docs from before them still read; a parsed doc always has
+ * both (false / null when unset), and `tempo` normalised ("3-1-X-0", see parseTempo).
+ */
 export const WorkoutExerciseDoc = z.object({
   id: z.uuid(),
   exerciseId: z.uuid(),
   exerciseName: z.string(),
   trackingType: TrackingTypeSchema,
   note: z.string().max(500).nullable(),
+  eachSide: z.boolean().optional(),
+  tempo: z.string().max(40).nullable().optional(),
   sets: z.array(WorkoutSetDoc).min(1).max(20),
   /** Docs saved before substitutes have none. */
   substitutes: z.array(WorkoutSubstituteDoc).max(MAX_SUBSTITUTES, 'Use at most 3 substitutes.').default([]),
@@ -73,6 +81,11 @@ export const WorkoutBlockDoc = z.object({
   exercises: z.array(WorkoutExerciseDoc).min(1).max(10),
 });
 export type WorkoutBlockDoc = z.infer<typeof WorkoutBlockDoc>;
+
+const normalisedTempo = (t: string | null | undefined): string | null => {
+  const r = parseTempo(t);
+  return r.ok ? r.tempo : null;
+};
 
 const dropRest = (s: WorkoutSetDoc): WorkoutSetDoc => (s.setType === 'drop' ? { ...s, restSeconds: 0 } : s);
 
@@ -173,6 +186,8 @@ export const WorkoutDoc = z
       block.exercises.forEach((ex, ei) => {
         const exPath = ['blocks', bi, 'exercises', ei];
         checkSets(ex.sets, ex.trackingType, [...exPath, 'sets'], ctx);
+        const tempo = parseTempo(ex.tempo);
+        if (!tempo.ok) ctx.addIssue({ code: 'custom', message: tempo.message, path: [...exPath, 'tempo'] });
         if (block.kind === 'choice' && ex.substitutes.length > 0) {
           ctx.addIssue({
             code: 'custom',
@@ -253,11 +268,15 @@ export const WorkoutDoc = z
     ...doc,
     blocks: doc.blocks.map((b) => ({
       ...b,
-      exercises: b.exercises.map((e) => ({
-        ...e,
-        sets: e.sets.map(dropRest),
-        substitutes: e.substitutes.map((sub) => ({ ...sub, sets: sub.sets.map(dropRest) })),
-      })),
+      exercises: b.exercises.map(
+        (e): WorkoutExerciseDoc => ({
+          ...e,
+          eachSide: e.eachSide === true,
+          tempo: normalisedTempo(e.tempo),
+          sets: e.sets.map(dropRest),
+          substitutes: e.substitutes.map((sub) => ({ ...sub, sets: sub.sets.map(dropRest) })),
+        }),
+      ),
     })),
   }));
 export type WorkoutDoc = z.output<typeof WorkoutDoc>;

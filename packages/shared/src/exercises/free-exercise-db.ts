@@ -1,5 +1,5 @@
 import type { Database } from '../database.types';
-import { inferTrackingType, type TrackingType } from './tracking';
+import { inferTrackingType, type LibraryTrackingType } from './tracking';
 
 export type ExerciseInsert = Database['public']['Tables']['exercises']['Insert'];
 
@@ -33,7 +33,7 @@ export function exerciseImageObjectPath(sourcePath: string): string {
 
 export function mapFreeExercise(
   e: FreeExercise,
-  overrides: Record<string, TrackingType>,
+  overrides: Record<string, LibraryTrackingType>,
 ): ExerciseInsert {
   return {
     source: 'builtin',

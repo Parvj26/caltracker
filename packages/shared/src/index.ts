@@ -22,8 +22,16 @@ export {
   parseClientCsv,
 } from './invites/csv';
 export type { CsvError, ParsedClientCsv } from './invites/csv';
-export { FALLBACK_TRACKING_TYPE, TRACKING_TYPES, inferTrackingType, isTrackingType, toTrackingType } from './exercises/tracking';
-export type { TrackingType } from './exercises/tracking';
+export {
+  FALLBACK_TRACKING_TYPE,
+  LIBRARY_TRACKING_TYPES,
+  TRACKING_TYPES,
+  inferTrackingType,
+  isTrackingType,
+  toLibraryTrackingType,
+  toTrackingType,
+} from './exercises/tracking';
+export type { LibraryTrackingType, TrackingType } from './exercises/tracking';
 export { FREE_EXERCISE_DB_IMAGE_PREFIX, exerciseImageObjectPath, mapFreeExercise } from './exercises/free-exercise-db';
 export { equipmentLabel, workoutEquipment } from './exercises/equipment';
 export type { ExerciseInsert, FreeExercise } from './exercises/free-exercise-db';
@@ -111,6 +119,7 @@ export {
   formatSetsSummary,
   targetFieldsFor,
   trackingTypeLabel,
+  countsWeightTimesReps,
 } from './workouts/targets';
 export { workoutPreview } from './workouts/preview';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
@@ -149,7 +158,24 @@ export {
   substituteSetShowsRest,
   updateSubstitute,
   updateSubstituteSet,
+  toggleExerciseMeasurement,
+  updateExerciseOptions,
 } from './workouts/doc-ops';
+export {
+  MEASUREMENTS,
+  MEASUREMENT_NAMES,
+  applyExercisePrefs,
+  canPickMeasurements,
+  exerciseBadges,
+  measurementsLabel,
+  measurementsOf,
+  setColumns,
+  toggleMeasurement,
+  trackingTypeOf,
+} from './workouts/measurements';
+export type { ExercisePrefs, Measurement, SetColumn, SetColumnField } from './workouts/measurements';
+export { TEMPO_MESSAGE, TEMPO_PATTERN, TEMPO_PLACEHOLDER, parseTempo, validTempo } from './workouts/tempo';
+export type { TempoResult } from './workouts/tempo';
 export type { ExercisePick, SubstitutePatch } from './workouts/doc-ops';
 export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate';
 export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';

@@ -24,6 +24,9 @@ describe('TARGET_FIELDS and labels', () => {
       time: ['duration'],
       distance: ['distance'],
       weight_time: ['weight', 'duration'],
+      weight: ['weight'],
+      reps_time: ['reps', 'duration'],
+      weight_reps_time: ['reps', 'weight', 'duration'],
     });
   });
   it('has a label per tracking type', () => {
@@ -33,6 +36,9 @@ describe('TARGET_FIELDS and labels', () => {
       time: 'time',
       distance: 'distance',
       weight_time: 'weight and time',
+      weight: 'weight only',
+      reps_time: 'reps and time',
+      weight_reps_time: 'weight, reps and time',
     });
   });
 });
