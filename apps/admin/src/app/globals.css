@@ -1,0 +1,32 @@
+/* Tokens (--ct-*) are injected by app/layout.tsx from @caltracker/design-tokens. Colours only via var(--ct-*). */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: light; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font-family: var(--ct-font-sans), system-ui, sans-serif;
+  font-weight: var(--ct-weight-body);
+  font-size: var(--ct-size-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { line-height: 1.2; }
+
+a { color: var(--ct-ink); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+
+:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* Buttons do not move when pressed (the UI kit only adds the press transform with no-preference). */
+  button:active { transform: none !important; }
+}
