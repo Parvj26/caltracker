@@ -555,6 +555,36 @@ export type Database = {
           },
         ]
       }
+      closed_workspace_clients: {
+        Row: {
+          closed_at: string
+          email: string
+          first_name: string
+          joined_at: string | null
+          last_name: string
+          user_id: string
+          workspace_name: string
+        }
+        Insert: {
+          closed_at?: string
+          email: string
+          first_name?: string
+          joined_at?: string | null
+          last_name?: string
+          user_id: string
+          workspace_name: string
+        }
+        Update: {
+          closed_at?: string
+          email?: string
+          first_name?: string
+          joined_at?: string | null
+          last_name?: string
+          user_id?: string
+          workspace_name?: string
+        }
+        Relationships: []
+      }
       coach_meals: {
         Row: {
           calories: number | null
@@ -2766,6 +2796,21 @@ export type Database = {
       admin_cancel_invite: { Args: { p_invite_id: string }; Returns: undefined }
       admin_client: { Args: { p_user_id: string }; Returns: Json }
       admin_coach: { Args: { p_user_id: string }; Returns: Json }
+      admin_coach_delete_files: {
+        Args: { p_user_ids?: string[]; p_workspace_id: string }
+        Returns: {
+          bucket_id: string
+          name: string
+        }[]
+      }
+      admin_coach_delete_preview: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
+      admin_coach_email_status: {
+        Args: { p_admin_id: string; p_email: string }
+        Returns: string
+      }
       admin_coaches: {
         Args: never
         Returns: {
@@ -2780,6 +2825,22 @@ export type Database = {
           workspace_id: string
           workspace_name: string
         }[]
+      }
+      admin_create_coach: {
+        Args: {
+          p_admin_id: string
+          p_user_id: string
+          p_workspace_name: string
+        }
+        Returns: string
+      }
+      admin_delete_coach: {
+        Args: {
+          p_admin_id: string
+          p_confirm_name: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       admin_invite_log: {
         Args: { p_limit?: number; p_user_id?: string }
@@ -2860,6 +2921,7 @@ export type Database = {
       }
       admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
       admin_remove_client: { Args: { p_user_id: string }; Returns: undefined }
+      admin_require_owner: { Args: never; Returns: boolean }
       admin_send_test_push: { Args: { p_user_id: string }; Returns: string }
       admin_set_admin: {
         Args: {

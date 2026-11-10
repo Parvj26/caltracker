@@ -30,6 +30,7 @@ select is(
     'client_limitations(client_id)>auth.users:c',
     'client_notes(client_id)>auth.users:c', 'client_notes(created_by)>auth.users:n',
     'client_stats(client_id)>auth.users:c',
+    'closed_workspace_clients(user_id)>auth.users:c',
     'coach_meals(created_by)>auth.users:n',
     'community_blocks(blocked_id)>auth.users:c', 'community_blocks(blocker_id)>auth.users:c',
     'community_comments(author_id)>profiles:c',
