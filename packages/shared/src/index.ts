@@ -602,3 +602,5 @@ export * from './push/index';
 export * from './admin/index';
 export { PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL, supportMailto } from './support/support-mailto';
 export type { SupportSurface } from './support/support-mailto';
+export { updateStatus } from './app-update/update-status';
+export type { UpdateConfig, UpdateStatus } from './app-update/update-status';
