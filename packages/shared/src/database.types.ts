@@ -34,6 +34,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_id: string
+          at: string
+          details: Json
+          id: number
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          at?: string
+          details?: Json
+          id?: never
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          at?: string
+          details?: Json
+          id?: never
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      admin_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          role?: Database["public"]["Enums"]["admin_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       award_catchup_attempts: {
         Row: {
           attempts: number
@@ -2664,6 +2712,32 @@ export type Database = {
         Args: { p_invite_id: string; p_user_id: string }
         Returns: string
       }
+      admin_list_admins: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          first_name: string
+          last_name: string
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }[]
+      }
+      admin_me: {
+        Args: never
+        Returns: {
+          email: string
+          role: Database["public"]["Enums"]["admin_role"]
+        }[]
+      }
+      admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
+      admin_set_admin: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["admin_role"]
+        }
+        Returns: string
+      }
       apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
       assign_program: {
         Args: {
@@ -3105,6 +3179,7 @@ export type Database = {
       workout_log_logger: { Args: { p_log_id: string }; Returns: Json }
     }
     Enums: {
+      admin_role: "readonly" | "support" | "owner"
       block_kind: "straight" | "superset" | "choice"
       log_status: "in_progress" | "completed" | "discarded"
       member_role: "owner" | "staff" | "client"
@@ -3245,6 +3320,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      admin_role: ["readonly", "support", "owner"],
       block_kind: ["straight", "superset", "choice"],
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],
