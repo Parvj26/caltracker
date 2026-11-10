@@ -7,6 +7,7 @@ import {
 import { renderInviteEmail } from './email.ts';
 import { upgradeLegacyInvites } from './legacy.ts';
 import { createMailer, type Mailer } from './mailer.ts';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 export interface HandlerDeps {
   mailer: Mailer;
@@ -338,21 +339,24 @@ if (import.meta.main) {
   const env = Deno.env;
   const usesResend = Boolean(env.get('RESEND_API_KEY'));
   Deno.serve(
-    createHandler({
-      mailer: createMailer(env),
-      supabaseAdmin: createClient(
-        env.get('SUPABASE_URL')!,
-        env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-        { auth: { persistSession: false, autoRefreshToken: false } },
-      ),
-      supabaseUrl: env.get('SUPABASE_URL')!,
-      anonKey: env.get('SUPABASE_ANON_KEY')!,
-      publicSiteUrl:
-        env.get('PUBLIC_SITE_URL') ??
-        (usesResend ? undefined : 'http://localhost:3000'),
-      usesResend,
-      // Resend allows 2 requests/second: keep a gap a little over 500ms between sends.
-      sendIntervalMs: usesResend ? 550 : 0,
-    }),
+    withErrorReporting(
+      'fn:send-invite',
+      createHandler({
+        mailer: createMailer(env),
+        supabaseAdmin: createClient(
+          env.get('SUPABASE_URL')!,
+          env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+          { auth: { persistSession: false, autoRefreshToken: false } },
+        ),
+        supabaseUrl: env.get('SUPABASE_URL')!,
+        anonKey: env.get('SUPABASE_ANON_KEY')!,
+        publicSiteUrl:
+          env.get('PUBLIC_SITE_URL') ??
+          (usesResend ? undefined : 'http://localhost:3000'),
+        usesResend,
+        // Resend allows 2 requests/second: keep a gap a little over 500ms between sends.
+        sendIntervalMs: usesResend ? 550 : 0,
+      }),
+    ),
   );
 }

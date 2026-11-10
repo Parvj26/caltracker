@@ -3,6 +3,7 @@ import { createMailer, type Mailer } from '../send-invite/mailer.ts';
 import { purgeStorage as defaultPurgeStorage, type StorageObject } from '../_shared/purge-storage.ts';
 import { renderClientDeletedEmail } from './email.ts';
 import { createPosthogEraser, type PosthogEraser } from './posthog.ts';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 // "Delete my account" from the phone (Apple requires it in the app; go-live plan Task 3).
 // POST, no body, the signed-in client's JWT. Only that client can delete themselves: the user comes from the JWT.
@@ -137,14 +138,17 @@ export function createHandler(deps: HandlerDeps) {
 if (import.meta.main) {
   const env = Deno.env;
   Deno.serve(
-    createHandler({
-      supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-        auth: { persistSession: false, autoRefreshToken: false },
+    withErrorReporting(
+      'fn:delete-account',
+      createHandler({
+        supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        supabaseUrl: env.get('SUPABASE_URL')!,
+        anonKey: env.get('SUPABASE_ANON_KEY')!,
+        mailer: createMailer(env),
+        posthog: createPosthogEraser(env),
       }),
-      supabaseUrl: env.get('SUPABASE_URL')!,
-      anonKey: env.get('SUPABASE_ANON_KEY')!,
-      mailer: createMailer(env),
-      posthog: createPosthogEraser(env),
-    }),
+    ),
   );
 }

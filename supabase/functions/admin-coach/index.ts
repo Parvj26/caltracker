@@ -3,6 +3,7 @@ import { AdminCoachRequest } from '@caltracker/shared';
 import { createMailer, type Mailer } from '../send-invite/mailer.ts';
 import { purgeStorage as defaultPurgeStorage, type StorageObject } from '../_shared/purge-storage.ts';
 import { renderWorkspaceClosedEmail } from './email.ts';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 // Admin site "Add coach" and "Delete coach" (owner admins only, two-step sign-in). The admin site has no service-role
 // key: it calls this function with the admin's JWT, as it does send-invite. Migration 20261110004000_admin_coach.sql.
@@ -265,18 +266,21 @@ if (import.meta.main) {
       key === 'INVITE_FROM_EMAIL' ? (env.get('NOTICE_FROM_EMAIL') ?? 'CalTracker <hello@caltracker.app>') : env.get(key),
   };
   Deno.serve(
-    createHandler({
-      supabaseAdmin: createClient(supabaseUrl, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      }),
-      createCallerClient: (authHeader) =>
-        createClient(supabaseUrl, anonKey, {
-          global: { headers: { Authorization: authHeader } },
+    withErrorReporting(
+      'fn:admin-coach',
+      createHandler({
+        supabaseAdmin: createClient(supabaseUrl, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
           auth: { persistSession: false, autoRefreshToken: false },
         }),
-      mailer: createMailer(mailerEnv),
-      publicSiteUrl: env.get('PUBLIC_SITE_URL') ?? (usesResend ? undefined : 'http://localhost:3000'),
-      sendIntervalMs: usesResend ? 550 : 0,
-    }),
+        createCallerClient: (authHeader) =>
+          createClient(supabaseUrl, anonKey, {
+            global: { headers: { Authorization: authHeader } },
+            auth: { persistSession: false, autoRefreshToken: false },
+          }),
+        mailer: createMailer(mailerEnv),
+        publicSiteUrl: env.get('PUBLIC_SITE_URL') ?? (usesResend ? undefined : 'http://localhost:3000'),
+        sendIntervalMs: usesResend ? 550 : 0,
+      }),
+    ),
   );
 }

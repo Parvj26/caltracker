@@ -9,6 +9,7 @@ import {
   type LogTreeRow,
   type Rng,
 } from '@caltracker/shared';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 // award-workout (docs/superpowers/specs/2026-11-05-stickers-prs-streaks-design.md): the only writer of stickers,
 // personal bests and streak stats. Idempotent per log: the first award is stored in `awards` and every later call
@@ -215,11 +216,14 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
 if (import.meta.main) {
   const env = Deno.env;
   Deno.serve(
-    createHandler({
-      supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-        auth: { persistSession: false, autoRefreshToken: false },
+    withErrorReporting(
+      'fn:award-workout',
+      createHandler({
+        supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        cronSecret: env.get('AWARD_WORKOUT_SECRET') ?? '',
       }),
-      cronSecret: env.get('AWARD_WORKOUT_SECRET') ?? '',
-    }),
+    ),
   );
 }
