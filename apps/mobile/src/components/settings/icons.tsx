@@ -11,10 +11,4 @@ export function BellIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-export function ChevronIcon({ size = 20, direction = 'right' }: { size?: number; direction?: 'left' | 'right' }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={palette.ink} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-      <Path d={direction === 'right' ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
-    </Svg>
-  );
-}
+export { ChevronIcon } from '@/components/ui/icons';

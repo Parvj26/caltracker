@@ -13,6 +13,7 @@ import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ExerciseDemo, ExerciseTools } from './exercise-tools';
 import { AddSetButton, SetRowLine, SetTable, type TableHandlers } from './set-table';
+import { fontFamilyFor } from '@/theme/fonts';
 
 export type PageHandlers = {
   table: (ex: ExerciseModel) => TableHandlers;
@@ -295,7 +296,7 @@ export function SupersetPage({
 const styles = StyleSheet.create({
   centre: { textAlign: 'center' },
   flex: { flex: 1 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
   exHead: { flexDirection: 'row', alignItems: 'center' },
   roundHead: { borderTopWidth: 1, borderTopColor: palette.border },
   strip: { backgroundColor: palette.tape, color: palette.ink, overflow: 'hidden' },

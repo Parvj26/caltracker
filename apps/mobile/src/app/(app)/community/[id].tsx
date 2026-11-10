@@ -16,6 +16,7 @@ import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 /** One post with its reactions and comments, and a comment box pinned at the bottom. */
 export default function PostScreen() {
@@ -226,7 +227,7 @@ function CommentItem({
   const reactions = useReactions({ target: { commentId: c.id }, rows: c.reactions, me, onChanged });
   return (
     <Pressable accessible={false} onLongPress={reactions.openPicker} style={[styles.commentRow, { gap: space[2.5] }]} testID={`comment-${c.id}`}>
-      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} />
+      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} ring={2} />
       <View style={[styles.flex, { gap: space[1] }]}>
         <View style={[styles.bubble, { paddingVertical: space[2], paddingLeft: space[3], gap: 2 }]}>
           <View style={styles.row}>
@@ -240,6 +241,7 @@ function CommentItem({
               accessibilityRole="button"
               accessibilityLabel={`More options for ${c.authorName}’s comment`}
               onPress={onMenu}
+              hitSlop={{ top: 10, bottom: 10 }}
               style={({ pressed }) => [styles.menuButton, pressed && { opacity: pressedOpacity }]}
             >
               <Text style={text('body')}>•••</Text>
@@ -260,12 +262,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
   flex: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '800' },
-  eyebrow: { fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  title: { fontSize: 18, fontFamily: fontFamilyFor('sans', 800) },
+  eyebrow: { fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
   commentRow: { flexDirection: 'row', alignItems: 'flex-start' },
   bubble: { backgroundColor: palette.surface, borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  // Drawn small so the bubble stays tight (as in the mockup); the 44 pt tap area comes from hitSlop.
+  menuButton: { minWidth: 44, height: 24, alignItems: 'center', justifyContent: 'center' },
   ink: { color: palette.ink },
   send: { minHeight: 44, justifyContent: 'center', borderWidth: 2, borderColor: palette.ink, backgroundColor: palette.lime },
   sendOff: { opacity: 0.5 },

@@ -26,6 +26,7 @@ import { PinIcon } from './icons';
 import { CardView, LinkedText } from './parts';
 import { useReactions } from './reactions';
 import { ChoiceSheet, PhotoViewer, type Choice } from './sheets';
+import { fontFamilyFor } from '@/theme/fonts';
 
 export type PostContext = {
   me: string;
@@ -132,7 +133,7 @@ function AuthorRow({ name, isCoach, age, avatarUrl, size, menu }: { name: string
   const { text, space } = useTheme();
   return (
     <View style={[styles.row, { gap: space[2.5] }]}>
-      <CoachAvatar name={name} url={avatarUrl} size={size} />
+      <CoachAvatar name={name} url={avatarUrl} size={size} ring={2} />
       <View style={styles.flex} accessible accessibilityLabel={`${name}${isCoach ? ', coach' : ''}, ${age}`}>
         <View style={[styles.row, styles.wrap, { gap: space[1] }]}>
           <Text style={text('sectionHeading')}>{name}</Text>
@@ -150,7 +151,7 @@ function PreviewLine({ comment, avatarUrl }: { comment: PreviewComment; avatarUr
   const { text, space } = useTheme();
   return (
     <View style={[styles.previewLine, { gap: space[2] }]} testID={`preview-comment-${comment.id}`}>
-      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} />
+      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} ring={1.5} />
       <Text style={[text('body'), styles.flex]} numberOfLines={3}>
         <Text style={styles.bold}>{comment.authorName}</Text> {comment.body}
       </Text>
@@ -227,7 +228,7 @@ export function PostItem({
       onPress={reactions.openPicker}
       style={({ pressed }) => [pill, pressed && { opacity: pressedOpacity }]}
     >
-      <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '☺+ React'}</Text>
+      <Text style={text('sectionHeading')}>{reactionTotal > 0 ? topReactionsLine(reactions.rows, 2) : '+ React'}</Text>
     </Pressable>
   );
 
@@ -346,10 +347,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
   flex: { flex: 1 },
-  bold: { fontWeight: '800' },
-  eyebrow: { color: palette.ink, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  bold: { fontFamily: fontFamilyFor('sans', 800) },
+  eyebrow: { color: palette.ink, fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   coachBadge: { backgroundColor: palette.ink, paddingHorizontal: 6, paddingVertical: 1 },
-  coachBadgeText: { color: white, fontWeight: '800' },
+  coachBadgeText: { color: white, fontFamily: fontFamilyFor('sans', 800) },
   menuButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   photo: { alignSelf: 'center' },
   pill: { minHeight: 44, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.surface },

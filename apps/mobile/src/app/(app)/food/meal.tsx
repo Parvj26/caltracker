@@ -394,7 +394,8 @@ function Stepper({ glyph, label, onPress, testID }: { glyph: string; label: stri
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  side: { width: 64 },
+  // Wide enough for "Cancel" on one line (TextButton pads its label); the empty right side keeps the title centred.
+  side: { width: 88 },
   headerTitle: { flex: 1, textAlign: 'center' },
   center: { textAlign: 'center' },
   pad: { paddingHorizontal: 4 },

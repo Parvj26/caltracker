@@ -264,7 +264,7 @@ export function CoachMessageCard() {
       accessibilityHint="Opens your chat with your coach"
       style={({ pressed }) => [styles.row, styles.quiet, { borderRadius: radius.card, padding: space[3.5], gap: space[3] }, pressed && styles.pressed]}
     >
-      <CoachAvatar name={coach?.name || 'Coach'} url={coach?.avatarUrl ?? null} size={44} />
+      <CoachAvatar name={coach?.name || 'Coach'} url={coach?.avatarUrl ?? null} size={44} ring={2} />
       <View style={[styles.flex, { gap: space[1] / 2 }]}>
         <Text style={text('sectionHeading')} numberOfLines={1}>
           {first}

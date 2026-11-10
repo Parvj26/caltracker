@@ -14,6 +14,7 @@ import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 /**
  * The community feed, opened from the Coach tab: a box to share, filters (all, the coach's posts, wins), pinned posts
@@ -174,7 +175,7 @@ export default function CommunityScreen() {
       {community && ctx ? (
         <View style={{ gap: space[3.5] }}>
           <View style={[styles.row, styles.shareBox, { borderRadius: radius.card, gap: space[2.5], paddingHorizontal: space[3], paddingVertical: space[2.5] }]}>
-            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} />
+            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} ring={2} />
             <Pressable
               testID="community-new-post"
               accessibilityRole="button"
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
   ink: { color: palette.ink },
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
   badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, alignItems: 'center', backgroundColor: palette.magenta },
-  badgeText: { color: white, fontWeight: '800' },
+  badgeText: { color: white, fontFamily: fontFamilyFor('sans', 800) },
   shareBox: { borderWidth: 2, borderColor: palette.ink },
   shareText: { flex: 1, minHeight: 44, justifyContent: 'center' },
   placeholder: { color: palette.inkMuted },

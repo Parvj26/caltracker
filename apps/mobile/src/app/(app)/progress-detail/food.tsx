@@ -108,7 +108,7 @@ export default function FoodProgressScreen() {
               onPress={() => router.push('/food')}
               style={({ pressed }) => [styles.box, styles.between, { borderRadius: radius.button, padding: space[3], minHeight: tapTarget.min }, pressed && { opacity: pressedOpacity }]}
             >
-              <View>
+              <View style={styles.flex}>
                 <Text style={text('sectionHeading')}>{`${s.mealCount} ${s.mealCount === 1 ? 'meal' : 'meals'} logged ${periodWords}`}</Text>
                 <Text style={text('caption')}>{`${s.photoCount} with photos`}</Text>
               </View>
@@ -122,14 +122,16 @@ export default function FoodProgressScreen() {
 }
 
 const styles = StyleSheet.create({
-  between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  flex: { flex: 1 },
   track: { height: 12, backgroundColor: palette.surface, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink, overflow: 'hidden' },
   fill: { height: '100%' },
   fillNear: { backgroundColor: palette.ink },
   fillPart: { backgroundColor: palette.lime },
   box: { borderWidth: borderWidth.card, borderColor: palette.border },
-  dots: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  dotCol: { width: `${100 / 7 - 2}%`, alignItems: 'center', gap: 4, marginBottom: 6 },
+  // Seven per row (a week), so the 4-week view is four aligned rows rather than eight-wide rows with a ragged end.
+  dots: { flexDirection: 'row', flexWrap: 'wrap' },
+  dotCol: { width: '14.28%', alignItems: 'center', gap: 4, marginBottom: 6 },
   dot: { width: DOT, height: DOT, borderRadius: DOT / 2, alignItems: 'center', justifyContent: 'center', borderWidth: borderWidth.card },
   dotHit: { backgroundColor: palette.lime, borderColor: palette.ink },
   dotUnder: { backgroundColor: palette.bg, borderColor: palette.ink },

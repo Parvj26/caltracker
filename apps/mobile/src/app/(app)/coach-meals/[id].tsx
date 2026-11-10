@@ -72,7 +72,14 @@ export default function CoachMealScreen() {
           </View>
           <View style={styles.boxes}>
             {MACRO_KEYS.map((k) => (
-              <View key={k} style={[styles.box, k === 'calories' ? styles.kcalBox : styles.otherBox]} testID={`coach-meal-${k}`}>
+              // One element per box ("450 kcal"), so VoiceOver reads the number with its unit.
+              <View
+                key={k}
+                accessible
+                accessibilityLabel={`${value(k)} ${LABEL[k]}`}
+                style={[styles.box, k === 'calories' ? styles.kcalBox : styles.otherBox]}
+                testID={`coach-meal-${k}`}
+              >
                 <Text style={font(800, 18)}>{value(k)}</Text>
                 <Text style={font(700, 11)}>{LABEL[k]}</Text>
               </View>

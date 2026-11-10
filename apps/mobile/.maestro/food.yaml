@@ -50,7 +50,9 @@ env:
 - tapOn:
     id: meal-calories
 - inputText: '300'
-- hideKeyboard
+# Not hideKeyboard: the number pad has no return key and it can leave the pad up, so Save's tap lands on a key.
+# Tapping plain text closes the keyboard instead.
+- tapOn: 'Only know some numbers\? .*'
 - scrollUntilVisible:
     element:
       id: meal-save
@@ -112,7 +114,11 @@ env:
     notVisible: 'Saving…'
     timeout: 20000
 
-# Edit one.
+# Edit one. Scroll it clear of the tab bar first, or the tap lands on a tab.
+- scrollUntilVisible:
+    element:
+      text: 'Maestro toast, .*'
+    centerElement: true
 - tapOn:
     text: 'Maestro toast, .*'
     index: 0
@@ -121,7 +127,9 @@ env:
     id: meal-calories
 - eraseText: 5
 - inputText: '350'
-- hideKeyboard
+# Not hideKeyboard: the number pad has no return key and it can leave the pad up, so Save's tap lands on a key.
+# Tapping plain text closes the keyboard instead.
+- tapOn: 'Only know some numbers\? .*'
 - scrollUntilVisible:
     element:
       id: meal-save
@@ -155,6 +163,10 @@ env:
 - repeat:
     times: 3
     commands:
+      - scrollUntilVisible:
+          element:
+            text: 'Maestro toast, .*'
+          centerElement: true
       - tapOn:
           text: 'Maestro toast, .*'
           index: 0

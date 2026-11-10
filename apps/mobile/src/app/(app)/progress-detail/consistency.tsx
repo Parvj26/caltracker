@@ -145,7 +145,8 @@ const styles = StyleSheet.create({
   ink: { color: palette.ink },
   cell: { flex: 1 },
   center: { textAlign: 'center' },
-  day: { height: 40, alignItems: 'center', justifyContent: 'center' },
+  // Every day carries today's border width (transparent), so today's ring doesn't widen its column.
+  day: { height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: borderWidth.card, borderColor: 'transparent' },
   dayDone: { backgroundColor: palette.ink },
   dayPast: { backgroundColor: palette.surface },
   today: { borderWidth: borderWidth.card, borderColor: palette.magenta },

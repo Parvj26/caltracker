@@ -30,7 +30,7 @@ export function CoachIntroCard({ coachName, workspaceName }: { coachName: string
   return (
     <Hero tone="drop" testID="today-new-coach">
       <View style={[styles.row, { gap: space[3] }]}>
-        <CoachAvatar name={name ?? workspaceName} url={coach?.avatarUrl ?? null} size={56} />
+        <CoachAvatar name={name ?? workspaceName} url={coach?.avatarUrl ?? null} size={56} ring={2} />
         <View style={styles.flex}>
           <Overline>Your coach</Overline>
           {name ? (

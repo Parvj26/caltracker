@@ -1,11 +1,22 @@
 # The Today tab: the date and "Hi <name>" header, the latest coach message (opens the chat), the This week and
 # Newest sticker tiles (each opens its own screen), the Community line, and Sign out behind the gear.
 # Run via `pnpm --filter mobile e2e .maestro/today-cards.yaml` (starts the helper bridge and passes HELPER_URL).
+# Seeds its own workout and coach message, so it passes on a fresh database (a client with neither sees the
+# first-time welcome instead of "Hi <name>"); both are removed at the end.
 appId: app.caltracker.client
 env:
   EMAIL: client@demo.local
   PASSWORD: demo-password-123
 ---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: coach-message, EMAIL: '${EMAIL}', NAME: 'E2E Today card hello' }
 - launchApp:
     clearState: true
     permissions: { notifications: allow }
@@ -22,6 +33,10 @@ env:
     visible:
       id: today-coach
     timeout: 20000
+# The notifications card (shown while iOS has not asked yet) pushes the coach card under the tab bar: put it away.
+- tapOn:
+    id: push-card-later
+    optional: true
 - tapOn:
     id: today-coach
 - extendedWaitUntil:
@@ -45,8 +60,9 @@ env:
     id: today-sticker
 - assertVisible:
     id: zoo-animals-title
+# The zoo book is a screen above the tabs: Back returns to Today.
 - tapOn:
-    id: tab-today
+    id: zoo-back
 # Sign out lives behind the gear now.
 - scrollUntilVisible:
     element:
@@ -68,3 +84,9 @@ env:
     visible:
       id: email-input
     timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

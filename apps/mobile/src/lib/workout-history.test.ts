@@ -49,7 +49,7 @@ describe('monthSummary', () => {
   ];
   it('counts this month’s workouts, time and lifts improved', () => {
     const logs = [log(), log({ id: 'l2', finishedAt: '2026-11-02T10:00:00Z', durationS: 3600 }), log({ id: 'l0', finishedAt: '2026-10-30T18:00:00Z' })];
-    expect(monthSummary(logs, prs, '2026-11-09', 'UTC')).toEqual({ title: 'November so far', workouts: 2, time: '1 h 52 min', prs: 1 });
+    expect(monthSummary(logs, prs, '2026-11-09', 'UTC')).toEqual({ title: 'November so far', workouts: 2, time: '1h 52m', prs: 1 });
   });
 
   it('says 0 min of training with no workouts', () => {

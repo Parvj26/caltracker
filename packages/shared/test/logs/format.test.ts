@@ -3,6 +3,7 @@ import {
   coachLine,
   formatLastResult,
   formatLogDuration,
+  formatLogDurationShort,
   formatLogSetTarget,
   formatLogVolume,
   formatResult,
@@ -88,6 +89,16 @@ describe('formatLogDuration', () => {
     expect(formatLogDuration(60 * 60)).toBe('1 h');
     expect(formatLogDuration(65 * 60)).toBe('1 h 5 min');
     expect(formatLogDuration(2 * 3600 + 59 * 60 + 50)).toBe('3 h');
+  });
+});
+
+describe('formatLogDurationShort', () => {
+  it('fits a stat tile: minutes, then compact hours and minutes', () => {
+    expect(formatLogDurationShort(0)).toBe('1 min');
+    expect(formatLogDurationShort(52 * 60 + 40)).toBe('53 min');
+    expect(formatLogDurationShort(60 * 60)).toBe('1h');
+    expect(formatLogDurationShort(4 * 3600 + 10 * 60)).toBe('4h 10m');
+    expect(formatLogDurationShort(2 * 3600 + 59 * 60 + 50)).toBe('3h');
   });
 });
 
