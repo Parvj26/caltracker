@@ -5,7 +5,7 @@
 .titleText { flex: 1; display: flex; flex-direction: column; min-width: 240px; }
 .title { margin: 0; font-size: 30px; font-weight: 800; line-height: 1.15; }
 .subtitle { margin: 0; font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); }
-.newButton { min-height: 48px; padding: 0 18px; border-radius: var(--ct-radius-button); border: 2px solid var(--ct-ink); background: var(--ct-lime); box-shadow: none; }
+.newButton { min-height: 48px; padding: 0 18px; border-radius: var(--ct-radius-button); border: 2px solid var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); box-shadow: none; }
 
 .columns { display: flex; flex-wrap: wrap; gap: var(--ct-space-6); align-items: flex-start; }
 .list { flex: 1 1 340px; display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
@@ -98,6 +98,20 @@
   cursor: pointer;
 }
 .save:disabled { opacity: 0.7; cursor: not-allowed; }
+/* Cancel: Save's size and shape, outlined instead of filled. */
+.cancel {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 2px solid var(--ct-ink);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cancel:disabled { opacity: 0.7; cursor: not-allowed; }
 .remove {
   min-height: 44px;
   padding: 0 14px;
