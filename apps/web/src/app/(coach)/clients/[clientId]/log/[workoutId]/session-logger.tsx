@@ -588,7 +588,7 @@ export function SessionLogger({
     if (await flush()) router.push(`/clients/${client.id}/training`);
   }
 
-  /** Gives the workout back to the client's phone; they carry on from what is saved. */
+  /** Gives the workout back to the client's phone; they carry on from what is saved, and the coach watches it live. */
   async function handBack() {
     const current = logRef.current;
     if (!current) return;
@@ -617,7 +617,8 @@ export function SessionLogger({
       return;
     }
     stopped.current = true;
-    router.push(`/clients/${client.id}/training`);
+    // Straight to the live view of this workout, so the coach can watch the client carry on.
+    router.push(`/clients/${client.id}/logs/${current.id}`);
   }
 
   const status =
