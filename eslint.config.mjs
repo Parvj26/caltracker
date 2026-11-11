@@ -59,11 +59,9 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        { selector: "JSXAttribute[name.name='role'][value.value='alert']", message: 'Use ErrorText with a code' },
-        { selector: "JSXAttribute[name.name='accessibilityRole'][value.value='alert']", message: 'Use ErrorText with a code' },
-        { selector: "JSXAttribute[name.name='role'] > JSXExpressionContainer > Literal[value='alert']", message: 'Use ErrorText with a code' },
-        { selector: "JSXAttribute[name.name='accessibilityRole'] > JSXExpressionContainer > Literal[value='alert']", message: 'Use ErrorText with a code' },
-        { selector: "JSXAttribute[name.name=/^(role|accessibilityRole)$/] > JSXExpressionContainer > TemplateLiteral[expressions.length=0] > TemplateElement[value.raw='alert']", message: 'Use ErrorText with a code' },
+        // Any spelling: role="alert", role={'alert'}, role={`alert`}, role={bad ? 'alert' : undefined}.
+        { selector: "JSXAttribute[name.name=/^(role|accessibilityRole)$/] Literal[value='alert']", message: 'Use ErrorText with a code' },
+        { selector: "JSXAttribute[name.name=/^(role|accessibilityRole)$/] TemplateElement[value.raw='alert']", message: 'Use ErrorText with a code' },
       ],
     },
   },
