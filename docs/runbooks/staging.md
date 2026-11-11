@@ -21,6 +21,7 @@ Pipeline: `.github/workflows/deploy-staging.yml`. GitHub Environments are not av
 | `STAGING_SUPABASE_SERVICE_ROLE_KEY` (new) | Supabase -> Project Settings -> API -> `service_role` | seed-staging job only | Rotating the JWT secret changes it; copy the new key into the secret. Never put it in chat or files |
 | `STAGING_SMOKE_COACH_EMAIL` (new) | Email of a staging coach used only by the smoke test | smoke job | Change the coach, update the secret |
 | `STAGING_SMOKE_COACH_PASSWORD` (new) | That coach's password, chosen on the `/set-password` page (see "Create the smoke coach" below) | smoke job | Set a new password via the reset email, update the secret |
+| `STAGING_POSTHOG_KEY` | PostHog -> Project settings -> Project API key (public by design) | web build (`NEXT_PUBLIC_POSTHOG_KEY`); also copied on every deploy to the web Worker secret and the Edge Function secret `POSTHOG_SERVER_KEY` for server error reports | Rotate in PostHog, update the secret, run Deploy staging |
 
 Both `STAGING_SMOKE_*` secrets are required for automatic runs: if either is missing the smoke job fails with an `::error::` (the session-refresh check must never be skipped silently). Only a manual "Run workflow" run may continue without them, and it prints a `::warning::`. Use a dedicated test coach, not a real person's account.
 
@@ -182,3 +183,9 @@ If that check fails on staging, fallback (a deliberate deviation, record it in t
 ## Moving hosts
 
 App code uses no Cloudflare APIs. Moving to Vercel means deleting `wrangler.jsonc`/`open-next.config.ts`, deploying with Vercel's Next.js support and changing DNS.
+
+## Coach website recordings and server errors
+
+- The staging web build sets `NEXT_PUBLIC_SESSION_REPLAY=on`, which only lets coach pages ask PostHog to record. Who is actually recorded is decided in PostHog: Project settings -> Session replay -> "Record user sessions" must be on, with the feature flag `coach-session-replay` linked as the trigger. Turning the flag off (or its rollout to 0%) stops new recordings from the next page load, no deploy needed. To build with recordings fully off, remove the variable from `deploy-staging.yml`.
+- Recordings hide all typed text, page text not marked `data-ph-safe`, photos, charts and attributes; network and console recording are off. See `apps/web/src/lib/analytics/replay-config.ts`.
+- Server errors (server actions and Edge Functions) are sent as `$exception` with only a code, the place (`where`), an error class name and the user id. The key is `POSTHOG_SERVER_KEY`, set by the deploy from `STAGING_POSTHOG_KEY` on the `caltracker-web-staging` Worker and in the Edge Function secrets. Without it nothing is sent.

@@ -125,6 +125,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.STAGING_POSTHOG_KEY }}
           NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
+          # Coach-website recordings (PO approved 2026-11-10). Who is recorded is still decided by the PostHog flag
+          # coach-session-replay; this switch only lets the page ask. Leave unset to build with recordings off.
+          NEXT_PUBLIC_SESSION_REPLAY: 'on'
         run: pnpm --filter web cf:build
 
       # The admin site, built against the same staging project with the anon key only (no service role). The STAGING tag
@@ -149,15 +152,29 @@ jobs:
         if: steps.newest.outputs.skip != 'true'
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # The public PostHog project key: functions report server errors with it (fixed fields only).
+          POSTHOG_SERVER_KEY: ${{ secrets.STAGING_POSTHOG_KEY }}
         run: |
           supabase secrets set --project-ref "$STAGING_SUPABASE_PROJECT_REF" \
             "PUBLIC_SITE_URL=$STAGING_SITE_URL" \
             "RESEND_API_KEY=$RESEND_API_KEY" \
+            "POSTHOG_SERVER_KEY=$POSTHOG_SERVER_KEY" \
             "INVITE_FROM_EMAIL=CalTracker <invites@caltracker.app>"
 
       - name: Deploy Edge Functions
         if: steps.newest.outputs.skip != 'true'
         run: pnpm functions:deploy --project-ref "$STAGING_SUPABASE_PROJECT_REF"
+
+      # Server actions report errors to PostHog with the public project key. A Worker secret survives deploys, but
+      # setting it every time keeps it in step with the GitHub secret. Set before the deploy so new code has it.
+      - name: Set web Worker secrets
+        if: steps.newest.outputs.skip != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          POSTHOG_SERVER_KEY: ${{ secrets.STAGING_POSTHOG_KEY }}
+        working-directory: apps/web
+        run: printf '%s' "$POSTHOG_SERVER_KEY" | pnpm exec wrangler secret put POSTHOG_SERVER_KEY --name caltracker-web-staging
 
       - name: Deploy web app to Cloudflare Workers
         if: steps.newest.outputs.skip != 'true'
