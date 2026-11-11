@@ -1,3 +1,5 @@
+export { buildServerErrorEvent, isServerFailureCode, isValidServerErrorCode, isValidServerErrorWhere } from './server-error';
+export type { ServerErrorEvent, ServerErrorInput } from './server-error';
 export { ALLOWED_KEYS } from './events';
 export type { AnalyticsProps, EventName, TaskName } from './events';
 export { sanitize } from './sanitize';
