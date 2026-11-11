@@ -20,3 +20,26 @@ export function alertReporter(report: (code: ErrorCode) => void): (el: AlertLike
     report(code);
   };
 }
+
+/**
+ * Watches `root` for error messages (role="alert") that appear, or whose code changes in place, and reports each
+ * one's code. Never reads their text. Returns the function that stops watching.
+ */
+export function watchAlerts(root: Node, report: (code: ErrorCode) => void): () => void {
+  const seen = alertReporter(report);
+  const observer = new MutationObserver((records) => {
+    for (const r of records) {
+      if (r.type === 'attributes') {
+        if (r.target instanceof HTMLElement && r.target.matches('[role="alert"]')) seen(r.target);
+        continue;
+      }
+      for (const node of r.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        const alerts = node.matches('[role="alert"]') ? [node] : [...node.querySelectorAll('[role="alert"]')];
+        for (const el of alerts) seen(el);
+      }
+    }
+  });
+  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-error-code'] });
+  return () => observer.disconnect();
+}

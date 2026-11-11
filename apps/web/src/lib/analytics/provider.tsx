@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
 import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
-import { alertReporter } from './alert-code';
+import { watchAlerts } from './alert-code';
 import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
 
 const SLOW_MS = 2000;
@@ -41,25 +41,10 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
   // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text. An alert whose
   // code changes in place (one error replacing another) counts again.
   useEffect(() => {
-    const seen = alertReporter((code) => {
+    return watchAlerts(document.body, (code) => {
       getTaskTracker().error();
       track('error_shown', { code, screen: scrubUrl(window.location.pathname) });
     });
-    const observer = new MutationObserver((records) => {
-      for (const r of records) {
-        if (r.type === 'attributes') {
-          if (r.target instanceof HTMLElement && r.target.matches('[role="alert"]')) seen(r.target);
-          continue;
-        }
-        for (const node of r.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          const alerts = node.matches('[role="alert"]') ? [node] : [...node.querySelectorAll('[role="alert"]')];
-          for (const el of alerts) seen(el);
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-error-code'] });
-    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
