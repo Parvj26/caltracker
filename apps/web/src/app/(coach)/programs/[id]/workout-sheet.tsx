@@ -6,7 +6,7 @@ import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
 import { saveWorkout, type SaveWorkoutOutcome } from '../../workouts/actions';
 import { saveSlotCopy, type SlotWorkout } from '../actions';
-import { cellLabel } from './grid-ids';
+import { cellLabel, copyDaySuffix } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -173,7 +173,7 @@ export function WorkoutSheet({
           <button type="button" className={`${styles.bigChoice} ${styles.bigChoiceAlt}`} onClick={() => answer('copy')}>
             <span className={styles.bigChoiceTitle}>Just {where}</span>
             <span className={styles.bigChoiceSub}>
-              Saves a copy called “{original} (Week {week})” on this day only. Everything else stays the same.
+              Saves a copy called “{original}{copyDaySuffix(week, day)}” on this day only. Everything else stays the same.
             </span>
           </button>
           <div className={styles.dialogActions}>
