@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AcceptInviteRequest, type AcceptInviteResponse } from '@caltracker/shared';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 // Join from the invite link (docs/superpowers/specs/2026-11-05-invite-join-design.md).
 // The raw invite token is the proof: it was emailed to the invited address, so holding it proves the
@@ -136,10 +137,13 @@ export function createHandler({ supabaseAdmin: admin }: HandlerDeps) {
 if (import.meta.main) {
   const env = Deno.env;
   Deno.serve(
-    createHandler({
-      supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-        auth: { persistSession: false, autoRefreshToken: false },
+    withErrorReporting(
+      'fn:accept-invite',
+      createHandler({
+        supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
       }),
-    }),
+    ),
   );
 }

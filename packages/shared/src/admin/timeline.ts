@@ -1,4 +1,5 @@
 import type { EventName, TaskName } from '../analytics/events';
+import { isValidServerErrorCode, isValidServerErrorWhere } from '../analytics/server-error';
 
 /** One row on the admin client page's Timeline. `at` is an ISO timestamp. */
 export type TimelineEvent = {
@@ -108,6 +109,14 @@ const LABELS: Record<EventName, (props: Props) => string | null> = {
  * (noise, PostHog's own `$` events, or anything not in the analytics catalogue).
  */
 export function posthogEventLabel(event: string, props: Record<string, unknown>): string | null {
+  // Browser `$exception`s are dropped before sending, so any that arrive are server errors. Only the
+  // pattern-checked code and where are shown, never other text.
+  if (event === '$exception') {
+    const { code, where } = props;
+    return isValidServerErrorCode(code) && isValidServerErrorWhere(where)
+      ? `Server error: ${code} (${where})`
+      : 'Server error';
+  }
   if (!Object.hasOwn(LABELS, event)) return null;
   return LABELS[event as EventName](props);
 }

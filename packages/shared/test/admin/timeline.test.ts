@@ -116,7 +116,28 @@ describe('posthogEventLabel', () => {
 
   it('returns null for unknown and PostHog $ events', () => {
     expect(posthogEventLabel('$pageview', {})).toBeNull();
-    expect(posthogEventLabel('$exception', {})).toBeNull();
     expect(posthogEventLabel('something_else', {})).toBeNull();
+  });
+
+  it('labels server errors with their code and where', () => {
+    expect(posthogEventLabel('$exception', { code: 'assign_save_failed', where: 'action:assign.assignProgram' })).toBe(
+      'Server error: assign_save_failed (action:assign.assignProgram)',
+    );
+    expect(posthogEventLabel('$exception', { code: 'server_error', where: 'fn:send-invite' })).toBe(
+      'Server error: server_error (fn:send-invite)',
+    );
+  });
+
+  it('shows a plain "Server error" when code or where fail the patterns, with no raw text', () => {
+    const bad = [
+      {},
+      { code: 'luis@example.com', where: 'action:assign' },
+      { code: 'assign_save_failed', where: 'Luis clicked save' },
+      { code: 'a'.repeat(41), where: 'fn:a' },
+      { code: 'x_failed', where: 'unknown' },
+      { code: 42, where: ['fn:a'] },
+      { $exception_list: [{ type: 'Error', value: 'luis@example.com' }], $exception_message: 'luis' },
+    ];
+    for (const props of bad) expect(posthogEventLabel('$exception', props)).toBe('Server error');
   });
 });

@@ -12,6 +12,7 @@ import {
   type SenderRow,
   type UserContext,
 } from './plan.ts';
+import { withErrorReporting } from '../_shared/report-error.ts';
 
 // send-push (docs/superpowers/specs/2026-11-09-client-push-notifications-design.md): sends client push notifications
 // straight to APNs. Called only by pg_cron through public.push_dispatch with the x-push-secret header:
@@ -284,12 +285,16 @@ export function createHandler({
 if (import.meta.main) {
   const env = Deno.env;
   Deno.serve(
-    createHandler({
-      supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-        auth: { persistSession: false, autoRefreshToken: false },
+    withErrorReporting(
+      'fn:send-push',
+      createHandler({
+        supabaseAdmin: createClient(env.get('SUPABASE_URL')!, env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }),
+        cronSecret: env.get('SEND_PUSH_SECRET') ?? '',
+        apns: apnsConfigFromEnv((k) => env.get(k)),
       }),
-      cronSecret: env.get('SEND_PUSH_SECRET') ?? '',
-      apns: apnsConfigFromEnv((k) => env.get(k)),
-    }),
+      { ignoreStatus: [503] },
+    ),
   );
 }
