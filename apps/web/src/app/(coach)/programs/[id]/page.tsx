@@ -29,7 +29,7 @@ export default async function ProgramPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { workspaceId, userId } = await requireCoach();
+  const { workspaceId, userId, units } = await requireCoach();
   const { id } = await params;
   const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
@@ -83,7 +83,7 @@ export default async function ProgramPage({
       </header>
       <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={program.auto_progression} />
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} units={units} workspaceId={workspaceId} />
     </div>
   );
 }

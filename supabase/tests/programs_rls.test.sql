@@ -1,5 +1,5 @@
 begin;
-select plan(53);
+select plan(61);
 
 -- Fixtures (as postgres)
 select tests.create_user('pg-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -146,6 +146,30 @@ reset role;
 select is((select array_agg(week order by week) from public.program_workouts where program_id = :'prog_a6'), array[2::smallint],
   'only the week-2 slot remains');
 select is((select weeks::int from public.programs where id = :'prog_a6'), 4, 'program weeks is now 4');
+
+-- Pointing a day at another library workout
+select id as slot_a6 from public.program_workouts where program_id = :'prog_a6' limit 1 \gset
+select tests.act_as(:'coach_a');
+select ok(public.set_program_slot_workout(:'slot_a6', :'lib_a2'), 'coach A can point a day at another of their library workouts');
+select throws_ok(format($q$select public.set_program_slot_workout(%L, %L)$q$, :'slot_a6', :'lib_b'),
+  '42501', null, 'coach A cannot point a day at another workspace''s workout');
+select throws_ok(format($q$select public.set_program_slot_workout(%L, %L)$q$, :'slot_a6', :'inst_a1'),
+  '42501', null, 'coach A cannot point a day at a client''s calendar workout');
+reset role;
+select tests.act_as(:'coach_b');
+select is(public.set_program_slot_workout(:'slot_a6', :'lib_b'), false, 'coach B cannot repoint coach A''s day');
+select throws_ok(format($q$select public.set_program_slot_workout(%L, %L)$q$, :'slot_b1', :'lib_a1'),
+  '42501', null, 'coach B cannot point its own day at workspace A''s workout');
+reset role;
+select tests.act_as(:'a1');
+select is(public.set_program_slot_workout(:'slot_a6', :'lib_a1'), false, 'a client cannot repoint a program day');
+reset role;
+select is((select workout_id from public.program_workouts where id = :'slot_a6'), :'lib_a2'::uuid, 'the day now uses the new workout');
+select ok(not has_function_privilege('anon', 'public.set_program_slot_workout(uuid, uuid)', 'execute')
+  and not has_function_privilege('service_role', 'public.set_program_slot_workout(uuid, uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.set_program_slot_workout(uuid, uuid)', 'execute'),
+  'only authenticated can call set_program_slot_workout');
+update public.program_workouts set workout_id = :'lib_a1' where id = :'slot_a6';
 
 -- Cascades
 delete from public.workouts where id = :'lib_a2';

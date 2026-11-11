@@ -113,6 +113,8 @@ export {
   trackingTypeLabel,
 } from './workouts/targets';
 export { workoutPreview } from './workouts/preview';
+export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
+export type { WorkoutSummaryRow } from './workouts/summary';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
