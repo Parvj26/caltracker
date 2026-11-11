@@ -49,7 +49,12 @@ export function pickBonus(args: {
   const discard = args.queue.filter((q) => oneOff(q) && q.key !== null && args.owned.has(q.key)).map((q) => q.id);
   const live = args.queue.filter((q) => !discard.includes(q.id));
   const waitingKeys = new Set(live.filter(oneOff).map((q) => q.key));
-  const fresh = args.earned.filter((b) => !(oneOff(b) && waitingKeys.has(b.key))).map(strip);
+  // A milestone number already waiting (its workout was reopened, and the next one reached the same count) is the
+  // same milestone: it is not queued a second time.
+  const waitingMilestones = new Set(live.filter((q) => q.kind === 'milestone').map((q) => q.value));
+  const fresh = args.earned
+    .filter((b) => !(oneOff(b) && waitingKeys.has(b.key)) && !(b.kind === 'milestone' && waitingMilestones.has(b.value)))
+    .map(strip);
 
   const due = live
     .filter((q) => q.earnedLogId !== args.logId && instantMs(q.earnedAt) < finished)

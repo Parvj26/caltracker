@@ -94,6 +94,12 @@ describe('pickBonus', () => {
     expect(s.fromQueue).toBe(waiting.id);
   });
 
+  it('never queues a milestone number that is already waiting', () => {
+    const waiting = queued(milestone(10), '2026-11-01T10:00:00.000Z');
+    const r = pickBonus({ ...at, earned: [milestone(10)], queue: [waiting] });
+    expect(r).toEqual({ give: milestone(10), fromQueue: waiting.id, enqueue: [], discard: [] });
+  });
+
   it('queues a landmark earned again (a new streak reaching it again is a second sticker)', () => {
     const waiting = queued(landmark('chichen-itza'), '2026-11-01T10:00:00.000Z');
     const r = pickBonus({ ...at, earned: [milestone(10), landmark('chichen-itza')], queue: [waiting] });
