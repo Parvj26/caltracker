@@ -136,7 +136,7 @@ test('Edit, Just this day: only that day changes, the other keeps the old versio
   for (const n of [1, 2, 3]) await setRow(page, 'Barbell Squat', `set ${n}`).getByLabel(/^Weight/).fill('80');
   await sheet.getByRole('button', { name: 'Save', exact: true }).click();
   const ask = page.getByRole('dialog', { name: `Save changes to “${workout}”?` });
-  await expect(ask.getByText(`Saves a copy called “${workout} (Week 1)” on this day only.`, { exact: false })).toBeVisible();
+  await expect(ask.getByText(`Saves a copy called “${workout} (Week 1, Wed)” on this day only.`, { exact: false })).toBeVisible();
   await ask.getByRole('button', { name: /Just Week 1, Day 3/ }).click();
 
   await expect(sheet).toBeHidden();
