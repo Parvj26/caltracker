@@ -141,3 +141,33 @@ describe('beforeSend (label pattern)', () => {
     expect(out?.properties.$elements_chain).toBe('button:nth-child="1";div:attr__ph-label="log_add_set"');
   });
 });
+
+describe('beforeSend (phone label copied into tag_name)', () => {
+  it('blanks a tag_name that holds a label breaking the rule, on the element and its children', () => {
+    const out = beforeSend({
+      event: '$autocapture',
+      properties: {
+        $elements: [
+          { tag_name: 'client Luis' },
+          { tag_name: 'client-Luis', 'attr__ph-label': 'client-Luis' },
+          { tag_name: 'client Luis', 'attr__ph-label': 'client Luis' },
+          { tag_name: 'log_set_done', 'attr__ph-label': 'log_set_done' },
+          { tag_name: 'Pressable' },
+          { tag_name: 'button' },
+        ],
+      },
+    });
+    expect(out?.properties.$elements).toEqual([
+      { tag_name: '' },
+      { tag_name: '' },
+      { tag_name: '' },
+      { tag_name: 'log_set_done', 'attr__ph-label': 'log_set_done' },
+      { tag_name: 'Pressable' },
+      { tag_name: 'button' },
+    ]);
+  });
+  it('blanks a bad tag in the elements chain', () => {
+    const out = beforeSend({ event: '$autocapture', properties: { $elements_chain: 'client Luis:nth-child="1";client-Luis:attr__ph-label="client-Luis";log_add_set:attr__ph-label="log_add_set";button.btn:nth-child="2"' } });
+    expect(out?.properties.$elements_chain).toBe(':nth-child="1";:;log_add_set:attr__ph-label="log_add_set";button.btn:nth-child="2"');
+  });
+});
