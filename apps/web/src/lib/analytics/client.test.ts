@@ -163,7 +163,41 @@ describe('session recording (web)', () => {
     }).not.toThrow();
   });
 
+  it('adds no tracing headers while the switch is off', async () => {
+    for (const value of ['', 'off', 'ON', 'true', '1']) {
+      vi.resetModules();
+      vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+      vi.stubEnv('NEXT_PUBLIC_SESSION_REPLAY', value);
+      vi.stubGlobal('window', { location: { hostname: 'caltracker.app', host: 'caltracker.app' } });
+      const ph = mockPosthog();
+      const { initAnalytics, startReplay } = await import('./client');
+      initAnalytics();
+      startReplay();
+      vi.unstubAllGlobals();
+      const config = ph.init.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(config.addTracingHeaders, value).toBeUndefined();
+      expect(ph.startSessionRecording, value).not.toHaveBeenCalled();
+    }
+  });
+
+  it('SessionReplayGate is used only by the coach layout', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const { join, relative } = await import('node:path');
+    const src = join(__dirname, '..', '..');
+    const users: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) && !p.endsWith('session-replay-gate.tsx') && readFileSync(p, 'utf8').includes('SessionReplayGate')) users.push(relative(src, p));
+      }
+    };
+    walk(src);
+    expect(users).toEqual([join('app', '(coach)', 'layout.tsx')]);
+  });
+
   it('keeps recording off at init and passes the privacy config and our own host for tracing headers', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SESSION_REPLAY', 'on');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
     vi.stubGlobal('window', { location: { hostname: 'caltracker.app', host: 'caltracker.app' } });
     const ph = mockPosthog();

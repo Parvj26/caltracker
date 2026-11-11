@@ -38,9 +38,10 @@ export function initAnalytics(): void {
       // Recordings never start on their own: only startReplay() (coach pages, env switch on) starts one.
       disable_session_recording: true,
       ...RECORDING_CONFIG,
-      // Adds X-POSTHOG-SESSION-ID to requests to our own website only (server errors land in the recording).
-      // PostHog matches the hostname (no port). Supabase is left out: a custom header would make every call preflight.
-      ...(typeof window === 'undefined' ? {} : { addTracingHeaders: [window.location.hostname] }),
+      // With recordings switched on only: adds X-POSTHOG-SESSION-ID to requests to our own website (server errors
+      // land in the recording). PostHog matches the hostname (no port). Supabase is left out: a custom header would
+      // make every call preflight.
+      ...(replaySwitchOn() && typeof window !== 'undefined' ? { addTracingHeaders: [window.location.hostname] } : {}),
       // Our guard works on the fields it names; the SDK's own event type carries more, passed through untouched.
       before_send: (event) => (event ? (beforeSend(event as unknown as OutgoingEvent) as unknown as typeof event) : null),
     });
