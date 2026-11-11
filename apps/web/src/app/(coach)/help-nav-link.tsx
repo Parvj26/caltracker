@@ -26,7 +26,9 @@ export function HelpNavLink() {
   return (
     <a href={href} data-ph-capture-attribute-label="help_feedback" aria-label="Help & feedback" title="Help & feedback" className={styles.navItem}>
       {NAV_ICONS.help}
-      <span className={styles.navLabel}>Help &amp; feedback</span>
+      <span className={styles.navLabel} data-ph-safe="">
+        Help &amp; feedback
+      </span>
     </a>
   );
 }

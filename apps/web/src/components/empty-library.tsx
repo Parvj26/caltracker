@@ -7,11 +7,11 @@ import { ButtonLink } from '@/components/ui';
 export function EmptyLibrary({ className, forProgram = false }: { className?: string | undefined; forProgram?: boolean }) {
   return (
     <>
-      <p className={className}>
+      <p className={className} data-ph-safe="">
         {forProgram ? 'No workouts yet. A program is built from workouts in your library.' : 'No workouts yet.'}
       </p>
       <div>
-        <ButtonLink href="/workouts/new" variant="secondary">
+        <ButtonLink href="/workouts/new" variant="secondary" phSafe>
           Create a workout
         </ButtonLink>
       </div>

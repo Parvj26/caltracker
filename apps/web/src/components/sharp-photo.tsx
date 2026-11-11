@@ -45,7 +45,8 @@ export function SharpPhoto({
   const style = { '--photo-max-height': maxHeight } as CSSProperties;
 
   return (
-    <span className={cx(styles.frame, className)} style={style} data-loaded={loaded ? 'true' : 'false'}>
+    // data-ph-block: the whole frame (photo and blurred placeholder) is a grey box in session recordings.
+    <span className={cx(styles.frame, className)} style={style} data-loaded={loaded ? 'true' : 'false'} data-ph-block="">
       {thumbSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- a private photo behind a signed URL
         <img className={cx(styles.fit, styles.placeholder, loaded && styles.hidden)} src={thumbSrc} alt="" aria-hidden="true" {...size} loading="lazy" onError={retryThumb} />

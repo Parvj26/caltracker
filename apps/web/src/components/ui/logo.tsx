@@ -30,7 +30,11 @@ export function Logo({ size = 'md', variant = 'full', className }: LogoProps) {
   return (
     <span role="img" aria-label="CalTracker" className={cx(styles.logo, styles[`logo-${size}`], className)}>
       <LogoMark />
-      {variant === 'full' ? <span aria-hidden="true">caltracker</span> : null}
+      {variant === 'full' ? (
+        <span aria-hidden="true" data-ph-safe="">
+          caltracker
+        </span>
+      ) : null}
     </span>
   );
 }

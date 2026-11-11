@@ -1,6 +1,7 @@
 import posthog from 'posthog-js';
 import { TaskTracker, isInternalEmail, isQuickUndo, sanitize, type EventName } from '@caltracker/shared';
 import { beforeSend, type OutgoingEvent } from '@caltracker/shared';
+import { RECORDING_CONFIG } from './replay-config';
 
 /**
  * The only door to PostHog in the web app (ESLint blocks importing posthog-js anywhere else).
@@ -9,6 +10,8 @@ import { beforeSend, type OutgoingEvent } from '@caltracker/shared';
 
 let ready = false;
 let identifiedAs: string | null = null;
+/** A coach page asked for a recording (it may ask before PostHog is initialised: child effects run first). */
+let wantReplay = false;
 
 export interface AnalyticsPerson {
   id: string;
@@ -32,7 +35,13 @@ export function initAnalytics(): void {
       rageclick: true,
       capture_dead_clicks: true,
       enable_heatmaps: true,
+      // Recordings never start on their own: only startReplay() (coach pages, env switch on) starts one.
       disable_session_recording: true,
+      ...RECORDING_CONFIG,
+      // With recordings switched on only: adds X-POSTHOG-SESSION-ID to requests to our own website (server errors
+      // land in the recording). PostHog matches the hostname (no port). Supabase is left out: a custom header would
+      // make every call preflight.
+      ...(replaySwitchOn() && typeof window !== 'undefined' ? { addTracingHeaders: [window.location.hostname] } : {}),
       // Our guard works on the fields it names; the SDK's own event type carries more, passed through untouched.
       before_send: (event) => (event ? (beforeSend(event as unknown as OutgoingEvent) as unknown as typeof event) : null),
     });
@@ -40,6 +49,44 @@ export function initAnalytics(): void {
   } catch {
     ready = false;
   }
+  if (ready && wantReplay) beginReplay();
+}
+
+/** Build-time switch, off unless set to exactly `on` (tests, CI and local stay off). */
+function replaySwitchOn(): boolean {
+  return process.env.NEXT_PUBLIC_SESSION_REPLAY === 'on';
+}
+
+function beginReplay(): void {
+  try {
+    // No override argument: PostHog's own settings (the coach-session-replay flag) still decide.
+    posthog.startSessionRecording();
+  } catch {
+    // ignore
+  }
+}
+
+function endReplay(): void {
+  if (!ready) return;
+  try {
+    posthog.stopSessionRecording();
+  } catch {
+    // ignore
+  }
+}
+
+/** Coach pages call this on mount. Starts now if PostHog is ready, otherwise as soon as it is. */
+export function startReplay(): void {
+  if (!replaySwitchOn() || wantReplay) return;
+  wantReplay = true;
+  if (ready) beginReplay();
+}
+
+/** Leaving the coach pages. */
+export function stopReplay(): void {
+  if (!wantReplay) return;
+  wantReplay = false;
+  endReplay();
 }
 
 export function track(event: EventName, props?: Record<string, unknown>): void {
@@ -88,6 +135,8 @@ export function getTaskTracker(): TaskTracker {
 export function resetAnalytics(): void {
   tracker.clear();
   identifiedAs = null;
+  wantReplay = false;
+  endReplay();
   if (!ready) return;
   try {
     posthog.reset();
