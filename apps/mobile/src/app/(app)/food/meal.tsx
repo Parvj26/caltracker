@@ -211,6 +211,7 @@ export default function MealScreen() {
             accessibilityLabel="Save meal"
             accessibilityState={{ disabled: busy, busy }}
             testID="meal-save"
+            ph-label="log_meal_save"
             style={({ pressed }) => [styles.save, inkShadow, (pressed || busy) && { opacity: pressedOpacity }]}
           >
             <Text style={font(800, 17)}>Save meal</Text>

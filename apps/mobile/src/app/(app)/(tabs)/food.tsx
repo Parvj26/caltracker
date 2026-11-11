@@ -138,6 +138,7 @@ export default function FoodScreen() {
         <BigButton
           title="Snap a photo"
           testID="food-snap"
+          ph-label="log_add_meal_photo"
           ink
           disabled={busy}
           icon={<CameraIcon color={white} />}
@@ -146,6 +147,7 @@ export default function FoodScreen() {
         <BigButton
           title="Type it in"
           testID="food-type-it"
+          ph-label="log_add_meal"
           icon={<PencilIcon />}
           onPress={() => router.push({ pathname: '/food/meal', params: { day } })}
         />

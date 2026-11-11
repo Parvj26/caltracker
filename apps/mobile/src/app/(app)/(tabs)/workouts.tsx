@@ -362,9 +362,9 @@ function DayCard({
           {status?.kind === 'done' ? (
             <Button title="View summary" testID={`view-log-${workout.doc.id}`} onPress={() => onView(status.logId)} />
           ) : status?.kind === 'in_progress' ? (
-            <Button title="Resume" testID={`start-${workout.doc.id}`} onPress={() => onResume(status.logId)} />
+            <Button title="Resume" testID={`start-${workout.doc.id}`} ph-label="log_start_workout" onPress={() => onResume(status.logId)} />
           ) : canStart ? (
-            <Button title="Start workout" testID={`start-${workout.doc.id}`} onPress={onStart} busy={starting} />
+            <Button title="Start workout" testID={`start-${workout.doc.id}`} ph-label="log_start_workout" onPress={onStart} busy={starting} />
           ) : (
             <Button variant="secondary" title="Preview" testID={`preview-${workout.doc.id}`} onPress={onPreview} />
           )}
