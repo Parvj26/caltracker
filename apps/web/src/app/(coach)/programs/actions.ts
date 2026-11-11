@@ -406,7 +406,7 @@ export async function loadSlotWorkout(slotId: string): Promise<SlotWorkout | nul
 export type SaveSlotCopyOutcome = (SaveWorkoutOutcome & { ok: false }) | { ok: true; id: string; name: string };
 
 /**
- * "Just Week N, Day M": saves the edited workout as a new library workout named "<name> (Week N, Ddd)" (every row gets a
+ * "Just Week N, Day M": saves the edited workout as a new library workout named "<name> (Week N, Day M)" (every row gets a
  * new id, as Duplicate does) and points only this program day at it. The original workout and every other day and
  * program stay as they were. If pointing the day at the copy fails, the copy is deleted again.
  */

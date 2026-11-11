@@ -189,7 +189,7 @@ describe('saveSlotCopy ("Just Week N, Day M")', () => {
   const doc = () =>
     addStraightBlock(emptyWorkout(makeId, 'Upper'), { id: makeId(), name: 'Bench', trackingType: 'weight_reps' }, makeId);
 
-  it('saves the edits as "<name> (Week N, Ddd)" with new ids and points only this day at it', async () => {
+  it('saves the edits as "<name> (Week N, Day M)" with new ids and points only this day at it', async () => {
     const edited = doc();
     respond = (call) => {
       if (call.table === 'program_workouts' && call.op === 'select') return { data: { program_id: PROGRAM, week: 3, day: 2 } };
@@ -197,9 +197,9 @@ describe('saveSlotCopy ("Just Week N, Day M")', () => {
       if (call.rpc === 'set_program_slot_workout') return { data: true };
       return {};
     };
-    expect(await saveSlotCopy({ slotId: SLOT, doc: edited })).toEqual({ ok: true, id: COPY, name: 'Upper (Week 3, Tue)' });
+    expect(await saveSlotCopy({ slotId: SLOT, doc: edited })).toEqual({ ok: true, id: COPY, name: 'Upper (Week 3, Day 2)' });
     const saved = calls.find((c) => c.rpc === 'save_workout')!.payload as { p_doc: { id: string; name: string } };
-    expect(saved.p_doc.name).toBe('Upper (Week 3, Tue)');
+    expect(saved.p_doc.name).toBe('Upper (Week 3, Day 2)');
     expect(saved.p_doc.id).not.toBe(edited.id);
     expect(calls.find((c) => c.rpc === 'set_program_slot_workout')).toMatchObject({
       payload: { p_slot_id: SLOT, p_workout_id: COPY },
