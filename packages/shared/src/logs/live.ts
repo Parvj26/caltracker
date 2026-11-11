@@ -4,7 +4,7 @@ import { awardPrEvents } from '../awards/week-prs';
 import { toTrackingType } from '../exercises/tracking';
 import { formatClock, fromKg } from '../units/units';
 import type { Units } from '../units/units';
-import { formatSetsSummary } from '../workouts/targets';
+import { formatSetsSummary, targetFieldsFor } from '../workouts/targets';
 import { blockRoundCount, currentStep, liveExercises, needsPick } from './flow';
 import { formatResult, stepName } from './format';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
@@ -157,23 +157,23 @@ const signed = (n: number, unit: string) => `${n > 0 ? '+' : '−'}${Math.abs(n)
 
 /** How a ticked set compares with its target: "+2 lb", "−2 reps", "as planned", or null when there is no target. */
 function againstPlan(ex: LogExerciseDoc, set: LogSetDoc, units: Units): string | null {
-  const tt = toTrackingType(ex.trackingType);
+  const fields = targetFieldsFor(toTrackingType(ex.trackingType));
   const t = set.target;
   const parts: string[] = [];
   let compared = false;
-  if ((tt === 'weight_reps' || tt === 'weight_time') && t.weightKg !== null && set.actualWeightKg !== null) {
+  if (fields.includes('weight') && t.weightKg !== null && set.actualWeightKg !== null) {
     compared = true;
     const diff = Math.round((fromKg(set.actualWeightKg, units) - fromKg(t.weightKg, units)) * 10) / 10;
     if (diff !== 0) parts.push(signed(diff, units));
   }
-  if ((tt === 'weight_reps' || tt === 'reps') && set.actualReps !== null && !t.toFailure && (t.repsMin !== null || t.repsMax !== null)) {
+  if (fields.includes('reps') && set.actualReps !== null && !t.toFailure && (t.repsMin !== null || t.repsMax !== null)) {
     compared = true;
     const min = t.repsMin ?? t.repsMax!;
     const max = t.repsMax ?? t.repsMin!;
     const diff = set.actualReps > max ? set.actualReps - max : set.actualReps < min ? set.actualReps - min : 0;
     if (diff !== 0) parts.push(signed(diff, Math.abs(diff) === 1 ? 'rep' : 'reps'));
   }
-  if ((tt === 'time' || tt === 'weight_time') && t.durationS !== null && set.actualDurationS !== null) {
+  if (fields.includes('duration') && t.durationS !== null && set.actualDurationS !== null) {
     compared = true;
     const diff = set.actualDurationS - t.durationS;
     if (diff !== 0) parts.push(signed(diff, 's'));

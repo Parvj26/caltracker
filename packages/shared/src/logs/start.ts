@@ -44,19 +44,32 @@ export function startLogFromWorkout(workout: WorkoutDoc, makeId: () => string, n
         plannedWorkoutExerciseId: e.id,
         swappedFromExerciseId: null,
         note: null,
+        eachSide: e.eachSide === true,
+        tempo: e.tempo ?? null,
         sets: e.sets.map((s) => logSetFromPlan(s, makeId)),
         substituteId: null,
         substituteOptions:
           e.substitutes.length === 0
             ? []
             : [
-                { substituteId: null, exerciseId: e.exerciseId, exerciseName: e.exerciseName, trackingType: e.trackingType, note: e.note, sets: e.sets },
+                {
+                  substituteId: null,
+                  exerciseId: e.exerciseId,
+                  exerciseName: e.exerciseName,
+                  trackingType: e.trackingType,
+                  note: e.note,
+                  eachSide: e.eachSide === true,
+                  tempo: e.tempo ?? null,
+                  sets: e.sets,
+                },
                 ...e.substitutes.map((sub) => ({
                   substituteId: sub.id,
                   exerciseId: sub.exerciseId,
                   exerciseName: sub.exerciseName,
                   trackingType: sub.trackingType,
                   note: sub.note,
+                  eachSide: false,
+                  tempo: null,
                   sets: sub.sets,
                 })),
               ].map((o) => ({ ...o, sets: o.sets.map((s) => planSnapshot(s)) })),

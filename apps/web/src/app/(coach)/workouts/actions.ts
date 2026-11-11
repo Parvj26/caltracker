@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc, duplicateWorkoutDoc } from '@caltracker/shared';
+import type { ExercisePrefs } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { loadWorkoutDoc } from '@/lib/workouts';
+import { loadExercisePrefs, loadWorkoutDoc } from '@/lib/workouts';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
@@ -13,6 +14,12 @@ const GENERIC_ERROR = "Couldn't save. Please try again.";
 const ALREADY_DONE =
   "This workout is already done, so its plan stays as it was (the log was done against it). Open its log to edit the results.";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The workspace's remembered choices per exercise, re-read by the builder after a save (see loadExercisePrefs). */
+export async function exercisePrefs(): Promise<Record<string, ExercisePrefs>> {
+  const { workspaceId } = await requireCoach();
+  return loadExercisePrefs(await createServerSupabase(), workspaceId);
+}
 
 export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   const { workspaceId } = await requireCoach(); // never trust a client-supplied workspace id
@@ -86,7 +93,11 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
   const copy = WorkoutDoc.safeParse(duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()));
   if (!copy.success) return { ok: false, error: 'Open this workout, fix the highlighted fields and save it, then copy it.' };
 
-  const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy.data });
+  // A copy is not the coach choosing measurements again, so it doesn't change what new exercises start with.
+  const { data, error } = await supabase.rpc('save_workout', {
+    p_workspace_id: workspaceId,
+    p_doc: { ...copy.data, rememberChoices: false },
+  });
   if (error) {
     if (error.code === '23514') return { ok: false, error: error.message };
     return { ok: false, error: "Couldn't copy. Please try again." };

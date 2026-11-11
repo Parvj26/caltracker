@@ -6,6 +6,7 @@ import type { ResultSet } from '../logs/format';
 import type { LogExerciseDoc, WorkoutLogDoc } from '../logs/schema';
 import { kgToInput, toKg, type Units } from '../units/units';
 import type { SetType, WorkoutDoc, WorkoutExerciseDoc } from '../workouts/schema';
+import { countsWeightTimesReps } from '../workouts/targets';
 
 export type BodyRegion = 'upper' | 'lower';
 
@@ -102,7 +103,7 @@ export function nextSuggestion(
   region: BodyRegion,
   units: Units,
 ): Suggestion | null {
-  if (prescription.trackingType !== 'weight_reps') return null;
+  if (!countsWeightTimesReps(prescription.trackingType)) return null;
   if (working(prescription.sets).some((s) => s.weightKg !== null)) return null;
   const r = ranges(prescription);
   const last = history[0];

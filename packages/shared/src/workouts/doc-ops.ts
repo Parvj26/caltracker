@@ -2,9 +2,15 @@ import type { TrackingType } from '../exercises/tracking';
 import { MAX_SUBSTITUTES } from './schema';
 import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc, WorkoutSubstituteDoc } from './schema';
 import { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS } from './sections';
-import { targetFieldsFor } from './targets';
+import { toggleMeasurement } from './measurements';
+import type { Measurement } from './measurements';
+import { fitSetTargets, targetFieldsFor } from './targets';
 
-export type ExercisePick = { id: string; name: string; trackingType: TrackingType };
+/**
+ * An exercise picked in the builder. `trackingType` is the library kind, or the coach's last choice of measurements
+ * for it (applyExercisePrefs), as is `eachSide`.
+ */
+export type ExercisePick = { id: string; name: string; trackingType: TrackingType; eachSide?: boolean };
 
 /** Sets (or superset rounds) a new exercise starts with, and the most one exercise may have. */
 export const DEFAULT_SETS = 3;
@@ -45,6 +51,8 @@ function newExercise(ex: ExercisePick, rest: number, rounds: number, makeId: () 
     exerciseName: ex.name,
     trackingType: ex.trackingType,
     note: null,
+    eachSide: ex.eachSide === true,
+    tempo: null,
     sets: Array.from({ length: rounds }, () => newSet(makeId, rest)),
     substitutes: [],
   };
@@ -429,6 +437,8 @@ export function replaceExercise(
     exerciseId: ex.id,
     exerciseName: ex.name,
     trackingType: ex.trackingType,
+    // Each side comes with the new exercise (its last choice); the tempo and note stay with the slot.
+    eachSide: ex.eachSide === true,
     sets: e.sets.map((s) => fitSet(s, allowed)),
     // A substitute that is now the exercise itself would be an alternative to itself.
     substitutes: e.substitutes.filter((sub) => sub.exerciseId !== ex.id),
@@ -595,4 +605,36 @@ export function substituteSetShowsRest(
   if (!ex) return false;
   const stand = { ...block, exercises: block.exercises.map((e, i) => (i === exerciseIndex ? { ...e, sets: substitute.sets } : e)) };
   return setShowsRest(stand, exerciseIndex, setIndex);
+}
+
+/**
+ * The Measurements menu: turns one of Weight / Reps / Time on or off for this workout exercise. Its sets lose the
+ * targets it no longer measures; a newly measured one starts empty. Unticking the last one, or any change to a
+ * distance exercise, changes nothing (same doc).
+ */
+export function toggleExerciseMeasurement(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  m: Measurement,
+): WorkoutDoc {
+  const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === workoutExerciseId);
+  if (!ex) return doc;
+  const trackingType = toggleMeasurement(ex.trackingType, m);
+  if (trackingType === ex.trackingType) return doc;
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({
+    ...e,
+    trackingType,
+    sets: e.sets.map((s) => fitSetTargets(trackingType, s)),
+  }));
+}
+
+/** Each side and Tempo, above "+ Set". The tempo is kept as typed; WorkoutDoc checks and normalises it on save. */
+export function updateExerciseOptions(
+  doc: WorkoutDoc,
+  blockId: string,
+  workoutExerciseId: string,
+  patch: { eachSide?: boolean; tempo?: string | null },
+): WorkoutDoc {
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, ...patch }));
 }

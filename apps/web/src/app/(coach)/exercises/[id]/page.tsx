@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { exercisePageTitle } from '@/lib/page-titles';
 import { getExercise } from '@/lib/page-data';
 import { notFound } from 'next/navigation';
-import { parseYoutubeUrl, toTrackingType, youtubeFormSearchUrl } from '@caltracker/shared';
+import { parseYoutubeUrl, toLibraryTrackingType, toTrackingType, youtubeFormSearchUrl } from '@caltracker/shared';
 import { ButtonLink, Card, Chip } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -123,7 +123,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
               exerciseId={ex.id}
               initial={{
                 name: ex.name,
-                trackingType: ex.tracking_type,
+                trackingType: toLibraryTrackingType(ex.tracking_type),
                 primaryMuscles: ex.primary_muscles,
                 equipment: ex.equipment,
                 instructions: ex.instructions,

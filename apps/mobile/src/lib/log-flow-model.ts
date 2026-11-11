@@ -8,6 +8,9 @@
 // Every rule (pre-fill, pick-one, rounds, drops, counting) comes from @caltracker/shared; this file only lays it out.
 import {
   targetFieldsFor,
+  countsWeightTimesReps,
+  exerciseBadges,
+  setColumns,
   blockRoundCount,
   completeSetWith,
   completedSetCount,
@@ -326,9 +329,9 @@ export function startGroups(log: WorkoutLogDoc, section: FlowSection, units: Uni
 
 export type CellModel = {
   field: StepField;
-  /** Column heading on a straight page ("LB", "REPS", "TIME", "MI"). */
+  /** Column heading on a straight page ("LB", "REPS", "TIME", "MI"; "LB EACH", "REPS EACH" for an each-side exercise). */
   heading: string;
-  /** The unit as words under a superset's cell ("lb", "reps", "m:ss", "mi"). */
+  /** The unit as words under a superset's cell ("lb", "reps", "m:ss", "mi"; "lb each", "reps each" for each side). */
   unit: string;
   /** What is stored, as the box shows it ("" when nothing is typed yet). */
   value: string;
@@ -358,15 +361,16 @@ export type RowModel = {
 
 const FIELD_ORDER: readonly StepField[] = ['weight', 'reps', 'duration', 'distance'];
 
-function cellFor(field: StepField, set: LogSetDoc, values: SetValues, units: Units): CellModel {
+function cellFor(field: StepField, set: LogSetDoc, values: SetValues, units: Units, eachSide: boolean): CellModel {
+  const each = eachSide ? ' each' : '';
   switch (field) {
     case 'weight': {
       const show = (v: number | null) => (v === null ? '' : String(kgToInput(v, units)));
-      return { field, heading: units.toUpperCase(), unit: units, value: show(set.actualWeightKg), placeholder: show(values.weightKg) };
+      return { field, heading: units.toUpperCase(), unit: `${units}${each}`, value: show(set.actualWeightKg), placeholder: show(values.weightKg) };
     }
     case 'reps': {
       const show = (v: number | null) => (v === null ? '' : String(v));
-      return { field, heading: 'REPS', unit: 'reps', value: show(set.actualReps), placeholder: show(values.reps) };
+      return { field, heading: 'REPS', unit: `reps${each}`, value: show(set.actualReps), placeholder: show(values.reps) };
     }
     case 'duration': {
       const show = (v: number | null) => (v === null ? '' : formatClock(v));
@@ -413,6 +417,9 @@ function deletableSets(ex: LogExerciseDoc): Set<string> {
 /** One row per set of the exercise, or only the sets at `setIndexes` (a superset round). */
 export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly LastResultSet[], setIndexes?: readonly number[]): RowModel[] {
   const fields = fieldsFor(ex);
+  const eachSide = ex.eachSide === true;
+  // The headings are the shared set columns' ("LB EACH | REPS EACH | TIME"), one per field logged.
+  const headings = new Map(setColumns(ex.trackingType, units, { eachSide }).map((c) => [c.field, c.heading]));
   const indexes = setIndexes ?? ex.sets.map((_, i) => i);
   return indexes.map((si) => {
     const set = ex.sets[si];
@@ -444,7 +451,8 @@ export function setRows(ex: LogExerciseDoc, units: Units, lastSets: readonly Las
       done: set.completedAt !== null,
       // A ticked set shows only what was saved: never the greyed pre-fill.
       cells: fields.map((f) => {
-        const cell = cellFor(f, set, values, units);
+        const base = cellFor(f, set, values, units, eachSide);
+        const cell = { ...base, heading: headings.get(f) ?? base.heading };
         return set.completedAt === null ? cell : { ...cell, placeholder: '' };
       }),
       values,
@@ -494,6 +502,9 @@ export type ExerciseModel = {
   lastTime: readonly LastResultSet[];
   /** Auto progression's suggestion, "Suggested 140 lb · ↑ +5 lb", or null. */
   progression: string | null;
+  /** The coach's "Each side" and "Tempo 3-1-1-0" badges under the name (shared exerciseBadges), and their help line. */
+  badges: string[];
+  badgeHelp: string | null;
 };
 
 /** Auto progression for the pre-fill: the client's recent sessions (empty when off) and their units. */
@@ -558,6 +569,12 @@ export type OptionPageModel = {
 
 export type PageModel = StraightPageModel | SupersetPageModel | OptionPageModel;
 
+/** The badges and help line the client sees under an exercise's name. */
+export function badgesOf(ex: Pick<LogExerciseDoc, 'trackingType' | 'eachSide' | 'tempo'>): { badges: string[]; badgeHelp: string | null } {
+  const { badges, help } = exerciseBadges(ex);
+  return { badges, badgeHelp: help };
+}
+
 function exerciseModel(
   ex: LogExerciseDoc,
   exerciseIndex: number,
@@ -577,6 +594,7 @@ function exerciseModel(
     swappedFromExerciseId: ex.swappedFromExerciseId,
     lastTime: last[ex.exerciseId]?.sets ?? [],
     progression: progressionLine(ex, last, progression),
+    ...badgesOf(ex),
   };
 }
 
@@ -680,7 +698,10 @@ export type MarkAllPlan = {
   tick: number;
   /** Open sets it leaves: no numbers to save yet (nothing typed, no coach target, no last time). */
   skip: number;
-  /** Of the sets it ticks, weight and reps ones that get no weight (reps only: could be bodyweight, so allowed). */
+  /**
+   * Of the sets it ticks, weight-and-reps ones (shared countsWeightTimesReps) that get no weight (reps only: could be
+   * bodyweight, so allowed).
+   */
   noWeight: number;
 };
 
@@ -696,7 +717,7 @@ export function markAllPlan(
   const open = (l: WorkoutLogDoc) => exercises(l).flatMap((e) => e.sets).filter((x) => x.completedAt === null).length;
   const wasOpen = new Set(exercises(log).flatMap((e) => e.sets.filter((x) => x.completedAt === null).map((x) => x.id)));
   const noWeight = exercises(done)
-    .filter((e) => e.trackingType === 'weight_reps')
+    .filter((e) => countsWeightTimesReps(e.trackingType))
     .flatMap((e) => e.sets)
     .filter((x) => wasOpen.has(x.id) && x.completedAt !== null && x.actualWeightKg === null).length;
   const tick = open(log) - open(done);

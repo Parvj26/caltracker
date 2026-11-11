@@ -26,6 +26,25 @@ describe('createLogStore', () => {
     expect(loaded?.log.blocks[0]!.exercises[0]!.sets).toEqual(log.blocks[0].exercises[0].sets);
   });
 
+  it('keeps a log whose exercise measures weight, reps and time each side with a tempo', async () => {
+    const storage = memoryStorage();
+    const base = sampleLog({ revision: 3 });
+    const ex = base.blocks[0].exercises[0];
+    const log = {
+      ...base,
+      blocks: [
+        {
+          ...base.blocks[0],
+          exercises: [{ ...ex, trackingType: 'weight_reps_time' as const, eachSide: true, tempo: '3-1-X-0', sets: [{ ...ex.sets[0], actualDurationS: 40 }] }],
+        },
+      ],
+    };
+    await createLogStore(storage, 'user-1').save({ log, lastSyncedRevision: 2 });
+    const loaded = await createLogStore(storage, 'user-1').load();
+    expect(loaded?.log.blocks[0]!.exercises[0]).toMatchObject({ trackingType: 'weight_reps_time', eachSide: true, tempo: '3-1-X-0' });
+    expect(loaded?.log.blocks[0]!.exercises[0]!.sets[0]).toMatchObject({ actualReps: 8, actualWeightKg: 60, actualDurationS: 40 });
+  });
+
   it('returns null when nothing is stored', async () => {
     expect(await createLogStore(memoryStorage(), 'user-1').load()).toBeNull();
   });

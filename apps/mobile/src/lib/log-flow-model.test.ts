@@ -6,6 +6,7 @@ import {
   completeSetWith,
   addLogExercise,
   emptyLog,
+  logVolumeKg,
   pickChoice,
   startLogFromWorkout,
   swapLogExercise,
@@ -704,5 +705,89 @@ describe('deleting a set', () => {
     ]);
     const circles = log.blocks[0].exercises[0];
     expect(deleteChoices(circles, 'lb', [])).toEqual([]);
+  });
+});
+
+describe('measurements: chosen columns, each side and tempo', () => {
+  /** One straight exercise measuring `trackingType`, with every target the type uses. */
+  function measuredLog(trackingType: string, over: Record<string, unknown> = {}): WorkoutLogDoc {
+    const fields = {
+      weight: { targetWeightKg: 20 },
+      reps: { targetRepsMin: 10, targetRepsMax: 10 },
+      time: { targetDurationS: 30 },
+    };
+    const uses = {
+      weight_reps_time: ['weight', 'reps', 'time'],
+      reps_time: ['reps', 'time'],
+      weight: ['weight'],
+      weight_reps: ['weight', 'reps'],
+    }[trackingType] as Array<keyof typeof fields>;
+    const targets: Record<string, unknown> = Object.assign(
+      { targetWeightKg: null, targetRepsMin: null, targetRepsMax: null, targetDurationS: null },
+      ...uses.map((u) => fields[u]),
+    ) as Record<string, unknown>;
+    const workout = WorkoutDoc.parse({
+      id: uuid(),
+      name: 'Measured',
+      notes: null,
+      sections: [],
+      blocks: [
+        {
+          id: uuid(),
+          sectionId: null,
+          kind: 'straight',
+          exercises: [{ ...exercise('Dumbbell Bench Press', [set('normal', targets), set('normal', targets)], trackingType), ...over }],
+        },
+      ],
+    });
+    return startLogFromWorkout(workout, uuid, NOW);
+  }
+
+  it('shows only the chosen measurements, with time next to reps and weight', () => {
+    const heads = (tt: string, units: 'kg' | 'lb') => setRows(measuredLog(tt).blocks[0].exercises[0], units, [])[0].cells.map((c) => c.heading);
+    expect(heads('weight_reps_time', 'lb')).toEqual(['LB', 'REPS', 'TIME']);
+    expect(heads('reps_time', 'lb')).toEqual(['REPS', 'TIME']);
+    expect(heads('weight', 'kg')).toEqual(['KG']);
+    const row = setRows(measuredLog('weight_reps_time').blocks[0].exercises[0], 'kg', [])[0];
+    expect(row.cells.map((c) => c.placeholder)).toEqual(['20', '10', '0:30']);
+  });
+
+  it('says EACH on weight and reps for an each-side exercise, as the shared setColumns does', () => {
+    const ex = measuredLog('weight_reps_time', { eachSide: true }).blocks[0].exercises[0];
+    const cells = setRows(ex, 'lb', [])[0].cells;
+    expect(cells.map((c) => c.heading)).toEqual(['LB EACH', 'REPS EACH', 'TIME']);
+    // A superset has no headings: the unit under each box says it instead.
+    expect(cells.map((c) => c.unit)).toEqual(['lb each', 'reps each', 'm:ss']);
+  });
+
+  it('puts the Each side and Tempo badges and their help line on the page', () => {
+    const log = measuredLog('weight_reps', { eachSide: true, tempo: '3-1-1-0' });
+    const m = buildPage(log, buildSections(log)[0].pages[0], 'lb', {});
+    if (m.kind !== 'straight') throw new Error('straight');
+    expect(m.exercise.badges).toEqual(['Each side', 'Tempo 3-1-1-0']);
+    expect(m.exercise.badgeHelp).toBe('Each side: the weight is per hand and the reps are per side. Tempo: seconds down, pause, up, pause.');
+    const plain = measuredLog('weight_reps');
+    const p = buildPage(plain, buildSections(plain)[0].pages[0], 'lb', {});
+    expect(p.kind === 'straight' && p.exercise.badges).toEqual([]);
+    expect(p.kind === 'straight' && p.exercise.badgeHelp).toBeNull();
+  });
+
+  it('logs a weight, reps and time set: typed time, then ✓ saves all three; it counts for volume', () => {
+    let log = measuredLog('weight_reps_time');
+    const ex = () => log.blocks[0].exercises[0];
+    const typed = readTyped('duration', '0:45', 'kg', false);
+    if (typed.kind !== 'ok') throw new Error('typed');
+    log = updateActual(log, ex().sets[0].id, typed.patch);
+    const row = setRows(ex(), 'kg', [])[0];
+    expect(row.cells.map((c) => c.value)).toEqual(['', '', '0:45']);
+    log = completeSetWith(log, row.setId, row.values, NOW);
+    expect(ex().sets[0]).toMatchObject({ actualWeightKg: 20, actualReps: 10, actualDurationS: 45 });
+    expect(LogSchema.safeParse(log).success).toBe(true);
+    expect(logVolumeKg(log)).toBe(200);
+    // Mark all names a weight, reps and time set that would go without a weight, as for weight and reps.
+    log = updateActual(log, ex().sets[1].id, { actualWeightKg: null });
+    const noTarget = measuredLog('weight_reps_time');
+    const bare = { ...noTarget, blocks: [{ ...noTarget.blocks[0], exercises: [{ ...noTarget.blocks[0].exercises[0], sets: noTarget.blocks[0].exercises[0].sets.map((s) => ({ ...s, target: { ...s.target, weightKg: null } })) }] }] };
+    expect(markAllPlan(bare, [bare.blocks[0].exercises[0].id], {}).noWeight).toBe(2);
   });
 });

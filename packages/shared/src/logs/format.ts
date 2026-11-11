@@ -3,7 +3,7 @@ import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import { formatDistance, formatDuration, formatTotalWeight, formatWeight } from '../units/units';
 import type { Units } from '../units/units';
-import { formatSetTarget } from '../workouts/targets';
+import { formatSetTarget, targetFieldsFor } from '../workouts/targets';
 import type { SetType } from '../workouts/schema';
 import type { LogExerciseDoc, LogSetTarget } from './schema';
 import type { SetValues } from './prefill';
@@ -52,6 +52,20 @@ function resultText(s: ResultSet, trackingType: TrackingType, units: Units): str
       const parts: string[] = [];
       if (s.actualWeightKg !== null) parts.push(formatWeight(s.actualWeightKg, units));
       if (s.actualDurationS !== null) parts.push(formatDuration(s.actualDurationS));
+      return parts.length > 0 ? parts.join(' · ') : null;
+    }
+    // A workout exercise's own measurements (weight only, reps and time, all three): "135 lb × 8 · 0:45".
+    case 'weight':
+    case 'reps_time':
+    case 'weight_reps_time': {
+      const fields = targetFieldsFor(trackingType);
+      const parts: string[] = [];
+      const w = fields.includes('weight') ? s.actualWeightKg : null;
+      const r = fields.includes('reps') ? s.actualReps : null;
+      if (w !== null && r !== null) parts.push(`${formatWeight(w, units)} × ${r}`);
+      else if (w !== null) parts.push(formatWeight(w, units));
+      else if (r !== null) parts.push(reps(r));
+      if (fields.includes('duration') && s.actualDurationS !== null) parts.push(formatDuration(s.actualDurationS));
       return parts.length > 0 ? parts.join(' · ') : null;
     }
   }
