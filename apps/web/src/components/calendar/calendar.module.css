@@ -440,6 +440,10 @@
   white-space: nowrap;
 }
 .viewLink:hover { background: var(--ct-surface); }
+/* Touch screens: full 44 px tap targets (the switcher grows by 4 px). */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .viewLink { min-height: var(--ct-tap-min); }
+}
 /* Text on a pastel fill is always ink. */
 .viewLinkOn, .viewLinkOn:hover { background: var(--ct-lime); }
 

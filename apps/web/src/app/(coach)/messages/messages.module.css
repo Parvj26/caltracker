@@ -130,7 +130,7 @@
 }
 .threadTitle { margin: 0; min-width: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
 .threadSub { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.threadLink { margin-left: auto; color: var(--ct-ink); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
+.threadLink { padding-block: calc((var(--ct-tap-min) - 1em) / 2); margin-block: calc((1em - var(--ct-tap-min)) / 2); margin-left: auto; color: var(--ct-ink); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
 
 .messages { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-4); overflow-y: auto; }
 .messages > * { flex-shrink: 0; }

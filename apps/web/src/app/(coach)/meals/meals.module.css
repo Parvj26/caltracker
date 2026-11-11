@@ -78,6 +78,10 @@
   color: var(--ct-ink);
   cursor: pointer;
 }
+/* Touch screens: a full 44 px tap target. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .smallButton { min-height: var(--ct-tap-min); }
+}
 .fileInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
