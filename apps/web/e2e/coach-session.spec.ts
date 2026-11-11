@@ -160,9 +160,9 @@ test('while the client logs on the phone the coach watches, views, then takes ov
   // The page now logs it, and says so.
   await expect(page.getByText(/Logged by you/)).toBeVisible();
 
-  // Hand it back: the client's phone holds it again.
+  // Hand it back: the client's phone holds it again, and the coach lands on the live view of that workout.
   await page.getByRole('button', { name: 'Hand back to Parv' }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${client}/training$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${client}/logs/${logId}$`));
   await expect.poll(async () => (await admin.from('workout_logs').select('logged_by').eq('id', logId).single()).data?.logged_by).toBe(client);
 });
 
