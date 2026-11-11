@@ -214,7 +214,6 @@ export const ERROR_CODES = {
   program_missing: 'This program is no longer in your library.',
   favourite_save_failed: "Couldn't save favourite. Try again.",
   exercises_load_failed: "Couldn't load exercises. Please try again.",
-  program_week_not_empty: 'The weeks you picked already have workouts. Copying replaces them.',
   history_load_failed: 'Couldn’t load your history. Check your connection and pull down to try again.',
   workout_load_failed: 'Couldn’t load this workout. Check your connection and try again.',
   progress_load_failed: 'Couldn’t load your progress. Check your connection and try again.',
