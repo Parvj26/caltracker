@@ -316,6 +316,20 @@ describe('parsing docs saved on the phone', () => {
     expect(parseWorkoutDocLenient('not a doc').success).toBe(false);
   });
 
+  it('a workout with a Tempo or Each side this build cannot read keeps the plan and drops just those', () => {
+    const doc = workout('weight_time') as unknown as { blocks: Array<{ exercises: Array<Record<string, unknown>> }> };
+    const sets = doc.blocks[0]!.exercises[0]!.sets as Array<Record<string, unknown>>;
+    Object.assign(sets[0]!, { targetRepsMin: null, targetRepsMax: null });
+    Object.assign(doc.blocks[0]!.exercises[0]!, { substitutes: [], tempo: '30-1-1-0', eachSide: 'left' });
+    expect(WorkoutDoc.safeParse(doc).success).toBe(false);
+    const read = parseWorkoutDocLenient(doc);
+    expect(read.success).toBe(true);
+    expect(read.success ? read.data.blocks[0]!.exercises[0] : null).toMatchObject({ tempo: null, eachSide: false });
+    Object.assign(doc.blocks[0]!.exercises[0]!, { tempo: '3-1-x-0', eachSide: true });
+    const ok = parseWorkoutDocLenient(doc);
+    expect(ok.success ? ok.data.blocks[0]!.exercises[0] : null).toMatchObject({ tempo: '3-1-X-0', eachSide: true });
+  });
+
   it('a log: the strict schema refuses an unknown type, the lenient read falls back to reps and keeps the numbers', () => {
     const target = { repsMin: null, repsMax: null, weightKg: 32, durationS: 60, distanceM: null, toFailure: false, restSeconds: 0 };
     const log = {
@@ -345,6 +359,8 @@ describe('parsing docs saved on the phone', () => {
               plannedWorkoutExerciseId: null,
               swappedFromExerciseId: null,
               note: null,
+              tempo: 99,
+              eachSide: 'yes',
               substituteId: null,
               substituteOptions: [
                 { substituteId: null, exerciseId: id(43), exerciseName: 'Future Carry', trackingType: 'x', note: null, sets: [{ setType: 'normal', target }] },
@@ -374,6 +390,7 @@ describe('parsing docs saved on the phone', () => {
     expect(ex?.trackingType).toBe('reps');
     expect(ex?.sets[0]).toMatchObject({ actualWeightKg: 32, actualDurationS: 55 });
     expect(ex?.substituteOptions.map((o) => o.trackingType)).toEqual(['reps', 'weight_reps']);
+    expect(ex).toMatchObject({ tempo: null, eachSide: false });
   });
 });
 

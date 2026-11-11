@@ -84,6 +84,28 @@ describe('parseCachedPlan', () => {
   });
 });
 
+describe('parseCachedPlan with measurements', () => {
+  it('keeps the new tracking types, Each side and Tempo on a saved workout', () => {
+    const ex = doc.blocks[0].exercises[0];
+    const set0 = ex.sets[0];
+    const b = (n: number, e: Record<string, unknown>) => ({ ...doc.blocks[0], id: `00000000-0000-4000-8000-00000000001${n}`, exercises: [{ ...ex, ...e }] });
+    const measured = {
+      ...doc,
+      blocks: [
+        b(0, { trackingType: 'weight_reps_time', eachSide: true, tempo: '3-1-1-0', sets: [{ ...set0, targetDurationS: 30 }] }),
+        b(1, { id: '00000000-0000-4000-8000-000000000006', trackingType: 'weight', sets: [{ ...set0, id: '00000000-0000-4000-8000-000000000007', targetRepsMin: null, targetRepsMax: null }] }),
+        b(2, { id: '00000000-0000-4000-8000-000000000008', trackingType: 'reps_time', sets: [{ ...set0, id: '00000000-0000-4000-8000-000000000009', targetWeightKg: null, targetDurationS: 45 }] }),
+      ],
+    };
+    const back = parseCachedPlan(JSON.stringify(plan({ week: [{ doc: measured, scheduledOn: '2026-11-09', programName: null, programDay: null }] as unknown as CachedPlan['week'] })));
+    const exercises = back?.week[0]?.doc.blocks.flatMap((x) => x.exercises) ?? [];
+    expect(exercises.map((e) => e.trackingType)).toEqual(['weight_reps_time', 'weight', 'reps_time']);
+    expect(exercises[0]).toMatchObject({ eachSide: true, tempo: '3-1-1-0' });
+    expect(exercises[0]?.sets[0]).toMatchObject({ targetRepsMin: 8, targetWeightKg: 60, targetDurationS: 30 });
+    expect(exercises[2]?.sets[0]).toMatchObject({ targetRepsMin: 8, targetDurationS: 45 });
+  });
+});
+
 describe('isLogForDay', () => {
   it('accepts a log and rejects a bad status', () => {
     expect(isLogForDay(log())).toBe(true);

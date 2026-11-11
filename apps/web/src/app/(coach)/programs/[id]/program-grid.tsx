@@ -32,7 +32,7 @@ import type { LiveSyncState } from '@/lib/live-sync';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
-import type { Units, WorkoutHints } from '@caltracker/shared';
+import type { ExercisePrefs, Units, WorkoutHints } from '@caltracker/shared';
 import { SlotSummary } from './slot-summary';
 import { WorkoutSheet, type SheetSaved, type SheetTarget } from './workout-sheet';
 import styles from '../programs.module.css';
@@ -92,12 +92,15 @@ export function ProgramGrid({
   hints,
   units,
   workspaceId,
+  exercisePrefs,
 }: {
   program: Program;
   /** The coach's units, for the summary card and the workout editor. */
   units: Units;
   /** The coach's workspace (from requireCoach), for the editor's exercise picker. */
   workspaceId: string;
+  /** The workspace's remembered measurements and Each side per exercise, for the workout editor. */
+  exercisePrefs: Record<string, ExercisePrefs>;
   initialSlots: Slot[];
   library: LibraryWorkout[];
   /** The program's Live Sync switch and status, as loaded. */
@@ -474,6 +477,7 @@ export function ProgramGrid({
           target={sheet}
           units={units}
           workspaceId={workspaceId}
+          exercisePrefs={exercisePrefs}
           onSaved={onSheetSaved}
           onClose={() => setSheet(null)}
         />

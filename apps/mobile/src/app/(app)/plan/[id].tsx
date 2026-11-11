@@ -3,6 +3,7 @@ import { Fragment, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import {
+  exerciseBadges,
   canStartSessionOn,
   localToday,
   sectionRuns,
@@ -10,6 +11,7 @@ import {
   type WorkoutBlockDoc,
   type WorkoutExerciseDoc,
 } from '@caltracker/shared';
+import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
@@ -289,12 +291,13 @@ function ExerciseRow({
   const { text, space, radius } = useTheme();
   const plan = exercisePlanLine(exercise, units);
   const lastLine = lastTimeLine(exercise, last, units);
+  const badges = exerciseBadges(exercise);
   return (
     <Pressable
       testID={`plan-exercise-${exercise.id}`}
       onPress={onInfo}
       accessibilityRole="button"
-      accessibilityLabel={[exercise.exerciseName, plan, lastLine].filter(Boolean).join(', ')}
+      accessibilityLabel={[exercise.exerciseName, ...badges.badges, plan, badges.help, lastLine].filter(Boolean).join(', ')}
       accessibilityHint="Opens exercise info"
       style={({ pressed }) => [
         styles.row,
@@ -307,6 +310,7 @@ function ExerciseRow({
       <View style={[styles.flex, { gap: 2 }]}>
         <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
         {plan ? <Text style={text('body')}>{plan}</Text> : null}
+        <ExerciseBadges badges={badges.badges} help={badges.help} testID={`plan-badges-${exercise.id}`} />
         {lastLine ? <Text style={[text('caption'), styles.last]}>{lastLine}</Text> : null}
       </View>
     </Pressable>

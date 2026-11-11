@@ -10,6 +10,9 @@ export const TARGET_FIELDS: Record<TrackingType, ReadonlyArray<'reps' | 'weight'
   time: ['duration'],
   distance: ['distance'],
   weight_time: ['weight', 'duration'],
+  weight: ['weight'],
+  reps_time: ['reps', 'duration'],
+  weight_reps_time: ['reps', 'weight', 'duration'],
 };
 
 export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
@@ -18,6 +21,9 @@ export const TRACKING_TYPE_LABELS: Record<TrackingType, string> = {
   time: 'time',
   distance: 'distance',
   weight_time: 'weight and time',
+  weight: 'weight only',
+  reps_time: 'reps and time',
+  weight_reps_time: 'weight, reps and time',
 };
 
 type TargetField = 'reps' | 'weight' | 'duration' | 'distance';
@@ -25,6 +31,14 @@ type TargetField = 'reps' | 'weight' | 'duration' | 'distance';
 /** The target fields a tracking type uses; an unknown type (from a newer server) gets the fallback's, never undefined. */
 export function targetFieldsFor(trackingType: TrackingType): ReadonlyArray<TargetField> {
   return (TARGET_FIELDS as Partial<Record<string, ReadonlyArray<TargetField>>>)[trackingType] ?? TARGET_FIELDS[FALLBACK_TRACKING_TYPE];
+}
+
+/**
+ * True for a type whose sets have both a weight and reps (weight and reps, or weight, reps and time): the sets that
+ * count for volume and lifting PRs.
+ */
+export function countsWeightTimesReps(trackingType: TrackingType): boolean {
+  return trackingType === 'weight_reps' || trackingType === 'weight_reps_time';
 }
 
 /** "weight and reps", "reps only", ...; an unknown type reads as the fallback's label. */

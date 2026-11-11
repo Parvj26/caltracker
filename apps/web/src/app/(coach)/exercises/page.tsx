@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { TRACKING_TYPES } from '@caltracker/shared';
+import { LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
 import { ButtonLink } from '@/components/ui';
 import { ExerciseBrowser } from './exercise-browser';
@@ -28,7 +28,7 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
         workspaceId={workspaceId}
         initialQuery={one(sp.q).trim().slice(0, 100)}
         initialSource={source === 'builtin' || source === 'custom' ? source : ''}
-        initialTracking={(TRACKING_TYPES as readonly string[]).includes(tracking) ? tracking : ''}
+        initialTracking={(LIBRARY_TRACKING_TYPES as readonly string[]).includes(tracking) ? tracking : ''}
       />
     </div>
   );

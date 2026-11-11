@@ -14,7 +14,7 @@ describe('inferTrackingType', () => {
 });
 
 describe('TRACKING_TYPES', () => {
-  it('lists every tracking type, including weight and time for loaded carries', () => {
-    expect(TRACKING_TYPES).toEqual(['weight_reps', 'reps', 'time', 'distance', 'weight_time']);
+  it('lists every tracking type, including weight and time for loaded carries and the workout-only measurements', () => {
+    expect(TRACKING_TYPES).toEqual(['weight_reps', 'reps', 'time', 'distance', 'weight_time', 'weight', 'reps_time', 'weight_reps_time']);
   });
 });

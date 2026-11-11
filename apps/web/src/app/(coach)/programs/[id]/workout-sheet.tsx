@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
-import { emptyWorkout, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { emptyWorkout, type ExercisePrefs, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
 import { saveWorkout, type SaveWorkoutOutcome } from '../../workouts/actions';
@@ -48,6 +48,7 @@ export function WorkoutSheet({
   target,
   units,
   workspaceId,
+  exercisePrefs,
   onSaved,
   onClose,
 }: {
@@ -55,6 +56,7 @@ export function WorkoutSheet({
   target: SheetTarget;
   units: Units;
   workspaceId: string;
+  exercisePrefs: Record<string, ExercisePrefs>;
   onSaved: (saved: SheetSaved) => void;
   onClose: () => void;
 }) {
@@ -149,6 +151,7 @@ export function WorkoutSheet({
           workspaceId={workspaceId}
           mode="library"
           isNew={target.kind === 'new'}
+          initialPrefs={exercisePrefs}
           saveLabel={target.kind === 'new' ? 'Save and add to day' : 'Save'}
           saveWith={saveWith}
           onDirtyChange={setDirty}

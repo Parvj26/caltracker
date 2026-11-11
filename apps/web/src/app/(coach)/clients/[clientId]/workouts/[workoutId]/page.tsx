@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { suggestionsForWorkout } from '@caltracker/shared';
 import { ProgressionCard } from '@/components/progression-card';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
+import { loadExercisePrefs } from '@/lib/workouts';
 import { requireCoach } from '@/lib/auth';
 import { getClient, getWorkoutDoc } from '@/lib/page-data';
 import { loadProgression } from '@/lib/progression';
@@ -44,6 +45,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
   const exerciseIds = loaded.doc.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId));
   const progression = await loadProgression(supabase, workoutId, exerciseIds).catch(() => ({}));
   const suggestions = suggestionsForWorkout(loaded.doc, progression, units);
+  const prefs = await loadExercisePrefs(supabase, workspaceId);
 
   return (
     <div className={styles.page}>
@@ -62,6 +64,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
         units={units}
         workspaceId={workspaceId}
         mode={{ clientName: client.name, date: loaded.scheduledOn }}
+        initialPrefs={prefs}
       />
     </div>
   );

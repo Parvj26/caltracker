@@ -1310,6 +1310,45 @@ export type Database = {
           },
         ]
       }
+      exercise_prefs: {
+        Row: {
+          each_side: boolean
+          exercise_id: string
+          tracking_type: Database["public"]["Enums"]["tracking_type"] | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          each_side?: boolean
+          exercise_id: string
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          each_side?: boolean
+          exercise_id?: string
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_prefs_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_prefs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           category: string | null
@@ -1466,6 +1505,7 @@ export type Database = {
           block_id: string
           client_id: string
           created_at: string
+          each_side: boolean
           exercise_id: string
           id: string
           log_id: string
@@ -1475,6 +1515,8 @@ export type Database = {
           substitute_id: string | null
           substitute_options: Json
           swapped_from_exercise_id: string | null
+          tempo: string | null
+          tracking_type: Database["public"]["Enums"]["tracking_type"] | null
           updated_at: string
           workspace_id: string
         }
@@ -1482,6 +1524,7 @@ export type Database = {
           block_id: string
           client_id: string
           created_at?: string
+          each_side?: boolean
           exercise_id: string
           id?: string
           log_id: string
@@ -1491,6 +1534,8 @@ export type Database = {
           substitute_id?: string | null
           substitute_options?: Json
           swapped_from_exercise_id?: string | null
+          tempo?: string | null
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
           updated_at?: string
           workspace_id: string
         }
@@ -1498,6 +1543,7 @@ export type Database = {
           block_id?: string
           client_id?: string
           created_at?: string
+          each_side?: boolean
           exercise_id?: string
           id?: string
           log_id?: string
@@ -1507,6 +1553,8 @@ export type Database = {
           substitute_id?: string | null
           substitute_options?: Json
           swapped_from_exercise_id?: string | null
+          tempo?: string | null
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
           updated_at?: string
           workspace_id?: string
         }
@@ -2341,10 +2389,13 @@ export type Database = {
           block_id: string
           client_id: string | null
           created_at: string
+          each_side: boolean
           exercise_id: string
           id: string
           note: string | null
           position: number
+          tempo: string | null
+          tracking_type: Database["public"]["Enums"]["tracking_type"] | null
           updated_at: string
           workout_id: string
           workspace_id: string
@@ -2353,10 +2404,13 @@ export type Database = {
           block_id: string
           client_id?: string | null
           created_at?: string
+          each_side?: boolean
           exercise_id: string
           id?: string
           note?: string | null
           position: number
+          tempo?: string | null
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
           updated_at?: string
           workout_id: string
           workspace_id: string
@@ -2365,10 +2419,13 @@ export type Database = {
           block_id?: string
           client_id?: string | null
           created_at?: string
+          each_side?: boolean
           exercise_id?: string
           id?: string
           note?: string | null
           position?: number
+          tempo?: string | null
+          tracking_type?: Database["public"]["Enums"]["tracking_type"] | null
           updated_at?: string
           workout_id?: string
           workspace_id?: string
@@ -3392,6 +3449,9 @@ export type Database = {
         | "time"
         | "distance"
         | "weight_time"
+        | "weight"
+        | "reps_time"
+        | "weight_reps_time"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3527,7 +3587,16 @@ export const Constants = {
       log_status: ["in_progress", "completed", "discarded"],
       member_role: ["owner", "staff", "client"],
       set_type: ["normal", "warmup", "drop"],
-      tracking_type: ["weight_reps", "reps", "time", "distance", "weight_time"],
+      tracking_type: [
+        "weight_reps",
+        "reps",
+        "time",
+        "distance",
+        "weight_time",
+        "weight",
+        "reps_time",
+        "weight_reps_time",
+      ],
     },
   },
 } as const

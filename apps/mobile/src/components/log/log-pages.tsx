@@ -14,6 +14,7 @@ import { useTheme } from '@/theme/use-theme';
 import { ExerciseDemo, ExerciseTools } from './exercise-tools';
 import { AddSetButton, SetRowLine, SetTable, type TableHandlers } from './set-table';
 import { fontFamilyFor } from '@/theme/fonts';
+import { ExerciseBadges } from '@/components/exercise-badges';
 
 export type PageHandlers = {
   table: (ex: ExerciseModel) => TableHandlers;
@@ -137,6 +138,7 @@ function SingleExercise({
       <Text ref={headingRef} testID={`exercise-name-${page}`} style={text('screenTitle')} accessibilityRole="header">
         {ex.name}
       </Text>
+      <ExerciseBadges badges={ex.badges} help={ex.badgeHelp} testID={`badges-${idKey}`} logging />
       <Notes ex={ex} idKey={idKey} />
       <ExerciseTools
         idKey={idKey}
@@ -250,6 +252,7 @@ export function SupersetPage({
                   ) : (
                     <Text style={text('body')}>{`${ex.label} · ${ex.name}`}</Text>
                   )}
+                  {current ? <ExerciseBadges badges={ex.badges} help={ex.badgeHelp} testID={`badges-${idKey}`} logging /> : null}
                   {current ? <Notes ex={{ ...ex, restLine: null }} idKey={idKey} /> : null}
                   {current ? <SubstituteStrip ex={ex} idKey={idKey} readOnly={readOnly} onPress={() => handlers.onSubstitute(ex)} /> : null}
                   {entry.rows.map((row) => (
