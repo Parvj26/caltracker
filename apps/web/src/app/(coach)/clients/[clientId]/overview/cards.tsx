@@ -94,7 +94,7 @@ export function HighlightsCard({ data, units }: { data: ClientOverview; units: U
       </dl>
       <p className={styles.caption}>
         {h.workouts === 1 ? '1 workout' : `${h.workouts} workouts`} finished.{' '}
-        <Link href={`/clients/${data.clientId}/training#bests-heading`}>See bests and stickers</Link>
+        <Link href={`/clients/${data.clientId}/training#bests-heading`} className="tap-inline">See bests and stickers</Link>
       </p>
     </Card>
   );
@@ -166,11 +166,11 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
         </>
       )}
       <p className={styles.caption}>
-        <Link href={`/clients/${data.clientId}/body${readOnly ? '' : '?scan=1'}`}>{readOnly ? 'See all scans' : 'Add scan'}</Link>
+        <Link href={`/clients/${data.clientId}/body${readOnly ? '' : '?scan=1'}`} className="tap-inline">{readOnly ? 'See all scans' : 'Add scan'}</Link>
         {readOnly ? null : (
           <>
             {' · '}
-            <Link href={`/clients/${data.clientId}/body`}>All scans</Link>
+            <Link href={`/clients/${data.clientId}/body`} className="tap-inline">All scans</Link>
           </>
         )}
       </p>

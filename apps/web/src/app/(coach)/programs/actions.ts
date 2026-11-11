@@ -1,8 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PROGRAM_WEEKS_MAX, ProgramInput, copyName } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, WorkoutDoc, copyName, duplicateWorkoutDoc } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
+import { loadWorkoutDoc } from '@/lib/workouts';
+import type { SaveWorkoutOutcome } from '../workouts/actions';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadLiveSync, type LiveSyncState } from '@/lib/live-sync';
@@ -350,4 +352,103 @@ export async function setProgramAutoProgression(id: string, on: boolean): Promis
   const row = data[0];
   if (!row) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
   return { ok: true, on: row.auto_progression };
+}
+
+/** A program day's workout as the summary card and editor show it, and where else it is used. */
+export type SlotWorkout = {
+  doc: WorkoutDoc;
+  /** Days of this slot's program that use the workout (this one included). */
+  daysInProgram: number;
+  /** Other programs that use it. */
+  otherPrograms: number;
+  /** Open invites whose plan puts it on a new client's calendar when they join (they copy it as it is then). */
+  invitePlans: number;
+};
+
+/**
+ * Loads the library workout on one program day, with its uses: every program day that points at it, and every open
+ * invite plan (which copies it when the client joins). Clients' calendar copies are separate workouts, so they don't
+ * count. Null when the slot isn't in this coach's workspace or its workout isn't a library workout.
+ */
+export async function loadSlotWorkout(slotId: string): Promise<SlotWorkout | null> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(slotId)) return null;
+  const supabase = await createServerSupabase();
+  const { data: slot, error } = await supabase
+    .from('program_workouts')
+    .select('program_id, workout_id')
+    .eq('id', slotId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load the day: ${error.message}`);
+  if (!slot) return null;
+  const [loaded, uses, invites] = await Promise.all([
+    loadWorkoutDoc(supabase, slot.workout_id),
+    supabase.from('program_workouts').select('program_id').eq('workout_id', slot.workout_id).eq('workspace_id', workspaceId),
+    supabase
+      .from('client_invite_plan_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('workout_id', slot.workout_id)
+      .eq('workspace_id', workspaceId),
+  ]);
+  if (uses.error) throw new Error(`Could not count the workout's uses: ${uses.error.message}`);
+  if (invites.error) throw new Error(`Could not count the workout's uses: ${invites.error.message}`);
+  if (!loaded || loaded.clientId !== null) return null;
+  return {
+    doc: loaded.doc,
+    daysInProgram: uses.data.filter((u) => u.program_id === slot.program_id).length,
+    otherPrograms: new Set(uses.data.filter((u) => u.program_id !== slot.program_id).map((u) => u.program_id)).size,
+    invitePlans: invites.count ?? 0,
+  };
+}
+
+export type SaveSlotCopyOutcome = (SaveWorkoutOutcome & { ok: false }) | { ok: true; id: string; name: string };
+
+/**
+ * "Just Week N, Day M": saves the edited workout as a new library workout named "<name> (Week N)" (every row gets a
+ * new id, as Duplicate does) and points only this program day at it. The original workout and every other day and
+ * program stay as they were. If pointing the day at the copy fails, the copy is deleted again.
+ */
+export async function saveSlotCopy(input: { slotId: string; doc: unknown }): Promise<SaveSlotCopyOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(input.slotId)) return { ok: false, error: "Couldn't find that day. It may have been removed." };
+  const parsed = WorkoutDoc.safeParse(input.doc);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: 'Check the highlighted fields.',
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.filter((p): p is string | number => typeof p !== 'symbol'),
+        message: i.message,
+      })),
+    };
+  }
+  const supabase = await createServerSupabase();
+  const { data: slot, error: slotError } = await supabase
+    .from('program_workouts')
+    .select('program_id, week')
+    .eq('id', input.slotId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (slotError) return { ok: false, error: "Couldn't save. Please try again." };
+  if (!slot) return { ok: false, error: "Couldn't find that day. It may have been removed." };
+
+  const copy = duplicateWorkoutDoc(parsed.data, () => crypto.randomUUID());
+  copy.name = copyName(parsed.data.name, 100, ` (Week ${slot.week})`);
+  const { data: id, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy });
+  if (error) {
+    if (error.code === '23514') return { ok: false, error: error.message };
+    return { ok: false, error: "Couldn't save. Please try again." };
+  }
+  const { data: moved, error: moveError } = await supabase.rpc('set_program_slot_workout', {
+    p_slot_id: input.slotId,
+    p_workout_id: id,
+  });
+  if (moveError || !moved) {
+    await supabase.from('workouts').delete().eq('id', id).eq('workspace_id', workspaceId).is('client_id', null);
+    return { ok: false, error: "Couldn't save. Please try again." };
+  }
+  revalidatePath('/workouts');
+  revalidatePath(`/programs/${slot.program_id}`);
+  return { ok: true, id, name: copy.name };
 }

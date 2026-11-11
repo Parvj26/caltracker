@@ -17,6 +17,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { PROGRAM_WEEKS_MAX, copyWeek } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
@@ -31,7 +32,9 @@ import type { LiveSyncState } from '@/lib/live-sync';
 import { MoveSlotDialog } from './move-slot-dialog';
 import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
-import type { WorkoutHints } from '@caltracker/shared';
+import type { ExercisePrefs, Units, WorkoutHints } from '@caltracker/shared';
+import { SlotSummary } from './slot-summary';
+import { WorkoutSheet, type SheetSaved, type SheetTarget } from './workout-sheet';
 import styles from '../programs.module.css';
 import { programWorkoutSaved } from '@/lib/analytics/client';
 
@@ -87,8 +90,17 @@ export function ProgramGrid({
   justCopied = false,
   liveSync,
   hints,
+  units,
+  workspaceId,
+  exercisePrefs,
 }: {
   program: Program;
+  /** The coach's units, for the summary card and the workout editor. */
+  units: Units;
+  /** The coach's workspace (from requireCoach), for the editor's exercise picker. */
+  workspaceId: string;
+  /** The workspace's remembered measurements and Each side per exercise, for the workout editor. */
+  exercisePrefs: Record<string, ExercisePrefs>;
   initialSlots: Slot[];
   library: LibraryWorkout[];
   /** The program's Live Sync switch and status, as loaded. */
@@ -102,6 +114,9 @@ export function ProgramGrid({
   const [weeks, setWeeks] = useState(program.weeks);
   const [picker, setPicker] = useState<DropData | null>(null);
   const [moving, setMoving] = useState<Slot | null>(null);
+  const [viewing, setViewing] = useState<Slot | null>(null);
+  const [sheet, setSheet] = useState<SheetTarget | null>(null);
+  const router = useRouter();
   const [copying, setCopying] = useState<number | null>(null);
   // Weeks a copy is still saving (a week may appear once per copy in flight).
   const [locked, setLocked] = useState<number[]>([]);
@@ -119,6 +134,7 @@ export function ProgramGrid({
   const [addingWeek, setAddingWeek] = useState(false);
   // The details as last saved, so "+ Add week" doesn't save half-typed edits.
   const savedDetails = useRef({ name: program.name, description: program.description });
+  const [savedName, setSavedName] = useState(program.name);
   const dndId = useId();
 
   const sensors = useSensors(
@@ -261,6 +277,23 @@ export function ProgramGrid({
     else moveSlot(data.slot, target.week, target.day);
   }
 
+  /** After the editor sheet saves: show the result on the plan, and refresh the page's library list. */
+  function onSheetSaved(saved: SheetSaved) {
+    setSheet(null);
+    if (saved.kind === 'new') {
+      addSlot({ id: saved.id, name: saved.name }, saved.week, saved.day);
+      setToast(`“${saved.name}” is on ${cellLabel(saved.week, saved.day)} and in your Workouts.`);
+    } else if (saved.kind === 'everywhere') {
+      setSlots((s) => s.map((x) => (x.workoutId === saved.id ? { ...x, workoutName: saved.name } : x)));
+      markSaved();
+    } else {
+      setSlots((s) => s.map((x) => (x.id === saved.slotId ? { ...x, workoutId: saved.id, workoutName: saved.name } : x)));
+      markSaved();
+      setToast(`Saved a copy, “${saved.name}”, on this day only.`);
+    }
+    router.refresh();
+  }
+
   async function addWeek() {
     if (weeks >= PROGRAM_WEEKS_MAX) return;
     const next = weeks + 1;
@@ -291,6 +324,7 @@ export function ProgramGrid({
         weeks={weeks}
         onSaved={(details, newWeeks, removed, expected) => {
           savedDetails.current = details;
+          setSavedName(details.name);
           setWeeks(newWeeks);
           setSlots((s) => s.filter((x) => x.week <= newWeeks));
           markSaved();
@@ -355,6 +389,7 @@ export function ProgramGrid({
                             day={d}
                             slots={inCell(w, d)}
                             onAdd={() => setPicker({ week: w, day: d })}
+                            onOpen={setViewing}
                             onMove={setMoving}
                             onRemove={removeSlot}
                           />
@@ -388,6 +423,10 @@ export function ProgramGrid({
           library={library}
           hints={hints}
           forProgram
+          onNew={() => {
+            setSheet({ kind: 'new', week: picker.week, day: picker.day });
+            setPicker(null);
+          }}
           onPick={(w) => {
             addSlot(w, picker.week, picker.day);
             setPicker(null);
@@ -408,6 +447,39 @@ export function ProgramGrid({
             setCopying(null);
           }}
           onClose={() => setCopying(null)}
+        />
+      ) : null}
+
+      {viewing ? (
+        <SlotSummary
+          slot={viewing}
+          units={units}
+          onEdit={(workout) => {
+            setSheet({ kind: 'edit', slot: viewing, workout });
+            setViewing(null);
+          }}
+          onMove={() => {
+            setMoving(viewing);
+            setViewing(null);
+          }}
+          onRemove={() => {
+            removeSlot(viewing);
+            setViewing(null);
+            focusSoon(addButtonDomId(viewing.week, viewing.day));
+          }}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
+
+      {sheet ? (
+        <WorkoutSheet
+          programName={savedName}
+          target={sheet}
+          units={units}
+          workspaceId={workspaceId}
+          exercisePrefs={exercisePrefs}
+          onSaved={onSheetSaved}
+          onClose={() => setSheet(null)}
         />
       ) : null}
 
@@ -445,6 +517,7 @@ function DayCell({
   day,
   slots,
   onAdd,
+  onOpen,
   onMove,
   onRemove,
 }: {
@@ -452,6 +525,7 @@ function DayCell({
   day: number;
   slots: Slot[];
   onAdd: () => void;
+  onOpen: (slot: Slot) => void;
   onMove: (slot: Slot) => void;
   onRemove: (slot: Slot) => void;
 }) {
@@ -465,6 +539,7 @@ function DayCell({
             <SlotChip
               key={s.id}
               slot={s}
+              onOpen={() => onOpen(s)}
               onMove={() => onMove(s)}
               onRemove={() => {
                 onRemove(s);
@@ -487,7 +562,7 @@ function DayCell({
   );
 }
 
-function SlotChip({ slot, onMove, onRemove }: { slot: Slot; onMove: () => void; onRemove: () => void }) {
+function SlotChip({ slot, onOpen, onMove, onRemove }: { slot: Slot; onOpen: () => void; onMove: () => void; onRemove: () => void }) {
   const data: DragData = { kind: 'slot', slot };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `slot-${slot.id}`, data });
   const [open, setOpen] = useState(false);
@@ -495,6 +570,8 @@ function SlotChip({ slot, onMove, onRemove }: { slot: Slot; onMove: () => void; 
   const wrapRef = useRef<HTMLLIElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  // Where the pointer went down, so a click that ends a drag doesn't also open the summary.
+  const downAt = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -534,6 +611,25 @@ function SlotChip({ slot, onMove, onRemove }: { slot: Slot; onMove: () => void; 
         ref={setNodeRef}
         {...attributes}
         {...listeners}
+        // Tap (a click without a drag) opens the summary. Enter opens it from the keyboard; Space still picks the chip
+        // up to move it. A keyboard click (detail 0, from Space) is the drag's, not a tap.
+        onPointerDown={(e) => {
+          downAt.current = { x: e.clientX, y: e.clientY };
+          listeners?.onPointerDown?.(e);
+        }}
+        onClick={(e) => {
+          const from = downAt.current;
+          const moved = from ? Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4 : false;
+          if (e.detail > 0 && !moved) onOpen();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onOpen();
+            return;
+          }
+          listeners?.onKeyDown?.(e);
+        }}
         className={styles.chipHandle}
         title={slot.workoutName}
       >
