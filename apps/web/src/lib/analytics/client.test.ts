@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// The first test pays for loading client.ts and its imports (posthog-js types, the shared package); on a busy CI
+// runner that has taken over 5 s.
+vi.setConfig({ testTimeout: 30_000 });
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
