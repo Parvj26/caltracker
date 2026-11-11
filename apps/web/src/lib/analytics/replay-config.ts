@@ -74,6 +74,8 @@ function reference(value: string): string {
  */
 export function maskAttribute(name: string, value: string, el?: Element | null): string {
   const key = name.toLowerCase();
+  // Inline percentages are progress bars drawn from client numbers (macros eaten, sets done): all shown as 50%.
+  if (key === 'style') return value.replace(/-?\d+(\.\d+)?%/g, '50%');
   if (LAYOUT_ATTRIBUTES.has(key)) return value;
   if (STYLE_HOOKS.has(key)) return PLAIN_WORD.test(value) ? value : stars(value);
   if (REFERENCES.has(key)) return reference(value);

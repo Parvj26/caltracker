@@ -106,7 +106,7 @@ describe('maskAttribute', () => {
     const div = el('<div class="card">x</div>', 'div');
     for (const [name, value] of [
       ['class', 'card'],
-      ['style', 'width: 40%'],
+      ['style', 'display: flex'],
       ['_cssText', '.a{color:red}'],
       ['role', 'dialog'],
       ['type', 'button'],
@@ -125,6 +125,13 @@ describe('maskAttribute', () => {
     ] as [string, string][]) {
       expect(maskAttribute(name, value, div), name).toBe(value);
     }
+  });
+
+  it('replaces percentages in inline styles (progress bars show client numbers) with a fixed one', () => {
+    const span = el('<span>x</span>', 'span');
+    expect(maskAttribute('style', 'width: 73%', span)).toBe('width: 50%');
+    expect(maskAttribute('style', 'width: 12.5%; inset-inline-start: -4%', span)).toBe('width: 50%; inset-inline-start: 50%');
+    expect(maskAttribute('style', '--photo-max-height: 80vh', span)).toBe('--photo-max-height: 80vh');
   });
 
   it('keeps styling hooks only while their value is a plain word', () => {

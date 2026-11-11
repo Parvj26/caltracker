@@ -73,6 +73,7 @@ function page(): string {
       <Chip phSafe>Past client</Chip>
       <Chip>{CANARY}</Chip>
       <Tile phSafe tone="lime" label="Workouts this week" value={`${CANARY} 7`} />
+      <span className="fill" style={{ width: '73%' }} />
       <time dateTime="2026-03-04T10:00:00Z">4 Mar</time>
       <div data-date="2026-03-05" data-client-id="0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f" data-testid="food-day-2026-11-10">
         day
@@ -132,7 +133,7 @@ describe('masking canary (session recordings)', () => {
 
   it('records no dates, record ids, test ids, numbers or chart data', () => {
     const json = recordFullSnapshot();
-    for (const leak of ['2026-03-04', '2026-03-05', '2026-03-01', '0b8c2f9e', 'food-day', '"83"', '"97"', '83.25', '79.75', '1,83', 'circle']) {
+    for (const leak of ['2026-03-04', '2026-03-05', '2026-03-01', '0b8c2f9e', 'food-day', '"83"', '"97"', '83.25', '79.75', '1,83', 'circle', '73%']) {
       expect(json, leak).not.toContain(leak);
     }
     // An unblocked SVG keeps its shape attributes masked; the two charts are blocked whole (no circles, no points).
