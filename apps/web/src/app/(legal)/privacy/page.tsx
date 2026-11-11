@@ -27,6 +27,11 @@ export default function PrivacyPage() {
           Your name and email; workouts, sets and personal bests; meals and food targets; body scans and goals; messages, photos
           and community posts; your phone’s notification token; and how you use the app (taps and screens) to improve it.
         </p>
+        <p>
+          On the coach website, we may also record sessions (pages, clicks and scrolling) to find and fix problems. Anything
+          you type, along with names, numbers, messages and photos, is hidden in these recordings, and they’re deleted
+          after 30 days.
+        </p>
       </LegalSection>
       <LegalSection title="Who can see it">
         <p>
@@ -37,12 +42,7 @@ export default function PrivacyPage() {
       <LegalSection title="Services we use">
         <p>
           Supabase (database and file storage), Cloudflare (website), Resend (emails), Apple (notifications) and PostHog (usage
-          statistics). They only process data to run CalTracker.
-        </p>
-        <p>
-          On the coach website we also record how pages are used (clicks, scrolling, page changes) so we can find and fix
-          problems; everything typed, client details and photos are hidden in these recordings, and recordings are deleted
-          after 30 days. The client app is not recorded.
+          statistics and coach website recordings). They only process data to run CalTracker.
         </p>
       </LegalSection>
       <LegalSection title="Deleting your data">
