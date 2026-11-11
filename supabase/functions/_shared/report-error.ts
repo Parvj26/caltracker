@@ -12,6 +12,10 @@ type Deps = {
   env?: Env;
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
   waitUntil?: ((p: Promise<unknown>) => void) | undefined;
+  /** Statuses that are expected answers, not failures (e.g. send-push's 503 "not configured"). */
+  ignoreStatus?: number[];
+  /** Never attach the caller's user id (delete-account: no PostHog person may be recreated after erasure). */
+  anonymous?: boolean;
 };
 
 const DEFAULT_HOST = 'https://us.i.posthog.com';
@@ -61,7 +65,7 @@ function report(req: Request, where: string, error: unknown, hasError: boolean, 
       ...(hasError ? { error } : {}),
       code: 'server_error',
       where,
-      distinctId: userIdFromAuth(req.headers.get('authorization')),
+      distinctId: deps.anonymous ? null : userIdFromAuth(req.headers.get('authorization')),
       sessionId: req.headers.get('x-posthog-session-id'),
     });
     const fetchImpl = deps.fetch ?? ((url, init) => fetch(url, init));
@@ -76,7 +80,7 @@ function report(req: Request, where: string, error: unknown, hasError: boolean, 
 
 /**
  * Wraps a `Deno.serve` handler. A thrown error is reported and answered with the same plain 500 Deno.serve gives
- * today; a response with status >= 500 is reported and returned unchanged.
+ * today; a response with status >= 500 (outside `ignoreStatus`) is reported and returned unchanged.
  */
 export function withErrorReporting(
   where: string,
@@ -92,7 +96,7 @@ export function withErrorReporting(
       report(req, where, error, true, deps);
       return new Response('Internal Server Error', { status: 500 });
     }
-    if (res.status >= 500) report(req, where, undefined, false, deps);
+    if (res.status >= 500 && !deps.ignoreStatus?.includes(res.status)) report(req, where, undefined, false, deps);
     return res;
   };
 }

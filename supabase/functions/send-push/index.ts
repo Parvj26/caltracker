@@ -294,6 +294,7 @@ if (import.meta.main) {
         cronSecret: env.get('SEND_PUSH_SECRET') ?? '',
         apns: apnsConfigFromEnv((k) => env.get(k)),
       }),
+      { ignoreStatus: [503] },
     ),
   );
 }

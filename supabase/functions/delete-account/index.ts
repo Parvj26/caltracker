@@ -149,6 +149,7 @@ if (import.meta.main) {
         mailer: createMailer(env),
         posthog: createPosthogEraser(env),
       }),
+      { anonymous: true },
     ),
   );
 }

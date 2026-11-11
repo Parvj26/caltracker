@@ -125,3 +125,41 @@ Deno.test('withErrorReporting: without waitUntil the send still runs in the back
   await new Promise((r) => setTimeout(r, 0));
   assertEquals(calls.length, 1);
 });
+
+Deno.test('withErrorReporting: ignoreStatus skips an expected status but still reports other 5xx and throws', async () => {
+  const { calls, deps, settle } = harness({ key: 'phc_x' });
+  const opts = { ...deps, ignoreStatus: [503] };
+  const notConfigured = await withErrorReporting(
+    'fn:send-push',
+    () => Promise.resolve(Response.json({ error: 'APNs is not configured' }, { status: 503 })),
+    opts,
+  )(request());
+  assertEquals(notConfigured.status, 503);
+  await settle();
+  assertEquals(calls.length, 0);
+
+  await withErrorReporting('fn:send-push', () => Promise.resolve(new Response('x', { status: 500 })), opts)(request());
+  await withErrorReporting('fn:send-push', () => Promise.reject(new Error('x')), opts)(request());
+  await settle();
+  assertEquals(calls.length, 2);
+});
+
+Deno.test('withErrorReporting: anonymous never sends the user id and skips the person profile', async () => {
+  const { calls, deps, settle } = harness({ key: 'phc_x' });
+  const auth = { Authorization: `Bearer ${jwt({ sub: USER })}` };
+  await withErrorReporting('fn:delete-account', () => Promise.reject(new Error('x')), { ...deps, anonymous: true })(
+    request(auth),
+  );
+  await withErrorReporting(
+    'fn:delete-account',
+    () => Promise.resolve(new Response('x', { status: 500 })),
+    { ...deps, anonymous: true },
+  )(request(auth));
+  await settle();
+  assertEquals(calls.length, 2);
+  for (const call of calls) {
+    assertEquals(call.body.distinct_id, 'server');
+    assertEquals((call.body.properties as Record<string, unknown>).$process_person_profile, false);
+  }
+  assert(!JSON.stringify(calls).includes(USER));
+});
