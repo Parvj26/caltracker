@@ -7,7 +7,11 @@ import { cx } from '@/components/ui/cx';
 import { NAV_ICONS, type NavIconName } from './nav-icons';
 import styles from './coach.module.css';
 
-/** A sidebar item (an icon, or `leading` such as the coach's photo, with an optional unread badge). It is the current page when the path is its href or below it (e.g. /exercises/123). */
+/**
+ * A sidebar item (an icon, or `leading` such as the coach's photo, with an optional unread badge). It is the current
+ * page when the path is its href or below it (e.g. /exercises/123). `label` must be fixed menu copy: it is shown in
+ * session recordings (the badge count is not).
+ */
 export function NavLink({
   href,
   label,
@@ -33,7 +37,9 @@ export function NavLink({
       className={cx(styles.navItem, current && styles.navItemCurrent)}
     >
       {leading ?? (icon ? NAV_ICONS[icon] : null)}
-      <span className={styles.navLabel}>{label}</span>
+      <span className={styles.navLabel} data-ph-safe="">
+        {label}
+      </span>
       {badge > 0 ? (
         <span className={styles.navBadge} data-nav-badge="" aria-hidden="true">
           {badge > 99 ? '99+' : badge}

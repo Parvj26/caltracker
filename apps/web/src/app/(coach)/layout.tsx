@@ -6,6 +6,7 @@ import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
+import { SessionReplayGate } from '@/lib/analytics/session-replay-gate';
 import { CoachSidebar } from './coach-sidebar';
 import { HelpNavLink } from './help-nav-link';
 import { NAV_ICONS } from './nav-icons';
@@ -40,13 +41,15 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   const person = { id: coach.userId, name: fullName, email: coach.email, workspaceId: coach.workspaceId, workspaceName: coach.workspaceName };
   return (
     <AnalyticsProvider person={person}>
+    {/* Coach pages only: recordings start here when NEXT_PUBLIC_SESSION_REPLAY=on and the PostHog flag allows. */}
+    <SessionReplayGate />
     <div className={styles.shell}>
       {/* useSearchParams needs a Suspense boundary; the bar renders nothing until a link is tapped. */}
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
       {/* First thing a keyboard user reaches: jumps past the menu to the page itself. */}
-      <a href="#main-content" className={styles.skipLink}>
+      <a href="#main-content" className={styles.skipLink} data-ph-safe="">
         Skip to content
       </a>
       <CoachSidebar userId={coach.userId} workspaceId={coach.workspaceId} initialUnread={unread}>
@@ -67,7 +70,9 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           <form action="/auth/sign-out" method="post">
             <button type="submit" data-ph-capture-attribute-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
               {NAV_ICONS.signOut}
-              <span className={styles.navLabel}>Sign out</span>
+              <span className={styles.navLabel} data-ph-safe="">
+                Sign out
+              </span>
             </button>
           </form>
           <LegalLinks className={styles.legal} />

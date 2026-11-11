@@ -25,7 +25,8 @@ export function CoachAvatar({
     return <StableImg src={url} className={cx(styles.avatar, sizeClass)} />;
   }
   return (
-    <span aria-hidden="true" className={cx(styles.avatar, sizeClass, styles[avatarTone(seed)])}>
+    // data-ph-block: a grey box in session recordings (the initials are part of a name).
+    <span aria-hidden="true" data-ph-block="" className={cx(styles.avatar, sizeClass, styles[avatarTone(seed)])}>
       {initials(name)}
     </span>
   );

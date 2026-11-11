@@ -64,7 +64,8 @@ export function LineChart({ title, points, axisFormat }: { title: string; points
       </p>
       {/* Heard by screen readers only when the keyboard moves between points. */}
       <p id={readId} className={styles.srOnly} aria-live="polite">{focused === null ? '' : `${shown.label}, ${shown.text}`}</p>
-      <div className={styles.plot}>
+      {/* data-ph-block: a grey box in session recordings (the line is the client's own numbers). */}
+      <div className={styles.plot} data-ph-block="">
         <div className={styles.yLabels} aria-hidden="true">
           <span>{axisFormat(hi)}</span>
           <span>{axisFormat(lo)}</span>

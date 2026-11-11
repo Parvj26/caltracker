@@ -1,10 +1,12 @@
 /**
  * Creates or updates the PO's PostHog dashboards (spec: usage analytics, "PostHog setup"). Safe to re-run:
- * dashboards and insights are found by name and updated in place.
+ * dashboards, insights and saved replay filters are found by name and updated in place.
  *
  * Needs POSTHOG_PERSONAL_API_KEY (operator's personal key; locally from the Keychain item
  * caltracker-posthog-personal-key) and POSTHOG_PROJECT_ID. Run: pnpm posthog:dashboards
  */
+
+import { upsertReplayFilters } from './posthog-replay-filters';
 
 const HOST = process.env.POSTHOG_API_HOST ?? 'https://us.posthog.com';
 
@@ -227,6 +229,10 @@ async function main(): Promise<void> {
       else await api('POST', '/insights/', body);
     }
     console.log(`${found ? 'Updated' : 'Created'} ${d.name} (${d.insights.length} charts): ${HOST}/project/${project}/dashboard/${dashboard.id}`);
+  }
+
+  for (const r of await upsertReplayFilters(api)) {
+    console.log(`${r.created ? 'Created' : 'Updated'} replay filter ${r.name}: ${HOST}/project/${project}/replay/playlists/${r.shortId}`);
   }
 }
 
