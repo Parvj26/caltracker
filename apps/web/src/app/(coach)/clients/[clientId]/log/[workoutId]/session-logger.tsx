@@ -756,7 +756,7 @@ export function SessionLogger({
           <Button variant="finish" className={styles.footerButton} onClick={() => void finish()} pending={finishing}>
             {finishing ? 'Finishing…' : 'Finish session'}
           </Button>
-          <Button variant="secondary" className={styles.footerButton} onClick={() => void handBack()} pending={handingBack}>
+          <Button variant="secondary" className={cx(styles.footerButton, styles.ledgeButton)} onClick={() => void handBack()} pending={handingBack}>
             Hand back to {client.firstName || 'client'}
           </Button>
           <Button variant="secondary" className={cx(styles.footerButton, styles.quietButton)} onClick={() => void cancel()}>
