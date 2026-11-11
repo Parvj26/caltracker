@@ -1,7 +1,6 @@
 import { buildServerErrorEvent, type ServerErrorEvent } from '@caltracker/shared';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase/server';
 
 /**
  * Server-side error reporting to PostHog (server actions, request errors). Plain `fetch` to PostHog's capture API
@@ -33,35 +32,26 @@ export async function send(event: ServerErrorEvent, opts: SendOptions = {}): Pro
   }
 }
 
-async function currentUserId(): Promise<string | null> {
+/** User id (from the auth cookie, no network call) and PostHog session id of the current request. */
+async function currentIds(): Promise<{ distinctId: string | null; sessionId: string | null }> {
   try {
-    const supabase = await createServerSupabase();
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? null;
+    const h = await headers();
+    return { distinctId: userIdFromCookieHeader(h.get('cookie')), sessionId: h.get(SESSION_HEADER) };
   } catch {
-    return null;
-  }
-}
-
-async function currentSessionId(): Promise<string | null> {
-  try {
-    return (await headers()).get(SESSION_HEADER);
-  } catch {
-    return null;
+    return { distinctId: null, sessionId: null };
   }
 }
 
 /**
- * Reports a server failure after the response is sent (`after()`), with the signed-in user's id and the browser's
- * PostHog session id when there is one. For server actions and route handlers. Never throws.
+ * Reports a server failure after the response is sent (`after()`), with the signed-in user's id (decoded from the
+ * auth cookie: no Supabase Auth call) and the browser's PostHog session id when there is one. For server actions and route handlers. Never throws.
  */
 export function reportServerError(input: { error?: unknown; code: string; where: string }): void {
   try {
     if (!process.env.POSTHOG_SERVER_KEY) return;
     after(async () => {
       try {
-        const [distinctId, sessionId] = await Promise.all([currentUserId(), currentSessionId()]);
-        await send(buildServerErrorEvent({ ...input, distinctId, sessionId }));
+        await send(buildServerErrorEvent({ ...input, ...(await currentIds()) }));
       } catch {
         // Best effort.
       }
@@ -122,15 +112,29 @@ export function scrubRoutePath(routePath: string): string {
     .split('/')
     .filter((segment) => segment !== '' && !/^\(.*\)$/.test(segment) && !segment.startsWith('@'))
     .join('/')
-    .replace(/\/?page$/, '')
+    .replace(/(^|\/)page$/, '')
     .replace(/[^A-Za-z0-9_./[\]-]/g, '_')
     .slice(0, 80);
   return cleaned === '' ? '/' : cleaned;
 }
 
+type RequestContext = { get?: () => { waitUntil?: (p: Promise<unknown>) => void } | undefined };
+
+/** The host's `waitUntil` for this request, through Next's portable request-context symbol (OpenNext and Vercel). */
+function requestWaitUntil(): ((p: Promise<unknown>) => void) | undefined {
+  try {
+    const ctx = (globalThis as unknown as Record<symbol, RequestContext | undefined>)[Symbol.for('@next/request-context')];
+    const waitUntil = ctx?.get?.()?.waitUntil;
+    return typeof waitUntil === 'function' ? (p) => waitUntil(p) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Next's `onRequestError` for a thrown server action error. Sends directly (awaited by Next after the error
- * response is under way), with the user id from the auth cookie and the session id header. Never throws.
+ * Next's `onRequestError` for a thrown server action error, with the user id from the auth cookie and the session
+ * id header. Next does NOT await this hook, so the send is handed to the request context's `waitUntil` (keeps the
+ * Worker alive until it finishes); without one it is awaited here. Never throws.
  */
 export async function reportRequestError(
   error: unknown,
@@ -140,7 +144,7 @@ export async function reportRequestError(
 ): Promise<void> {
   try {
     if (context.routeType !== 'action') return;
-    await send(
+    const pending = send(
       buildServerErrorEvent({
         error,
         code: 'server_error',
@@ -150,6 +154,9 @@ export async function reportRequestError(
       }),
       opts,
     );
+    const waitUntil = requestWaitUntil();
+    if (waitUntil) waitUntil(pending);
+    else await pending;
   } catch {
     // Best effort.
   }

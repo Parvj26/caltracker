@@ -4,11 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const USER = '0b6a8f7e-3c2d-4e1f-9a8b-7c6d5e4f3a2b';
 const after = vi.fn<(task: () => Promise<void>) => void>();
 const headerGet = vi.fn<(name: string) => string | null>();
-const getUser = vi.fn();
 
 vi.mock('next/server', () => ({ after: (task: () => Promise<void>) => after(task) }));
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve({ get: (name: string) => headerGet(name) }) }));
-vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => Promise.resolve({ auth: { getUser } }) }));
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabase: () => Promise.reject(new Error('reportServerError must not call Supabase Auth')),
+}));
 
 const { reportRequestError, reportServerError, scrubRoutePath, send, userIdFromCookieHeader } = await import('./server');
 
@@ -22,7 +23,6 @@ const event = buildServerErrorEvent({ code: 'assign_save_failed', where: 'action
 beforeEach(() => {
   after.mockReset();
   headerGet.mockReset();
-  getUser.mockReset();
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -75,12 +75,12 @@ describe('reportServerError', () => {
     expect(after).not.toHaveBeenCalled();
   });
 
-  it('schedules the send with after(), with user id and session header, no message', async () => {
+  it('schedules the send with after(), with the user id from the auth cookie (no network) and the session header, no message', async () => {
     vi.stubEnv('POSTHOG_SERVER_KEY', 'phc_x');
     const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}')));
     vi.stubGlobal('fetch', fetchMock);
-    getUser.mockResolvedValue({ data: { user: { id: USER, email: 'luis@example.com' } } });
-    headerGet.mockImplementation((name) => (name === 'x-posthog-session-id' ? 'sess-123' : null));
+    const cookie = `sb-abc-auth-token=base64-${b64url(JSON.stringify({ access_token: jwt(USER) }))}`;
+    headerGet.mockImplementation((name) => (name === 'x-posthog-session-id' ? 'sess-123' : name === 'cookie' ? cookie : null));
 
     reportServerError({ error: new Error('luis@example.com'), code: 'assign_save_failed', where: 'action:assign.assignProgram' });
     expect(after).toHaveBeenCalledOnce();
@@ -103,7 +103,7 @@ describe('reportServerError', () => {
     vi.unstubAllGlobals();
   });
 
-  it('never throws when after() throws or the user lookup fails', async () => {
+  it('never throws when after() throws, the cookie is junk or fetch fails', async () => {
     vi.stubEnv('POSTHOG_SERVER_KEY', 'phc_x');
     after.mockImplementationOnce(() => {
       throw new Error('outside request scope');
@@ -112,7 +112,7 @@ describe('reportServerError', () => {
 
     const fetchMock = vi.fn<typeof fetch>(() => Promise.reject(new Error('down')));
     vi.stubGlobal('fetch', fetchMock);
-    getUser.mockRejectedValue(new Error('auth down'));
+    headerGet.mockImplementation((name) => (name === 'cookie' ? 'sb-abc-auth-token=base64-!!!' : null));
     reportServerError({ code: 'x_failed', where: 'action:a' });
     await expect(after.mock.calls.at(-1)![0]()).resolves.toBeUndefined();
     expect(sentBody(fetchMock).distinct_id).toBe('server');
@@ -147,6 +147,12 @@ describe('scrubRoutePath', () => {
     expect(scrubRoutePath('/(coach)/page')).toBe('/');
     expect(scrubRoutePath('/(coach)/@modal/x/page')).toBe('x');
     expect(scrubRoutePath('/a b/page?q=luis')).toBe('a_b');
+  });
+
+  it('strips only a whole trailing page segment', () => {
+    expect(scrubRoutePath('/x/homepage/page')).toBe('x/homepage');
+    expect(scrubRoutePath('/x/homepage')).toBe('x/homepage');
+    expect(scrubRoutePath('/page/settings/page')).toBe('page/settings');
   });
 });
 
@@ -185,5 +191,52 @@ describe('reportRequestError (onRequestError)', () => {
       reportRequestError(new Error('x'), request({}), { routeType: 'action', routePath: '/page' }, { key: 'phc_x', fetchImpl }),
     ).resolves.toBeUndefined();
     expect(sentBody(fetchImpl).distinct_id).toBe('server');
+  });
+
+  describe('request context waitUntil', () => {
+    const KEY = Symbol.for('@next/request-context');
+    const g = globalThis as unknown as Record<symbol, unknown>;
+    afterEach(() => {
+      delete g[KEY];
+    });
+
+    it('hands the send to the request context waitUntil when there is one', async () => {
+      let release!: () => void;
+      const fetchImpl = vi.fn<typeof fetch>(
+        () => new Promise<Response>((resolve) => (release = () => resolve(new Response('{}')))),
+      );
+      const waitUntil = vi.fn<(p: Promise<unknown>) => void>();
+      g[KEY] = { get: () => ({ waitUntil }) };
+      await reportRequestError(new Error('x'), request({}), { routeType: 'action', routePath: '/a/page' }, { key: 'phc_x', fetchImpl });
+      expect(waitUntil).toHaveBeenCalledOnce();
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      release();
+      await expect(waitUntil.mock.calls[0]![0]).resolves.toBeUndefined();
+    });
+
+    it('awaits the send itself when there is no request context', async () => {
+      g[KEY] = { get: () => undefined };
+      let done = false;
+      const fetchImpl = vi.fn<typeof fetch>(async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        done = true;
+        return new Response('{}');
+      });
+      await reportRequestError(new Error('x'), request({}), { routeType: 'action', routePath: '/a/page' }, { key: 'phc_x', fetchImpl });
+      expect(done).toBe(true);
+    });
+
+    it('never throws when the request context getter throws', async () => {
+      g[KEY] = {
+        get: () => {
+          throw new Error('boom');
+        },
+      };
+      const fetchImpl = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}')));
+      await expect(
+        reportRequestError(new Error('x'), request({}), { routeType: 'action', routePath: '/a/page' }, { key: 'phc_x', fetchImpl }),
+      ).resolves.toBeUndefined();
+      expect(fetchImpl).toHaveBeenCalledOnce();
+    });
   });
 });
