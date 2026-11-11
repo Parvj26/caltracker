@@ -106,6 +106,60 @@ export type Database = {
         }
         Relationships: []
       }
+      award_bonus_queue: {
+        Row: {
+          client_id: string
+          created_at: string
+          earned_at: string
+          earned_log_id: string
+          id: string
+          kind: string
+          seq: number
+          sticker_key: string | null
+          value: number | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          earned_at: string
+          earned_log_id: string
+          id?: string
+          kind: string
+          seq?: never
+          sticker_key?: string | null
+          value?: number | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          earned_at?: string
+          earned_log_id?: string
+          id?: string
+          kind?: string
+          seq?: never
+          sticker_key?: string | null
+          value?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "award_bonus_queue_earned_log_id_fkey"
+            columns: ["earned_log_id"]
+            isOneToOne: false
+            referencedRelation: "workout_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "award_bonus_queue_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       award_catchup_attempts: {
         Row: {
           attempts: number
@@ -2997,6 +3051,10 @@ export type Database = {
         Returns: string
       }
       auto_finish_stale_logs: { Args: never; Returns: number }
+      award_bonus_queue_version: {
+        Args: { p_client_id: string; p_workspace_id: string }
+        Returns: string
+      }
       award_catchup: { Args: never; Returns: number }
       award_history_version: {
         Args: { p_client_id: string; p_workspace_id: string }

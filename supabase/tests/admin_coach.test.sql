@@ -18,7 +18,7 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
-    'awards', 'body_measurements', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
+    'award_bonus_queue', 'awards', 'body_measurements', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
     'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
@@ -241,6 +241,8 @@ insert into public.workout_log_comments (log_id, workspace_id, client_id, author
 values (:'vic_log', :'ws', :'vic', :'coach', 'Great work');
 insert into public.awards (log_id, client_id, workspace_id, result) values (:'vic_log', :'vic', :'ws', '{}');
 insert into public.sticker_awards (client_id, workspace_id, sticker_key, first_log_id) values (:'vic', :'ws', 'cat', :'vic_log');
+insert into public.award_bonus_queue (client_id, workspace_id, earned_log_id, kind, sticker_key, earned_at)
+values (:'vic', :'ws', :'vic_log', 'landmark', 'petra', now());
 insert into public.client_stats (client_id, workspace_id, workouts) values (:'vic', :'ws', 1);
 insert into public.personal_records (client_id, workspace_id, exercise_id, kind, value_kg, achieved_at, log_id)
 values (:'vic', :'ws', :'coach_ex', 'heaviest', 60, now(), :'vic_log');
