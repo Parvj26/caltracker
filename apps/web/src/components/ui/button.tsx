@@ -9,12 +9,15 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   /** While true the button is disabled and announced as busy. */
   pending?: boolean;
+  /** Its text is fixed product copy (never a name, number or anything typed): shown in session recordings. */
+  phSafe?: boolean;
 };
 
-export function Button({ variant = 'primary', pending = false, disabled, className, type = 'button', ...rest }: ButtonProps) {
+export function Button({ variant = 'primary', pending = false, phSafe = false, disabled, className, type = 'button', ...rest }: ButtonProps) {
   return (
     <button
       {...rest}
+      data-ph-safe={phSafe ? '' : undefined}
       type={type}
       disabled={disabled || pending}
       aria-busy={pending || undefined}
@@ -23,9 +26,13 @@ export function Button({ variant = 'primary', pending = false, disabled, classNa
   );
 }
 
-export type ButtonLinkProps = ComponentProps<typeof Link> & { variant?: ButtonVariant };
+export type ButtonLinkProps = ComponentProps<typeof Link> & {
+  variant?: ButtonVariant;
+  /** Its text is fixed product copy (never a name, number or anything typed): shown in session recordings. */
+  phSafe?: boolean;
+};
 
 /** A link that looks like a Button (use for navigation and external links). Callers add rel/target for external URLs. */
-export function ButtonLink({ variant = 'primary', className, ...rest }: ButtonLinkProps) {
-  return <Link {...rest} className={cx(styles.button, styles[variant], className)} />;
+export function ButtonLink({ variant = 'primary', phSafe = false, className, ...rest }: ButtonLinkProps) {
+  return <Link {...rest} data-ph-safe={phSafe ? '' : undefined} className={cx(styles.button, styles[variant], className)} />;
 }

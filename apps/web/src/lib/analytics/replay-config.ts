@@ -33,14 +33,24 @@ const TEXT_ATTRIBUTES = new Set([
   'aria-placeholder',
 ]);
 
+/** Where a photo's address lives. Photos themselves are blocked, but their (signed) links must not leak either. */
+const IMAGE_SOURCES = new Set(['src', 'srcset', 'imagesrcset', 'poster']);
+
 /**
  * rrweb calls this for every attribute it records. Text masking does not reach attributes, and an `aria-label` or
- * `title` can say "Remove Luis", so these are masked like text (unless inside `data-ph-safe`). Email and phone links
- * are always masked. Layout attributes (class, style, ids, page links) stay so the recording still looks right.
+ * `title` can say "Remove Luis", so these are masked like text (unless inside `data-ph-safe`). Photo addresses
+ * (including the `<link rel="preload" as="image">` React adds for each photo) and email/phone links are always
+ * masked; other links lose their query, tokens and ids. Layout attributes (class, style) stay so the recording
+ * still looks right.
  */
 export function maskAttribute(name: string, value: string, el?: Element | null): string {
   const key = name.toLowerCase();
-  if (key === 'href' && /^\s*(mailto|tel|sms):/i.test(value)) return stars(value);
+  if (IMAGE_SOURCES.has(key)) return stars(value);
+  if (key === 'href') {
+    if (/^\s*(mailto|tel|sms):/i.test(value)) return stars(value);
+    if (el?.tagName === 'LINK' && el.getAttribute('as') === 'image') return stars(value);
+    return scrubUrl(value);
+  }
   if (!TEXT_ATTRIBUTES.has(key)) return value;
   return el?.closest(SAFE) ? value : stars(value);
 }

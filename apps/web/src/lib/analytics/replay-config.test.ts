@@ -67,6 +67,21 @@ describe('maskAttribute', () => {
     expect(maskAttribute('href', 'tel:+3460000000', a)).not.toContain('346');
   });
 
+  it('hides image links (React preloads photos with <link rel="preload" as="image">) and photo sources', () => {
+    const link = el('<link rel="preload" as="image" href="https://x/storage/luis.jpg?token=abc">', 'link');
+    expect(maskAttribute('href', 'https://x/storage/luis.jpg?token=abc', link)).not.toMatch(/luis|abc/);
+    const img = el('<img src="https://x/luis.jpg">', 'img');
+    expect(maskAttribute('src', 'https://x/luis.jpg', img)).not.toContain('luis');
+    expect(maskAttribute('srcset', 'https://x/luis.jpg 2x', img)).not.toContain('luis');
+    expect(maskAttribute('imagesrcset', 'https://x/luis.jpg 2x', link)).not.toContain('luis');
+  });
+
+  it('drops tokens and ids from other links', () => {
+    const a = el('<a href="/x">x</a>', 'a');
+    expect(maskAttribute('href', '/invite/secret-token?x=1', a)).toBe('/invite/[token]');
+    expect(maskAttribute('href', '/clients/0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/training', a)).toBe('/clients/[id]/training');
+  });
+
   it('keeps layout attributes and page links', () => {
     const div = el('<div class="card">x</div>', 'div');
     expect(maskAttribute('class', 'card', div)).toBe('card');

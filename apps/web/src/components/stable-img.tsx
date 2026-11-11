@@ -23,6 +23,6 @@ export function StableImg({ src, className }: { src: string; className?: string 
   return (
     // A plain <img>: the signed link is already the right size (256 px) and expires, so next/image can't cache it.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={current} alt="" className={className} onError={retry} />
+    <img src={current} alt="" className={className} onError={retry} data-ph-block="" />
   );
 }

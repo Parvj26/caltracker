@@ -49,7 +49,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         <NavProgress />
       </Suspense>
       {/* First thing a keyboard user reaches: jumps past the menu to the page itself. */}
-      <a href="#main-content" className={styles.skipLink}>
+      <a href="#main-content" className={styles.skipLink} data-ph-safe="">
         Skip to content
       </a>
       <CoachSidebar userId={coach.userId} workspaceId={coach.workspaceId} initialUnread={unread}>
@@ -70,7 +70,9 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           <form action="/auth/sign-out" method="post">
             <button type="submit" data-ph-capture-attribute-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
               {NAV_ICONS.signOut}
-              <span className={styles.navLabel}>Sign out</span>
+              <span className={styles.navLabel} data-ph-safe="">
+                Sign out
+              </span>
             </button>
           </form>
           <LegalLinks className={styles.legal} />
