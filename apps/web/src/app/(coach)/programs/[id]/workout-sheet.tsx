@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
-import { emptyWorkout, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { emptyWorkout, type ExercisePrefs, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
 import { saveWorkout, type SaveWorkoutOutcome } from '../../workouts/actions';
 import { saveSlotCopy, type SlotWorkout } from '../actions';
-import { cellLabel } from './grid-ids';
+import { cellLabel, copyDaySuffix } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -48,6 +48,7 @@ export function WorkoutSheet({
   target,
   units,
   workspaceId,
+  exercisePrefs,
   onSaved,
   onClose,
 }: {
@@ -55,6 +56,7 @@ export function WorkoutSheet({
   target: SheetTarget;
   units: Units;
   workspaceId: string;
+  exercisePrefs: Record<string, ExercisePrefs>;
   onSaved: (saved: SheetSaved) => void;
   onClose: () => void;
 }) {
@@ -149,6 +151,7 @@ export function WorkoutSheet({
           workspaceId={workspaceId}
           mode="library"
           isNew={target.kind === 'new'}
+          initialPrefs={exercisePrefs}
           saveLabel={target.kind === 'new' ? 'Save and add to day' : 'Save'}
           saveWith={saveWith}
           onDirtyChange={setDirty}
@@ -170,7 +173,7 @@ export function WorkoutSheet({
           <button type="button" className={`${styles.bigChoice} ${styles.bigChoiceAlt}`} onClick={() => answer('copy')}>
             <span className={styles.bigChoiceTitle}>Just {where}</span>
             <span className={styles.bigChoiceSub}>
-              Saves a copy called “{original} (Week {week})” on this day only. Everything else stays the same.
+              Saves a copy called “{original}{copyDaySuffix(week, day)}” on this day only. Everything else stays the same.
             </span>
           </button>
           <div className={styles.dialogActions}>

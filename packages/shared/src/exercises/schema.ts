@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TRACKING_TYPES } from './tracking';
+import { LIBRARY_TRACKING_TYPES } from './tracking';
 import { canonicalYoutubeUrl, parseYoutubeUrl } from './youtube';
 
 export const YOUTUBE_URL_ERROR = 'Paste a YouTube link (youtube.com or youtu.be).';
@@ -23,9 +23,7 @@ const textList = z.array(z.string().trim().min(1).max(500)).max(100).default([])
 
 export const CustomExerciseInput = z.object({
   name: z.string().trim().min(1, 'Enter a name.').max(100, 'Keep the name under 100 characters.'),
-  trackingType: z.enum(TRACKING_TYPES as [string, ...string[]]) as z.ZodType<
-    (typeof TRACKING_TYPES)[number]
-  >,
+  trackingType: z.enum(LIBRARY_TRACKING_TYPES),
   primaryMuscles: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
   equipment: z
     .string()

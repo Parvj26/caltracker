@@ -89,9 +89,9 @@ type Props = {
 };
 
 /** One labelled box in a set row: a small caption above it, as in the approved mockup. */
-function Field({ caption, children }: { caption: string; children: ReactNode }) {
+function Field({ caption, col, children }: { caption: string; col: string; children: ReactNode }) {
   return (
-    <div className={styles.field}>
+    <div className={styles.field} data-col={col}>
       <span className={styles.fieldCaption} aria-hidden="true">
         {caption}
       </span>
@@ -101,7 +101,7 @@ function Field({ caption, children }: { caption: string; children: ReactNode }) 
 }
 
 /**
- * One set: its number, its type letter (W / N / F / D, see SetTypeMenu), one rep count (or weight, time or distance,
+ * One set (see SetTable for the two layouts): its number, its type letter (W / N / F / D, see SetTypeMenu), one rep count (or weight, time or distance,
  * as the exercise's tracking type needs) and rest. A drop is indented under the set above and has no rest of its own.
  * The × in the corner removes it.
  */
@@ -117,7 +117,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         <span className={styles.setLabel} aria-hidden="true">
           {number}
         </span>
-        <div className={styles.field}>
+        <div className={styles.field} data-col="type">
           <span className={styles.fieldCaption} aria-hidden="true">
             Type
           </span>
@@ -125,7 +125,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         </div>
 
         {fields.includes('reps') ? (
-          <Field caption="Reps">
+          <Field caption="Reps" col="reps">
             <NumberInput
               label="Reps"
               inputMode="numeric"
@@ -140,7 +140,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         ) : null}
 
         {fields.includes('weight') ? (
-          <Field caption="Weight">
+          <Field caption="Weight" col="weight">
             <NumberInput
               label={`Weight (${units})`}
               inputMode="decimal"
@@ -156,7 +156,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         ) : null}
 
         {fields.includes('duration') ? (
-          <Field caption="Time">
+          <Field caption="Time" col="duration">
             <NumberInput
               label="Duration (m:ss)"
               inputMode="numeric"
@@ -171,7 +171,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         ) : null}
 
         {fields.includes('distance') ? (
-          <Field caption="Distance">
+          <Field caption="Distance" col="distance">
             <NumberInput
               label={`Distance (${distanceUnit})`}
               inputMode="decimal"
@@ -189,7 +189,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         {/* A drop goes straight on from the set above, so it has no rest; nor does a superset exercise that runs
             straight into the next one. */}
         {showRest && !isDrop ? (
-          <Field caption="Rest">
+          <Field caption="Rest" col="rest">
             <NumberInput
               label="Rest (m:ss)"
               inputMode="numeric"

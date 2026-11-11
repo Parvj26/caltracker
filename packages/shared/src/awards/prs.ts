@@ -1,3 +1,4 @@
+import { countsWeightTimesReps } from '../workouts/targets';
 import { liveExercises } from '../logs/flow';
 import type { WorkoutLogDoc } from '../logs/schema';
 
@@ -27,7 +28,7 @@ export function liftsByExercise(log: WorkoutLogDoc): Map<string, Lift[]> {
   const out = new Map<string, Lift[]>();
   for (const b of log.blocks) {
     for (const { exercise: e } of liveExercises(b)) {
-      if (e.trackingType !== 'weight_reps') continue;
+      if (!countsWeightTimesReps(e.trackingType)) continue;
       for (const s of e.sets) {
         if (s.setType === 'warmup' || s.completedAt === null) continue;
         const weightKg = s.actualWeightKg ?? 0;

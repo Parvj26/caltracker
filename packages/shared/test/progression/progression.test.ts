@@ -217,8 +217,15 @@ describe('nextSuggestion: when there is nothing to suggest', () => {
     expect(nextSuggestion(good, p, 'upper', 'kg')?.change).toBe('up');
   });
 
+  it('suggests for weight, reps and time the same as for weight and reps', () => {
+    expect(nextSuggestion(good, { ...plan(), trackingType: 'weight_reps_time' }, 'upper', 'kg')).toEqual(
+      nextSuggestion(good, plan(), 'upper', 'kg'),
+    );
+    expect(nextSuggestion(good, plan(), 'upper', 'kg')).not.toBeNull();
+  });
+
   it('skips exercises not tracked by weight and reps', () => {
-    for (const trackingType of ['reps', 'time', 'distance'] as const) {
+    for (const trackingType of ['reps', 'time', 'distance', 'weight', 'reps_time', 'weight_time'] as const) {
       expect(nextSuggestion(good, { ...plan(), trackingType }, 'upper', 'kg')).toBeNull();
     }
   });

@@ -21,8 +21,8 @@ select is(
     'awards', 'body_measurements', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
-    'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercises',
-    'live_sync_tombstones', 'log_blocks', 'log_exercises', 'log_sets', 'meals', 'messages', 'nutrition_targets',
+    'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
+    'exercises', 'live_sync_tombstones', 'log_blocks', 'log_exercises', 'log_sets', 'meals', 'messages', 'nutrition_targets',
     'past_clients', 'personal_records', 'program_assignments', 'program_workouts', 'programs', 'push_outbox',
     'sticker_awards', 'workout_blocks', 'workout_exercises', 'workout_log_comments', 'workout_logs', 'workout_sets',
     'workout_substitutes', 'workouts', 'workspace_members'
@@ -225,6 +225,7 @@ select tests.create_workout(:'ws', 'AC Library day', null, null, :'coach_ex') as
 insert into public.program_workouts (program_id, week, day, position, workout_id) values (:'prog', 1, 1, 0, :'lib_workout');
 insert into public.exercise_favorites (coach_id, exercise_id) values (:'olga', :'coach_ex');
 insert into public.exercise_overrides (workspace_id, exercise_id, coach_notes) values (:'ws', :'global_ex', 'Knees out');
+insert into public.exercise_prefs (workspace_id, exercise_id, tracking_type, each_side) values (:'ws', :'global_ex', 'weight', true);
 insert into public.coach_meals (workspace_id, name, calories, created_by)
 values (:'ws', 'AC Oats', 400, :'coach') returning id as coach_meal \gset
 insert into public.custom_metrics (workspace_id, name, min, max) values (:'ws', 'Waist', 15, 80);

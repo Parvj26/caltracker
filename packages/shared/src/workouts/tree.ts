@@ -4,6 +4,8 @@ import { MAX_SUBSTITUTES, SET_TYPES, WorkoutSetDoc, WorkoutSubstituteDoc, substi
 import type { BlockKind, SetType, WorkoutDoc } from './schema';
 import { sectionsFromBlocks } from './sections';
 import { fitSetTargets } from './targets';
+import { effectiveTrackingType } from './measurements';
+import { validTempo } from './tempo';
 
 /**
  * PostgREST nested select for one workout with its blocks, exercises (and their names) and sets.
@@ -12,7 +14,7 @@ import { fitSetTargets } from './targets';
 export const WORKOUT_TREE_SELECT =
   'id, name, notes, client_id, scheduled_on, ' +
   'workout_blocks(id, position, kind, section_id, section_name, ' +
-  'workout_exercises(id, position, exercise_id, note, exercises(name, tracking_type), ' +
+  'workout_exercises(id, position, exercise_id, note, tracking_type, each_side, tempo, exercises(name, tracking_type), ' +
   'workout_substitutes(id, position, exercise_id, note, sets, exercises(name, tracking_type)), ' +
   'workout_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
   'target_distance_m, to_failure, rest_seconds, note)))';
@@ -61,6 +63,10 @@ export type WorkoutTreeRow = {
       position: number;
       exercise_id: string;
       note: string | null;
+      /** The coach's measurements for this workout (null: the library kind). Missing on rows selected before them. */
+      tracking_type?: TrackingType | null;
+      each_side?: boolean;
+      tempo?: string | null;
       exercises: { name: string; tracking_type: TrackingType } | null;
       workout_sets: WorkoutTreeSetRow[];
       /** Missing on rows selected before substitutes existed. */
@@ -75,7 +81,8 @@ const byPosition = <T extends { position: number }>(xs: readonly T[]): T[] =>
 const num = (v: Numeric): number | null => (v === null ? null : Number(v));
 
 /**
- * The tracking type is read live from the exercise, but the sets were written for whatever type it had then.
+ * The tracking type is the workout exercise's own (the coach's measurements) or else read live from the exercise,
+ * but the sets were written for whatever type it had then.
  * Drop targets the current type doesn't use, so the doc stays valid and the coach can still open and save the
  * workout after changing an exercise's type. A type this build doesn't know reads as the fallback (toTrackingType).
  */
@@ -139,13 +146,15 @@ export function workoutRowToDoc(row: WorkoutTreeRow): WorkoutDoc {
       sectionId: b.section_id,
       kind: b.kind,
       exercises: byPosition(b.workout_exercises).map((e) => {
-        const trackingType = toTrackingType(e.exercises?.tracking_type ?? 'weight_reps');
+        const trackingType = effectiveTrackingType(e.tracking_type, e.exercises?.tracking_type);
         return {
           id: e.id,
           exerciseId: e.exercise_id,
           exerciseName: e.exercises?.name ?? '',
           trackingType,
           note: e.note,
+          eachSide: e.each_side === true,
+          tempo: validTempo(e.tempo),
           sets: byPosition(e.workout_sets).map((s) =>
             fitSet(trackingType, {
               id: s.id,

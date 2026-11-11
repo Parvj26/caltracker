@@ -7,6 +7,7 @@ import { loadWorkoutDoc } from '@/lib/workouts';
 import type { SaveWorkoutOutcome } from '../workouts/actions';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { copyDaySuffix } from './[id]/grid-ids';
 import { loadLiveSync, type LiveSyncState } from '@/lib/live-sync';
 
 // Every action takes the workspace from the signed-in coach (requireCoach), never from the browser, and filters by
@@ -405,7 +406,7 @@ export async function loadSlotWorkout(slotId: string): Promise<SlotWorkout | nul
 export type SaveSlotCopyOutcome = (SaveWorkoutOutcome & { ok: false }) | { ok: true; id: string; name: string };
 
 /**
- * "Just Week N, Day M": saves the edited workout as a new library workout named "<name> (Week N)" (every row gets a
+ * "Just Week N, Day M": saves the edited workout as a new library workout named "<name> (Week N, Day M)" (every row gets a
  * new id, as Duplicate does) and points only this program day at it. The original workout and every other day and
  * program stay as they were. If pointing the day at the copy fails, the copy is deleted again.
  */
@@ -426,7 +427,7 @@ export async function saveSlotCopy(input: { slotId: string; doc: unknown }): Pro
   const supabase = await createServerSupabase();
   const { data: slot, error: slotError } = await supabase
     .from('program_workouts')
-    .select('program_id, week')
+    .select('program_id, week, day')
     .eq('id', input.slotId)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
@@ -434,7 +435,7 @@ export async function saveSlotCopy(input: { slotId: string; doc: unknown }): Pro
   if (!slot) return { ok: false, error: "Couldn't find that day. It may have been removed." };
 
   const copy = duplicateWorkoutDoc(parsed.data, () => crypto.randomUUID());
-  copy.name = copyName(parsed.data.name, 100, ` (Week ${slot.week})`);
+  copy.name = copyName(parsed.data.name, 100, copyDaySuffix(slot.week, slot.day));
   const { data: id, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy });
   if (error) {
     if (error.code === '23514') return { ok: false, error: error.message };

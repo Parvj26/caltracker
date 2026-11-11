@@ -2,10 +2,7 @@ import type { ChangeEvent } from 'react';
 import {
   distanceUnitFor,
   formatClock,
-  formatDistance,
-  formatDuration,
   formatLogSetTarget,
-  formatWeight,
   fromMeters,
   isAddedExercise,
   kgToInput,
@@ -13,6 +10,8 @@ import {
   needsPick,
   sectionRuns,
   substitutedFrom,
+  formatResult,
+  targetFieldsFor,
   toTrackingType,
   type LogSetDoc,
   type TrackingType,
@@ -21,6 +20,9 @@ import {
 } from '@caltracker/shared';
 import { Chip } from '@/components/ui';
 import styles from './log.module.css';
+
+const hasField = (t: TrackingType, f: 'weight' | 'reps' | 'duration' | 'distance') =>
+  targetFieldsFor(toTrackingType(t)).includes(f);
 
 /** What a set's boxes hold while the coach corrects, as the text typed. Keys that don't apply to the exercise are absent. */
 export type SetDraft = { reps?: string; weight?: string; time?: string; distance?: string };
@@ -32,34 +34,18 @@ export function draftFor(set: LogSetDoc, trackingType: TrackingType, units: Unit
   const weight = set.actualWeightKg === null ? '' : String(kgToInput(set.actualWeightKg, units));
   const time = set.actualDurationS === null ? '' : formatClock(set.actualDurationS);
   const distance = set.actualDistanceM === null ? '' : String(fromMeters(set.actualDistanceM, distanceUnitFor(units)));
-  switch (toTrackingType(trackingType)) {
-    case 'weight_reps': return { weight, reps };
-    case 'reps': return { reps };
-    case 'time': return { time };
-    case 'distance': return { distance };
-    case 'weight_time': return { weight, time };
-  }
+  const fields = targetFieldsFor(toTrackingType(trackingType));
+  return {
+    ...(fields.includes('weight') ? { weight } : {}),
+    ...(fields.includes('reps') ? { reps } : {}),
+    ...(fields.includes('duration') ? { time } : {}),
+    ...(fields.includes('distance') ? { distance } : {}),
+  };
 }
 
-const reps = (n: number) => `${n} ${n === 1 ? 'rep' : 'reps'}`;
-
 function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
-  switch (toTrackingType(t)) {
-    case 'weight_reps':
-      if (s.actualReps !== null && s.actualWeightKg !== null) return `${formatWeight(s.actualWeightKg, units)} × ${s.actualReps}`;
-      if (s.actualReps !== null) return reps(s.actualReps);
-      return s.actualWeightKg !== null ? formatWeight(s.actualWeightKg, units) : '–';
-    case 'reps': return s.actualReps !== null ? reps(s.actualReps) : '–';
-    case 'time': return s.actualDurationS !== null ? formatDuration(s.actualDurationS) : '–';
-    case 'distance': return s.actualDistanceM !== null ? formatDistance(s.actualDistanceM, units) : '–';
-    case 'weight_time': {
-      const parts = [
-        s.actualWeightKg !== null ? formatWeight(s.actualWeightKg, units) : null,
-        s.actualDurationS !== null ? formatDuration(s.actualDurationS) : null,
-      ].filter((p) => p !== null);
-      return parts.length > 0 ? parts.join(' · ') : '–';
-    }
-  }
+  const values = { reps: s.actualReps, weightKg: s.actualWeightKg, durationS: s.actualDurationS, distanceM: s.actualDistanceM };
+  return formatResult(values, t, units) ?? '–';
 }
 
 /** Something the client typed on the phone (a workout or an exercise note), labelled so the coach knows who wrote it. */
@@ -167,10 +153,10 @@ export function PlannedVsActual({
                               <td>
                                 {edit && draft ? (
                                   <span className={styles.inputs}>
-                                    {ex.trackingType === 'weight_reps' || ex.trackingType === 'weight_time' ? field('weight', `weight (${units})`, 'decimal') : null}
-                                    {ex.trackingType === 'weight_reps' || ex.trackingType === 'reps' ? field('reps', 'reps', 'numeric') : null}
-                                    {ex.trackingType === 'time' || ex.trackingType === 'weight_time' ? field('time', 'time (m:ss)', 'text') : null}
-                                    {ex.trackingType === 'distance' ? field('distance', `distance (${distUnit})`, 'decimal') : null}
+                                    {hasField(ex.trackingType, 'weight') ? field('weight', `weight (${units})`, 'decimal') : null}
+                                    {hasField(ex.trackingType, 'reps') ? field('reps', 'reps', 'numeric') : null}
+                                    {hasField(ex.trackingType, 'duration') ? field('time', 'time (m:ss)', 'text') : null}
+                                    {hasField(ex.trackingType, 'distance') ? field('distance', `distance (${distUnit})`, 'decimal') : null}
                                   </span>
                                 ) : done ? (
                                   actualText(set, ex.trackingType, units)
