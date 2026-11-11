@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
+import { createRequire } from 'node:module';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { record } from 'posthog-js/rrweb';
 import { describe, expect, it } from 'vitest';
 import { Button, Chip, Tile } from '@/components/ui';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { LineChart as StrengthChart } from '@/components/charts/line-chart';
+import { LineChart as ProgressChart } from '@/app/(coach)/clients/[clientId]/progress/line-chart';
 import { RECORDING_CONFIG } from './replay-config';
 
 /**
@@ -13,6 +16,7 @@ import { RECORDING_CONFIG } from './replay-config';
  */
 
 const CANARY = 'Zebracanary';
+const posthogVersion = (createRequire(import.meta.url)('posthog-js/package.json') as { version: string }).version;
 
 /**
  * posthog-js 1.447.3 `LazyLoadedSessionRecording._startRecorder`: these defaults, then every key of
@@ -69,6 +73,32 @@ function page(): string {
       <Chip phSafe>Past client</Chip>
       <Chip>{CANARY}</Chip>
       <Tile phSafe tone="lime" label="Workouts this week" value={`${CANARY} 7`} />
+      <time dateTime="2026-03-04T10:00:00Z">4 Mar</time>
+      <div data-date="2026-03-05" data-client-id="0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f" data-testid="food-day-2026-11-10">
+        day
+      </div>
+      <div role="progressbar" aria-valuenow={83} aria-valuemin={0} aria-valuemax={97} />
+      <svg viewBox="0 0 10 10">
+        <polyline points="1,83.25 2,79.75" />
+      </svg>
+      <ProgressChart
+        title="Weight"
+        axisFormat={(v) => `${v} kg`}
+        points={[
+          { date: '2026-03-01', label: '1 Mar', value: 83.25, text: '83.25 kg' },
+          { date: '2026-03-08', label: '8 Mar', value: 79.75, text: '79.75 kg' },
+        ]}
+      />
+      <StrengthChart
+        title="Squat"
+        summary="Squat best set"
+        yLabel={(v) => `${v} kg`}
+        xLabel={(v) => `day ${v}`}
+        points={[
+          { x: 1, y: 83.25, label: '83.25 kg' },
+          { x: 8, y: 79.75, label: '79.75 kg' },
+        ]}
+      />
     </main>,
   );
 }
@@ -88,10 +118,25 @@ function recordFullSnapshot(): string {
 }
 
 describe('masking canary (session recordings)', () => {
+  it('runs against the posthog-js version it was written for', () => {
+    // POSTHOG_RRWEB_DEFAULTS is copied from this version's `_startRecorder`. After an upgrade, re-derive it from
+    // node_modules/posthog-js/lib/src/extensions/replay/external/lazy-loaded-session-recorder.js, then bump this.
+    expect(posthogVersion, 'posthog-js was upgraded: re-check the recording options (see comment)').toBe('1.447.3');
+  });
+
   it('records nothing of the client: names, notes, typed values, photos, labels, emails', () => {
     const json = recordFullSnapshot();
     expect(json).not.toContain(CANARY);
     expect(json.toLowerCase()).not.toContain(CANARY.toLowerCase());
+  });
+
+  it('records no dates, record ids, test ids, numbers or chart data', () => {
+    const json = recordFullSnapshot();
+    for (const leak of ['2026-03-04', '2026-03-05', '2026-03-01', '0b8c2f9e', 'food-day', '"83"', '"97"', '83.25', '79.75', '1,83', 'circle']) {
+      expect(json, leak).not.toContain(leak);
+    }
+    // An unblocked SVG keeps its shape attributes masked; the two charts are blocked whole (no circles, no points).
+    expect(json).not.toMatch(/"points":"[\d,. ]+"/);
   });
 
   it('keeps fixed copy marked data-ph-safe readable', () => {

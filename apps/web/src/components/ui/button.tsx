@@ -9,7 +9,7 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   /** While true the button is disabled and announced as busy. */
   pending?: boolean;
-  /** Its text is fixed product copy (never a name, number or anything typed): shown in session recordings. */
+  /** Its text, its labels (aria-label, title) and everything inside it are fixed product copy (never a name, number or anything typed): shown in session recordings. */
   phSafe?: boolean;
 };
 
@@ -28,7 +28,7 @@ export function Button({ variant = 'primary', pending = false, phSafe = false, d
 
 export type ButtonLinkProps = ComponentProps<typeof Link> & {
   variant?: ButtonVariant;
-  /** Its text is fixed product copy (never a name, number or anything typed): shown in session recordings. */
+  /** Its text, its labels (aria-label, title) and everything inside it are fixed product copy (never a name, number or anything typed): shown in session recordings. */
   phSafe?: boolean;
 };
 

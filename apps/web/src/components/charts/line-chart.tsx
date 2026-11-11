@@ -73,6 +73,8 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
         aria-describedby={`${id}-readout`}
         onKeyDown={onKeyDown}
         data-testid="line-chart"
+        // A grey box in session recordings: the line is the client's own numbers.
+        data-ph-block=""
       >
         <svg viewBox={`0 0 ${W} ${H}`} className={styles.svg} aria-hidden="true" focusable="false">
           <line x1={PAD.left} x2={W - PAD.right} y1={H - PAD.bottom} y2={H - PAD.bottom} className={styles.axis} />

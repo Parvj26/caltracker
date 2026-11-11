@@ -19,40 +19,66 @@ export function maskText(text: string, el?: HTMLElement | null): string {
   return el?.closest(SAFE) ? text : stars(text);
 }
 
-/** Attributes that carry words a person could read (tooltips, screen-reader labels, alt text, placeholders). */
-const TEXT_ATTRIBUTES = new Set([
-  'alt',
-  'title',
-  'placeholder',
-  'label',
-  'value',
-  'aria-label',
-  'aria-description',
-  'aria-valuetext',
-  'aria-roledescription',
-  'aria-placeholder',
-]);
-
-/** Where a photo's address lives. Photos themselves are blocked, but their (signed) links must not leak either. */
-const IMAGE_SOURCES = new Set(['src', 'srcset', 'imagesrcset', 'poster']);
+/** Readable words (tooltips, screen-reader labels, alt text): shown only inside `data-ph-safe` (fixed copy). */
+const SAFE_TEXT_ATTRIBUTES = new Set(['alt', 'title', 'placeholder', 'aria-label', 'aria-description', 'aria-roledescription']);
 
 /**
- * rrweb calls this for every attribute it records. Text masking does not reach attributes, and an `aria-label` or
- * `title` can say "Remove Luis", so these are masked like text (unless inside `data-ph-safe`). Photo addresses
- * (including the `<link rel="preload" as="image">` React adds for each photo) and email/phone links are always
- * masked; other links lose their query, tokens and ids. Layout attributes (class, style) stay so the recording
- * still looks right.
+ * Attributes that only shape how the page looks or behaves, never what a person entered: recorded as they are so
+ * the replay renders. Everything not listed here is masked (deny by default), so a new attribute is hidden until
+ * someone decides it is safe. SVG geometry is kept for icons; charts are blocked whole (`data-ph-block`), so their
+ * data-driven geometry is never recorded. `points` is not kept.
+ */
+const LAYOUT_ATTRIBUTES = new Set([
+  // styling and structure
+  'class', 'style', '_csstext', 'role', 'type', 'tabindex', 'rel', 'as', 'media', 'dir', 'lang', 'hidden', 'inert',
+  'disabled', 'checked', 'selected', 'readonly', 'required', 'multiple', 'open', 'draggable', 'contenteditable',
+  'width', 'height',
+  // SVG icons and the logo
+  'xmlns', 'viewbox', 'focusable', 'fill', 'fill-rule', 'clip-rule', 'stroke', 'stroke-width', 'stroke-linecap',
+  'stroke-linejoin', 'preserveaspectratio', 'd', 'r', 'rx', 'ry', 'cx', 'cy', 'x', 'y', 'x1', 'x2', 'y1', 'y2',
+  'transform', 'text-anchor', 'dominant-baseline',
+  // widget state (true/false/page, never content)
+  'aria-hidden', 'aria-expanded', 'aria-selected', 'aria-current', 'aria-disabled', 'aria-modal', 'aria-pressed',
+  'aria-checked', 'aria-busy', 'aria-live', 'aria-haspopup', 'aria-orientation', 'aria-required', 'aria-invalid',
+  'aria-multiselectable', 'aria-sort', 'aria-level', 'aria-posinset', 'aria-setsize', 'aria-colcount', 'aria-rowcount',
+  'aria-colindex', 'aria-rowindex',
+  // our own markers (fixed labels and codes)
+  'data-ph-safe', 'data-ph-block', 'data-ph-capture-attribute-label', 'data-error-code',
+  // layout rrweb itself adds to blocked elements (their size and position)
+  'rr_width', 'rr_height', 'rr_left', 'rr_top', 'rr_position', 'rr_transform', 'rr_display', 'rr_scrollleft',
+  'rr_scrolltop', 'rr_mediastate', 'rr_open_mode',
+]);
+
+/** Styling hooks the CSS reads (`[data-screen='thread']`): kept only while the value is a plain word like `true`. */
+const STYLE_HOOKS = new Set([
+  'data-loaded', 'data-over', 'data-state', 'data-screen', 'data-message', 'data-unread', 'data-here', 'data-flash',
+  'data-on-now', 'data-preview', 'data-preview-tile', 'data-drop', 'data-mine', 'data-avatar', 'data-coach-sidebar',
+  'data-nav-badge', 'data-menu-dot', 'data-menu-backdrop', 'data-live',
+]);
+const PLAIN_WORD = /^[a-z]+(-[a-z]+)*$|^$/;
+
+/** Attributes that point at another element by id (labels, tabs, menus). Kept so the page structure holds. */
+const REFERENCES = new Set(['id', 'for', 'aria-controls', 'aria-labelledby', 'aria-describedby', 'aria-owns', 'aria-activedescendant', 'aria-errormessage', 'form', 'list', 'headers']);
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+function reference(value: string): string {
+  const scrubbed = value.replace(UUID, '[id]');
+  return /@|\d{4,}/.test(scrubbed) ? stars(value) : scrubbed;
+}
+
+/**
+ * rrweb calls this for every attribute it records. Deny by default: only layout, styling and behaviour attributes
+ * (above) are kept. Everything else is masked: dates (`datetime`, `data-date`), record ids (`data-client-id`), test
+ * ids, numbers (`aria-valuenow`), every link and photo address (paths can hold file names), and readable words
+ * (`aria-label="Remove Luis"`, `title`, `alt`) unless they sit inside `data-ph-safe`.
  */
 export function maskAttribute(name: string, value: string, el?: Element | null): string {
   const key = name.toLowerCase();
-  if (IMAGE_SOURCES.has(key)) return stars(value);
-  if (key === 'href') {
-    if (/^\s*(mailto|tel|sms):/i.test(value)) return stars(value);
-    if (el?.tagName === 'LINK' && el.getAttribute('as') === 'image') return stars(value);
-    return scrubUrl(value);
-  }
-  if (!TEXT_ATTRIBUTES.has(key)) return value;
-  return el?.closest(SAFE) ? value : stars(value);
+  if (LAYOUT_ATTRIBUTES.has(key)) return value;
+  if (STYLE_HOOKS.has(key)) return PLAIN_WORD.test(value) ? value : stars(value);
+  if (REFERENCES.has(key)) return reference(value);
+  if (SAFE_TEXT_ATTRIBUTES.has(key) && el?.closest(SAFE)) return value;
+  return stars(value);
 }
 
 type RecordingConfig = {

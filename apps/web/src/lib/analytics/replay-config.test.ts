@@ -76,17 +76,69 @@ describe('maskAttribute', () => {
     expect(maskAttribute('imagesrcset', 'https://x/luis.jpg 2x', link)).not.toContain('luis');
   });
 
-  it('drops tokens and ids from other links', () => {
+  it('hides every link (paths can hold storage file names)', () => {
     const a = el('<a href="/x">x</a>', 'a');
-    expect(maskAttribute('href', '/invite/secret-token?x=1', a)).toBe('/invite/[token]');
-    expect(maskAttribute('href', '/clients/0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f/training', a)).toBe('/clients/[id]/training');
+    expect(maskAttribute('href', '/invite/secret-token?x=1', a)).not.toMatch(/secret|invite/);
+    expect(maskAttribute('href', 'https://x/storage/v1/object/sign/photos/luis.jpg', a)).not.toContain('luis');
   });
 
-  it('keeps layout attributes and page links', () => {
+  it('is deny-by-default: dates, ids, numbers, test ids and unknown attributes are hidden', () => {
+    const div = el('<div>x</div>', 'div');
+    for (const [name, value] of [
+      ['datetime', '2026-03-04T10:00:00Z'],
+      ['content', 'Luis'],
+      ['data-date', '2026-03-05'],
+      ['data-client-id', '0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f'],
+      ['data-invite-id', 'abc'],
+      ['data-testid', 'food-day-2026-11-10'],
+      ['aria-valuenow', '83'],
+      ['aria-valuemin', '0'],
+      ['aria-valuemax', '120'],
+      ['points', '0,82 10,79.5'],
+      ['data-anything-new', 'luis'],
+      ['name', 'luis'],
+    ] as [string, string][]) {
+      expect(maskAttribute(name, value, div), name).toBe('*'.repeat(value.length));
+    }
+  });
+
+  it('keeps layout, styling and behaviour attributes so the recording still looks right', () => {
     const div = el('<div class="card">x</div>', 'div');
-    expect(maskAttribute('class', 'card', div)).toBe('card');
-    expect(maskAttribute('href', '/clients', div)).toBe('/clients');
-    expect(maskAttribute('_cssText', '.a{color:red}', div)).toBe('.a{color:red}');
+    for (const [name, value] of [
+      ['class', 'card'],
+      ['style', 'width: 40%'],
+      ['_cssText', '.a{color:red}'],
+      ['role', 'dialog'],
+      ['type', 'button'],
+      ['aria-hidden', 'true'],
+      ['aria-expanded', 'false'],
+      ['aria-current', 'page'],
+      ['viewBox', '0 0 24 24'],
+      ['d', 'M6 11l6-6 6 6'],
+      ['rr_width', '40px'],
+      ['data-ph-safe', ''],
+      ['data-ph-block', ''],
+      ['data-ph-capture-attribute-label', 'nav_clients'],
+      ['data-error-code', 'invite_email_invalid'],
+      ['data-screen', 'thread'],
+      ['data-over', 'true'],
+    ] as [string, string][]) {
+      expect(maskAttribute(name, value, div), name).toBe(value);
+    }
+  });
+
+  it('keeps styling hooks only while their value is a plain word', () => {
+    const div = el('<div>x</div>', 'div');
+    expect(maskAttribute('data-unread', '3', div)).toBe('*');
+    expect(maskAttribute('data-state', '2026-11-10', div)).toBe('**********');
+  });
+
+  it('keeps element references but drops record ids from them', () => {
+    const div = el('<div>x</div>', 'div');
+    expect(maskAttribute('id', '_r_1_', div)).toBe('_r_1_');
+    expect(maskAttribute('aria-controls', 'invite-panel-email', div)).toBe('invite-panel-email');
+    expect(maskAttribute('id', 'row-0b8c2f9e-1d2a-4c3b-9e8f-7a6b5c4d3e2f', div)).toBe('row-[id]');
+    expect(maskAttribute('id', 'luis@example.com', div)).toBe('****************');
   });
 
   it('keeps fixed labels inside data-ph-safe', () => {

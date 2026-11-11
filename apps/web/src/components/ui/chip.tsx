@@ -10,7 +10,7 @@ export type ChipProps = HTMLAttributes<HTMLSpanElement> & {
   tone?: ChipTone;
   /** Let a long label wrap onto several lines instead of staying on one. */
   wrap?: boolean;
-  /** Its text is fixed product copy (never a name, number or anything typed): shown in session recordings. */
+  /** Its text, its labels (aria-label, title) and everything inside it are fixed product copy (never a name, number or anything typed): shown in session recordings. */
   phSafe?: boolean;
 };
 
