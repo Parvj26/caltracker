@@ -55,7 +55,7 @@ export function AssignButton({ kind, id, name, compact = false }: { kind: 'worko
   return (
     <>
       {compact ? (
-        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
+        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open">
           Assign
         </button>
       ) : (

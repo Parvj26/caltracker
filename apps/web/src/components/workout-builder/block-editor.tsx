@@ -312,7 +312,7 @@ function SubstituteButton({ exercise, onAdd }: { exercise: WorkoutExerciseDoc; o
 /** "+ Set (copies last set)", shared with the substitute editor. */
 export function AddSetButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" className={styles.addSet} aria-label={label} title="Adds a copy of the last set" onClick={onClick} data-ph-capture-attribute-label="workout_add_set" data-ph-safe="">
+    <button type="button" className={styles.addSet} aria-label={label} title="Adds a copy of the last set" onClick={onClick} data-ph-capture-attribute-label="workout_add_set">
       + Set <span className={styles.addSetHint}>(copies last set)</span>
     </button>
   );
