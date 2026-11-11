@@ -1,3 +1,5 @@
+import { buildSmartIndex, smartMatch } from '../search/smart-search';
+
 /** Most results the Home client search shows. */
 export const SEARCH_MAX_RESULTS = 8;
 
@@ -7,11 +9,15 @@ export function foldForSearch(s: string): string {
 }
 
 /**
- * The clients whose "first last" name contains the typed text anywhere (case and accents ignored), in the given
- * order, at most 8. An empty or blank query finds nothing.
+ * The clients matching the typed text with the shared smart search (typos in longer words, partial words, any word
+ * order, case and accents ignored), best match first (whole name, then starts-with, then the rest, then typos), the
+ * given order within a tier, at most 8. An empty or blank query finds nothing.
  */
 export function searchClients<T extends { firstName: string; lastName: string }>(clients: readonly T[], query: string): T[] {
-  const needle = foldForSearch(query.trim());
-  if (needle === '') return [];
-  return clients.filter((c) => foldForSearch(`${c.firstName} ${c.lastName}`).includes(needle)).slice(0, SEARCH_MAX_RESULTS);
+  const index = buildSmartIndex(clients, (c) => ({ name: `${c.firstName} ${c.lastName}`.trim() }));
+  // smartMatch keeps the given order, and sort is stable, so ties stay in the caller's order.
+  return smartMatch(index, query)
+    .sort((a, b) => a.tier - b.tier)
+    .slice(0, SEARCH_MAX_RESULTS)
+    .map((h) => h.item);
 }
