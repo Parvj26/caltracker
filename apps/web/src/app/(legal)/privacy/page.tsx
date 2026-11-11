@@ -39,6 +39,11 @@ export default function PrivacyPage() {
           Supabase (database and file storage), Cloudflare (website), Resend (emails), Apple (notifications) and PostHog (usage
           statistics). They only process data to run CalTracker.
         </p>
+        <p>
+          On the coach website we also record how pages are used (clicks, scrolling, page changes) so we can find and fix
+          problems; everything typed, client details and photos are hidden in these recordings, and recordings are deleted
+          after 30 days. The client app is not recorded.
+        </p>
       </LegalSection>
       <LegalSection title="Deleting your data">
         <p>
