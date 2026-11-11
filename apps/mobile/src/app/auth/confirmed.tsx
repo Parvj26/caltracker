@@ -6,6 +6,7 @@ import { Button, ErrorText, Logo, Screen } from '@/components/ui';
 import { LINK_FAILED, codeFromLink, completeConfirmation, oncePerCode } from '@/lib/confirm-link';
 import { pkceVerifier, supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
+import type { ShownError } from '@/lib/error-shown';
 
 // Module level, so it also survives the screen remounting: each code is exchanged once, and a re-run of the
 // effect below (a new router or linking URL) waits for that same exchange instead of starting a second one.
@@ -19,19 +20,19 @@ export default function Confirmed() {
   const params = useLocalSearchParams<{ code?: string }>();
   const url = Linking.useLinkingURL();
   const code = codeFromLink(params.code, url);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     if (!code) {
       // No code arrived (e.g. the screen was opened directly): never leave the spinner hanging.
-      const t = setTimeout(() => setError(LINK_FAILED), 4000);
+      const t = setTimeout(() => setError({ code: 'link_failed', text: LINK_FAILED }), 4000);
       return () => clearTimeout(t);
     }
     void confirmCode(code).then((result) => {
       if (cancelled) return;
       if (result.ok) router.replace('/');
-      else setError(result.message);
+      else setError({ code: 'link_failed', text: result.message });
     });
     return () => {
       cancelled = true;
@@ -43,7 +44,7 @@ export default function Confirmed() {
       <Logo size="lg" />
       {error ? (
         <>
-          <ErrorText>{error}</ErrorText>
+          <ErrorText code={error.code}>{error.text}</ErrorText>
           <Button testID="go-sign-in" title="Go to sign in" onPress={() => router.replace('/sign-in')} />
         </>
       ) : (

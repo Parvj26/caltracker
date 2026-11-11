@@ -367,7 +367,7 @@ export default function MealScreen() {
       </View>
 
       {problems.map((p) => (
-        <ErrorText key={p} testID="meal-problem">
+        <ErrorText key={p} testID="meal-problem" code="meal_details_invalid">
           {p}
         </ErrorText>
       ))}

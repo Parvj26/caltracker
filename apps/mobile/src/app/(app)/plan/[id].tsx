@@ -153,7 +153,7 @@ export default function PlanPreview() {
       {loaded.kind === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {loaded.kind === 'failed' ? (
         <Card>
-          <ErrorText>{LOAD_FAILED}</ErrorText>
+          <ErrorText code="workout_load_failed">{LOAD_FAILED}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => void load()} />
         </Card>
       ) : null}

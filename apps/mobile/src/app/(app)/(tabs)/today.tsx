@@ -40,6 +40,7 @@ import {
 } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 /** Whole plans of today's workouts by id, for the card's time and muscle groups. */
 type Plans = Record<string, WorkoutDoc>;
@@ -149,7 +150,7 @@ export default function Today() {
   const [data, setData] = useState<TodayData | null>(null);
   // Today's whole plans by workout id, merged in as they arrive (a late answer still fills its card).
   const [plans, setPlans] = useState<Plans>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState<string | null>(null);
   // The guard itself is a ref: state only updates on the next render, so two quick taps could both get past it.
@@ -178,7 +179,7 @@ export default function Today() {
       if (next.kind === 'today' && finishedIsLoaded(finishedRef.current, next.logs)) forgetFinished();
     } catch {
       if (ticket !== latest.current) return;
-      setError(LOAD_FAILED);
+      setError({ code: 'today_load_failed', text: LOAD_FAILED });
     }
   }, []);
 
@@ -320,7 +321,7 @@ export default function Today() {
 
         {error ? (
           <Card>
-            <ErrorText>{error}</ErrorText>
+            <ErrorText code={error.code}>{error.text}</ErrorText>
             <Button variant="secondary" title="Try again" onPress={() => void refresh()} busy={refreshing} />
           </Card>
         ) : null}

@@ -4,6 +4,8 @@ import { AuthShell } from '@/components/auth-shell';
 import { LegalLinks } from '@/components/legal-links';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import type { ShownError } from '@/lib/error-shown';
+import { isNetworkFailure } from '@/lib/network-failure';
 
 export default function SignIn() {
   // Pre-filled when the Join screen sends someone here ("You already have an account").
@@ -11,14 +13,15 @@ export default function SignIn() {
   const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
 
   async function submit() {
     setBusy(true);
     setError(null);
     const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (err) setError(err.message);
+    // Never the raw auth message: the same words for an unknown email and a wrong password.
+    if (err) setError({ code: isNetworkFailure(err) ? 'network_offline' : err.code === 'invalid_credentials' || err.status === 400 ? 'sign_in_failed' : 'server_error' });
     // On success the session listener routes to the app and links the workspace.
   }
 
@@ -43,7 +46,7 @@ export default function SignIn() {
         value={password}
         onChangeText={setPassword}
       />
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <Button testID="submit-button" title={busy ? 'Signing in...' : 'Sign in'} onPress={() => void submit()} busy={busy} />
       <TextButton testID="go-sign-up" href="/sign-up" title="Create an account" />
       <LegalLinks />

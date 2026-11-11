@@ -5,11 +5,12 @@ import type { Units } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { palette, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 /** kg / lb switch for Settings. Saves as soon as one is tapped. */
 export function UnitsPicker({ units, onChange }: { units: Units; onChange: (units: Units) => Promise<void> }) {
   const { text, space, radius } = useTheme();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
 
   async function pick(next: Units) {
     if (next === units) return;
@@ -17,7 +18,7 @@ export function UnitsPicker({ units, onChange }: { units: Units; onChange: (unit
     try {
       await onChange(next);
     } catch {
-      setError('Could not save your units. Try again.');
+      setError({ code: 'units_save_failed' });
     }
   }
 
@@ -47,7 +48,7 @@ export function UnitsPicker({ units, onChange }: { units: Units; onChange: (unit
         })}
       </View>
       <Text style={text('caption')}>Used for workouts, PRs and body weight.</Text>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
     </View>
   );
 }

@@ -30,6 +30,7 @@ import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from '@/components/ui/icons';
+import type { ShownError } from '@/lib/error-shown';
 
 const RANGE_LABELS: Record<OverviewPeriod, string> = { '4w': '1 mo', '3m': '3 mo', '1y': '1 yr', all: 'All' };
 
@@ -54,7 +55,7 @@ export default function BodyScreen() {
   const [weight, setWeight] = useState('');
   const [entryDate, setEntryDate] = useState<IsoDate>(() => localToday());
   const [editing, setEditing] = useState<HistoryItem | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<ShownError | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const reload = () => setSavedKey((k) => k + 1);
@@ -114,7 +115,7 @@ export default function BodyScreen() {
     if (savingRef.current || !units || !workspace) return;
     const parsed = parseWeightInput(weight, units);
     if (!parsed.ok) {
-      setFormError(parsed.error);
+      setFormError({ code: 'weight_invalid', text: parsed.error });
       return;
     }
     savingRef.current = true;
@@ -124,8 +125,8 @@ export default function BodyScreen() {
       await saveMyWeight({ workspaceId: workspace.workspaceId, measuredOn: entryDate, weightKg: parsed.kg, id: editing?.id });
       closeForm();
       reload();
-    } catch (e) {
-      setFormError(e instanceof Error ? e.message : 'Could not save your weight.');
+    } catch {
+      setFormError({ code: 'weight_save_failed' });
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -206,7 +207,7 @@ export default function BodyScreen() {
               </Text>
               <StepButton testID="date-next" direction="right" label="Next day" disabled={entryDate >= today} onPress={() => setEntryDate((d) => stepWeightDate(d, 1, localToday()))} />
             </View>
-            {formError ? <ErrorText testID="weight-error">{formError}</ErrorText> : null}
+            {formError ? <ErrorText testID="weight-error" code={formError.code}>{formError.text}</ErrorText> : null}
             <Button testID="weight-save" title={editing ? 'Save change' : 'Save weight'} onPress={() => void save()} busy={saving} disabled={units === null} />
             <TextButton testID="weight-cancel" title="Cancel" onPress={closeForm} />
           </InkCard>

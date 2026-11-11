@@ -15,6 +15,7 @@ import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
+import type { ShownError } from '@/lib/error-shown';
 
 /**
  * The community feed, opened from the Coach tab: a box to share, filters (all, the coach's posts, wins), pinned posts
@@ -28,7 +29,7 @@ export default function CommunityScreen() {
   const units = useUnits() ?? 'lb';
   const { community, ready, removed, offline, coaches, blocked, setBlocked, unread, refresh } = useCommunity();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState<FeedFilter>('all');
@@ -51,8 +52,8 @@ export default function CommunityScreen() {
     try {
       setPosts(await loadFeed(community.id));
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t load the community.');
+    } catch {
+      setError({ code: 'community_load_failed' });
     }
     setNow(Date.now());
   }, [community]);
@@ -215,7 +216,7 @@ export default function CommunityScreen() {
             })}
           </View>
 
-          {error ? <ErrorText>{error}</ErrorText> : null}
+          {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
           {posts === null && !error ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading posts" /> : null}
           {posts !== null && visible.length === 0 ? (
             <Text style={text('body')} testID="community-empty">

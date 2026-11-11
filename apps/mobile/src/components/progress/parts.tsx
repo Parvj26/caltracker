@@ -125,7 +125,7 @@ export function LoadState({ status, hasData, onRetry, busy }: { status: 'loading
   if (status === 'offline') {
     return (
       <View style={{ gap: space[2] }} testID="progress-load-error">
-        <ErrorText>{PROGRESS_LOAD_FAILED}</ErrorText>
+        <ErrorText code="progress_load_failed">{PROGRESS_LOAD_FAILED}</ErrorText>
         <Button variant="secondary" title="Try again" onPress={onRetry} busy={busy} />
       </View>
     );

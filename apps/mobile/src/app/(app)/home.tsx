@@ -40,7 +40,7 @@ export default function Home() {
             ? `You're no longer connected to ${removedFromWorkspace}. If that's a mistake, ask your coach to invite you again.`
             : 'Your coach needs to invite this email before you can join their workspace.'}
         </Text>
-        {claimError ? <ErrorText>{claimError}</ErrorText> : null}
+        {claimError ? <ErrorText code="claim_failed">{claimError}</ErrorText> : null}
         <Button testID="check-again" title="Check again" onPress={() => void checkAgain()} busy={checking} />
       </Card>
       <TextButton testID="sign-out" title="Sign out" onPress={() => void signOutAndForget()} />

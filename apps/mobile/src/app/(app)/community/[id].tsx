@@ -17,6 +17,7 @@ import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
+import type { ShownError } from '@/lib/error-shown';
 
 /** One post with its reactions and comments, and a comment box pinned at the bottom. */
 export default function PostScreen() {
@@ -29,7 +30,7 @@ export default function PostScreen() {
   const { community, coaches, blocked, setBlocked } = useCommunity();
   const [post, setPost] = useState<FeedPost | null | undefined>(undefined);
   const [comments, setComments] = useState<FeedComment[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -40,8 +41,8 @@ export default function PostScreen() {
       setPost(p);
       setComments(c);
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t load the post.');
+    } catch {
+      setError({ code: 'post_load_failed' });
       setPost((prev) => prev ?? null);
     }
     setNow(Date.now());
@@ -94,7 +95,7 @@ export default function PostScreen() {
   const send = async () => {
     const parsed = CommentInput.safeParse(draft);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Write a comment first.');
+      setError({ code: 'comment_empty', text: parsed.error.issues[0]?.message });
       return;
     }
     setSending(true);
@@ -103,8 +104,8 @@ export default function PostScreen() {
       await addComment(id, parsed.data);
       setDraft('');
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t add the comment.');
+    } catch {
+      setError({ code: 'comment_save_failed' });
     } finally {
       setSending(false);
     }
@@ -113,7 +114,7 @@ export default function PostScreen() {
   const circle = [styles.circle, { borderRadius: radius.pill }];
   const footer = post ? (
     <View style={{ gap: space[1] }}>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <View style={[styles.row, { gap: space[2] }]}>
         <TextInput
           testID="comment-input"

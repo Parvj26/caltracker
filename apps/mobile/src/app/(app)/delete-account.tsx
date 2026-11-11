@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 /**
  * Settings -> Delete account (approved account-canvas Delete board). What is erased, the coach warning, type DELETE
@@ -20,7 +21,7 @@ export default function DeleteAccountScreen() {
   const coach = useCoachProfile();
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const ready = canConfirmDelete(typed) && !busy;
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
@@ -34,7 +35,7 @@ export default function DeleteAccountScreen() {
       return;
     }
     setBusy(false);
-    setError(result.message);
+    setError({ code: result.status === 'coach_account' ? 'delete_coach_account' : 'delete_account_failed', text: result.message });
   }
 
   const footer = (
@@ -54,7 +55,7 @@ export default function DeleteAccountScreen() {
           <Text style={[text('screenTitle'), styles.buttonLabel, ready && styles.buttonLabelOn]}>Delete my account</Text>
         )}
       </Pressable>
-      {error ? <ErrorText testID="delete-account-error">{error}</ErrorText> : null}
+      {error ? <ErrorText testID="delete-account-error" code={error.code}>{error.text}</ErrorText> : null}
       <Text style={[text('caption'), styles.centre, styles.hint]}>The button turns on once you type {DELETE_WORD}.</Text>
       <Pressable
         testID="delete-account-cancel"

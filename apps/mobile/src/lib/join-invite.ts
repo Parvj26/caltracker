@@ -1,4 +1,5 @@
 import {
+  type ErrorCode,
   AcceptInviteResponse,
   INVITE_TOKEN_PATTERN,
   type AcceptInviteReason,
@@ -79,6 +80,25 @@ export async function joinInvite(client: Client, input: AcceptInviteRequest): Pr
 }
 
 /** Plain-language copy for each way joining can fail. */
+const JOIN_CODES: Record<JoinFailure['reason'], ErrorCode> = {
+  not_found: 'join_link_invalid',
+  expired: 'join_link_expired',
+  used: 'join_link_used',
+  account_exists: 'account_exists',
+  coach_account: 'join_coach_account',
+  other_coach: 'join_other_coach',
+  weak_password: 'password_weak',
+  invalid_request: 'join_invalid_request',
+  offline: 'network_offline',
+  server: 'server_error',
+  joined_sign_in_failed: 'join_sign_in_failed',
+};
+
+/** The error code sent when the invite screen shows this reason. */
+export function joinCode(reason: JoinFailure['reason']): ErrorCode {
+  return JOIN_CODES[reason];
+}
+
 export function joinMessage(reason: JoinFailure['reason'], workspaceName: string): string {
   switch (reason) {
     case 'not_found':

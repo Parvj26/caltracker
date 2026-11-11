@@ -13,6 +13,7 @@ import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import type { ShownError } from '@/lib/error-shown';
 
 /**
  * Write a post: text (links work), up to 4 photos (shrunk on the phone first), and optionally a card shared from the
@@ -50,7 +51,7 @@ export default function NewPostScreen() {
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [failed, setFailed] = useState(false);
 
   const addPhotos = async () => {
@@ -62,7 +63,7 @@ export default function NewPostScreen() {
       for (const p of picked) ready.push(await preparePhoto(p));
       setPhotos((prev) => [...prev, ...ready].slice(0, MAX_POST_PHOTOS));
     } catch (e) {
-      setError(e instanceof PhotoError ? e.message : 'Couldn’t open your photos.');
+      setError(e instanceof PhotoError ? { code: 'photo_unusable', text: e.message } : { code: 'photos_open_failed' });
     } finally {
       setPreparing(false);
     }
@@ -80,11 +81,11 @@ export default function NewPostScreen() {
     setError(null);
     const parsed = PostInput.safeParse({ body, photoCount: photos.length, card });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Write something or add a photo.');
+      setError({ code: 'post_empty', text: parsed.error.issues[0]?.message });
       return;
     }
     if (!community) {
-      setError('You’re not in the community right now.');
+      setError({ code: 'community_not_member' });
       return;
     }
     setPosting(true);
@@ -93,9 +94,9 @@ export default function NewPostScreen() {
       completePost();
       if (card?.kind === 'workout') markWorkoutShared(card.logId);
       router.back();
-    } catch (e) {
+    } catch {
       setFailed(true);
-      setError(e instanceof Error && e.message ? e.message : 'Couldn’t post. Please try again.');
+      setError({ code: 'post_save_failed' });
     } finally {
       setPosting(false);
     }
@@ -157,7 +158,7 @@ export default function NewPostScreen() {
           onPress={() => void addPhotos()}
         />
       ) : null}
-      {error ? <ErrorText testID="new-post-error">{error}</ErrorText> : null}
+      {error ? <ErrorText testID="new-post-error" code={error.code}>{error.text}</ErrorText> : null}
       <Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />
     </Screen>
   );
