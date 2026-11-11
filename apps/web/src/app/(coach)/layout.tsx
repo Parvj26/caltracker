@@ -1,5 +1,7 @@
 import { CoachAvatar } from '@/components/coach-avatar';
+import { Suspense } from 'react';
 import { LegalLinks } from '@/components/legal-links';
+import { NavProgress } from '@/components/nav-progress';
 import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
@@ -39,6 +41,10 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   return (
     <AnalyticsProvider person={person}>
     <div className={styles.shell}>
+      {/* useSearchParams needs a Suspense boundary; the bar renders nothing until a link is tapped. */}
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       {/* First thing a keyboard user reaches: jumps past the menu to the page itself. */}
       <a href="#main-content" className={styles.skipLink}>
         Skip to content

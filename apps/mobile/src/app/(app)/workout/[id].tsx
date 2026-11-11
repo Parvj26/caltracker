@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  exerciseBadges,
   formatRest,
   formatSetTarget,
   formatSetsSummary,
@@ -14,6 +15,7 @@ import {
   type WorkoutDoc,
   type WorkoutExerciseDoc,
 } from '@caltracker/shared';
+import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
@@ -249,6 +251,7 @@ function ExerciseSection({
   const labels = setLabels(exercise.sets);
   const summary = formatSetsSummary(exercise.sets, exercise.trackingType, units);
   const setsWord = `${summary.count} ${summary.count === 1 ? 'set' : 'sets'}`;
+  const badges = exerciseBadges(exercise);
   return (
     <View style={{ gap: space[2] }}>
       <View style={[styles.exerciseHeader, { gap: space[2] }]}>
@@ -303,6 +306,7 @@ function ExerciseSection({
           </Pressable>
         )}
       </View>
+      <ExerciseBadges badges={badges.badges} help={badges.help} testID={`preview-badges-${exercise.id}`} />
       {exercise.note ? <Text style={text('body')}>{exercise.note}</Text> : null}
 
       {expanded && summary.count > 0

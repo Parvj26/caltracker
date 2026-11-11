@@ -273,3 +273,107 @@
 .substituteName { font-weight: var(--ct-weight-section-heading); }
 .substituteBody { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .substituteBody[hidden] { display: none; }
+
+/* ---------- Measurements tab ("Weight · Reps ⌄") ---------- */
+.measureWrap { position: relative; }
+.measurePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.measurePill:hover, .measurePillOpen { border-color: var(--ct-ink); }
+.measureMenu {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + var(--ct-space-1));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-width: calc(100vw - 2 * var(--ct-space-4));
+  padding: var(--ct-space-3) var(--ct-space-1);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  box-shadow: var(--ct-shadow-sticker);
+}
+.measureTitle { padding: 0 var(--ct-space-3) var(--ct-space-1); font-weight: var(--ct-weight-button); }
+.measureItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.measureItem:hover { background: var(--ct-surface); }
+.measureHint { margin: 0; padding: var(--ct-space-1) var(--ct-space-3) 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.checkbox { width: 24px; height: 24px; margin: 0; accent-color: var(--ct-ink); cursor: pointer; }
+.checkbox:disabled { cursor: not-allowed; }
+
+/* ---------- Each side and Tempo, above "+ Set" ---------- */
+.exerciseOptions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-6); }
+.eachSide, .tempo { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); cursor: pointer; }
+.tempoInput { width: 8rem; text-align: center; font-variant-numeric: tabular-nums; }
+.optionsError { flex-basis: 100%; }
+
+/* The compact table's header row: only below 600 px. */
+.setHeader { display: none; }
+
+/* ---------- iPhone width: one compact table per exercise ---------- */
+/* A header row (SET | LB | REPS | REST, following the measurements) then one thin row per set: the type letter, a
+   box per column and × at the end. Weight comes first here, as on the phone. A drop row is indented and has no rest
+   box. --set-cols (from SetTable) is the number of value columns, rest included. The name is the first line of the
+   exercise header; the measurements tab and the icon buttons share the second. */
+@media (max-width: 599px) {
+  .block { padding: var(--ct-space-3); }
+  .blockHeader { gap: var(--ct-space-2); }
+  .blockHeader .blockTitle { flex: 1 1 calc(100% - 40px); min-width: 0; }
+  .blockTools { flex-wrap: nowrap; gap: var(--ct-space-1); }
+  .iconButton { width: 44px; height: 44px; }
+
+  .sets { gap: var(--ct-space-1); }
+  .setHeader, .setRow {
+    display: grid;
+    grid-template-columns: 44px repeat(var(--set-cols, 2), minmax(0, 1fr)) 32px;
+    column-gap: var(--ct-space-2);
+    align-items: center;
+  }
+  .setHeader {
+    font-size: var(--ct-size-caption);
+    font-weight: var(--ct-weight-button);
+    letter-spacing: 0.04em;
+    color: var(--ct-ink-muted);
+    text-align: center;
+  }
+  .setRow { padding: 0; border: 0; border-radius: 0; background: transparent; row-gap: var(--ct-space-1); }
+  .dropRow { margin-left: 0; padding-left: var(--ct-space-3-5); }
+  .setCells { display: contents; }
+  .setLabel, .fieldCaption, .unit { display: none; }
+  .field { min-width: 0; }
+  .fieldBox { display: flex; }
+  .field[data-col='type'] { order: 0; }
+  .field[data-col='weight'] { order: 1; }
+  .field[data-col='reps'] { order: 2; }
+  .field[data-col='duration'] { order: 3; }
+  .field[data-col='distance'] { order: 4; }
+  .field[data-col='rest'] { order: 5; }
+  .narrow { width: 100%; min-height: 44px; text-align: center; }
+  .kindButton { width: 44px; height: 44px; }
+  .removeSet { position: static; order: 6; grid-column: -2 / -1; width: 32px; height: 44px; }
+  .rowError { order: 7; grid-column: 1 / -1; padding-left: 0; }
+  .exerciseFooter .addSet { align-self: stretch; }
+  .substitute { margin-left: 0; }
+}

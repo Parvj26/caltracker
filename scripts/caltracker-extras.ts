@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TRACKING_TYPES, type FreeExercise, type TrackingType } from '@caltracker/shared';
+import { LIBRARY_TRACKING_TYPES, type FreeExercise, type LibraryTrackingType } from '@caltracker/shared';
 
 /** Built-in exercises CalTracker adds on top of free-exercise-db. Same shape, plus an explicit tracking type. */
 export interface ExtraExercise extends FreeExercise {
-  trackingType: TrackingType;
+  trackingType: LibraryTrackingType;
 }
 
 /** Every extra id starts with this. free-exercise-db ids never contain a colon, so the two can never clash. */
@@ -45,7 +45,7 @@ export function validateExtras(list: unknown, freeIds: Iterable<string> = []): E
     const name = raw.name!.toLowerCase();
     if (seenNames.has(name)) fail('duplicate name');
     seenNames.add(name);
-    if (!TRACKING_TYPES.includes(raw.trackingType as TrackingType)) fail(`bad tracking type ${String(raw.trackingType)}`);
+    if (!(LIBRARY_TRACKING_TYPES as readonly string[]).includes(String(raw.trackingType))) fail(`bad tracking type ${String(raw.trackingType)}`);
     if (!CATEGORIES.has(String(raw.category))) fail(`unknown category ${String(raw.category)}`);
     if (raw.equipment !== null && !EQUIPMENT.has(String(raw.equipment))) fail(`unknown equipment ${String(raw.equipment)}`);
     if (!Array.isArray(raw.primaryMuscles) || raw.primaryMuscles.length === 0) fail('needs a primary muscle');

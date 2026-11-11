@@ -5,7 +5,8 @@ import { trackingTypeLabel, formatSetsSummary, substituteSetShowsRest } from '@c
 import type { Units, WorkoutBlockDoc, WorkoutSubstituteDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { AddSetButton, rowNames } from './block-editor';
-import { SetRow, type SetPatch } from './set-row';
+import { type SetPatch } from './set-row';
+import { SetTable } from './set-table';
 import styles from './builder.module.css';
 
 export type SubstituteActions = {
@@ -74,24 +75,16 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
         </ErrorText>
       ))}
       <div id={setsId} hidden={!expanded} className={styles.substituteBody}>
-        <div className={styles.sets}>
-          {sub.sets.map((s, si) => (
-            <SetRow
-              key={s.id}
-              set={s}
-              number={si + 1}
-              name={`${sub.exerciseName} (substitute) ${names[si]}`}
-              trackingType={sub.trackingType}
-              units={units}
-              showRest={restShown[si]!}
-              canRemove={sub.sets.length > 1}
-              canDrop={si > 0}
-              errors={errors.get(`set:${s.id}`) ?? []}
-              onChange={(patch) => actions.onUpdateSet(s.id, patch)}
-              onRemove={() => actions.onRemoveSet(s.id)}
-            />
-          ))}
-        </div>
+        <SetTable
+          sets={sub.sets}
+          names={names.map((n) => `${sub.exerciseName} (substitute) ${n}`)}
+          trackingType={sub.trackingType}
+          units={units}
+          restShown={restShown}
+          errors={errors}
+          onUpdate={actions.onUpdateSet}
+          onRemove={actions.onRemoveSet}
+        />
         <div className={styles.exerciseFooter}>
           <AddSetButton label={`Add a set to substitute ${sub.exerciseName}`} onClick={actions.onAddSet} />
           <label className={styles.exerciseNote}>

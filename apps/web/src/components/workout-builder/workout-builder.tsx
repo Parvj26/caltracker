@@ -1,7 +1,7 @@
 'use client';
 
 import type { ErrorCode } from '@caltracker/shared';
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   MAX_BLOCKS,
@@ -35,10 +35,13 @@ import {
   updateSubstitute,
   updateSubstituteSet,
   withSingleReps,
+  toggleExerciseMeasurement,
+  updateExerciseOptions,
+  applyExercisePrefs,
 } from '@caltracker/shared';
-import type { ExercisePick, IsoDate, Units } from '@caltracker/shared';
+import type { ExercisePick, ExercisePrefs, IsoDate, Units } from '@caltracker/shared';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
-import { saveWorkout, type SaveIssue } from '@/app/(coach)/workouts/actions';
+import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
 import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
@@ -57,10 +60,21 @@ type Props = {
   /** The coach's workspace (from requireCoach), for the exercise picker. */
   workspaceId: string;
   mode: BuilderMode;
+  /**
+   * Saves instead of saveWorkout (the program builder asks where an edit goes first). Resolving null means the coach
+   * went back to editing: nothing was saved and nothing is shown.
+   */
+  saveWith?: (doc: WorkoutDoc) => Promise<SaveWorkoutOutcome | null>;
+  /** The save button's words (default "Save workout"). */
+  saveLabel?: string;
+  /** Told when the workout gains or loses unsaved changes. */
+  onDirtyChange?: (dirty: boolean) => void;
   /** Called after each successful save. Without it, a new library workout moves to /workouts/[id]. */
   onSaved?: (id: string) => void;
   /** True when `initial` has never been saved (it shows no "Saved" status yet). */
   isNew?: boolean;
+  /** The workspace's remembered measurements and Each side per exercise (loadExercisePrefs). */
+  initialPrefs?: Record<string, ExercisePrefs>;
 };
 
 type Picker =
@@ -73,6 +87,7 @@ type Picker =
   | { kind: 'substitute'; blockId: string; exId: string; name: string; exclude: string[] };
 
 const makeId = () => crypto.randomUUID();
+const NO_PREFS: Record<string, ExercisePrefs> = {};
 /** The most exercises "+ Exercise" adds in one go (a workout holds up to 30 blocks). */
 const STRAIGHT_PICK_MAX = 10;
 
@@ -118,6 +133,10 @@ function issuesByKey(doc: WorkoutDoc, issues: readonly SaveIssue[]): Map<string,
       else add(`exercise:${ex.id}`, message);
       continue;
     }
+    if (ex && path[4] === 'tempo') {
+      add(`tempo:${ex.id}`, message);
+      continue;
+    }
     const set = ex && typeof si === 'number' ? ex.sets[si] : undefined;
     if (set) add(`set:${set.id}`, message);
     else if (ex) add(`exercise:${ex.id}`, message);
@@ -131,7 +150,18 @@ const formatDay = (date: IsoDate) =>
     new Date(`${date}T00:00:00Z`),
   );
 
-export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isNew = false }: Props) {
+export function WorkoutBuilder({
+  initial,
+  units,
+  workspaceId,
+  mode,
+  onSaved,
+  isNew = false,
+  initialPrefs = NO_PREFS,
+  saveWith,
+  saveLabel = 'Save workout',
+  onDirtyChange,
+}: Props) {
   const router = useRouter();
   // One rep count per set: an older range (10–12) shows, and saves, as its top number. Not an unsaved change by itself.
   const [doc, setDoc] = useState<WorkoutDoc>(() => withSingleReps(initial));
@@ -145,6 +175,23 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
   const [picker, setPicker] = useState<Picker | null>(null);
   const [pending, startTransition] = useTransition();
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
+  // The workspace's remembered choices per exercise: read with the page, then again after each save. A ref, not
+  // state: the picker may hold an onPick from an earlier render.
+  const prefs = useRef<Record<string, ExercisePrefs>>(initialPrefs);
+  const [prefsVersion, setPrefsVersion] = useState(0);
+  useEffect(() => {
+    if (prefsVersion === 0) return;
+    let live = true;
+    void exercisePrefs()
+      .then((p) => {
+        if (live) prefs.current = p;
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [prefsVersion]);
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -171,15 +218,19 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     }
     const snapshot = doc;
     startTransition(async () => {
-      let outcome: Awaited<ReturnType<typeof saveWorkout>>;
+      let outcome: SaveWorkoutOutcome | null;
       try {
-        outcome = await saveWorkout(parsed.data);
+        outcome = await (saveWith ?? saveWorkout)(parsed.data);
       } catch (e) {
         setFormError(failureCode(e, 'save_offline'));
         return;
       }
+      if (outcome === null) return;
       // A saved workout changes the coach's "recently used" list.
-      if (outcome.ok) invalidateExerciseIndex();
+      if (outcome.ok) {
+        invalidateExerciseIndex();
+        setPrefsVersion((v) => v + 1);
+      }
       if (!outcome.ok) {
         setErrors(issuesByKey(snapshot, outcome.issues ?? []));
         setFormError(outcome.code);
@@ -200,9 +251,12 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     });
   }
 
-  function onPick(exs: ExercisePick[], sets: number) {
+  function onPick(picked: ExercisePick[], sets: number) {
     const p = picker;
     setPicker(null);
+    // Each exercise starts with the measurements and Each side this workspace last saved it with (not a substitute,
+    // which keeps its own kind).
+    const exs = p?.kind === 'substitute' ? picked : picked.map((x) => applyExercisePrefs(x, prefs.current[x.id]));
     const [ex] = exs;
     if (!p || !ex) return;
     setDoc((d) => {
@@ -250,6 +304,8 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
     onAddSet: (exId) => setDoc((d) => addSet(d, blockId, exId, makeId)),
     onRemoveSet: (exId, setId) => setDoc((d) => removeSet(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => setDoc((d) => updateSet(d, blockId, exId, setId, patch)),
+    onToggleMeasurement: (exId, m) => setDoc((d) => toggleExerciseMeasurement(d, blockId, exId, m)),
+    onExerciseOptions: (exId, patch) => setDoc((d) => updateExerciseOptions(d, blockId, exId, patch)),
     onAddSubstitute: (exId) => {
       const ex = doc.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.id === exId);
       // The planned exercise and its substitutes can't be picked again (addSubstitute would refuse them).
@@ -415,8 +471,8 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         {formError ? <ErrorText code={formError} /> : null}
         {formError === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
-        <Button onClick={save} pending={pending} data-ph-capture-attribute-label="workout_save" data-ph-safe="">
-          {pending ? 'Saving…' : 'Save workout'}
+        <Button onClick={save} pending={pending} data-ph-capture-attribute-label="workout_save">
+          {pending ? 'Saving…' : saveLabel}
         </Button>
       </div>
 

@@ -1,7 +1,8 @@
-import { toTrackingType } from '../exercises/tracking';
 import type { TrackingType } from '../exercises/tracking';
 import type { BlockKind, SetType } from '../workouts/schema';
 import { sectionsFromBlocks } from '../workouts/sections';
+import { effectiveTrackingType } from '../workouts/measurements';
+import { validTempo } from '../workouts/tempo';
 import { parseLogSubstituteOptionLenient } from './schema';
 import type { LogSubstituteOption } from './schema';
 import type { LogStatus, WorkoutLogDoc } from './schema';
@@ -15,6 +16,7 @@ export const LOG_TREE_SELECT =
   'id, workout_id, name, status, started_at, finished_at, last_activity_at, auto_finished, revision, notes, ' +
   'log_blocks(id, position, kind, section_id, section_name, picked_exercise_id, ' +
   'log_exercises(id, position, exercise_id, planned_workout_exercise_id, swapped_from_exercise_id, note, ' +
+  'tracking_type, each_side, tempo, ' +
   'substitute_id, substitute_options, ' +
   'exercises!log_exercises_exercise_id_fkey(name, tracking_type), ' +
   'log_sets(id, position, set_type, target_reps_min, target_reps_max, target_weight_kg, target_duration_s, ' +
@@ -71,6 +73,10 @@ export type LogTreeRow = {
       substitute_id?: string | null;
       /** The jsonb column: LogSubstituteOption[] in the doc's camelCase, as save_workout_log stored it. */
       substitute_options?: unknown;
+      /** What the plan measured when it differs from the library kind (null: the library kind). Missing on older selects. */
+      tracking_type?: TrackingType | null;
+      each_side?: boolean;
+      tempo?: string | null;
       exercises: { name: string; tracking_type: TrackingType } | null;
       log_sets: LogTreeSetRow[];
     }>;
@@ -130,10 +136,12 @@ export function logRowToDoc(row: LogTreeRow): WorkoutLogDoc {
         id: e.id,
         exerciseId: e.exercise_id,
         exerciseName: e.exercises?.name ?? '',
-        trackingType: toTrackingType(e.exercises?.tracking_type ?? 'weight_reps'),
+        trackingType: effectiveTrackingType(e.tracking_type, e.exercises?.tracking_type),
         plannedWorkoutExerciseId: e.planned_workout_exercise_id,
         swappedFromExerciseId: e.swapped_from_exercise_id,
         note: e.note,
+        eachSide: e.each_side === true,
+        tempo: validTempo(e.tempo),
         ...readSubstituteOptions(e.substitute_id ?? null, e.substitute_options),
         sets: byPosition(e.log_sets).map((s) => ({
           id: s.id,

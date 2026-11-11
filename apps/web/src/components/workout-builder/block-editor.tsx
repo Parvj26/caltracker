@@ -1,11 +1,13 @@
 'use client';
 
-import { useId } from 'react';
-import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, trackingTypeLabel, setShowsRest } from '@caltracker/shared';
-import type { Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
+import { useId, useState } from 'react';
+import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, TEMPO_PLACEHOLDER, parseTempo, setShowsRest } from '@caltracker/shared';
+import type { Measurement, Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { Icon, type IconName } from './icons';
-import { SetRow, type SetPatch } from './set-row';
+import { MeasurementsMenu } from './measurements-menu';
+import { type SetPatch } from './set-row';
+import { SetTable } from './set-table';
 import { SubstituteEditor, type SubstituteActions } from './substitute-editor';
 import styles from './builder.module.css';
 
@@ -63,6 +65,10 @@ export type BlockActions = {
   onAddSet: (exId: string) => void;
   onRemoveSet: (exId: string, setId: string) => void;
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
+  /** The measurements tab: one of Weight / Reps / Time on or off (see toggleExerciseMeasurement). */
+  onToggleMeasurement: (exId: string, m: Measurement) => void;
+  /** Each side and Tempo, above "+ Set". */
+  onExerciseOptions: (exId: string, patch: { eachSide?: boolean; tempo?: string | null }) => void;
   onAddSubstitute: (exId: string) => void;
   substitute: (exId: string, substituteId: string) => SubstituteActions;
 };
@@ -76,7 +82,7 @@ type Props = {
   /** The workout's sections, to offer "Move to section…" (omitted or empty: no menu). */
   sections: ReadonlyArray<{ id: string; name: string }>;
   units: Units;
-  /** Inline errors keyed by `block:<id>`, `exercise:<id>` and `set:<id>`. */
+  /** Inline errors keyed by `block:<id>`, `exercise:<id>`, `tempo:<exercise id>` and `set:<id>`. */
   errors: ReadonlyMap<string, string[]>;
   actions: BlockActions;
 };
@@ -125,7 +131,13 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
             <SwapName name={first.exerciseName} nameId={headingId} onSwap={() => actions.onSwap(first.id)} />
           </TitleTag>
         )}
-        {!multi ? <span className={styles.caption}>{trackingTypeLabel(first.trackingType)}</span> : null}
+        {!multi ? (
+          <MeasurementsMenu
+            trackingType={first.trackingType}
+            exerciseName={first.exerciseName}
+            onToggle={(m) => actions.onToggleMeasurement(first.id, m)}
+          />
+        ) : null}
         <div className={styles.blockTools}>
           {targets.length > 0 ? (
             <select
@@ -172,7 +184,11 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
                 <ExerciseTag className={styles.exerciseName}>
                   <SwapName name={ex.exerciseName} onSwap={() => actions.onSwap(ex.id)} />
                 </ExerciseTag>
-                <span className={styles.caption}>{trackingTypeLabel(ex.trackingType)}</span>
+                <MeasurementsMenu
+                  trackingType={ex.trackingType}
+                  exerciseName={ex.exerciseName}
+                  onToggle={(m) => actions.onToggleMeasurement(ex.id, m)}
+                />
                 <div className={styles.blockTools}>
                   {/* Pick-one options are already alternatives to each other, so they get no substitutes. */}
                   {!choice ? <SubstituteButton exercise={ex} onAdd={() => actions.onAddSubstitute(ex.id)} /> : null}
@@ -190,24 +206,21 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
           {m}
         </ErrorText>
             ))}
-            <div className={styles.sets}>
-              {ex.sets.map((s, si) => (
-                <SetRow
-                  key={s.id}
-                  set={s}
-                  number={si + 1}
-                  name={`${ex.exerciseName} ${names[si]}`}
-                  trackingType={ex.trackingType}
-                  units={units}
-                  showRest={restShown[si]!}
-                  canRemove={ex.sets.length > 1}
-                  canDrop={si > 0}
-                  errors={errors.get(`set:${s.id}`) ?? []}
-                  onChange={(patch) => actions.onUpdateSet(ex.id, s.id, patch)}
-                  onRemove={() => actions.onRemoveSet(ex.id, s.id)}
-                />
-              ))}
-            </div>
+            <SetTable
+              sets={ex.sets}
+              names={names.map((n) => `${ex.exerciseName} ${n}`)}
+              trackingType={ex.trackingType}
+              units={units}
+              restShown={restShown}
+              errors={errors}
+              onUpdate={(setId, patch) => actions.onUpdateSet(ex.id, setId, patch)}
+              onRemove={(setId) => actions.onRemoveSet(ex.id, setId)}
+            />
+            <ExerciseOptions
+              exercise={ex}
+              errors={errors.get(`tempo:${ex.id}`) ?? []}
+              onChange={(patch) => actions.onExerciseOptions(ex.id, patch)}
+            />
             <div className={styles.exerciseFooter}>
               <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
               <label className={styles.exerciseNote}>
@@ -302,5 +315,70 @@ export function AddSetButton({ label, onClick }: { label: string; onClick: () =>
     <button type="button" className={styles.addSet} aria-label={label} title="Adds a copy of the last set" onClick={onClick} data-ph-capture-attribute-label="workout_add_set" data-ph-safe="">
       + Set <span className={styles.addSetHint}>(copies last set)</span>
     </button>
+  );
+}
+
+/**
+ * Each side (a checkbox) and Tempo (optional, "0-0-0-0"), above "+ Set". The tempo is kept as typed; a bad one is
+ * marked when the box is left (and refused on save), with the rule as the message.
+ */
+function ExerciseOptions({
+  exercise: ex,
+  errors,
+  onChange,
+}: {
+  exercise: WorkoutExerciseDoc;
+  errors: readonly string[];
+  onChange: (patch: { eachSide?: boolean; tempo?: string | null }) => void;
+}) {
+  const tempoId = useId();
+  const [left, setLeft] = useState(false);
+  const parsed = parseTempo(ex.tempo);
+  const messages = [...(left && !parsed.ok ? [parsed.message] : []), ...errors];
+  const shown = [...new Set(messages)];
+  return (
+    <div className={styles.exerciseOptions}>
+      <label className={styles.eachSide}>
+        <input
+          type="checkbox"
+          className={styles.checkbox}
+          checked={ex.eachSide === true}
+          aria-label={`Each side for ${ex.exerciseName}`}
+          onChange={(e) => onChange({ eachSide: e.target.checked })}
+        />
+        <span aria-hidden="true">Each side</span>
+      </label>
+      <label className={styles.tempo}>
+        <span aria-hidden="true">Tempo</span>
+        <input
+          type="text"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={20}
+          className={`${styles.input} ${styles.tempoInput}`}
+          placeholder={TEMPO_PLACEHOLDER}
+          aria-label={`Tempo for ${ex.exerciseName}`}
+          aria-invalid={shown.length > 0 || undefined}
+          aria-describedby={shown.length > 0 ? tempoId : undefined}
+          value={ex.tempo ?? ''}
+          onChange={(e) => {
+            setLeft(false);
+            onChange({ tempo: e.target.value === '' ? null : e.target.value });
+          }}
+          onBlur={() => setLeft(true)}
+        />
+      </label>
+      {shown.length > 0 ? (
+        <div id={tempoId} className={styles.optionsError}>
+          {shown.map((m) => (
+            <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+              {m}
+            </ErrorText>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

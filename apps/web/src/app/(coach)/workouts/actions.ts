@@ -2,15 +2,22 @@
 
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc, duplicateWorkoutDoc } from '@caltracker/shared';
+import type { ExercisePrefs } from '@caltracker/shared';
 import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { loadWorkoutDoc } from '@/lib/workouts';
+import { loadExercisePrefs, loadWorkoutDoc } from '@/lib/workouts';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
 export type SaveWorkoutOutcome = { ok: true; id: string } | (ActionFailure & { issues?: SaveIssue[] });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The workspace's remembered choices per exercise, re-read by the builder after a save (see loadExercisePrefs). */
+export async function exercisePrefs(): Promise<Record<string, ExercisePrefs>> {
+  const { workspaceId } = await requireCoach();
+  return loadExercisePrefs(await createServerSupabase(), workspaceId);
+}
 
 export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   const { workspaceId } = await requireCoach(); // never trust a client-supplied workspace id
@@ -81,7 +88,11 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
   const copy = WorkoutDoc.safeParse(duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()));
   if (!copy.success) return fail('workout_copy_invalid', 'action:workouts.duplicateWorkout');
 
-  const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: copy.data });
+  // A copy is not the coach choosing measurements again, so it doesn't change what new exercises start with.
+  const { data, error } = await supabase.rpc('save_workout', {
+    p_workspace_id: workspaceId,
+    p_doc: { ...copy.data, rememberChoices: false },
+  });
   if (error) {
     if (error.code === '23514') return fail('workout_invalid', 'action:workouts.duplicateWorkout');
     return fail('workout_copy_failed', 'action:workouts.duplicateWorkout');

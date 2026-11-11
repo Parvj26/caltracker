@@ -189,7 +189,7 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
           </h2>
           {rows.length === 0 ? (
             <p className={styles.empty}>
-              No workouts planned for today. <Link href="/programs">Plan workouts in Programs</Link>
+              No workouts planned for today. <Link href="/programs" className="tap-inline">Plan workouts in Programs</Link>
             </p>
           ) : (
             <>

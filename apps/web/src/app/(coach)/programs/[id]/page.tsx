@@ -11,6 +11,7 @@ import { AutoProgressionPanel } from './auto-progression-panel';
 import { DeleteProgram } from './delete-program';
 import { loadLiveSync } from '@/lib/live-sync';
 import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
+import { loadExercisePrefs } from '@/lib/workouts';
 import { ProgramGrid, type LibraryWorkout, type Slot } from './program-grid';
 import styles from '../programs.module.css';
 
@@ -29,13 +30,13 @@ export default async function ProgramPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { workspaceId, userId } = await requireCoach();
+  const { workspaceId, userId, units } = await requireCoach();
   const { id } = await params;
   const justCopied = (await searchParams).copied === '1';
   if (!UUID.test(id)) notFound();
   const supabase = await createServerSupabase();
 
-  const [program, slots, library, live, history] = await Promise.all([
+  const [program, slots, library, live, history, prefs] = await Promise.all([
     getProgram(id),
     supabase
       .from('program_workouts')
@@ -54,6 +55,7 @@ export default async function ProgramPage({
       .limit(LIBRARY_LIMIT),
     loadLiveSync(supabase, workspaceId, id),
     loadPickerHistory(supabase, workspaceId, userId),
+    loadExercisePrefs(supabase, workspaceId),
   ]);
   if (slots.error) throw new Error(`Could not load the program's workouts: ${slots.error.message}`);
   if (library.error) throw new Error(`Could not load workouts: ${library.error.message}`);
@@ -83,7 +85,7 @@ export default async function ProgramPage({
       </header>
       <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={program.auto_progression} />
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} units={units} workspaceId={workspaceId} exercisePrefs={prefs} />
     </div>
   );
 }

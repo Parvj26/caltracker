@@ -244,6 +244,7 @@ export const ERROR_CODES = {
   join_invalid_request: 'Check your name and password, then try again.',
   join_sign_in_failed: "You're all set. Sign in with your email and new password.",
   sign_up_failed: "Couldn't create your account. Please try again.",
+  program_day_gone: "Couldn't find that day. It may have been removed.",
   missing_code: SERVER_ERROR_MESSAGE,
 } as const;
 
