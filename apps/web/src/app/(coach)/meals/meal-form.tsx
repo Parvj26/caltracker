@@ -18,6 +18,7 @@ import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { removeCoachMeal, saveCoachMeal, type CoachMealInput } from './actions';
+import { mealFormDirty } from './form-dirty';
 import styles from './meals.module.css';
 
 type StoredPhoto = { path: string; thumbPath: string; width: number; height: number; url: string | null };
@@ -32,6 +33,7 @@ export type MealFormValue = {
 
 const LABEL: Record<MacroKey, string> = { calories: 'kcal', protein: 'Protein g', carbs: 'Carbs g', fat: 'Fat g' };
 const toText = (n: number | null) => (n === null ? '' : String(n));
+export const DISCARD_CONFIRM = 'Discard changes?';
 export const REMOVE_CONFIRM = "Remove this meal? Clients won't see it any more. Meals they already logged stay.";
 
 async function sizeOf(blob: Blob): Promise<{ width: number; height: number }> {
@@ -66,7 +68,9 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const discardRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const discardTitleId = useId();
 
   // The local preview's link is freed when it is replaced and when the form goes away.
   const previewRef = useRef<string | null>(null);
@@ -139,6 +143,24 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
     } finally {
       setPending(false);
     }
+  }
+
+  const dirty = mealFormDirty(
+    {
+      name: initial.name,
+      macroText: { calories: toText(initial.macros.calories), protein: toText(initial.macros.protein), carbs: toText(initial.macros.carbs), fat: toText(initial.macros.fat) },
+      ingredients: initial.ingredients,
+      howTo: initial.howTo,
+      photoPath: initial.photo?.path ?? null,
+      newFile: false,
+    },
+    { name, macroText, ingredients, howTo, photoPath: stored?.path ?? null, newFile: file !== null },
+  );
+
+  /** Back to the list without saving; asks first if anything was typed. */
+  function cancel() {
+    if (dirty) discardRef.current?.showModal();
+    else router.push('/meals');
   }
 
   async function remove() {
@@ -235,12 +257,34 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
         <button type="submit" className={styles.save} disabled={pending} aria-busy={pending || undefined}>
           {pending ? 'Saving…' : 'Save'}
         </button>
+        <button type="button" className={styles.cancel} onClick={cancel} disabled={pending}>
+          Cancel
+        </button>
         {!isNew ? (
           <button type="button" className={styles.remove} onClick={() => dialogRef.current?.showModal()}>
             Remove meal
           </button>
         ) : null}
       </div>
+
+      <dialog ref={discardRef} className={styles.dialog} aria-labelledby={discardTitleId}>
+        <h2 id={discardTitleId} className={styles.dialogTitle}>
+          {DISCARD_CONFIRM}
+        </h2>
+        <div className={styles.dialogActions}>
+          <Button variant="secondary" onClick={() => discardRef.current?.close()}>
+            Keep editing
+          </Button>
+          <Button
+            onClick={() => {
+              discardRef.current?.close();
+              router.push('/meals');
+            }}
+          >
+            Discard
+          </Button>
+        </div>
+      </dialog>
 
       {!isNew ? (
         <dialog
