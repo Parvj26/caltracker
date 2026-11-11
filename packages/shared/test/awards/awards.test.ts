@@ -270,9 +270,11 @@ describe('computeAward', () => {
   });
   it('landmarks only when the streak moves up; milestones only when the count moves', () => {
     const up = computeAward(base({ statsBefore: stats({ workouts: 9, streak: 3 }), statsAfter: stats({ workouts: 10, streak: 4 }) }));
-    expect(up.landmarks).toEqual(['colosseum']);
+    // One bonus per workout: the milestone; the landmark and rare finds wait (bonus.test.ts).
     expect(up.milestone).toBe(10);
-    expect(up.rare).toEqual(['axolotl', 'quokka']);
+    expect(up.landmarks).toEqual([]);
+    expect(up.rare).toEqual([]);
+    expect(computeAward(base({ statsBefore: stats({ streak: 3 }), statsAfter: stats({ streak: 4 }) })).landmarks).toEqual(['colosseum']);
     const same = computeAward(base({ statsBefore: stats({ workouts: 10, streak: 4 }), statsAfter: stats({ workouts: 11, streak: 4 }) }));
     expect(same.landmarks).toEqual([]);
     expect(same.milestone).toBeNull();
