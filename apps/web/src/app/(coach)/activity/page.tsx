@@ -13,11 +13,12 @@ import {
   logVolumeKg,
   type LogTreeRow,
 } from '@caltracker/shared';
-import { Card, Chip, SelectField } from '@/components/ui';
+import { Card, Chip } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { renderTime } from '@/lib/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { ClientFilter } from './client-filter';
 import { LocalDateTime } from './local-date-time';
 import styles from './activity.module.css';
 
@@ -74,7 +75,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const names = new Map<string, string>();
   for (const p of past.data) names.set(p.user_id, p.full_name || p.email);
   for (const p of profiles.data ?? []) names.set(p.id, p.full_name || 'Client');
-  const options = [...names].sort((a, b) => a[1].localeCompare(b[1]));
+  const options = [...names].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ id, name }));
 
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
   const rows = (logs.data as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[]).slice(0, PAGE_SIZE).map((row) => {
@@ -107,19 +108,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           <h1 className={styles.title}>Activity</h1>
           <p className={styles.caption}>Workouts your clients have finished, newest first.</p>
         </div>
-        <form method="get" action="/activity" className={styles.filter}>
-          <SelectField label="Client" name="client" defaultValue={clientFilter ?? ''}>
-            <option value="">All clients</option>
-            {options.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </SelectField>
-          <button type="submit" className={styles.smallButton}>
-            Filter
-          </button>
-        </form>
+        <ClientFilter clients={options} selectedId={clientFilter} />
       </header>
 
       {rows.length === 0 ? (

@@ -1,0 +1,52 @@
+/* The client picker shared by Home ("Find a client") and Activity (filter). Colours, radii and type via var(--ct-*).
+   Every control is at least 44 px tall (--ct-tap-min). */
+.wrap { position: relative; }
+.box { position: relative; display: flex; align-items: center; }
+.input {
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+}
+.input:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+/* Room on the right for the clear button. */
+.withClear { padding-right: var(--ct-tap-min); }
+.clear {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-button);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.clear:hover { background: var(--ct-bg); }
+.clear:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.list {
+  position: absolute;
+  z-index: 10;
+  inset: 100% 0 auto 0;
+  margin: var(--ct-space-1) 0 0;
+  padding: var(--ct-space-1);
+  list-style: none;
+  background: var(--ct-surface);
+  border-radius: var(--ct-radius-input);
+  box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+}
+.list[hidden] { display: none; }
+.option { display: flex; align-items: center; min-height: var(--ct-tap-min); padding: 0 var(--ct-space-2-5); border-radius: var(--ct-radius-input); cursor: pointer; }
+.option[aria-selected='true'] { background: var(--ct-bg); font-weight: var(--ct-weight-section-heading); }
+.none:empty { display: none; }
+.none { margin: var(--ct-space-1) 0 0; padding: var(--ct-space-2) var(--ct-space-2-5); color: var(--ct-ink-muted); }

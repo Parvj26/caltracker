@@ -131,11 +131,38 @@ test('the client filter narrows the feed', async ({ page }) => {
   await expect(page.getByText(mine)).toBeVisible();
   await expect(page.getByText(theirs)).toBeVisible();
 
-  await page.getByRole('combobox', { name: /^Client/ }).selectOption({ label: `Sam ${last}` });
-  await page.getByRole('button', { name: 'Filter' }).click();
+  // No Filter button: typing a name with a typo and picking the suggestion narrows the feed straight away.
+  await expect(page.getByRole('button', { name: 'Filter' })).toHaveCount(0);
+  const box = page.getByRole('combobox', { name: 'Filter by client' });
+  await expect(box).toHaveAttribute('placeholder', 'All clients');
+  const typo = `${last.slice(0, 2)}${last[3]}${last[2]}${last.slice(4)}`;
+  await box.fill(`sam ${typo}`);
+  await expect(box).toHaveAttribute('aria-expanded', 'true');
+  const option = page.getByRole('option', { name: `Sam ${last}`, exact: true });
+  await expect(option).toBeVisible();
+  // The first suggestion is active and announced through aria-activedescendant.
+  await expect(box).toHaveAttribute('aria-activedescendant', /.+/);
+  // Earlier runs may leave clients with similar names, so pick this one by its exact name.
+  await option.click();
   await expect(page).toHaveURL(new RegExp(`client=${other}`));
   await expect(page.getByText(theirs)).toBeVisible();
   await expect(page.getByText(mine)).toHaveCount(0);
+  await expect(box).toHaveValue(`Sam ${last}`);
+
+  // Back shows everyone again, and Forward the filtered feed with the name in the box.
+  await page.goBack();
+  await expect(page.getByText(mine)).toBeVisible();
+  await expect(box).toHaveValue('');
+  await page.goForward();
+  await expect(page.getByText(mine)).toHaveCount(0);
+  await expect(box).toHaveValue(`Sam ${last}`);
+
+  // The × shows everyone again.
+  await page.getByRole('button', { name: 'Show all clients' }).click();
+  await expect(page).toHaveURL(/\/activity$/);
+  await expect(page.getByText(mine)).toBeVisible();
+  await expect(page.getByText(theirs)).toBeVisible();
+  await expect(box).toHaveValue('');
 });
 
 test('the calendar marks a finished workout done and links to its log, and a skipped past one missed', async ({ page }) => {
