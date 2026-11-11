@@ -128,7 +128,7 @@ export function AssignDialog({
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={styles.dialogTitle}>Assign a program</h2>
+      <h2 id={titleId} className={styles.dialogTitle} data-ph-safe="">Assign a program</h2>
       {programs.length === 0 ? (
         <>
           <p className={styles.dialogBody}>
@@ -149,6 +149,7 @@ export function AssignDialog({
           <p className={styles.dialogBody}>Copies the program&apos;s workouts onto {clientName}&apos;s calendar.</p>
           <SelectField
             label="Program"
+            data-ph-capture-attribute-label="assign_pick_program"
             value={programId}
             onChange={(e) => {
               setProgramId(e.target.value);
@@ -165,6 +166,7 @@ export function AssignDialog({
             id={dateInputId}
             label="Start date"
             type="date"
+            data-ph-capture-attribute-label="assign_pick_date"
             min={earliestProgramStart(today)}
             value={startDate}
             onChange={(e) => {
@@ -204,7 +206,7 @@ export function AssignDialog({
       {error ? <ErrorText code={error} /> : null}
       <div className={styles.dialogActions}>
         {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
+        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           Cancel
         </Button>
         {clashes.length > 0 ? (
@@ -213,7 +215,7 @@ export function AssignDialog({
           </Button>
         ) : null}
         {programs.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null}>
+          <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null} data-ph-capture-attribute-label="assign_save" data-ph-safe="">
             {pending ? 'Assigning…' : clashes.length > 0 ? 'Add alongside' : 'Assign'}
           </Button>
         ) : null}

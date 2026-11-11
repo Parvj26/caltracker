@@ -138,7 +138,7 @@ export function ProgramDetails({
         />
         {errors.description ? <ErrorText code={codeForMessage(errors.description, 'field_format')}>{errors.description}</ErrorText> : null}
         <div className={cx(styles.fullRow, styles.detailsSave)}>
-          <Button type="submit" variant="secondary" pending={pending && !confirm}>
+          <Button type="submit" variant="secondary" pending={pending && !confirm} data-ph-capture-attribute-label="program_save">
             {pending && !confirm ? 'Saving…' : 'Save details'}
           </Button>
           {/* The page's own status line says "All changes saved", so this one only flags edits and shows the tick. */}

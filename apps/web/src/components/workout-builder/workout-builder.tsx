@@ -389,13 +389,13 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
       </div>
 
       <div className={styles.addRow}>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercise" data-ph-safe="">
           + Exercise
         </Button>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })} data-ph-capture-attribute-label="workout_add_superset" data-ph-safe="">
           + Superset / circuit
         </Button>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'choice' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'choice' })} data-ph-capture-attribute-label="workout_add_pick_one" data-ph-safe="">
           + Pick one
         </Button>
         {full ? (
@@ -415,7 +415,7 @@ export function WorkoutBuilder({ initial, units, workspaceId, mode, onSaved, isN
         {formError ? <ErrorText code={formError} /> : null}
         {formError === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
-        <Button onClick={save} pending={pending}>
+        <Button onClick={save} pending={pending} data-ph-capture-attribute-label="workout_save" data-ph-safe="">
           {pending ? 'Saving…' : 'Save workout'}
         </Button>
       </div>

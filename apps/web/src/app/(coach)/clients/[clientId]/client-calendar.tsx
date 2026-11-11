@@ -291,7 +291,7 @@ export function ClientCalendar({
         </div>
         {readOnly ? null : (
           <div className={styles.titleActions}>
-            <Button variant="secondary" onClick={() => setAssigning(true)}>
+            <Button variant="secondary" onClick={() => setAssigning(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
               Assign program
             </Button>
             <Button onClick={() => setAdding(true)}>+ Add workout</Button>

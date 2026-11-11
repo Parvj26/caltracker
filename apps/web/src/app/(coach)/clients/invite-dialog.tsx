@@ -72,6 +72,8 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
     <>
       <Button
         className={styles.inviteButton}
+        data-ph-capture-attribute-label="invite_open"
+        data-ph-safe=""
         onClick={() => {
           setRound((r) => r + 1);
           setOpen(true);
@@ -135,7 +137,7 @@ function InviteDialog({
       ) : (
         <>
           <div className={styles.dialogHeader}>
-            <h2 id={titleId} className={styles.inviteTitle}>Invite a client</h2>
+            <h2 id={titleId} className={styles.inviteTitle} data-ph-safe="">Invite a client</h2>
             <button type="button" aria-label="Close" className={styles.closeButton} onClick={() => dialogRef.current?.close()}>
               ×
             </button>
@@ -150,6 +152,8 @@ function InviteDialog({
                 aria-selected={tab === t}
                 aria-controls={`invite-panel-${t}`}
                 className={styles.segment}
+                data-ph-capture-attribute-label={t === 'csv' ? 'invite_csv_open' : 'invite_one_open'}
+                data-ph-safe=""
                 onClick={() => setTab(t)}
               >
                 {t === 'one' ? 'One client' : 'Many (CSV)'}
@@ -424,8 +428,8 @@ function OneClientForm({
       {result ? <p role="status" className={styles.status}><StatusChip view={result} /></p> : null}
 
       <div className={styles.inviteActionsRow}>
-        <Button variant="secondary" onClick={onCancel} disabled={pending}>Cancel</Button>
-        <Button type="submit" pending={pending}>{pending ? 'Sending…' : 'Send invite'}</Button>
+        <Button variant="secondary" onClick={onCancel} disabled={pending} data-ph-capture-attribute-label="invite_cancel" data-ph-safe="">Cancel</Button>
+        <Button type="submit" pending={pending} data-ph-capture-attribute-label="invite_send" data-ph-safe="">{pending ? 'Sending…' : 'Send invite'}</Button>
       </div>
     </form>
   );

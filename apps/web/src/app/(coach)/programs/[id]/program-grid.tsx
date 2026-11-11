@@ -342,6 +342,7 @@ export function ProgramGrid({
                             id={copyWeekButtonDomId(w)}
                             className={styles.smallButton}
                             aria-label={`Copy week ${w}`}
+                            data-ph-capture-attribute-label="program_copy_week"
                             onClick={() => setCopying(w)}
                           >
                             Copy…
@@ -366,7 +367,7 @@ export function ProgramGrid({
               </table>
             </div>
             <div>
-              <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX}>
+              <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX} data-ph-capture-attribute-label="program_add_week">
                 + Add week
               </Button>
             </div>
@@ -479,6 +480,7 @@ function DayCell({
         id={addButtonDomId(week, day)}
         className={styles.addButton}
         aria-label={`Add a workout to week ${week}, day ${day}`}
+        data-ph-capture-attribute-label="program_add_workout"
         onClick={onAdd}
       >
         +

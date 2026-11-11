@@ -55,11 +55,13 @@ export function AssignButton({ kind, id, name, compact = false }: { kind: 'worko
   return (
     <>
       {compact ? (
-        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)}>
+        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
           Assign
         </button>
       ) : (
-        <Button onClick={() => setOpen(true)}>Assign {kind}</Button>
+        <Button onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
+          Assign {kind}
+        </Button>
       )}
       {open ? (
         <AssignToClientsDialog
@@ -317,7 +319,7 @@ export function AssignToClientsDialog({
               return (
                 <li key={c.id} className={styles.client}>
                   <label className={styles.clientLabel}>
-                    <input type="checkbox" checked={on || assigned(c.id)} disabled={assigned(c.id) || pending} onChange={() => toggle(c.id)} />
+                    <input type="checkbox" checked={on || assigned(c.id)} disabled={assigned(c.id) || pending} onChange={() => toggle(c.id)} data-ph-capture-attribute-label="assign_pick_client" />
                     <span>{nameOf(c)}</span>
                   </label>
                   {result?.ok ? (
@@ -352,6 +354,7 @@ export function AssignToClientsDialog({
               id={dateInputId}
               label={isWorkout ? 'Date' : 'Start date'}
               type="date"
+              data-ph-capture-attribute-label="assign_pick_date"
               min={isWorkout ? today : earliestProgramStart(today)}
               value={date}
               onChange={(e) => {
@@ -400,7 +403,7 @@ export function AssignToClientsDialog({
       ) : null}
       <div className={calendar.dialogActions}>
         {error?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
+        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           {results.size > 0 ? 'Close' : 'Cancel'}
         </Button>
         {clashing.length > 0 && !useFreeDay ? (
@@ -409,7 +412,7 @@ export function AssignToClientsDialog({
           </Button>
         ) : null}
         {clients.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={n === 0 || dateError !== null || missingProgram}>
+          <Button onClick={() => void assign()} pending={pending} disabled={n === 0 || dateError !== null || missingProgram} data-ph-capture-attribute-label="assign_save">
             {label}
           </Button>
         ) : null}

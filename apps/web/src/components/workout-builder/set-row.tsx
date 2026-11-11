@@ -206,6 +206,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
       <button
         type="button"
         className={styles.removeSet}
+        data-ph-capture-attribute-label="workout_remove_set"
         aria-label={`Remove set ${number}`}
         title={canRemove ? 'Remove set' : 'An exercise keeps at least one set'}
         disabled={!canRemove}

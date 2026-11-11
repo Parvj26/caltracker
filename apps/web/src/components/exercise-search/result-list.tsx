@@ -48,6 +48,7 @@ export function ResultList({
               <div
                 id={optionId(row.id)}
                 role="option"
+                data-ph-capture-attribute-label="workout_exercise_pick"
                 aria-selected={picked}
                 aria-label={row.name}
                 className={styles.row}

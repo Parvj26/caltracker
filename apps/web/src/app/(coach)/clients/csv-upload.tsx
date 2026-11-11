@@ -76,7 +76,7 @@ export function CsvUpload() {
 
   return (
     <section className={styles.panelSection}>
-      <h3 id="csv-heading" className={styles.sectionHeading}>Invite many clients from a spreadsheet (CSV)</h3>
+      <h3 id="csv-heading" className={styles.sectionHeading} data-ph-safe="">Invite many clients from a spreadsheet (CSV)</h3>
       <div id="csv-body" className={styles.csvBody}>
       <p id="csv-explain" className={styles.explain}>
         Bring your client list from Everfit or Excel: one row per client with first name, last name and email.
@@ -94,6 +94,7 @@ export function CsvUpload() {
           accept=".csv,text/csv"
           aria-labelledby="csv-heading"
           aria-describedby="csv-explain csv-limit csv-help"
+          data-ph-capture-attribute-label="invite_csv_upload"
           className={styles.fileInput}
           disabled={pending}
           onChange={(e) => void onFile(e)}
@@ -141,7 +142,7 @@ export function CsvUpload() {
                 </table>
               </div>
               {statuses.size === 0 ? (
-                <Button pending={pending} onClick={() => send(parsed.rows)}>
+                <Button pending={pending} onClick={() => send(parsed.rows)} data-ph-capture-attribute-label="invite_csv_send">
                   {pending ? 'Sending…' : `Send ${parsed.rows.length} invite${parsed.rows.length === 1 ? '' : 's'}`}
                 </Button>
               ) : failed.size > 0 ? (

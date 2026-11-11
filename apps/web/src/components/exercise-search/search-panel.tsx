@@ -250,6 +250,7 @@ export function SearchPanel({
           type="text"
           ref={searchRef}
           role="combobox"
+          data-ph-capture-attribute-label="workout_exercise_search"
           // The list is always shown beside the box (never collapsed), so the combobox is always expanded.
           aria-expanded="true"
           aria-controls={listId}
@@ -354,7 +355,7 @@ export function SearchPanel({
           {many ? footerExtra : null}
           {onCancel ? <Button variant="secondary" onClick={onCancel}>Cancel</Button> : null}
           {many ? (
-            <Button disabled={selected.length < min} onClick={() => onPick?.(selected)}>
+            <Button disabled={selected.length < min} onClick={() => onPick?.(selected)} data-ph-capture-attribute-label="workout_exercise_add_picked">
               {selected.length < min
                 ? `Pick at least ${min} ${min === 1 ? 'exercise' : 'exercises'}`
                 : `Add ${selected.length} ${selected.length === 1 ? 'exercise' : 'exercises'}`}

@@ -73,7 +73,7 @@ export function NewProgramForm() {
         />
         {formError ? <ErrorText code={formError} /> : null}
         <div>
-          <Button type="submit" pending={pending}>
+          <Button type="submit" pending={pending} data-ph-capture-attribute-label="program_name_save">
             {pending ? 'Creating…' : 'Create program'}
           </Button>
         </div>
