@@ -6,7 +6,7 @@ import { IsoDateSchema, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { calendarAddDomId, calendarItemDomId, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
-import { Button, TextField } from '@/components/ui';
+import { Button, TextField, errorFromText } from '@/components/ui';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 
@@ -244,7 +244,7 @@ export function MoveDialog({
         min={today}
         value={date}
         onChange={(e) => setDate(e.target.value)}
-        {...(error ? { error } : {})}
+        {...(error ? { error: errorFromText(error, 'assign_date_invalid') } : {})}
       />
       <div className={styles.dialogActions}>
         <Button variant="secondary" onClick={() => dialogRef.current?.close()}>

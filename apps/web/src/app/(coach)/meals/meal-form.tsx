@@ -13,7 +13,7 @@ import {
   type MacroKey,
   type MealMacros,
 } from '@caltracker/shared';
-import { Button, ErrorText } from '@/components/ui';
+import { Button, ErrorText, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -61,7 +61,7 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
   const [stored, setStored] = useState<StoredPhoto | null>(initial.photo);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -107,7 +107,7 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
       if ('error' in r) problems.push(r.error);
     }
     if (problems[0]) {
-      setError(problems[0]);
+      setError(errorFromText(problems[0], 'meal_details_invalid'));
       return;
     }
     setPending(true);
@@ -127,15 +127,15 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
         photo,
         dropPaths: before.filter((p) => !keep.has(p)),
       });
-      if ('error' in out) {
-        setError(out.error);
+      if (!out.ok) {
+        setError({ code: out.code });
         return;
       }
       setSaved(true);
       if (isNew) router.push(`/meals/${initial.id}`);
       else router.refresh();
     } catch (err) {
-      setError(err instanceof PhotoError ? err.message : "Couldn't save. Please try again.");
+      setError(err instanceof PhotoError ? errorFromText(err.message, 'meal_photo_failed') : { code: 'meal_save_failed' });
     } finally {
       setPending(false);
     }
@@ -145,8 +145,8 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
     setPending(true);
     const out = await removeCoachMeal(initial.id);
     setPending(false);
-    if ('error' in out) {
-      setError(out.error);
+    if (!out.ok) {
+      setError({ code: out.code });
       dialogRef.current?.close();
       return;
     }
@@ -224,7 +224,7 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
         <textarea className={styles.textarea} rows={3} value={howTo} onChange={(e) => setHowTo(e.target.value)} maxLength={COACH_MEAL_LIMITS.howTo} />
       </label>
 
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       {saved && !isNew ? (
         <p role="status" className={styles.status}>
           Saved

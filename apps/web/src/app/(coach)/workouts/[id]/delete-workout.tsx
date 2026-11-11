@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
@@ -13,7 +14,7 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
   const titleId = useId();
   const bodyId = useId();
   const [uses, setUses] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
   function open() {
@@ -22,7 +23,7 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
     dialogRef.current?.showModal();
     countProgramUses(id)
       .then(setUses)
-      .catch(() => setError("Couldn't check which programs use it. Please try again."));
+      .catch(() => setError('workout_uses_failed'));
   }
 
   function confirm() {
@@ -32,7 +33,7 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
       if (outcome.ok) {
         dialogRef.current?.close();
         router.push('/workouts');
-      } else setError(outcome.error ?? "Couldn't delete. Please try again.");
+      } else setError(outcome.code);
     });
   }
 
@@ -58,7 +59,7 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
                 uses > 0 ? ', except upcoming ones not yet started from programs with Live Sync on' : ''
               }.`}
         </p>
-        {error ? <ErrorText>{error}</ErrorText> : null}
+        {error ? <ErrorText code={error} /> : null}
         <div className={styles.dialogActions}>
           <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
             Cancel

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { followingWeeks, slotsInWeeks } from '@caltracker/shared';
-import { Button, SelectField } from '@/components/ui';
+import { Button, ErrorText, SelectField } from '@/components/ui';
 import { assignedNote, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
@@ -84,11 +84,11 @@ export function CopyWeekDialog({
         </>
       ) : confirming ? (
         <>
-          <p id={bodyId} className={styles.dialogBody} role="alert">
+          <ErrorText id={bodyId} code="program_week_not_empty" className={styles.dialogBody}>
             {weeksLabel(targets).replace(/^w/, 'W')} already {targets.length === 1 ? 'has' : 'have'}{' '}
             {plural(replacing, 'workout', 'workouts')}. Copying replaces {replacing === 1 ? 'it' : 'them'} with week{' '}
             {week}&apos;s {plural(sourceCount, 'workout', 'workouts')}.
-          </p>
+          </ErrorText>
           <div className={styles.dialogActions}>
             <Button variant="secondary" onClick={() => setConfirming(false)}>Back</Button>
             <Button onClick={copy} disabled={saving}>

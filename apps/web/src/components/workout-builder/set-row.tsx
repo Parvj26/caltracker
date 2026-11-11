@@ -214,7 +214,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         <Icon name="close" size={18} />
       </button>
       {errors.map((message) => (
-        <ErrorText key={message} className={styles.rowError}>
+        <ErrorText key={message} code="workout_fields_invalid" safe={false} className={styles.rowError}>
           {message}
         </ErrorText>
       ))}

@@ -1,8 +1,10 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button, ErrorText, TextField } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import type { ActionFailure } from '@/lib/action-result';
+import { failureCode } from '@/lib/action-errors';
 import { addCustomMeasure, archiveCustomMeasure } from './actions';
 import type { CustomMetric } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
@@ -16,7 +18,7 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
   const [unit, setUnit] = useState('');
   const [min, setMin] = useState('');
   const [max, setMax] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -28,15 +30,15 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
     };
   }, []);
 
-  async function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>, fallback: string): Promise<boolean> {
+  async function run(action: () => Promise<{ ok: true } | ActionFailure>, fallback: ErrorCode): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
       const outcome = await action();
-      if (!outcome.ok) setError(outcome.error);
+      if (!outcome.ok) setError(outcome.code);
       return outcome.ok;
     } catch (e) {
-      setError(failureMessage(e, fallback));
+      setError(failureCode(e, fallback));
       return false;
     } finally {
       setPending(false);
@@ -47,10 +49,10 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
     const lo = Number(min);
     const hi = Number(max);
     if (min.trim() === '' || max.trim() === '' || !Number.isFinite(lo) || !Number.isFinite(hi)) {
-      setError('Enter the smallest and largest value as numbers.');
+      setError('measure_range_not_numbers');
       return;
     }
-    const ok = await run(() => addCustomMeasure({ name, unitLabel: unit, min: lo, max: hi }), "Couldn't add the measure. Please try again.");
+    const ok = await run(() => addCustomMeasure({ name, unitLabel: unit, min: lo, max: hi }), 'measure_add_offline');
     if (ok) {
       setName('');
       setUnit('');
@@ -71,7 +73,7 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
           {active.map((c) => (
             <li key={c.id} className={styles.listRow}>
               <span>{c.unit_label ? `${c.name} (${c.unit_label})` : c.name} · {c.min} to {c.max}</span>
-              <Button variant="secondary" disabled={pending} aria-label={`Archive ${c.name}`} onClick={() => void run(() => archiveCustomMeasure(c.id), "Couldn't archive that measure.")}>
+              <Button variant="secondary" disabled={pending} aria-label={`Archive ${c.name}`} onClick={() => void run(() => archiveCustomMeasure(c.id), 'measure_archive_failed')}>
                 Archive
               </Button>
             </li>
@@ -92,7 +94,7 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
           <TextField label="Smallest value" inputMode="decimal" value={min} onChange={(e) => setMin(e.target.value)} />
           <TextField label="Largest value" inputMode="decimal" value={max} onChange={(e) => setMax(e.target.value)} />
         </div>
-        {error ? <ErrorText>{error}</ErrorText> : null}
+        {error ? <ErrorText code={error} /> : null}
         <div className={calendar.dialogActions}>
           <Button variant="secondary" onClick={() => dialogRef.current?.close()}>Done</Button>
           <Button type="submit" pending={pending}>Add measure</Button>

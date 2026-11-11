@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { errorMessage } from '@caltracker/shared';
 import { Button } from '@/components/ui';
 import { sendInvites } from './actions';
 import { statusView, type StatusView } from './status-copy';
@@ -27,7 +28,7 @@ export function ResendButton({ email, firstName, lastName, label = 'Resend', ari
     setMessage(null);
     startTransition(async () => {
       const outcome = await sendInvites([{ email, firstName, lastName }]);
-      if (!outcome.ok) return setMessage({ text: outcome.error, tone: 'amber' });
+      if (!outcome.ok) return setMessage({ text: errorMessage(outcome.code), tone: 'amber' });
       const result = outcome.results[0];
       setMessage(result ? statusView(result.status, result.message) : null);
     });

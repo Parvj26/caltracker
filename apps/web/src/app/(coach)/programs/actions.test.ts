@@ -112,7 +112,7 @@ describe('duplicateProgram', () => {
 
   it('refuses a program it cannot find in this workspace, without calling the database function', async () => {
     respond = () => ({ data: null });
-    expect(await duplicateProgram(PROGRAM)).toEqual({ ok: false, error: "Couldn't find that program. It may have been deleted." });
+    expect(await duplicateProgram(PROGRAM)).toEqual({ ok: false, code: 'program_deleted' });
     expect(calls.some((c) => c.op === 'rpc')).toBe(false);
   });
 
@@ -152,14 +152,14 @@ describe('copyProgramWeek', () => {
     respond = () => ({ error: { code: '23514', message: 'That week changed since the page loaded. Reload the page and try again.' } });
     expect(await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids })).toEqual({
       ok: false,
-      error: 'That week changed since the page loaded. Reload the page and try again.',
+      code: 'program_week_changed',
     });
   });
 
   it('says the program is gone when the database refuses it (another workspace\'s program)', async () => {
     respond = () => ({ error: { code: '42501', message: 'Program not found.' } });
     const result = await copyProgramWeek({ programId: PROGRAM, fromWeek: 1, toWeeks: [2], ids });
-    expect(result).toEqual({ ok: false, error: "Couldn't find that program. It may have been deleted." });
+    expect(result).toEqual({ ok: false, code: 'program_deleted' });
   });
 
   it('refuses bad input before touching the database', async () => {

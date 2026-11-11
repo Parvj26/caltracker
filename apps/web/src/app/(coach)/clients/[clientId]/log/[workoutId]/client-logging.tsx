@@ -1,11 +1,12 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { completedSetCount, openSetCount, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { Button, Card, ErrorText } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { PlannedVsActual } from '../../logs/[logId]/planned-vs-actual';
 import { takeOverSession } from './actions';
 import styles from './session.module.css';
@@ -30,7 +31,7 @@ export function ClientLogging({
 }) {
   const router = useRouter();
   const [viewing, setViewing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
   const total = completedSetCount(log) + openSetCount(log);
@@ -41,12 +42,12 @@ export function ClientLogging({
       try {
         const outcome = await takeOverSession(log.id);
         if (!outcome.ok) {
-          setError(outcome.error);
+          setError(outcome.code);
           return;
         }
         router.refresh();
       } catch (e) {
-        setError(failureMessage(e, "Couldn't take over. Check your connection and try again."));
+        setError(failureCode(e, 'session_takeover_failed'));
       }
     });
   }
@@ -77,7 +78,7 @@ export function ClientLogging({
             Refresh
           </Button>
         </div>
-        {error ? <ErrorText>{error}</ErrorText> : null}
+        {error ? <ErrorText code={error} /> : null}
       </Card>
       {viewing ? (
         <section aria-label="What they have logged so far" className={styles.viewOnly}>

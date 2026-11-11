@@ -68,9 +68,11 @@ export function SectionHeader({ section, index, count, empty, errors, onRename, 
           </button>
         </div>
       </div>
-      {blank ? <ErrorText>Name the section.</ErrorText> : null}
+      {blank ? <ErrorText code="field_required">Name the section.</ErrorText> : null}
       {errors.map((m) => (
-        <ErrorText key={m}>{m}</ErrorText>
+        <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
       ))}
       {empty ? <p className={styles.caption}>No exercises yet.</p> : null}
     </div>

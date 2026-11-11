@@ -1,8 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PROGRAM_WEEKS_MAX, ProgramInput, copyName } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, codeForMessage, copyName } from '@caltracker/shared';
 import type { Database } from '@caltracker/shared';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadLiveSync, type LiveSyncState } from '@/lib/live-sync';
@@ -17,7 +18,7 @@ const isInt = (v: unknown, min: number, max: number): v is number =>
 /** Positions are smallint in the database; a cell never holds anywhere near this many. */
 const POSITION_MAX = 9999;
 
-export type UpdateProgramOutcome = { ok: true; removedSlots: number } | { ok: false; error: string };
+export type UpdateProgramOutcome = { ok: true; removedSlots: number } | ActionFailure;
 
 export async function createProgram(input: ProgramInput): Promise<{ id: string }> {
   const { workspaceId } = await requireCoach();
@@ -35,9 +36,9 @@ export async function createProgram(input: ProgramInput): Promise<{ id: string }
 
 export async function updateProgram(id: string, input: ProgramInput): Promise<UpdateProgramOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id)) return { ok: false, error: "Couldn't find that program." };
+  if (!isUuid(id)) return fail('program_not_found', 'action:programs.updateProgram');
   const parsed = ProgramInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the details.' };
+  if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'program_details_invalid'), 'action:programs.updateProgram');
 
   const supabase = await createServerSupabase();
   const { data: current, error: readError } = await supabase
@@ -46,8 +47,8 @@ export async function updateProgram(id: string, input: ProgramInput): Promise<Up
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
-  if (readError) return { ok: false, error: "Couldn't save. Please try again." };
-  if (!current) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (readError) return fail('program_save_failed', 'action:programs.updateProgram');
+  if (!current) return fail('program_deleted', 'action:programs.updateProgram');
 
   // Name and description first: if changing the length then fails, the worst left behind is a harmless rename.
   const { error } = await supabase
@@ -55,7 +56,7 @@ export async function updateProgram(id: string, input: ProgramInput): Promise<Up
     .update({ name: parsed.data.name, description: parsed.data.description })
     .eq('id', id)
     .eq('workspace_id', workspaceId);
-  if (error) return { ok: false, error: "Couldn't save the name and description. Please try again." };
+  if (error) return fail('program_details_save_failed', 'action:programs.updateProgram');
 
   // set_program_weeks deletes slots past the new end and changes weeks in one transaction.
   let removedSlots = 0;
@@ -64,7 +65,7 @@ export async function updateProgram(id: string, input: ProgramInput): Promise<Up
       p_program_id: id,
       p_weeks: parsed.data.weeks,
     });
-    if (weeksError) return { ok: false, error: "Couldn't change the number of weeks. Please try again." };
+    if (weeksError) return fail('program_weeks_save_failed', 'action:programs.updateProgram');
     removedSlots = removed;
   }
 
@@ -73,14 +74,14 @@ export async function updateProgram(id: string, input: ProgramInput): Promise<Up
   return { ok: true, removedSlots };
 }
 
-export async function deleteProgram(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function deleteProgram(id: string): Promise<{ ok: true } | ActionFailure> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id)) return { ok: false, error: "Couldn't find that program." };
+  if (!isUuid(id)) return fail('program_not_found', 'action:programs.deleteProgram');
   const supabase = await createServerSupabase();
   // Slots go with it (on delete cascade). Clients who were assigned it keep their calendar copies.
   const { data, error } = await supabase.from('programs').delete().eq('id', id).eq('workspace_id', workspaceId).select('id');
-  if (error) return { ok: false, error: "Couldn't delete. Please try again." };
-  if (data.length === 0) return { ok: false, error: "Couldn't find that program. It may already be deleted." };
+  if (error) return fail('program_delete_failed', 'action:programs.deleteProgram');
+  if (data.length === 0) return fail('program_already_deleted', 'action:programs.deleteProgram');
   revalidatePath('/programs');
   return { ok: true };
 }
@@ -213,7 +214,7 @@ export async function removeProgramWorkout(id: string): Promise<void> {
   if (error) throw new Error(`Could not remove the workout: ${error.message}`);
 }
 
-export type DuplicateProgramOutcome = { ok: true; id: string } | { ok: false; error: string };
+export type DuplicateProgramOutcome = { ok: true; id: string } | ActionFailure;
 
 /**
  * Copies a program (details and every workout on its weeks) into a new program named "<name> (copy)" in the coach's
@@ -222,7 +223,7 @@ export type DuplicateProgramOutcome = { ok: true; id: string } | { ok: false; er
  */
 export async function duplicateProgram(id: string): Promise<DuplicateProgramOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id)) return { ok: false, error: "Couldn't find that program." };
+  if (!isUuid(id)) return fail('program_not_found', 'action:programs.duplicateProgram');
   const supabase = await createServerSupabase();
   const { data: program, error: readError } = await supabase
     .from('programs')
@@ -230,8 +231,8 @@ export async function duplicateProgram(id: string): Promise<DuplicateProgramOutc
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .maybeSingle();
-  if (readError) return { ok: false, error: "Couldn't copy. Please try again." };
-  if (!program) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (readError) return fail('program_copy_failed', 'action:programs.duplicateProgram');
+  if (!program) return fail('program_deleted', 'action:programs.duplicateProgram');
 
   const newId = crypto.randomUUID();
   const { error } = await supabase.rpc('duplicate_program', {
@@ -239,14 +240,14 @@ export async function duplicateProgram(id: string): Promise<DuplicateProgramOutc
     p_program_id: id,
     p_name: copyName(program.name),
   });
-  if (error) return { ok: false, error: "Couldn't copy. Please try again." };
+  if (error) return fail('program_copy_failed', 'action:programs.duplicateProgram');
   revalidatePath('/programs');
   return { ok: true, id: newId };
 }
 
 export type CopyWeekOutcome =
   | { ok: true; slots: Array<{ id: string; week: number; day: number; position: number; workoutId: string }> }
-  | { ok: false; error: string };
+  | ActionFailure;
 
 /** A week holds at most 7 days of a few workouts each; this only stops absurd requests. */
 const COPY_IDS_MAX = 2000;
@@ -276,7 +277,7 @@ export async function copyProgramWeek(input: {
     ids.length > COPY_IDS_MAX ||
     !ids.every(isUuid)
   ) {
-    return { ok: false, error: "Couldn't copy that week." };
+    return fail('program_copy_week_invalid', 'action:programs.copyProgramWeek');
   }
   // RLS (security invoker) limits the function to the coach's own workspace's programs.
   const supabase = await createServerSupabase();
@@ -288,9 +289,10 @@ export async function copyProgramWeek(input: {
   });
   if (error) {
     // 23514: a guard in copy_program_week; its message is written for the coach.
-    if (error.code === '23514') return { ok: false, error: error.message };
-    if (error.code === '42501') return { ok: false, error: "Couldn't find that program. It may have been deleted." };
-    return { ok: false, error: "Couldn't copy. Please try again." };
+    // Only the code goes back; the database text stays on the server.
+    if (error.code === '23514') return fail(/changed since/i.test(error.message) ? 'program_week_changed' : /no workouts/i.test(error.message) ? 'program_week_empty' : 'program_copy_week_invalid', 'action:programs.copyProgramWeek');
+    if (error.code === '42501') return fail('program_deleted', 'action:programs.copyProgramWeek');
+    return fail('program_copy_failed', 'action:programs.copyProgramWeek');
   }
   revalidatePath(`/programs/${programId}`);
   return {
@@ -299,7 +301,7 @@ export async function copyProgramWeek(input: {
   };
 }
 
-export type LiveSyncOutcome = ({ ok: true } & LiveSyncState) | { ok: false; error: string };
+export type LiveSyncOutcome = ({ ok: true } & LiveSyncState) | ActionFailure;
 
 /**
  * Turns the program's Live Sync on or off. Turning it on runs the catch-up sync in the same transaction (a database
@@ -307,7 +309,7 @@ export type LiveSyncOutcome = ({ ok: true } & LiveSyncState) | { ok: false; erro
  */
 export async function setProgramLiveSync(id: string, on: boolean): Promise<LiveSyncOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id) || typeof on !== 'boolean') return { ok: false, error: "Couldn't find that program." };
+  if (!isUuid(id) || typeof on !== 'boolean') return fail('program_not_found', 'action:programs.setProgramLiveSync');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('programs')
@@ -315,10 +317,10 @@ export async function setProgramLiveSync(id: string, on: boolean): Promise<LiveS
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .select('id');
-  if (error) return { ok: false, error: "Couldn't change Live Sync. Please try again." };
-  if (data.length === 0) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (error) return fail('live_sync_save_failed', 'action:programs.setProgramLiveSync');
+  if (data.length === 0) return fail('program_deleted', 'action:programs.setProgramLiveSync');
   const state = await loadLiveSync(supabase, workspaceId, id);
-  if (!state) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (!state) return fail('program_deleted', 'action:programs.setProgramLiveSync');
   return { ok: true, ...state };
 }
 
@@ -330,7 +332,7 @@ export async function getLiveSyncStatus(id: string): Promise<LiveSyncState | nul
   return loadLiveSync(supabase, workspaceId, id);
 }
 
-export type AutoProgressionOutcome = { ok: true; on: boolean } | { ok: false; error: string };
+export type AutoProgressionOutcome = { ok: true; on: boolean } | ActionFailure;
 
 /**
  * Turns the program's Auto progression on or off. It never changes any workout: it only decides whether the phone
@@ -338,7 +340,7 @@ export type AutoProgressionOutcome = { ok: true; on: boolean } | { ok: false; er
  */
 export async function setProgramAutoProgression(id: string, on: boolean): Promise<AutoProgressionOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id) || typeof on !== 'boolean') return { ok: false, error: "Couldn't find that program." };
+  if (!isUuid(id) || typeof on !== 'boolean') return fail('program_not_found', 'action:programs.setProgramAutoProgression');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('programs')
@@ -346,8 +348,8 @@ export async function setProgramAutoProgression(id: string, on: boolean): Promis
     .eq('id', id)
     .eq('workspace_id', workspaceId)
     .select('auto_progression');
-  if (error) return { ok: false, error: "Couldn't change Auto progression. Please try again." };
+  if (error) return fail('auto_progression_save_failed', 'action:programs.setProgramAutoProgression');
   const row = data[0];
-  if (!row) return { ok: false, error: "Couldn't find that program. It may have been deleted." };
+  if (!row) return fail('program_deleted', 'action:programs.setProgramAutoProgression');
   return { ok: true, on: row.auto_progression };
 }

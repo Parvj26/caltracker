@@ -156,7 +156,9 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         </div>
       </header>
       {(errors.get(`block:${block.id}`) ?? []).map((m) => (
-        <ErrorText key={m}>{m}</ErrorText>
+        <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
       ))}
 
       {block.exercises.map((ex, ei) => {
@@ -184,7 +186,9 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               </div>
             ) : null}
             {(errors.get(`exercise:${ex.id}`) ?? []).map((m) => (
-              <ErrorText key={m}>{m}</ErrorText>
+              <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
             ))}
             <div className={styles.sets}>
               {ex.sets.map((s, si) => (

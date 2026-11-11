@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useState, useTransition } from 'react';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { ErrorText } from '@/components/ui';
@@ -9,7 +10,7 @@ import styles from './community.module.css';
 
 /** Who is in the community. Removing someone only takes them out of the community; they stay your client. */
 export function Members({ communityId, members }: { communityId: string; members: Member[] }) {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
   const active = members.filter((m) => !m.removedAt);
   const removed = members.filter((m) => m.removedAt);
@@ -19,7 +20,7 @@ export function Members({ communityId, members }: { communityId: string; members
     startTransition(async () => {
       setError(null);
       const r = await setMemberRemoved(communityId, m.userId, remove);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(r.code);
     });
   };
 
@@ -60,7 +61,7 @@ export function Members({ communityId, members }: { communityId: string; members
           </ul>
         </>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </section>
   );
 }

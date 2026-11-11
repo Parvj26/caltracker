@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
+import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
 import styles from './clients.module.css';
 
@@ -27,7 +28,7 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
   function confirm() {
@@ -37,7 +38,7 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
       if (outcome.ok) {
         dialogRef.current?.close();
         document.getElementById(focusAfterId)?.focus();
-      } else setError(outcome.error);
+      } else setError(outcome.code);
     });
   }
 
@@ -74,7 +75,7 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
       >
         <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
         <p id={bodyId} className={styles.dialogBody}>{body}</p>
-        {error ? <ErrorText>{error}</ErrorText> : null}
+        {error ? <ErrorText code={error} /> : null}
         <div className={styles.dialogActions}>
           <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
             Cancel

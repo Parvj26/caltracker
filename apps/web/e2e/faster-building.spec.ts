@@ -125,7 +125,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
   await expect(dialog).toContainText('Live Sync is on: clients on this program get this change from today on.');
   await dialog.getByLabel('Copy to').selectOption({ label: 'Week 2' });
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toHaveText("Week 2 already has 1 workout. Copying replaces it with week 1's 2 workouts.");
+  await expect(dialog.getByRole('alert')).toContainText("Week 2 already has 1 workout. Copying replaces it with week 1's 2 workouts.");
   await dialog.getByRole('button', { name: 'Replace week 2' }).click();
   await expect(dialog).toBeHidden();
   await expect(chip(2, 1)).toBeVisible();

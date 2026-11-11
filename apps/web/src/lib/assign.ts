@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { BAD_TODAY_ERROR, isPlausibleToday, localToday, programStartError, scheduleDateError } from '@caltracker/shared';
-import type { Database, IsoDate } from '@caltracker/shared';
+import { codeForMessage, isPlausibleToday, localToday, programStartError, scheduleDateError } from '@caltracker/shared';
+import type { Database, ErrorCode, IsoDate } from '@caltracker/shared';
+import { fail, type ActionFailure } from '@/lib/action-result';
 
 // Server-only helpers behind every "put this on a client's calendar" action: the calendar's own dialogs and the
 // library's Assign to several clients. Each call is one database function (schedule_workout or assign_program),
@@ -8,25 +9,25 @@ import type { Database, IsoDate } from '@caltracker/shared';
 // workout(s) in one transaction: all or nothing for that client. Copies go through copy_workout, so Live Sync's
 // bookkeeping (planned_on, source_hash) is set the same way whichever screen assigned it.
 
-export type Outcome<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
-
-export const GENERIC = "Couldn't save. Please try again.";
-export const NOT_A_CLIENT = "You can't add workouts for this client. They may no longer be your client.";
+export type Outcome<T extends object = object> = ({ ok: true } & T) | ActionFailure;
 
 /**
  * Date rules (single workouts today or later, programs from up to 7 days back) are measured from the coach's own
  * today, which only the browser knows. The browser sends it; it must be within a day of UTC's date here, so it can't
  * be moved far to get round the rules.
  */
-export const todayError = (today: IsoDate) => (isPlausibleToday(today, localToday('UTC')) ? null : BAD_TODAY_ERROR);
+export const todayError = (today: IsoDate): ErrorCode | null => (isPlausibleToday(today, localToday('UTC')) ? null : 'date_bad_today');
+
+/** The code of a shared date rule's message (each one is in the error-code list). */
+export const dateCode = (message: string | null): ErrorCode | null => (message ? codeForMessage(message, 'assign_date_invalid') : null);
 
 /** schedule_workout: one library workout onto one client's day (today or later). */
 export async function scheduleOne(
   supabase: SupabaseClient<Database>,
   i: { newId: string; workoutId: string; clientId: string; date: IsoDate; today: IsoDate },
 ): Promise<Outcome> {
-  const dateError = scheduleDateError(i.date, i.today);
-  if (dateError) return { ok: false, error: dateError };
+  const dateError = dateCode(scheduleDateError(i.date, i.today));
+  if (dateError) return fail(dateError, 'action:assign.scheduleOne');
   const { error } = await supabase.rpc('schedule_workout', {
     p_new_id: i.newId,
     p_workout_id: i.workoutId,
@@ -34,14 +35,9 @@ export async function scheduleOne(
     p_date: i.date,
   });
   if (error) {
-    if (error.code === '42501') return { ok: false, error: NOT_A_CLIENT };
-    if (error.code === '23505') {
-      return {
-        ok: false,
-        error: 'This add was already sent with a different workout or day. Close this, check the calendar, then add again if needed.',
-      };
-    }
-    return { ok: false, error: GENERIC };
+    if (error.code === '42501') return fail('client_not_current', 'action:assign.scheduleOne');
+    if (error.code === '23505') return fail('schedule_conflict', 'action:assign.scheduleOne');
+    return fail('schedule_save_failed', 'action:assign.scheduleOne');
   }
   return { ok: true };
 }
@@ -51,8 +47,8 @@ export async function assignOne(
   supabase: SupabaseClient<Database>,
   i: { assignmentId: string; programId: string; clientId: string; startDate: IsoDate; today: IsoDate },
 ): Promise<Outcome<{ count: number }>> {
-  const dateError = programStartError(i.startDate, i.today);
-  if (dateError) return { ok: false, error: dateError };
+  const dateError = dateCode(programStartError(i.startDate, i.today));
+  if (dateError) return fail(dateError, 'action:assign.assignOne');
   const { data: id, error } = await supabase.rpc('assign_program', {
     p_assignment_id: i.assignmentId,
     p_program_id: i.programId,
@@ -60,15 +56,9 @@ export async function assignOne(
     p_start_date: i.startDate,
   });
   if (error) {
-    if (error.code === '42501') return { ok: false, error: NOT_A_CLIENT };
-    if (error.code === '23505') {
-      return {
-        ok: false,
-        error:
-          'Assign was already sent with a different program or start date. Close this, check the calendar, then assign again if needed.',
-      };
-    }
-    return { ok: false, error: GENERIC };
+    if (error.code === '42501') return fail('client_not_current', 'action:assign.assignOne');
+    if (error.code === '23505') return fail('assign_conflict', 'action:assign.assignOne');
+    return fail('assign_save_failed', 'action:assign.assignOne');
   }
   const { count, error: countError } = await supabase
     .from('workouts')
@@ -85,8 +75,8 @@ export async function copyOne(
   supabase: SupabaseClient<Database>,
   i: { newId: string; sourceId: string; clientId: string; date: IsoDate; today: IsoDate },
 ): Promise<Outcome> {
-  const dateError = scheduleDateError(i.date, i.today);
-  if (dateError) return { ok: false, error: dateError };
+  const dateError = dateCode(scheduleDateError(i.date, i.today));
+  if (dateError) return fail(dateError, 'action:assign.copyOne');
   const { error } = await supabase.rpc('copy_client_workout', {
     p_source: i.sourceId,
     p_new_id: i.newId,
@@ -94,11 +84,9 @@ export async function copyOne(
     p_date: i.date,
   });
   if (error) {
-    if (error.code === '42501') return { ok: false, error: "You can't copy to this client. They may no longer be your client." };
-    if (error.code === '23505') {
-      return { ok: false, error: 'This copy was already sent for a different day. Close this, check the calendar, then copy again if needed.' };
-    }
-    return { ok: false, error: GENERIC };
+    if (error.code === '42501') return fail('copy_not_client', 'action:assign.copyOne');
+    if (error.code === '23505') return fail('copy_conflict', 'action:assign.copyOne');
+    return fail('copy_save_failed', 'action:assign.copyOne');
   }
   return { ok: true };
 }

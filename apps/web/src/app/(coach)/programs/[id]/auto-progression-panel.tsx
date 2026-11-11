@@ -1,8 +1,9 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useId, useState } from 'react';
 import { Card, ErrorText } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { setProgramAutoProgression } from '../actions';
 import styles from '../programs.module.css';
 
@@ -13,7 +14,7 @@ import styles from '../programs.module.css';
 export function AutoProgressionPanel({ programId, initial }: { programId: string; initial: boolean }) {
   const [on, setOn] = useState(initial);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const labelId = useId();
   const helpId = useId();
 
@@ -23,12 +24,12 @@ export function AutoProgressionPanel({ programId, initial }: { programId: string
     try {
       const outcome = await setProgramAutoProgression(programId, !on);
       if (!outcome.ok) {
-        setError(outcome.error);
+        setError(outcome.code);
         return;
       }
       setOn(outcome.on);
     } catch (e) {
-      setError(failureMessage(e, "Couldn't change Auto progression. Please try again."));
+      setError(failureCode(e, 'auto_progression_save_failed'));
     } finally {
       setPending(false);
     }
@@ -59,7 +60,7 @@ export function AutoProgressionPanel({ programId, initial }: { programId: string
         sets at the top of the rep range last time: +5 lb upper body, +10 lb lower body (+2.5 / +5 kg). Below the
         bottom of the range two sessions in a row: 10% lighter. A weight you type in a workout always wins.
       </p>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </Card>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
 import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
+import { alertCode } from './alert-code';
 import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
 
 const SLOW_MS = 2000;
@@ -49,7 +50,7 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
             if (seen.has(el)) continue;
             seen.add(el);
             getTaskTracker().error();
-            track('error_shown', { code: el.getAttribute('data-error-code') ?? 'alert', screen: scrubUrl(window.location.pathname) });
+            track('error_shown', { code: alertCode(el.getAttribute('data-error-code')), screen: scrubUrl(window.location.pathname) });
           }
         }
       }

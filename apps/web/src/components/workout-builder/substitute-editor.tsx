@@ -69,7 +69,9 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
         </div>
       </div>
       {(errors.get(`substitute:${sub.id}`) ?? []).map((m) => (
-        <ErrorText key={m}>{m}</ErrorText>
+        <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
       ))}
       <div id={setsId} hidden={!expanded} className={styles.substituteBody}>
         <div className={styles.sets}>

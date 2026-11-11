@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui';
-import { MAX_PHOTOS } from '@caltracker/shared';
+import { Button, ErrorText } from '@/components/ui';
+import { MAX_PHOTOS, type ErrorCode } from '@caltracker/shared';
 import { canSendDraft } from './model';
 import styles from './messages.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
@@ -21,7 +21,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
   // Starts when the coach begins typing, so just opening a thread is not counted as a reply given up.
   const completeReply = useAnalyticsTask('reply_message', body.trim().length > 0);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const latestPhotos = useRef(photos);
@@ -54,8 +54,8 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
     const picked = [...list];
     const images = picked.filter((f) => f.type.startsWith('image/'));
     const room = MAX_PHOTOS - photos.length;
-    if (images.length < picked.length) setError('Only photos can be sent.');
-    else if (images.length > room) setError(`You can add up to ${MAX_PHOTOS} photos to a message.`);
+    if (images.length < picked.length) setError('message_photos_only');
+    else if (images.length > room) setError('message_photo_limit');
     else setError(null);
     setPhotos((prev) => [...prev, ...images.slice(0, room).map((file) => ({ file, url: URL.createObjectURL(file) }))]);
     if (picker.current) picker.current.value = '';
@@ -102,7 +102,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
           ))}
         </ul>
       ) : null}
-      {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+      {error ? <ErrorText code={error} className={styles.error} /> : null}
       <div className={styles.composerRow}>
         <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} aria-label="Choose photos" />
         <button

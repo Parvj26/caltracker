@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
@@ -13,7 +14,7 @@ export function DeleteProgram({ id, name }: { id: string; name: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
   function confirm() {
@@ -24,7 +25,7 @@ export function DeleteProgram({ id, name }: { id: string; name: string }) {
         markUndone('program', id);
         dialogRef.current?.close();
         router.push('/programs');
-      } else setError(outcome.error);
+      } else setError(outcome.code);
     });
   }
 
@@ -52,7 +53,7 @@ export function DeleteProgram({ id, name }: { id: string; name: string }) {
         <p id={bodyId} className={styles.dialogBody}>
           The program and its weekly plan are deleted. Clients already on it keep the workouts on their calendars.
         </p>
-        {error ? <ErrorText>{error}</ErrorText> : null}
+        {error ? <ErrorText code={error} /> : null}
         <div className={styles.dialogActions}>
           <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
             Cancel

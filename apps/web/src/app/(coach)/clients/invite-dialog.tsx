@@ -6,9 +6,11 @@ import {
   InviteInput,
   IsoDateSchema,
   addDays,
+  codeForMessage,
   invitePlanError,
   isoWeekday,
   localToday,
+  type ErrorCode,
   type InvitePlan,
   type IsoDate,
 } from '@caltracker/shared';
@@ -16,7 +18,7 @@ import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
 import { Button, ButtonLink, ErrorText, SelectField, TextField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { useBrowserToday } from '@/lib/local-today';
 import type { PickerHints } from '@/lib/picker-hints';
 import { inviteClient } from './actions';
@@ -32,7 +34,12 @@ type Program = { id: string; name: string; weeks: number };
 type PlanKind = InvitePlan['kind'];
 type Item = { key: string; workoutId: string | null; on: IsoDate };
 
-type FieldError = { field: 'firstName' | 'lastName' | 'email'; message: string };
+type FieldError = { field: 'firstName' | 'lastName' | 'email'; code: ErrorCode };
+const FIELD_CODES: Record<FieldError['field'], ErrorCode> = {
+  firstName: 'invite_first_name_invalid',
+  lastName: 'invite_last_name_invalid',
+  email: 'invite_email_invalid',
+};
 const FIELD_MESSAGES: Record<FieldError['field'], string> = {
   firstName: 'Enter a first name (1 to 100 characters).',
   lastName: 'Last name can be at most 100 characters.',
@@ -51,7 +58,7 @@ type Sent = {
   expiresAt: string | null;
   /** Step 3 of "Next steps", or null with nothing planned (or when the plan couldn't be kept). */
   planStep: { lead: string; name: string; rest: string } | null;
-  planError: string | null;
+  planError: ErrorCode | null;
   /** Extra word from the send (for example they already train with another coach). */
   note: StatusView | null;
 };
@@ -195,7 +202,7 @@ function OneClientForm({
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [result, setResult] = useState<StatusView | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -209,15 +216,15 @@ function OneClientForm({
   const chosen = items.filter((i): i is Item & { workoutId: string } => i.workoutId !== null);
   const last = items[items.length - 1]!;
 
-  function buildPlan(): InvitePlan | string {
+  function buildPlan(): InvitePlan | ErrorCode {
     if (kind === 'program') {
-      if (!program) return 'Pick a program, or choose Nothing yet.';
-      if (!IsoDateSchema.safeParse(startOn).success) return 'Pick a start day.';
+      if (!program) return 'invite_plan_no_program';
+      if (!IsoDateSchema.safeParse(startOn).success) return 'invite_plan_no_start';
       return { kind: 'program', programId: program.id, startOn };
     }
     if (kind === 'workouts') {
-      if (chosen.length === 0) return 'Pick a workout, or choose Nothing yet.';
-      if (chosen.some((i) => !IsoDateSchema.safeParse(i.on).success)) return 'Pick a day for each workout.';
+      if (chosen.length === 0) return 'invite_plan_no_workout';
+      if (chosen.some((i) => !IsoDateSchema.safeParse(i.on).success)) return 'invite_plan_no_day';
       return { kind: 'workouts', items: chosen.map((i) => ({ workoutId: i.workoutId, on: i.on })) };
     }
     return { kind: 'none' };
@@ -240,19 +247,19 @@ function OneClientForm({
     const parsed = InviteInput.safeParse({ firstName, lastName, email });
     if (!parsed.success) {
       const bad = (['firstName', 'lastName', 'email'] as const).find((f) => parsed.error.issues.some((i) => i.path[0] === f)) ?? 'firstName';
-      setFieldError({ field: bad, message: FIELD_MESSAGES[bad] });
+      setFieldError({ field: bad, code: FIELD_CODES[bad] });
       return;
     }
     setFieldError(null);
     const plan = buildPlan();
     if (typeof plan === 'string') return setError(plan);
     const badPlan = invitePlanError(plan, today);
-    if (badPlan) return setError(badPlan);
+    if (badPlan) return setError(codeForMessage(badPlan, 'invite_plan_invalid'));
 
     startTransition(async () => {
       try {
         const outcome = await inviteClient({ invite: parsed.data, plan, today });
-        if (!outcome.ok) return setError(outcome.error);
+        if (!outcome.ok) return setError(outcome.code);
         const { result: r } = outcome;
         if (r.status === 'sent' || r.status === 'resent' || r.status === 'with_another_coach') {
           onSent({
@@ -267,7 +274,7 @@ function OneClientForm({
         }
         setResult(statusView(r.status, r.message));
       } catch (e) {
-        setError(failureMessage(e, "Couldn't send. Check your connection and try again."));
+        setError(failureCode(e, 'invite_send_offline'));
       }
     });
   }
@@ -293,7 +300,11 @@ function OneClientForm({
         hint="They'll sign in to the app with this email."
         {...invalid('email')}
       />
-      {fieldError ? <ErrorText id="invite-field-error">{fieldError.message}</ErrorText> : null}
+      {fieldError ? (
+        <ErrorText id="invite-field-error" code={fieldError.code}>
+          {FIELD_MESSAGES[fieldError.field]}
+        </ErrorText>
+      ) : null}
 
       <section className={styles.startBox} aria-labelledby="start-heading">
         <div className={styles.startHeader}>
@@ -409,7 +420,7 @@ function OneClientForm({
         <b>What {who} gets:</b> an email &ldquo;{coachName} invited you to CalTracker&rdquo; with a Join button. The link works for 14 days.
       </p>
 
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       {result ? <p role="status" className={styles.status}><StatusChip view={result} /></p> : null}
 
       <div className={styles.inviteActionsRow}>
@@ -434,7 +445,7 @@ function SentView({ titleId, sent, onAnother, onDone }: { titleId: string; sent:
         ) : null}
       </p>
       {sent.note ? <p className={styles.status}><StatusChip view={sent.note} /></p> : null}
-      {sent.planError ? <ErrorText>{sent.planError}</ErrorText> : null}
+      {sent.planError ? <ErrorText code={sent.planError} /> : null}
       <div className={styles.nextSteps}>
         <h3 className={styles.startHeading}>Next steps for {sent.firstName}</h3>
         <ol className={styles.stepList}>

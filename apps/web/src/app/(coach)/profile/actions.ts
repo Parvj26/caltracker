@@ -1,22 +1,21 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, ProfileInput, passwordBytes } from '@caltracker/shared';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, ProfileInput, codeForMessage, passwordBytes } from '@caltracker/shared';
 import { acceptableAvatarFiles, type AvatarExt } from '@/lib/avatar-files';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
 /** `partial`: the name, bio and units were saved even though the business rename was refused. */
-export type ProfileOutcome = { ok: true } | { ok: false; error: string; partial?: true };
+export type ProfileOutcome = { ok: true } | (ActionFailure & { partial?: true });
 
-const GENERIC = 'Something went wrong. Please try again.';
-const WRONG_CURRENT_PASSWORD = "That's not your current password.";
 
 /** The name, business, bio and units. Only what changed is written; nothing changed means no write and no error. */
 export async function saveProfile(input: ProfileInput): Promise<ProfileOutcome> {
   const coach = await requireCoach();
   const parsed = ProfileInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the highlighted fields.' };
+  if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'field_format'), 'action:profile.saveProfile');
   const next = parsed.data;
   const supabase = await createServerSupabase();
 
@@ -27,18 +26,18 @@ export async function saveProfile(input: ProfileInput): Promise<ProfileOutcome> 
       .from('profiles')
       .update({ first_name: next.firstName, last_name: next.lastName, bio: next.bio, units: next.units })
       .eq('id', coach.userId);
-    if (error) return { ok: false, error: "Couldn't save your profile. Please try again." };
+    if (error) return fail('profile_save_failed', 'action:profile.saveProfile');
   }
   if (next.businessName !== coach.workspaceName) {
     // Owner-only in the database; a staff coach gets the refusal here.
     const { error } = await supabase.rpc('update_workspace_name', { p_name: next.businessName });
     if (error) {
-      const why = error.code === '42501' ? 'Only the business owner can change the business name.' : "Couldn't save the business name. Please try again.";
+      const why = error.code === '42501' ? 'business_name_owner_only' : 'business_name_save_failed';
       if (profileChanged) {
         revalidatePath('/', 'layout');
-        return { ok: false, error: `${why} Your other changes were saved.`, partial: true };
+        return { ...fail(why, 'action:profile.saveProfile'), partial: true };
       }
-      return { ok: false, error: why };
+      return fail(why, 'action:profile.saveProfile');
     }
   }
   if (profileChanged || next.businessName !== coach.workspaceName) revalidatePath('/', 'layout');
@@ -56,8 +55,8 @@ export async function uploadAvatar(formData: FormData): Promise<ProfileOutcome> 
   const avatar = formData.get('avatar');
   const thumb = formData.get('thumb');
   const ext = formData.get('ext');
-  const refused: ProfileOutcome = { ok: false, error: "That image couldn't be used. Try a JPEG or PNG." };
-  if (!(avatar instanceof Blob) || !(thumb instanceof Blob) || (ext !== 'webp' && ext !== 'jpg')) return { ok: false, error: GENERIC };
+  const refused: ProfileOutcome = fail('avatar_unusable', 'action:profile.uploadAvatar');
+  if (!(avatar instanceof Blob) || !(thumb instanceof Blob) || (ext !== 'webp' && ext !== 'jpg')) return fail('server_error', 'action:profile.uploadAvatar');
   if (!(await acceptableAvatarFiles(avatar, thumb, ext))) return refused;
 
   const supabase = await createServerSupabase();
@@ -67,10 +66,10 @@ export async function uploadAvatar(formData: FormData): Promise<ProfileOutcome> 
     supabase.storage.from('avatars').upload(`${folder}/avatar.${ext}`, avatar, options),
     supabase.storage.from('avatars').upload(`${folder}/avatar-thumb.${ext}`, thumb, options),
   ]);
-  if (full.error || small.error) return { ok: false, error: "Couldn't upload your photo. Please try again." };
+  if (full.error || small.error) return fail('upload_failed', 'action:profile.uploadAvatar');
 
   const { error } = await supabase.from('profiles').update({ avatar_path: `${folder}/avatar.${ext}` }).eq('id', coach.userId);
-  if (error) return { ok: false, error: "Couldn't save your photo. Please try again." };
+  if (error) return fail('avatar_save_failed', 'action:profile.uploadAvatar');
   // Best effort: drop the other format's files if the photo used to be saved the other way.
   const other: AvatarExt = ext === 'webp' ? 'jpg' : 'webp';
   await supabase.storage.from('avatars').remove([`${folder}/avatar.${other}`, `${folder}/avatar-thumb.${other}`]);
@@ -83,7 +82,7 @@ export async function removeAvatar(): Promise<ProfileOutcome> {
   const coach = await requireCoach();
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('profiles').update({ avatar_path: null }).eq('id', coach.userId);
-  if (error) return { ok: false, error: "Couldn't remove your photo. Please try again." };
+  if (error) return fail('avatar_remove_failed', 'action:profile.removeAvatar');
   // Best effort: the files are private and nothing points at them any more.
   await supabase.storage.from('avatars').remove(['webp', 'jpg'].flatMap((e) => [`${coach.userId}/avatar.${e}`, `${coach.userId}/avatar-thumb.${e}`]));
   revalidatePath('/', 'layout');
@@ -93,28 +92,22 @@ export async function removeAvatar(): Promise<ProfileOutcome> {
 export async function changePassword(input: { current: string; next: string; confirm: string }): Promise<ProfileOutcome> {
   const coach = await requireCoach();
   const { current, next, confirm } = input;
-  if (typeof current !== 'string' || typeof next !== 'string' || typeof confirm !== 'string') return { ok: false, error: GENERIC };
-  if (current === '') return { ok: false, error: 'Enter your current password.' };
-  if (next.length < PASSWORD_MIN_LENGTH) return { ok: false, error: `Use at least ${PASSWORD_MIN_LENGTH} characters.` };
-  if (passwordBytes(next) > PASSWORD_MAX_LENGTH) return { ok: false, error: 'That password is too long. Use 72 bytes or fewer.' };
-  if (next !== confirm) return { ok: false, error: 'The two passwords do not match.' };
-  if (next === current) return { ok: false, error: 'Choose a password you have not used before.' };
+  if (typeof current !== 'string' || typeof next !== 'string' || typeof confirm !== 'string') return fail('server_error', 'action:profile.changePassword');
+  if (current === '') return fail('password_current_required', 'action:profile.changePassword');
+  if (next.length < PASSWORD_MIN_LENGTH) return fail('password_too_short', 'action:profile.changePassword');
+  if (passwordBytes(next) > PASSWORD_MAX_LENGTH) return fail('password_too_long', 'action:profile.changePassword');
+  if (next !== confirm) return fail('password_mismatch', 'action:profile.changePassword');
+  if (next === current) return fail('password_reused', 'action:profile.changePassword');
 
   const supabase = await createServerSupabase();
   // Re-authenticate first: a stolen open session alone must not be enough to take over the account.
   const signedIn = await supabase.auth.signInWithPassword({ email: coach.email, password: current });
   if (signedIn.error) {
-    return {
-      ok: false,
-      error: signedIn.error.code === 'invalid_credentials' ? WRONG_CURRENT_PASSWORD : GENERIC,
-    };
+    return fail(signedIn.error.code === 'invalid_credentials' ? 'password_current_wrong' : 'server_error', 'action:profile.changePassword');
   }
   const { error } = await supabase.auth.updateUser({ password: next });
   if (error) {
-    return {
-      ok: false,
-      error: error.code === 'same_password' ? 'Choose a password you have not used before.' : "We couldn't change your password. Please try again.",
-    };
+    return fail(error.code === 'same_password' ? 'password_reused' : 'password_change_failed', 'action:profile.changePassword');
   }
   return { ok: true };
 }

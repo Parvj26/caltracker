@@ -1,9 +1,10 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { IMAGE_ERROR, processAvatar } from '@/lib/image-resize';
 import { removeAvatar, uploadAvatar } from './actions';
 import styles from './profile.module.css';
@@ -13,7 +14,7 @@ export function AvatarPicker({ preview, hasPhoto }: { preview: ReactNode; hasPho
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [notice, setNotice] = useState('');
 
   async function choose(file: File | undefined) {
@@ -28,10 +29,10 @@ export function AvatarPicker({ preview, hasPhoto }: { preview: ReactNode; hasPho
       body.set('thumb', thumb, `avatar-thumb.${ext}`);
       body.set('ext', ext);
       const outcome = await uploadAvatar(body);
-      if (!outcome.ok) setError(outcome.error);
+      if (!outcome.ok) setError(outcome.code);
       else setNotice('Photo updated.');
     } catch (e) {
-      setError(e instanceof Error && e.message === IMAGE_ERROR ? IMAGE_ERROR : failureMessage(e, "Couldn't upload your photo. Please try again."));
+      setError(e instanceof Error && e.message === IMAGE_ERROR ? 'avatar_unusable' : failureCode(e, 'upload_failed'));
     } finally {
       setBusy(null);
       if (inputRef.current) inputRef.current.value = ''; // so choosing the same file again still fires
@@ -44,10 +45,10 @@ export function AvatarPicker({ preview, hasPhoto }: { preview: ReactNode; hasPho
     setBusy('remove');
     try {
       const outcome = await removeAvatar();
-      if (!outcome.ok) setError(outcome.error);
+      if (!outcome.ok) setError(outcome.code);
       else setNotice('Photo removed.');
     } catch (e) {
-      setError(failureMessage(e, "Couldn't remove your photo. Please try again."));
+      setError(failureCode(e, 'avatar_remove_failed'));
     } finally {
       setBusy(null);
     }
@@ -80,8 +81,8 @@ export function AvatarPicker({ preview, hasPhoto }: { preview: ReactNode; hasPho
         </div>
       </div>
       <div role="status" className={styles.success}>{notice}</div>
-      {error ? <ErrorText>{error}</ErrorText> : null}
-      {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+      {error ? <ErrorText code={error} /> : null}
+      {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
     </div>
   );
 }

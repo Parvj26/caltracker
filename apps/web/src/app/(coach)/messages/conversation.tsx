@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dayLabel, isAlreadyUploaded, mergeById, mergeOutbox, messageYoutubeIds, photoPaths, seenMessageId, thumbPathOf, type PhotoExt } from '@caltracker/shared';
-import type { Message, OutboxItem } from '@caltracker/shared';
+import type { ErrorCode, Message, OutboxItem } from '@caltracker/shared';
+import { ErrorText, errorFromText, type FieldError } from '@/components/ui';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { cx } from '@/components/ui/cx';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { avatarTone, initials } from '../clients/avatar';
 import { markRead, sendMessage } from './actions';
@@ -19,12 +20,17 @@ import styles from './messages.module.css';
 const BUCKET = 'message-images';
 const SIGNED_URL_SECONDS = 3600;
 const RESIGN_AFTER_MS = 50 * 60 * 1000;
-const GENERIC_FAILURE = "Couldn't send. Please try again.";
 
-type Pending = OutboxItem & { photoIds: string[]; files: File[]; previews: string[]; error?: string | undefined };
+type Pending = OutboxItem & { photoIds: string[]; files: File[]; previews: string[]; error?: FieldError | undefined };
 type Compressed = { full: Blob; thumb: Blob; ext: PhotoExt };
 
-class SendError extends Error {}
+class SendError extends Error {
+  readonly code: ErrorCode;
+  constructor(code: ErrorCode) {
+    super(code);
+    this.code = code;
+  }
+}
 
 type Props = {
   conversationId: string | null;
@@ -136,7 +142,11 @@ function Bubble({
         )}
         {seen ? <span>Seen</span> : null}
       </div>
-      {pending?.state === 'failed' && pending.error ? <p role="alert" className={styles.error}>{pending.error}</p> : null}
+      {pending?.state === 'failed' && pending.error ? (
+        <ErrorText code={pending.error.code} className={styles.error}>
+          {pending.error.text}
+        </ErrorText>
+      ) : null}
     </div>
   );
 }
@@ -292,7 +302,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
           for (const [path, blob] of [[paths.full, b.full], [paths.thumb, b.thumb]] as const) {
             const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: type, upsert: false });
             // A retry finds the photo already there: that is a success.
-            if (error && !isAlreadyUploaded(error)) throw new SendError("Couldn't upload the photo. Please try again.");
+            if (error && !isAlreadyUploaded(error)) throw new SendError('message_photo_upload_failed');
           }
         }
       }
@@ -302,13 +312,14 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
         image_paths: imagePaths,
         client_msg_id: p.clientMsgId,
       });
-      if (!out.ok) throw new SendError(out.error);
+      if (!out.ok) throw new SendError(out.code);
       setMessages((prev) => mergeById(prev, [toMessage(out.message)]));
       compressed.current.delete(p.clientMsgId);
       setPending((prev) => prev.filter((x) => x.clientMsgId !== p.clientMsgId));
       p.previews.forEach((u) => URL.revokeObjectURL(u));
     } catch (e) {
-      const error = e instanceof SendError || e instanceof PhotoError ? e.message : failureMessage(e, GENERIC_FAILURE);
+      const error: FieldError =
+        e instanceof SendError ? { code: e.code } : e instanceof PhotoError ? errorFromText(e.message, 'photo_unusable') : { code: failureCode(e, 'message_send_failed') };
       setPending((prev) => prev.map((x) => (x.clientMsgId === p.clientMsgId ? { ...x, state: 'failed', error } : x)));
     }
   }

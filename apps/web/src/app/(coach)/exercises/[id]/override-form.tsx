@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useState, useTransition } from 'react';
 import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
 import { saveOverride } from '../actions';
@@ -16,7 +17,7 @@ export function OverrideForm({
   coachNotes: string | null;
 }) {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [saved, setSaved] = useState(false);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -29,7 +30,7 @@ export function OverrideForm({
     startTransition(async () => {
       const result = await saveOverride(exerciseId, { youtubeUrl: url || null, coachNotes: notes || null });
       if (result.ok) setSaved(true);
-      else setError(result.error);
+      else setError(result.code);
     });
   }
 
@@ -37,7 +38,7 @@ export function OverrideForm({
     <form className={styles.form} onSubmit={onSubmit}>
       <TextField label="Pinned YouTube video" name="youtubeUrl" defaultValue={youtubeUrl ?? ''} placeholder="https://youtu.be/..." />
       <TextAreaField label="Coaching notes" name="coachNotes" rows={4} defaultValue={coachNotes ?? ''} />
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       {saved ? <p role="status" className={styles.saved}>Saved</p> : null}
       <Button type="submit" pending={pending} className={styles.submit}>Save</Button>
     </form>

@@ -11,11 +11,11 @@ import {
   programClashes,
   programStartError,
 } from '@caltracker/shared';
-import type { IsoDate } from '@caltracker/shared';
+import type { ErrorCode, IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink, ErrorText, SelectField, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { Button, ButtonLink, ErrorText, SelectField, TextField, errorFromText } from '@/components/ui';
+import { failureCode } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
@@ -74,7 +74,7 @@ export function AssignDialog({
   const [startDate, setStartDate] = useState(() => nextMonday(today));
   const [assignmentId] = useState(() => crypto.randomUUID());
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -108,10 +108,10 @@ export function AssignDialog({
         onAssigned(program.name, outcome.count);
         return;
       }
-      setError(outcome.error);
+      setError(outcome.code);
     } catch (e) {
       // The same id is kept, so trying again can't copy the program twice.
-      setError(failureMessage(e, "Couldn't assign. Check your connection and try again."));
+      setError(failureCode(e, 'assign_offline'));
     } finally {
       busy.current = false;
       setPending(false);
@@ -171,7 +171,7 @@ export function AssignDialog({
               setStartDate(e.target.value);
               setError(null);
             }}
-            {...(startError ? { error: startError } : {})}
+            {...(startError ? { error: errorFromText(startError, 'assign_date_invalid') } : {})}
           />
           {program && startError === null ? <p className={styles.preview}>{assignPreview(program, startDate)}</p> : null}
           {inPast ? (
@@ -201,9 +201,9 @@ export function AssignDialog({
           ) : null}
         </>
       )}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       <div className={styles.dialogActions}>
-        {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
           Cancel
         </Button>

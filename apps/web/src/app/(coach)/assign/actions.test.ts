@@ -102,7 +102,7 @@ describe('assignToClients', () => {
     if (!out.ok) throw new Error('expected per-client results');
     expect(out.results.map((r) => r.ok)).toEqual([true, false, true]);
     expect(out.results[1]).toMatchObject({ clientId: B, ok: false });
-    expect(out.results[1]!.ok ? '' : out.results[1]!.error).toContain('may no longer be your client');
+    expect(out.results[1]!.ok ? '' : out.results[1]!.code).toBe('client_not_current');
   });
 
   it('refuses past days per the date rules without calling the database', async () => {
@@ -116,7 +116,7 @@ describe('assignToClients', () => {
 
   it('refuses a device date far from the server\'s, and malformed input', async () => {
     const far = await assignToClients({ kind: 'workout', sourceId: SOURCE, today: '2026-11-20', targets: targets('2026-11-20') });
-    expect(far.ok ? '' : far.error).toContain('date looks wrong');
+    expect(far.ok ? '' : far.code).toBe('date_bad_today');
     const none = await assignToClients({ kind: 'workout', sourceId: SOURCE, today: '2026-11-07', targets: [] });
     expect(none.ok).toBe(false);
     expect(rpcs).toHaveLength(0);

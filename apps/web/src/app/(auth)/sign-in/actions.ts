@@ -1,9 +1,10 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import type { ErrorCode } from '@caltracker/shared';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-export type SignInState = { error: string | null };
+export type SignInState = { code: ErrorCode | null };
 
 export async function signIn(_prev: SignInState, formData: FormData): Promise<SignInState> {
   const emailValue = formData.get('email');
@@ -15,7 +16,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   if (error) {
     // Same message for unknown email and wrong password, so we never reveal which emails exist.
     const invalid = error.code === 'invalid_credentials' || error.status === 400;
-    return { error: invalid ? 'Incorrect email or password' : 'Something went wrong. Please try again.' };
+    return { code: invalid ? 'sign_in_failed' : 'server_error' };
   }
   redirect('/home');
 }

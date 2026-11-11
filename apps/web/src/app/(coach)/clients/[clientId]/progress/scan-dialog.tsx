@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { IsoDateSchema } from '@caltracker/shared';
+import { IsoDateSchema, errorMessage, type ErrorCode } from '@caltracker/shared';
 import type { IsoDate, Units } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ErrorText, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage, isStaleDeployError } from '@/lib/action-errors';
+import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { saveScan } from './actions';
 import { preparePrintout, type Printout } from './compress';
@@ -53,9 +53,9 @@ export function ScanDialog({
   const [inputs, setInputs] = useState<Record<string, string>>(() => ({ ...original?.inputs }));
   const [printout, setPrintout] = useState<Printout | null>(null);
   const [removePrintout, setRemovePrintout] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<ErrorCode | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<FieldError | null>(null);
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
 
@@ -78,8 +78,8 @@ export function ScanDialog({
     if (!file) return;
     try {
       setPrintout(await preparePrintout(file));
-    } catch (e) {
-      setFileError(e instanceof Error ? e.message : 'Printouts must be an image or a PDF under 5 MB.');
+    } catch {
+      setFileError('scan_printout_invalid_file');
     }
   }
 
@@ -89,7 +89,7 @@ export function ScanDialog({
     const parsed = parseScanForm(inputs, fields, customs, units, original);
     setErrors(parsed.ok ? {} : parsed.errors);
     if (!parsed.ok) {
-      if (parsed.form) setFormError(parsed.form);
+      if (parsed.form) setFormError(errorFromText(parsed.form, 'scan_invalid'));
       return;
     }
     if (dateError || !parsedDate.success || fileError) return;
@@ -104,7 +104,7 @@ export function ScanDialog({
         const up = await createBrowserSupabase().storage.from('scan-attachments').upload(uploaded, printout.blob, { contentType: printout.contentType });
         if (up.error) {
           uploaded = null;
-          setFormError("Couldn't upload the printout. Check your connection and try again.");
+          setFormError({ code: 'scan_printout_upload_failed' });
           return;
         }
         attachment = uploaded;
@@ -124,13 +124,13 @@ export function ScanDialog({
         return;
       }
       uploaded = null; // the server already took the file back
-      setFormError(outcome.warning ? `${outcome.error} ${outcome.warning}` : outcome.error);
+      setFormError({ code: outcome.code, text: outcome.warning ? `${errorMessage(outcome.code)} ${outcome.warning}` : undefined });
       if (outcome.warning) onWarning(outcome.warning);
     } catch (e) {
       // The row may have been saved even though the answer never arrived, so the file stays: a leftover file is
       // better than a scan whose printout link is broken. Only a call that certainly never ran takes it back.
       if (!isStaleDeployError(e)) uploaded = null;
-      setFormError(failureMessage(e, "Couldn't save the scan. Check your connection and try again."));
+      setFormError({ code: failureCode(e, 'scan_save_offline') });
     } finally {
       // The file of a save that certainly never reached the server (a stale page) is removed here, best effort.
       if (uploaded) void createBrowserSupabase().storage.from('scan-attachments').remove([uploaded]);
@@ -164,19 +164,20 @@ export function ScanDialog({
           max={today}
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          {...(dateError ? { error: dateError } : {})}
+          {...(dateError ? { error: errorFromText(dateError, 'field_format') } : {})}
         />
         <div className={styles.fields}>
           {fields.map((f) => (
             <TextField
               key={f.key}
               label={f.label}
+              labelSafe={!f.key.startsWith('custom:')}
               type="text"
               inputMode="decimal"
               autoComplete="off"
               value={inputs[f.key] ?? ''}
               onChange={(e) => setInputs((s) => ({ ...s, [f.key]: e.target.value }))}
-              {...(errors[f.key] ? { error: errors[f.key]! } : {})}
+              {...(errors[f.key] ? { error: { ...errorFromText(errors[f.key]!, 'field_format'), safe: !f.key.startsWith('custom:') } } : {})}
             />
           ))}
         </div>
@@ -185,7 +186,7 @@ export function ScanDialog({
         <div className={styles.fileRow}>
           <label className={styles.fileLabel} htmlFor={`${titleId}-file`}>Printout (image or PDF, up to 5 MB)</label>
           <input id={`${titleId}-file`} type="file" accept="image/*,application/pdf" onChange={(e) => void onFile(e.target.files?.[0])} />
-          {fileError ? <ErrorText>{fileError}</ErrorText> : null}
+          {fileError ? <ErrorText code={fileError} /> : null}
           {scan?.hasPrintout && !printout ? (
             <label>
               <input type="checkbox" checked={removePrintout} onChange={(e) => setRemovePrintout(e.target.checked)} /> Remove the current printout
@@ -193,9 +194,9 @@ export function ScanDialog({
           ) : null}
         </div>
 
-        {formError ? <ErrorText>{formError}</ErrorText> : null}
+        {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
         <div className={calendar.dialogActions}>
-          {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={calendar.smallButton} /> : null}
+          {formError?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
           <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>Cancel</Button>
           <Button type="submit" pending={pending}>{pending ? 'Saving…' : 'Save scan'}</Button>
         </div>

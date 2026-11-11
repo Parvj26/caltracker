@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ERROR_CODES, LABEL_PATTERN, errorMessage, isErrorCode } from '../../src/analytics/error-codes';
+import { BAD_TODAY_ERROR } from '../../src/programs/date-rules';
+import { ERROR_CODES, LABEL_PATTERN, codeForMessage, errorMessage, isErrorCode } from '../../src/analytics/error-codes';
 import { sanitize } from '../../src/analytics/sanitize';
 
 describe('error codes', () => {
@@ -34,5 +35,18 @@ describe('sanitize error codes', () => {
   });
   it('passes known codes through', () => {
     expect(sanitize('error_shown', { code: 'invite_email_invalid', screen: '/clients' })).toEqual({ code: 'invite_email_invalid', screen: '/clients' });
+  });
+});
+
+describe('codeForMessage', () => {
+  it('finds the code of a fixed shared message', () => {
+    expect(codeForMessage(BAD_TODAY_ERROR, 'field_format')).toBe('date_bad_today');
+  });
+  it('falls back for unknown or empty text', () => {
+    expect(codeForMessage('Luis typed this', 'field_format')).toBe('field_format');
+    expect(codeForMessage(null, 'server_error')).toBe('server_error');
+  });
+  it('never answers missing_code for the shared server message', () => {
+    expect(codeForMessage(errorMessage('server_error'), 'field_format')).toBe('server_error');
   });
 });

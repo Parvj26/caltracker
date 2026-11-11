@@ -4,8 +4,8 @@ import { useEffect, useState, useTransition } from 'react';
 import { liveExercises, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
-import { Button, ErrorText } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { Button, ErrorText, errorFromText, type FieldError } from '@/components/ui';
+import { failureCode } from '@/lib/action-errors';
 import { correctLog } from './actions';
 import { CLIENT_UPDATED_MESSAGE, buildCorrections, logVersion } from './corrections';
 import { PlannedVsActual, draftFor, type Drafts } from './planned-vs-actual';
@@ -47,7 +47,7 @@ export function CorrectForm({
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   }, [startEditing]);
   const clientUpdated = editing && startVersion !== null && startVersion !== logVersion(log);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -65,7 +65,7 @@ export function CorrectForm({
     if (clientUpdated) return;
     const built = buildCorrections(drafts, startDrafts);
     if ('error' in built) {
-      setError(built.error);
+      setError(errorFromText(built.error, 'log_numbers_invalid'));
       return;
     }
     const { sets } = built;
@@ -73,11 +73,11 @@ export function CorrectForm({
       try {
         const outcome = await correctLog({ logId: log.id, sets });
         if (!outcome.ok) {
-          setError(outcome.error);
+          setError({ code: outcome.code });
           return;
         }
       } catch (e) {
-        setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
+        setError({ code: failureCode(e, 'save_offline') });
         return;
       }
       completeEdit();
@@ -109,15 +109,15 @@ export function CorrectForm({
         <div className={styles.saveBar}>
           {clientUpdated ? (
             <>
-              <ErrorText>{CLIENT_UPDATED_MESSAGE}</ErrorText>
+              <ErrorText code="log_client_updated">{CLIENT_UPDATED_MESSAGE}</ErrorText>
               <Button variant="secondary" onClick={start} disabled={pending}>
                 Use latest numbers
               </Button>
             </>
           ) : error ? (
-            <ErrorText>{error}</ErrorText>
+            <ErrorText code={error.code}>{error.text}</ErrorText>
           ) : null}
-          {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+          {error?.code === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
           <Button variant="secondary" onClick={() => setEditing(false)} disabled={pending}>
             Cancel
           </Button>

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -10,7 +11,7 @@ import {
   type SearchFilters,
 } from '@caltracker/shared';
 import { setFavourite } from '@/app/(coach)/workouts/actions';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, rememberFavourite, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { Button, ErrorText } from '@/components/ui';
@@ -83,7 +84,7 @@ export function SearchPanel({
   const [selected, setSelected] = useState<ExercisePick[]>([]);
   const [detail, setDetail] = useState<{ id: string; imagePaths: string[]; instructions: string[] } | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
-  const [starError, setStarError] = useState<string | null>(null);
+  const [starError, setStarError] = useState<ErrorCode | null>(null);
   const starSeq = useRef(new Map<string, number>());
   const searchRef = useRef<HTMLInputElement>(null);
   const details = useRef(new Map<string, { imagePaths: string[]; instructions: string[] }>());
@@ -196,17 +197,17 @@ export function SearchPanel({
     rememberFavourite(id, want);
     setStarError(null);
     let ok = false;
-    let message = "Couldn't save favourite. Try again.";
+    let code: ErrorCode = 'favourite_save_failed';
     try {
       ok = (await setFavourite(id, want)).ok;
     } catch (e) {
-      message = failureMessage(e, message);
+      code = failureCode(e, code);
     }
     if (starSeq.current.get(id) !== seq) return;
     if (!ok) {
       rememberFavourite(id, before);
       set(before);
-      setStarError(message);
+      setStarError(code);
     }
   }
 
@@ -297,8 +298,8 @@ export function SearchPanel({
         </div>
       ) : null}
 
-      {error ? <ErrorText>Couldn&apos;t load exercises. Please try again.</ErrorText> : null}
-      {starError ? <ErrorText>{starError}</ErrorText> : null}
+      {error ? <ErrorText code="exercises_load_failed" /> : null}
+      {starError ? <ErrorText code={starError} /> : null}
 
       <div className={styles.split} data-preview={previewOpen || undefined}>
         <div className={styles.listPane} aria-busy={!data && !error}>

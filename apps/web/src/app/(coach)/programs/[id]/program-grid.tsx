@@ -17,7 +17,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { PROGRAM_WEEKS_MAX, copyWeek } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, copyWeek, errorMessage } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
@@ -218,7 +218,7 @@ export function ProgramGrid({
       .then((outcome) => {
         if (!outcome.ok) {
           undo();
-          setToast(outcome.error);
+          setToast(errorMessage(outcome.code));
           return;
         }
         // Same ids as shown; take the saved days and order in case the source week differed from this page.
@@ -268,7 +268,7 @@ export function ProgramGrid({
     setAddingWeek(true);
     try {
       const outcome = await updateProgram(program.id, { ...savedDetails.current, weeks: next });
-      if (!outcome.ok) throw new Error(outcome.error);
+      if (!outcome.ok) throw new Error(outcome.code);
       markSaved();
     } catch (e) {
       setWeeks(next - 1);

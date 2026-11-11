@@ -9,6 +9,7 @@ import {
   NAME_HEADERS,
   clientCsvTemplate,
   parseClientCsv,
+  type ErrorCode,
   type InviteInput,
 } from '@caltracker/shared';
 import { Button, Chip, ErrorText } from '@/components/ui';
@@ -40,7 +41,7 @@ export function CsvUpload() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [statuses, setStatuses] = useState<Map<string, StatusView>>(new Map());
   const [failed, setFailed] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -59,7 +60,7 @@ export function CsvUpload() {
     setError(null);
     startTransition(async () => {
       const outcome = await sendInvites(rows);
-      if (!outcome.ok) return setError(outcome.error);
+      if (!outcome.ok) return setError(outcome.code);
       // Merge, so a retry of the failed rows keeps the results of the rows that already went through.
       setStatuses((prev) => new Map([...prev, ...outcome.results.map((r): [string, StatusView] => [r.email, statusView(r.status, r.message)])]));
       setFailed((prev) => {
@@ -104,7 +105,9 @@ export function CsvUpload() {
       {parsed ? (
         <>
           {parsed.errors.length > 0 ? (
-            <div role="alert" className={styles.lineErrors}>
+            <div className={styles.lineErrors}>
+              <ErrorText code="csv_bad_format" />
+              {/* Not an alert and not marked safe: a line can quote what was typed in the file. */}
               <ul>
                 {parsed.errors.map((e) => (
                   <li key={`${e.line}-${e.message}`}>
@@ -150,7 +153,7 @@ export function CsvUpload() {
           ) : null}
         </>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       </div>
     </section>
   );

@@ -65,7 +65,7 @@ describe('scheduleWorkout', () => {
   });
 
   it("refuses a date before the browser's today", async () => {
-    expect(await scheduleWorkout({ ...input, date: '2026-11-04' })).toEqual({ ok: false, error: 'Pick today or a later date.' });
+    expect(await scheduleWorkout({ ...input, date: '2026-11-04' })).toEqual({ ok: false, code: 'date_in_past' });
     expect(rpcs()).toHaveLength(0);
   });
 
@@ -80,14 +80,14 @@ describe('scheduleWorkout', () => {
     rpcError = { code: '23505', message: 'duplicate key value violates unique constraint "workouts_pkey"' };
     expect(await scheduleWorkout(input)).toEqual({
       ok: false,
-      error: 'This add was already sent with a different workout or day. Close this, check the calendar, then add again if needed.',
+      code: 'schedule_conflict',
     });
   });
 
   it('refuses a "today" more than a day from UTC', async () => {
     const out = await scheduleWorkout({ ...input, date: '2026-11-01', today: '2026-11-01' });
     expect(out.ok).toBe(false);
-    expect(out.ok ? '' : out.error).toMatch(/date looks wrong/);
+    expect(out.ok ? '' : out.code).toBe('date_bad_today');
     expect(rpcs()).toHaveLength(0);
   });
 });
@@ -101,7 +101,7 @@ describe('moveClientWorkout', () => {
   it('refuses a past date and a far-off today', async () => {
     expect(await moveClientWorkout({ workoutId: WORKOUT, date: '2026-11-04', today: '2026-11-05' })).toEqual({
       ok: false,
-      error: 'Pick today or a later date.',
+      code: 'date_in_past',
     });
     expect(await moveClientWorkout({ workoutId: WORKOUT, date: '2026-12-04', today: '2026-12-01' })).toMatchObject({ ok: false });
     expect(rpcs()).toHaveLength(0);
@@ -111,7 +111,7 @@ describe('moveClientWorkout', () => {
     completedLogs = 1;
     expect(await moveClientWorkout({ workoutId: WORKOUT, date: '2026-11-09', today: '2026-11-05' })).toEqual({
       ok: false,
-      error: "You can't move a workout that's already done: it stays on the day it was done. View its log instead.",
+      code: 'workout_move_done',
     });
     expect(rpcs()).toHaveLength(0);
   });
@@ -128,7 +128,7 @@ describe('assignProgram', () => {
   it('refuses a start 8 days ago and a far-off today', async () => {
     expect(await assignProgram({ ...input, startDate: '2026-10-28' })).toEqual({
       ok: false,
-      error: 'Programs can start up to 7 days ago.',
+      code: 'program_start_too_early',
     });
     expect(await assignProgram({ ...input, today: '2026-11-08' })).toMatchObject({ ok: false });
     expect(rpcs()).toHaveLength(0);

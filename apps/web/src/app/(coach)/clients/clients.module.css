@@ -172,6 +172,7 @@
   font-weight: var(--ct-weight-section-heading);
 }
 
+.lineErrors { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .lineErrors ul { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .lineErrors li { display: flex; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
 .errorMarker { color: var(--ct-magenta); font-weight: var(--ct-weight-button); }
