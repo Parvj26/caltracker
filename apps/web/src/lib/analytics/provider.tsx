@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
 import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
-import { alertCode } from './alert-code';
+import { alertReporter } from './alert-code';
 import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
 
 const SLOW_MS = 2000;
@@ -38,24 +38,27 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
     if (ms > SLOW_MS) track('slow_screen', { screen: scrubUrl(window.location.pathname), ms });
   }, []);
 
-  // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text.
+  // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text. An alert whose
+  // code changes in place (one error replacing another) counts again.
   useEffect(() => {
-    const seen = new WeakSet<Node>();
+    const seen = alertReporter((code) => {
+      getTaskTracker().error();
+      track('error_shown', { code, screen: scrubUrl(window.location.pathname) });
+    });
     const observer = new MutationObserver((records) => {
       for (const r of records) {
+        if (r.type === 'attributes') {
+          if (r.target instanceof HTMLElement && r.target.matches('[role="alert"]')) seen(r.target);
+          continue;
+        }
         for (const node of r.addedNodes) {
           if (!(node instanceof HTMLElement)) continue;
           const alerts = node.matches('[role="alert"]') ? [node] : [...node.querySelectorAll('[role="alert"]')];
-          for (const el of alerts) {
-            if (seen.has(el)) continue;
-            seen.add(el);
-            getTaskTracker().error();
-            track('error_shown', { code: alertCode(el.getAttribute('data-error-code')), screen: scrubUrl(window.location.pathname) });
-          }
+          for (const el of alerts) seen(el);
         }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-error-code'] });
     return () => observer.disconnect();
   }, []);
 
