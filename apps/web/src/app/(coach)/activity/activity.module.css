@@ -13,7 +13,11 @@
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
 
-.filter { display: flex; align-items: flex-end; gap: var(--ct-space-2); margin-left: auto; }
+/* The client filter box: right of the title on wide screens, full width once the row wraps. */
+.filter { flex: 0 1 280px; min-width: 220px; margin-left: auto; }
+@media (max-width: 700px) {
+  .filter { flex: 1 1 100%; margin-left: 0; }
+}
 
 .smallButton {
   display: inline-flex;

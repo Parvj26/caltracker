@@ -126,3 +126,25 @@ test('the coach adds a meal with a photo, edits it and removes it', async ({ pag
   const gone = await admin.from('coach_meals').select('deleted_at').eq('name', name).single();
   expect(gone.data?.deleted_at).not.toBeNull();
 });
+
+test('Cancel leaves the meal form, asking "Discard changes?" only after typing', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto('/meals/new');
+  const form = page.getByRole('form', { name: 'New meal' });
+  await form.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page).toHaveURL(/\/meals$/);
+
+  await page.goto('/meals/new');
+  await form.getByLabel('Name').fill(`E2E Unsaved ${unique()}`);
+  await form.getByRole('button', { name: 'Cancel' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Discard changes?');
+  await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/\/meals\/new$/);
+  await expect(form.getByLabel('Name')).not.toHaveValue('');
+
+  await form.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Discard' }).click();
+  await expect(page).toHaveURL(/\/meals$/);
+});

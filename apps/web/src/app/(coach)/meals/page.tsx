@@ -11,9 +11,12 @@ export default async function MealsPage() {
   const meals = await listCoachMeals(workspaceId);
   return (
     <MealsShell meals={meals} selectedId={null}>
-      <section className={`${styles.panel} ${styles.panelQuiet}`} aria-label="Edit meal">
-        <p className={styles.empty}>{meals.length > 0 ? 'Pick a meal to edit it, or add a new one.' : 'Your meals show here once you add them.'}</p>
-      </section>
+      {/* With no meals the list's own "No meals yet" is the one empty state, so the hint box stays out. */}
+      {meals.length > 0 ? (
+        <section className={`${styles.panel} ${styles.panelQuiet}`} aria-label="Edit meal">
+          <p className={styles.empty}>Pick a meal to edit it, or add a new one.</p>
+        </section>
+      ) : null}
     </MealsShell>
   );
 }

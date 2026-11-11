@@ -23,6 +23,17 @@ describe('searchClients', () => {
     expect(SEARCH_MAX_RESULTS).toBe(8);
     expect(found.map((x) => x.id)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7']);
   });
+  it('forgives a typo in a longer name word', () => {
+    expect(searchClients(clients, 'smtih').map((x) => x.id)).toEqual(['2']);
+    expect(searchClients(clients, 'garica').map((x) => x.id)).toEqual(['1']);
+  });
+  it('matches the words in any order', () => {
+    expect(searchClients(clients, 'smith anna').map((x) => x.id)).toEqual(['2']);
+  });
+  it('ranks the whole name, then a starts-with, then a typo, keeping the given order within each', () => {
+    const list = [c('t', 'Marla', 'Reed'), c('p1', 'Mariah', 'Lee'), c('p2', 'Maria', 'Lopez'), c('e', 'Maria', '')];
+    expect(searchClients(list, 'maria').map((x) => x.id)).toEqual(['e', 'p1', 'p2', 't']);
+  });
   it('finds nothing for an empty or blank query', () => {
     expect(searchClients(clients, '')).toEqual([]);
     expect(searchClients(clients, '   ')).toEqual([]);
