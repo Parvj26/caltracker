@@ -140,11 +140,11 @@ test('Edit, Just this day: only that day changes, the other keeps the old versio
   await ask.getByRole('button', { name: /Just Week 1, Day 3/ }).click();
 
   await expect(sheet).toBeHidden();
-  await expect(chip(page, 1, 3, `${workout} (Week 1)`)).toBeVisible();
+  await expect(chip(page, 1, 3, `${workout} (Week 1, Wed)`)).toBeVisible();
   await expect(chip(page, 1, 1, workout)).toBeVisible();
   await page.reload();
-  await chip(page, 1, 3, `${workout} (Week 1)`).click();
-  await expect(page.getByRole('dialog', { name: `${workout} (Week 1)`, exact: true }).getByText(/3 sets · 8 reps · 80 (kg|lb)/)).toBeVisible();
+  await chip(page, 1, 3, `${workout} (Week 1, Wed)`).click();
+  await expect(page.getByRole('dialog', { name: `${workout} (Week 1, Wed)`, exact: true }).getByText(/3 sets · 8 reps · 80 (kg|lb)/)).toBeVisible();
   await page.keyboard.press('Escape');
   await chip(page, 1, 1, workout).click();
   await expect(page.getByRole('dialog', { name: workout, exact: true }).getByText(/3 sets · 8 reps · 60 (kg|lb)/)).toBeVisible();

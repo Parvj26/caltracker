@@ -1,5 +1,8 @@
 /** The program grid's days, labels and DOM ids, so focus can land somewhere sensible after a chip moves. */
 export const DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+/** Program day 1 is a Monday, so day 3 is Wed. */
+export const weekdayShort = (day: number) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day - 1] ?? '';
+export const copyDaySuffix = (week: number, day: number) => ` (Week ${week}, ${weekdayShort(day)})`;
 export const cellLabel = (week: number, day: number) => `Week ${week}, Day ${day}`;
 export const chipDomId = (slotId: string) => `program-chip-${slotId}`;
 export const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
