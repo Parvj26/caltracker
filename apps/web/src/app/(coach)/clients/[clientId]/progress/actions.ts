@@ -84,7 +84,7 @@ export async function deleteScan(id: string): Promise<Outcome<{ warning?: string
   if (!isUuid(id)) return fail('scan_invalid', 'action:progress.deleteScan');
   const supabase = await createServerSupabase();
   const row = await supabase.from('body_measurements').select('attachment_path').eq('id', id).maybeSingle();
-  if (row.error) return fail('scan_save_failed', 'action:progress.deleteScan');
+  if (row.error) return fail('scan_delete_failed', 'action:progress.deleteScan');
   if (!row.data) return fail('scan_already_gone', 'action:progress.deleteScan');
 
   const { data, error } = await supabase.from('body_measurements').delete().eq('id', id).select('id');
@@ -116,7 +116,7 @@ export async function addCustomMeasure(input: CustomMeasureInput): Promise<Outco
   const { error } = await supabase.from('custom_metrics').insert({ workspace_id: workspaceId, name, unit_label: unitLabel, min, max });
   if (error) {
     if (error.code === '23505') return fail('measure_name_taken', 'action:progress.addCustomMeasure');
-    return fail('scan_save_failed', 'action:progress.addCustomMeasure');
+    return fail('measure_add_failed', 'action:progress.addCustomMeasure');
   }
   refresh();
   return { ok: true };

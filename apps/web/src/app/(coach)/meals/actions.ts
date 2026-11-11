@@ -35,7 +35,7 @@ function ownsFile(workspaceId: string, mealId: string, path: string, thumb: bool
 /** Creates or updates a shared meal of the coach's workspace. Safe to repeat (the id is made in the browser). */
 export async function saveCoachMeal(input: CoachMealInput): Promise<CoachMealOutcome> {
   const { workspaceId } = await requireCoach(); // never trust a client-supplied workspace id
-  if (!isUuid(input.id)) return fail('meal_save_failed', 'action:meals.saveCoachMeal');
+  if (!isUuid(input.id)) return fail('request_invalid', 'action:meals.saveCoachMeal');
   const problems = coachMealProblems(input);
   if (problems[0]) return fail(codeForMessage(problems[0], 'meal_details_invalid'), 'action:meals.saveCoachMeal');
 
@@ -50,7 +50,7 @@ export async function saveCoachMeal(input: CoachMealInput): Promise<CoachMealOut
   if (p) {
     const sizeOk = (n: number) => Number.isInteger(n) && n >= 1 && n <= 1600;
     const thumbOk = p.thumbPath === p.path.replace(/\.(webp|jpg)$/, '-thumb.$1');
-    if (!ownsFile(workspaceId, input.id, p.path, false) || !thumbOk || !sizeOk(p.width) || !sizeOk(p.height)) return fail('meal_photo_failed', 'action:meals.saveCoachMeal');
+    if (!ownsFile(workspaceId, input.id, p.path, false) || !thumbOk || !sizeOk(p.width) || !sizeOk(p.height)) return fail('meal_photo_invalid', 'action:meals.saveCoachMeal');
   }
 
   const fields = {

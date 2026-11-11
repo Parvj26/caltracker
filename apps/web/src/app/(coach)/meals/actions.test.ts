@@ -74,7 +74,7 @@ describe('saveCoachMeal', () => {
 
   it('rejects a photo outside this meal\'s files', async () => {
     const photo = { path: `${WS}/${OLD}-${PHOTO}.webp`, thumbPath: `${WS}/${OLD}-${PHOTO}-thumb.webp`, width: 100, height: 100 };
-    await expect(saveCoachMeal({ ...base, photo })).resolves.toEqual({ ok: false, code: 'meal_photo_failed' });
+    await expect(saveCoachMeal({ ...base, photo })).resolves.toEqual({ ok: false, code: 'meal_photo_invalid' });
     expect(calls).toEqual([]);
   });
 

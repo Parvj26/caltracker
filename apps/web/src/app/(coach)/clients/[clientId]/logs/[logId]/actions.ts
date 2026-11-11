@@ -21,7 +21,7 @@ export async function addComment(input: { logId: string; body: string }): Promis
   const body = typeof input.body === 'string' ? input.body.trim() : '';
   if (!body) return fail('comment_empty', 'action:logs.addComment');
   if (body.length > BODY_MAX) return fail('comment_too_long', 'action:logs.addComment');
-  if (!UUID.test(input.logId)) return fail('save_failed', 'action:logs.addComment');
+  if (!UUID.test(input.logId)) return fail('request_invalid', 'action:logs.addComment');
   const supabase = await createServerSupabase();
   // workspace_id, client_id and author_id are filled in by the database (a trigger and a default; the grant only
   // allows id, log_id and body), but the generated Insert type lists them as required, hence the cast.
@@ -36,7 +36,7 @@ export async function addComment(input: { logId: string; body: string }): Promis
 
 export async function deleteComment(id: string): Promise<Outcome> {
   await requireCoach();
-  if (!UUID.test(id)) return fail('save_failed', 'action:logs.deleteComment');
+  if (!UUID.test(id)) return fail('request_invalid', 'action:logs.deleteComment');
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('workout_log_comments').delete().eq('id', id);
   if (error) return fail('comment_delete_failed', 'action:logs.deleteComment');
@@ -61,12 +61,12 @@ const bad = (v: unknown, max: number, whole: boolean) =>
 
 export async function correctLog(input: { logId: string; sets: SetCorrection[] }): Promise<Outcome> {
   const { units } = await requireCoach();
-  if (!UUID.test(input.logId) || !Array.isArray(input.sets)) return fail('save_failed', 'action:logs.correctLog');
+  if (!UUID.test(input.logId) || !Array.isArray(input.sets)) return fail('request_invalid', 'action:logs.correctLog');
   if (input.sets.length === 0) return fail('log_nothing_to_change', 'action:logs.correctLog');
 
   const sets: Record<string, unknown>[] = [];
   for (const s of input.sets) {
-    if (!UUID.test(s.id)) return fail('save_failed', 'action:logs.correctLog');
+    if (!UUID.test(s.id)) return fail('request_invalid', 'action:logs.correctLog');
     const out: Record<string, unknown> = { id: s.id };
     if (s.actualReps !== undefined) {
       if (bad(s.actualReps, 1000, true)) return fail('log_reps_invalid', 'action:logs.correctLog');

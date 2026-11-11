@@ -19,9 +19,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export async function sendMessage(input: NewMessage): Promise<Outcome<{ message: MessageRow }>> {
   const { userId } = await requireCoach();
-  if (typeof input?.body !== 'string' || !Array.isArray(input.image_paths)) return fail('message_send_failed', 'action:messages.sendMessage');
-  if (typeof input.conversation_id !== 'string' || !UUID.test(input.conversation_id)) return fail('message_send_failed', 'action:messages.sendMessage');
-  if (typeof input.client_msg_id !== 'string' || !UUID.test(input.client_msg_id)) return fail('message_send_failed', 'action:messages.sendMessage');
+  if (typeof input?.body !== 'string' || !Array.isArray(input.image_paths)) return fail('request_invalid', 'action:messages.sendMessage');
+  if (typeof input.conversation_id !== 'string' || !UUID.test(input.conversation_id)) return fail('request_invalid', 'action:messages.sendMessage');
+  if (typeof input.client_msg_id !== 'string' || !UUID.test(input.client_msg_id)) return fail('request_invalid', 'action:messages.sendMessage');
   if (input.body.length > 4000) return fail('message_too_long', 'action:messages.sendMessage');
   if (input.image_paths.length > 4) return fail('message_too_many_photos', 'action:messages.sendMessage');
   if (input.body.trim() === '' && input.image_paths.length === 0) return fail('message_empty', 'action:messages.sendMessage');
@@ -57,7 +57,7 @@ export async function sendMessage(input: NewMessage): Promise<Outcome<{ message:
 /** The coach has read the conversation up to now. */
 export async function markRead(conversationId: string): Promise<Outcome> {
   await requireCoach();
-  if (!UUID.test(conversationId)) return fail('message_read_failed', 'action:messages.markRead');
+  if (!UUID.test(conversationId)) return fail('request_invalid', 'action:messages.markRead');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('mark_conversation_read', { p_conversation_id: conversationId });
   return error ? fail('message_read_failed', 'action:messages.markRead') : { ok: true };

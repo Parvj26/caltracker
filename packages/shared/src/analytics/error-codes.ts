@@ -245,6 +245,9 @@ export const ERROR_CODES = {
   join_sign_in_failed: "You're all set. Sign in with your email and new password.",
   sign_up_failed: "Couldn't create your account. Please try again.",
   program_day_gone: "Couldn't find that day. It may have been removed.",
+  request_invalid: 'Something went wrong. Reload the page and try again.',
+  measure_add_failed: "Couldn't add the measure. Please try again.",
+  meal_photo_invalid: "Couldn't save the photo. Please try again.",
   missing_code: SERVER_ERROR_MESSAGE,
 } as const;
 

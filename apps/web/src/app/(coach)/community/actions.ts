@@ -25,7 +25,7 @@ export type NewPostImage = { path: string; thumbPath: string; width: number; hei
 /** Posts as the coach. The photos were shrunk and uploaded by the browser into the coach's folder for this post. */
 export async function createPost(input: { postId: string; communityId: string; body: string; images: NewPostImage[] }): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(input.postId) || !UUID.test(input.communityId)) return fail('server_error', 'action:community.createPost');
+  if (!UUID.test(input.postId) || !UUID.test(input.communityId)) return fail('request_invalid', 'action:community.createPost');
   const images = Array.isArray(input.images) ? input.images.slice(0, MAX_POST_PHOTOS + 1) : [];
   const parsed = PostInput.safeParse({ body: input.body, photoCount: images.length, card: null });
   if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'field_format'), 'action:community.createPost');
@@ -43,7 +43,7 @@ export async function createPost(input: { postId: string; communityId: string; b
 /** Deletes a post (any post: the coach moderates) and then its photo files. */
 export async function deletePost(postId: string): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(postId)) return fail('server_error', 'action:community.deletePost');
+  if (!UUID.test(postId)) return fail('request_invalid', 'action:community.deletePost');
   const supabase = await createServerSupabase();
   const images = await supabase.from('community_post_images').select('path, thumb_path').eq('post_id', postId);
   const { error, count } = await supabase.from('community_posts').delete({ count: 'exact' }).eq('id', postId);
@@ -59,7 +59,7 @@ async function removeFiles(supabase: Awaited<ReturnType<typeof createServerSupab
 
 export async function setPinned(postId: string, pinned: boolean): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(postId)) return fail('server_error', 'action:community.setPinned');
+  if (!UUID.test(postId)) return fail('request_invalid', 'action:community.setPinned');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('set_community_post_pinned', { p_post_id: postId, p_pinned: pinned });
   if (error) return fail(pinned ? 'post_pin_failed' : 'post_unpin_failed', 'action:community.setPinned');
@@ -68,7 +68,7 @@ export async function setPinned(postId: string, pinned: boolean): Promise<Commun
 
 export async function addComment(postId: string, body: string): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(postId)) return fail('server_error', 'action:community.addComment');
+  if (!UUID.test(postId)) return fail('request_invalid', 'action:community.addComment');
   const parsed = CommentInput.safeParse(body);
   if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'field_format'), 'action:community.addComment');
   const supabase = await createServerSupabase();
@@ -81,7 +81,7 @@ export async function addComment(postId: string, body: string): Promise<Communit
 
 export async function deleteComment(commentId: string): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(commentId)) return fail('server_error', 'action:community.deleteComment');
+  if (!UUID.test(commentId)) return fail('request_invalid', 'action:community.deleteComment');
   const supabase = await createServerSupabase();
   const { error, count } = await supabase.from('community_comments').delete({ count: 'exact' }).eq('id', commentId);
   if (error || count === 0) return fail('comment_delete_failed', 'action:community.deleteComment');
@@ -95,7 +95,7 @@ export async function setReaction(target: ReactionTarget, reaction: ReactionKey,
   const coach = await requireCoach();
   const postId = 'postId' in target ? target.postId : null;
   const commentId = 'commentId' in target ? target.commentId : null;
-  if (!isReactionKey(reaction) || !UUID.test(postId ?? commentId ?? '')) return fail('server_error', 'action:community.setReaction');
+  if (!isReactionKey(reaction) || !UUID.test(postId ?? commentId ?? '')) return fail('request_invalid', 'action:community.setReaction');
   const supabase = await createServerSupabase();
   if (on) {
     // Who and where (and a comment's post) are filled in by the database; the generated Insert type still lists them.
@@ -116,7 +116,7 @@ export async function setReaction(target: ReactionTarget, reaction: ReactionKey,
 /** Takes a client out of the community only (they stay a client), or lets them back in. */
 export async function setMemberRemoved(communityId: string, userId: string, removed: boolean): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(communityId) || !UUID.test(userId)) return fail('server_error', 'action:community.setMemberRemoved');
+  if (!UUID.test(communityId) || !UUID.test(userId)) return fail('request_invalid', 'action:community.setMemberRemoved');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc(removed ? 'remove_community_member' : 'restore_community_member', {
     p_community_id: communityId,
@@ -129,7 +129,7 @@ export async function setMemberRemoved(communityId: string, userId: string, remo
 /** Closes a report: 'removed' deletes the reported post or comment (and a post's photos), 'kept' leaves it. */
 export async function resolveReport(reportId: string, resolution: 'removed' | 'kept'): Promise<CommunityOutcome> {
   await requireCoach();
-  if (!UUID.test(reportId) || (resolution !== 'removed' && resolution !== 'kept')) return fail('server_error', 'action:community.resolveReport');
+  if (!UUID.test(reportId) || (resolution !== 'removed' && resolution !== 'kept')) return fail('request_invalid', 'action:community.resolveReport');
   const supabase = await createServerSupabase();
   let files: string[] = [];
   if (resolution === 'removed') {

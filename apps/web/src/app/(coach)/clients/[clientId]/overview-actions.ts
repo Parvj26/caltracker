@@ -20,7 +20,7 @@ const refusal = (code: string | undefined): ErrorCode => (code === '42501' ? 're
 
 export async function addNote(clientId: string, body: string): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId) || typeof body !== 'string') return fail('record_save_failed', 'action:overview.addNote');
+  if (!UUID.test(clientId) || typeof body !== 'string') return fail('request_invalid', 'action:overview.addNote');
   const checked = validateNote(body);
   if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:overview.addNote');
   const supabase = await createServerSupabase();
@@ -32,7 +32,7 @@ export async function addNote(clientId: string, body: string): Promise<RecordOut
 
 export async function updateNote(noteId: string, body: string): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(noteId) || typeof body !== 'string') return fail('record_save_failed', 'action:overview.updateNote');
+  if (!UUID.test(noteId) || typeof body !== 'string') return fail('request_invalid', 'action:overview.updateNote');
   const checked = validateNote(body);
   if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:overview.updateNote');
   const supabase = await createServerSupabase();
@@ -45,7 +45,7 @@ export async function updateNote(noteId: string, body: string): Promise<RecordOu
 
 export async function deleteNote(noteId: string): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(noteId)) return fail('record_save_failed', 'action:overview.deleteNote');
+  if (!UUID.test(noteId)) return fail('request_invalid', 'action:overview.deleteNote');
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('client_notes').delete().eq('id', noteId).eq('workspace_id', workspaceId);
   if (error) return fail('note_delete_failed', 'action:overview.deleteNote');
@@ -56,7 +56,7 @@ export async function deleteNote(noteId: string): Promise<RecordOutcome> {
 /** One record per client: update it, or create it the first time (a race with another tab ends in an update). */
 export async function saveLimitations(clientId: string, body: string): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId) || typeof body !== 'string') return fail('record_save_failed', 'action:overview.saveLimitations');
+  if (!UUID.test(clientId) || typeof body !== 'string') return fail('request_invalid', 'action:overview.saveLimitations');
   const checked = validateLimitations(body);
   if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:overview.saveLimitations');
   const supabase = await createServerSupabase();
@@ -75,7 +75,7 @@ export async function saveLimitations(clientId: string, body: string): Promise<R
 
 export async function saveGoal(clientId: string, goal: string, targetDate: string | null): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId) || typeof goal !== 'string') return fail('record_save_failed', 'action:overview.saveGoal');
+  if (!UUID.test(clientId) || typeof goal !== 'string') return fail('request_invalid', 'action:overview.saveGoal');
   if (targetDate !== null && (typeof targetDate !== 'string' || !DATE.test(targetDate) || targetDate < '2000-01-01')) {
     return fail('goal_date_invalid', 'action:overview.saveGoal');
   }
@@ -97,7 +97,7 @@ export async function saveGoal(clientId: string, goal: string, targetDate: strin
 
 export async function clearGoal(clientId: string): Promise<RecordOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId)) return fail('record_save_failed', 'action:overview.clearGoal');
+  if (!UUID.test(clientId)) return fail('request_invalid', 'action:overview.clearGoal');
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('client_goals').delete().eq('workspace_id', workspaceId).eq('client_id', clientId);
   if (error) return fail('goal_remove_failed', 'action:overview.clearGoal');

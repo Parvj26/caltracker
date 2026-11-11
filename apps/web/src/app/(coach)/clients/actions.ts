@@ -117,7 +117,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Removes a client from the coach's workspace (soft: they move to Past clients). */
 export async function removeClient(userId: string): Promise<SimpleOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(userId)) return fail('server_error', 'action:clients.removeClient');
+  if (!UUID.test(userId)) return fail('request_invalid', 'action:clients.removeClient');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('remove_client', { p_workspace_id: workspaceId, p_user_id: userId });
   revalidatePath('/clients');
@@ -130,7 +130,7 @@ export async function removeClient(userId: string): Promise<SimpleOutcome> {
 /** Deletes a pending invite, so the link in the email stops working. Accepted invites are never touched. */
 export async function cancelInvite(inviteId: string): Promise<SimpleOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(inviteId)) return fail('server_error', 'action:clients.cancelInvite');
+  if (!UUID.test(inviteId)) return fail('request_invalid', 'action:clients.cancelInvite');
   const supabase = await createServerSupabase();
   // RLS also limits this to the coach's own workspace.
   const { data, error } = await supabase

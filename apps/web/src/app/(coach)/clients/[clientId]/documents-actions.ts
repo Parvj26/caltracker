@@ -79,7 +79,7 @@ const LINK_FOR_S = 300;
 /** A short-lived link (5 minutes) to open one document, made when the coach asks for it. */
 export async function documentLink(id: string): Promise<{ ok: true; url: string } | ActionFailure> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return fail('document_save_failed', 'action:documents.documentLink');
+  if (!UUID.test(id)) return fail('request_invalid', 'action:documents.documentLink');
   const supabase = await createServerSupabase();
   const row = await supabase.from('client_documents').select('storage_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
   if (row.error) return fail('document_open_failed', 'action:documents.documentLink');
@@ -91,7 +91,7 @@ export async function documentLink(id: string): Promise<{ ok: true; url: string 
 
 export async function renameDocument(id: string, name: string): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id) || typeof name !== 'string') return fail('document_save_failed', 'action:documents.renameDocument');
+  if (!UUID.test(id) || typeof name !== 'string') return fail('request_invalid', 'action:documents.renameDocument');
   const checked = validateDocumentName(name);
   if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:documents.renameDocument');
   const supabase = await createServerSupabase();
@@ -103,7 +103,7 @@ export async function renameDocument(id: string, name: string): Promise<Document
 
 export async function setDocumentShared(id: string, shared: boolean): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id) || typeof shared !== 'boolean') return fail('document_save_failed', 'action:documents.setDocumentShared');
+  if (!UUID.test(id) || typeof shared !== 'boolean') return fail('request_invalid', 'action:documents.setDocumentShared');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('client_documents')
@@ -120,7 +120,7 @@ export async function setDocumentShared(id: string, shared: boolean): Promise<Do
 
 export async function deleteDocument(id: string): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return fail('document_save_failed', 'action:documents.deleteDocument');
+  if (!UUID.test(id)) return fail('request_invalid', 'action:documents.deleteDocument');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.from('client_documents').delete().eq('id', id).eq('workspace_id', workspaceId).select('storage_path');
   if (error) return fail('document_delete_failed', 'action:documents.deleteDocument');

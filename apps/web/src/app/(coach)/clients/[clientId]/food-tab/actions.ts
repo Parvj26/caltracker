@@ -16,7 +16,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function saveTargets(clientId: string, input: Partial<Record<MacroKey, string>>): Promise<TargetsOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId) || typeof input !== 'object' || input === null) return fail('targets_save_failed', 'action:food.saveTargets');
+  if (!UUID.test(clientId) || typeof input !== 'object' || input === null) return fail('request_invalid', 'action:food.saveTargets');
   const parsed = parseTargetsForm(input);
   if (!parsed.ok) return { ...fail('targets_invalid', 'action:food.saveTargets'), fieldErrors: parsed.errors };
   const supabase = await createServerSupabase();

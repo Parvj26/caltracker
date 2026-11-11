@@ -36,7 +36,7 @@ function refusal(error: { code?: string; hint?: string; message: string }): Save
 /** Saves the whole session doc (the same document the phone sends). */
 export async function saveSession(input: { clientId: string; doc: WorkoutLogDoc }): Promise<SaveOutcome> {
   await requireCoach();
-  if (!UUID.test(input.clientId)) return { ...fail('session_save_failed', 'action:session.saveSession'), final: true };
+  if (!UUID.test(input.clientId)) return { ...fail('request_invalid', 'action:session.saveSession'), final: true };
   const parsed = WorkoutLogDoc.safeParse(input.doc);
   if (!parsed.success) return { ...fail(codeForMessage(parsed.error.issues[0]?.message, 'log_numbers_invalid'), 'action:session.saveSession'), final: true };
   const supabase = await createServerSupabase();
@@ -62,7 +62,7 @@ export async function loadSession(logId: string): Promise<WorkoutLogDoc | null> 
 /** "Take over": the client was logging this on the phone; from now on only the coach changes it. */
 export async function takeOverSession(logId: string): Promise<{ ok: true } | ActionFailure> {
   await requireCoach();
-  if (!UUID.test(logId)) return fail('session_save_failed', 'action:session.takeOverSession');
+  if (!UUID.test(logId)) return fail('request_invalid', 'action:session.takeOverSession');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('take_over_workout_log', { p_log_id: logId });
   if (error) {
@@ -77,7 +77,7 @@ export async function takeOverSession(logId: string): Promise<{ ok: true } | Act
 /** "Hand back to client": the coach stops logging; the client carries on on their phone. */
 export async function handBackSession(logId: string): Promise<{ ok: true } | ActionFailure> {
   await requireCoach();
-  if (!UUID.test(logId)) return fail('session_save_failed', 'action:session.handBackSession');
+  if (!UUID.test(logId)) return fail('request_invalid', 'action:session.handBackSession');
   const supabase = await createServerSupabase();
   const { error } = await supabase.rpc('hand_back_workout_log', { p_log_id: logId });
   if (error) {

@@ -56,7 +56,7 @@ export async function uploadAvatar(formData: FormData): Promise<ProfileOutcome> 
   const thumb = formData.get('thumb');
   const ext = formData.get('ext');
   const refused: ProfileOutcome = fail('avatar_unusable', 'action:profile.uploadAvatar');
-  if (!(avatar instanceof Blob) || !(thumb instanceof Blob) || (ext !== 'webp' && ext !== 'jpg')) return fail('server_error', 'action:profile.uploadAvatar');
+  if (!(avatar instanceof Blob) || !(thumb instanceof Blob) || (ext !== 'webp' && ext !== 'jpg')) return fail('request_invalid', 'action:profile.uploadAvatar');
   if (!(await acceptableAvatarFiles(avatar, thumb, ext))) return refused;
 
   const supabase = await createServerSupabase();
@@ -92,7 +92,7 @@ export async function removeAvatar(): Promise<ProfileOutcome> {
 export async function changePassword(input: { current: string; next: string; confirm: string }): Promise<ProfileOutcome> {
   const coach = await requireCoach();
   const { current, next, confirm } = input;
-  if (typeof current !== 'string' || typeof next !== 'string' || typeof confirm !== 'string') return fail('server_error', 'action:profile.changePassword');
+  if (typeof current !== 'string' || typeof next !== 'string' || typeof confirm !== 'string') return fail('request_invalid', 'action:profile.changePassword');
   if (current === '') return fail('password_current_required', 'action:profile.changePassword');
   if (next.length < PASSWORD_MIN_LENGTH) return fail('password_too_short', 'action:profile.changePassword');
   if (passwordBytes(next) > PASSWORD_MAX_LENGTH) return fail('password_too_long', 'action:profile.changePassword');
