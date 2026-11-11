@@ -6,6 +6,7 @@ import { Logo } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
+import { SessionReplayGate } from '@/lib/analytics/session-replay-gate';
 import { CoachSidebar } from './coach-sidebar';
 import { HelpNavLink } from './help-nav-link';
 import { NAV_ICONS } from './nav-icons';
@@ -40,6 +41,8 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   const person = { id: coach.userId, name: fullName, email: coach.email, workspaceId: coach.workspaceId, workspaceName: coach.workspaceName };
   return (
     <AnalyticsProvider person={person}>
+    {/* Coach pages only: recordings start here when NEXT_PUBLIC_SESSION_REPLAY=on and the PostHog flag allows. */}
+    <SessionReplayGate />
     <div className={styles.shell}>
       {/* useSearchParams needs a Suspense boundary; the bar renders nothing until a link is tapped. */}
       <Suspense fallback={null}>
