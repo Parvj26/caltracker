@@ -62,6 +62,66 @@ describe('createRefreshScheduler', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  describe('paused (a dialog is open)', () => {
+    let paused = false;
+    const makePausable = () =>
+      createRefreshScheduler({ refresh, isVisible: () => visible, isPaused: () => paused, now: () => Date.now() });
+    beforeEach(() => {
+      paused = false;
+    });
+
+    it('holds changes while paused, then refreshes once when resumed', () => {
+      const s = makePausable();
+      paused = true;
+      s.change();
+      s.change();
+      vi.advanceTimersByTime(5000);
+      expect(refresh).not.toHaveBeenCalled();
+      paused = false;
+      s.resume();
+      expect(refresh).toHaveBeenCalledTimes(1);
+      s.resume();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('a change already waiting when a dialog opens waits for it to close', () => {
+      const s = makePausable();
+      s.change();
+      paused = true;
+      vi.advanceTimersByTime(1000);
+      expect(refresh).not.toHaveBeenCalled();
+      paused = false;
+      s.resume();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('resuming with nothing missed does not refresh, and resuming while still paused does nothing', () => {
+      const s = makePausable();
+      paused = true;
+      s.resume();
+      paused = false;
+      s.resume();
+      expect(refresh).not.toHaveBeenCalled();
+      paused = true;
+      s.change();
+      s.resume();
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it('a hidden tab still waits after the dialog closes', () => {
+      const s = makePausable();
+      paused = true;
+      s.change();
+      paused = false;
+      visible = false;
+      s.resume();
+      expect(refresh).not.toHaveBeenCalled();
+      visible = true;
+      s.visibility();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('becoming visible with nothing missed does not refresh', () => {
     const s = make();
     visible = false;

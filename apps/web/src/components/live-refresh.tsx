@@ -19,6 +19,11 @@ export type LiveSource = { table: LiveTable; filter: string };
 
 let channelCount = 0;
 
+/** An open dialog anywhere on the page holds refreshes back (see LiveRefresh). */
+const dialogOpen = () => document.querySelector('dialog[open]') !== null;
+/** How often a held-back refresh checks whether the dialog has gone (one removed without closing sends no event). */
+const RESUME_CHECK_MS = 1000;
+
 /**
  * Re-renders the current page (router.refresh, so server components load fresh data) shortly after a matching row
  * changes, e.g. `<LiveRefresh on={[{ table: 'workout_logs', filter: `workspace_id=eq.${id}` }]} renderedAt={Date.now()} />`.
@@ -27,6 +32,9 @@ let channelCount = 0;
  * - `renderedAt`: when the server rendered the page; a join more than 1 s later refreshes once (changes in between
  *   were never sent). A later render's new value does not resubscribe.
  * - `maxWaitMs`: the longest a steady stream of changes waits for a refresh (2 s by default; busy pages use more).
+ *
+ * While any dialog is open the refresh waits, and happens once the dialog has closed: a re-render under an open
+ * dialog can close a native picker in it (iPhone) or shift what the coach is reading.
  *
  * Renders nothing visible; `data-live` ("connecting", "live" or "offline") lets tests wait until the page is
  * listening. Runs only in the browser: on the server it is just the empty span.
@@ -46,14 +54,22 @@ export function LiveRefresh({ on, renderedAt, maxWaitMs }: { on: LiveSource[]; r
     const s = createRefreshScheduler({
       refresh: () => router.refresh(),
       isVisible: () => document.visibilityState === 'visible',
+      isPaused: dialogOpen,
       renderedAt: firstRender.current,
       maxWaitMs,
     });
     scheduler.current = s;
     const onVisibility = () => s.visibility();
     document.addEventListener('visibilitychange', onVisibility);
+    // A dialog's close event doesn't bubble, so listen in the capture phase; the timer covers dialogs that are
+    // removed from the page while open.
+    const onDialogClose = () => s.resume();
+    document.addEventListener('close', onDialogClose, true);
+    const resumeCheck = setInterval(() => s.resume(), RESUME_CHECK_MS);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('close', onDialogClose, true);
+      clearInterval(resumeCheck);
       s.dispose();
       scheduler.current = null;
     };
