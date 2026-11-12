@@ -21,6 +21,42 @@
 .tabs[data-more-before][data-more-after] {
   mask-image: linear-gradient(to right, transparent, black 48px, black calc(100% - 48px), transparent);
 }
+/* A round arrow over each faded edge (client-tabs.tsx shows it only while tabs are hidden there, so on phones): a
+   fade alone looked like a cut-off "Doc…". A tap scrolls the strip. */
+.tabsWrap { position: relative; min-width: 0; }
+.tabsArrow {
+  position: absolute;
+  top: 0;
+  bottom: var(--ct-border-width-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 22px;
+  font-weight: var(--ct-weight-section-heading);
+  line-height: 1;
+  cursor: pointer;
+  isolation: isolate;
+}
+.tabsArrow::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-border);
+  z-index: -1;
+}
+.tabsArrowBefore { left: 0; }
+.tabsArrowAfter { right: 0; }
 .tabList { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .tab {
   display: inline-flex;
