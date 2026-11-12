@@ -40,7 +40,7 @@ test('add three exercises at once with 4 sets each, and save', async ({ page }) 
   await expect(picker).toBeHidden();
 
   // Block titles, top to bottom (each block is a <section> whose <header> holds its title).
-  await expect(page.locator('section > header h2')).toHaveText(['Pushups', 'Barbell Squat', 'Pullups']);
+  await expect(page.locator('section header h2')).toHaveText(['Pushups', 'Barbell Squat', 'Pullups']);
   for (const n of [1, 2, 3, 4]) await expect(setRow(page, 'Barbell Squat', `set ${n}`)).toBeVisible();
   await expect(setRow(page, 'Barbell Squat', 'set 5')).toHaveCount(0);
 

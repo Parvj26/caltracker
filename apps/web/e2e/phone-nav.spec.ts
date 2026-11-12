@@ -107,12 +107,15 @@ test.describe('on an iPhone', () => {
     else await expect(dot).toHaveCount(0);
   });
 
-  test('on the workout editor the button sits above the save bar', async ({ page }) => {
+  test('on the workout editor the save bar is at the top, clear of the button', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts/new');
-    await expect(page.locator('[data-bottom-bar]')).toBeVisible();
-    // The save bar is sticky at the foot of the screen; the button floats 88 px up, clear of it.
-    await expect(menuButton(page)).toHaveCSS('bottom', '88px');
+    // On a phone the builder's save bar (Save and + Exercise) sits at the top of the screen, so the menu button keeps
+    // its usual place at the bottom and covers neither.
+    const save = (await page.getByRole('button', { name: 'Save workout' }).boundingBox())!;
+    const button = (await menuButton(page).boundingBox())!;
+    expect(save.y + save.height).toBeLessThan(button.y);
+    await expect(menuButton(page)).toHaveCSS('bottom', '16px');
   });
 });
 

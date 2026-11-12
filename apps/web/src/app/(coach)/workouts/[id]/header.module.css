@@ -1,0 +1,41 @@
+/* The workout page header's ⋯ (Duplicate, Delete). Colours, radii and sizes only via var(--ct-*). */
+.wrap { display: contents; }
+.moreButton { display: none; }
+.panel { display: contents; }
+
+@media (max-width: 899.98px) {
+  .wrap { position: relative; display: block; }
+  .moreButton {
+    display: grid;
+    place-items: center;
+    width: var(--ct-tap-min);
+    height: var(--ct-tap-min);
+    border: 0;
+    border-radius: var(--ct-radius-pill);
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    font: inherit;
+    font-size: var(--ct-size-section-heading);
+    font-weight: var(--ct-weight-button);
+    cursor: pointer;
+  }
+  .moreButton[aria-expanded='true'] { background: var(--ct-border); }
+  .panel { display: none; }
+  .panel[data-open] {
+    position: absolute;
+    z-index: 12;
+    top: calc(100% + var(--ct-space-1));
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ct-space-2);
+    min-width: 13rem;
+    padding: var(--ct-space-2);
+    border: var(--ct-border-width-card) solid var(--ct-border);
+    border-radius: var(--ct-radius-input);
+    background: var(--ct-bg);
+    box-shadow: var(--ct-shadow-sticker);
+  }
+  .panel[data-open] > * { width: 100%; }
+  .panel[data-open] button { width: 100%; }
+}

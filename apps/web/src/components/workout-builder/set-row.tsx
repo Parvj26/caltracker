@@ -11,6 +11,8 @@ import {
   fromMeters,
   kgToInput,
   parseClock,
+  stepReps,
+  stepWeight,
   toKg,
   toMeters,
 } from '@caltracker/shared';
@@ -88,6 +90,24 @@ type Props = {
   onRemove: () => void;
 };
 
+/**
+ * − and + on either side of a box (phones, iPads and other touch screens; hidden on a desktop with a mouse). Typing
+ * still works; each tap changes the doc at once. 44 px tall, spaced apart.
+ */
+function Stepper({ less, more, onStep, children }: { less: string; more: string; onStep: (dir: 1 | -1) => void; children: ReactNode }) {
+  return (
+    <span className={styles.stepper}>
+      <button type="button" className={styles.stepButton} aria-label={less} onClick={() => onStep(-1)} data-ph-capture-attribute-label="workout_step_down">
+        <span aria-hidden="true">−</span>
+      </button>
+      {children}
+      <button type="button" className={styles.stepButton} aria-label={more} onClick={() => onStep(1)} data-ph-capture-attribute-label="workout_step_up">
+        <span aria-hidden="true">+</span>
+      </button>
+    </span>
+  );
+}
+
 /** One labelled box in a set row: a small caption above it, as in the approved mockup. */
 function Field({ caption, col, children }: { caption: string; col: string; children: ReactNode }) {
   return (
@@ -112,7 +132,8 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
   const distanceUnit = distanceUnitFor(units);
 
   return (
-    <div role="group" aria-label={name} className={cx(styles.setRow, isDrop && styles.dropRow)}>
+    // data-values: how many value boxes the row has, so a phone's two-line layout knows which boxes wrap to line 2.
+    <div role="group" aria-label={name} className={cx(styles.setRow, isDrop && styles.dropRow)} data-values={fields.length}>
       <div className={styles.setCells}>
         <span className={styles.setLabel} aria-hidden="true">
           {number}
@@ -126,31 +147,46 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
 
         {fields.includes('reps') ? (
           <Field caption="Reps" col="reps">
-            <NumberInput
-              label="Reps"
-              inputMode="numeric"
-              placeholder={set.toFailure ? 'max' : 'reps'}
-              className={styles.narrow}
-              value={singleReps(set.targetRepsMin, set.targetRepsMax)}
-              format={String}
-              parse={parseWhole}
-              onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
-            />
+            <Stepper
+              less="Fewer reps"
+              more="More reps"
+              onStep={(dir) => {
+                const n = stepReps(singleReps(set.targetRepsMin, set.targetRepsMax), dir);
+                onChange({ targetRepsMin: n, targetRepsMax: n });
+              }}
+            >
+              <NumberInput
+                label="Reps"
+                inputMode="numeric"
+                placeholder={set.toFailure ? 'max' : 'reps'}
+                className={styles.narrow}
+                value={singleReps(set.targetRepsMin, set.targetRepsMax)}
+                format={String}
+                parse={parseWhole}
+                onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
+              />
+            </Stepper>
           </Field>
         ) : null}
 
         {fields.includes('weight') ? (
           <Field caption="Weight" col="weight">
-            <NumberInput
-              label={`Weight (${units})`}
-              inputMode="decimal"
-              placeholder={units}
-              className={styles.narrow}
-              value={set.targetWeightKg}
-              format={(kg) => String(kgToInput(kg, units))}
-              parse={parseDecimal}
-              onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
-            />
+            <Stepper
+              less="Less weight"
+              more="More weight"
+              onStep={(dir) => onChange({ targetWeightKg: stepWeight(set.targetWeightKg, dir, units) })}
+            >
+              <NumberInput
+                label={`Weight (${units})`}
+                inputMode="decimal"
+                placeholder={units}
+                className={styles.narrow}
+                value={set.targetWeightKg}
+                format={(kg) => String(kgToInput(kg, units))}
+                parse={parseDecimal}
+                onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
+              />
+            </Stepper>
             <span className={styles.unit} aria-hidden="true">{units}</span>
           </Field>
         ) : null}

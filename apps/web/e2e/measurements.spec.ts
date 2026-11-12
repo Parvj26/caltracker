@@ -150,26 +150,32 @@ test('at iPhone width each exercise is one compact table', async ({ page }) => {
   await signInAsCoach(page);
   await newWorkout(page, ex);
   const region = page.getByRole('region', { name: ex });
+  // A newly added exercise opens (phones fold the others to one line).
+  await expect(region.getByRole('button', { name: new RegExp(`^${ex}: `) })).toHaveAttribute('aria-expanded', 'true');
   await setRow(page, ex, 'set 2').getByRole('button', { name: /^Set type: / }).click();
   await setRow(page, ex, 'set 2').getByRole('menuitemradio', { name: 'Drop set', exact: true }).click();
 
-  // One header row for the exercise, following the measurements, weight first.
+  // One header row for the exercise, naming the first line's boxes, weight first.
   const header = region.locator('[class*="setHeader"]');
   await expect(header).toHaveCount(1);
   await expect(header).toBeVisible();
-  await expect(header.locator('span')).toHaveText(['SET', 'KG', 'REPS', 'REST']);
+  await expect(header.locator('span:visible')).toHaveText(['SET', 'KG', 'REPS']);
 
-  // Each set is one thin row: the letter, the boxes and × side by side, no captions.
+  // Each set: the letter, weight and reps with − / +, and × on one line; rest (with its caption) under them.
   for (const n of [1, 2, 3]) {
     const row = setRow(page, ex, `set ${n}`);
     const box = (await row.boundingBox())!;
-    expect(box.height).toBeLessThan(56);
+    expect(box.height).toBeLessThan(n === 2 ? 56 : 104);
     const letter = (await row.getByRole('button', { name: /^Set type: / }).boundingBox())!;
     const remove = (await row.getByRole('button', { name: `Remove set ${n}` }).boundingBox())!;
+    const plus = (await row.getByRole('button', { name: 'More reps' }).boundingBox())!;
     expect(Math.abs(letter.y - remove.y)).toBeLessThan(8);
+    expect(Math.abs(letter.y - plus.y)).toBeLessThan(8);
     expect(remove.x).toBeGreaterThan(letter.x + 200);
+    expect(remove.width).toBeGreaterThanOrEqual(44);
     await expect(row.getByText('Weight', { exact: true })).toBeHidden();
   }
+  await expect(setRow(page, ex, 'set 1').getByText('Rest', { exact: true })).toBeVisible();
   // A drop row is indented and has no rest box.
   const drop = setRow(page, ex, 'set 2');
   await expect(drop.getByLabel('Rest (m:ss)')).toHaveCount(0);
@@ -177,21 +183,16 @@ test('at iPhone width each exercise is one compact table', async ({ page }) => {
   const firstLetter = (await setRow(page, ex, 'set 1').getByRole('button', { name: /^Set type: / }).boundingBox())!;
   expect(dropLetter.x).toBeGreaterThan(firstLetter.x + 8);
 
-  // The name has the first line of the header to itself; the measurements tab and the four icon buttons come under
-  // it (the buttons stay together, beside the tab when there is room: the coach site's icon rail leaves a 390 px
-  // phone less width than the mockup had).
-  const name = (await region.getByRole('button', { name: `Swap exercise: ${ex}` }).boundingBox())!;
-  const pill = (await measurements(page, ex).boundingBox())!;
-  expect(pill.y).toBeGreaterThan(name.y + name.height - 4);
-  const icons = await Promise.all(
-    [`Add a substitute for ${ex}`, `Move ${ex} up`, `Move ${ex} down`, `Remove ${ex}`].map(
-      async (label) => (await region.getByRole('button', { name: label, exact: true }).boundingBox())!,
-    ),
-  );
-  for (const b of icons) {
-    expect(Math.abs(b.y - icons[0]!.y)).toBeLessThan(4);
-    expect(b.y).toBeGreaterThan(name.y + name.height - 4);
+  // The measurements tab stays in the open exercise; swap, substitute, move and remove are in ⋯.
+  await expect(measurements(page, ex)).toBeVisible();
+  for (const label of [`Add a substitute for ${ex}`, `Move ${ex} up`, `Move ${ex} down`, `Remove ${ex}`]) {
+    await expect(region.getByRole('button', { name: label, exact: true })).toBeHidden();
   }
+  await region.getByRole('button', { name: `More for ${ex}` }).click();
+  for (const item of ['Move to top', 'Move to…', 'Swap exercise', 'Add substitute', 'Notes', 'Delete exercise']) {
+    await expect(region.getByRole('menuitem', { name: item })).toBeVisible();
+  }
+  await page.keyboard.press('Escape');
 
   // No sideways scrolling.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
