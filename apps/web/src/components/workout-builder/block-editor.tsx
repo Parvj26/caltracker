@@ -1,9 +1,17 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES, TEMPO_PLACEHOLDER, parseTempo, setShowsRest } from '@caltracker/shared';
+import {
+  MAX_CHOICE_OPTIONS,
+  MAX_SUBSTITUTES,
+  TEMPO_PLACEHOLDER,
+  blockCollapsedSummary,
+  parseTempo,
+  setShowsRest,
+} from '@caltracker/shared';
 import type { Measurement, Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
+import { BlockMenu, MoveToDialog, type MenuItem } from './block-menu';
 import { Icon, type IconName } from './icons';
 import { MeasurementsMenu } from './measurements-menu';
 import { type SetPatch } from './set-row';
@@ -85,6 +93,16 @@ type Props = {
   /** Inline errors keyed by `block:<id>`, `exercise:<id>`, `tempo:<exercise id>` and `set:<id>`. */
   errors: ReadonlyMap<string, string[]>;
   actions: BlockActions;
+  /**
+   * Phones and iPad portrait (below 900 px) fold each block to one line; `open` unfolds it (one at a time, see
+   * WorkoutBuilder) and `onToggle` is a tap on the folded line. Wider screens always show every block in full.
+   */
+  open?: boolean;
+  onToggle?: () => void;
+  /** The blocks in this block's section, in order (this one included), for "Move to top" and "Move to…". */
+  siblings?: ReadonlyArray<{ id: string; index: number; title: string }>;
+  /** Moves this block to a place in the doc (moveBlock keeps it inside its section). */
+  onMoveTo?: (index: number) => void;
 };
 
 const rounds = (e: WorkoutExerciseDoc) => e.sets.filter((s) => s.setType !== 'drop').length;
@@ -96,8 +114,35 @@ export function supersetTitle(block: WorkoutBlockDoc): string {
   return `Superset / circuit · ${even ? `${counts[0]} rounds` : `${counts.join(' + ')} sets`}`;
 }
 
-export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, units, errors, actions }: Props) {
+/** True when any message from the last save sits on this block, one of its exercises, substitutes or sets. */
+function blockHasErrors(block: WorkoutBlockDoc, errors: ReadonlyMap<string, string[]>): boolean {
+  if (errors.size === 0) return false;
+  const keys = [`block:${block.id}`];
+  for (const ex of block.exercises) {
+    keys.push(`exercise:${ex.id}`, `tempo:${ex.id}`, ...ex.sets.map((s) => `set:${s.id}`));
+    for (const sub of ex.substitutes) keys.push(`substitute:${sub.id}`, ...sub.sets.map((s) => `set:${s.id}`));
+  }
+  return keys.some((k) => (errors.get(k)?.length ?? 0) > 0);
+}
+
+export function BlockEditor({
+  block,
+  index,
+  canMoveUp,
+  canMoveDown,
+  sections,
+  units,
+  errors,
+  actions,
+  open = false,
+  onToggle,
+  siblings = [],
+  onMoveTo,
+}: Props) {
   const headingId = useId();
+  const bodyId = useId();
+  const noteId = useId();
+  const [moving, setMoving] = useState(false);
   const superset = block.kind === 'superset';
   const first = block.exercises[0]!;
   const choice = block.kind === 'choice';
@@ -118,9 +163,84 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
     ...(block.sectionId !== null ? [{ id: 'none', name: 'No section' }] : []),
     ...sections.filter((sec) => sec.id !== block.sectionId),
   ];
+  const summary = blockCollapsedSummary(block, units);
+  const hasErrors = blockHasErrors(block, errors);
+  // A block with a message from the last save stays open, so the coach can see what to fix.
+  const shown = open || hasErrors;
+  const place = siblings.findIndex((s) => s.id === block.id);
+  const noun = superset ? 'superset' : choice ? 'pick-one group' : 'exercise';
+  const focusNote = () => {
+    if (!shown) onToggle?.();
+    // After the block has unfolded.
+    requestAnimationFrame(() => setTimeout(() => document.getElementById(noteId)?.focus(), 0));
+  };
+  const menuItems: MenuItem[] = [
+    { label: 'Move to top', disabled: place <= 0, onSelect: () => onMoveTo?.(siblings[0]!.index) },
+    { label: 'Move to…', disabled: siblings.length < 2 && targets.length === 0, onSelect: () => setMoving(true) },
+    ...(!multi ? [{ label: 'Swap exercise', onSelect: () => actions.onSwap(first.id) }] : []),
+    ...(!multi
+      ? [
+          {
+            label: 'Add substitute',
+            disabled: first.substitutes.length >= MAX_SUBSTITUTES,
+            onSelect: () => actions.onAddSubstitute(first.id),
+          },
+        ]
+      : []),
+    { label: 'Notes', onSelect: focusNote },
+    { label: `Delete ${noun}`, danger: true, onSelect: actions.onRemoveBlock },
+  ];
 
   return (
-    <section aria-labelledby={headingId} className={styles.block}>
+    <section aria-labelledby={headingId} className={styles.block} data-open={shown ? '' : undefined}>
+      {/* Phones and iPad portrait: one tappable line (name, then "4 × 8 @ 60 kg · rest 1:30") and the ⋯ menu. */}
+      <div className={styles.fold}>
+        <button
+          type="button"
+          className={styles.foldButton}
+          aria-expanded={shown}
+          aria-controls={bodyId}
+          aria-label={`${summary.title}: ${summary.line}`}
+          onClick={onToggle}
+          data-ph-capture-attribute-label="workout_block_fold"
+        >
+          <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
+          <span className={styles.foldText}>
+            <span className={styles.foldTitle}>{summary.title}</span>
+            <span className={styles.foldLine}>{summary.line}</span>
+            {!shown
+              ? summary.parts.map((p) => (
+                  <span key={p.key} className={styles.foldLine}>
+                    {p.name} · {p.line}
+                  </span>
+                ))
+              : null}
+            {hasErrors ? <span className={styles.foldError}>Needs a fix</span> : null}
+          </span>
+          <span className={styles.foldChevron} aria-hidden="true">
+            <Icon name="chevron" size={20} />
+          </span>
+        </button>
+        <BlockMenu name={summary.title} items={menuItems} />
+      </div>
+      {moving ? (
+        <MoveToDialog
+          name={summary.title}
+          places={siblings.map((s) => ({
+            key: s.id,
+            label: s.title,
+            current: s.id === block.id,
+            onSelect: () => onMoveTo?.(s.index),
+          }))}
+          sections={targets.map((t) => ({
+            key: t.id,
+            label: t.name,
+            onSelect: () => actions.onMoveToSection(t.id === 'none' ? null : t.id),
+          }))}
+          onClose={() => setMoving(false)}
+        />
+      ) : null}
+      <div id={bodyId} className={styles.blockBody}>
       <header className={styles.blockHeader}>
         <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
         {multi ? (
@@ -226,6 +346,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               <label className={styles.exerciseNote}>
                 <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
                 <input
+                  id={ei === 0 ? noteId : undefined}
                   type="text"
                   placeholder="Exercise note (optional)"
                   maxLength={500}
@@ -291,6 +412,7 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
           ) : null}
         </div>
       ) : null}
+      </div>
     </section>
   );
 }

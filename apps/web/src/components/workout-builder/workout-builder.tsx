@@ -145,6 +145,14 @@ function issuesByKey(doc: WorkoutDoc, issues: readonly SaveIssue[]): Map<string,
   return out;
 }
 
+/** A block's name in "Move to…": the exercise, or the group's exercises. */
+function blockTitle(block: WorkoutDoc['blocks'][number]): string {
+  const names = block.exercises.map((e) => e.exerciseName);
+  if (block.kind === 'superset') return `Superset: ${names.join(' + ')}`;
+  if (block.kind === 'choice') return `Pick one: ${names.join(' or ')}`;
+  return names[0] ?? '';
+}
+
 const formatDay = (date: IsoDate) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' }).format(
     new Date(`${date}T00:00:00Z`),
@@ -173,6 +181,9 @@ export function WorkoutBuilder({
   const [errors, setErrors] = useState<Map<string, string[]>>(new Map());
   const [formError, setFormError] = useState<ErrorCode | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
+  // Phones and iPad portrait fold every block to one line and open one at a time (wider screens ignore this).
+  const [openId, setOpenId] = useState<string | null>(null);
+  const knownBlocks = useRef<Set<string>>(new Set(initial.blocks.map((b) => b.id)));
   const [pending, startTransition] = useTransition();
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
   // The workspace's remembered choices per exercise: read with the page, then again after each save. A ref, not
@@ -192,6 +203,13 @@ export function WorkoutBuilder({
     };
   }, [prefsVersion]);
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+
+  // A newly added exercise (or group) opens, so the coach can fill it in straight away.
+  useEffect(() => {
+    const added = doc.blocks.find((b) => !knownBlocks.current.has(b.id));
+    knownBlocks.current = new Set(doc.blocks.map((b) => b.id));
+    if (added) setOpenId(added.id);
+  }, [doc.blocks]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -325,7 +343,14 @@ export function WorkoutBuilder({
   const items = useMemo(() => {
     type Item =
       | { kind: 'section'; section: { id: string; name: string }; empty: boolean }
-      | { kind: 'block'; block: WorkoutDoc['blocks'][number]; index: number; canMoveUp: boolean; canMoveDown: boolean };
+      | {
+          kind: 'block';
+          block: WorkoutDoc['blocks'][number];
+          index: number;
+          canMoveUp: boolean;
+          canMoveDown: boolean;
+          siblings: Array<{ id: string; index: number; title: string }>;
+        };
     const out: Item[] = [];
     const shown = new Set<string>();
     const showEmptyThrough = (upTo: number) => {
@@ -342,8 +367,14 @@ export function WorkoutBuilder({
         shown.add(run.section.id);
         out.push({ kind: 'section', section: run.section, empty: false });
       }
+      const siblings = run.blockIndexes.map((bi) => ({
+        id: doc.blocks[bi]!.id,
+        index: bi,
+        title: blockTitle(doc.blocks[bi]!),
+      }));
       run.blockIndexes.forEach((bi, k) =>
         out.push({
+          siblings,
           kind: 'block',
           block: doc.blocks[bi]!,
           index: bi,
@@ -433,6 +464,10 @@ export function WorkoutBuilder({
               units={units}
               errors={errors}
               actions={actionsFor(item.block.id, item.index)}
+              open={openId === item.block.id}
+              onToggle={() => setOpenId((cur) => (cur === item.block.id ? null : item.block.id))}
+              siblings={item.siblings}
+              onMoveTo={(to) => setDoc((d) => moveBlock(d, item.block.id, to))}
             />
           ),
         )}
@@ -445,7 +480,7 @@ export function WorkoutBuilder({
       </div>
 
       <div className={styles.addRow}>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercise" data-ph-safe="">
+        <Button variant="secondary" className={styles.wideOnly} disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercise" data-ph-safe="">
           + Exercise
         </Button>
         <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })} data-ph-capture-attribute-label="workout_add_superset" data-ph-safe="">
@@ -462,7 +497,9 @@ export function WorkoutBuilder({
         <AddSectionMenu full={doc.sections.length >= 10} onAdd={(name) => setDoc((d) => addSection(d, name, makeId))} />
       </div>
 
-      <div className={styles.saveBar} data-bottom-bar="">
+      {/* Wide screens: a save bar stuck to the bottom. Phones and iPad portrait: the same bar moves to the top (under
+          the notch), with "+ Exercise" beside Save, so neither hides behind the keyboard or the Menu button. */}
+      <div className={styles.saveBar}>
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}
@@ -471,8 +508,32 @@ export function WorkoutBuilder({
         {formError ? <ErrorText code={formError} /> : null}
         {formError === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
-        <Button onClick={save} pending={pending} data-ph-capture-attribute-label="workout_save">
-          {pending ? 'Saving…' : saveLabel}
+        <Button
+          variant="secondary"
+          className={styles.narrowOnly}
+          disabled={full}
+          onClick={() => setPicker({ kind: 'straight' })}
+          data-ph-capture-attribute-label="workout_add_exercise_top"
+          data-ph-safe=""
+        >
+          + Exercise
+        </Button>
+        <Button
+          onClick={save}
+          pending={pending}
+          aria-label={pending ? undefined : saveLabel}
+          data-ph-capture-attribute-label="workout_save"
+        >
+          {pending ? (
+            'Saving…'
+          ) : saveLabel === 'Save workout' ? (
+            // On a phone the top bar says just "Save" (the name stays "Save workout").
+            <span>
+              Save<span className={styles.wideWord}> workout</span>
+            </span>
+          ) : (
+            saveLabel
+          )}
         </Button>
       </div>
 

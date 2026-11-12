@@ -333,47 +333,240 @@
 .setHeader { display: none; }
 
 /* ---------- iPhone width: one compact table per exercise ---------- */
-/* A header row (SET | LB | REPS | REST, following the measurements) then one thin row per set: the type letter, a
-   box per column and × at the end. Weight comes first here, as on the phone. A drop row is indented and has no rest
-   box. --set-cols (from SetTable) is the number of value columns, rest included. The name is the first line of the
-   exercise header; the measurements tab and the icon buttons share the second. */
+/* A header row (SET | KG | REPS, following the measurements) then each set: the type letter, the first two value
+   boxes (with − and +) and × on line 1; any further box (rest, or time on a weight-reps-time exercise) on line 2 with
+   its caption. Weight comes first here, as on the phone. A drop row is indented and has no rest box. */
 @media (max-width: 599px) {
-  .block { padding: var(--ct-space-3); }
+  .block { padding: var(--ct-space-2); }
   .blockHeader { gap: var(--ct-space-2); }
   .blockHeader .blockTitle { flex: 1 1 calc(100% - 40px); min-width: 0; }
   .blockTools { flex-wrap: nowrap; gap: var(--ct-space-1); }
   .iconButton { width: 44px; height: 44px; }
 
-  .sets { gap: var(--ct-space-1); }
-  .setHeader, .setRow {
-    display: grid;
-    grid-template-columns: 44px repeat(var(--set-cols, 2), minmax(0, 1fr)) 32px;
-    column-gap: var(--ct-space-2);
-    align-items: center;
-  }
+  .sets { gap: var(--ct-space-2); }
   .setHeader {
-    font-size: var(--ct-size-caption);
+    display: grid;
+    grid-template-columns: 44px repeat(2, minmax(0, 1fr)) 44px;
+    column-gap: var(--ct-space-1);
+    align-items: center;
+    font-size: 13px;
     font-weight: var(--ct-weight-button);
     letter-spacing: 0.04em;
     color: var(--ct-ink-muted);
     text-align: center;
   }
-  .setRow { padding: 0; border: 0; border-radius: 0; background: transparent; row-gap: var(--ct-space-1); }
+  .setHeader > :nth-child(n + 4) { display: none; }
+  .setRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    column-gap: var(--ct-space-1);
+    align-items: start;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    row-gap: var(--ct-space-1);
+  }
+  .setCells {
+    display: grid;
+    grid-template-columns: 44px repeat(2, minmax(0, 1fr));
+    column-gap: var(--ct-space-1);
+    row-gap: var(--ct-space-1);
+    align-items: center;
+  }
   .dropRow { margin-left: 0; padding-left: var(--ct-space-3-5); }
-  .setCells { display: contents; }
   .setLabel, .fieldCaption, .unit { display: none; }
   .field { min-width: 0; }
   .fieldBox { display: flex; }
-  .field[data-col='type'] { order: 0; }
+  .field[data-col='type'] { order: 0; grid-row: span 2; align-self: start; }
   .field[data-col='weight'] { order: 1; }
   .field[data-col='reps'] { order: 2; }
   .field[data-col='duration'] { order: 3; }
   .field[data-col='distance'] { order: 4; }
   .field[data-col='rest'] { order: 5; }
-  .narrow { width: 100%; min-height: 44px; text-align: center; }
+  /* A box on line 2 shows its caption beside it (the header row only names line 1). */
+  .setRow[data-values='2'] .field[data-col='rest'],
+  .setRow[data-values='3'] .field[data-col='rest'],
+  .setRow[data-values='3'] .field[data-col='duration'] { flex-direction: row; align-items: center; gap: var(--ct-space-2); }
+  .setRow[data-values='2'] .field[data-col='rest'] .fieldCaption,
+  .setRow[data-values='3'] .field[data-col='rest'] .fieldCaption,
+  .setRow[data-values='3'] .field[data-col='duration'] .fieldCaption { display: inline; font-size: 14px; }
+  .narrow { width: 100%; min-width: 0; min-height: 44px; text-align: center; }
+  .stepper { display: flex; width: 100%; gap: 2px; }
+  .stepper .narrow { flex: 1; width: auto; min-width: 0; padding: 0 2px; }
+  .stepper .stepButton { width: 32px; height: 44px; }
   .kindButton { width: 44px; height: 44px; }
-  .removeSet { position: static; order: 6; grid-column: -2 / -1; width: 32px; height: 44px; }
-  .rowError { order: 7; grid-column: 1 / -1; padding-left: 0; }
+  .removeSet { position: static; grid-column: 2; grid-row: 1; width: 44px; height: 44px; }
+  .rowError { grid-column: 1 / -1; padding-left: 0; }
   .exerciseFooter .addSet { align-self: stretch; }
   .substitute { margin-left: 0; }
+}
+
+/* ---------- Phones, iPads and other touch screens ---------- */
+/* Desktop with a mouse: nothing below changes it. The fold line, the ⋯ menu, the steppers and the top "+ Exercise"
+   are hidden there; the bottom "+ Exercise" and the icon buttons stay. */
+.fold, .narrowOnly, .stepButton { display: none; }
+.saveBar .narrowOnly { display: none; }
+.stepper { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
+
+/* The ⋯ menu (same look as the calendar's item menu). */
+.menuWrap { position: relative; flex: none; }
+.moreButton {
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-section-heading);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.moreButton:hover, .moreButton[aria-expanded='true'] { background: var(--ct-border); }
+.menu {
+  position: absolute;
+  z-index: 12;
+  top: 100%;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  margin: var(--ct-space-1) 0 0;
+  padding: var(--ct-space-1);
+  list-style: none;
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  box-shadow: var(--ct-shadow-sticker);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.menuItem:hover:not(:disabled), .menuItem:focus-visible { background: var(--ct-surface); }
+.menuItem:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
+.menuItemDanger { color: var(--ct-danger); }
+
+/* "Move to…" window. */
+.moveDialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: var(--ct-space-4-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.moveDialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.moveDialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.moveList { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+.moveItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-1) var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  cursor: pointer;
+}
+.moveItem:hover:not(:disabled) { border-color: var(--ct-ink); }
+.moveItem:disabled { cursor: default; background: var(--ct-surface); }
+.moveActions { display: flex; justify-content: flex-end; }
+
+/* Touch screens (and any screen below 900 px): − and + beside the reps and weight boxes. */
+@media (max-width: 899.98px), (pointer: coarse) {
+  .stepButton {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--ct-tap-min);
+    height: 48px;
+    padding: 0;
+    border: var(--ct-border-width-card) solid var(--ct-border);
+    border-radius: var(--ct-radius-input);
+    background: var(--ct-bg);
+    color: var(--ct-ink);
+    font: inherit;
+    font-size: var(--ct-size-section-heading);
+    font-weight: var(--ct-weight-button);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .stepButton:active { background: var(--ct-surface); }
+  .stepper .narrow { width: 4.5rem; }
+}
+
+/* Phones and iPad portrait: each block folds to one line ("Bench Press" / "4 × 8 @ 60 kg · rest 1:30"); one is open
+   at a time. The ⋯ menu stands in for the header's icon buttons; the save bar moves to the top with "+ Exercise". */
+@media (max-width: 899.98px) {
+  .block { gap: var(--ct-space-2); padding: var(--ct-space-2) var(--ct-space-3); }
+  .block[data-open] { border-color: var(--ct-ink); }
+  .fold { display: flex; align-items: center; gap: var(--ct-space-1); }
+  .foldButton {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    gap: var(--ct-space-3);
+    min-height: var(--ct-tap-min);
+    padding: var(--ct-space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--ct-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .foldButton .blockNumber { flex: none; }
+  .foldText { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+  .foldTitle { overflow: hidden; font-weight: var(--ct-weight-section-heading); text-overflow: ellipsis; white-space: nowrap; }
+  .foldLine { overflow: hidden; font-size: 14px; color: var(--ct-ink-muted); text-overflow: ellipsis; white-space: nowrap; }
+  .foldError { font-size: 14px; font-weight: var(--ct-weight-button); color: var(--ct-danger); }
+  .foldChevron { display: grid; flex: none; place-items: center; transform: rotate(-90deg); transition: transform 0.15s; }
+  .block[data-open] .foldChevron { transform: none; }
+  .block:not([data-open]) .blockBody { display: none; }
+  .blockBody { display: flex; flex-direction: column; gap: var(--ct-space-3); padding-bottom: var(--ct-space-2); }
+  /* The fold line already names the block, and ⋯ holds swap, move and delete. The measurements tab stays. */
+  .blockHeader .blockNumber, .blockHeader .blockTitle, .blockHeader > .blockTools { display: none; }
+  .blockHeader:not(:has(.measureWrap)) { display: none; }
+
+  .builder > .saveBar {
+    order: -1;
+    position: sticky;
+    z-index: 11;
+    top: env(safe-area-inset-top);
+    bottom: auto;
+    padding: var(--ct-space-2) 0;
+    border-top: 0;
+    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+  }
+  /* In a window (the program's day sheet) the window already sits below the notch. */
+  :global(dialog) .builder > .saveBar { top: 0; }
+  .saveBar .narrowOnly { display: inline-flex; }
+  /* One line: a short status, "+ Exercise" and "Save". */
+  .builder > .saveBar { gap: var(--ct-space-2); }
+  .builder > .saveBar > [role='status'] { flex: 1 1 auto; min-width: 0; text-align: right; }
+  /* An error from the last save gets its own line above the buttons. */
+  .builder > .saveBar > :not([role='status']):not(button) { flex-basis: 100%; }
+  .saveBar button { padding-left: var(--ct-space-3-5); padding-right: var(--ct-space-3-5); }
+  .wideWord { display: none; }
+  .addRow .wideOnly { display: none; }
 }
