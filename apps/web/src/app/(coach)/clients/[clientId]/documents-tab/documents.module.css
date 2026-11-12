@@ -8,6 +8,8 @@
 .fieldLabel { font-weight: var(--ct-weight-section-heading); }
 .fileLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .file { min-height: var(--ct-tap-min); font: inherit; max-width: 100%; }
+/* Shown on touch screens only (below), in place of the browser's own small "Choose File". */
+.chooseButton, .chosenFile { display: none; }
 .check { display: inline-flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); cursor: pointer; }
 .check input { width: 20px; height: 20px; accent-color: var(--ct-ink); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
@@ -49,3 +51,33 @@
 }
 .textButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Touch screens (iPhone, iPad): a big "Choose a file" button, and Rename / Delete as outlined buttons, not links. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .fileLabel { position: relative; }
+  .file { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; }
+  .chooseButton {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--ct-button-min-height);
+    padding: 0 var(--ct-space-6);
+    border-radius: var(--ct-radius-button);
+    background: var(--ct-bg);
+    color: var(--ct-ink);
+    box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-ink);
+    font-weight: var(--ct-weight-button);
+    cursor: pointer;
+  }
+  .fileLabel:focus-within .chooseButton { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+  .file:disabled + .chooseButton { opacity: 0.5; cursor: default; }
+  .chosenFile { display: block; margin: 0; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+  .textButton {
+    justify-content: center;
+    padding: 0 var(--ct-space-3);
+    border-radius: var(--ct-radius-input);
+    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+    text-decoration: none;
+  }
+}

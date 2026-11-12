@@ -93,7 +93,12 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
       <label className={styles.fileLabel}>
         <span className={styles.fieldLabel}>File</span>
         <input ref={input} type="file" accept={ACCEPT} className={styles.file} onChange={(e) => void choose(e.target.files?.[0])} disabled={pending} />
+        {/* Touch screens: a big button in place of the browser's small "Choose File" (the input stays, hidden, and
+            keeps the name "File"). */}
+        <span aria-hidden="true" className={styles.chooseButton}>{file ? 'Choose another file' : 'Choose a file'}</span>
       </label>
+      {/* The hidden input still tells screen readers which file it holds; this line is for the eye. */}
+      {file ? <p aria-hidden="true" className={styles.chosenFile}>{file.original.name}</p> : null}
       {preparing ? <p className={styles.caption} role="status">Getting the file ready…</p> : null}
       {file ? (
         <>
