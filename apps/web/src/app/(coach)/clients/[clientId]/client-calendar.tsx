@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
 import { errorMessage, type CalendarView, type IsoDate } from '@caltracker/shared';
@@ -96,6 +96,7 @@ export function ClientCalendar({
   const timeZone = useTimeZone();
   const readOnly = client.removedAt !== null;
   const pathname = usePathname();
+  const router = useRouter();
   const storedView = useStoredCalendarView(coachId);
   const view = viewParam ?? storedView ?? DEFAULT_CALENDAR_VIEW;
   const range = calendarRange(view, from ?? today);
@@ -255,6 +256,8 @@ export function ClientCalendar({
   // The month view's padding days belong to other months: it steps from its own 1st.
   const shownFrom = range.month ? `${range.month}-01` : range.start;
   const title = range.month ? formatMonth(range.month) : formatRange(range.start, range.end);
+  const prevHref = viewHref(view, stepCalendar(view, shownFrom, -1));
+  const nextHref = viewHref(view, stepCalendar(view, shownFrom, 1));
   const grid = {
     weeks: range.weeks,
     month: range.month,
@@ -268,12 +271,14 @@ export function ClientCalendar({
         view={view}
         title={title}
         todayHref={viewHref(view, today)}
-        prevHref={viewHref(view, stepCalendar(view, shownFrom, -1))}
-        nextHref={viewHref(view, stepCalendar(view, shownFrom, 1))}
+        prevHref={prevHref}
+        nextHref={nextHref}
         viewHref={(v) => viewHref(v, switchAnchor(range, today))}
         onPickView={(v) => storeCalendarView(coachId, v)}
       />
     ),
+    // A sideways swipe steps like ‹ and ›, keeping the page where it is.
+    onSwipe: (step: -1 | 1) => router.push(step < 0 ? prevHref : nextHref, { scroll: false }),
   };
 
   return (

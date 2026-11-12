@@ -419,6 +419,13 @@
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); }
 .toolbarNav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); min-width: 0; }
 .toolbarNav .monthTitle { min-width: 0; text-align: left; }
+/* Wider screens: the title after both arrows (it comes between them in the page, for phones and iPads below). */
+.toolbarNav .monthTitle { order: 1; }
+/* Phones and iPads: ‹ and › either side of the dates, 48 px with a bigger arrow. */
+@media (max-width: 1199.98px), (hover: none) and (pointer: coarse) {
+  .toolbarNav .monthTitle { order: 0; }
+  .navArrow { min-width: 48px; min-height: 48px; font-size: 1.75rem; line-height: 1; }
+}
 .todayLink { padding: 0 var(--ct-space-3); }
 .viewSwitch {
   display: inline-flex;
@@ -497,6 +504,62 @@
   .weekLayout .day { min-height: 0; }
   .weekLayout .dayWeekday { display: inline; }
   .weekLayout .addButton { margin-top: 0; }
+}
+
+/* ---------- Phone (the calendar 600 px or narrower) ---------- */
+@container (max-width: 600px) {
+  /* The toolbar: Today ‹ dates › on one line, the view switcher full width under it. */
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbarNav { flex-wrap: nowrap; }
+  .toolbarNav .monthTitle { flex: 1; text-align: center; }
+  .viewSwitch { display: flex; }
+  .viewLink { flex: 1; justify-content: center; padding: 0 var(--ct-space-1); }
+
+  /* The month view fits the screen: a dot on each day with workouts (the picked day's list is under the grid). Until
+     the page has loaded, the cells just hide their cards, so the wide grid never shows. */
+  .calendar:not(.weekLayout) .grid { min-width: 0; border-spacing: 2px; }
+  .calendar:not(.weekLayout) .grid th { padding: var(--ct-space-1) 0; text-align: center; }
+  .calendar:not(.weekLayout) .day { min-height: 48px; }
+  .calendar:not(.weekLayout) .items, .calendar:not(.weekLayout) .addButton { display: none; }
+}
+.dotDay { min-height: 0; padding: 0; }
+.dotButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  min-height: 48px;
+  padding: var(--ct-space-1) 0;
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.dotButton .dayNumber { padding: 0; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ct-ink); }
+.dotEmpty { visibility: hidden; }
+/* Text on a pastel fill is always ink. */
+.dotDaySelected { background: var(--ct-lime); }
+.otherMonth.dotDaySelected .dayNumber { color: var(--ct-ink); }
+.dayPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2);
+  padding: var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.dayPanelTitle { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.dayPanelEmpty { margin: 0; color: var(--ct-ink-muted); }
+.dayPanel .addButton { margin-top: 0; opacity: 1; }
+/* iPad portrait (about 730 px for the calendar): the month's seven columns fit without scrolling sideways. */
+@container (max-width: 780px) {
+  .grid { min-width: 0; }
 }
 
 /* A past client's message history, under the calendar. */

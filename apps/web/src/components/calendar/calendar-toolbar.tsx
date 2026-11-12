@@ -9,7 +9,7 @@ export const VIEW_LABELS: Record<CalendarView, string> = { '1w': '1 Week', '2w':
 const STEP_WORDS: Record<CalendarView, string> = { '1w': 'week', '2w': '2 weeks', '4w': '4 weeks', month: 'month' };
 
 /**
- * Above the calendar: TODAY, ‹ › (one view length back or on), the range on screen, and the view switcher. Every
+ * Above the calendar: TODAY, ‹ › (one view length back or on) around the range on screen, and the view switcher. Every
  * control is a link with ?view=&from=, so reloading or sharing the address shows the same days.
  */
 export function CalendarToolbar({
@@ -37,15 +37,17 @@ export function CalendarToolbar({
         <Link href={todayHref} className={cx(styles.monthLink, styles.todayLink)}>
           Today
         </Link>
-        <Link href={prevHref} className={styles.monthLink} aria-label={`Previous ${STEP_WORDS[view]}`}>
+        {/* ‹ title ›: on phones and iPads the arrows sit either side of the dates; wider screens show the title after
+            both arrows, as before (CSS order). */}
+        <Link href={prevHref} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Previous ${STEP_WORDS[view]}`}>
           <span aria-hidden="true">‹</span>
-        </Link>
-        <Link href={nextHref} className={styles.monthLink} aria-label={`Next ${STEP_WORDS[view]}`}>
-          <span aria-hidden="true">›</span>
         </Link>
         <h2 className={styles.monthTitle} aria-live="polite">
           {title}
         </h2>
+        <Link href={nextHref} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Next ${STEP_WORDS[view]}`}>
+          <span aria-hidden="true">›</span>
+        </Link>
       </div>
       <nav aria-label="Calendar view" className={styles.viewSwitch}>
         {CALENDAR_VIEWS.map((v) => (
