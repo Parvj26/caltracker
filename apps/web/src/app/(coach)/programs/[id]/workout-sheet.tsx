@@ -102,6 +102,16 @@ export function WorkoutSheet({
     setAsking(null);
   }
 
+  /**
+   * The top bar's Save (phones, where the keyboard covers the editor's own save bar): presses the editor's Save, so
+   * checks, messages and the "where does this edit go?" question are all the same. The keyboard closes first, so a
+   * message in the save bar can be seen.
+   */
+  function saveFromTop() {
+    (document.activeElement as HTMLElement | null)?.blur();
+    dialogRef.current?.querySelector<HTMLButtonElement>('[data-bottom-bar] [data-ph-capture-attribute-label="workout_save"]')?.click();
+  }
+
   async function saveWith(doc: WorkoutDoc): Promise<SaveWorkoutOutcome | null> {
     if (target.kind === 'new') {
       const outcome = await saveWorkout(doc);
@@ -140,6 +150,10 @@ export function WorkoutSheet({
             {target.kind === 'new' ? 'New workout' : `Edit ${original}`}
           </h2>
         </div>
+        {/* Phones only (CSS): wider screens keep the editor's own save bar in view. */}
+        <Button className={styles.sheetTopSave} onClick={saveFromTop} data-ph-capture-attribute-label="program_sheet_top_save">
+          Save
+        </Button>
       </header>
       {target.kind === 'new' ? (
         <p className={styles.sheetNote}>Saving puts it on {where} and in your Workouts list, then brings you back to the program.</p>

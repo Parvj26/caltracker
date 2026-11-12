@@ -40,7 +40,7 @@ test('add three exercises at once with 4 sets each, and save', async ({ page }) 
   await expect(picker).toBeHidden();
 
   // Block titles, top to bottom (each block is a <section> whose <header> holds its title).
-  await expect(page.locator('section > header h2')).toHaveText(['Pushups', 'Barbell Squat', 'Pullups']);
+  await expect(page.locator('section header h2')).toHaveText(['Pushups', 'Barbell Squat', 'Pullups']);
   for (const n of [1, 2, 3, 4]) await expect(setRow(page, 'Barbell Squat', `set ${n}`)).toBeVisible();
   await expect(setRow(page, 'Barbell Squat', 'set 5')).toHaveCount(0);
 
@@ -137,7 +137,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
 
   // Repeat week 1 for every following week: week 3 was empty, but week 2 is not, so it asks again.
   await page.getByRole('button', { name: 'Copy week 1', exact: true }).click();
-  await dialog.getByLabel('Copy to').selectOption({ label: 'Every following week (weeks 2 to 3)' });
+  await dialog.getByLabel('Copy to').selectOption({ label: 'Weeks 2–3' });
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
   await dialog.getByRole('button', { name: 'Replace weeks 2 to 3' }).click();
   await expect(chip(3, 1)).toBeVisible();

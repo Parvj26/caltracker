@@ -4,11 +4,13 @@ import type { Database } from '@caltracker/shared';
 import { loadInbox, loadUnreadTotal } from './data';
 
 type Row = Record<string, unknown>;
-type Call = { table: string; columns: string; head: boolean };
+/** `settledBefore`: how many queries had already returned when this one was sent (0 for the first round). */
+type Call = { table: string; columns: string; head: boolean; settledBefore: number };
 
 /** A tiny stand-in for the Supabase query builder: filters rows by eq/neq/gt, orders, limits, counts. */
 function fakeDb(tables: Record<string, Row[]>) {
   const calls: Call[] = [];
+  let settled = 0;
   const db = {
     from(table: string) {
       let rows = [...(tables[table] ?? [])];
@@ -19,7 +21,7 @@ function fakeDb(tables: Record<string, Row[]>) {
         select(cols: string, opts?: { count?: string; head?: boolean }) {
           head = opts?.head === true;
           count = opts?.count === 'exact';
-          calls.push({ table, columns: cols, head });
+          calls.push({ table, columns: cols, head, settledBefore: settled });
           return q;
         },
         eq(col: string, v: unknown) {
@@ -48,6 +50,7 @@ function fakeDb(tables: Record<string, Row[]>) {
         },
         then(resolve: (v: unknown) => unknown) {
           const data = rows.slice(0, limit);
+          settled++;
           return Promise.resolve(resolve({ data: head ? null : data, count: count ? rows.length : null, error: null }));
         },
       };
@@ -120,6 +123,32 @@ describe('loadUnreadTotal (the sidebar badge)', () => {
     // a: 1 (t4 after t3), b: 1 (t9 after t8).
     expect(await loadUnreadTotal(db, WS, ME)).toBe(2);
     expect((await loadInbox(db, WS, ME)).reduce((n, r) => n + r.unread, 0)).toBe(2);
+  });
+
+  it('needs one round of queries in a small workspace (it is on every page load)', async () => {
+    const w = world();
+    w.conversation_reads.push({ conversation_id: 'cb', user_id: ME, last_read_at: t(8) });
+    const { db, calls } = fakeDb(w);
+    expect(await loadUnreadTotal(db, WS, ME)).toBe(2);
+    expect(calls.map((c) => c.settledBefore)).toEqual(calls.map(() => 0));
+  });
+
+  it('stays exact in a busy workspace where the quick look is full but most messages are already read', async () => {
+    const w = world();
+    w.conversation_reads.push({ conversation_id: 'cb', user_id: ME, last_read_at: t(8) });
+    // 300 read messages from before both read marks.
+    const old = Array.from({ length: 300 }, (_, i) => ({
+      conversation_id: 'cb',
+      workspace_id: WS,
+      sender_id: 'b',
+      body: '',
+      image_paths: [],
+      created_at: new Date(Date.UTC(2026, 10, 5, 9, 0, 0, i)).toISOString(),
+    }));
+    w.messages.push(...old);
+    const { db } = fakeDb(w);
+    // a: 1 (t4 after t3), b: 1 (t9 after t8); the old ones are read.
+    expect(await loadUnreadTotal(db, WS, ME)).toBe(2);
   });
 
   it('counts exactly when the window is full, never undercounting', async () => {

@@ -69,6 +69,7 @@
 .formCard { max-width: 1040px; padding: var(--ct-space-4) var(--ct-space-4-5); }
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
 .weeksField { max-width: 8rem; }
+.weeksGroup { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2); }
 .detailsForm { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--ct-space-3); }
 .nameField { flex: 1 1 280px; }
 .descriptionField { flex: 1 1 100%; }
@@ -79,12 +80,39 @@
 
 /* ---------- Builder: library panel beside the grid ---------- */
 .builder { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.headerMenu { position: relative; display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--ct-space-1); }
+.headerMenu .menu { min-width: 12rem; }
+
+/* Program settings (Auto progression, Live Sync, name and weeks): open above the plan on wider screens; on a phone
+   they fold into one "Program settings" row below the plan. */
+.settings { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.settingsBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.settingsToggle {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The plan comes first in the page. From 1366 px the Library sits in a column on its left; narrower (iPads, 1280 px
+   laptops) it goes below the plan, so the plan isn't pushed down and its days stay wide enough to tap. */
 .workspace { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); gap: var(--ct-space-4-5); align-items: start; }
-/* Below 1366 px (iPad portrait, 1280 px laptops) the library sits above the grid, so all seven days fit side by side.
-   From 1366 px (iPad landscape) on, the grid fits beside it. */
+.workspace > .library { grid-column: 1; grid-row: 1; }
+.workspace > .gridSection { grid-column: 2; grid-row: 1; }
 @media (max-width: 1365.98px) {
   .workspace { grid-template-columns: minmax(0, 1fr); }
-  .workspace .library { position: static; }
+  .workspace > .library { grid-column: 1; grid-row: 2; position: static; }
+  .workspace > .gridSection { grid-column: 1; grid-row: 1; }
   .workspace .libraryList { max-height: 240px; }
 }
 
@@ -122,13 +150,17 @@
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
   cursor: grab;
-  touch-action: none;
+  /* No touch-action: none: a swipe that starts here scrolls, a tap asks which day, a long press picks it up. No text
+     selection or iOS callout on that long press. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .libraryItem:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 
 .gridSection { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .gridScroll { overflow-x: auto; }
-.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 820px; width: 100%; }
+.grid { border-collapse: separate; border-spacing: var(--ct-space-1); table-layout: fixed; min-width: 700px; width: 100%; }
 .grid th {
   padding: var(--ct-space-1) var(--ct-space-2);
   font-size: var(--ct-size-caption);
@@ -137,7 +169,10 @@
   text-align: left;
 }
 .grid td { vertical-align: top; padding: 0; }
-.grid .weekHead { width: 5.5rem; white-space: nowrap; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+.grid .weekHead { width: 4.75rem; white-space: nowrap; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+/* The week labels stay in view when the grid scrolls sideways. */
+.grid .weekHead { position: sticky; left: 0; z-index: 1; background: var(--ct-bg); }
+.addWeekRow { display: flex; }
 
 .cell {
   display: flex;
@@ -172,7 +207,9 @@
   font-weight: var(--ct-weight-section-heading);
   text-align: left;
   cursor: grab;
-  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 /* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
    than the whole chip is cut with "…" (the full name is in the title). */
@@ -236,6 +273,62 @@
   cursor: pointer;
 }
 .menuItem:hover, .menuItem:focus-visible { background: var(--ct-surface); }
+.menuItem.dangerText { color: var(--ct-danger); }
+.menuItem:disabled { color: var(--ct-ink-muted); cursor: progress; }
+
+/* ---------- Phone plan: week tabs, then the seven days down the page ---------- */
+.weekBar { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.weekTabs {
+  position: relative;
+  display: flex;
+  gap: var(--ct-space-1);
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.weekTab {
+  flex: none;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3-5);
+  border: 0;
+  border-radius: 999px;
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.weekTab[aria-selected='true'] { background: var(--ct-ink); color: var(--ct-bg); }
+.weekActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+.dayList { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.dayRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-1) var(--ct-space-1) var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.dayRowHead { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.dayRowName {
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-ink-muted);
+}
+.dayRow .addButton { width: var(--ct-tap-min); }
+.dayRow .chips { margin-right: var(--ct-space-2); }
+.dayRow .chipHandle { display: flex; align-items: center; padding-right: var(--ct-tap-min); font-size: var(--ct-size-body); }
+.dayRow .menuSpace { display: none; }
+.rest { padding-bottom: var(--ct-space-1); font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+
+/* "Copy to…": the seven days of the picked week as checkboxes. */
+.dayChecks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-1) var(--ct-space-3); margin: 0; padding: 0; border: 0; }
+.dayCheck { display: flex; align-items: center; gap: var(--ct-space-2); min-height: var(--ct-tap-min); cursor: pointer; }
+.dayCheck input { width: 22px; height: 22px; margin: 0; accent-color: var(--ct-ink); }
+.dayCheck:has(input:disabled) { cursor: default; color: var(--ct-ink-muted); }
 
 .addButton {
   min-height: var(--ct-tap-min);
@@ -425,9 +518,12 @@
 .sheet::backdrop { background: color-mix(in srgb, var(--ct-ink) 45%, transparent); }
 .sheet[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .sheetHeader { display: flex; align-items: center; gap: var(--ct-space-3); }
+/* The sheet's top-bar Save: phones only (below), where the keyboard covers the editor's own save bar. */
+.sheetHeader .sheetTopSave { display: none; flex: none; }
 .sheetNote { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .sheetBody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 599.98px) {
+  .sheetHeader .sheetTopSave { display: inline-flex; }
   .sheet {
     width: 100vw;
     max-width: none;
@@ -456,3 +552,12 @@
 .bigChoiceAlt { background: var(--ct-drop); }
 .bigChoiceTitle { font-size: var(--ct-size-body); font-weight: var(--ct-weight-button); }
 .bigChoiceSub { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+
+/* ---------- Phone: the plan first, settings folded below it ---------- */
+@media (max-width: 599.98px) {
+  .settings { order: 2; }
+  .settingsToggle { display: flex; }
+  .settings[data-open='false'] .settingsBody { display: none; }
+  /* The phone shows week tabs instead (once the page has loaded), so the wide grid never flashes up first. */
+  .gridScroll, .addWeekRow { display: none; }
+}

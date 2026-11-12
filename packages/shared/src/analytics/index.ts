@@ -3,6 +3,8 @@ export type { ServerErrorEvent, ServerErrorInput } from './server-error';
 export { ALLOWED_KEYS } from './events';
 export type { AnalyticsProps, EventName, TaskName } from './events';
 export { sanitize } from './sanitize';
+export { firstLoadBreakdown, slowFirstLoad } from './load-timing';
+export type { FirstLoadBreakdown, NavTiming } from './load-timing';
 export { scrubUrl } from './scrub-url';
 export { INTERNAL_EMAILS, isInternalEmail } from './internal';
 export { ABANDON_AFTER_MS, TaskTracker } from './task-tracker';

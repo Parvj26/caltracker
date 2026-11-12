@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readAll } from './coach-home';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@caltracker/shared';
+import { loadHomeData, readAll } from './coach-home';
 
 /** A fake paged query over `total` rows whose server caps each page at `cap` rows. */
 function pager(total: number, cap: number) {
@@ -34,5 +36,62 @@ describe('readAll', () => {
 
   it('throws with what it was loading', async () => {
     await expect(readAll(() => Promise.resolve({ data: null, error: { message: 'boom' } }), 'workouts')).rejects.toThrow('Could not load workouts: boom');
+  });
+});
+
+/**
+ * A fake Supabase where every query answers one round after it is sent (a round = one trip to the database), and
+ * which records the round each table was first asked for. Paged tables have one row on their first page.
+ */
+function roundsDb() {
+  let round = 0;
+  const sentIn: Record<string, number> = {};
+  const sentCount: Record<string, number> = {};
+  const rows: Record<string, unknown[]> = {
+    workspace_members: [{ user_id: 'c1', created_at: '2026-11-01T00:00:00Z' }],
+    workouts: [{ id: 'w1', client_id: 'c1', name: 'Legs', scheduled_on: '2026-11-11', assignment_id: null, workout_logs: [] }],
+    workout_logs: [{ client_id: 'c1', finished_at: '2026-11-10T10:00:00Z', name: 'Legs' }],
+    program_assignments: [],
+    awards: [],
+    profiles: [{ id: 'c1', first_name: 'Cleo', last_name: 'C' }],
+  };
+  const answer = (table: string, data: unknown[]) => {
+    const sent = round;
+    sentIn[table] ??= sent;
+    sentCount[table] = (sentCount[table] ?? 0) + 1;
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        round = Math.max(round, sent + 1);
+        resolve({ data, error: null });
+      }, 0),
+    );
+  };
+  const from = (table: string) => {
+    let range: [number, number] | null = null;
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'in', 'gte', 'lte', 'order']) q[m] = () => q;
+    q.range = (a: number, b: number) => ((range = [a, b]), q);
+    q.then = (ok: (v: unknown) => unknown, fail: (e: unknown) => unknown) =>
+      answer(table, range && range[0] > 0 ? [] : (rows[table] ?? [])).then(ok, fail);
+    return q;
+  };
+  const rpc = () => answer('rpc', []);
+  return { db: { from, rpc } as unknown as SupabaseClient<Database>, sentIn, sentCount };
+}
+
+describe('loadHomeData', () => {
+  it('asks for client names as soon as the client list is back, not after every paged read', async () => {
+    const { db, sentIn } = roundsDb();
+    const data = await loadHomeData(db, 'ws', '2026-11-11');
+    expect(data.clients[0]).toMatchObject({ id: 'c1', firstName: 'Cleo', lastWorkoutName: 'Legs' });
+    // Round 0: the first queries. Round 1: names, alongside the paged reads' check for a second page.
+    expect(sentIn.profiles).toBe(1);
+  });
+
+  it('reads the client list once (each await of a Supabase query sends it again)', async () => {
+    const { db, sentCount } = roundsDb();
+    await loadHomeData(db, 'ws', '2026-11-11');
+    expect(sentCount.workspace_members).toBe(1);
+    expect(sentCount.profiles).toBe(1);
   });
 });

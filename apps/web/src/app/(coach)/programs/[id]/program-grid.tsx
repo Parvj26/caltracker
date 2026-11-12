@@ -4,7 +4,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   pointerWithin,
   rectIntersection,
   useDraggable,
@@ -18,14 +19,25 @@ import {
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { PROGRAM_WEEKS_MAX, copyWeek, errorMessage } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, copySlotTo, copyWeek, errorMessage, type PlanCell } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
 import { addProgramWorkout, copyProgramWeek, moveProgramWorkout, removeProgramWorkout, updateProgram } from '../actions';
+import { AutoProgressionPanel } from './auto-progression-panel';
 import { CopyWeekDialog } from './copy-week-dialog';
-import { DUPLICATE_NOTE, assignedNote, DAYS, cellLabel, chipDomId, copyWeekButtonDomId, focusSoon } from './grid-ids';
+import {
+  DUPLICATE_NOTE,
+  assignedNote,
+  DAYS,
+  cellLabel,
+  cellsLabel,
+  chipDomId,
+  copyWeekButtonDomId,
+  focusSoon,
+  libraryItemDomId,
+} from './grid-ids';
 import { LibraryPanel } from './library-panel';
 import { LiveSyncPanel } from './live-sync-panel';
 import type { LiveSyncState } from '@/lib/live-sync';
@@ -34,6 +46,7 @@ import { ProgramDetails } from './program-details';
 import { WorkoutPicker } from './workout-picker';
 import type { ExercisePrefs, Units, WorkoutHints } from '@caltracker/shared';
 import { SlotSummary } from './slot-summary';
+import { usePhone } from './use-phone';
 import { WorkoutSheet, type SheetSaved, type SheetTarget } from './workout-sheet';
 import styles from '../programs.module.css';
 import { programWorkoutSaved } from '@/lib/analytics/client';
@@ -49,6 +62,11 @@ type DropData = { week: number; day: number };
 const cellId = (week: number, day: number) => `cell-${week}-${day}`;
 /** DOM ids, so focus can land somewhere sensible after a chip moves or disappears. */
 const addButtonDomId = (week: number, day: number) => `program-add-${week}-${day}`;
+const weekTabDomId = (week: number) => `program-week-tab-${week}`;
+/** A click this soon after a drag ended belongs to the drag, not a tap. */
+const DRAG_CLICK_MS = 400;
+/** The clock, for the drag-then-click check (only read in event handlers). */
+const now = () => Date.now();
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 const LOCKED_MESSAGE = 'That week is still being copied. Try again in a moment.';
 
@@ -80,8 +98,11 @@ const nextPosition = (slots: Slot[], week: number, day: number, ignoreId?: strin
 
 /**
  * The program builder: rows are weeks, columns are "Day 1" to "Day 7" counted from the start date the program is
- * assigned with. Drag library workouts onto days and chips between days, or use each day's "+" button and each
- * chip's menu (the keyboard and touch path). Slot changes show at once and are undone, with a message, if saving fails.
+ * assigned with. On a phone it is one week at a time instead (week tabs), with the seven days listed down the page, and
+ * the program's settings fold away below the plan. Drag library workouts onto days and chips between days (a long press
+ * on a touch screen, so a swipe still scrolls), or tap: a Library workout asks which day, each day has a "+" button and
+ * each chip a menu (Copy to…, Move to…, Remove). Slot changes show at once and are undone, with a message, if saving
+ * fails.
  */
 export function ProgramGrid({
   program,
@@ -89,12 +110,15 @@ export function ProgramGrid({
   library,
   justCopied = false,
   liveSync,
+  autoProgression,
   hints,
   units,
   workspaceId,
   exercisePrefs,
 }: {
   program: Program;
+  /** The program's Auto progression switch, as loaded. */
+  autoProgression: boolean;
   /** The coach's units, for the summary card and the workout editor. */
   units: Units;
   /** The coach's workspace (from requireCoach), for the editor's exercise picker. */
@@ -114,8 +138,21 @@ export function ProgramGrid({
   const [weeks, setWeeks] = useState(program.weeks);
   const [picker, setPicker] = useState<DropData | null>(null);
   const [moving, setMoving] = useState<Slot | null>(null);
+  const [copyingSlot, setCopyingSlot] = useState<Slot | null>(null);
+  const [adding, setAdding] = useState<LibraryWorkout | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // The week shown on a phone (week tabs).
+  const [tab, setTab] = useState(1);
+  const phone = usePhone();
+  const lastDragEnd = useRef(0);
+  const justDragged = () => now() - lastDragEnd.current < DRAG_CLICK_MS;
   const [viewing, setViewing] = useState<Slot | null>(null);
-  const [sheet, setSheet] = useState<SheetTarget | null>(null);
+  const [sheet, setSheetState] = useState<SheetTarget | null>(null);
+  // Opening the editor clears any message, so an old one isn't left behind the sheet.
+  const setSheet = (target: SheetTarget | null) => {
+    if (target) setToast(null);
+    setSheetState(target);
+  };
   const router = useRouter();
   const [copying, setCopying] = useState<number | null>(null);
   // Weeks a copy is still saving (a week may appear once per copy in flight).
@@ -138,7 +175,10 @@ export function ProgramGrid({
   const dndId = useId();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    // Mouse: a drag starts after 4 px, so a plain click still taps. Touch: a long press picks a workout up, so a swipe
+    // that starts on a chip or a Library workout scrolls the page (same as the client calendar).
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -202,6 +242,39 @@ export function ProgramGrid({
       () => moveProgramWorkout({ id: slot.id, week, day, position }),
       (s) => s.map((x) => (x.id === slot.id ? { ...x, ...before } : x)),
     );
+  }
+
+  /**
+   * "Copy to…": the same workout on each picked day, as new slots (like a week copy, they share the workout, so no new
+   * workout is made). Shown at once; any day that fails to save is taken off again, with a message.
+   */
+  function copySlot(slot: Slot, cells: PlanCell[]) {
+    if (isLocked(...cells.map((c) => c.week))) return;
+    const { added, targets } = copySlotTo(slots, slot, cells, weeks, () => crypto.randomUUID());
+    if (added.length === 0) return;
+    setSlots((s) => [...s, ...added]);
+    setInFlight((n) => n + 1);
+    void Promise.allSettled(
+      added.map((a) => addProgramWorkout({ id: a.id, programId: program.id, week: a.week, day: a.day, workoutId: a.workoutId })),
+    )
+      .then((results) => {
+        const failedIds = new Set(added.filter((_, i) => results[i]?.status === 'rejected').map((a) => a.id));
+        if (failedIds.size === 0) {
+          markSaved();
+          setToast(`Copied “${slot.workoutName}” to ${cellsLabel(targets)}. ${assignedNote(live)}`);
+          return;
+        }
+        setSlots((s) => s.filter((x) => !failedIds.has(x.id)));
+        const rejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+        if (failedIds.size === added.length) {
+          setToast(failureMessage(rejected?.reason, `Couldn't copy “${slot.workoutName}”, so nothing changed. Please try again.`));
+          return;
+        }
+        markSaved();
+        const failed = added.filter((a) => failedIds.has(a.id));
+        setToast(`Couldn't copy “${slot.workoutName}” to ${cellsLabel(failed)}. The other days were saved. Please try those again.`);
+      })
+      .finally(() => setInFlight((n) => n - 1));
   }
 
   function removeSlot(slot: Slot) {
@@ -270,6 +343,7 @@ export function ProgramGrid({
 
   function onDragEnd(e: DragEndEvent) {
     setDragging(null);
+    lastDragEnd.current = now();
     const data = e.active.data.current as DragData | undefined;
     const target = e.over?.data.current as DropData | undefined;
     if (!data || !target) return;
@@ -298,6 +372,7 @@ export function ProgramGrid({
     if (weeks >= PROGRAM_WEEKS_MAX) return;
     const next = weeks + 1;
     setWeeks(next);
+    setTab(next);
     setAddingWeek(true);
     try {
       const outcome = await updateProgram(program.id, { ...savedDetails.current, weeks: next });
@@ -305,6 +380,7 @@ export function ProgramGrid({
       markSaved();
     } catch (e) {
       setWeeks(next - 1);
+      setTab((t) => Math.min(t, next - 1));
       setToast(failureMessage(e, "Couldn't add a week, so it was undone. Please try again."));
     } finally {
       setAddingWeek(false);
@@ -315,24 +391,76 @@ export function ProgramGrid({
   const inCell = (week: number, day: number) => sorted.filter((s) => s.week === week && s.day === day);
   const weekNumbers = Array.from({ length: weeks }, (_, i) => i + 1);
   const status = inFlight > 0 ? 'Saving…' : savedOnce ? 'All changes saved' : '';
+  const shownWeek = Math.min(tab, weeks);
+  const settingsId = `${dndId}-settings`;
+  const dayProps = (w: number, d: number) => ({
+    week: w,
+    day: d,
+    slots: inCell(w, d),
+    onAdd: () => setPicker({ week: w, day: d }),
+    onOpen: setViewing,
+    onMove: setMoving,
+    onCopy: setCopyingSlot,
+    onRemove: removeSlot,
+  });
+
+  // Keep the shown week's tab in view in the sideways-scrolling tab row (only sideways: the page itself stays put).
+  useEffect(() => {
+    if (!phone) return;
+    const el = document.getElementById(weekTabDomId(shownWeek));
+    const row = el?.parentElement;
+    if (!el || !row) return;
+    row.scrollTo({ left: el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2 });
+  }, [phone, shownWeek]);
+
+  function onTabKey(e: KeyboardEvent<HTMLDivElement>) {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    const to = e.key === 'Home' ? 1 : e.key === 'End' ? weeks : step ? ((shownWeek - 1 + step + weeks) % weeks) + 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    setTab(to);
+    focusSoon(weekTabDomId(to));
+  }
+
+  const addWeekLabel = phone ? '+ Week' : '+ Add week';
+  const addWeekButton = (
+    <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX} data-ph-capture-attribute-label="program_add_week">
+      {addWeekLabel}
+    </Button>
+  );
 
   return (
     <div className={styles.builder}>
-      <LiveSyncPanel programId={program.id} initial={liveSync} refreshKey={saves} onChange={setLive} />
-      <ProgramDetails
-        program={program}
-        weeks={weeks}
-        onSaved={(details, newWeeks, removed, expected) => {
-          savedDetails.current = details;
-          setSavedName(details.name);
-          setWeeks(newWeeks);
-          setSlots((s) => s.filter((x) => x.week <= newWeeks));
-          markSaved();
-          if (removed !== expected) {
-            setToast(`${removed === 1 ? '1 workout was' : `${removed} workouts were`} removed from the weeks you cut.`);
-          }
-        }}
-      />
+      {/* On a phone the plan comes first and these fold away (CSS); wider screens show them open, above the plan. */}
+      <section className={styles.settings} data-open={settingsOpen} aria-label="Program settings">
+        <button
+          type="button"
+          className={styles.settingsToggle}
+          aria-expanded={settingsOpen}
+          aria-controls={settingsId}
+          onClick={() => setSettingsOpen((o) => !o)}
+        >
+          Program settings <span aria-hidden="true">{settingsOpen ? '▴' : '▾'}</span>
+        </button>
+        <div id={settingsId} className={styles.settingsBody}>
+          <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={autoProgression} />
+          <LiveSyncPanel programId={program.id} initial={liveSync} refreshKey={saves} onChange={setLive} />
+          <ProgramDetails
+            program={program}
+            weeks={weeks}
+            onSaved={(details, newWeeks, removed, expected) => {
+              savedDetails.current = details;
+              setSavedName(details.name);
+              setWeeks(newWeeks);
+              setSlots((s) => s.filter((x) => x.week <= newWeeks));
+              markSaved();
+              if (removed !== expected) {
+                setToast(`${removed === 1 ? '1 workout was' : `${removed} workouts were`} removed from the weeks you cut.`);
+              }
+            }}
+          />
+        </div>
+      </section>
 
       <p role="status" className={styles.status}>
         {status}
@@ -345,68 +473,103 @@ export function ProgramGrid({
         accessibility={{ announcements }}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        onDragCancel={() => setDragging(null)}
+        onDragCancel={() => {
+          setDragging(null);
+          lastDragEnd.current = now();
+        }}
       >
         <div className={styles.workspace}>
-          <LibraryPanel library={library} />
-
           <section className={styles.gridSection} aria-labelledby={`${dndId}-grid`}>
             <h2 id={`${dndId}-grid`} className={styles.sectionHeading}>Weekly plan</h2>
             <p className={styles.caption}>Day 1 is the start date you pick when you assign the program.</p>
-            <div className={styles.gridScroll}>
-              <table className={styles.grid} aria-label="Program weeks">
-                <thead>
-                  <tr>
-                    <th scope="col" className={styles.weekHead}>
-                      <span className={styles.visuallyHidden}>Week</span>
-                    </th>
-                    {DAYS.map((d) => (
-                      <th key={d} scope="col">Day {d}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {weekNumbers.map((w) => (
-                    <tr key={w}>
-                      <th scope="row" className={styles.weekHead}>
+            {phone ? (
+              <>
+                <div className={styles.weekBar}>
+                  <div role="tablist" aria-label="Program week" className={styles.weekTabs} onKeyDown={onTabKey}>
+                    {weekNumbers.map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        role="tab"
+                        id={weekTabDomId(w)}
+                        aria-selected={w === shownWeek}
+                        aria-controls={`${dndId}-week`}
+                        tabIndex={w === shownWeek ? 0 : -1}
+                        className={styles.weekTab}
+                        onClick={() => setTab(w)}
+                      >
                         Week {w}
-                        <div>
-                          <button
-                            type="button"
-                            id={copyWeekButtonDomId(w)}
-                            className={styles.smallButton}
-                            aria-label={`Copy week ${w}`}
-                            data-ph-capture-attribute-label="program_copy_week"
-                            onClick={() => setCopying(w)}
-                          >
-                            Copy…
-                          </button>
-                        </div>
-                      </th>
-                      {DAYS.map((d) => (
-                        <td key={d}>
-                          <DayCell
-                            week={w}
-                            day={d}
-                            slots={inCell(w, d)}
-                            onAdd={() => setPicker({ week: w, day: d })}
-                            onOpen={setViewing}
-                            onMove={setMoving}
-                            onRemove={removeSlot}
-                          />
-                        </td>
-                      ))}
-                    </tr>
+                      </button>
+                    ))}
+                  </div>
+                  <div className={styles.weekActions}>
+                    {addWeekButton}
+                    <button
+                      type="button"
+                      id={copyWeekButtonDomId(shownWeek)}
+                      className={styles.smallButton}
+                      aria-label={`Copy week ${shownWeek}`}
+                      data-ph-capture-attribute-label="program_copy_week"
+                      onClick={() => setCopying(shownWeek)}
+                    >
+                      Copy week
+                    </button>
+                  </div>
+                </div>
+                <div role="tabpanel" id={`${dndId}-week`} aria-labelledby={weekTabDomId(shownWeek)} className={styles.dayList}>
+                  {DAYS.map((d) => (
+                    <DayCell key={`${shownWeek}-${d}`} layout="list" {...dayProps(shownWeek, d)} />
                   ))}
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX} data-ph-capture-attribute-label="program_add_week">
-                + Add week
-              </Button>
-            </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.gridScroll}>
+                  <table className={styles.grid} aria-label="Program weeks">
+                    <thead>
+                      <tr>
+                        <th scope="col" className={styles.weekHead}>
+                          <span className={styles.visuallyHidden}>Week</span>
+                        </th>
+                        {DAYS.map((d) => (
+                          <th key={d} scope="col">Day {d}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekNumbers.map((w) => (
+                        <tr key={w}>
+                          <th scope="row" className={styles.weekHead}>
+                            Week {w}
+                            <div>
+                              <button
+                                type="button"
+                                id={copyWeekButtonDomId(w)}
+                                className={styles.smallButton}
+                                aria-label={`Copy week ${w}`}
+                                data-ph-capture-attribute-label="program_copy_week"
+                                onClick={() => setCopying(w)}
+                              >
+                                Copy…
+                              </button>
+                            </div>
+                          </th>
+                          {DAYS.map((d) => (
+                            <td key={d}>
+                              <DayCell layout="grid" {...dayProps(w, d)} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className={styles.addWeekRow}>{addWeekButton}</div>
+              </>
+            )}
           </section>
+
+          <LibraryPanel library={library} onPick={setAdding} justDragged={justDragged} />
         </div>
 
         <DragOverlay dropAnimation={null}>
@@ -463,6 +626,10 @@ export function ProgramGrid({
             setMoving(viewing);
             setViewing(null);
           }}
+          onCopy={() => {
+            setCopyingSlot(viewing);
+            setViewing(null);
+          }}
           onRemove={() => {
             removeSlot(viewing);
             setViewing(null);
@@ -486,13 +653,52 @@ export function ProgramGrid({
 
       {moving ? (
         <MoveSlotDialog
-          slot={moving}
+          mode="move"
+          name={moving.workoutName}
+          from={moving}
+          initial={moving}
           weeks={weeks}
+          // The menu that opened this is gone, and the chip remounts in its new day: focus the chip there.
+          returnFocusTo={chipDomId(moving.id)}
           onMove={(week, day) => {
             moveSlot(moving, week, day);
+            if (phone) setTab(week);
             setMoving(null);
           }}
           onClose={() => setMoving(null)}
+        />
+      ) : null}
+
+      {copyingSlot ? (
+        <MoveSlotDialog
+          mode="copy"
+          name={copyingSlot.workoutName}
+          from={copyingSlot}
+          initial={copyingSlot}
+          weeks={weeks}
+          returnFocusTo={chipDomId(copyingSlot.id)}
+          onCopy={(cells) => {
+            copySlot(copyingSlot, cells);
+            setCopyingSlot(null);
+          }}
+          onClose={() => setCopyingSlot(null)}
+        />
+      ) : null}
+
+      {adding ? (
+        <MoveSlotDialog
+          mode="add"
+          name={adding.name}
+          initial={{ week: phone ? shownWeek : 1, day: 1 }}
+          weeks={weeks}
+          returnFocusTo={libraryItemDomId(adding.id)}
+          onMove={(week, day) => {
+            addSlot(adding, week, day);
+            if (phone) setTab(week);
+            setToast(`Added “${adding.name}” to ${cellLabel(week, day)}.`);
+            setAdding(null);
+          }}
+          onClose={() => setAdding(null)}
         />
       ) : null}
 
@@ -514,57 +720,91 @@ export function ProgramGrid({
 /* ---------- One day ---------- */
 
 function DayCell({
+  layout,
   week,
   day,
   slots,
   onAdd,
   onOpen,
   onMove,
+  onCopy,
   onRemove,
 }: {
+  /** grid: a cell of the weeks x days table; list: one row of the phone's day list ("Day 3" and its "+" on top). */
+  layout: 'grid' | 'list';
   week: number;
   day: number;
   slots: Slot[];
   onAdd: () => void;
   onOpen: (slot: Slot) => void;
   onMove: (slot: Slot) => void;
+  onCopy: (slot: Slot) => void;
   onRemove: (slot: Slot) => void;
 }) {
   const data: DropData = { week, day };
   const { setNodeRef, isOver } = useDroppable({ id: cellId(week, day), data });
+  const addButton = (
+    <button
+      type="button"
+      id={addButtonDomId(week, day)}
+      className={styles.addButton}
+      aria-label={`Add a workout to week ${week}, day ${day}`}
+      data-ph-capture-attribute-label="program_add_workout"
+      onClick={onAdd}
+    >
+      +
+    </button>
+  );
+  const chips =
+    slots.length > 0 ? (
+      <ul className={styles.chips}>
+        {slots.map((s) => (
+          <SlotChip
+            key={s.id}
+            slot={s}
+            onOpen={() => onOpen(s)}
+            onMove={() => onMove(s)}
+            onCopy={() => onCopy(s)}
+            onRemove={() => {
+              onRemove(s);
+              focusSoon(addButtonDomId(week, day));
+            }}
+          />
+        ))}
+      </ul>
+    ) : null;
+  if (layout === 'list') {
+    return (
+      <div ref={setNodeRef} role="group" aria-label={cellLabel(week, day)} className={cx(styles.dayRow, isOver && styles.cellOver)}>
+        <div className={styles.dayRowHead}>
+          <span className={styles.dayRowName} aria-hidden="true">Day {day}</span>
+          {addButton}
+        </div>
+        {chips ?? <span className={styles.rest}>Rest</span>}
+      </div>
+    );
+  }
   return (
     <div ref={setNodeRef} role="group" aria-label={cellLabel(week, day)} className={cx(styles.cell, isOver && styles.cellOver)}>
-      {slots.length > 0 ? (
-        <ul className={styles.chips}>
-          {slots.map((s) => (
-            <SlotChip
-              key={s.id}
-              slot={s}
-              onOpen={() => onOpen(s)}
-              onMove={() => onMove(s)}
-              onRemove={() => {
-                onRemove(s);
-                focusSoon(addButtonDomId(week, day));
-              }}
-            />
-          ))}
-        </ul>
-      ) : null}
-      <button
-        type="button"
-        id={addButtonDomId(week, day)}
-        className={styles.addButton}
-        aria-label={`Add a workout to week ${week}, day ${day}`}
-        data-ph-capture-attribute-label="program_add_workout"
-        onClick={onAdd}
-      >
-        +
-      </button>
+      {chips}
+      {addButton}
     </div>
   );
 }
 
-function SlotChip({ slot, onOpen, onMove, onRemove }: { slot: Slot; onOpen: () => void; onMove: () => void; onRemove: () => void }) {
+function SlotChip({
+  slot,
+  onOpen,
+  onMove,
+  onCopy,
+  onRemove,
+}: {
+  slot: Slot;
+  onOpen: () => void;
+  onMove: () => void;
+  onCopy: () => void;
+  onRemove: () => void;
+}) {
   const data: DragData = { kind: 'slot', slot };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `slot-${slot.id}`, data });
   const [open, setOpen] = useState(false);
@@ -617,7 +857,6 @@ function SlotChip({ slot, onOpen, onMove, onRemove }: { slot: Slot; onOpen: () =
         // up to move it. A keyboard click (detail 0, from Space) is the drag's, not a tap.
         onPointerDown={(e) => {
           downAt.current = { x: e.clientX, y: e.clientY };
-          listeners?.onPointerDown?.(e);
         }}
         onClick={(e) => {
           const from = downAt.current;
@@ -654,38 +893,30 @@ function SlotChip({ slot, onOpen, onMove, onRemove }: { slot: Slot; onOpen: () =
       </button>
       {open ? (
         <ul id={menuId} role="menu" aria-label={`Options for ${slot.workoutName}`} className={styles.menu} onKeyDown={onMenuKey}>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                itemsRef.current[0] = el;
-              }}
-              className={styles.menuItem}
-              onClick={() => {
-                setOpen(false);
-                onMove();
-              }}
-            >
-              Move to…
-            </button>
-          </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              ref={(el) => {
-                itemsRef.current[1] = el;
-              }}
-              className={styles.menuItem}
-              onClick={() => {
-                setOpen(false);
-                onRemove();
-              }}
-            >
-              Remove
-            </button>
-          </li>
+          {(
+            [
+              ['Copy to…', onCopy],
+              ['Move to…', onMove],
+              ['Remove', onRemove],
+            ] as const
+          ).map(([label, run], i) => (
+            <li key={label} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                ref={(el) => {
+                  itemsRef.current[i] = el;
+                }}
+                className={cx(styles.menuItem, label === 'Remove' && styles.dangerText)}
+                onClick={() => {
+                  setOpen(false);
+                  run();
+                }}
+              >
+                {label}
+              </button>
+            </li>
+          ))}
         </ul>
       ) : null}
     </li>

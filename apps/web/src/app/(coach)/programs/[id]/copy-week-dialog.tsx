@@ -107,7 +107,8 @@ export function CopyWeekDialog({
               <option key={w} value={w}>Week {w}</option>
             ))}
             {following.length > 1 ? (
-              <option value={FOLLOWING}>Every following week (weeks {following[0]} to {following[following.length - 1]})</option>
+              // Short, so it isn't cut off in a phone's picker: "Weeks 2–4" (every week after this one).
+              <option value={FOLLOWING}>Weeks {following[0]}–{following[following.length - 1]}</option>
             ) : null}
           </SelectField>
           {saving ? <p className={styles.dialogBody}>Waiting for your last change to save…</p> : null}

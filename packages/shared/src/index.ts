@@ -124,6 +124,8 @@ export {
 export { workoutPreview } from './workouts/preview';
 export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
 export type { WorkoutSummaryRow } from './workouts/summary';
+export { blockCollapsedSummary, exerciseCollapsedLine, stepReps, stepWeight, weightStep } from './workouts/collapsed';
+export type { CollapsedBlock } from './workouts/collapsed';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
@@ -181,8 +183,8 @@ export { TEMPO_MESSAGE, TEMPO_PATTERN, TEMPO_PLACEHOLDER, parseTempo, validTempo
 export type { TempoResult } from './workouts/tempo';
 export type { ExercisePick, SubstitutePatch } from './workouts/doc-ops';
 export { COPY_SUFFIX, copyName, duplicateWorkoutDoc } from './workouts/duplicate';
-export { copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
-export type { PlanSlot } from './programs/grid';
+export { copySlotTo, copyWeek, followingWeeks, slotsInWeeks } from './programs/grid';
+export type { PlanCell, PlanSlot } from './programs/grid';
 export { AssignProgramInput, PROGRAM_WEEKS_MAX, ProgramInput, ScheduleWorkoutInput } from './programs/schema';
 export { programClashes } from './programs/clashes';
 export {

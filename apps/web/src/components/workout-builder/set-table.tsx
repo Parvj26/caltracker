@@ -33,9 +33,11 @@ export function SetTable({ sets, names, trackingType, units, restShown, errors, 
       <div className={styles.setHeader} aria-hidden="true">
         <span>SET</span>
         {columns.map((c) => (
-          <span key={c.field}>{c.heading}</span>
+          <span key={c.field} data-col={c.field}>
+            {c.heading}
+          </span>
         ))}
-        {anyRest ? <span>REST</span> : null}
+        {anyRest ? <span data-col="rest">REST</span> : null}
       </div>
       {sets.map((s, si) => (
         <SetRow

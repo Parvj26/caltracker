@@ -69,9 +69,21 @@ export async function loadHomeData(
 
   const prSince = new Date(Date.now() - PR_WINDOW_DAYS * 86_400_000).toISOString();
 
-  const [members, workouts, finished, assignments, awards, scans] = await Promise.all([
-    // Current clients only: a removed client is no longer a workspace member, which is how the Clients page does it.
+  // Current clients only: a removed client is no longer a workspace member, which is how the Clients page does it.
+  // One promise, awaited twice below: a Supabase query sends a new request every time it is awaited.
+  const membersP = Promise.resolve(
     supabase.from('workspace_members').select('user_id, created_at').eq('workspace_id', workspaceId).eq('role', 'client'),
+  );
+  // No direct foreign key links workspace_members to profiles, so load the names separately (as the Clients page does),
+  // as soon as the client list is back rather than after every paged read below.
+  const namesP = membersP.then(async (members) => {
+    const ids = members.data?.map((m) => m.user_id) ?? [];
+    return ids.length ? await supabase.from('profiles').select('id, first_name, last_name').in('id', ids) : { data: [], error: null };
+  });
+
+  const [members, profiles, workouts, finished, assignments, awards, scans] = await Promise.all([
+    membersP,
+    namesP,
     readAll(
       (from, to) =>
         supabase
@@ -122,9 +134,6 @@ export async function loadHomeData(
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (assignments.error) throw new Error(`Could not load programs: ${assignments.error.message}`);
 
-  // No direct foreign key links workspace_members to profiles, so load the names separately (as the Clients page does).
-  const ids = members.data.map((m) => m.user_id);
-  const profiles = ids.length ? await supabase.from('profiles').select('id, first_name, last_name').in('id', ids) : { data: [], error: null };
   if (profiles.error) throw new Error(`Could not load client names: ${profiles.error.message}`);
   const nameOf = new Map((profiles.data ?? []).map((p) => [p.id, p]));
 
