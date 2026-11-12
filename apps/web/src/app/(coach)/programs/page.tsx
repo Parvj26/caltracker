@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
+import { LinkRow } from '@/components/link-row';
 import { ButtonLink, Card } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -61,7 +62,8 @@ export default async function ProgramsPage() {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id}>
+                // The whole row opens the program; Assign and Duplicate stay their own buttons.
+                <LinkRow key={p.id} href={`/programs/${p.id}`}>
                   <td>
                     <Link href={`/programs/${p.id}`} className={styles.nameLink}>
                       {p.name}
@@ -70,12 +72,12 @@ export default async function ProgramsPage() {
                   <td className={styles.numeric}>{p.weeks}</td>
                   <td className={styles.numeric}>{p.slots}</td>
                   <td>
-                    <div className={assignStyles.actions}>
+                    <div className={assignStyles.actions} data-row-actions>
                       <AssignButton kind="program" id={p.id} name={p.name} compact />
                       <DuplicateButton kind="program" id={p.id} name={p.name} compact />
                     </div>
                   </td>
-                </tr>
+                </LinkRow>
               ))}
             </tbody>
           </table>

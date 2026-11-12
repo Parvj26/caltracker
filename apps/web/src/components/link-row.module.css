@@ -1,0 +1,6 @@
+/* A table row that opens its item (LinkRow). The pointer cursor also makes iOS Safari send taps on it as clicks. */
+.row { cursor: pointer; }
+@media (hover: hover) {
+  .row:hover > td { background: var(--ct-surface); }
+}
+.row:active > td { background: var(--ct-surface); }
