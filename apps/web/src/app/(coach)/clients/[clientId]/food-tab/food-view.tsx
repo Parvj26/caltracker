@@ -40,21 +40,35 @@ const useTimeZone = () => useSyncExternalStore(noSubscribe, () => Intl.DateTimeF
 const UNIT: Record<MacroKey, string> = { calories: 'kcal', protein: 'g', carbs: 'g', fat: 'g' };
 const bare = (key: MacroKey, n: number) => formatMacro(key, n).replace(/ (kcal|g)$/, '');
 
-/** "1,240 / 2,000" with a small bar, or the plain total without a target. */
-function TotalCell({ macro, total, target }: { macro: MacroKey; total: number; target: number | null }) {
+/** "1,240 / 2,000" (and "over" past the target), or the plain total without a target. */
+function MacroAmount({ macro, total, target }: { macro: MacroKey; total: number; target: number | null }) {
   const p = macroProgress(total, target);
   return (
+    <span>
+      {bare(macro, total)}
+      {p.target !== null ? <span className={styles.muted}> / {bare(macro, p.target)}</span> : null}
+      {p.over ? <span className={styles.over}> over</span> : null}
+    </span>
+  );
+}
+
+/** The small bar of a day's total against its target (nothing without a target). */
+function MacroTrack({ total, target }: { total: number; target: number | null }) {
+  const p = macroProgress(total, target);
+  if (p.fraction === null) return null;
+  return (
+    <span className={styles.track} aria-hidden="true">
+      <span className={styles.fill} data-over={p.over ? 'true' : 'false'} style={{ width: `${Math.round(p.fraction * 100)}%` }} />
+    </span>
+  );
+}
+
+/** "1,240 / 2,000" with a small bar, or the plain total without a target. */
+function TotalCell({ macro, total, target }: { macro: MacroKey; total: number; target: number | null }) {
+  return (
     <td className={styles.num}>
-      <span>
-        {bare(macro, total)}
-        {p.target !== null ? <span className={styles.muted}> / {bare(macro, p.target)}</span> : null}
-        {p.over ? <span className={styles.over}> over</span> : null}
-      </span>
-      {p.fraction !== null ? (
-        <span className={styles.track} aria-hidden="true">
-          <span className={styles.fill} data-over={p.over ? 'true' : 'false'} style={{ width: `${Math.round(p.fraction * 100)}%` }} />
-        </span>
-      ) : null}
+      <MacroAmount macro={macro} total={total} target={target} />
+      <MacroTrack total={total} target={target} />
     </td>
   );
 }
@@ -152,6 +166,32 @@ export function FoodView({
             </tbody>
           </table>
         </div>
+        {/* Phones: one row per day with a small bar for each of the four against its target (the table is hidden). */}
+        <ul className={styles.phoneDays} aria-label={`Daily totals${shownTargets ? ' against targets' : ''}`} data-testid="food-week-phone">
+          {days.map((d) => {
+            const list = byDay[d]!;
+            const totals = dailyTotals(list.map((m) => m.macros));
+            return (
+              <li key={d} className={styles.phoneDay} data-testid={`food-phone-day-${d}`}>
+                <p className={styles.phoneDayHead}>
+                  <span className={styles.phoneDayName}>{d === today ? 'Today' : shortDayLabel(d, today)}</span>
+                  <span className={styles.muted}>{list.length === 0 ? 'No meals' : `${list.length} ${list.length === 1 ? 'meal' : 'meals'}`}</span>
+                </p>
+                <dl className={styles.phoneBars}>
+                  {MACRO_KEYS.map((k) => (
+                    <div key={k} className={styles.phoneBar}>
+                      <dt className={styles.phoneBarName}>{MACRO_NAMES[k]}</dt>
+                      <dd className={styles.phoneBarValue}>
+                        <MacroAmount macro={k} total={totals[k]} target={shownTargets?.[k] ?? null} /> <span className={styles.muted}>{UNIT[k]}</span>
+                        <MacroTrack total={totals[k]} target={shownTargets?.[k] ?? null} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
         {!shownTargets ? <p className={styles.muted}>No targets yet. Set them above to see each day against them.</p> : null}
       </section>
 

@@ -71,6 +71,46 @@ export function whereTheyAre(log: WorkoutLogDoc): LivePosition | null {
   };
 }
 
+/** One exercise still to come, for the live view's "Up next" list. */
+export type UpNextItem = {
+  blockIndex: number;
+  /** The log exercise; null for a pick-one group not picked yet (named by its options). */
+  exerciseId: string | null;
+  name: string;
+  /** Sets not ticked yet (for a pick-one group, the most any option has). */
+  setsLeft: number;
+  /** The section the exercise is in, or null. */
+  section: string | null;
+};
+
+/**
+ * What comes after where they are now (whereTheyAre): the next exercises that still have unticked sets, in workout
+ * order and wrapping round to any they skipped, at most `limit` of them. The current one is not included.
+ */
+export function upNext(log: WorkoutLogDoc, limit = 3): UpNextItem[] {
+  const here = whereTheyAre(log);
+  if (!here) return [];
+  const list = entries(log);
+  const at = list.findIndex((e) => e.blockIndex === here.blockIndex && (e.exercise?.id ?? null) === here.exerciseId);
+  const order = [...list.slice(at + 1), ...list.slice(0, Math.max(0, at))];
+  const open = (sets: readonly LogSetDoc[]) => sets.filter((s) => s.completedAt === null).length;
+  return order
+    .filter(hasOpenSet)
+    .slice(0, Math.max(0, limit))
+    .map(({ blockIndex, exercise }) => {
+      const block = log.blocks[blockIndex]!;
+      const section = log.sections.find((s) => s.id === block.sectionId)?.name ?? null;
+      if (exercise) return { blockIndex, exerciseId: exercise.id, name: exercise.exerciseName, setsLeft: open(exercise.sets), section };
+      return {
+        blockIndex,
+        exerciseId: null,
+        name: block.exercises.map((e) => e.exerciseName).join(' or '),
+        setsLeft: Math.max(0, ...block.exercises.map((e) => open(e.sets))),
+        section,
+      };
+    });
+}
+
 export type LiveStats = {
   done: number;
   total: number;

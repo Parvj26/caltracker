@@ -28,6 +28,21 @@
 .fill[data-over='true'] { background: var(--ct-amber); }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
+/* The week on phones: a list of days, each with four small bars (calories, protein, carbs, fat) against the
+   targets, in place of the table (whose Fat column fell off the screen and whose dates wrapped onto three lines). */
+.phoneDays { display: none; }
+@media (max-width: 599.98px) {
+  .tableWrap { display: none; }
+  .phoneDays { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+  .phoneDay { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3) 0; border-bottom: 1px solid var(--ct-border); }
+  .phoneDayHead { display: flex; justify-content: space-between; align-items: baseline; gap: var(--ct-space-2); margin: 0; }
+  .phoneDayName { font-weight: var(--ct-weight-section-heading); }
+  .phoneBars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-2) var(--ct-space-4); margin: 0; }
+  .phoneBar { min-width: 0; }
+  .phoneBarName { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+  .phoneBarValue { margin: 0; font-size: var(--ct-size-caption); overflow-wrap: anywhere; }
+}
+
 .meals { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
 .meal { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); background: var(--ct-surface); min-width: 0; }
 .photo { border-radius: var(--ct-radius-input); }

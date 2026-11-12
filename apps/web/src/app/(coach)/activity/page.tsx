@@ -121,22 +121,23 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </p>
       ) : (
         <Card className={styles.listCard}>
-          <table className={styles.table} aria-label="Finished workouts">
-            <thead>
-              <tr>
-                <th scope="col">Client</th>
-                <th scope="col">Workout</th>
-                <th scope="col">Finished</th>
-                <th scope="col">Duration</th>
-                <th scope="col">Sets</th>
-                <th scope="col">Volume</th>
+          {/* Explicit roles: on phones the table is restyled as cards (display: block), which would otherwise drop them. */}
+          <table className={styles.table} aria-label="Finished workouts" role="table">
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader">Client</th>
+                <th scope="col" role="columnheader">Workout</th>
+                <th scope="col" role="columnheader">Finished</th>
+                <th scope="col" role="columnheader">Duration</th>
+                <th scope="col" role="columnheader">Sets</th>
+                <th scope="col" role="columnheader">Volume</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {rows.map(({ row, clientName, sets, volumeKg, seconds, planned, hasPr, byCoach }) => (
-                <tr key={row.id}>
-                  <td>{clientName}</td>
-                  <td>
+                <tr key={row.id} role="row">
+                  <td role="cell" className={styles.clientCell}>{clientName}</td>
+                  <td role="cell" className={styles.workoutTd}>
                     <div className={styles.workoutCell}>
                       <Link href={`/clients/${row.client_id}/logs/${row.id}`} className={styles.nameLink}>
                         {row.name}
@@ -147,10 +148,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                       {planned ? null : <Chip>Unplanned</Chip>}
                     </div>
                   </td>
-                  <td className={styles.numeric}>{row.finished_at ? <LocalDateTime iso={row.finished_at} /> : null}</td>
-                  <td className={styles.numeric}>{formatLogDuration(seconds)}</td>
-                  <td className={styles.numeric}>{count(sets, 'set', 'sets')}</td>
-                  <td className={styles.numeric}>{volumeKg > 0 ? formatLogVolume(volumeKg, units) : '–'}</td>
+                  <td role="cell" className={styles.numeric}>{row.finished_at ? <LocalDateTime iso={row.finished_at} /> : null}</td>
+                  <td role="cell" className={styles.numeric}>{formatLogDuration(seconds)}</td>
+                  <td role="cell" className={styles.numeric}>{count(sets, 'set', 'sets')}</td>
+                  <td role="cell" className={styles.numeric}>{volumeKg > 0 ? formatLogVolume(volumeKg, units) : '–'}</td>
                 </tr>
               ))}
             </tbody>
