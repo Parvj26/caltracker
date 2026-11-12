@@ -117,17 +117,25 @@ export function ProgramDetails({
           {...errorProp(errors.name, 'program_name_required')}
           className={styles.nameField}
         />
-        <TextField
-          label="Weeks"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={PROGRAM_WEEKS_MAX}
-          value={weeksText}
-          onChange={(e) => setWeeksText(e.target.value)}
-          {...errorProp(errors.weeks)}
-          className={styles.weeksField}
-        />
+        {/* A changed length gets its own Save right beside the field, instead of waiting for "Save details" below. */}
+        <div className={styles.weeksGroup}>
+          <TextField
+            label="Weeks"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={PROGRAM_WEEKS_MAX}
+            value={weeksText}
+            onChange={(e) => setWeeksText(e.target.value)}
+            {...errorProp(errors.weeks)}
+            className={styles.weeksField}
+          />
+          {weeksText !== String(weeks) ? (
+            <Button type="submit" pending={pending && !confirm} data-ph-capture-attribute-label="program_save_weeks">
+              Save weeks
+            </Button>
+          ) : null}
+        </div>
         <TextAreaField
           label="Description"
           value={description}
