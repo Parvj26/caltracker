@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyWeek, followingWeeks, slotsInWeeks } from '../../src/programs/grid';
+import { copySlotTo, copyWeek, followingWeeks, slotsInWeeks } from '../../src/programs/grid';
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 let counter = 9000;
@@ -96,5 +96,37 @@ describe('copyWeek', () => {
   it('does not change the input', () => {
     const frozen = Object.freeze(plan.map((s) => Object.freeze({ ...s })));
     expect(() => copyWeek(frozen, { from: 1, to: [2], weeks: 4 }, makeId)).not.toThrow();
+  });
+});
+
+describe('copySlotTo', () => {
+  it('puts the same workout on each chosen day, last in that day, with new ids', () => {
+    const source = plan[2]!; // week 1, day 3
+    const { added, targets } = copySlotTo(plan, source, [{ week: 1, day: 1 }, { week: 3, day: 3 }], 4, makeId);
+    expect(targets).toEqual([{ week: 1, day: 1 }, { week: 3, day: 3 }]);
+    expect(added).toHaveLength(2);
+    expect(added.map((s) => [s.week, s.day, s.position])).toEqual([[1, 1, 2], [3, 3, 0]]);
+    for (const s of added) {
+      expect(s.workoutId).toBe(source.workoutId);
+      expect(s.workoutName).toBe(source.workoutName);
+      expect(s.id).not.toBe(source.id);
+    }
+    expect(new Set(added.map((s) => s.id)).size).toBe(2);
+  });
+
+  it('ignores the source day, repeats and days outside the program, and sorts by week then day', () => {
+    const source = plan[0]!; // week 1, day 1
+    const { targets } = copySlotTo(
+      plan,
+      source,
+      [{ week: 2, day: 7 }, { week: 1, day: 1 }, { week: 2, day: 7 }, { week: 5, day: 1 }, { week: 0, day: 2 }, { week: 2, day: 8 }, { week: 1.5, day: 2 }, { week: 2, day: 2 }],
+      4,
+      makeId,
+    );
+    expect(targets).toEqual([{ week: 2, day: 2 }, { week: 2, day: 7 }]);
+  });
+
+  it('adds nothing when no target is left', () => {
+    expect(copySlotTo(plan, plan[0]!, [{ week: 1, day: 1 }], 4, makeId)).toEqual({ added: [], targets: [] });
   });
 });
