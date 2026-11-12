@@ -568,7 +568,7 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
   .calendar:not(.weekLayout) .grid { min-width: 0; border-spacing: 2px; }
   .calendar:not(.weekLayout) .grid th { padding: var(--ct-space-1) 0; text-align: center; }
   .calendar:not(.weekLayout) .day { min-height: 48px; }
-  .calendar:not(.weekLayout) .items, .calendar:not(.weekLayout) .addButton { display: none; }
+  .calendar:not(.weekLayout) .grid .items, .calendar:not(.weekLayout) .grid .addButton { display: none; }
 }
 .dotDay { min-height: 0; padding: 0; }
 .dotButton {
