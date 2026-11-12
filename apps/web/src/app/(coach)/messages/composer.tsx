@@ -84,6 +84,8 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
   return (
     <form
       className={styles.composer}
+      // On an iPhone the floating Menu button would sit on Add photos; the thread's Back leaves the screen.
+      data-no-menu-button=""
       onSubmit={(e) => {
         e.preventDefault();
         submit();
