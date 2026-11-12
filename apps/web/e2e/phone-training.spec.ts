@@ -28,7 +28,10 @@ const longDay = (d: string) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(
     new Date(`${d}T00:00:00Z`),
   );
-const mondayOf = (d: string) => addDays(d, 1 - (new Date(`${d}T00:00:00Z`).getUTCDay() || 7));
+/** "Thu 12 Nov", as the day's "+" says it. */
+const shortDay = (d: string) =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${d}T00:00:00Z`));
+const mondayOf =(d: string) => addDays(d, 1 - (new Date(`${d}T00:00:00Z`).getUTCDay() || 7));
 
 async function expectNoSidewaysScroll(page: Page) {
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -78,6 +81,7 @@ test('the month view fits the phone: a dot per day with workouts, the tapped day
   await expect(todayButton).toHaveAttribute('aria-pressed', 'true');
   const panel = page.getByRole('region', { name: longDay(date), exact: true });
   await expect(panel.getByText(name, { exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: `Add workout to ${shortDay(date)}`, exact: true })).toBeVisible();
   // Every day button is a full tap target.
   const box = (await todayButton.boundingBox())!;
   expect(box.height).toBeGreaterThanOrEqual(44);
@@ -152,7 +156,8 @@ test('the assign dialog lists programs with full names; the assigned row opens t
   const nameText = dialog.getByText(program, { exact: true });
   await expect(nameText).toBeVisible();
   expect(await nameText.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  const row = dialog.locator('label').filter({ has: choice });
+  // `has` is matched inside each label, so the radio locator must not start from the dialog.
+  const row = dialog.locator('label').filter({ has: page.getByRole('radio', { name: program, exact: true }) });
   expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expectNoSidewaysScroll(page);
   await nameText.click();
