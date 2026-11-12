@@ -50,6 +50,13 @@ export const ALLOWED_KEYS = [
   'query',
   'kind',
   'role',
+  // slow_screen on a first page load: where the time went (see load-timing.ts).
+  'server_ms',
+  'download_ms',
+  'dom_ms',
+  'redirect_ms',
+  'dns_tcp_ms',
+  'nav_type',
 ] as const;
 
 export type AnalyticsProps = Record<string, string | number | boolean>;

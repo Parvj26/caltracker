@@ -2,12 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { scrubUrl } from '@caltracker/shared';
+import { scrubUrl, slowFirstLoad } from '@caltracker/shared';
 import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
 import { watchAlerts } from './alert-code';
 import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
-
-const SLOW_MS = 2000;
 
 /** Starts analytics for a signed-in coach and feeds taps, back presses, screens and tab visibility to the task tracker. */
 export function AnalyticsProvider({ person, children }: { person: AnalyticsPerson; children: React.ReactNode }) {
@@ -31,11 +29,11 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
     if (getTaskTracker().isOpen('build_program') && buildProgramLeft(pathname, buildingProgramId())) getTaskTracker().abandon('build_program');
   }, [pathname]);
 
-  // First page load.
+  // First page load, with where the time went (server, network or the device). Numbers only.
   useEffect(() => {
     const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-    const ms = nav ? Math.round(nav.domContentLoadedEventEnd) : 0;
-    if (ms > SLOW_MS) track('slow_screen', { screen: scrubUrl(window.location.pathname), ms });
+    const slow = slowFirstLoad(nav);
+    if (slow) track('slow_screen', { screen: scrubUrl(window.location.pathname), ...slow });
   }, []);
 
   // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text. An alert whose
