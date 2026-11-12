@@ -25,6 +25,8 @@ export const toMessage = (r: MessageRow): Message => ({
 
 /** How many recent messages the inbox looks at to find previews and unread counts. */
 const RECENT_LIMIT = 1000;
+/** The newest messages loaded alongside the first queries (small: it is wasted in a busy workspace). */
+const QUICK_LIMIT = 200;
 
 /** The thread shows this many latest messages first; "Show earlier messages" loads another page. */
 export const PAGE_SIZE = 100;
@@ -133,12 +135,26 @@ async function exactUnread(supabase: Db, conversationId: string, me: string, rea
  * only) but a lean read: three small queries plus one of (conversation_id, sender_id, created_at) for the clients'
  * messages newer than the oldest read mark, never the bodies. If that window is full, the conversations in it are
  * counted exactly by the database instead, so the badge never undercounts. Works with the server or browser client.
+ * It runs on every page load, so the newest QUICK_LIMIT messages are fetched in the same round as the three small
+ * queries: in a workspace with fewer than that, they are the whole story and the badge costs one round trip.
  */
 export async function loadUnreadTotal(supabase: Db, workspaceId: string, me: string): Promise<number> {
-  const [members, conversations, reads] = await Promise.all([
+  const recentFrom = (limit: number, after: string | null) => {
+    let q = supabase
+      .from('messages')
+      .select('conversation_id, sender_id, created_at')
+      .eq('workspace_id', workspaceId)
+      .neq('sender_id', me)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (after !== null) q = q.gt('created_at', after);
+    return q;
+  };
+  const [members, conversations, reads, quick] = await Promise.all([
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client'),
     supabase.from('conversations').select('id, client_id').eq('workspace_id', workspaceId),
     supabase.from('conversation_reads').select('conversation_id, last_read_at').eq('user_id', me),
+    recentFrom(QUICK_LIMIT, null),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (conversations.error) throw new Error(`Could not load conversations: ${conversations.error.message}`);
@@ -160,15 +176,10 @@ export async function loadUnreadTotal(supabase: Db, workspaceId: string, me: str
     }
     if (bound === null || Date.parse(r) < Date.parse(bound)) bound = r;
   }
-  let q = supabase
-    .from('messages')
-    .select('conversation_id, sender_id, created_at')
-    .eq('workspace_id', workspaceId)
-    .neq('sender_id', me)
-    .order('created_at', { ascending: false })
-    .limit(RECENT_LIMIT);
-  if (bound !== null) q = q.gt('created_at', bound);
-  const recent = await q;
+  // Fewer than QUICK_LIMIT messages in the workspace: the quick look already holds every one (unreadCount below
+  // ignores the read ones). Otherwise read the bounded window as before.
+  if (quick.error) throw new Error(`Could not load messages: ${quick.error.message}`);
+  const recent = quick.data.length < QUICK_LIMIT ? quick : await recentFrom(RECENT_LIMIT, bound);
   if (recent.error) throw new Error(`Could not load messages: ${recent.error.message}`);
 
   const by = new Map<string, Stamped[]>();
