@@ -5,6 +5,8 @@ import { IsoDateSchema, errorMessage, type ErrorCode } from '@caltracker/shared'
 import type { IsoDate, Units } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
+import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { saveScan } from './actions';
@@ -142,16 +144,22 @@ export function ScanDialog({
   return (
     <dialog
       ref={dialogRef}
-      className={calendar.dialog}
+      // On an iPhone it fills the screen with Cancel and Save stuck to the bottom; touch screens get a × too.
+      className={cx(calendar.dialog, sheet.sheet)}
       aria-labelledby={titleId}
       onCancel={(e) => {
         if (pending) e.preventDefault();
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={calendar.dialogTitle}>{scan ? 'Edit scan' : 'Add a scan'}</h2>
+      <div className={sheet.header}>
+        <h2 id={titleId} className={calendar.dialogTitle}>{scan ? 'Edit scan' : 'Add a scan'}</h2>
+        <button type="button" className={sheet.close} aria-label="Close" onClick={() => dialogRef.current?.close()} disabled={pending}>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
       <form
-        className={styles.form}
+        className={cx(styles.form, sheet.body)}
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
@@ -195,7 +203,7 @@ export function ScanDialog({
         </div>
 
         {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
-        <div className={calendar.dialogActions}>
+        <div className={cx(calendar.dialogActions, sheet.actions)}>
           {formError?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
           <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>Cancel</Button>
           <Button type="submit" pending={pending}>{pending ? 'Saving…' : 'Save scan'}</Button>
