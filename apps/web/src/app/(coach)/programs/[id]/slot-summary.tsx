@@ -11,13 +11,14 @@ const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /**
  * Tap a workout on the plan: a card with its exercises (one line each), its notes and how many days of the program
- * use it, with Edit workout, Move to… and Remove from day. ✕ or Escape closes it.
+ * use it, with Edit workout, Copy to…, Move to… and Remove from day. ✕ or Escape closes it.
  */
 export function SlotSummary({
   slot,
   units,
   onEdit,
   onMove,
+  onCopy,
   onRemove,
   onClose,
 }: {
@@ -25,6 +26,7 @@ export function SlotSummary({
   units: Units;
   onEdit: (workout: SlotWorkout) => void;
   onMove: () => void;
+  onCopy: () => void;
   onRemove: () => void;
   onClose: () => void;
 }) {
@@ -101,6 +103,9 @@ export function SlotSummary({
           Edit workout
         </Button>
         <span className={styles.summarySpacer} />
+        <Button variant="secondary" onClick={onCopy}>
+          Copy to…
+        </Button>
         <Button variant="secondary" onClick={onMove}>
           Move to…
         </Button>

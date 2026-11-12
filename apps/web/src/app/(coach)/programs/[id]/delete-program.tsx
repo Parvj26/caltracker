@@ -2,14 +2,19 @@
 
 import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
+import { useId, useImperativeHandle, useRef, useState, useTransition, type Ref } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import { deleteProgram } from '../actions';
 import styles from '../programs.module.css';
 import { markUndone } from '@/lib/analytics/client';
 
-/** Delete a program, after saying that clients already on it keep their calendars. */
-export function DeleteProgram({ id, name }: { id: string; name: string }) {
+export type DeleteProgramHandle = { open: () => void };
+
+/**
+ * Delete a program, after saying that clients already on it keep their calendars. The program page's ⋯ menu opens it
+ * through `handle`.
+ */
+export function DeleteProgram({ id, name, handle }: { id: string; name: string; handle: Ref<DeleteProgramHandle> }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -29,17 +34,15 @@ export function DeleteProgram({ id, name }: { id: string; name: string }) {
     });
   }
 
+  useImperativeHandle(handle, () => ({
+    open: () => {
+      setError(null);
+      dialogRef.current?.showModal();
+    },
+  }));
+
   return (
     <>
-      <Button
-        variant="secondary"
-        onClick={() => {
-          setError(null);
-          dialogRef.current?.showModal();
-        }}
-      >
-        Delete program
-      </Button>
       <dialog
         ref={dialogRef}
         className={styles.dialog}

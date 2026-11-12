@@ -6,9 +6,7 @@ import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { AssignButton } from '@/components/assign/assign-to-clients';
-import { DuplicateButton } from '@/components/duplicate-button';
-import { AutoProgressionPanel } from './auto-progression-panel';
-import { DeleteProgram } from './delete-program';
+import { ProgramMenu } from './program-menu';
 import { loadLiveSync } from '@/lib/live-sync';
 import { loadPickerHistory, pickerHints } from '@/lib/picker-hints';
 import { loadExercisePrefs } from '@/lib/workouts';
@@ -79,13 +77,11 @@ export default async function ProgramPage({
         <h1 className={styles.title}>{program.name}</h1>
         <div className={styles.titleActions}>
           <AssignButton kind="program" id={program.id} name={program.name} />
-          <DuplicateButton kind="program" id={program.id} name={program.name} />
-          <DeleteProgram id={program.id} name={program.name} />
+          <ProgramMenu id={program.id} name={program.name} />
         </div>
       </header>
-      <AutoProgressionPanel key={`ap-${program.id}`} programId={program.id} initial={program.auto_progression} />
       {/* key: opening a different program starts a fresh grid. */}
-      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} hints={hints} units={units} workspaceId={workspaceId} exercisePrefs={prefs} />
+      <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} autoProgression={program.auto_progression} hints={hints} units={units} workspaceId={workspaceId} exercisePrefs={prefs} />
     </div>
   );
 }

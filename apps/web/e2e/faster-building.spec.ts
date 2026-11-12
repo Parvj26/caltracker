@@ -135,7 +135,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
 
   // Repeat week 1 for every following week: week 3 was empty, but week 2 is not, so it asks again.
   await page.getByRole('button', { name: 'Copy week 1', exact: true }).click();
-  await dialog.getByLabel('Copy to').selectOption({ label: 'Every following week (weeks 2 to 3)' });
+  await dialog.getByLabel('Copy to').selectOption({ label: 'Weeks 2–3' });
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
   await dialog.getByRole('button', { name: 'Replace weeks 2 to 3' }).click();
   await expect(chip(3, 1)).toBeVisible();

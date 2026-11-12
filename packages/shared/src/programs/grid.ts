@@ -32,3 +32,38 @@ export function copyWeek<T extends PlanSlot>(
   const added = targets.flatMap((week) => source.map((s) => ({ ...s, id: makeId(), week })));
   return { slots: [...slots.filter((s) => !targets.includes(s.week)), ...added], removed, added, weeks: targets };
 }
+
+/** One day of a program: week 1..weeks, day 1..7. */
+export type PlanCell = { week: number; day: number };
+
+/**
+ * "Copy to…" for one workout on the plan: the same workout goes on each chosen day, last in that day, as a new slot
+ * (like copyWeek, the copies point at the same workout, so no new workout is made). The source day, repeats and days
+ * outside the program are ignored; `targets` is what's left, by week then day, in the order of `added`.
+ */
+export function copySlotTo<T extends PlanSlot>(
+  slots: readonly T[],
+  source: T,
+  to: readonly PlanCell[],
+  weeks: number,
+  makeId: () => string,
+): { added: T[]; targets: PlanCell[] } {
+  const valid = (c: PlanCell) =>
+    Number.isInteger(c.week) && Number.isInteger(c.day) && c.week >= 1 && c.week <= weeks && c.day >= 1 && c.day <= 7;
+  const seen = new Set<string>();
+  const targets = to
+    .filter((c) => valid(c) && !(c.week === source.week && c.day === source.day))
+    .filter((c) => {
+      const key = `${c.week}-${c.day}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((c) => ({ week: c.week, day: c.day }))
+    .sort((a, b) => a.week - b.week || a.day - b.day);
+  const added = targets.map((c) => {
+    const position = slots.reduce((max, s) => (s.week === c.week && s.day === c.day ? Math.max(max, s.position + 1) : max), 0);
+    return { ...source, id: makeId(), week: c.week, day: c.day, position };
+  });
+  return { added, targets };
+}
