@@ -1,5 +1,6 @@
 import { isErrorCode } from './error-codes';
 import { ALLOWED_KEYS, type AnalyticsProps } from './events';
+import { navType } from './load-timing';
 
 const ALLOWED = new Set<string>(ALLOWED_KEYS);
 const QUERY_MAX = 60;
@@ -7,7 +8,8 @@ const QUERY_MAX = 60;
 /**
  * The privacy guard: keeps only allow-listed keys with primitive values. `query` is allowed only on
  * exercise searches (exercise names are not personal) and is capped at 60 characters. `code` must be
- * in the error-code list; anything else becomes `missing_code` so we notice.
+ * in the error-code list; anything else becomes `missing_code` so we notice. `nav_type` must be a known navigation
+ * type; anything else becomes `other`.
  */
 export function sanitize(event: string, props: Record<string, unknown> | undefined): AnalyticsProps {
   const out: AnalyticsProps = {};
@@ -17,6 +19,10 @@ export function sanitize(event: string, props: Record<string, unknown> | undefin
     if (key === 'query' && event !== 'exercise_search_no_results') continue;
     if (key === 'code') {
       out.code = isErrorCode(value) ? value : 'missing_code';
+      continue;
+    }
+    if (key === 'nav_type') {
+      out.nav_type = navType(value);
       continue;
     }
     if (typeof value === 'string') out[key] = key === 'query' ? value.slice(0, QUERY_MAX) : value;
