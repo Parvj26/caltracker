@@ -26,6 +26,8 @@ import {
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
+import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
@@ -260,7 +262,8 @@ export function AssignToClientsDialog({
   return (
     <dialog
       ref={dialogRef}
-      className={calendar.dialog}
+      // On an iPhone it fills the screen: the client list takes the spare height and the buttons stay at the bottom.
+      className={cx(calendar.dialog, sheet.sheet)}
       aria-labelledby={titleId}
       onCancel={(e) => {
         if (pending) e.preventDefault();
@@ -310,7 +313,7 @@ export function AssignToClientsDialog({
               </button>
             ) : null}
           </div>
-          <ul id={listId} className={styles.clients} aria-label="Clients">
+          <ul id={listId} className={cx(styles.clients, sheet.grow)} aria-label="Clients">
             {shown.length === 0 ? <li className={calendar.caption}>No clients match.</li> : null}
             {shown.map((c) => {
               const result = results.get(c.id);
@@ -401,7 +404,7 @@ export function AssignToClientsDialog({
           <span>{MAYBE_SENT}</span>
         </p>
       ) : null}
-      <div className={calendar.dialogActions}>
+      <div className={cx(calendar.dialogActions, sheet.actions)}>
         {error?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           {results.size > 0 ? 'Close' : 'Cancel'}
