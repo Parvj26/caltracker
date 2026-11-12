@@ -89,6 +89,7 @@ export {
   switchAnchor,
 } from './dates/calendar-range';
 export type { CalendarRange, CalendarView } from './dates/calendar-range';
+export { SWIPE_MIN_PX, calendarSwipeStep, phoneCalendarDay } from './dates/calendar-phone';
 export {
   BLOCK_KINDS,
   SET_TYPES,
