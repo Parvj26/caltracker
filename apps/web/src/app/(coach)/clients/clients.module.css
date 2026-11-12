@@ -470,6 +470,36 @@
 @media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
   .segment, .planOption { min-height: var(--ct-tap-min); }
 }
+/* iPhone: the pill of three choices wrapped onto two lines, so they stack as full-width radio rows instead (still
+   buttons with aria-pressed; the ring and dot only draw the choice). */
+@media (max-width: 599.98px) {
+  .startHeader { flex-direction: column; align-items: stretch; }
+  .planToggle { flex-direction: column; flex-wrap: nowrap; gap: var(--ct-space-2); padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .planOption,
+  .planOption[aria-pressed='true'] {
+    display: flex;
+    align-items: center;
+    gap: var(--ct-space-3);
+    width: 100%;
+    padding: 0 var(--ct-space-3-5);
+    border-radius: var(--ct-radius-input);
+    background: var(--ct-bg);
+    color: var(--ct-ink);
+    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+    font-size: var(--ct-size-body);
+    text-align: left;
+  }
+  .planOption[aria-pressed='true'] { box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-ink); }
+  .planOption::before {
+    content: '';
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px var(--ct-ink);
+  }
+  .planOption[aria-pressed='true']::before { background: radial-gradient(circle, var(--ct-ink) 0 5px, transparent 6px); }
+}
 .programGrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--ct-space-2-5); }
 .startNote { margin: 0; font-size: 14px; color: var(--ct-ink-muted); }
 .startEmpty { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); }
