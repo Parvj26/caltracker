@@ -5,7 +5,19 @@ import { NextRequest } from 'next/server';
 // the project's public signing key) instead of a getUser network call to Supabase Auth.
 const getClaims = vi.fn();
 const getUser = vi.fn();
-vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: { getClaims, getUser } }) }));
+type CookieOpts = { cookies: { setAll: (c: Array<{ name: string; value: string; options: Record<string, unknown> }>) => void } };
+let opts: CookieOpts | null = null;
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: (_url: string, _key: string, o: CookieOpts) => {
+    opts = o;
+    return { auth: { getClaims, getUser } };
+  },
+}));
+/** getClaims refreshing an expired session: the library hands the new tokens to setAll, as @supabase/ssr does. */
+const refreshThen = (result: unknown) => async () => {
+  opts!.cookies.setAll([{ name: 'sb-test-auth-token', value: 'fresh', options: { path: '/', httpOnly: true } }]);
+  return result;
+};
 
 import { updateSession } from './middleware';
 
@@ -32,5 +44,18 @@ describe('updateSession', () => {
     getClaims.mockResolvedValue({ data: null, error: null });
     const res = await updateSession(req('/invite/abc'));
     expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('passes refreshed session cookies on to the page', async () => {
+    getClaims.mockImplementation(refreshThen({ data: { claims: { sub: 'u1' } }, error: null }));
+    const res = await updateSession(req('/workouts'));
+    expect(res.headers.get('location')).toBeNull();
+    expect(res.cookies.get('sb-test-auth-token')?.value).toBe('fresh');
+  });
+  it('keeps the refreshed cookies on the sign-in redirect too', async () => {
+    getClaims.mockImplementation(refreshThen({ data: null, error: new Error('refresh token revoked') }));
+    const res = await updateSession(req('/workouts'));
+    expect(res.headers.get('location')).toBe('https://caltracker.test/sign-in');
+    expect(res.cookies.get('sb-test-auth-token')?.value).toBe('fresh');
   });
 });

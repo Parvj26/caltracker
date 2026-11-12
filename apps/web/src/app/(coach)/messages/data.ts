@@ -25,7 +25,11 @@ export const toMessage = (r: MessageRow): Message => ({
 
 /** How many recent messages the inbox looks at to find previews and unread counts. */
 const RECENT_LIMIT = 1000;
-/** The newest messages loaded alongside the first queries (small: it is wasted in a busy workspace). */
+/**
+ * The newest messages loaded alongside the first queries (small: it is wasted in a busy workspace). A reply shorter
+ * than this is taken as "that's every message", which relies on PostgREST's max_rows being at least 200 (it is 1000
+ * in supabase/config.toml and on staging). A lower cap would cut the reply short and undercount.
+ */
 const QUICK_LIMIT = 200;
 
 /** The thread shows this many latest messages first; "Show earlier messages" loads another page. */

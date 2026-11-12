@@ -46,6 +46,7 @@ describe('readAll', () => {
 function roundsDb() {
   let round = 0;
   const sentIn: Record<string, number> = {};
+  const sentCount: Record<string, number> = {};
   const rows: Record<string, unknown[]> = {
     workspace_members: [{ user_id: 'c1', created_at: '2026-11-01T00:00:00Z' }],
     workouts: [{ id: 'w1', client_id: 'c1', name: 'Legs', scheduled_on: '2026-11-11', assignment_id: null, workout_logs: [] }],
@@ -57,6 +58,7 @@ function roundsDb() {
   const answer = (table: string, data: unknown[]) => {
     const sent = round;
     sentIn[table] ??= sent;
+    sentCount[table] = (sentCount[table] ?? 0) + 1;
     return new Promise((resolve) =>
       setTimeout(() => {
         round = Math.max(round, sent + 1);
@@ -74,7 +76,7 @@ function roundsDb() {
     return q;
   };
   const rpc = () => answer('rpc', []);
-  return { db: { from, rpc } as unknown as SupabaseClient<Database>, sentIn };
+  return { db: { from, rpc } as unknown as SupabaseClient<Database>, sentIn, sentCount };
 }
 
 describe('loadHomeData', () => {
@@ -84,5 +86,12 @@ describe('loadHomeData', () => {
     expect(data.clients[0]).toMatchObject({ id: 'c1', firstName: 'Cleo', lastWorkoutName: 'Legs' });
     // Round 0: the first queries. Round 1: names, alongside the paged reads' check for a second page.
     expect(sentIn.profiles).toBe(1);
+  });
+
+  it('reads the client list once (each await of a Supabase query sends it again)', async () => {
+    const { db, sentCount } = roundsDb();
+    await loadHomeData(db, 'ws', '2026-11-11');
+    expect(sentCount.workspace_members).toBe(1);
+    expect(sentCount.profiles).toBe(1);
   });
 });

@@ -70,17 +70,20 @@ export async function loadHomeData(
   const prSince = new Date(Date.now() - PR_WINDOW_DAYS * 86_400_000).toISOString();
 
   // Current clients only: a removed client is no longer a workspace member, which is how the Clients page does it.
-  const membersQuery = supabase.from('workspace_members').select('user_id, created_at').eq('workspace_id', workspaceId).eq('role', 'client');
+  // One promise, awaited twice below: a Supabase query sends a new request every time it is awaited.
+  const membersP = Promise.resolve(
+    supabase.from('workspace_members').select('user_id, created_at').eq('workspace_id', workspaceId).eq('role', 'client'),
+  );
   // No direct foreign key links workspace_members to profiles, so load the names separately (as the Clients page does),
   // as soon as the client list is back rather than after every paged read below.
-  const namesQuery = Promise.resolve(membersQuery).then(async (members) => {
+  const namesP = membersP.then(async (members) => {
     const ids = members.data?.map((m) => m.user_id) ?? [];
     return ids.length ? await supabase.from('profiles').select('id, first_name, last_name').in('id', ids) : { data: [], error: null };
   });
 
   const [members, profiles, workouts, finished, assignments, awards, scans] = await Promise.all([
-    membersQuery,
-    namesQuery,
+    membersP,
+    namesP,
     readAll(
       (from, to) =>
         supabase
