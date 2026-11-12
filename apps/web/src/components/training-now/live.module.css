@@ -177,3 +177,68 @@
   .liveDot, .railNow, .flash, .here.flash { animation: none; }
   .barFill { transition: none; }
 }
+
+/* ---------- "Is here" tag: the full wording beside the name, a short one on its own line on phones ---------- */
+.hereShort { display: none; }
+@media (max-width: 599.98px) {
+  .hereTag { display: table; margin: var(--ct-space-1) 0 0; }
+  .hereLong { display: none; }
+  .hereShort { display: inline; }
+  .exercise { gap: var(--ct-space-3); }
+  .photo { width: 56px; height: 56px; border-radius: 12px; }
+  .section { gap: var(--ct-space-3); }
+}
+
+/* ---------- Up next: beside the workout on a landscape iPad (1000-1199 px), which had a wide empty strip ---------- */
+.upNext { display: none; }
+@media (min-width: 1000px) and (max-width: 1199.98px) {
+  .innerWide { max-width: 1104px; }
+  .body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 0 var(--ct-space-6); align-items: start; }
+  .upNext {
+    position: sticky;
+    top: var(--ct-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ct-space-3);
+    margin-top: 26px;
+    padding: var(--ct-space-4);
+    border-radius: 18px;
+    background: var(--ct-surface);
+  }
+}
+/* On an iPhone the same list sits under the current exercise, across the full width (rail included), where the
+   page below the workout had a big empty area. */
+.upNextPhone { display: none; }
+@media (max-width: 599.98px) {
+  .upNextPhone {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ct-space-3);
+    margin-left: calc(-1 * (14px + var(--ct-space-3)));
+    padding: var(--ct-space-4);
+    border-radius: 18px;
+    background: var(--ct-surface);
+  }
+}
+.upNextTitle { margin: 0; font-size: 13px; font-weight: var(--ct-weight-screen-title); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ct-ink-muted); }
+.upNextEmpty { margin: 0; color: var(--ct-ink-muted); }
+.upNextList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ct-space-3); counter-reset: up-next; }
+.upNextItem { display: flex; flex-direction: column; gap: 2px; padding-left: 30px; position: relative; counter-increment: up-next; }
+.upNextItem::before {
+  content: counter(up-next);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-size: 11px;
+  font-weight: var(--ct-weight-screen-title);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.upNextName { font-weight: var(--ct-weight-screen-title); overflow-wrap: anywhere; }
+.upNextMeta { font-size: 13px; color: var(--ct-ink-muted); }

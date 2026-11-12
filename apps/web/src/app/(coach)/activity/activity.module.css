@@ -52,3 +52,19 @@
 .nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
 .pager { display: flex; align-items: center; gap: var(--ct-space-3); }
+
+/* iPhone: one card per workout instead of a 629 px table squeezed into the screen. The client on top, the workout
+   (with its chips) under it, then the finish time, duration, sets and volume on one line that wraps between items.
+   Same markup as the table (it keeps explicit roles in page.tsx), so iPad and desktop are unchanged. */
+@media (max-width: 599.98px) {
+  .listCard { padding: var(--ct-space-1) var(--ct-space-4); overflow-x: visible; }
+  .table, .table tbody, .table tr { display: block; }
+  .table thead { display: none; }
+  .table tr { padding: var(--ct-space-2-5) 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
+  .table tbody tr:first-child { border-top: 0; }
+  .table td { display: inline; padding: 0; border-top: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+  .table td.clientCell, .table td.workoutTd { display: block; font-size: inherit; color: var(--ct-ink); }
+  .table td.clientCell { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+  .table td.numeric:not(:last-child)::after { content: ' · '; white-space: normal; }
+  .nameLink { overflow-wrap: anywhere; }
+}

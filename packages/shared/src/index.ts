@@ -395,8 +395,8 @@ export {
   safeTimeZone,
 } from './awards/history';
 export type { AwardContext } from './awards/history';
-export { elapsedClock, exerciseProgressLabel, liveSetLine, liveStats, orderTrainingTabs, tickNote, whereTheyAre } from './logs/live';
-export type { LivePosition, LiveStats } from './logs/live';
+export { elapsedClock, exerciseProgressLabel, liveSetLine, liveStats, orderTrainingTabs, tickNote, upNext, whereTheyAre } from './logs/live';
+export type { LivePosition, LiveStats, UpNextItem } from './logs/live';
 export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
 export {
