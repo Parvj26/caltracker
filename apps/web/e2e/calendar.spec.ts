@@ -90,7 +90,7 @@ async function freshClient(firstName: string, lastName: string): Promise<string>
 async function openAssign(page: Page, program: string) {
   await page.getByRole('button', { name: 'Assign program' }).click();
   const dialog = page.getByRole('dialog', { name: 'Assign a program' });
-  await dialog.getByLabel('Program').selectOption({ label: program });
+  await dialog.getByRole('radio', { name: program, exact: true }).check();
   return dialog;
 }
 

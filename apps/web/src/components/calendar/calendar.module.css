@@ -322,6 +322,38 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+/* The assign dialog's programs: rows to tap, each with its full name and size. The list scrolls when long. */
+.programChoices { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
+.programChoicesLegend { padding: 0; margin-bottom: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
+.programList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-1);
+  max-height: min(264px, 40dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.programChoice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--ct-space-3);
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.programChoice input { grid-row: 1 / span 2; width: 20px; height: 20px; margin: 0; accent-color: var(--ct-ink); }
+.programChoiceName { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.programChoiceSize { grid-column: 2; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.programChoice:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+/* Text on a pastel fill is always ink. */
+.programChoice:has(input:checked) { background: var(--ct-lime); }
+.programChoice:has(input:checked) .programChoiceSize { color: var(--ct-ink); }
+.programChoice:has(input:focus-visible) { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+
 /* The assign dialog with no programs yet: two ways forward instead of a dead end. */
 .emptyActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
 .preview { margin: 0; font-weight: var(--ct-weight-section-heading); }

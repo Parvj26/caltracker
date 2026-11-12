@@ -14,7 +14,7 @@ import {
 import type { ErrorCode, IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink, ErrorText, SelectField, TextField, errorFromText } from '@/components/ui';
+import { Button, ButtonLink, ErrorText, TextField, errorFromText } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
@@ -31,6 +31,45 @@ export function assignPreview(program: PickerProgram, start: IsoDate): string {
   const dates = program.slots.filter((s) => s.week <= program.weeks).map((s) => programDayToDate(start, s.week, s.day));
   const n = dates.length;
   return `${n} ${n === 1 ? 'workout' : 'workouts'} from ${formatShortDay(start)} to ${formatShortDay(programEndDate(start, program.weeks))}`;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** "4 weeks · 12 workouts": the program's length and the workouts inside it. */
+export const programSize = (p: PickerProgram) => `${plural(p.weeks, 'week')} · ${plural(p.slots.filter((s) => s.week <= p.weeks).length, 'workout')}`;
+
+/**
+ * The programs as rows to tap, each with its full name (wrapping, never cut short like a native select's) and its
+ * size. Radio buttons, so arrow keys move between them and a screen reader hears "Program, radio group".
+ */
+function ProgramChoices({ programs, value, onChange }: { programs: PickerProgram[]; value: string; onChange: (id: string) => void }) {
+  const name = useId();
+  const listRef = useRef<HTMLDivElement>(null);
+  // The picked program (the last assigned one) may be far down a long list: show it.
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLInputElement>('input:checked')?.scrollIntoView({ block: 'nearest' });
+  }, []);
+  return (
+    <fieldset className={styles.programChoices} data-ph-capture-attribute-label="assign_pick_program">
+      <legend className={styles.programChoicesLegend}>Program</legend>
+      <div ref={listRef} className={styles.programList}>
+        {programs.map((p) => (
+          <label key={p.id} className={styles.programChoice}>
+            <input
+              type="radio"
+              name={name}
+              value={p.id}
+              checked={p.id === value}
+              onChange={() => onChange(p.id)}
+              aria-labelledby={`${name}-${p.id}-name`}
+              aria-describedby={`${name}-${p.id}-size`}
+            />
+            <span id={`${name}-${p.id}-name`} className={styles.programChoiceName}>{p.name}</span>
+            <span id={`${name}-${p.id}-size`} className={styles.programChoiceSize}>{programSize(p)}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 /**
@@ -147,21 +186,14 @@ export function AssignDialog({
       ) : (
         <>
           <p className={styles.dialogBody}>Copies the program&apos;s workouts onto {clientName}&apos;s calendar.</p>
-          <SelectField
-            label="Program"
-            data-ph-capture-attribute-label="assign_pick_program"
+          <ProgramChoices
+            programs={programs}
             value={programId}
-            onChange={(e) => {
-              setProgramId(e.target.value);
+            onChange={(id) => {
+              setProgramId(id);
               setError(null);
             }}
-          >
-            {programs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </SelectField>
+          />
           <TextField
             id={dateInputId}
             label="Start date"
