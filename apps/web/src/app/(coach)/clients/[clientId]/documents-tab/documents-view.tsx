@@ -92,8 +92,13 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
       <p className={styles.caption}>A PDF (up to 5 MB) or a photo. Photos are made smaller before upload. No videos.</p>
       <label className={styles.fileLabel}>
         <span className={styles.fieldLabel}>File</span>
-        <input ref={input} type="file" accept={ACCEPT} className={styles.file} onChange={(e) => void choose(e.target.files?.[0])} disabled={pending} />
+        {/* aria-label keeps the name "File" alone: the label also holds the "Choose a file" button text. */}
+        <input ref={input} type="file" accept={ACCEPT} aria-label="File" className={styles.file} onChange={(e) => void choose(e.target.files?.[0])} disabled={pending} />
+        {/* Touch screens: a big button in place of the browser's small "Choose File" (the input stays, hidden). */}
+        <span aria-hidden="true" className={styles.chooseButton}>{file ? 'Choose another file' : 'Choose a file'}</span>
       </label>
+      {/* The hidden input still tells screen readers which file it holds; this line is for the eye. */}
+      {file ? <p aria-hidden="true" className={styles.chosenFile}>{file.original.name}</p> : null}
       {preparing ? <p className={styles.caption} role="status">Getting the file ready…</p> : null}
       {file ? (
         <>

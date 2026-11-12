@@ -178,7 +178,8 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
   }
 
   return (
-    <form className={styles.panel} aria-label={isNew ? 'New meal' : 'Edit meal'} onSubmit={(e) => void save(e)} noValidate>
+    // data-no-menu-button: on an iPhone the floating Menu button would sit on the sticky Save bar; Cancel leaves.
+    <form className={styles.panel} aria-label={isNew ? 'New meal' : 'Edit meal'} onSubmit={(e) => void save(e)} noValidate data-no-menu-button="">
       <h2 className={styles.panelTitle}>{isNew ? 'New meal' : 'Edit meal'}</h2>
 
       <label className={styles.field}>

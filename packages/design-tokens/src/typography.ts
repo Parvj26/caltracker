@@ -12,7 +12,8 @@ export type TypeRole =
 export interface TypeStyle {
   family: 'sans' | 'hand';
   weight: 500 | 700 | 800;
-  size: { phone: number; tablet: number; web: number };
+  /** `phone` is the native app; `web` is every browser width unless `webPhone` says otherwise. */
+  size: { phone: number; tablet: number; web: number; webPhone?: number };
   trackingEm?: number;
   rotateDeg?: number;
   muted?: boolean;
@@ -26,7 +27,8 @@ export const typeScale: Record<TypeRole, TypeStyle> = {
   bigNumber: { family: 'sans', weight: 800, size: same(26), tabular: true },
   sectionHeading: { family: 'sans', weight: 700, size: same(16) },
   body: { family: 'sans', weight: 500, size: same(15) },
-  caption: { family: 'sans', weight: 500, size: same(12), muted: true },
+  // 13 px in a phone-width browser: 12 px was too small to read on an iPhone (phone audit, 2026-11-11).
+  caption: { family: 'sans', weight: 500, size: { ...same(12), webPhone: 13 }, muted: true },
   button: { family: 'sans', weight: 800, size: { phone: 15, tablet: 16, web: 16 }, trackingEm: 0.03 },
   // Coach and app notes: the app font in bold, not handwriting, so they are easy to read (PO, 2026-11-09).
   hand: { family: 'sans', weight: 700, size: same(17) },

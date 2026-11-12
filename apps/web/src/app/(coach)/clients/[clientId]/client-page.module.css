@@ -142,6 +142,13 @@
 .feedItem:first-child { border-top: 0; }
 .feedText { min-width: 0; overflow-wrap: anywhere; }
 .feedAge { flex: none; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; }
+/* Touch screens: a row's link fills its side of the row and is at least 44 px tall (it was the 18 px line of text). */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .feedItem { align-items: center; min-height: var(--ct-tap-min); padding-block: 0; }
+  .feedText { padding-block: var(--ct-space-2); }
+  .feedText:has(> a) { flex: 1; padding-block: 0; }
+  .feedText > a { display: flex; align-items: center; min-height: var(--ct-tap-min); padding-block: var(--ct-space-1); }
+}
 
 /* Profile */
 .facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ct-space-1) var(--ct-space-3); margin: 0; }

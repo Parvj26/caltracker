@@ -130,6 +130,38 @@
   .macros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* Touch screens (iPhone, iPad): the fields look and size like the shared TextField (48 px, grey fill, ink border on
+   focus) instead of 40 px boxes with a thin border, and Save / Cancel stay stuck to the bottom of the screen while the
+   form is in view, so they aren't lost under the two big text boxes. On an iPhone the floating Menu button is hidden
+   on this screen (data-no-menu-button on the form); Cancel leaves it. Desktop with a mouse is unchanged. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .label, .macroLabel { font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+  .input, .textarea {
+    min-height: var(--ct-button-min-height);
+    padding: var(--ct-space-3) var(--ct-space-3-5);
+    border: 2px solid transparent;
+    border-radius: var(--ct-radius-input);
+    background: var(--ct-surface);
+    transition: border-color 80ms ease-out, background-color 80ms ease-out;
+  }
+  .macroInput { min-height: var(--ct-button-min-height); padding-inline: var(--ct-space-3); border-radius: var(--ct-radius-input); }
+  .input:focus, .textarea:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+  .input:focus-visible, .textarea:focus-visible { outline: none; }
+  .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+  .input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0 -20px -20px;
+    padding: var(--ct-space-3) 20px calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+    border-top: var(--ct-border-width-card) solid var(--ct-border);
+    border-radius: 0 0 var(--ct-radius-card) var(--ct-radius-card);
+    background: var(--ct-bg);
+  }
+}
+
 /* Remove meal confirmation */
 .dialog {
   max-width: min(420px, calc(100vw - 32px));

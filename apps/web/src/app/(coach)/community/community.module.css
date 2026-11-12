@@ -110,6 +110,14 @@
 .postWho { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .postAuthor { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
 .postTools { display: flex; gap: var(--ct-space-2); }
+/* With a mouse, Pin and Delete sit side by side. On touch screens Delete moves into the post's ⋯ menu (post-menu.tsx),
+   so a thumb aiming at Pin can't hit it. */
+.menuWrap { position: relative; flex: none; }
+.touchOnly { display: none; }
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .mouseOnly { display: none; }
+  .touchOnly { display: block; }
+}
 .postBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reactions { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .reactionBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }

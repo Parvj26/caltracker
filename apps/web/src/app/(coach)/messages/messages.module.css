@@ -120,10 +120,14 @@
   padding: var(--ct-space-3) var(--ct-space-4);
   border-bottom: 1px solid var(--ct-border);
 }
+/* Shows on iPads and phones only (below); a full 44 x 44 tap target there, never squeezed by a long name. */
 .back {
   display: none;
+  flex: none;
   align-items: center;
+  min-width: var(--ct-tap-min);
   min-height: var(--ct-tap-min);
+  white-space: nowrap;
   color: var(--ct-ink);
   font-weight: var(--ct-weight-button);
   text-decoration: none;

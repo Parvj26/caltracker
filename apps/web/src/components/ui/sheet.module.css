@@ -1,0 +1,72 @@
+/*
+ * Dialogs that become a full-screen sheet on an iPhone (below the 600 px tablet breakpoint): the whole sheet scrolls and
+ * its buttons stay stuck to the bottom edge. iPads and desktops keep the dialog's own look. Colours and sizes only via
+ * var(--ct-*).
+ *
+ * Use next to the dialog's own classes:
+ *   .sheet    on the <dialog>
+ *   .header   around the title and the × (.close), which shows on touch screens only
+ *   .grow     on the one child that takes the spare height (a long list)
+ *   .body     on a child that wraps the fields and the buttons (a <form>), so the buttons inside it can stick
+ *   .actions  on the button row
+ * A modal dialog sits above the floating Menu button, so the sticky row needs no --coach-menu-room.
+ */
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-3); }
+.close { display: none; }
+
+/* Touch screens (iPhone, iPad) get a × to close; with a mouse, Cancel and Escape do. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--ct-tap-min);
+    height: var(--ct-tap-min);
+    padding: 0;
+    border: 0;
+    border-radius: var(--ct-radius-pill);
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    font: inherit;
+    font-size: var(--ct-size-section-heading);
+    font-weight: var(--ct-weight-button);
+    cursor: pointer;
+  }
+  .close:disabled { opacity: 0.5; cursor: default; }
+  .close:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+}
+
+@media (max-width: 599.98px) {
+  dialog.sheet[open] {
+    --sheet-pad: var(--ct-space-4);
+    box-sizing: border-box;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: calc(var(--sheet-pad) + env(safe-area-inset-top)) var(--sheet-pad) 0;
+    border: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* Nothing is squashed to fit (that left two names and half the buttons showing); the sheet scrolls instead. */
+  .sheet[open] > * { flex-shrink: 0; }
+  .sheet[open] > .grow { flex: 1 1 auto; min-height: 176px; max-height: none; }
+  .sheet[open] > .body { display: flex; flex-direction: column; flex: 1 0 auto; overflow: visible; }
+  /* Pushed to the bottom when there is room, stuck to the bottom edge while the sheet scrolls. */
+  .sheet[open] .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin: auto calc(-1 * var(--sheet-pad)) 0;
+    padding: var(--ct-space-3) var(--sheet-pad) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+    border-top: var(--ct-border-width-card) solid var(--ct-border);
+    background: var(--ct-bg);
+  }
+  /* Thumb-sized: the buttons share the row's width. */
+  .sheet[open] .actions > * { flex: 1 1 auto; }
+}

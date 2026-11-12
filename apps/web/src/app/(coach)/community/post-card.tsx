@@ -6,8 +6,10 @@ import { COMMENT_BODY_MAX, cardText, postAge, splitLinks, type CommunityCard, ty
 import { CoachAvatar } from '@/components/coach-avatar';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { Chip, ErrorText } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
 import { addComment, deleteComment, deletePost, setPinned, type CommunityOutcome } from './actions';
 import type { FeedPost } from './data';
+import { PostMenu } from './post-menu';
 import { ReactionBar } from './reaction-bar';
 import styles from './community.module.css';
 
@@ -74,6 +76,9 @@ export function PostCard({
       if (!r.ok) setError(r.code);
       else after?.();
     });
+  const removePost = () => {
+    if (window.confirm('Delete this post for everyone?')) run(() => deletePost(post.id));
+  };
 
   return (
     <article className={styles.post} id={`post-${post.id}`} aria-label={`Post by ${post.authorName}`} data-testid="community-post">
@@ -92,16 +97,10 @@ export function PostCard({
           <button type="button" className={styles.smallButton} disabled={pending} onClick={() => run(() => setPinned(post.id, !post.pinnedAt))}>
             {post.pinnedAt ? 'Unpin' : 'Pin'}
           </button>
-          <button
-            type="button"
-            className={styles.smallButton}
-            disabled={pending}
-            onClick={() => {
-              if (window.confirm('Delete this post for everyone?')) run(() => deletePost(post.id));
-            }}
-          >
+          <button type="button" className={cx(styles.smallButton, styles.mouseOnly)} disabled={pending} onClick={removePost}>
             Delete
           </button>
+          <PostMenu className={styles.touchOnly} disabled={pending} onDelete={removePost} />
         </div>
       </header>
 

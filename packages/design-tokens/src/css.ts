@@ -4,7 +4,13 @@ import { typeScale } from './typography';
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 
-/** One `:root{...}` rule exposing the tokens as `--ct-*` custom properties. */
+/** Below the web app's tablet breakpoint (an iPhone in a browser). */
+export const WEB_PHONE_MEDIA = '(max-width: 599.98px)';
+
+/**
+ * A `:root{...}` rule exposing the tokens as `--ct-*` custom properties, then one phone-width media rule for the
+ * sizes that differ in a browser on a phone (`size.webPhone`).
+ */
 export function toCssVariables(theme: ThemeName = 'light'): string {
   const vars: string[] = [];
   for (const [k, v] of Object.entries(colors[theme])) vars.push(`--ct-${kebab(k)}:${v};`);
@@ -23,5 +29,9 @@ export function toCssVariables(theme: ThemeName = 'light'): string {
     if (v.trackingEm !== undefined) vars.push(`--ct-tracking-${role}:${v.trackingEm}em;`);
     if (v.rotateDeg !== undefined) vars.push(`--ct-rotate-${role}:${v.rotateDeg}deg;`);
   }
-  return `:root{${vars.join('')}}`;
+  const phone = Object.entries(typeScale)
+    .filter(([, v]) => v.size.webPhone !== undefined && v.size.webPhone !== v.size.web)
+    .map(([k, v]) => `--ct-size-${kebab(k)}:${v.size.webPhone}px;`);
+  const phoneRule = phone.length > 0 ? `@media ${WEB_PHONE_MEDIA}{:root{${phone.join('')}}}` : '';
+  return `:root{${vars.join('')}}${phoneRule}`;
 }

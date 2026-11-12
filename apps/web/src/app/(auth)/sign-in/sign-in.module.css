@@ -20,3 +20,7 @@
   font-weight: var(--ct-weight-section-heading);
   color: var(--ct-ink-muted);
 }
+/* Touch screens: each link is at least 44 px wide too ("Terms" was 36 px), with the 16 px gap kept. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .legal a { justify-content: center; min-width: var(--ct-tap-min); }
+}
