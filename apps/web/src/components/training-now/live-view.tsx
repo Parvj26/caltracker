@@ -83,11 +83,16 @@ function HereTag({ name }: { name: string }) {
   );
 }
 
-/** "Up next" beside the workout on a landscape iPad, where the page had a wide empty strip; hidden elsewhere. */
-function UpNext({ items }: { items: UpNextItem[] }) {
+/**
+ * "Up next": the exercises still to come. `side` sits beside the workout on a landscape iPad (the page had a wide
+ * empty strip); `phone` sits under the current exercise on an iPhone. Each is hidden at other widths, so only one
+ * shows (and is read) at a time.
+ */
+function UpNext({ items, place }: { items: UpNextItem[]; place: 'side' | 'phone' }) {
+  const id = `live-up-next-${place}`;
   return (
-    <aside className={styles.upNext} aria-labelledby="live-up-next">
-      <h2 id="live-up-next" className={styles.upNextTitle}>
+    <aside className={place === 'side' ? styles.upNext : styles.upNextPhone} aria-labelledby={id}>
+      <h2 id={id} className={styles.upNextTitle}>
         Up next
       </h2>
       {items.length === 0 ? (
@@ -316,6 +321,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
                             );
                           })}
                         </ul>
+                        {hereBlock ? <UpNext items={next} place="phone" /> : null}
                       </div>
                     );
                   })}
@@ -324,7 +330,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
             );
           })}
         </div>
-        {position ? <UpNext items={next} /> : null}
+        {position ? <UpNext items={next} place="side" /> : null}
       </div>
     </div>
   );

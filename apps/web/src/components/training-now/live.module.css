@@ -206,6 +206,20 @@
     background: var(--ct-surface);
   }
 }
+/* On an iPhone the same list sits under the current exercise, across the full width (rail included), where the
+   page below the workout had a big empty area. */
+.upNextPhone { display: none; }
+@media (max-width: 599.98px) {
+  .upNextPhone {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ct-space-3);
+    margin-left: calc(-1 * (14px + var(--ct-space-3)));
+    padding: var(--ct-space-4);
+    border-radius: 18px;
+    background: var(--ct-surface);
+  }
+}
 .upNextTitle { margin: 0; font-size: 13px; font-weight: var(--ct-weight-screen-title); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ct-ink-muted); }
 .upNextEmpty { margin: 0; color: var(--ct-ink-muted); }
 .upNextList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ct-space-3); counter-reset: up-next; }

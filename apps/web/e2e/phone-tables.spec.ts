@@ -3,8 +3,8 @@ import { demoWorkspace, freshClient, unique } from './assign-helpers';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 
 // Phone fixes, batch 2: Activity as cards, the Food week as one row per day with four bars, the client tabs' arrow,
-// and the live view (short "HERE NOW" on phones, Up next on a landscape iPad). Chromium with iPhone sizes and touch
-// (the browser can't be chosen per spec). Each CI shard starts from an empty database, so every test seeds its own
+// and the live view (short "HERE NOW" and Up next under the current exercise on phones, Up next beside the workout
+// on a landscape iPad). Chromium with iPhone sizes and touch (the browser can't be chosen per spec). Each CI shard starts from an empty database, so every test seeds its own
 // client, log and meals in the demo workspace, and everything is removed afterwards.
 
 const admin = serviceClient();
@@ -156,8 +156,17 @@ test.describe('live view', () => {
     await expect(pick.getByText('MAYA IS HERE')).toBeHidden();
     // The label is a single line.
     expect((await pick.getByText('HERE NOW').boundingBox())!.height).toBeLessThan(26);
-    // The Up next column is only for a landscape iPad.
-    await expect(page.getByRole('complementary', { name: 'Up next' })).toBeHidden();
+    // Up next sits under the current exercise, across the screen, with what comes after it.
+    const next = page.getByRole('complementary', { name: 'Up next' });
+    await expect(next).toHaveCount(1);
+    await expectOnScreen(next);
+    await expect(next.getByRole('listitem')).toHaveCount(1);
+    await expect(next).toContainText('Pick one: Butterfly or Hamstring Stretch');
+    await expect(next).toContainText('2 sets to go');
+    const here = (await pick.boundingBox())!;
+    const card = (await next.boundingBox())!;
+    expect(card.y).toBeGreaterThan(here.y);
+    expect(card.width).toBeGreaterThan(390 - 48);
     await expectNoSidewaysScroll(page);
   });
 
