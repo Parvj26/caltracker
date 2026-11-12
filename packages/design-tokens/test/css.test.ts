@@ -3,7 +3,7 @@ import { toCssVariables } from '../src/index';
 
 describe('toCssVariables', () => {
   const css = toCssVariables();
-  it('is a single :root rule', () => {
+  it('is a :root rule, then the phone-width overrides', () => {
     expect(css.startsWith(':root{')).toBe(true);
     expect(css.endsWith('}')).toBe(true);
   });
@@ -37,5 +37,16 @@ describe('toCssVariables shape tokens', () => {
     expect(css).toContain('--ct-tracking-screen-title:-0.02em;');
     expect(css).toContain('--ct-tracking-button:0.03em;');
     expect(css).not.toContain('--ct-rotate-hand');
+  });
+});
+
+describe('toCssVariables on phone-width screens', () => {
+  const css = toCssVariables();
+  const [base, phone] = css.split('@media');
+  it('keeps the web caption size for iPads and desktops', () => {
+    expect(base).toContain('--ct-size-caption:12px;');
+  });
+  it('makes captions 13 px below the 600 px breakpoint, and changes nothing else there', () => {
+    expect(phone).toBe(' (max-width: 599.98px){:root{--ct-size-caption:13px;}}');
   });
 });
