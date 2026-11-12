@@ -10,6 +10,7 @@ import { loadExercisePrefs } from '@/lib/workouts';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DuplicateButton } from '@/components/duplicate-button';
 import { DeleteWorkout } from './delete-workout';
+import { MoreActions } from './more-actions';
 import styles from '../workouts.module.css';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -33,8 +34,10 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         <h1 className={styles.title}>{loaded.doc.name}</h1>
         <div className={styles.titleActions}>
           <AssignButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
-          <DuplicateButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
-          <DeleteWorkout id={loaded.doc.id} name={loaded.doc.name} />
+          <MoreActions name={loaded.doc.name}>
+            <DuplicateButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
+            <DeleteWorkout id={loaded.doc.id} name={loaded.doc.name} />
+          </MoreActions>
         </div>
       </header>
       {/* key: opening a different workout starts a fresh builder. */}
