@@ -342,6 +342,11 @@
 }
 .inlineAction:disabled { cursor: default; color: var(--ct-ink-muted); }
 .inlineStatus { flex-basis: 100%; }
+/* Touch screens: Resend and Cancel are full 44 x 44 tap targets, 8 px apart (they were 28 px tall). */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .inviteActions { gap: 0 var(--ct-space-2); }
+  .inlineAction { min-width: var(--ct-tap-min); min-height: var(--ct-tap-min); padding: 0 var(--ct-space-1); }
+}
 
 .cell { display: flex; flex-direction: column; justify-content: center; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
 .cardLabel { display: none; }

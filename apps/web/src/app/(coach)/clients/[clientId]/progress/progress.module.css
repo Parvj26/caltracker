@@ -19,6 +19,11 @@
 }
 /* Text on a pastel fill is always ink. */
 .range[aria-pressed='true'] { background: var(--ct-lime); box-shadow: none; }
+/* Touch screens: every range is at least 44 px wide ("All" was 43 px) with 8 px between them. */
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
+  .ranges { flex-wrap: wrap; gap: var(--ct-space-2); }
+  .range { min-width: var(--ct-tap-min); }
+}
 
 .charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
 .chartCard { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); background: var(--ct-surface); min-width: 0; }
