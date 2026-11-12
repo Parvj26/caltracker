@@ -252,7 +252,7 @@
 .addButton:hover { color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 
 /* ---------- Toast ---------- */
-.toastRegion { position: fixed; z-index: 20; right: var(--ct-space-4); bottom: var(--ct-space-4); max-width: min(420px, calc(100vw - 32px)); }
+.toastRegion { position: fixed; z-index: 20; right: var(--ct-space-4); bottom: calc(var(--ct-space-4) + var(--coach-menu-room, 0px)); max-width: min(420px, calc(100vw - 32px)); }
 .toast {
   display: flex;
   align-items: center;

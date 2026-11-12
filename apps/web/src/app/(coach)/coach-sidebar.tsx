@@ -32,6 +32,32 @@ export function CoachSidebar({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
 
+  // On an iPhone the floating button tucks away while the coach scrolls down (reading or filling in a page) and comes
+  // back as soon as they scroll up, or reach the top or bottom of the page.
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    const phone = window.matchMedia(PHONE_QUERY);
+    let last = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        const atEnd = y + window.innerHeight >= document.documentElement.scrollHeight - 4;
+        if (!phone.matches || y < 24 || atEnd) setTucked(false);
+        else if (y > last + 6) setTucked(true);
+        else if (y < last - 6) setTucked(false);
+        last = y;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const close = useCallback(() => {
     setOpen(false);
     buttonRef.current?.focus();
@@ -87,6 +113,7 @@ export function CoachSidebar({
         aria-expanded={open}
         aria-controls="coach-menu"
         data-ph-capture-attribute-label="phone_menu"
+        data-tucked={tucked && !open ? '' : undefined}
         onClick={() => setOpen(true)}
       >
         {NAV_ICONS.menu}

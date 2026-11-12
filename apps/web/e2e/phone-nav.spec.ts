@@ -107,12 +107,12 @@ test.describe('on an iPhone', () => {
     else await expect(dot).toHaveCount(0);
   });
 
-  test('on the workout editor the button sits above the save bar', async ({ page }) => {
+  test('on the workout editor the button is hidden, clear of the save bar', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts/new');
     await expect(page.locator('[data-bottom-bar]')).toBeVisible();
-    // The save bar is sticky at the foot of the screen; the button floats 88 px up, clear of it.
-    await expect(menuButton(page)).toHaveCSS('bottom', '88px');
+    // The save bar is sticky at the foot of the screen; ← Workouts leaves the editor instead.
+    await expect(menuButton(page)).toBeHidden();
   });
 });
 
