@@ -103,13 +103,13 @@ export function WorkoutSheet({
   }
 
   /**
-   * The top bar's Save (phones, where the keyboard covers the editor's own save bar): presses the editor's Save, so
-   * checks, messages and the "where does this edit go?" question are all the same. The keyboard closes first, so a
-   * message in the save bar can be seen.
+   * The top bar's Save (phones): presses the editor's Save, so checks, messages and the "where does this edit go?"
+   * question are all the same. The keyboard closes first, so a message beside Save can be seen. Found by its label
+   * alone: the editor's Save moved from a bottom bar to the top on phones, so a selector naming the bar broke.
    */
   function saveFromTop() {
     (document.activeElement as HTMLElement | null)?.blur();
-    dialogRef.current?.querySelector<HTMLButtonElement>('[data-bottom-bar] [data-ph-capture-attribute-label="workout_save"]')?.click();
+    dialogRef.current?.querySelector<HTMLButtonElement>('[data-ph-capture-attribute-label="workout_save"]')?.click();
   }
 
   async function saveWith(doc: WorkoutDoc): Promise<SaveWorkoutOutcome | null> {
