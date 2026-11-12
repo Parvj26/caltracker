@@ -124,6 +124,6 @@ test("the program picker starts on the coach's most recently assigned program", 
   await signInAs(page, coach.email);
   await page.goto(`/clients/${coach.clientId}/training`);
   await page.getByRole('button', { name: 'Assign program', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Assign a program' }).getByLabel('Program')).toHaveValue(zebra);
+  await expect(page.getByRole('dialog', { name: 'Assign a program' }).getByRole('radio', { name: 'Zebra block', exact: true })).toBeChecked();
 
 });

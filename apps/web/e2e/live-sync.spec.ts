@@ -87,7 +87,7 @@ test('Live Sync on: program edits reach the client calendar, tagged Live; off: t
   const monday = addDays(today, 8 - weekday(today));
   await page.getByRole('button', { name: 'Assign program' }).click();
   const dialog = page.getByRole('dialog', { name: 'Assign a program' });
-  await dialog.getByLabel('Program').selectOption({ label: program });
+  await dialog.getByRole('radio', { name: program, exact: true }).check();
   await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();

@@ -106,7 +106,7 @@ export default async function ClientPage({
       .order('created_at'),
     supabase
       .from('program_assignments')
-      .select('id, program_name, start_date, end_date')
+      .select('id, program_id, program_name, start_date, end_date')
       .eq('workspace_id', workspaceId)
       .eq('client_id', client.id)
       .is('cancelled_on', null)
@@ -210,6 +210,7 @@ export default async function ClientPage({
   );
   const summaries: AssignmentSummary[] = assignments.data.map((a) => ({
     id: a.id,
+    programId: a.program_id,
     programName: a.program_name,
     startDate: a.start_date,
     endDate: a.end_date ?? a.start_date,

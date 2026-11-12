@@ -19,8 +19,8 @@ import {
 } from '@dnd-kit/core';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
-import { isLiveWorkout } from '@caltracker/shared';
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type TouchEvent } from 'react';
+import { calendarSwipeStep, isLiveWorkout, phoneCalendarDay } from '@caltracker/shared';
 import type { IsoDate, WorkoutPreview } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { formatDayMonth, formatLongDay, formatShortDay, formatWeekday } from './format';
@@ -83,7 +83,17 @@ type Props = {
    * told, so it can offer fewer controls).
    */
   editableFrom?: IsoDate;
+  /**
+   * Present: a sideways finger swipe across the calendar steps it (1 = on, -1 = back), as the toolbar's › and ‹ do.
+   * A swipe that starts on a workout card is left to the card (a long press drags it).
+   */
+  onSwipe?: (step: -1 | 1) => void;
 };
+
+/** At or below this width the month view shows a dot per day and the picked day's workouts under the grid. */
+const COMPACT_MAX_PX = 600;
+/** Touches this close to the screen's sides are the browser's back and forward swipes, not the calendar's. */
+const EDGE_PX = 24;
 
 type DragData = { item: CalendarItem; from: IsoDate };
 type DropData = { date: IsoDate };
@@ -113,10 +123,14 @@ const announcements: Announcements = {
 /**
  * Monday-first weeks of days: a month, or 1, 2 or 4 weeks. Each day cell carries data-date; today has an ink ring and
  * aria-current="date". Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space
- * to drop); the "+" button and the item controls from renderItem are the non-drag path.
+ * to drop); the "+" button and the item controls from renderItem are the non-drag path. When the calendar is narrow
+ * (a phone), the month view is a grid of dots (a dot on each day with workouts) and the picked day's workouts show
+ * under it; a long press on one of those cards can still drop it on another day of the grid.
  */
-export function MonthCalendar({ weeks, month, label, layout, toolbar, days, today, renderItem, logHref, itemHref, onDropItem, onAddToDay, editableFrom }: Props) {
+export function MonthCalendar({ weeks, month, label, layout, toolbar, days, today, renderItem, logHref, itemHref, onDropItem, onAddToDay, editableFrom, onSwipe }: Props) {
   const dndId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<CalendarItem | null>(null);
   const sensors = useSensors(
     // Mouse: a drag starts after 4 px, so a plain click still opens the card. Touch: a long press picks the card up,
@@ -126,6 +140,13 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
     useSensor(KeyboardSensor),
   );
   const draggable = Boolean(onDropItem);
+  const narrow = useNarrow(rootRef, COMPACT_MAX_PX);
+  const compact = narrow && layout === 'month';
+  const [picked, setPicked] = useState<IsoDate | null>(null);
+  const first = weeks[0]![0]!;
+  const last = weeks.at(-1)!.at(-1)!;
+  const shownDay = today ? phoneCalendarDay({ start: first, end: last, month }, today, picked) : (picked ?? first);
+  const swipe = useSwipe(scrollRef, onSwipe, dragging !== null);
 
   function onDragStart(e: DragStartEvent) {
     setDragging((e.active.data.current as DragData | undefined)?.item ?? null);
@@ -137,9 +158,11 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
     if (!data || !target || data.from === target.date) return;
     onDropItem?.(data.item.id, target.date);
   }
+  const editableOn = (date: IsoDate) => editableFrom === undefined || date >= editableFrom;
+  const shownEditable = editableOn(shownDay);
 
   return (
-    <div className={cx(styles.calendar, layout === 'week' && styles.weekLayout)}>
+    <div ref={rootRef} className={cx(styles.calendar, layout === 'week' && styles.weekLayout, compact && styles.compact)} {...swipe}>
       {toolbar}
 
       <DndContext
@@ -151,7 +174,7 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragging(null)}
       >
-        <div className={styles.scroll}>
+        <div ref={scrollRef} className={styles.scroll}>
           <table className={styles.grid} aria-label={label}>
             <thead>
               <tr>
@@ -164,25 +187,39 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
               {weeks.map((week) => (
                 <tr key={week[0]}>
                   {week.map((date) => {
-                    const editable = editableFrom === undefined || date >= editableFrom;
+                    const editable = editableOn(date);
+                    const inMonth = month === null || date.startsWith(`${month}-`);
                     return (
                       <td key={date}>
-                        <DayCell
-                          date={date}
-                          items={days[date] ?? NONE}
-                          inMonth={month === null || date.startsWith(`${month}-`)}
-                          layout={layout}
-                          firstShown={date === weeks[0]![0]}
-                          isToday={date === today}
-                          draggable={draggable && editable}
-                          dragActive={dragging !== null}
-                          renderItem={renderItem}
-                          logHref={logHref}
-                          itemHref={itemHref}
-                          today={today}
-                          editable={editable}
-                          {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
-                        />
+                        {compact ? (
+                          <DotDay
+                            date={date}
+                            count={(days[date] ?? NONE).length}
+                            inMonth={inMonth}
+                            isToday={date === today}
+                            selected={date === shownDay}
+                            droppable={draggable && editable}
+                            dragActive={dragging !== null}
+                            onPick={() => setPicked(date)}
+                          />
+                        ) : (
+                          <DayCell
+                            date={date}
+                            items={days[date] ?? NONE}
+                            inMonth={inMonth}
+                            layout={layout}
+                            firstShown={date === first}
+                            isToday={date === today}
+                            draggable={draggable && editable}
+                            dragActive={dragging !== null}
+                            renderItem={renderItem}
+                            logHref={logHref}
+                            itemHref={itemHref}
+                            today={today}
+                            editable={editable}
+                            {...(onAddToDay && editable ? { onAdd: () => onAddToDay(date) } : {})}
+                          />
+                        )}
                       </td>
                     );
                   })}
@@ -191,11 +228,181 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
             </tbody>
           </table>
         </div>
+        {compact ? (
+          <DayPanel
+            date={shownDay}
+            items={days[shownDay] ?? NONE}
+            draggable={draggable && shownEditable}
+            editable={shownEditable}
+            renderItem={renderItem}
+            logHref={logHref}
+            itemHref={itemHref}
+            today={today}
+            {...(onAddToDay && shownEditable ? { onAdd: () => onAddToDay(shownDay) } : {})}
+          />
+        ) : null}
         <DragOverlay dropAnimation={null}>
           {dragging ? <span className={styles.overlayItem}>{dragging.name}</span> : null}
         </DragOverlay>
       </DndContext>
     </div>
+  );
+}
+
+/** True while the element is at most `maxPx` wide (false on the server and until it has been measured). */
+function useNarrow(ref: RefObject<HTMLElement | null>, maxPx: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setNarrow(entry.contentRect.width > 0 && entry.contentRect.width <= maxPx);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, maxPx]);
+  return narrow;
+}
+
+/**
+ * Touch handlers that turn a sideways swipe into onSwipe. Ignored: swipes that start on a workout card or its
+ * controls (a long press there drags the card), next to the screen's sides (the browser's own back swipe), with two
+ * fingers, during a drag, or on a grid that scrolls sideways itself.
+ */
+function useSwipe(scrollRef: RefObject<HTMLElement | null>, onSwipe: Props['onSwipe'], dragActive: boolean) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  if (!onSwipe) return {};
+  return {
+    onTouchStart: (event: TouchEvent<HTMLDivElement>) => {
+      start.current = null;
+      const touch = event.touches[0];
+      if (event.touches.length !== 1 || !touch) return;
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-calendar-card], [data-item-controls], dialog, input, select, textarea')) return;
+      if (touch.clientX < EDGE_PX || touch.clientX > window.innerWidth - EDGE_PX) return;
+      const scroller = scrollRef.current;
+      if (scroller && scroller.contains(target) && scroller.scrollWidth > scroller.clientWidth + 1) return;
+      start.current = { x: touch.clientX, y: touch.clientY };
+    },
+    onTouchMove: (event: TouchEvent<HTMLDivElement>) => {
+      if (event.touches.length !== 1) start.current = null;
+    },
+    onTouchEnd: (event: TouchEvent<HTMLDivElement>) => {
+      const from = start.current;
+      start.current = null;
+      const touch = event.changedTouches[0];
+      if (!from || !touch || dragActive) return;
+      const step = calendarSwipeStep({ dx: touch.clientX - from.x, dy: touch.clientY - from.y });
+      if (step !== 0) onSwipe(step);
+    },
+    onTouchCancel: () => {
+      start.current = null;
+    },
+  };
+}
+
+const workoutCount = (n: number) => (n === 0 ? 'no workouts' : n === 1 ? '1 workout' : `${n} workouts`);
+
+/** A phone month's day: its number, and a dot when it has workouts. A tap shows its workouts under the grid. */
+function DotDay({
+  date,
+  count,
+  inMonth,
+  isToday,
+  selected,
+  droppable,
+  dragActive,
+  onPick,
+}: {
+  date: IsoDate;
+  count: number;
+  inMonth: boolean;
+  isToday: boolean;
+  selected: boolean;
+  /** Takes a card dragged from the picked day's list under the grid. */
+  droppable: boolean;
+  dragActive: boolean;
+  onPick: () => void;
+}) {
+  const data: DropData = { date };
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${date}`, data, disabled: !droppable });
+  const drop = dragActive ? (droppable ? 'open' : 'locked') : undefined;
+  return (
+    <div
+      ref={setNodeRef}
+      data-date={date}
+      data-drop={drop}
+      className={cx(
+        styles.day,
+        styles.dotDay,
+        !inMonth && styles.otherMonth,
+        isToday && styles.today,
+        selected && styles.dotDaySelected,
+        drop === 'open' && styles.dropOpen,
+        drop === 'locked' && styles.dropLocked,
+        isOver && styles.dayOver,
+      )}
+    >
+      <button
+        type="button"
+        className={styles.dotButton}
+        aria-pressed={selected}
+        aria-current={isToday ? 'date' : undefined}
+        aria-label={`${formatLongDay(date)}: ${workoutCount(count)}`}
+        onClick={onPick}
+      >
+        <span className={styles.dayNumber} aria-hidden="true">{Number(date.slice(8))}</span>
+        <span className={cx(styles.dot, count === 0 && styles.dotEmpty)} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/** Under a phone month's dots: the picked day's workouts (as in a week view) and its "+". */
+function DayPanel({
+  date,
+  items,
+  draggable,
+  editable,
+  renderItem,
+  logHref,
+  itemHref,
+  today,
+  onAdd,
+}: {
+  date: IsoDate;
+  items: CalendarItem[];
+  draggable: boolean;
+  editable: boolean;
+  renderItem: Props['renderItem'];
+  logHref: Props['logHref'];
+  itemHref: Props['itemHref'];
+  today: IsoDate | null;
+  onAdd?: () => void;
+}) {
+  const headingId = useId();
+  return (
+    <section className={styles.dayPanel} aria-labelledby={headingId} data-day-panel={date}>
+      <h3 id={headingId} className={styles.dayPanelTitle} aria-live="polite">
+        {formatLongDay(date)}
+      </h3>
+      {items.length > 0 ? (
+        <DayItems
+          date={date}
+          items={items}
+          draggable={draggable}
+          editable={editable}
+          renderItem={renderItem}
+          logHref={logHref}
+          itemHref={itemHref}
+          today={today}
+          showPreview
+        />
+      ) : (
+        <p className={styles.dayPanelEmpty}>No workouts</p>
+      )}
+      {onAdd ? <AddButton date={date} onAdd={onAdd} /> : null}
+    </section>
   );
 }
 
@@ -264,51 +471,89 @@ function DayCell({
         </span>
       )}
       {items.length > 0 ? (
-        <ul className={styles.items}>
-          {items.map((item) =>
-            item.addedByClient && item.logId && logHref ? (
-              <ClientAddedItem key={item.id} name={item.name} href={logHref(item.logId)} />
-            ) : (
-            <DayItem
-              key={item.id}
-              item={item}
-              date={date}
-              // A done workout stays on the day it was done.
-              draggable={draggable && !item.logId}
-              lockedDone={draggable && Boolean(item.logId)}
-              editable={editable}
-              renderItem={renderItem}
-              logHref={logHref}
-              showPreview={layout === 'week'}
-              href={itemHref ? itemHref(item, editable) : null}
-              missed={item.logId === null && today !== null && date < today}
-              live={
-                item.liveSync !== undefined &&
-                today !== null &&
-                isLiveWorkout({ ...item.liveSync, date }, today)
-              }
-            />
-            ),
-          )}
-        </ul>
+        <DayItems
+          date={date}
+          items={items}
+          draggable={draggable}
+          editable={editable}
+          renderItem={renderItem}
+          logHref={logHref}
+          itemHref={itemHref}
+          today={today}
+          showPreview={layout === 'week'}
+        />
       ) : null}
-      {onAdd ? (
-        <button
-          type="button"
-          id={calendarAddDomId(date)}
-          className={styles.addButton}
-          aria-label={`Add workout to ${formatShortDay(date)}`}
-          title={`Add workout to ${formatShortDay(date)}`}
-          onClick={onAdd}
-        >
-          <span aria-hidden="true">+</span>
-          {/* The title is a mouse-only tooltip; this shows the same words to keyboard users on focus. */}
-          <span aria-hidden="true" className={styles.addTip}>
-            Add workout to {formatShortDay(date)}
-          </span>
-        </button>
-      ) : null}
+      {onAdd ? <AddButton date={date} onAdd={onAdd} /> : null}
     </div>
+  );
+}
+
+/** A day's workout cards (a grid cell's, or the phone month's picked day's). */
+function DayItems({
+  date,
+  items,
+  draggable,
+  editable,
+  renderItem,
+  logHref,
+  itemHref,
+  today,
+  showPreview,
+}: {
+  date: IsoDate;
+  items: CalendarItem[];
+  draggable: boolean;
+  editable: boolean;
+  renderItem: Props['renderItem'];
+  logHref: Props['logHref'];
+  itemHref: Props['itemHref'];
+  today: IsoDate | null;
+  showPreview: boolean;
+}) {
+  return (
+    <ul className={styles.items}>
+      {items.map((item) =>
+        item.addedByClient && item.logId && logHref ? (
+          <ClientAddedItem key={item.id} name={item.name} href={logHref(item.logId)} />
+        ) : (
+          <DayItem
+            key={item.id}
+            item={item}
+            date={date}
+            // A done workout stays on the day it was done.
+            draggable={draggable && !item.logId}
+            lockedDone={draggable && Boolean(item.logId)}
+            editable={editable}
+            renderItem={renderItem}
+            logHref={logHref}
+            showPreview={showPreview}
+            href={itemHref ? itemHref(item, editable) : null}
+            missed={item.logId === null && today !== null && date < today}
+            live={item.liveSync !== undefined && today !== null && isLiveWorkout({ ...item.liveSync, date }, today)}
+          />
+        ),
+      )}
+    </ul>
+  );
+}
+
+/** A day's "+": adds a workout to that day. */
+function AddButton({ date, onAdd }: { date: IsoDate; onAdd: () => void }) {
+  return (
+    <button
+      type="button"
+      id={calendarAddDomId(date)}
+      className={styles.addButton}
+      aria-label={`Add workout to ${formatShortDay(date)}`}
+      title={`Add workout to ${formatShortDay(date)}`}
+      onClick={onAdd}
+    >
+      <span aria-hidden="true">+</span>
+      {/* The title is a mouse-only tooltip; this shows the same words to keyboard users on focus. */}
+      <span aria-hidden="true" className={styles.addTip}>
+        Add workout to {formatShortDay(date)}
+      </span>
+    </button>
   );
 }
 
@@ -415,6 +660,7 @@ function DayItem({
     // A mouse and touch shortcut: the name button and the "⋯" menu stay the keyboard and screen-reader way in.
     <li
       ref={draggable ? setNodeRef : undefined}
+      data-calendar-card
       {...(draggable ? listeners : lockedHandlers)}
       className={cx(
         styles.item,
@@ -509,7 +755,7 @@ const keepPress = { onPointerDown: stop, onMouseDown: stop, onTouchStart: stop }
 /** A workout the client added on the phone: a different look, "Added by client", and the whole card opens the log. */
 function ClientAddedItem({ name, href }: { name: string; href: string }) {
   return (
-    <li className={cx(styles.item, styles.clientItem)}>
+    <li className={cx(styles.item, styles.clientItem)} data-calendar-card>
       <Link href={href} className={styles.clientLink} title={name} aria-label={`${name}, added by client: view the log`}>
         <span className={styles.itemName}>{name}</span>
         <span className={styles.clientTag}>

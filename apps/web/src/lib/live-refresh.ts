@@ -5,6 +5,8 @@
  * - Changes are debounced (`delayMs`, 500 ms by default): a client ticking off several sets quickly costs one
  *   re-render. A steady stream still refreshes at least every `maxWaitMs`.
  * - Nothing is refreshed while the tab is hidden; the page is marked stale and refreshes once it is visible again.
+ * - Nothing is refreshed while paused (`isPaused`, e.g. a dialog is open: a re-render could close a native picker in
+ *   it, or move what the coach is reading); the page refreshes once on `resume()` if anything changed meanwhile.
  * - After the channel drops (error, timeout, closed) and joins again, the page refreshes once, because changes made
  *   while disconnected were never sent.
  * - The first join refreshes only when the server render is older than `firstJoinGraceMs` (1 s): a change made
@@ -15,6 +17,8 @@ export type RefreshScheduler = {
   change(): void;
   /** The tab's visibility changed (call on `visibilitychange`). */
   visibility(): void;
+  /** Whatever paused refreshes has ended (e.g. a dialog closed): refresh now if something changed meanwhile. */
+  resume(): void;
   /** The Realtime channel reported a status (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED). */
   status(status: string): void;
   /** Stops for good (on unmount): clears the timer and ignores anything after. */
@@ -24,6 +28,8 @@ export type RefreshScheduler = {
 export type RefreshSchedulerOptions = {
   refresh: () => void;
   isVisible: () => boolean;
+  /** True while refreshes should wait (e.g. a dialog is open). Default: never. */
+  isPaused?: () => boolean;
   delayMs?: number | undefined;
   maxWaitMs?: number | undefined;
   /** When the server rendered the page (ms since epoch); omit to never refresh on the first join. */
@@ -43,6 +49,7 @@ const DROPPED = new Set(['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']);
 export function createRefreshScheduler({
   refresh,
   isVisible,
+  isPaused = () => false,
   delayMs = LIVE_REFRESH_DELAY_MS,
   maxWaitMs = LIVE_REFRESH_MAX_WAIT_MS,
   renderedAt,
@@ -58,6 +65,9 @@ export function createRefreshScheduler({
   let joined = false;
   let disposed = false;
 
+  // Visible and not paused.
+  const canRefresh = () => isVisible() && !isPaused();
+
   const cancel = () => {
     if (timer !== null) clearTimer(timer);
     timer = null;
@@ -66,7 +76,7 @@ export function createRefreshScheduler({
   const fire = () => {
     timer = null;
     if (disposed) return;
-    if (!isVisible()) {
+    if (!canRefresh()) {
       stale = true;
       return;
     }
@@ -76,7 +86,7 @@ export function createRefreshScheduler({
 
   const change = () => {
     if (disposed) return;
-    if (!isVisible()) {
+    if (!canRefresh()) {
       cancel();
       stale = true;
       return;
@@ -88,13 +98,16 @@ export function createRefreshScheduler({
     timer = setTimer(fire, Math.min(delayMs, left));
   };
 
+  const catchUp = () => {
+    if (disposed || !canRefresh() || !stale) return;
+    cancel();
+    fire();
+  };
+
   return {
     change,
-    visibility() {
-      if (disposed || !isVisible() || !stale) return;
-      cancel();
-      fire();
-    },
+    visibility: catchUp,
+    resume: catchUp,
     status(status) {
       if (disposed) return;
       if (DROPPED.has(status)) {
