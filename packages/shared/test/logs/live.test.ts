@@ -9,6 +9,7 @@ import {
   liveStats,
   orderTrainingTabs,
   tickNote,
+  upNext,
   whereTheyAre,
 } from '../../src/logs/live';
 import { fixtureSectionedWorkout, fixtureWorkout, uuid } from './fixture';
@@ -93,6 +94,54 @@ describe('whereTheyAre', () => {
     const choice = log.blocks[2]!;
     const picked = pickChoice(tickAll(tickAll(log, 0, 1), 1, 2), choice.id, choice.exercises[1]!.id, at(3));
     expect(whereTheyAre(picked)).toMatchObject({ blockIndex: 2, exerciseId: choice.exercises[1]!.id });
+  });
+});
+
+describe('upNext', () => {
+  it('lists the exercises after the one they are on, with the sets still to do', () => {
+    const log = fresh();
+    const [, a, b] = exercises(log);
+    expect(upNext(log)).toEqual([
+      { blockIndex: 1, exerciseId: a!.id, name: 'Bench press', setsLeft: 3, section: null },
+      { blockIndex: 1, exerciseId: b!.id, name: 'Bench press', setsLeft: 3, section: null },
+    ]);
+  });
+
+  it('skips the current exercise and anything already done, and counts only unticked sets', () => {
+    let log = tickAll(fresh(), 0, 1);
+    log = tick(log, 1, 0, 2); // A1
+    log = tick(log, 2, 0, 3); // B1
+    log = tick(log, 1, 1, 4); // A2: they are on the superset's A
+    const b = exercises(log)[2]!;
+    expect(upNext(log)).toEqual([{ blockIndex: 1, exerciseId: b.id, name: 'Bench press', setsLeft: 2, section: null }]);
+  });
+
+  it('wraps round to an exercise they skipped', () => {
+    let log = tick(fresh(), 0, 1, 1);
+    log = tick(log, 2, 0, 5); // jumped ahead to B
+    expect(upNext(log).map((n) => n.exerciseId)).toEqual([exercises(log)[0]!.id, exercises(log)[1]!.id]);
+  });
+
+  it('keeps to the limit and names the section', () => {
+    const log = startLogFromWorkout(fixtureSectionedWorkout(), uuid, T0);
+    const next = upNext(log, 2);
+    expect(next.map((n) => [n.blockIndex, n.section])).toEqual([
+      [1, 'Resistance Training'],
+      [2, 'Resistance Training'],
+    ]);
+  });
+
+  it('shows a pick-one group not picked yet as one entry naming every option', () => {
+    const log = startLogFromWorkout(fixtureSectionedWorkout(), uuid, T0);
+    const choice = upNext(log).find((n) => n.blockIndex === 2)!;
+    expect(choice).toEqual({ blockIndex: 2, exerciseId: null, name: 'Exercise or Exercise', setsLeft: 3, section: 'Resistance Training' });
+  });
+
+  it('is empty once every set is ticked, and when only the current exercise is left', () => {
+    const all = [0, 1, 2].reduce((l, i) => tickAll(l, i, i), fresh());
+    expect(upNext(all)).toEqual([]);
+    const lastOne = [0, 1].reduce((l, i) => tickAll(l, i, i), fresh());
+    expect(upNext(lastOne)).toEqual([]);
   });
 });
 
