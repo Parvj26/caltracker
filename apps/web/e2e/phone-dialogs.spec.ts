@@ -32,7 +32,10 @@ async function expectTappable(control: Locator, { wide = false } = {}) {
   if (wide) expect(box.width, 'tap target width').toBeGreaterThanOrEqual(44);
 }
 
-test.describe('iPhone 13 (390 x 844)', () => {
+// The iPhone 13's screen is 390 x 844, but Safari's bars leave a 390 x 664 page area (Playwright's iPhone 13 viewport).
+const IPHONE13_VIEWPORT = iphone13.viewport;
+
+test.describe('iPhone 13 (390 x 664 page area)', () => {
   test.use({ ...iphone13 });
 
   test('Assign fills the screen: the client list gets the room and the buttons stay at the bottom', async ({ page }) => {
@@ -44,9 +47,12 @@ test.describe('iPhone 13 (390 x 844)', () => {
     const dialog = page.getByRole('dialog', { name: `Assign ${name}` });
     await expect(dialog.getByRole('list', { name: 'Clients' })).toBeVisible();
 
+    // Edge to edge: the window's own 640 px / 100dvh - 32 px cap (calendar.module.css) would leave a gap.
     const box = (await dialog.boundingBox())!;
-    expect(box.width).toBe(390);
-    expect(Math.round(box.height)).toBe(844);
+    expect(box.x).toBe(0);
+    expect(box.y).toBe(0);
+    expect(box.width).toBe(IPHONE13_VIEWPORT.width);
+    expect(Math.round(box.height)).toBe(IPHONE13_VIEWPORT.height);
     // At least four names' worth of list (it showed about two before).
     expect((await dialog.getByRole('list', { name: 'Clients' }).boundingBox())!.height).toBeGreaterThanOrEqual(176);
     for (const button of [dialog.getByRole('button', { name: 'Cancel' }), dialog.getByRole('button', { name: 'Assign', exact: true })]) {
