@@ -1,8 +1,21 @@
 import { devices, expect, test, type Page } from '@playwright/test';
-import { signInAsCoach } from './helpers';
+import { demoWorkspace, seedLibraryWorkout, unique } from './assign-helpers';
+import { serviceClient, signInAsCoach } from './helpers';
 
 // Phone fixes, batch 1: the Add exercises window, the floating Menu button, the Workouts list and the message box.
-// Chromium with iPhone sizes and touch (the browser can't be chosen per spec). Read-only: nothing is saved.
+// Chromium with iPhone sizes and touch (the browser can't be chosen per spec). The tests save nothing; the workout
+// below exists only so the Workouts list is never empty (each CI shard starts from a fresh database).
+
+const admin = serviceClient();
+let workoutId: string | undefined;
+
+test.beforeAll(async () => {
+  workoutId = await seedLibraryWorkout(admin, await demoWorkspace(admin), `Phone list ${unique()}`);
+});
+
+test.afterAll(async () => {
+  if (workoutId) await admin.from('workouts').delete().eq('id', workoutId);
+});
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
 const SE = { width: 375, height: 667 };
