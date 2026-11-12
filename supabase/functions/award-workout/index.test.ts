@@ -136,6 +136,15 @@ async function stickers(clientId: string) {
   if (error) throw error;
   return data;
 }
+async function queue(clientId: string) {
+  const { data, error } = await admin
+    .from('award_bonus_queue')
+    .select('kind, sticker_key, value, earned_log_id')
+    .eq('client_id', clientId)
+    .order('seq');
+  if (error) throw error;
+  return data;
+}
 async function records(clientId: string) {
   const { data, error } = await admin
     .from('personal_records')
@@ -232,8 +241,9 @@ t('the same log twice gives one award and an identical response', async () => {
   // A new client: the animal is the seeded pick for this log id, the same one the phone previews.
   const pick = pickLadderAnimal(3000, [], logId)!;
   assertEquals(a.ladder, { key: pick.sticker.key, multiple: pick.multiple, isNew: true, count: 1, shiny: false });
+  // One bonus per workout: the first-workout milestone; the first landmark waits for the next workout.
   assertEquals(a.milestone, 1);
-  assertEquals(a.landmarks, ['chichen-itza']);
+  assertEquals(a.landmarks, []);
   assertEquals(a.prs, [], 'the first log of an exercise is a baseline');
 
   // A second call, even one whose rolls would all hit, returns the stored result.
@@ -248,8 +258,9 @@ t('the same log twice gives one award and an identical response', async () => {
   const owned = await stickers(client.id);
   assertEquals(
     owned.map((s) => [s.sticker_key, s.count]),
-    [['chichen-itza', 1], [pick.sticker.key, 1]].sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
+    [[pick.sticker.key, 1]],
   );
+  assertEquals((await queue(client.id)).map((q) => [q.kind, q.sticker_key]), [['landmark', 'chichen-itza']]);
   const { data: stats } = await admin.from('client_stats').select('workouts, streak, journey_week, streak_week').eq('client_id', client.id).single();
   const { data: log } = await admin.from('workout_logs').select('finished_at').eq('id', logId).single();
   // The streak's last week is the Monday of the workout's week (the profile's zone is UTC by default).
@@ -276,6 +287,13 @@ t('injected rolls are deterministic: 0 hits shiny and a drop, 0.5 hits neither',
   const { ws, exerciseId } = await makeWorkspace();
   const lucky = await addClient(ws);
   const plain = await addClient(ws);
+  // A drop is only rolled when there is no other bonus: the first workout's milestone and the landmark it queued
+  // are handed out first.
+  const handler = handlerWith(() => 0.5);
+  for (const minutesAgo of [40, 30]) {
+    const { logId } = await makeLog(ws, lucky.id, exerciseId, five(60), { minutesAgo });
+    assertEquals((await call(handler, { logId }, asUser(lucky.token))).status, 200);
+  }
   const l1 = await makeLog(ws, lucky.id, exerciseId, five(60));
   const l2 = await makeLog(ws, plain.id, exerciseId, five(60));
   const a = (await (await call(handlerWith(() => 0), { logId: l1.logId }, asUser(lucky.token))).json()) as AwardResult;
@@ -510,4 +528,49 @@ t('a client the coach removed gets 403 not_a_client and no award', async () => {
   assertEquals((await res.json()).hint, 'not_a_client');
   assertEquals((await call(handlerWith(), { logId }, { 'x-award-secret': SECRET })).status, 403);
   assertEquals(await awardRows(logId), []);
+});
+
+t('one bonus per workout: the rest wait and come one per later workout, highest priority first; a retry or a recompute changes nothing', async () => {
+  const { ws, coach, exerciseId } = await makeWorkspace();
+  const client = await addClient(ws);
+  const handler = handlerWith(() => 0.5);
+  const award = async (logId: string, token = client.token, body: Record<string, unknown> = {}) => {
+    const res = await call(handler, { logId, ...body }, asUser(token));
+    assertEquals(res.status, 200);
+    return (await res.json()) as AwardResult;
+  };
+  const bonuses = (a: AwardResult) => [
+    ...(a.milestone !== null ? [`milestone:${a.milestone}`] : []),
+    ...a.landmarks.map((k) => `landmark:${k}`),
+    ...a.rare.map((k) => `rare:${k}`),
+    ...(a.drop ? [`drop:${a.drop}`] : []),
+  ];
+
+  // Workout 1 earns the milestone and the first landmark: the milestone now, the landmark waits.
+  const w1 = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 30 });
+  const a1 = await award(w1.logId);
+  assert(a1.ladder, 'every workout still gets its ladder animal');
+  assertEquals(bonuses(a1), ['milestone:1']);
+  assertEquals((await queue(client.id)).map((q) => q.sticker_key), ['chichen-itza']);
+
+  // The same workout again (a retry, a coach correction, a re-finish) neither gives nor queues anything again.
+  assertEquals(await award(w1.logId), a1);
+  await award(w1.logId, coach.token, { recompute: true });
+  const { error } = await admin.from('workout_logs').update({ revision: 3 }).eq('id', w1.logId);
+  if (error) throw error;
+  assertEquals(bonuses(await award(w1.logId)), ['milestone:1']);
+  assertEquals((await queue(client.id)).map((q) => q.sticker_key), ['chichen-itza']);
+
+  // Workout 2 earns nothing new: the waiting landmark is handed out, once.
+  const w2 = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 20 });
+  const a2 = await award(w2.logId);
+  assert(a2.ladder);
+  assertEquals(bonuses(a2), ['landmark:chichen-itza']);
+  assertEquals(await queue(client.id), []);
+  const owned = await stickers(client.id);
+  assertEquals(owned.find((s) => s.sticker_key === 'chichen-itza')?.count, 1, 'in the sticker book once it is given');
+
+  // Workout 3: nothing to give, no lucky roll.
+  const w3 = await makeLog(ws, client.id, exerciseId, five(60), { minutesAgo: 10 });
+  assertEquals(bonuses(await award(w3.logId)), []);
 });

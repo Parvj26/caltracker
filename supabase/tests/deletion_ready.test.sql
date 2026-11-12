@@ -22,7 +22,7 @@ select is(
   ) x),
   array[
     'admin_users(created_by)>auth.users:n', 'admin_users(user_id)>auth.users:c',
-    'awards(client_id)>auth.users:c',
+    'award_bonus_queue(client_id)>auth.users:c', 'awards(client_id)>auth.users:c',
     'body_measurements(client_id)>auth.users:c', 'body_measurements(entered_by)>auth.users:n',
     'client_documents(client_id)>auth.users:c', 'client_documents(uploaded_by)>auth.users:n',
     'client_goals(client_id)>auth.users:c',
@@ -151,6 +151,8 @@ insert into public.workout_log_comments (log_id, workspace_id, client_id, author
 values (:'vic_log', :'ws', :'vic', :'coach', 'Great work');
 insert into public.awards (log_id, client_id, workspace_id, result) values (:'vic_log', :'vic', :'ws', '{}');
 insert into public.sticker_awards (client_id, workspace_id, sticker_key, first_log_id) values (:'vic', :'ws', 'cat', :'vic_log');
+insert into public.award_bonus_queue (client_id, workspace_id, earned_log_id, kind, sticker_key, earned_at)
+values (:'vic', :'ws', :'vic_log', 'landmark', 'petra', now());
 insert into public.client_stats (client_id, workspace_id, workouts) values (:'vic', :'ws', 1);
 insert into public.personal_records (client_id, workspace_id, exercise_id, kind, value_kg, achieved_at, log_id)
 values (:'vic', :'ws', :'coach_ex', 'heaviest', 60, now(), :'vic_log');

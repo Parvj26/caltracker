@@ -2,11 +2,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   awardContext,
   awardedStickers,
-  computeAward,
   logRowToDoc,
+  planAward,
   safeTimeZone,
   type AwardResult,
   type LogTreeRow,
+  type QueuedBonus,
   type Rng,
 } from '@caltracker/shared';
 import { withErrorReporting } from '../_shared/report-error.ts';
@@ -21,6 +22,9 @@ import { withErrorReporting } from '../_shared/report-error.ts';
 //   - a coach correction (web, Task 7): { logId, recompute: true }. That rewrites the log's PRs, the client's
 //     bests and stats from the logs, and never rolls again. A workout keeps its ladder animal forever (only its
 //     multiple follows the corrected volume); one with no animal yet may get one. Never a second one per log.
+// At most one bonus sticker per workout (the shared planAward): the others the workout earned wait in
+// award_bonus_queue and are handed out one per later finished workout. Only a first award changes the queue
+// (apply_award ignores it on a retry, a recompute or a re-finish), so a workout never hands out or queues twice.
 // The award stored includes the workout's volume (volumeKg, from the shared logVolumeKg), so a shared workout card can
 // say how much was lifted without the database adding anything up; a recompute refreshes it.
 // A reopened and re-finished log (its revision changed since the award) is recomputed the same way on the next
@@ -55,6 +59,9 @@ type Inputs = {
   /** The ladder animal of each of the client's awards in this workspace, with its log's finish time. */
   ladder_awards: Array<{ log_id: string; finished_at: string; key: string }>;
   logs: LogTreeRow[];
+  /** The client's bonuses waiting to be given in this workspace, and their fingerprint for apply_award. */
+  bonus_queue?: Array<{ id: string; earned_log_id: string; kind: QueuedBonus['kind']; key: string | null; value: number | null; earned_at: string; seq: number }>;
+  bonus_queue_version?: string;
 };
 type Applied = { status: 'existing' | 'awarded' | 'recomputed'; result: AwardResult } | { status: 'conflict' };
 
@@ -157,7 +164,17 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
       const owned = new Map(inputs.owned.map((o) => [o.key, { count: o.count, shiny: o.shiny }]));
       // An award already stored keeps its animal forever; apply_award and the awards trigger hold that too.
       const keepLadder = inputs.award ? (inputs.award.ladder?.key ?? null) : null;
-      const award = computeAward({ ...ctx, owned, rng, keepLadder });
+      const bonusQueue: QueuedBonus[] = (inputs.bonus_queue ?? []).map((q) => ({
+        id: q.id,
+        earnedLogId: q.earned_log_id,
+        kind: q.kind,
+        key: q.key,
+        value: q.value,
+        earnedAt: q.earned_at,
+        seq: q.seq,
+      }));
+      const plan = planAward({ ...ctx, owned, rng, keepLadder, bonusQueue });
+      const award = plan.award;
 
       const { data: applied, error: applyError } = await admin.rpc('apply_award', {
         p_log_id: logId,
@@ -167,6 +184,12 @@ export function createHandler({ supabaseAdmin: admin, cronSecret, rng = cryptoRn
           owned_total: inputs.owned_total,
           award,
           stickers: awardedStickers(award),
+          bonus: {
+            queue_version: inputs.bonus_queue_version ?? '',
+            from_queue: plan.fromQueue,
+            discard: plan.discard,
+            enqueue: plan.enqueue,
+          },
           records: ctx.records.map((r) => ({
             exercise_id: r.exerciseId,
             kind: r.kind,

@@ -37,7 +37,7 @@ env:
 - extendedWaitUntil:
     visible: 'NEW for your zoo book'
     timeout: 10000
-# Then the week-1 landmark and "Workout #1" (a first workout of a fresh streak); step through them all.
+# Then "Workout #1" (one bonus per workout: the week-1 landmark waits for the next one); step through them all.
 - runFlow: helpers/reveal-through.yaml
 # Summary: the sticker row with the count.
 - extendedWaitUntil:

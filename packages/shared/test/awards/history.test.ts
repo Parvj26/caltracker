@@ -148,7 +148,8 @@ describe('awardContext', () => {
     const award = computeAward({ ...c, owned: new Map(), rng: () => 0.5 });
     expect(award.prs).toEqual([]);
     expect(award.milestone).toBe(1);
-    expect(award.landmarks).toEqual(['chichen-itza']);
+    // One bonus per workout: the first landmark waits for the next workout (planAward's enqueue).
+    expect(award.landmarks).toEqual([]);
   });
   it('hands over the ladder animals of the logs finished before this one, oldest first', () => {
     const awards = [
