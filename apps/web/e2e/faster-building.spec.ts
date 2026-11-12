@@ -96,6 +96,8 @@ test('duplicate a workout from its page and from the list', async ({ page }) => 
 });
 
 test('duplicate a program, then copy and repeat a week', async ({ page }) => {
+  // Builds a workout and a 3-week program, then duplicates, copies and reloads: about 28 s on CI, too close to 30.
+  test.slow();
   const workout = `Week copy ${unique()}`;
   const program = `Copy weeks ${unique()}`;
   created.workouts.push(workout);

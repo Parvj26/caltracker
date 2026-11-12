@@ -15,11 +15,16 @@ import { failureCode } from '@/lib/action-errors';
 import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, rememberFavourite, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { Button, ErrorText } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
 import { FilterChips, hasActiveFilters } from './filter-chips';
 import { Preview } from './preview';
 import { ResultList } from './result-list';
 import styles from './exercise-search.module.css';
 import { track } from '@/lib/analytics/client';
+import { useMediaQuery } from '@/lib/use-media-query';
+
+/** Matches the CSS breakpoint below which the preview opens over the list instead of beside it. */
+const NARROW_QUERY = '(max-width: 900px)';
 
 type Props = {
   mode: 'pick-one' | 'pick-many' | 'browse';
@@ -157,6 +162,10 @@ export function SearchPanel({
   }, [activeId, supabase]);
 
   const many = mode === 'pick-many';
+  // Phones and iPad portrait: the preview would cover the list, so picking only ticks a row (or, picking one, marks it)
+  // and the row's "i" button opens the details. Browsing still opens the details on a tap.
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const tapOnlyPicks = narrow && mode !== 'browse';
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected]);
   const imageUrl = (path: string) => exerciseImageUrl(supabase, path);
 
@@ -168,7 +177,7 @@ export function SearchPanel({
 
   function activate(id: string) {
     setHighlightId(id);
-    setPreviewOpen(true);
+    if (!tapOnlyPicks) setPreviewOpen(true);
     const row = hits.find((h) => h.row.id === id)?.row;
     if (many && row) toggleSelected(row);
   }
@@ -245,7 +254,7 @@ export function SearchPanel({
   return (
     <div className={styles.panel}>
       <label className={styles.searchLabel}>
-        <span>Search exercises</span>
+        <span className={styles.searchLabelText}>Search exercises</span>
         <input
           type="text"
           ref={searchRef}
@@ -261,6 +270,7 @@ export function SearchPanel({
           autoCapitalize="off"
           spellCheck={false}
           className={styles.input}
+          placeholder="Search exercises…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -270,7 +280,7 @@ export function SearchPanel({
         />
       </label>
       {many ? (
-        <p id={hintId} className={styles.caption}>
+        <p id={hintId} className={cx(styles.caption, styles.hint)}>
           {hint}
           {selected.length >= max ? ` You can pick at most ${max}.` : ''}
         </p>
@@ -319,12 +329,21 @@ export function SearchPanel({
               listId={listId}
               hits={hits}
               shown={shown}
-              activeId={activeId}
+              // Ticking on a phone: the tick shows what is picked, so the keyboard highlight would only look like a pick.
+              activeId={tapOnlyPicks && many ? undefined : activeId}
               selectedIds={many ? selectedIds : null}
               favourites={favourites}
               imageUrl={imageUrl}
               optionId={optionId}
               onActivate={activate}
+              {...(tapOnlyPicks
+                ? {
+                    onDetails: (id: string) => {
+                      setHighlightId(id);
+                      setPreviewOpen(true);
+                    },
+                  }
+                : {})}
               onToggleFavourite={(id) => void toggleStar(id)}
               onShowMore={() => setShown((n) => n + PAGE_SIZE)}
             />
@@ -350,12 +369,17 @@ export function SearchPanel({
         </section>
       </div>
 
-      {onCancel || many ? (
+      {onCancel || many || tapOnlyPicks ? (
         <div className={styles.footer}>
           {many ? footerExtra : null}
-          {onCancel ? <Button variant="secondary" onClick={onCancel}>Cancel</Button> : null}
+          {onCancel ? <Button variant="secondary" className={styles.cancel} onClick={onCancel}>Cancel</Button> : null}
+          {tapOnlyPicks && mode === 'pick-one' && !previewOpen ? (
+            <Button className={cx(styles.footerAdd, styles.footerPickOne)} disabled={!active} onClick={() => active && primary(active)}>
+              Add to workout
+            </Button>
+          ) : null}
           {many ? (
-            <Button disabled={selected.length < min} onClick={() => onPick?.(selected)} data-ph-capture-attribute-label="workout_exercise_add_picked">
+            <Button className={styles.footerAdd} disabled={selected.length < min} onClick={() => onPick?.(selected)} data-ph-capture-attribute-label="workout_exercise_add_picked">
               {selected.length < min
                 ? `Pick at least ${min} ${min === 1 ? 'exercise' : 'exercises'}`
                 : `Add ${selected.length} ${selected.length === 1 ? 'exercise' : 'exercises'}`}

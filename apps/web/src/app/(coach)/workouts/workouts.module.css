@@ -35,6 +35,31 @@
 .numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
+/* iPhone: each workout is a card (name, then exercises and date, then Assign and Duplicate), never wider than the
+   screen. iPad and desktop keep the table. */
+.phoneOnly { display: none; }
+@media (max-width: 599.98px) {
+  .phoneOnly { display: inline; }
+  .listCard { padding: var(--ct-space-1) var(--ct-space-4); }
+  .table, .table tbody { display: block; }
+  .table thead { display: none; }
+  .table tr {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0 var(--ct-space-3);
+    padding: var(--ct-space-2) 0 var(--ct-space-3);
+    border-top: var(--ct-border-width-card) solid var(--ct-border);
+  }
+  .table tbody tr:first-child { border-top: 0; }
+  .table td { display: block; padding: 0; border-top: 0; }
+  .table td:first-child { grid-column: 1 / -1; }
+  .table td:nth-child(2), .table td:nth-child(3) { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+  .table td:last-child { grid-column: 1 / -1; padding-top: var(--ct-space-2); }
+  .nameLink { overflow-wrap: anywhere; }
+  .rowActions { display: flex; }
+}
+
 /* ---------- Delete dialog ---------- */
 .dialog {
   width: min(440px, calc(100vw - 32px));

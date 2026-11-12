@@ -15,6 +15,8 @@ type Props = {
   imageUrl: (path: string) => string;
   optionId: (id: string) => string;
   onActivate: (id: string) => void;
+  /** Phones: a tap on a row only picks it, and this small "i" button beside it opens the details. */
+  onDetails?: (id: string) => void;
   onToggleFavourite: (id: string) => void;
   onShowMore: () => void;
 };
@@ -34,7 +36,7 @@ function Highlighted({ name, ranges }: { name: string; ranges: Array<[number, nu
 }
 
 export function ResultList({
-  listId, hits, shown, activeId, selectedIds, favourites, imageUrl, optionId, onActivate, onToggleFavourite, onShowMore,
+  listId, hits, shown, activeId, selectedIds, favourites, imageUrl, optionId, onActivate, onDetails, onToggleFavourite, onShowMore,
 }: Props) {
   const visible = hits.slice(0, shown);
   return (
@@ -65,6 +67,17 @@ export function ResultList({
                   </span>
                 </span>
               </div>
+              {onDetails ? (
+                <button
+                  type="button"
+                  className={styles.info}
+                  aria-label={`Details for ${row.name}`}
+                  data-ph-capture-attribute-label="workout_exercise_details"
+                  onClick={() => onDetails(row.id)}
+                >
+                  <span aria-hidden="true">i</span>
+                </button>
+              ) : null}
               <FavouriteButton name={row.name} favourite={favourites.has(row.id)} onToggle={() => onToggleFavourite(row.id)} />
             </li>
           );

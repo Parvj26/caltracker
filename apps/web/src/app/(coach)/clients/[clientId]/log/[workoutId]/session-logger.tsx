@@ -672,7 +672,8 @@ export function SessionLogger({
   const locked = log.status !== 'in_progress' || save.kind === 'final' || handingBack;
 
   return (
-    <div className={styles.session}>
+    // data-no-menu-button: on an iPhone the floating Menu button would sit on Previous / Next; Back leaves the screen.
+    <div className={styles.session} data-no-menu-button="">
       <header className={styles.sessionHead}>
         <div>
           <h1 className={styles.title}>

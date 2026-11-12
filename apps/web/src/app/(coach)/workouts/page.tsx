@@ -83,12 +83,16 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
                       {w.name}
                     </Link>
                   </td>
-                  <td className={styles.numeric}>{w.exercises}</td>
                   <td className={styles.numeric}>
+                    {w.exercises}
+                    <span className={styles.phoneOnly}>{w.exercises === 1 ? ' exercise' : ' exercises'}</span>
+                  </td>
+                  <td className={styles.numeric}>
+                    <span className={styles.phoneOnly}>Updated </span>
                     <LocalDate iso={w.updatedAt} />
                   </td>
                   <td>
-                    <div className={assignStyles.actions}>
+                    <div className={`${assignStyles.actions} ${styles.rowActions}`}>
                       <AssignButton kind="workout" id={w.id} name={w.name} compact />
                       <DuplicateButton kind="workout" id={w.id} name={w.name} compact />
                     </div>

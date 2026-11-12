@@ -53,7 +53,12 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
 
   return (
     <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
+      <div className={styles.dialogHead}>
+        <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
+        <button type="button" className={styles.close} aria-label="Close picker" onClick={() => dialogRef.current?.close()}>
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
       <SearchPanel
         mode={multiple ? 'pick-many' : 'pick-one'}
         workspaceId={workspaceId}
