@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { IsoDate } from '@caltracker/shared';
 import { formatDayMonth, formatShortDay } from '@/components/calendar/format';
@@ -10,8 +11,12 @@ import type { AssignmentSummary } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
+const assignmentText = (a: AssignmentSummary) => `${a.programName} · ${formatDayMonth(a.startDate)} – ${formatDayMonth(a.endDate)}`;
 
-/** The client's assigned programs, each with "Remove from calendar" (from the coach's today on). */
+/**
+ * The client's assigned programs: each row opens its program, with "Remove from calendar" (from the coach's today on)
+ * beside it.
+ */
 export function AssignmentsPanel({
   assignments,
   today,
@@ -37,9 +42,18 @@ export function AssignmentsPanel({
           <ul className={styles.assignments}>
             {assignments.map((a) => (
               <li key={a.id} className={styles.assignment}>
-                <span className={styles.assignmentName}>
-                  {`${a.programName} · ${formatDayMonth(a.startDate)} – ${formatDayMonth(a.endDate)}`}
-                </span>
+                {a.programId ? (
+                  // The row opens the program; "Remove from calendar" stays its own button beside it.
+                  <Link href={`/programs/${a.programId}`} className={styles.assignmentLink}>
+                    <span className={styles.assignmentName}>{assignmentText(a)}</span>
+                    <span aria-hidden="true" className={styles.assignmentChevron}>›</span>
+                  </Link>
+                ) : (
+                  // Its program has been deleted since: nothing to open.
+                  <span className={styles.assignmentLink}>
+                    <span className={styles.assignmentName}>{assignmentText(a)}</span>
+                  </span>
+                )}
                 {readOnly ? null : (
                   <Button
                     variant="secondary"

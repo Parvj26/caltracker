@@ -28,6 +28,8 @@ import styles from '@/components/calendar/calendar.module.css';
 export type CalendarEntry = CalendarItem & { date: IsoDate };
 export type AssignmentSummary = {
   id: string;
+  /** The program it was copied from, or null once that program has been deleted. */
+  programId: string | null;
   programName: string;
   startDate: IsoDate;
   endDate: IsoDate;

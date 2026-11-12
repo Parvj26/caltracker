@@ -289,7 +289,23 @@
   border-top: var(--ct-border-width-card) solid var(--ct-border);
 }
 .assignment:first-child { border-top: 0; }
-.assignmentName { flex: 1 1 240px; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+/* The row's name and dates open the program: a full-height row, not a button; "Remove from calendar" sits beside it. */
+.assignmentLink {
+  display: flex;
+  flex: 1 1 240px;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-width: 0;
+  min-height: var(--ct-tap-min);
+  margin: 0 calc(-1 * var(--ct-space-2));
+  padding: 0 var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-surface); }
+.assignmentName { flex: 1; min-width: 0; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.assignmentChevron { flex: none; font-size: var(--ct-size-section-heading); color: var(--ct-ink-muted); }
 
 /* ---------- Dialogs ---------- */
 .dialog {
