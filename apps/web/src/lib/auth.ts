@@ -22,22 +22,26 @@ export type CoachContext = {
  * Signed-out visitors go to /sign-in. Signed-in users without an owner/staff membership go to
  * /not-a-coach, which shows "This dashboard is for coaches. Clients use the CalTracker app."
  * V1 has one coach membership per user; if there are several, the earliest created wins.
- * Wrapped in cache() so one request queries once.
+ * Wrapped in cache() so one request (layout, page and tab title) checks and queries once.
  */
 export const requireCoach = cache(async (): Promise<CoachContext> => {
   const supabase = await createServerSupabase();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect('/sign-in');
+  // The token's signature is verified locally (getClaims, with the project's public signing key), not with a round
+  // trip to Supabase Auth: the proxy has already refreshed the session, and every query below is still checked by
+  // the database's row-level security with this same token.
+  const { data: auth } = await supabase.auth.getClaims();
+  const user = auth?.claims;
+  if (!user?.sub) redirect('/sign-in');
 
   const [{ data, error }, profile] = await Promise.all([
     supabase
       .from('workspace_members')
       .select('workspace_id, workspaces(name)')
-      .eq('user_id', auth.user.id)
+      .eq('user_id', user.sub)
       .in('role', ['owner', 'staff'])
       .order('created_at', { ascending: true })
       .limit(1),
-    supabase.from('profiles').select('first_name, last_name, units, bio, avatar_path, updated_at').eq('id', auth.user.id).maybeSingle(),
+    supabase.from('profiles').select('first_name, last_name, units, bio, avatar_path, updated_at').eq('id', user.sub).maybeSingle(),
   ]);
   if (error) throw new Error(`Could not load membership: ${error.message}`);
   if (profile.error) throw new Error(`Could not load profile: ${profile.error.message}`);
@@ -45,8 +49,8 @@ export const requireCoach = cache(async (): Promise<CoachContext> => {
   const row = data[0];
   if (!row) redirect('/not-a-coach');
   return {
-    userId: auth.user.id,
-    email: auth.user.email ?? '',
+    userId: user.sub,
+    email: user.email ?? '',
     firstName: profile.data?.first_name ?? '',
     lastName: profile.data?.last_name ?? '',
     workspaceId: row.workspace_id,

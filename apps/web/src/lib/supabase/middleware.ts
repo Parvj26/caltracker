@@ -20,11 +20,15 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   );
 
-  const { data } = await supabase.auth.getUser();
+  // getClaims refreshes an expired session (that's what writes the new cookies above) and verifies the token's
+  // signature locally with the project's public signing key, so a signed-in page load makes no extra trip to
+  // Supabase Auth. (getUser asked the Auth server every time.) Data access is still checked by the database's
+  // row-level security on every query, which is the real guard.
+  const { data } = await supabase.auth.getClaims();
   const path = request.nextUrl.pathname;
   const isPublic = path === '/sign-in' || path === '/forgot-password' || path === '/auth/confirm' || path.startsWith('/invite/');
 
-  if (!data.user && !isPublic) {
+  if (!data?.claims && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
     url.search = '';
