@@ -92,7 +92,9 @@ async function seed() {
     { conversation_id: conv.data.id, workspace_id: ws.id, sender_id: client.id, body: 'Hi Luis' },
   ]);
   if (msg.error) throw msg.error;
-  const meal = await admin.from('meals').insert({ workspace_id: ws.id, client_id: client.id, eaten_on: '2026-11-10', calories: 500 });
+  // eaten_on must be within a day of eaten_at (now), so use today's UTC date rather than a fixed one.
+  const today = new Date().toISOString().slice(0, 10);
+  const meal = await admin.from('meals').insert({ workspace_id: ws.id, client_id: client.id, eaten_on: today, calories: 500 });
   if (meal.error) throw meal.error;
 
   const files = [
