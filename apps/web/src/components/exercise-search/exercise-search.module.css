@@ -10,6 +10,19 @@
 }
 .dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
 .dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.dialogHead { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.close {
+  flex: none;
+  min-width: var(--ct-tap-min);
+  min-height: var(--ct-tap-min);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 
 .panel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); }
@@ -101,6 +114,28 @@
   background: var(--ct-bg);
   font-weight: var(--ct-weight-button);
 }
+.info {
+  flex: none;
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.info span {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-weight: var(--ct-weight-button);
+}
 .star {
   flex: none;
   min-height: var(--ct-tap-min);
@@ -167,6 +202,43 @@
   .split[data-preview] .previewPane { display: block; }
   .split[data-preview] .listPane { display: none; }
   .back { display: inline-flex; align-items: center; }
+}
+/* Wide screens show the preview beside the list, with its own Add button. */
+@media (min-width: 900.02px) { .footerPickOne { display: none; } }
+
+/* iPhone: the picker fills the screen and the list gets the room. One sideways-scrolling row of filters, the hint and
+   Cancel go (the x closes), picks show as one scrolling row, and the Add button stays at the bottom. */
+@media (max-width: 640px) {
+  .dialog {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+  }
+  .dialog[open] { gap: var(--ct-space-2); }
+  .panel { gap: var(--ct-space-2); }
+  .searchLabelText, .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .filters, .picked {
+    flex-wrap: nowrap;
+    margin: 0 calc(-1 * var(--ct-space-4));
+    padding: 0 var(--ct-space-4);
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .filters::-webkit-scrollbar, .picked::-webkit-scrollbar { display: none; }
+  .filter, .picked li { flex: none; white-space: nowrap; }
+  .filterGap { flex: none; width: var(--ct-space-1); }
+  .row { padding: var(--ct-space-1) var(--ct-space-2); gap: var(--ct-space-2); }
+  .thumb { width: 40px; height: 40px; }
+  .row .tags { flex-wrap: nowrap; overflow: hidden; }
+  .footer { flex-wrap: wrap; align-items: center; justify-content: space-between; padding-top: var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+  .footer .cancel { display: none; }
+  .footerAdd { flex: 1 1 180px; min-width: 0; }
 }
 
 .placeholder { display: inline-flex; align-items: center; justify-content: center; background: var(--ct-surface); color: var(--ct-ink-muted); }
