@@ -15,9 +15,11 @@ import {
   needsPick,
   sectionRuns,
   tickNote,
+  upNext,
   whereTheyAre,
   type LogBlockDoc,
   type LogExerciseDoc,
+  type UpNextItem,
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
@@ -68,6 +70,45 @@ function useJustTicked(log: WorkoutLogDoc): ReadonlySet<string> {
   return flash;
 }
 
+/**
+ * Where they are: "<NAME> IS HERE" beside the exercise on iPad and desktop; on phones a shorter "HERE NOW" on its
+ * own line (the long one wrapped onto two). Only one of the two is shown, so a screen reader reads it once.
+ */
+function HereTag({ name }: { name: string }) {
+  return (
+    <span className={styles.hereTag}>
+      <span className={styles.hereLong}>{name.toUpperCase()} IS HERE</span>
+      <span className={styles.hereShort}>HERE NOW</span>
+    </span>
+  );
+}
+
+/** "Up next" beside the workout on a landscape iPad, where the page had a wide empty strip; hidden elsewhere. */
+function UpNext({ items }: { items: UpNextItem[] }) {
+  return (
+    <aside className={styles.upNext} aria-labelledby="live-up-next">
+      <h2 id="live-up-next" className={styles.upNextTitle}>
+        Up next
+      </h2>
+      {items.length === 0 ? (
+        <p className={styles.upNextEmpty}>Nothing after this one.</p>
+      ) : (
+        <ol className={styles.upNextList}>
+          {items.map((item) => (
+            <li key={item.exerciseId ?? `pick-${item.blockIndex}`} className={styles.upNextItem}>
+              <span className={styles.upNextName}>{item.exerciseId === null ? `Pick one: ${item.name}` : item.name}</span>
+              <span className={styles.upNextMeta}>
+                {item.section ? `${item.section} · ` : ''}
+                {item.setsLeft} {item.setsLeft === 1 ? 'set' : 'sets'} to go
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  );
+}
+
 function ExerciseRow({
   exercise,
   photo,
@@ -100,7 +141,7 @@ function ExerciseRow({
       <div className={styles.exerciseText}>
         <span className={styles.exerciseName}>
           {exercise.exerciseName}
-          {here ? <span className={styles.hereTag}>{hereName.toUpperCase()} IS HERE</span> : null}
+          {here ? <HereTag name={hereName} /> : null}
         </span>
         <span className={cx(styles.setLine, line.done.length === 0 && styles.setLineTodo)} data-testid="set-line">
           {line.done.length > 0 ? <span className={styles.doneSets}>{line.done.map((t) => `✓ ${t}`).join(', ')}</span> : null}
@@ -142,6 +183,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
   const position = whereTheyAre(log);
   const runs = sectionRuns(log.blocks, log.sections);
   const hereName = pane.holder.kind === 'client' ? pane.firstName : pane.holder.name;
+  const next = upNext(log, 4);
 
   function takeOver() {
     if (!log.workoutId) return;
@@ -164,7 +206,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
   return (
     <div className={styles.live}>
       <header className={cx(styles.head, styles.bleedSides, !joined && styles.bleedTop, joined && styles.headJoined)}>
-        <div className={cx(styles.inner, styles.headInner)}>
+        <div className={cx(styles.inner, styles.innerWide, styles.headInner)}>
           <div className={styles.headTop}>
             <p className={styles.liveLabel}>
               <span className={styles.liveDot} aria-hidden="true" />
@@ -220,66 +262,69 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
         </div>
       </header>
 
-      <div className={cx(styles.inner, styles.body)}>
-        {runs.map((run) => {
-          const blocks = run.blockIndexes.map((i) => ({ block: log.blocks[i]!, index: i }));
-          const onNow = position !== null && run.blockIndexes.includes(position.blockIndex);
-          const done = blocks.every(({ block }) => isBlockDone(block));
-          return (
-            <section key={run.blockIndexes[0]} className={styles.section} aria-label={run.section?.name ?? 'Exercises'} data-on-now={onNow || undefined}>
-              <div className={styles.rail} aria-hidden="true">
-                <span className={cx(styles.railDot, done && styles.railDone, onNow && styles.railNow)}>{done && !onNow ? '✓' : ''}</span>
-                <span className={styles.railLine} />
-              </div>
-              <div className={styles.sectionBody}>
-                {run.section ? (
-                  <h2 className={styles.sectionTitle}>
-                    {run.section.name}
-                    {onNow ? <span className={styles.onNow}>● ON NOW</span> : null}
-                  </h2>
-                ) : onNow ? (
-                  <p className={styles.onNow}>● ON NOW</p>
-                ) : null}
-                {blocks.map(({ block, index }) => {
-                  const hereBlock = position?.blockIndex === index;
-                  const label = blockLabel(block, hereBlock ? position : null);
-                  // A pick-one group not picked yet shows every option; otherwise only what is being done.
-                  const shown = needsPick(block) ? block.exercises : liveExercises(block).map((e) => e.exercise);
-                  return (
-                    <div key={block.id} className={styles.sectionBody}>
-                      {label ? (
-                        <p className={styles.blockLabel}>
-                          {label}
-                          {hereBlock && position?.exerciseId === null ? <span className={styles.hereTag}>{hereName.toUpperCase()} IS HERE</span> : null}
-                        </p>
-                      ) : null}
-                      <ul className={styles.list}>
-                        {shown.map((exercise) => {
-                          const here = hereBlock && position?.exerciseId === exercise.id;
-                          const last = position?.lastTicked;
-                          const note = here && last && last.exerciseId === exercise.id && now !== null ? tickNote(exercise, last.setIndex, now, units) : null;
-                          return (
-                            <ExerciseRow
-                              key={exercise.id}
-                              exercise={exercise}
-                              photo={pane.photos[exercise.exerciseId] ?? null}
-                              units={units}
-                              here={here}
-                              hereName={hereName}
-                              note={note}
-                              pr={stats.prExerciseIds.includes(exercise.exerciseId)}
-                              flash={exercise.sets.some((s) => flash.has(s.id))}
-                            />
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+      <div className={cx(styles.inner, styles.innerWide, styles.body)}>
+        <div className={styles.timeline}>
+          {runs.map((run) => {
+            const blocks = run.blockIndexes.map((i) => ({ block: log.blocks[i]!, index: i }));
+            const onNow = position !== null && run.blockIndexes.includes(position.blockIndex);
+            const done = blocks.every(({ block }) => isBlockDone(block));
+            return (
+              <section key={run.blockIndexes[0]} className={styles.section} aria-label={run.section?.name ?? 'Exercises'} data-on-now={onNow || undefined}>
+                <div className={styles.rail} aria-hidden="true">
+                  <span className={cx(styles.railDot, done && styles.railDone, onNow && styles.railNow)}>{done && !onNow ? '✓' : ''}</span>
+                  <span className={styles.railLine} />
+                </div>
+                <div className={styles.sectionBody}>
+                  {run.section ? (
+                    <h2 className={styles.sectionTitle}>
+                      {run.section.name}
+                      {onNow ? <span className={styles.onNow}>● ON NOW</span> : null}
+                    </h2>
+                  ) : onNow ? (
+                    <p className={styles.onNow}>● ON NOW</p>
+                  ) : null}
+                  {blocks.map(({ block, index }) => {
+                    const hereBlock = position?.blockIndex === index;
+                    const label = blockLabel(block, hereBlock ? position : null);
+                    // A pick-one group not picked yet shows every option; otherwise only what is being done.
+                    const shown = needsPick(block) ? block.exercises : liveExercises(block).map((e) => e.exercise);
+                    return (
+                      <div key={block.id} className={styles.sectionBody}>
+                        {label ? (
+                          <p className={styles.blockLabel}>
+                            {label}
+                            {hereBlock && position?.exerciseId === null ? <HereTag name={hereName} /> : null}
+                          </p>
+                        ) : null}
+                        <ul className={styles.list}>
+                          {shown.map((exercise) => {
+                            const here = hereBlock && position?.exerciseId === exercise.id;
+                            const last = position?.lastTicked;
+                            const note = here && last && last.exerciseId === exercise.id && now !== null ? tickNote(exercise, last.setIndex, now, units) : null;
+                            return (
+                              <ExerciseRow
+                                key={exercise.id}
+                                exercise={exercise}
+                                photo={pane.photos[exercise.exerciseId] ?? null}
+                                units={units}
+                                here={here}
+                                hereName={hereName}
+                                note={note}
+                                pr={stats.prExerciseIds.includes(exercise.exerciseId)}
+                                flash={exercise.sets.some((s) => flash.has(s.id))}
+                              />
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+        {position ? <UpNext items={next} /> : null}
       </div>
     </div>
   );
