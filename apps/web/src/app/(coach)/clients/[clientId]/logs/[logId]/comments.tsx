@@ -1,9 +1,10 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useState, useTransition } from 'react';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextAreaField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { addComment, deleteComment } from './actions';
 import styles from './log.module.css';
@@ -13,7 +14,7 @@ export type CommentView = { id: string; body: string; createdAt: string; authorN
 
 export function Comments({ logId, comments }: { logId: string; comments: CommentView[] }) {
   const [body, setBody] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
   const completeReview = useAnalyticsTask('review_workout');
 
@@ -22,13 +23,13 @@ export function Comments({ logId, comments }: { logId: string; comments: Comment
     startTransition(async () => {
       try {
         const outcome = await action();
-        if (!outcome.ok) setError(outcome.error);
+        if (!outcome.ok) setError(outcome.code);
         else {
           completeReview();
           onOk?.();
         }
       } catch (e) {
-        setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
+        setError(failureCode(e, 'save_offline'));
       }
     });
   }
@@ -61,8 +62,8 @@ export function Comments({ logId, comments }: { logId: string; comments: Comment
       </ul>
       <TextAreaField label="Comment" value={body} maxLength={1000} rows={3} onChange={(e) => setBody(e.target.value)} />
       <div className={styles.saveBar}>
-        {error ? <ErrorText>{error}</ErrorText> : null}
-        {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        {error ? <ErrorText code={error} /> : null}
+        {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <Button pending={pending} onClick={() => run(() => addComment({ logId, body }), () => setBody(''))}>
           {pending ? 'Posting…' : 'Post comment'}
         </Button>

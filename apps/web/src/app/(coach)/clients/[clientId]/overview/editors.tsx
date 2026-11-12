@@ -1,10 +1,11 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useId, useRef, useState, useTransition } from 'react';
 import { GOAL_MAX_LENGTH, NOTE_MAX_LENGTH, countdownLabel, type IsoDate } from '@caltracker/shared';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Button, Card, ErrorText, TextAreaField, TextField } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import type { OverviewNote } from '@/lib/client-overview';
 import { addNote, clearGoal, deleteNote, saveGoal, saveLimitations, updateNote, type RecordOutcome } from '../overview-actions';
 import styles from '../client-page.module.css';
@@ -12,16 +13,16 @@ import styles from '../client-page.module.css';
 /** Runs a save, keeps the button busy meanwhile, and turns a failure (or a dropped connection) into a message. */
 function useSave() {
   const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   function run(action: () => Promise<RecordOutcome>, onDone: () => void) {
     setError(null);
     start(async () => {
       try {
         const outcome = await action();
         if (outcome.ok) onDone();
-        else setError(outcome.error);
+        else setError(outcome.code);
       } catch (e) {
-        setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
+        setError(failureCode(e, 'save_offline'));
       }
     });
   }
@@ -78,7 +79,7 @@ export function GoalCard({
         >
           <TextField label="Goal" value={text} onChange={(e) => setText(e.target.value)} maxLength={GOAL_MAX_LENGTH} required autoFocus placeholder="Run the Dubai half marathon" />
           <TextField label="Target date (optional)" type="date" value={date} onChange={(e) => setDate(e.target.value)} min="2000-01-01" />
-          {save.error ? <ErrorText>{save.error}</ErrorText> : null}
+          {save.error ? <ErrorText code={save.error} /> : null}
           <div className={styles.actions}>
             <Button type="submit" pending={save.pending}>{save.pending ? 'Saving…' : 'Save goal'}</Button>
             <Button variant="secondary" onClick={close} disabled={save.pending}>Cancel</Button>
@@ -153,7 +154,7 @@ export function LimitationsCard({ clientId, body, readOnly }: { clientId: string
             autoFocus
             placeholder="Left knee: no deep squats. Lower back: avoid heavy deadlifts."
           />
-          {save.error ? <ErrorText>{save.error}</ErrorText> : null}
+          {save.error ? <ErrorText code={save.error} /> : null}
           <div className={styles.actions}>
             <Button type="submit" pending={save.pending}>{save.pending ? 'Saving…' : 'Save'}</Button>
             <Button variant="secondary" onClick={close} disabled={save.pending}>Cancel</Button>
@@ -191,7 +192,7 @@ function NoteItem({ note, readOnly }: { note: OverviewNote; readOnly: boolean })
           }}
         >
           <TextAreaField label="Edit note" value={text} onChange={(e) => setText(e.target.value)} maxLength={NOTE_MAX_LENGTH} rows={3} autoFocus />
-          {save.error ? <ErrorText>{save.error}</ErrorText> : null}
+          {save.error ? <ErrorText code={save.error} /> : null}
           <div className={styles.actions}>
             <Button type="submit" pending={save.pending}>{save.pending ? 'Saving…' : 'Save'}</Button>
             <Button variant="secondary" onClick={() => setEditing(false)} disabled={save.pending}>Cancel</Button>
@@ -224,7 +225,7 @@ function NoteItem({ note, readOnly }: { note: OverviewNote; readOnly: boolean })
           <button type="button" className={styles.textButton} onClick={() => setConfirming(true)}>Delete</button>
         </div>
       )}
-      {!editing && save.error ? <ErrorText>{save.error}</ErrorText> : null}
+      {!editing && save.error ? <ErrorText code={save.error} /> : null}
     </li>
   );
 }
@@ -250,7 +251,7 @@ export function NotesCard({ clientId, notes, readOnly }: { clientId: string; not
           }}
         >
           <TextAreaField label="New note" value={text} onChange={(e) => setText(e.target.value)} maxLength={NOTE_MAX_LENGTH} rows={3} placeholder="Prefers morning sessions." />
-          {save.error ? <ErrorText>{save.error}</ErrorText> : null}
+          {save.error ? <ErrorText code={save.error} /> : null}
           <div className={styles.actions}>
             <Button type="submit" variant="secondary" pending={save.pending} disabled={!text.trim()}>
               {save.pending ? 'Adding…' : 'Add note'}

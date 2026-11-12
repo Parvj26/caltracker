@@ -1,10 +1,11 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useState, type FormEvent } from 'react';
 import { PASSWORD_MIN_LENGTH } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { changePassword } from './actions';
 import styles from './profile.module.css';
 
@@ -12,7 +13,7 @@ export function PasswordForm() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -20,13 +21,13 @@ export function PasswordForm() {
     e.preventDefault();
     setError(null);
     setDone(false);
-    if (next.length < PASSWORD_MIN_LENGTH) return setError(`Use at least ${PASSWORD_MIN_LENGTH} characters.`);
-    if (next !== confirm) return setError('The two passwords do not match.');
+    if (next.length < PASSWORD_MIN_LENGTH) return setError('password_too_short');
+    if (next !== confirm) return setError('password_mismatch');
     setPending(true);
     try {
       const outcome = await changePassword({ current, next, confirm });
       if (!outcome.ok) {
-        setError(outcome.error);
+        setError(outcome.code);
         return;
       }
       setCurrent('');
@@ -34,7 +35,7 @@ export function PasswordForm() {
       setConfirm('');
       setDone(true);
     } catch (err) {
-      setError(failureMessage(err, "Couldn't change your password. Please try again."));
+      setError(failureCode(err, 'password_change_failed'));
     } finally {
       setPending(false);
     }
@@ -57,8 +58,8 @@ export function PasswordForm() {
           {pending ? 'Changing…' : 'Change password'}
         </Button>
         <div role="status">{done ? <p className={styles.success}>Password changed.</p> : null}</div>
-        {error ? <ErrorText>{error}</ErrorText> : null}
-        {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        {error ? <ErrorText code={error} /> : null}
+        {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
       </div>
     </form>
   );

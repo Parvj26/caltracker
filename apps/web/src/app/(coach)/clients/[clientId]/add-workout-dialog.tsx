@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { IsoDateSchema, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate, WorkoutHints } from '@caltracker/shared';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
-import { Button, TextField } from '@/components/ui';
+import { Button, TextField, errorFromText } from '@/components/ui';
 import styles from '@/components/calendar/calendar.module.css';
 
 type LibraryWorkout = { id: string; name: string };
@@ -55,7 +55,7 @@ export function AddWorkoutDialog({
           value={date}
           hint="Tap a workout to add it on this day."
           onChange={(e) => setDate(e.target.value)}
-          {...(dateError ? { error: dateError } : {})}
+          {...(dateError ? { error: errorFromText(dateError, 'assign_date_invalid') } : {})}
         />
       ) : null}
       <WorkoutChoices

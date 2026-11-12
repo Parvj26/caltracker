@@ -1,9 +1,10 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useState } from 'react';
 import { liveSyncStatus } from '@caltracker/shared';
 import { Card, ErrorText } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import type { LiveSyncState } from '@/lib/live-sync';
 import { getLiveSyncStatus, setProgramLiveSync } from '../actions';
 import styles from '../programs.module.css';
@@ -27,7 +28,7 @@ export function LiveSyncPanel({
 }) {
   const [state, setState] = useState(initial);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   // "2 min ago" is measured in the browser, after hydration, and kept fresh.
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -68,14 +69,14 @@ export function LiveSyncPanel({
     try {
       const outcome = await setProgramLiveSync(programId, next);
       if (!outcome.ok) {
-        setError(outcome.error);
+        setError(outcome.code);
         return;
       }
       setState({ on: outcome.on, clients: outcome.clients, syncedAt: outcome.syncedAt, skipped: outcome.skipped });
       setNow(new Date());
       onChange(outcome.on);
     } catch (e) {
-      setError(failureMessage(e, "Couldn't change Live Sync. Please try again."));
+      setError(failureCode(e, 'live_sync_save_failed'));
     } finally {
       setPending(false);
     }
@@ -108,7 +109,7 @@ export function LiveSyncPanel({
       <p className={styles.liveSyncStatus} data-testid="live-sync-status">
         {liveSyncStatus(state, now ?? new Date(state.syncedAt ?? 0))}
       </p>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </Card>
   );
 }

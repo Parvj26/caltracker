@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { BIO_MAX_LENGTH, BUSINESS_NAME_MAX_LENGTH, ProfileInput, characterCount } from '@caltracker/shared';
+import { BIO_MAX_LENGTH, BUSINESS_NAME_MAX_LENGTH, ProfileInput, characterCount, codeForMessage, errorMessage, type ErrorCode } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
-import { Button, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
+import { Button, ErrorText, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { saveProfile } from './actions';
 import styles from './profile.module.css';
 
@@ -14,14 +14,14 @@ type Fields = 'firstName' | 'lastName' | 'businessName' | 'bio';
 type Values = { firstName: string; lastName: string; businessName: string; bio: string; units: 'lb' | 'kg' };
 
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
-const errorProp = (message: string | undefined) => (message ? { error: message } : {});
+const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_format') => (message ? { error: errorFromText(message, fallback) } : {});
 
 /** Photo is handled by AvatarPicker; this form is the names, business, bio and units, with one Save button. */
 export function ProfileForm({ initial, email }: { initial: Values; email: string }) {
   const [values, setValues] = useState<Values>(initial);
   const [saved, setSaved] = useState<Values>(initial);
   const [errors, setErrors] = useState<Partial<Record<Fields, string>>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<FieldError | null>(null);
   const [pending, setPending] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
@@ -57,14 +57,14 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
       if (!outcome.ok) {
         // The details were saved but the business rename was refused: the saved state follows what the server kept.
         if (outcome.partial) setSaved({ ...parsed.data, businessName: saved.businessName });
-        setFormError(outcome.error);
+        setFormError({ code: outcome.code, text: outcome.partial ? `${errorMessage(outcome.code)} Your other changes were saved.` : undefined });
         return;
       }
       setValues(parsed.data);
       setSaved(parsed.data);
       setSavedAt(Date.now());
     } catch (err) {
-      setFormError(failureMessage(err, "Couldn't save. Please try again."));
+      setFormError({ code: failureCode(err, 'save_failed') });
     } finally {
       setPending(false);
     }
@@ -91,6 +91,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
       <TextField
         label="Business name"
         value={values.businessName}
+        hintSafe={false}
         hint={`Clients see "Welcome to ${values.businessName.trim() || 'your business'}". Up to ${BUSINESS_NAME_MAX_LENGTH} characters.`}
         onChange={(e) => set('businessName', e.target.value)}
         {...errorProp(errors.businessName)}
@@ -107,7 +108,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
         <p id="bio-count" className={cx(styles.counter, bioOver && styles.counterOver)}>
           {bioCount} / {BIO_MAX_LENGTH}
         </p>
-        {errors.bio ? <ErrorText>{errors.bio}</ErrorText> : null}
+        {errors.bio ? <ErrorText code={codeForMessage(errors.bio, 'field_format')}>{errors.bio}</ErrorText> : null}
       </div>
       <SelectField label="Units" value={values.units} onChange={(e) => set('units', e.target.value === 'kg' ? 'kg' : 'lb')}>
         <option value="lb">Pounds (lb)</option>
@@ -120,8 +121,8 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <SaveStatus pending={pending} dirty={dirty} everSaved={false} savedAt={savedAt} />
-        {formError ? <ErrorText>{formError}</ErrorText> : null}
-        {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
+        {formError?.code === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
       </div>
     </form>
   );

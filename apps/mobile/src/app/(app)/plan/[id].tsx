@@ -127,11 +127,12 @@ export default function PlanPreview() {
     status?.kind === 'done' ? (
       <Button title="View summary" testID="plan-view-log" onPress={() => openSummary(status.logId)} />
     ) : status?.kind === 'in_progress' ? (
-      <Button title="Resume" testID="plan-start" onPress={() => openLog(status.logId)} />
+      <Button title="Resume" testID="plan-start" ph-label="log_start_workout" onPress={() => openLog(status.logId)} />
     ) : canStartSessionOn(workout.scheduledOn, localToday()) ? (
       <Button
         title="Start workout"
         testID="plan-start"
+        ph-label="log_start_workout"
         onPress={() => void startPlanned(workout.doc)}
         busy={starting === workout.doc.id}
       />
@@ -155,7 +156,7 @@ export default function PlanPreview() {
       {loaded.kind === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {loaded.kind === 'failed' ? (
         <Card>
-          <ErrorText>{LOAD_FAILED}</ErrorText>
+          <ErrorText code="workout_load_failed">{LOAD_FAILED}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => void load()} />
         </Card>
       ) : null}

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CustomExerciseInput, LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
-import { Button, ErrorText, SelectField, TextAreaField, TextField } from '@/components/ui';
+import { Button, ErrorText, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { createCustomExercise, updateCustomExercise } from './actions';
 import { EQUIPMENT, TRACKING_LABELS } from './filters';
@@ -31,7 +31,7 @@ const EMPTY: ExerciseFormInitial = {
 export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: string; initial?: ExerciseFormInitial }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const [saved, setSaved] = useState(false);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -47,7 +47,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
       youtubeUrl: text('youtubeUrl'),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Check the exercise details.');
+      setError(errorFromText(parsed.error.issues[0]?.message ?? 'Check the exercise details.', 'field_format'));
       return;
     }
     setError(null);
@@ -64,7 +64,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
           router.push(`/exercises/${id}`);
         }
       } catch {
-        setError("Couldn't save the exercise. Please try again.");
+        setError({ code: 'exercise_save_failed' });
       }
     });
   }
@@ -88,7 +88,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
       </datalist>
       <TextAreaField label="Instructions (one step per line)" name="instructions" rows={5} defaultValue={initial.instructions.join('\n')} />
       <TextField label="YouTube URL (optional)" name="youtubeUrl" defaultValue={initial.youtubeUrl ?? ''} />
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       {saved ? <p role="status" className={styles.saved}>Saved</p> : null}
       <Button type="submit" pending={pending} className={styles.submit}>
         {exerciseId ? 'Save changes' : 'Create exercise'}

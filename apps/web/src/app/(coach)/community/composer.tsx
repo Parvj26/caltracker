@@ -2,8 +2,9 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { COMMUNITY_BUCKET, MAX_POST_PHOTOS, POST_BODY_MAX, communityPhotoPaths, contentTypeFor } from '@caltracker/shared';
-import { Button, ErrorText } from '@/components/ui';
+import { Button, ErrorText, errorFromText, type FieldError } from '@/components/ui';
 import { processCommunityPhoto, type ProcessedPhoto } from '@/lib/community-photo';
+import { PhotoError } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { createPost } from './actions';
 import styles from './community.module.css';
@@ -24,7 +25,7 @@ type Picked = { id: string; photo: ProcessedPhoto; preview: string };
 export function Composer({ communityId, workspaceId, userId }: { communityId: string; workspaceId: string; userId: string }) {
   const [body, setBody] = useState('');
   const [photos, setPhotos] = useState<Picked[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [pending, startTransition] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -35,7 +36,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
     if (!files?.length) return;
     setError(null);
     const room = MAX_POST_PHOTOS - photos.length;
-    if (files.length > room) setError(`Up to ${MAX_POST_PHOTOS} photos per post.`);
+    if (files.length > room) setError({ code: 'post_too_many_photos' });
     setPreparing(true);
     try {
       const added: Picked[] = [];
@@ -45,7 +46,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
       }
       setPhotos((p) => [...p, ...added]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'That photo couldn’t be used.');
+      setError(e instanceof PhotoError ? errorFromText(e.message, 'photo_unusable') : { code: 'photo_unusable' });
     } finally {
       setPreparing(false);
       if (fileInput.current) fileInput.current.value = '';
@@ -57,7 +58,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
   const submit = () => {
     setError(null);
     if (!body.trim() && photos.length === 0) {
-      setError('Write something or add a photo.');
+      setError({ code: 'post_empty' });
       return;
     }
     startTransition(async () => {
@@ -72,14 +73,14 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
           supabase.storage.from(COMMUNITY_BUCKET).upload(paths.thumbPath, p.photo.thumb, options),
         ]);
         if (!uploaded(full.error) || !uploaded(thumb.error)) {
-          setError('Couldn’t upload a photo. Please try again.');
+          setError({ code: 'upload_failed' });
           return;
         }
         images.push({ ...paths, width: p.photo.width, height: p.photo.height });
       }
       const result = await createPost({ postId, communityId, body, images });
       if (!result.ok) {
-        setError(result.error);
+        setError({ code: result.code });
         return;
       }
       for (const p of photos) URL.revokeObjectURL(p.preview);
@@ -116,7 +117,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
           ))}
         </ul>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <div className={styles.composerActions}>
         <label className={styles.smallButton} aria-disabled={photos.length >= MAX_POST_PHOTOS || preparing}>
           {preparing ? 'Preparing…' : 'Add photos'}

@@ -84,14 +84,14 @@ export function CopyWeekDialog({
         </>
       ) : confirming ? (
         <>
-          <p id={bodyId} className={styles.dialogBody} role="alert">
+          <p id={bodyId} className={styles.dialogBody} role="status">
             {weeksLabel(targets).replace(/^w/, 'W')} already {targets.length === 1 ? 'has' : 'have'}{' '}
             {plural(replacing, 'workout', 'workouts')}. Copying replaces {replacing === 1 ? 'it' : 'them'} with week{' '}
             {week}&apos;s {plural(sourceCount, 'workout', 'workouts')}.
           </p>
           <div className={styles.dialogActions}>
             <Button variant="secondary" onClick={() => setConfirming(false)}>Back</Button>
-            <Button onClick={copy} disabled={saving}>
+            <Button onClick={copy} disabled={saving} data-ph-capture-attribute-label="program_copy_week_save">
               Replace {weeksLabel(targets)}
             </Button>
           </div>
@@ -113,7 +113,7 @@ export function CopyWeekDialog({
           {saving ? <p className={styles.dialogBody}>Waiting for your last change to save…</p> : null}
           <div className={styles.dialogActions}>
             <Button variant="secondary" onClick={close}>Cancel</Button>
-            <Button onClick={copy} disabled={saving || targets.length === 0}>
+            <Button onClick={copy} disabled={saving || targets.length === 0} data-ph-capture-attribute-label="program_copy_week_save">
               Copy
             </Button>
           </div>

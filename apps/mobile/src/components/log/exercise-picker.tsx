@@ -19,6 +19,7 @@ import type { LoadedExerciseIndex } from '@/lib/exercise-index';
 import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { track } from '@/lib/analytics/client';
+import type { ShownError } from '@/lib/error-shown';
 
 const NO_FILTERS: SearchFilters = { muscles: [], equipment: [], customOnly: false };
 const NO_FAVOURITES: ReadonlySet<string> = new Set();
@@ -79,7 +80,7 @@ export function ExercisePicker({
   const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -97,7 +98,7 @@ export function ExercisePicker({
         if (!stale) setData(d);
       })
       .catch(() => {
-        if (!stale) setError('Couldn’t load exercises. Check your connection and try again.');
+        if (!stale) setError({ code: 'exercises_load_failed', text: 'Couldn’t load exercises. Check your connection and try again.' });
       });
     loadRecentExerciseIds()
       .then((ids) => {
@@ -172,7 +173,7 @@ export function ExercisePicker({
               />
             ))}
           </ScrollView>
-          {error ? <ErrorText>{error}</ErrorText> : null}
+          {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
           {data?.refreshFailed ? <Text style={text('caption')}>Using saved library</Text> : null}
           {loading ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
           {index && hits.length === 0 ? <Text style={text('body')}>No exercises match.</Text> : null}

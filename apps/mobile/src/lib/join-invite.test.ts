@@ -1,6 +1,7 @@
+import { isErrorCode } from '@caltracker/shared';
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { joinInvite, joinMessage, loadInvite, type JoinFailure } from './join-invite';
+import { joinInvite, joinMessage, loadInvite, type JoinFailure, joinCode } from './join-invite';
 
 const token = 'A'.repeat(43);
 const input = { token, password: 'password1', firstName: 'Sam', lastName: 'Lee' };
@@ -146,5 +147,13 @@ describe('joinMessage', () => {
     expect(joinMessage('account_exists', 'Fit Co')).toBe('You already have an account. Sign in to join Fit Co.');
     expect(joinMessage('expired', 'Fit Co')).toBe('This invite has expired. Ask your coach to send a new one.');
     expect(joinMessage('offline', 'Fit Co')).toBe('No connection. Check your internet and try again.');
+  });
+});
+
+describe('joinCode', () => {
+  it('gives every reason a code from the shared list', () => {
+    expect(joinCode('expired')).toBe('join_link_expired');
+    expect(joinCode('offline')).toBe('network_offline');
+    expect(isErrorCode(joinCode('joined_sign_in_failed'))).toBe(true);
   });
 });

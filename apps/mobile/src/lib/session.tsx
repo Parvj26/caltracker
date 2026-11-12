@@ -52,9 +52,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (ticket !== latest.current) return;
       setClaimError(null);
       setClaimed({ userId: id, workspace, removedFrom: removed });
-    } catch (e) {
+    } catch {
       if (ticket !== latest.current) return;
-      setClaimError(e instanceof Error ? e.message : 'Could not check your invite. Try again.');
+      setClaimError('Could not check your invite. Try again.');
       // A failed check (often just no signal) never disconnects a client who was connected.
       setClaimed((prev) => (prev?.userId === id ? prev : { userId: id, workspace: null, removedFrom: null }));
     }

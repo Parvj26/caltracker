@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -44,7 +45,7 @@ import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } f
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
 import { Button, ErrorText, TextAreaField, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { AddSectionMenu } from './add-section-menu';
 import { SectionHeader } from './section-header';
 import { BlockEditor, type BlockActions } from './block-editor';
@@ -170,7 +171,7 @@ export function WorkoutBuilder({
     lastNewSave?.id === initial.id && Date.now() - lastNewSave.at < SAVED_CHIP_MS ? lastNewSave.at : null,
   );
   const [errors, setErrors] = useState<Map<string, string[]>>(new Map());
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<ErrorCode | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [pending, startTransition] = useTransition();
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
@@ -212,7 +213,7 @@ export function WorkoutBuilder({
         message: i.message,
       }));
       setErrors(issuesByKey(doc, issues));
-      setFormError('Check the highlighted fields.');
+      setFormError('workout_fields_invalid');
       return;
     }
     const snapshot = doc;
@@ -221,7 +222,7 @@ export function WorkoutBuilder({
       try {
         outcome = await (saveWith ?? saveWorkout)(parsed.data);
       } catch (e) {
-        setFormError(failureMessage(e, "Couldn't save. Check your connection and try again."));
+        setFormError(failureCode(e, 'save_offline'));
         return;
       }
       if (outcome === null) return;
@@ -232,7 +233,7 @@ export function WorkoutBuilder({
       }
       if (!outcome.ok) {
         setErrors(issuesByKey(snapshot, outcome.issues ?? []));
-        setFormError(outcome.error);
+        setFormError(outcome.code);
         return;
       }
       setErrors(new Map());
@@ -390,7 +391,7 @@ export function WorkoutBuilder({
           label="Workout name"
           maxLength={100}
           value={doc.name}
-          {...(errors.has('name') ? { error: errors.get('name')![0]! } : {})}
+          {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
           onChange={(e) => setDoc((d) => ({ ...d, name: e.target.value }))}
         />
         <TextAreaField
@@ -401,7 +402,9 @@ export function WorkoutBuilder({
           onChange={(e) => setDoc((d) => ({ ...d, notes: e.target.value === '' ? null : e.target.value }))}
         />
         {(errors.get('notes') ?? []).map((m) => (
-          <ErrorText key={m}>{m}</ErrorText>
+          <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
         ))}
       </div>
 
@@ -435,18 +438,20 @@ export function WorkoutBuilder({
         )}
         {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
         {(errors.get('blocks') ?? []).map((m) => (
-          <ErrorText key={m}>{m}</ErrorText>
+          <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
         ))}
       </div>
 
       <div className={styles.addRow}>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercise" data-ph-safe="">
           + Exercise
         </Button>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'superset' })} data-ph-capture-attribute-label="workout_add_superset" data-ph-safe="">
           + Superset / circuit
         </Button>
-        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'choice' })}>
+        <Button variant="secondary" disabled={full} onClick={() => setPicker({ kind: 'choice' })} data-ph-capture-attribute-label="workout_add_pick_one" data-ph-safe="">
           + Pick one
         </Button>
         {full ? (
@@ -459,12 +464,14 @@ export function WorkoutBuilder({
 
       <div className={styles.saveBar} data-bottom-bar="">
         {(errors.get('general') ?? []).map((m) => (
-          <ErrorText key={m}>{m}</ErrorText>
+          <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
         ))}
-        {formError ? <ErrorText>{formError}</ErrorText> : null}
-        {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+        {formError ? <ErrorText code={formError} /> : null}
+        {formError === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
-        <Button onClick={save} pending={pending}>
+        <Button onClick={save} pending={pending} data-ph-capture-attribute-label="workout_save">
           {pending ? 'Saving…' : saveLabel}
         </Button>
       </div>

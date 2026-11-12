@@ -3,16 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc, duplicateWorkoutDoc } from '@caltracker/shared';
 import type { ExercisePrefs } from '@caltracker/shared';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadExercisePrefs, loadWorkoutDoc } from '@/lib/workouts';
 
 export type SaveIssue = { path: (string | number)[]; message: string };
-export type SaveWorkoutOutcome = { ok: true; id: string } | { ok: false; error: string; issues?: SaveIssue[] };
+export type SaveWorkoutOutcome = { ok: true; id: string } | (ActionFailure & { issues?: SaveIssue[] });
 
-const GENERIC_ERROR = "Couldn't save. Please try again.";
-const ALREADY_DONE =
-  "This workout is already done, so its plan stays as it was (the log was done against it). Open its log to edit the results.";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The workspace's remembered choices per exercise, re-read by the builder after a save (see loadExercisePrefs). */
@@ -26,8 +24,7 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   const parsed = WorkoutDoc.safeParse(doc);
   if (!parsed.success) {
     return {
-      ok: false,
-      error: 'Check the highlighted fields.',
+      ...fail('workout_fields_invalid', 'action:workouts.saveWorkout'),
       issues: parsed.error.issues.map((i) => ({
         path: i.path.filter((p): p is string | number => typeof p !== 'symbol'),
         message: i.message,
@@ -46,15 +43,15 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
     .eq('workspace_id', workspaceId)
     .eq('status', 'completed')
     .limit(1);
-  if (done.error) return { ok: false, error: GENERIC_ERROR };
-  if (done.data.length > 0) return { ok: false, error: ALREADY_DONE };
+  if (done.error) return fail('workout_save_failed', 'action:workouts.saveWorkout');
+  if (done.data.length > 0) return fail('workout_already_done', 'action:workouts.saveWorkout');
 
   const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: parsed.data });
   if (error) {
-    // 23514: a document guard in save_workout; its message is written for the coach.
-    if (error.code === '23514') return { ok: false, error: error.message };
-    if (error.code === '42501') return { ok: false, error: "You can't edit this workout." };
-    return { ok: false, error: GENERIC_ERROR };
+    // 23514: a document guard in save_workout. Its text can name rows, so only the code goes back.
+    if (error.code === '23514') return fail(/already done/i.test(error.message) ? 'workout_already_done' : 'workout_invalid', 'action:workouts.saveWorkout');
+    if (error.code === '42501') return fail('workout_edit_denied', 'action:workouts.saveWorkout');
+    return fail('workout_save_failed', 'action:workouts.saveWorkout');
   }
 
   revalidatePath('/workouts');
@@ -65,9 +62,7 @@ export async function saveWorkout(doc: unknown): Promise<SaveWorkoutOutcome> {
   return { ok: true, id: data };
 }
 
-export type DuplicateOutcome = { ok: true; id: string } | { ok: false; error: string };
-
-const NOT_IN_LIBRARY = "Couldn't find that workout in your library. It may have been deleted.";
+export type DuplicateOutcome = { ok: true; id: string } | ActionFailure;
 
 /**
  * Copies a library workout (as last saved) into a new library workout named "<name> (copy)", in the coach's own
@@ -76,7 +71,7 @@ const NOT_IN_LIBRARY = "Couldn't find that workout in your library. It may have 
  */
 export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return { ok: false, error: NOT_IN_LIBRARY };
+  if (!UUID.test(id)) return fail('workout_not_in_library', 'action:workouts.duplicateWorkout');
   const supabase = await createServerSupabase();
   const { data: own, error: ownError } = await supabase
     .from('workouts')
@@ -85,13 +80,13 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
     .eq('workspace_id', workspaceId)
     .is('client_id', null)
     .maybeSingle();
-  if (ownError) return { ok: false, error: "Couldn't copy. Please try again." };
-  if (!own) return { ok: false, error: NOT_IN_LIBRARY };
+  if (ownError) return fail('workout_copy_failed', 'action:workouts.duplicateWorkout');
+  if (!own) return fail('workout_not_in_library', 'action:workouts.duplicateWorkout');
 
   const loaded = await loadWorkoutDoc(supabase, id);
-  if (!loaded) return { ok: false, error: NOT_IN_LIBRARY };
+  if (!loaded) return fail('workout_not_in_library', 'action:workouts.duplicateWorkout');
   const copy = WorkoutDoc.safeParse(duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()));
-  if (!copy.success) return { ok: false, error: 'Open this workout, fix the highlighted fields and save it, then copy it.' };
+  if (!copy.success) return fail('workout_copy_invalid', 'action:workouts.duplicateWorkout');
 
   // A copy is not the coach choosing measurements again, so it doesn't change what new exercises start with.
   const { data, error } = await supabase.rpc('save_workout', {
@@ -99,16 +94,16 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
     p_doc: { ...copy.data, rememberChoices: false },
   });
   if (error) {
-    if (error.code === '23514') return { ok: false, error: error.message };
-    return { ok: false, error: "Couldn't copy. Please try again." };
+    if (error.code === '23514') return fail('workout_invalid', 'action:workouts.duplicateWorkout');
+    return fail('workout_copy_failed', 'action:workouts.duplicateWorkout');
   }
   revalidatePath('/workouts');
   return { ok: true, id: data };
 }
 
-export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteWorkout(id: string): Promise<{ ok: true } | ActionFailure> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return { ok: false, error: "Couldn't find that workout." };
+  if (!UUID.test(id)) return fail('workout_not_found', 'action:workouts.deleteWorkout');
   const supabase = await createServerSupabase();
   // Program slots go with it (on delete cascade). Clients' calendar copies are separate rows and stay, except that
   // Live Sync removes untouched upcoming copies from programs that have it on (the slots changed).
@@ -120,8 +115,8 @@ export async function deleteWorkout(id: string): Promise<{ ok: boolean; error?: 
     .eq('workspace_id', workspaceId)
     .is('client_id', null)
     .select('id');
-  if (error) return { ok: false, error: "Couldn't delete. Please try again." };
-  if (data.length === 0) return { ok: false, error: "Couldn't find that workout in your library. It may already be deleted." };
+  if (error) return fail('workout_delete_failed', 'action:workouts.deleteWorkout');
+  if (data.length === 0) return fail('workout_already_deleted', 'action:workouts.deleteWorkout');
 
   revalidatePath('/workouts');
   revalidatePath('/programs', 'layout');

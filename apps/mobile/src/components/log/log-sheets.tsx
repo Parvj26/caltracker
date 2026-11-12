@@ -198,7 +198,7 @@ export function FinishSheet({
                   <Button testID="finish-keep-going" variant="secondary" title="Keep going" onPress={() => onKeepGoing(feel, note)} />
                 </View>
                 <View style={styles.flex}>
-                  <Button testID="finish-confirm" variant="finish" title="Finish" busy={busy} onPress={() => onFinish(feel, note)} />
+                  <Button testID="finish-confirm" variant="finish" title="Finish" busy={busy} ph-label="log_finish_confirm" onPress={() => onFinish(feel, note)} />
                 </View>
               </View>
               <Text style={text('caption')}>Then your stickers and personal bests.</Text>

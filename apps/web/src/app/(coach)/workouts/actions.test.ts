@@ -138,14 +138,14 @@ describe('saveWorkout', () => {
   it("passes on the database's own refusal (a log finished between the check and the save)", async () => {
     const refusal = "This workout is already done, so its plan can't change. Edit the logged results instead.";
     respond = (call) => (call.op === 'rpc' ? { data: null, error: { code: '23514', message: refusal } } : { data: [] });
-    expect(await saveWorkout(doc)).toEqual({ ok: false, error: refusal });
+    expect(await saveWorkout(doc)).toEqual({ ok: false, code: 'workout_already_done' });
   });
 
   it("refuses a workout the client has finished, so the log's plan stays as it was", async () => {
     respond = (call) => (call.table === 'workout_logs' ? { data: [{ id: 'log' }] } : { data: WORKOUT });
     const outcome = await saveWorkout(doc);
     expect(outcome.ok).toBe(false);
-    expect(outcome.ok ? '' : outcome.error).toMatch(/already done/);
+    expect(outcome.ok ? '' : outcome.code).toBe('workout_already_done');
     expect(calls.some((c) => c.op === 'rpc')).toBe(false);
   });
 

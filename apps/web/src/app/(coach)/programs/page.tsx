@@ -40,7 +40,7 @@ export default async function ProgramsPage() {
           </p>
         </div>
         <div className={styles.titleActions}>
-          <ButtonLink href="/programs/new">New program</ButtonLink>
+          <ButtonLink href="/programs/new" data-ph-capture-attribute-label="program_new">New program</ButtonLink>
         </div>
       </header>
 

@@ -4,11 +4,13 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { borderWidth } from '@caltracker/design-tokens';
 import { MAX_PHOTOS } from '@caltracker/shared';
 import { CameraIcon } from '@/components/coach/icons';
+import { ErrorText } from '@/components/ui';
 import { PhotoError, compressPhoto } from '@/lib/compress-photo';
 import type { OutboxPhoto } from '@/lib/outbox';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import type { ShownError } from '@/lib/error-shown';
 
 const BODY_MAX = 4000;
 
@@ -27,7 +29,7 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
   const completeMessage = useAnalyticsTask('message_coach', body.trim().length > 0);
   const [photos, setPhotos] = useState<OutboxPhoto[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const canSend = !busy && (body.trim() !== '' || photos.length > 0);
 
   async function pick() {
@@ -47,9 +49,9 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
       const done: OutboxPhoto[] = [];
       for (const a of picked) done.push(await compressPhoto({ uri: a.uri, width: a.width, height: a.height }));
       setPhotos((prev) => [...prev, ...done].slice(0, MAX_PHOTOS));
-      if (res.assets.length > room) setError(`You can add up to ${MAX_PHOTOS} photos to a message.`);
+      if (res.assets.length > room) setError({ code: 'message_photo_limit' });
     } catch (e) {
-      setError(e instanceof PhotoError ? e.message : "Couldn't prepare that photo. Please try another.");
+      setError(e instanceof PhotoError ? { code: 'photo_unusable', text: e.message } : { code: 'photo_prepare_failed' });
     } finally {
       setBusy(false);
     }
@@ -107,7 +109,7 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
           ))}
         </View>
       ) : null}
-      {error ? <Text style={text('caption')} accessibilityRole="alert">{error}</Text> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <View style={styles.row}>
         <Pressable
           testID="coach-photo-button"

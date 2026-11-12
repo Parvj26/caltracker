@@ -4,7 +4,8 @@ import { buttonMinHeight } from '@caltracker/design-tokens';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useRevealOnFocus } from './screen';
-import { currentScreen, getTaskTracker, track } from '@/lib/analytics/client';
+import type { ErrorCode } from '@caltracker/shared';
+import { errorTextContent, reportErrorShown } from '@/lib/error-shown';
 
 type TextFieldProps = TextInputProps & {
   label: string;
@@ -55,20 +56,24 @@ export function TextField({ label, hint, testID, style, onFocus, onBlur, ...rest
   );
 }
 
-/** Error message: ink text with a magenta marker, so colour is never the only signal. */
-export function ErrorText({ children, testID }: { children: string; testID?: string }) {
+/**
+ * Error message: ink text with a magenta marker, so colour is never the only signal. `code` (from the shared error
+ * list) is sent with error_shown; the text shown is `children` (fixed copy only, never a raw server message) or the
+ * code's catalogue message. The only place that may use accessibilityRole="alert" (lint enforces it).
+ */
+export function ErrorText({ code, children, testID }: { code: ErrorCode; children?: string | undefined; testID?: string }) {
   const { text, space } = useTheme();
+  const shown = errorTextContent(code, children);
   // Count the error (never its text) each time a new message shows.
   useEffect(() => {
-    getTaskTracker().error();
-    track('error_shown', { code: 'alert', screen: currentScreen() });
-  }, [children]);
+    reportErrorShown(code);
+  }, [code, shown]);
   return (
     <View testID={testID} accessibilityRole="alert" style={[styles.errorRow, { gap: space[2] }]}>
       <Text style={[text('sectionHeading'), styles.marker]} accessibilityElementsHidden importantForAccessibility="no">
         ⚠
       </Text>
-      <Text style={[text('sectionHeading'), styles.errorText]}>{children}</Text>
+      <Text style={[text('sectionHeading'), styles.errorText]}>{shown}</Text>
     </View>
   );
 }

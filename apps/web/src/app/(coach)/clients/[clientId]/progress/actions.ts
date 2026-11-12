@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -9,14 +10,13 @@ import { createServerSupabase } from '@/lib/supabase/server';
 // workspace id is never taken from the browser. Printout files are removed through the Storage API, never by SQL on
 // storage.objects (that would leave the real file behind).
 
-export type Outcome<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string; warning?: string };
+export type Outcome<T extends object = object> = ({ ok: true } & T) | (ActionFailure & { warning?: string });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const BUCKET = 'scan-attachments';
 const UPLOAD_LEFT_BEHIND = "The scan wasn't saved, and the uploaded printout file could not be removed.";
-const GENERIC = "Couldn't save. Please try again.";
 const refresh = () => revalidatePath('/clients/[clientId]', 'layout');
 
 export type SaveScanInput = {
@@ -34,19 +34,19 @@ export async function saveScan(input: SaveScanInput): Promise<Outcome<{ warning?
   const { workspaceId } = await requireCoach();
   const { id, clientId, measuredOn, values, attachmentPath } = input;
   if (!isUuid(id) || !isUuid(clientId) || typeof measuredOn !== 'string' || !DATE.test(measuredOn)) {
-    return { ok: false, error: 'The scan is not valid.' };
+    return fail('scan_invalid', 'action:progress.saveScan');
   }
   if (typeof values !== 'object' || values === null || Object.values(values).some((v) => typeof v !== 'number')) {
-    return { ok: false, error: 'The scan is not valid.' };
+    return fail('scan_invalid', 'action:progress.saveScan');
   }
   if (attachmentPath != null && (typeof attachmentPath !== 'string' || !attachmentPath.startsWith(`${workspaceId}/${clientId}/`))) {
-    return { ok: false, error: 'The printout does not belong to this client.' };
+    return fail('scan_printout_invalid', 'action:progress.saveScan');
   }
 
   const supabase = await createServerSupabase();
   const before = await supabase.from('body_measurements').select('attachment_path').eq('id', id).maybeSingle();
   // Without the current printout path, a replaced or cleared file could be left behind unnoticed: stop here.
-  if (before.error) return { ok: false, error: GENERIC };
+  if (before.error) return fail('scan_save_failed', 'action:progress.saveScan');
   const oldPath = before.data?.attachment_path ?? null;
 
   const p: Record<string, unknown> = { id, workspace_id: workspaceId, client_id: clientId, measured_on: measuredOn, values };
@@ -59,9 +59,15 @@ export async function saveScan(input: SaveScanInput): Promise<Outcome<{ warning?
       const removed = await supabase.storage.from(BUCKET).remove([attachmentPath]);
       if (removed.error) warning = UPLOAD_LEFT_BEHIND;
     }
-    // 42501 and 23514 messages are written for people (e.g. "Add a new scan instead.").
-    const message = error.code === '42501' || error.code === '23514' ? error.message : GENERIC;
-    return warning ? { ok: false, error: message, warning } : { ok: false, error: message };
+    // Only a code goes back: some database messages name a custom measure the coach typed.
+    const code =
+      error.code === '42501'
+        ? /new scan/i.test(error.message) ? 'scan_edit_denied' : 'scan_save_denied'
+        : error.code === '23514'
+          ? /printout/i.test(error.message) ? 'scan_printout_invalid' : /at least one/i.test(error.message) ? 'scan_empty' : 'scan_invalid'
+          : 'scan_save_failed';
+    const failed = fail(code, 'action:progress.saveScan');
+    return warning ? { ...failed, warning } : failed;
   }
 
   let warning: string | undefined;
@@ -75,15 +81,15 @@ export async function saveScan(input: SaveScanInput): Promise<Outcome<{ warning?
 
 export async function deleteScan(id: string): Promise<Outcome<{ warning?: string }>> {
   await requireCoach();
-  if (!isUuid(id)) return { ok: false, error: 'The scan is not valid.' };
+  if (!isUuid(id)) return fail('scan_invalid', 'action:progress.deleteScan');
   const supabase = await createServerSupabase();
   const row = await supabase.from('body_measurements').select('attachment_path').eq('id', id).maybeSingle();
-  if (row.error) return { ok: false, error: GENERIC };
-  if (!row.data) return { ok: false, error: 'That scan is already gone.' };
+  if (row.error) return fail('scan_delete_failed', 'action:progress.deleteScan');
+  if (!row.data) return fail('scan_already_gone', 'action:progress.deleteScan');
 
   const { data, error } = await supabase.from('body_measurements').delete().eq('id', id).select('id');
-  if (error) return { ok: false, error: "Couldn't delete the scan. Please try again." };
-  if (data.length === 0) return { ok: false, error: "You can't delete that scan." };
+  if (error) return fail('scan_delete_failed', 'action:progress.deleteScan');
+  if (data.length === 0) return fail('scan_delete_denied', 'action:progress.deleteScan');
 
   let warning: string | undefined;
   const path = row.data.attachment_path;
@@ -102,15 +108,15 @@ export async function addCustomMeasure(input: CustomMeasureInput): Promise<Outco
   const name = String(input.name ?? '').trim();
   const unitLabel = String(input.unitLabel ?? '').trim();
   const { min, max } = input;
-  if (name.length < 1 || name.length > 40) return { ok: false, error: 'Give the measure a name of up to 40 characters.' };
-  if (unitLabel.length > 10) return { ok: false, error: 'The unit label can be up to 10 characters.' };
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return { ok: false, error: 'The smallest value must be below the largest.' };
+  if (name.length < 1 || name.length > 40) return fail('measure_name_invalid', 'action:progress.addCustomMeasure');
+  if (unitLabel.length > 10) return fail('measure_unit_too_long', 'action:progress.addCustomMeasure');
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return fail('measure_range_invalid', 'action:progress.addCustomMeasure');
 
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('custom_metrics').insert({ workspace_id: workspaceId, name, unit_label: unitLabel, min, max });
   if (error) {
-    if (error.code === '23505') return { ok: false, error: 'You already have a measure with that name.' };
-    return { ok: false, error: GENERIC };
+    if (error.code === '23505') return fail('measure_name_taken', 'action:progress.addCustomMeasure');
+    return fail('measure_add_failed', 'action:progress.addCustomMeasure');
   }
   refresh();
   return { ok: true };
@@ -119,7 +125,7 @@ export async function addCustomMeasure(input: CustomMeasureInput): Promise<Outco
 /** Archiving hides a measure from the scan form but keeps its history. */
 export async function archiveCustomMeasure(id: string): Promise<Outcome> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(id)) return { ok: false, error: 'The measure is not valid.' };
+  if (!isUuid(id)) return fail('measure_invalid', 'action:progress.archiveCustomMeasure');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('custom_metrics')
@@ -128,7 +134,7 @@ export async function archiveCustomMeasure(id: string): Promise<Outcome> {
     .eq('workspace_id', workspaceId)
     .is('archived_at', null)
     .select('id');
-  if (error || data.length === 0) return { ok: false, error: "Couldn't archive that measure." };
+  if (error || data.length === 0) return fail('measure_archive_failed', 'action:progress.archiveCustomMeasure');
   refresh();
   return { ok: true };
 }

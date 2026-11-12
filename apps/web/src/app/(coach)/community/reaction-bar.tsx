@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
   REACTIONS,
@@ -42,7 +43,7 @@ export function ReactionBar({
   }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [who, setWho] = useState<ReactionKey | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [, startTransition] = useTransition();
   const pickerId = useId();
   const plusRef = useRef<HTMLButtonElement>(null);
@@ -70,7 +71,7 @@ export function ReactionBar({
       if (!r.ok) {
         // Undo only this tap: other taps made since then stay.
         setShown((rows) => applyReactionChange(rows, invertReactionChange(change)));
-        setError(r.error);
+        setError(r.code);
       }
     });
   };
@@ -132,7 +133,7 @@ export function ReactionBar({
           {whoSummary.names.map((n, i) => (i === 0 ? n : `, ${n}`)).join('')}
         </p>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </div>
   );
 }

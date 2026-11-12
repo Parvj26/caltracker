@@ -16,6 +16,7 @@ import { photoParams, pickMealPhoto } from '@/lib/pick-meal-photo';
 import { useFood } from '@/lib/use-food';
 import { palette, pressedOpacity, radius, space, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 
 /**
@@ -30,7 +31,7 @@ export default function FoodScreen() {
   const [day, setDay] = useState(today);
   const [weeksBack, setWeeksBack] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
@@ -88,7 +89,7 @@ export default function FoodScreen() {
       const picked = await pickMealPhoto('camera');
       if (picked) router.push({ pathname: '/food/meal', params: { day, ...photoParams(picked) } });
     } catch (e) {
-      setError(e instanceof PhotoError ? e.message : "Couldn't prepare that photo. Please try another.");
+      setError(e instanceof PhotoError ? { code: 'photo_unusable', text: e.message } : { code: 'photo_prepare_failed' });
     } finally {
       setBusy(false);
     }
@@ -137,6 +138,7 @@ export default function FoodScreen() {
         <BigButton
           title="Snap a photo"
           testID="food-snap"
+          ph-label="log_add_meal_photo"
           ink
           disabled={busy}
           icon={<CameraIcon color={white} />}
@@ -145,11 +147,12 @@ export default function FoodScreen() {
         <BigButton
           title="Type it in"
           testID="food-type-it"
+          ph-label="log_add_meal"
           icon={<PencilIcon />}
           onPress={() => router.push({ pathname: '/food/meal', params: { day } })}
         />
       </View>
-      {error ? <ErrorText testID="food-error">{error}</ErrorText> : null}
+      {error ? <ErrorText testID="food-error" code={error.code}>{error.text}</ErrorText> : null}
 
       <LogAgainChips
         items={again}

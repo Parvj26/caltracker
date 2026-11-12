@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore, useTransition, type FormEvent } from 'react';
@@ -24,8 +25,8 @@ import {
   type MacroTargets,
 } from '@caltracker/shared';
 import { SharpPhoto } from '@/components/sharp-photo';
-import { Button, Card, ErrorText, TextField } from '@/components/ui';
-import { failureMessage } from '@/lib/action-errors';
+import { Button, Card, ErrorText, TextField, errorFromText } from '@/components/ui';
+import { failureCode } from '@/lib/action-errors';
 import { saveTargets } from './actions';
 import type { CoachMeal } from './load';
 import { TIME_ZONE_COOKIE } from './week';
@@ -218,7 +219,7 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
   const initial = { calories: toText(targets?.calories), protein: toText(targets?.protein), carbs: toText(targets?.carbs), fat: toText(targets?.fat) };
   const [values, setValues] = useState<Record<MacroKey, string>>(initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<MacroKey, string>>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const [touched, setTouched] = useState(false);
@@ -238,10 +239,10 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
           setSaved(true);
         } else {
           setFieldErrors(outcome.fieldErrors ?? {});
-          setError(outcome.error);
+          setError(outcome.code);
         }
       } catch (err) {
-        setError(failureMessage(err, "Couldn't save the targets. Check your connection and try again."));
+        setError(failureCode(err, 'targets_save_offline'));
       }
     });
   }
@@ -267,7 +268,7 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
                 inputMode="decimal"
                 value={values[k]}
                 placeholder="No target"
-                {...(fieldErrors[k] ? { error: fieldErrors[k] } : {})}
+                {...(fieldErrors[k] ? { error: errorFromText(fieldErrors[k], 'targets_invalid') } : {})}
                 onChange={(e) => {
                   setSaved(false);
                   setTouched(true);
@@ -287,7 +288,7 @@ function TargetsCard({ clientId, firstName, targets, readOnly }: { clientId: str
               </span>
             ) : null}
           </div>
-          {error ? <ErrorText>{error}</ErrorText> : null}
+          {error ? <ErrorText code={error} /> : null}
         </form>
       )}
     </Card>

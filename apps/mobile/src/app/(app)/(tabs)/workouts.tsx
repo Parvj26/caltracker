@@ -29,6 +29,7 @@ import { palette, pressedOpacity, radius, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import { ChevronIcon, HistoryIcon } from '@/components/ui/icons';
+import type { ShownError } from '@/lib/error-shown';
 
 type WeekData = {
   weekStart: IsoDate;
@@ -78,7 +79,7 @@ export default function Workouts() {
   // Null: the week's default day (today in this week, else its first workout day).
   const [picked, setPicked] = useState<IsoDate | null>(null);
   const [data, setData] = useState<WeekData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [naming, setNaming] = useState(false);
   const latest = useRef(0);
@@ -94,7 +95,7 @@ export default function Workouts() {
       setError(null);
     } catch {
       if (ticket !== latest.current) return;
-      setError(LOAD_FAILED);
+      setError({ code: 'workouts_load_failed', text: LOAD_FAILED });
     }
   }, []);
 
@@ -173,7 +174,7 @@ export default function Workouts() {
 
       {error ? (
         <Card>
-          <ErrorText>{error}</ErrorText>
+          <ErrorText code={error.code}>{error.text}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => void refresh()} busy={refreshing} />
         </Card>
       ) : null}
@@ -361,9 +362,9 @@ function DayCard({
           {status?.kind === 'done' ? (
             <Button title="View summary" testID={`view-log-${workout.doc.id}`} onPress={() => onView(status.logId)} />
           ) : status?.kind === 'in_progress' ? (
-            <Button title="Resume" testID={`start-${workout.doc.id}`} onPress={() => onResume(status.logId)} />
+            <Button title="Resume" testID={`start-${workout.doc.id}`} ph-label="log_start_workout" onPress={() => onResume(status.logId)} />
           ) : canStart ? (
-            <Button title="Start workout" testID={`start-${workout.doc.id}`} onPress={onStart} busy={starting} />
+            <Button title="Start workout" testID={`start-${workout.doc.id}`} ph-label="log_start_workout" onPress={onStart} busy={starting} />
           ) : (
             <Button variant="secondary" title="Preview" testID={`preview-${workout.doc.id}`} onPress={onPreview} />
           )}

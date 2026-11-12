@@ -10,6 +10,7 @@ import { clockLabel, prefsEditable, prefsNote, settingsSections, type SettingsRo
 import { usePush } from '@/lib/use-push';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 const TIME_TITLES: Record<TimeField, string> = {
   reminderTime: 'Reminder time',
@@ -29,12 +30,12 @@ export default function NotificationsSettingsScreen() {
   const editable = prefsEditable(prefsSource);
   const note = prefsNote(prefsSource);
   const [editing, setEditing] = useState<TimeField | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const current = prefs ?? DEFAULT_PUSH_PREFS;
 
   const save = (next: PushPrefs) => {
     setError(null);
-    updatePrefs(next).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Couldn’t save. Try again.'));
+    updatePrefs(next).catch(() => setError({ code: 'notifications_save_failed' }));
   };
 
   const toggle = (row: SettingsRow) => {
@@ -79,7 +80,7 @@ export default function NotificationsSettingsScreen() {
         </View>
       ) : null}
 
-      {error ? <ErrorText testID="notifications-error">{error}</ErrorText> : null}
+      {error ? <ErrorText testID="notifications-error" code={error.code}>{error.text}</ErrorText> : null}
       {note ? (
         <Text style={text('caption')} testID="notifications-prefs-note">
           {note}

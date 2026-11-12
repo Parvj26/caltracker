@@ -112,7 +112,7 @@ export default function SummaryScreen() {
         <Card>
           {remote.kind === 'failed' ? (
             <>
-              <ErrorText>{LOAD_FAILED}</ErrorText>
+              <ErrorText code="workout_load_failed">{LOAD_FAILED}</ErrorText>
               <Button variant="secondary" title="Try again" onPress={() => setAttempt((n) => n + 1)} />
             </>
           ) : (

@@ -52,4 +52,17 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Every on-screen error goes through ErrorText, which carries a code from the shared error list.
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/mobile/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/components/ui/text-field.tsx', 'apps/mobile/src/components/ui/text-field.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        // Any spelling: role="alert", role={'alert'}, role={`alert`}, role={bad ? 'alert' : undefined}.
+        { selector: "JSXAttribute[name.name=/^(role|accessibilityRole)$/] Literal[value='alert']", message: 'Use ErrorText with a code' },
+        { selector: "JSXAttribute[name.name=/^(role|accessibilityRole)$/] TemplateElement[value.raw='alert']", message: 'Use ErrorText with a code' },
+      ],
+    },
+  },
 );

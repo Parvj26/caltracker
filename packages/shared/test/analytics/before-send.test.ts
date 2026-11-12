@@ -40,9 +40,9 @@ describe('beforeSend (web)', () => {
   it('strips text and attributes from the elements chain except ph-label', () => {
     const out = beforeSend({
       event: '$autocapture',
-      properties: { $elements_chain: 'button.btn:attr__ph-label="start"attr__title="Maya"href="/invite/abc"nth-child="1"text="185 lb";div:text="x"' },
+      properties: { $elements_chain: 'button.btn:attr__ph-label="log_start_workout"attr__title="Maya"href="/invite/abc"nth-child="1"text="185 lb";div:text="x"' },
     });
-    expect(out?.properties.$elements_chain).toBe('button.btn:attr__ph-label="start"nth-child="1";div:');
+    expect(out?.properties.$elements_chain).toBe('button.btn:attr__ph-label="log_start_workout"nth-child="1";div:');
   });
 
   it('sanitizes custom event properties but keeps PostHog $ properties', () => {
@@ -98,7 +98,7 @@ describe('beforeSend (nested values)', () => {
   });
   it('keeps the click label on autocaptured clicks only', () => {
     expect(beforeSend({ event: '$autocapture', properties: { label: 'nav_clients' } })?.properties).toEqual({ label: 'nav_clients' });
-    expect(beforeSend({ event: '$rageclick', properties: { label: 'save' } })?.properties).toEqual({ label: 'save' });
+    expect(beforeSend({ event: '$rageclick', properties: { label: 'assign_save' } })?.properties).toEqual({ label: 'assign_save' });
     expect(beforeSend({ event: '$pageview', properties: { label: 'x' } })?.properties).toEqual({});
   });
 });
@@ -116,3 +116,58 @@ describe('beforeSend (phone labels)', () => {
   });
 });
 
+
+describe('beforeSend (label pattern)', () => {
+  it('drops click labels that do not follow area_action', () => {
+    expect(beforeSend({ event: '$autocapture', properties: { label: 'Save button' } })?.properties).toEqual({});
+    expect(beforeSend({ event: '$autocapture', properties: { label: 'client_[id]' } })?.properties).toEqual({});
+    expect(beforeSend({ event: '$autocapture', properties: { label: 'assign_save' } })?.properties).toEqual({ label: 'assign_save' });
+  });
+  it('removes ph-label from elements when it does not match', () => {
+    const out = beforeSend({
+      event: '$autocapture',
+      properties: {
+        $elements: [
+          { tag_name: 'button', 'attr__ph-label': 'Bad Label' },
+          { tag_name: 'button', 'attr__ph-label': 'client_5f0c2c1e-1111-4222-8333-444455556666' },
+          { tag_name: 'button', 'attr__ph-label': 'log_set_done' },
+        ],
+      },
+    });
+    expect(out?.properties.$elements).toEqual([{ tag_name: 'button' }, { tag_name: 'button' }, { tag_name: 'button', 'attr__ph-label': 'log_set_done' }]);
+  });
+  it('removes ph-label from the elements chain when it does not match', () => {
+    const out = beforeSend({ event: '$autocapture', properties: { $elements_chain: 'button:attr__ph-label="Bad Label"nth-child="1";div:attr__ph-label="log_add_set"' } });
+    expect(out?.properties.$elements_chain).toBe('button:nth-child="1";div:attr__ph-label="log_add_set"');
+  });
+});
+
+describe('beforeSend (phone label copied into tag_name)', () => {
+  it('blanks a tag_name that holds a label breaking the rule, on the element and its children', () => {
+    const out = beforeSend({
+      event: '$autocapture',
+      properties: {
+        $elements: [
+          { tag_name: 'client Luis' },
+          { tag_name: 'client-Luis', 'attr__ph-label': 'client-Luis' },
+          { tag_name: 'client Luis', 'attr__ph-label': 'client Luis' },
+          { tag_name: 'log_set_done', 'attr__ph-label': 'log_set_done' },
+          { tag_name: 'Pressable' },
+          { tag_name: 'button' },
+        ],
+      },
+    });
+    expect(out?.properties.$elements).toEqual([
+      { tag_name: '' },
+      { tag_name: '' },
+      { tag_name: '' },
+      { tag_name: 'log_set_done', 'attr__ph-label': 'log_set_done' },
+      { tag_name: 'Pressable' },
+      { tag_name: 'button' },
+    ]);
+  });
+  it('blanks a bad tag in the elements chain', () => {
+    const out = beforeSend({ event: '$autocapture', properties: { $elements_chain: 'client Luis:nth-child="1";client-Luis:attr__ph-label="client-Luis";log_add_set:attr__ph-label="log_add_set";button.btn:nth-child="2"' } });
+    expect(out?.properties.$elements_chain).toBe(':nth-child="1";:;log_add_set:attr__ph-label="log_add_set";button.btn:nth-child="2"');
+  });
+});

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   BUILT_IN_METRIC_KEYS,
@@ -15,7 +16,7 @@ import {
 import type { BuiltInMetricKey, ChartRange, IsoDate, Units } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, Chip, ErrorText } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { STALE_DEPLOY_MESSAGE, failureCode } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { deleteScan } from './actions';
 import { LineChart } from './line-chart';
@@ -55,7 +56,7 @@ export function ProgressSection({
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState<ScanRow | null>(null);
   const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<ErrorCode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Drop ?scan=1 once it has opened the form, so a reload doesn't open it again.
@@ -111,10 +112,10 @@ export function ProgressSection({
         setDeleting(null);
         setToast(outcome.warning ?? 'Scan deleted.');
       } else {
-        setDeleteError(outcome.error);
+        setDeleteError(outcome.code);
       }
     } catch (e) {
-      setDeleteError(failureMessage(e, "Couldn't delete the scan. Check your connection and try again."));
+      setDeleteError(failureCode(e, 'scan_delete_offline'));
     } finally {
       setDeletePending(false);
     }
@@ -298,7 +299,7 @@ function DeleteScanDialog({
   when: string;
   clientName: string;
   pending: boolean;
-  error: string | null;
+  error: ErrorCode | null;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -318,7 +319,7 @@ function DeleteScanDialog({
       <p className={calendar.dialogBody}>
         The scan of {when} for {clientName}{scan.hasPrintout ? ' and its printout' : ''} will be deleted. This can&apos;t be undone.
       </p>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       <div className={calendar.dialogActions}>
         <Button variant="secondary" onClick={() => ref.current?.close()} disabled={pending}>Cancel</Button>
         <Button onClick={onDelete} pending={pending}>{pending ? 'Deleting…' : 'Delete scan'}</Button>

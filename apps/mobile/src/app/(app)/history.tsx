@@ -60,7 +60,7 @@ export default function History() {
       {history.status === 'loading' && !data ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {history.status === 'offline' && !data ? (
         <Card>
-          <ErrorText>{LOAD_FAILED}</ErrorText>
+          <ErrorText code="history_load_failed">{LOAD_FAILED}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => setRefreshKey((k) => k + 1)} />
         </Card>
       ) : null}

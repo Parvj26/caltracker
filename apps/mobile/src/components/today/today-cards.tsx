@@ -130,6 +130,7 @@ export function WorkoutCard({
             <Button
               title={status?.kind === 'in_progress' ? 'Resume' : 'Start workout'}
               testID={`start-${workout.id}`}
+              ph-label="log_start_workout"
               onPress={onStart}
               busy={starting}
             />
@@ -199,6 +200,7 @@ export function FoodCard({ refreshKey }: { refreshKey: number }) {
         </Text>
         <Pressable
           testID="today-add-meal"
+          ph-label="log_add_meal"
           onPress={() => router.push({ pathname: '/food/meal', params: { day: today } })}
           accessibilityRole="button"
           accessibilityLabel="Add meal"

@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { DOCUMENT_MAX_BYTES, validateDocumentName } from '@caltracker/shared';
+import { DOCUMENT_MAX_BYTES, codeForMessage, validateDocumentName, type ErrorCode } from '@caltracker/shared';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -9,12 +10,11 @@ import { createServerSupabase } from '@/lib/supabase/server';
 // (storage policies let only the workspace's coach write, for a current client), then createDocument records it.
 // The workspace always comes from requireCoach(). Files are removed through the Storage API, never by SQL.
 
-export type DocumentOutcome = { ok: true; warning?: string } | { ok: false; error: string; warning?: string };
+export type DocumentOutcome = { ok: true; warning?: string } | (ActionFailure & { warning?: string });
 
 const BUCKET = 'client-documents';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPES: Record<string, string> = { pdf: 'application/pdf', webp: 'image/webp', jpg: 'image/jpeg' };
-const GENERIC = "Couldn't save the document. Please try again.";
 const refresh = () => revalidatePath('/clients/[clientId]', 'layout');
 
 export type NewDocument = { id: string; clientId: string; name: string; path: string; contentType: string; sizeBytes: number; shared: boolean };
@@ -36,26 +36,27 @@ export async function createDocument(input: NewDocument): Promise<DocumentOutcom
     sizeBytes <= DOCUMENT_MAX_BYTES &&
     typeof shared === 'boolean';
   const supabase = await createServerSupabase();
-  const takeBack = async (error: string): Promise<DocumentOutcome> => {
+  const takeBack = async (code: ErrorCode): Promise<DocumentOutcome> => {
+    const failed = fail(code, 'action:documents.createDocument');
     // The file was uploaded for a record that wasn't made: remove it (only ever inside this client's folder).
     if (typeof path === 'string' && path.startsWith(prefix)) {
       const removed = await supabase.storage.from(BUCKET).remove([path]);
-      if (removed.error) return { ok: false, error, warning: 'The uploaded file could not be removed.' };
+      if (removed.error) return { ...failed, warning: 'The uploaded file could not be removed.' };
     }
-    return { ok: false, error };
+    return failed;
   };
-  if (!valid) return takeBack('That file is not a valid document.');
+  if (!valid) return takeBack('document_invalid');
   const name = validateDocumentName(String(input.name ?? ''));
-  if (!name.ok) return takeBack(name.error);
+  if (!name.ok) return takeBack(codeForMessage(name.error, 'field_format'));
 
   // Trust what Storage holds, not what the browser said: the size and type must match the uploaded object.
   const fileName = path.slice(prefix.length);
   const listed = await supabase.storage.from(BUCKET).list(`${workspaceId}/${clientId}`, { search: fileName, limit: 1 });
-  if (listed.error) return { ok: false, error: GENERIC };
+  if (listed.error) return fail('document_save_failed', 'action:documents.createDocument');
   const stored = listed.data.find((o) => o.name === fileName);
   const meta = (stored?.metadata ?? {}) as { size?: unknown; mimetype?: unknown };
   if (!stored || meta.size !== sizeBytes || meta.mimetype !== contentType) {
-    return takeBack("The uploaded file doesn't match. Please try again.");
+    return takeBack('document_upload_mismatch');
   }
 
   const { error } = await supabase.from('client_documents').insert({
@@ -68,7 +69,7 @@ export async function createDocument(input: NewDocument): Promise<DocumentOutcom
     size_bytes: sizeBytes,
     shared_with_client: shared,
   });
-  if (error) return takeBack(error.code === '42501' ? "This client was removed, so documents can't be added." : GENERIC);
+  if (error) return takeBack(error.code === '42501' ? 'document_client_removed' : 'document_save_failed');
   refresh();
   return { ok: true };
 }
@@ -76,33 +77,33 @@ export async function createDocument(input: NewDocument): Promise<DocumentOutcom
 const LINK_FOR_S = 300;
 
 /** A short-lived link (5 minutes) to open one document, made when the coach asks for it. */
-export async function documentLink(id: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+export async function documentLink(id: string): Promise<{ ok: true; url: string } | ActionFailure> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return { ok: false, error: GENERIC };
+  if (!UUID.test(id)) return fail('request_invalid', 'action:documents.documentLink');
   const supabase = await createServerSupabase();
   const row = await supabase.from('client_documents').select('storage_path').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
-  if (row.error) return { ok: false, error: "Couldn't open the document. Please try again." };
-  if (!row.data) return { ok: false, error: 'That document is gone. Reload the page to see the latest.' };
+  if (row.error) return fail('document_open_failed', 'action:documents.documentLink');
+  if (!row.data) return fail('document_gone', 'action:documents.documentLink');
   const signed = await supabase.storage.from(BUCKET).createSignedUrl(row.data.storage_path, LINK_FOR_S);
-  if (signed.error) return { ok: false, error: "Couldn't open the document. Please try again." };
+  if (signed.error) return fail('document_open_failed', 'action:documents.documentLink');
   return { ok: true, url: signed.data.signedUrl };
 }
 
 export async function renameDocument(id: string, name: string): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id) || typeof name !== 'string') return { ok: false, error: GENERIC };
+  if (!UUID.test(id) || typeof name !== 'string') return fail('request_invalid', 'action:documents.renameDocument');
   const checked = validateDocumentName(name);
-  if (!checked.ok) return checked;
+  if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:documents.renameDocument');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.from('client_documents').update({ name: checked.value }).eq('id', id).eq('workspace_id', workspaceId).select('id');
-  if (error || data.length === 0) return { ok: false, error: "Couldn't rename the document." };
+  if (error || data.length === 0) return fail('document_rename_failed', 'action:documents.renameDocument');
   refresh();
   return { ok: true };
 }
 
 export async function setDocumentShared(id: string, shared: boolean): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id) || typeof shared !== 'boolean') return { ok: false, error: GENERIC };
+  if (!UUID.test(id) || typeof shared !== 'boolean') return fail('request_invalid', 'action:documents.setDocumentShared');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from('client_documents')
@@ -111,19 +112,19 @@ export async function setDocumentShared(id: string, shared: boolean): Promise<Do
     .eq('workspace_id', workspaceId)
     .select('id');
   // 42501: a removed client's document can only be unshared, never shared again.
-  if (error?.code === '42501') return { ok: false, error: "This client was removed, so documents can't be shared with them." };
-  if (error || data.length === 0) return { ok: false, error: "Couldn't change sharing. Please try again." };
+  if (error?.code === '42501') return fail('document_share_client_removed', 'action:documents.setDocumentShared');
+  if (error || data.length === 0) return fail('document_share_failed', 'action:documents.setDocumentShared');
   refresh();
   return { ok: true };
 }
 
 export async function deleteDocument(id: string): Promise<DocumentOutcome> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return { ok: false, error: GENERIC };
+  if (!UUID.test(id)) return fail('request_invalid', 'action:documents.deleteDocument');
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.from('client_documents').delete().eq('id', id).eq('workspace_id', workspaceId).select('storage_path');
-  if (error) return { ok: false, error: "Couldn't delete the document. Please try again." };
-  if (data.length === 0) return { ok: false, error: 'That document is already gone.' };
+  if (error) return fail('document_delete_failed', 'action:documents.deleteDocument');
+  if (data.length === 0) return fail('document_already_gone', 'action:documents.deleteDocument');
   refresh();
   const removed = await supabase.storage.from(BUCKET).remove([data[0]!.storage_path]);
   return removed.error ? { ok: true, warning: 'The document is deleted, but its file could not be removed.' } : { ok: true };

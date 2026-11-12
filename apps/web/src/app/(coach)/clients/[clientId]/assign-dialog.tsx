@@ -11,11 +11,11 @@ import {
   programClashes,
   programStartError,
 } from '@caltracker/shared';
-import type { IsoDate } from '@caltracker/shared';
+import type { ErrorCode, IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink, ErrorText, SelectField, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { Button, ButtonLink, ErrorText, SelectField, TextField, errorFromText } from '@/components/ui';
+import { failureCode } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
@@ -74,7 +74,7 @@ export function AssignDialog({
   const [startDate, setStartDate] = useState(() => nextMonday(today));
   const [assignmentId] = useState(() => crypto.randomUUID());
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -108,10 +108,10 @@ export function AssignDialog({
         onAssigned(program.name, outcome.count);
         return;
       }
-      setError(outcome.error);
+      setError(outcome.code);
     } catch (e) {
       // The same id is kept, so trying again can't copy the program twice.
-      setError(failureMessage(e, "Couldn't assign. Check your connection and try again."));
+      setError(failureCode(e, 'assign_offline'));
     } finally {
       busy.current = false;
       setPending(false);
@@ -128,7 +128,7 @@ export function AssignDialog({
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={styles.dialogTitle}>Assign a program</h2>
+      <h2 id={titleId} className={styles.dialogTitle} data-ph-safe="">Assign a program</h2>
       {programs.length === 0 ? (
         <>
           <p className={styles.dialogBody}>
@@ -149,6 +149,7 @@ export function AssignDialog({
           <p className={styles.dialogBody}>Copies the program&apos;s workouts onto {clientName}&apos;s calendar.</p>
           <SelectField
             label="Program"
+            data-ph-capture-attribute-label="assign_pick_program"
             value={programId}
             onChange={(e) => {
               setProgramId(e.target.value);
@@ -165,13 +166,14 @@ export function AssignDialog({
             id={dateInputId}
             label="Start date"
             type="date"
+            data-ph-capture-attribute-label="assign_pick_date"
             min={earliestProgramStart(today)}
             value={startDate}
             onChange={(e) => {
               setStartDate(e.target.value);
               setError(null);
             }}
-            {...(startError ? { error: startError } : {})}
+            {...(startError ? { error: errorFromText(startError, 'assign_date_invalid') } : {})}
           />
           {program && startError === null ? <p className={styles.preview}>{assignPreview(program, startDate)}</p> : null}
           {inPast ? (
@@ -201,10 +203,10 @@ export function AssignDialog({
           ) : null}
         </>
       )}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
       <div className={styles.dialogActions}>
-        {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
+        {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
+        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           Cancel
         </Button>
         {clashes.length > 0 ? (
@@ -213,7 +215,7 @@ export function AssignDialog({
           </Button>
         ) : null}
         {programs.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null}>
+          <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null} data-ph-capture-attribute-label="assign_save" data-ph-safe="">
             {pending ? 'Assigning…' : clashes.length > 0 ? 'Add alongside' : 'Assign'}
           </Button>
         ) : null}

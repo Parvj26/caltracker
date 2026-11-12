@@ -249,6 +249,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
         ))}
         <Pressable
           testID={`tick-${id}`}
+          ph-label="log_set_done"
           disabled={locked}
           onPress={() => handlers.onTick(row)}
           hitSlop={4}
@@ -360,6 +361,7 @@ export function AddSetButton({ testID, onPress, title = '+ Add set' }: { testID:
   return (
     <Pressable
       testID={testID}
+      ph-label="log_add_set"
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={title.replace(/^\+ /, '')}

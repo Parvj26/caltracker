@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore, useTransition } from 'react';
@@ -22,8 +23,9 @@ import {
 } from '@caltracker/shared';
 import { takeOverSession } from '@/app/(coach)/clients/[clientId]/log/[workoutId]/actions';
 import { Photo } from '@/components/exercise-search/photo';
+import { ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import { failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import type { WatchPane } from '@/lib/training-now';
 import styles from './live.module.css';
 
@@ -134,7 +136,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
   const { log } = pane;
   const now = useNowSecond();
   const flash = useJustTicked(log);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
   const stats = liveStats(log, pane.award);
   const position = whereTheyAre(log);
@@ -149,12 +151,12 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
       try {
         const outcome = await takeOverSession(log.id);
         if (!outcome.ok) {
-          setError(outcome.error);
+          setError(outcome.code);
           return;
         }
         router.push(`/clients/${pane.clientId}/log/${workoutId}`);
       } catch (e) {
-        setError(failureMessage(e, "Couldn't take over. Check your connection and try again."));
+        setError(failureCode(e, 'session_takeover_failed'));
       }
     });
   }
@@ -213,9 +215,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
             <div className={styles.barFill} style={{ width: `${Math.round(stats.fraction * 100)}%` }} />
           </div>
           {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
+            <ErrorText code={error} className={styles.error} />
           ) : null}
         </div>
       </header>

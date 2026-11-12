@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { AssignProgramInput, IsoDateSchema, ScheduleWorkoutInput, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
-import { assignOne, scheduleOne, todayError, type Outcome } from '@/lib/assign';
+import { fail } from '@/lib/action-result';
+import { assignOne, dateCode, scheduleOne, todayError, type Outcome } from '@/lib/assign';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
@@ -17,16 +18,15 @@ export type { Outcome } from '@/lib/assign';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v);
-const ALREADY_DONE = "You can't move a workout that's already done: it stays on the day it was done. View its log instead.";
 
 const refreshCalendar = () => revalidatePath('/clients/[clientId]', 'layout');
 
 export async function assignProgram(input: AssignProgramInput): Promise<Outcome<{ count: number }>> {
   await requireCoach();
   const parsed = AssignProgramInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: 'Pick a program and a valid start date.' };
+  if (!parsed.success) return fail('assign_input_invalid', 'action:clients.assignProgram');
   const badToday = todayError(parsed.data.today);
-  if (badToday) return { ok: false, error: badToday };
+  if (badToday) return fail(badToday, 'action:clients.assignProgram');
   const outcome = await assignOne(await createServerSupabase(), parsed.data);
   if (outcome.ok) refreshCalendar();
   return outcome;
@@ -35,9 +35,9 @@ export async function assignProgram(input: AssignProgramInput): Promise<Outcome<
 export async function scheduleWorkout(input: ScheduleWorkoutInput): Promise<Outcome> {
   await requireCoach();
   const parsed = ScheduleWorkoutInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: 'Pick a workout and a valid date.' };
+  if (!parsed.success) return fail('schedule_input_invalid', 'action:clients.scheduleWorkout');
   const badToday = todayError(parsed.data.today);
-  if (badToday) return { ok: false, error: badToday };
+  if (badToday) return fail(badToday, 'action:clients.scheduleWorkout');
   const outcome = await scheduleOne(await createServerSupabase(), parsed.data);
   if (outcome.ok) refreshCalendar();
   return outcome;
@@ -53,8 +53,8 @@ export async function moveClientWorkout(input: { workoutId: string; date: IsoDat
   const date = IsoDateSchema.safeParse(input.date);
   const today = IsoDateSchema.safeParse(input.today);
   if (!isUuid(input.workoutId) || !date.success || !today.success) throw new Error('Invalid move');
-  const dateError = todayError(today.data) ?? scheduleDateError(date.data, today.data);
-  if (dateError) return { ok: false, error: dateError };
+  const dateError = todayError(today.data) ?? dateCode(scheduleDateError(date.data, today.data));
+  if (dateError) return fail(dateError, 'action:clients.moveClientWorkout');
   const supabase = await createServerSupabase();
   const done = await supabase
     .from('workout_logs')
@@ -63,7 +63,7 @@ export async function moveClientWorkout(input: { workoutId: string; date: IsoDat
     .eq('workspace_id', workspaceId)
     .eq('status', 'completed');
   if (done.error) throw new Error(`Could not check the workout: ${done.error.message}`);
-  if ((done.count ?? 0) > 0) return { ok: false, error: ALREADY_DONE };
+  if ((done.count ?? 0) > 0) return fail('workout_move_done', 'action:clients.moveClientWorkout');
   const { data, error } = await supabase
     .from('workouts')
     .update({ scheduled_on: date.data })

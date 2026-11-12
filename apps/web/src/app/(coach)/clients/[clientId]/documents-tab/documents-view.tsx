@@ -1,10 +1,11 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useRef, useState, useTransition } from 'react';
-import { DOCUMENT_NAME_MAX_LENGTH, documentKind, formatFileSize } from '@caltracker/shared';
+import { DOCUMENT_NAME_MAX_LENGTH, documentKind, errorMessage, formatFileSize } from '@caltracker/shared';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
-import { Button, Card, ErrorText, TextField } from '@/components/ui';
-import { failureMessage, isStaleDeployError } from '@/lib/action-errors';
+import { Button, Card, ErrorText, TextField, type FieldError } from '@/components/ui';
+import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { createDocument, deleteDocument, documentLink, renameDocument, setDocumentShared, type DocumentOutcome } from '../documents-actions';
 import { preparePrintout, type Printout } from '../progress/compress';
@@ -23,7 +24,7 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
   const [file, setFile] = useState<{ prepared: Printout; original: File } | null>(null);
   const [name, setName] = useState('');
   const [shared, setShared] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [pending, start] = useTransition();
 
@@ -32,7 +33,7 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
     setFile(null);
     if (!f) return;
     if (!documentKind(f.type, f.size)) {
-      setError(FILE_ERROR);
+      setError({ code: 'document_file_invalid' });
       if (input.current) input.current.value = '';
       return;
     }
@@ -41,8 +42,8 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
       // Images are shrunk on this device (1600 px long edge, WebP or JPEG); PDFs are kept as they are.
       setFile({ prepared: await preparePrintout(f, FILE_ERROR), original: f });
       setName((n) => n || baseName(f));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : FILE_ERROR);
+    } catch {
+      setError({ code: 'document_file_invalid' });
       if (input.current) input.current.value = '';
     } finally {
       setPreparing(false);
@@ -59,14 +60,14 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
       try {
         const up = await createBrowserSupabase().storage.from('client-documents').upload(path, file.prepared.blob, { contentType: file.prepared.contentType });
         if (up.error) {
-          setError("Couldn't upload the file. Check your connection and try again.");
+          setError({ code: 'upload_offline' });
           return;
         }
         uploaded = true;
         const outcome = await createDocument({ id, clientId, name, path, contentType: file.prepared.contentType, sizeBytes: file.prepared.blob.size, shared });
         uploaded = false; // saved, or the server already took the file back
         if (!outcome.ok) {
-          setError(outcome.warning ? `${outcome.error} ${outcome.warning}` : outcome.error);
+          setError({ code: outcome.code, text: outcome.warning ? `${errorMessage(outcome.code)} ${outcome.warning}` : undefined });
           return;
         }
         setFile(null);
@@ -78,7 +79,7 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
         // The record may have been saved even though the answer never arrived, so the file stays (a leftover file
         // beats a document whose file is gone). Only a call that certainly never ran (a stale page) takes it back.
         if (!isStaleDeployError(e)) uploaded = false;
-        setError(failureMessage(e, "Couldn't save the document. Check your connection and try again."));
+        setError({ code: failureCode(e, 'document_save_offline') });
       } finally {
         if (uploaded) void createBrowserSupabase().storage.from('client-documents').remove([path]);
       }
@@ -106,7 +107,7 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
           </label>
         </>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <div className={styles.actions}>
         <Button onClick={upload} pending={pending} disabled={!file || !name.trim() || preparing}>
           {pending ? 'Uploading…' : 'Upload'}
@@ -122,7 +123,7 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
   const [name, setName] = useState(doc.name);
   // The switch moves at once; it goes back if the save fails.
   const [shared, setShared] = useState(doc.shared);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, start] = useTransition();
 
   function run(action: () => Promise<DocumentOutcome>, done: string, after?: () => void, undo?: () => void) {
@@ -132,14 +133,14 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
         const outcome = await action();
         if (!outcome.ok) {
           undo?.();
-          setError(outcome.error);
+          setError(outcome.code);
         } else {
           after?.();
           onMessage(outcome.warning ?? done);
         }
       } catch (e) {
         undo?.();
-        setError(failureMessage(e, "Couldn't save. Check your connection and try again."));
+        setError(failureCode(e, 'save_offline'));
       }
     });
   }
@@ -158,11 +159,11 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
       else if (link.ok) window.location.href = link.url;
       else {
         tab?.close();
-        setError(link.error);
+        setError(link.code);
       }
     } catch (e) {
       tab?.close();
-      setError(failureMessage(e, "Couldn't open the document. Check your connection and try again."));
+      setError(failureCode(e, 'document_open_offline'));
     } finally {
       setOpening(false);
     }
@@ -237,7 +238,7 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
           </button>
         </div>
       )}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </li>
   );
 }

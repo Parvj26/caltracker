@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   IsoDateSchema,
@@ -14,7 +15,7 @@ import {
   scheduleDateError,
   workoutClashes,
 } from '@caltracker/shared';
-import type { IsoDate, ProgramClash } from '@caltracker/shared';
+import { errorMessage, type IsoDate, type ProgramClash } from '@caltracker/shared';
 import {
   assignToClients,
   loadAssignTargets,
@@ -24,8 +25,8 @@ import {
 } from '@/app/(coach)/assign/actions';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ErrorText, TextField } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, failureMessage, isStaleDeployError } from '@/lib/action-errors';
+import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
 import styles from './assign.module.css';
@@ -54,11 +55,13 @@ export function AssignButton({ kind, id, name, compact = false }: { kind: 'worko
   return (
     <>
       {compact ? (
-        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)}>
+        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open">
           Assign
         </button>
       ) : (
-        <Button onClick={() => setOpen(true)}>Assign {kind}</Button>
+        <Button onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
+          Assign {kind}
+        </Button>
       )}
       {open ? (
         <AssignToClientsDialog
@@ -115,7 +118,7 @@ export function AssignToClientsDialog({
   const isCopy = source.kind === 'copy';
   const verb = isCopy ? 'Copied' : 'Assigned';
   const [targets, setTargets] = useState<AssignTargets | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<ErrorCode | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(preselect));
   const [freeDay, setFreeDay] = useState(false);
@@ -125,7 +128,7 @@ export function AssignToClientsDialog({
   const [results, setResults] = useState<ReadonlyMap<string, ClientResult>>(new Map());
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError | null>(null);
   const busy = useRef(false);
   // One id per client and day: retrying the same choice repeats it (the database copies once); another day gets a new one.
   const ids = useRef(new Map<string, string>());
@@ -155,7 +158,7 @@ export function AssignToClientsDialog({
         if (live) setTargets(t);
       })
       .catch((e: unknown) => {
-        if (live) setLoadError(failureMessage(e, "Couldn't load your clients. Check your connection and try again."));
+        if (live) setLoadError(failureCode(e, 'clients_load_failed'));
       });
     return () => {
       live = false;
@@ -219,7 +222,7 @@ export function AssignToClientsDialog({
     try {
       const outcome = await assignToClients({ kind: source.kind, sourceId: source.id, today, targets: sent });
       if (!outcome.ok) {
-        setError(outcome.error);
+        setError({ code: outcome.code });
         return;
       }
       setUncertain(false);
@@ -232,10 +235,11 @@ export function AssignToClientsDialog({
         return;
       }
       setResults(next);
-      setError(assignSummary(source.name, all, verb));
+      // The summary names the program or workout, so it stays hidden in recordings.
+      setError({ code: 'assign_partial_failed', text: assignSummary(source.name, all, verb), safe: false });
     } catch (e) {
       // The same clients and days keep their ids, so trying again can't copy twice.
-      setError(failureMessage(e, `Couldn't ${isCopy ? 'copy' : 'assign'}. Check your connection and try again.`));
+      setError({ code: failureCode(e, isCopy ? 'copy_offline' : 'assign_offline') });
       if (!isStaleDeployError(e)) setUncertain(true);
     } finally {
       busy.current = false;
@@ -273,7 +277,7 @@ export function AssignToClientsDialog({
         </p>
       ) : null}
       {loadError ? (
-        <ErrorText>{loadError}</ErrorText>
+        <ErrorText code={loadError} />
       ) : targets === null ? (
         <p className={calendar.caption} role="status">Loading clients…</p>
       ) : clients.length === 0 ? (
@@ -315,13 +319,13 @@ export function AssignToClientsDialog({
               return (
                 <li key={c.id} className={styles.client}>
                   <label className={styles.clientLabel}>
-                    <input type="checkbox" checked={on || assigned(c.id)} disabled={assigned(c.id) || pending} onChange={() => toggle(c.id)} />
+                    <input type="checkbox" checked={on || assigned(c.id)} disabled={assigned(c.id) || pending} onChange={() => toggle(c.id)} data-ph-capture-attribute-label="assign_pick_client" />
                     <span>{nameOf(c)}</span>
                   </label>
                   {result?.ok ? (
                     <span className={styles.done}>{verb} ✓</span>
                   ) : result && !result.ok && on ? (
-                    <span className={styles.failed}>{result.error}</span>
+                    <span className={styles.failed}>{errorMessage(result.code)}</span>
                   ) : on && useFreeDay ? (
                     <span className={styles.note}>{formatShortDay(dayFor(c.id))}</span>
                   ) : clashes.length > 0 ? (
@@ -350,13 +354,14 @@ export function AssignToClientsDialog({
               id={dateInputId}
               label={isWorkout ? 'Date' : 'Start date'}
               type="date"
+              data-ph-capture-attribute-label="assign_pick_date"
               min={isWorkout ? today : earliestProgramStart(today)}
               value={date}
               onChange={(e) => {
                 setDate(e.target.value);
                 setError(null);
               }}
-              {...(dateError ? { error: dateError } : {})}
+              {...(dateError ? { error: errorFromText(dateError, 'assign_date_invalid') } : {})}
             />
           )}
           {!isWorkout && !dateError && date < today ? (
@@ -365,7 +370,7 @@ export function AssignToClientsDialog({
               <span>This start date is in the past. Workouts before today will show as missed later.</span>
             </p>
           ) : null}
-          {missingProgram ? <ErrorText>This program is no longer in your library.</ErrorText> : null}
+          {missingProgram ? <ErrorText code="program_missing" /> : null}
           {clashing.length > 0 ? (
             <section className={calendar.clashNote} aria-labelledby={clashTitleId} role="status">
               <p id={clashTitleId} className={calendar.clashTitle}>
@@ -387,7 +392,9 @@ export function AssignToClientsDialog({
           ) : null}
         </>
       )}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error.code} safe={error.safe}>
+          {error.text}
+        </ErrorText> : null}
       {uncertain ? (
         <p className={calendar.pastNote}>
           <span aria-hidden="true" className={calendar.pastMarker}>●</span>
@@ -395,8 +402,8 @@ export function AssignToClientsDialog({
         </p>
       ) : null}
       <div className={calendar.dialogActions}>
-        {error === STALE_DEPLOY_MESSAGE ? <ReloadButton className={calendar.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
+        {error?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
+        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           {results.size > 0 ? 'Close' : 'Cancel'}
         </Button>
         {clashing.length > 0 && !useFreeDay ? (
@@ -405,7 +412,7 @@ export function AssignToClientsDialog({
           </Button>
         ) : null}
         {clients.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={n === 0 || dateError !== null || missingProgram}>
+          <Button onClick={() => void assign()} pending={pending} disabled={n === 0 || dateError !== null || missingProgram} data-ph-capture-attribute-label="assign_save">
             {label}
           </Button>
         ) : null}

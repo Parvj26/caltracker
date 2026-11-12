@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { PROGRAM_WEEKS_MAX, copyWeek } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, copyWeek, errorMessage } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
@@ -234,7 +234,7 @@ export function ProgramGrid({
       .then((outcome) => {
         if (!outcome.ok) {
           undo();
-          setToast(outcome.error);
+          setToast(errorMessage(outcome.code));
           return;
         }
         // Same ids as shown; take the saved days and order in case the source week differed from this page.
@@ -301,7 +301,7 @@ export function ProgramGrid({
     setAddingWeek(true);
     try {
       const outcome = await updateProgram(program.id, { ...savedDetails.current, weeks: next });
-      if (!outcome.ok) throw new Error(outcome.error);
+      if (!outcome.ok) throw new Error(outcome.code);
       markSaved();
     } catch (e) {
       setWeeks(next - 1);
@@ -376,6 +376,7 @@ export function ProgramGrid({
                             id={copyWeekButtonDomId(w)}
                             className={styles.smallButton}
                             aria-label={`Copy week ${w}`}
+                            data-ph-capture-attribute-label="program_copy_week"
                             onClick={() => setCopying(w)}
                           >
                             Copy…
@@ -401,7 +402,7 @@ export function ProgramGrid({
               </table>
             </div>
             <div>
-              <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX}>
+              <Button variant="secondary" onClick={() => void addWeek()} pending={addingWeek} disabled={weeks >= PROGRAM_WEEKS_MAX} data-ph-capture-attribute-label="program_add_week">
                 + Add week
               </Button>
             </div>
@@ -554,6 +555,7 @@ function DayCell({
         id={addButtonDomId(week, day)}
         className={styles.addButton}
         aria-label={`Add a workout to week ${week}, day ${day}`}
+        data-ph-capture-attribute-label="program_add_workout"
         onClick={onAdd}
       >
         +

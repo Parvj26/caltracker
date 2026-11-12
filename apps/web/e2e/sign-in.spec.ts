@@ -17,13 +17,13 @@ test('demo coach signs in and lands on /home with the workspace name', async ({ 
 
 test('wrong password shows a generic error', async ({ page }) => {
   await signIn(page, 'coach@demo.local', 'wrong-password');
-  await expect(page.getByText('Incorrect email or password')).toBeVisible();
+  await expect(page.getByText('Wrong email or password.')).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
 test('unknown email shows the same error', async ({ page }) => {
   await signIn(page, 'nobody@demo.local', 'wrong-password');
-  await expect(page.getByText('Incorrect email or password')).toBeVisible();
+  await expect(page.getByText('Wrong email or password.')).toBeVisible();
 });
 
 test('visiting /clients signed out redirects to /sign-in', async ({ page }) => {

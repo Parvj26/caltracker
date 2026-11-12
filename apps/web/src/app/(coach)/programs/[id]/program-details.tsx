@@ -1,19 +1,19 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { PROGRAM_WEEKS_MAX, ProgramInput } from '@caltracker/shared';
+import { PROGRAM_WEEKS_MAX, ProgramInput, codeForMessage, type ErrorCode } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
-import { Button, Card, ErrorText, TextAreaField, TextField } from '@/components/ui';
+import { Button, Card, ErrorText, TextAreaField, TextField, errorFromText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import { STALE_DEPLOY_MESSAGE, failureMessage } from '@/lib/action-errors';
+import { failureCode } from '@/lib/action-errors';
 import { countSlotsBeyondWeek, updateProgram } from '../actions';
 import type { Program } from './program-grid';
 import { shrinkWarning } from './shrink-warning';
 import styles from '../programs.module.css';
 
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
-const errorProp = (message: string | undefined) => (message ? { error: message } : {});
+const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_format') => (message ? { error: errorFromText(message, fallback) } : {});
 
 /** The program's name, length and description, with "Save details" (shrinking asks first). */
 export function ProgramDetails({
@@ -30,7 +30,7 @@ export function ProgramDetails({
   const [description, setDescription] = useState(program.description ?? '');
   const [weeksText, setWeeksText] = useState(String(program.weeks));
   const [errors, setErrors] = useState<Partial<Record<'name' | 'description' | 'weeks', string>>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<ErrorCode | null>(null);
   const [pending, setPending] = useState(false);
   const [confirm, setConfirm] = useState<{ input: ProgramInput; count: number } | null>(null);
   const [saved, setSaved] = useState({ name: program.name, description: program.description ?? '' });
@@ -55,14 +55,14 @@ export function ProgramDetails({
     try {
       const outcome = await updateProgram(program.id, input);
       if (!outcome.ok) {
-        setFormError(outcome.error);
+        setFormError(outcome.code);
         return;
       }
       setSaved({ name, description });
       setSavedAt(Date.now());
       onSaved({ name: input.name, description: input.description }, input.weeks, outcome.removedSlots, expected);
     } catch (e) {
-      setFormError(failureMessage(e, "Couldn't save. Please try again."));
+      setFormError(failureCode(e, 'save_failed'));
     } finally {
       setPending(false);
       dialogRef.current?.close();
@@ -94,7 +94,7 @@ export function ProgramDetails({
         count = await countSlotsBeyondWeek(program.id, parsed.data.weeks);
       } catch (e) {
         setPending(false);
-        setFormError(failureMessage(e, "Couldn't check the weeks you're removing. Please try again."));
+        setFormError(failureCode(e, 'program_weeks_check_failed'));
         return;
       }
       setPending(false);
@@ -114,7 +114,7 @@ export function ProgramDetails({
           value={name}
           maxLength={100}
           onChange={(e) => setName(e.target.value)}
-          {...errorProp(errors.name)}
+          {...errorProp(errors.name, 'program_name_required')}
           className={styles.nameField}
         />
         <TextField
@@ -136,15 +136,15 @@ export function ProgramDetails({
           onChange={(e) => setDescription(e.target.value)}
           className={styles.descriptionField}
         />
-        {errors.description ? <ErrorText>{errors.description}</ErrorText> : null}
+        {errors.description ? <ErrorText code={codeForMessage(errors.description, 'field_format')}>{errors.description}</ErrorText> : null}
         <div className={cx(styles.fullRow, styles.detailsSave)}>
-          <Button type="submit" variant="secondary" pending={pending && !confirm}>
+          <Button type="submit" variant="secondary" pending={pending && !confirm} data-ph-capture-attribute-label="program_save">
             {pending && !confirm ? 'Saving…' : 'Save details'}
           </Button>
           {/* The page's own status line says "All changes saved", so this one only flags edits and shows the tick. */}
           <SaveStatus pending={pending && !confirm} dirty={dirty} everSaved={false} savedAt={savedAt} />
-          {formError ? <ErrorText>{formError}</ErrorText> : null}
-          {formError === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+          {formError ? <ErrorText code={formError} /> : null}
+          {formError === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         </div>
       </form>
 

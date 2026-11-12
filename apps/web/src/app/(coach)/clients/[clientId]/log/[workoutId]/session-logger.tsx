@@ -11,6 +11,7 @@ import {
   completedSetCount,
   discardLog,
   distanceUnitFor,
+  errorMessage,
   finishLog,
   formatClock,
   formatLastResult,
@@ -42,6 +43,7 @@ import {
   updateActual,
   withSuggestion,
   type ActualPatch,
+  type ErrorCode,
   type IsoDate,
   type LogBlockDoc,
   type LogEdit,
@@ -62,7 +64,11 @@ import { handBackSession, loadSession, saveSession } from './actions';
 import styles from './session.module.css';
 
 type Field = 'weight' | 'reps' | 'time' | 'distance';
-type SaveState = { kind: 'idle' | 'saving' | 'saved' } | { kind: 'error' | 'final'; message: string };
+type SaveState =
+  | { kind: 'idle' | 'saving' | 'saved' }
+  | { kind: 'error'; message: string }
+  /** `safe: false` when the message names the client. */
+  | { kind: 'final'; code: ErrorCode; message: string; safe: boolean };
 type Op = LogEdit;
 
 const SAVE_DELAY_MS = 400;
@@ -434,9 +440,9 @@ export function SessionLogger({
         if (!outcome.ok) {
           if (outcome.final) {
             stopped.current = true;
-            setSave({ kind: 'final', message: outcome.error });
+            setSave({ kind: 'final', code: outcome.code, message: errorMessage(outcome.code), safe: true });
           } else {
-            setSave({ kind: 'error', message: outcome.error });
+            setSave({ kind: 'error', message: errorMessage(outcome.code) });
             timer.current = setTimeout(() => void flushRef.current(), RETRY_MS);
           }
           return false;
@@ -449,7 +455,7 @@ export function SessionLogger({
         }
         if (outcome.loggedByOther) {
           stopped.current = true;
-          setSave({ kind: 'final', message: `${client.firstName || 'Your client'} is logging this on their phone now.` });
+          setSave({ kind: 'final', code: 'session_client_logging', message: `${client.firstName || 'Your client'} is logging this on their phone now.`, safe: false });
           router.refresh();
           return false;
         }
@@ -607,7 +613,7 @@ export function SessionLogger({
     try {
       const outcome = await handBackSession(current.id);
       if (!outcome.ok) {
-        setNotice(outcome.error);
+        setNotice(errorMessage(outcome.code));
         undo();
         return;
       }
@@ -680,7 +686,11 @@ export function SessionLogger({
           {status}
         </p>
       </header>
-      {save.kind === 'final' ? <ErrorText>{save.message}</ErrorText> : null}
+      {save.kind === 'final' ? (
+        <ErrorText code={save.code} safe={save.safe}>
+          {save.message}
+        </ErrorText>
+      ) : null}
       {notice ? (
         <p className={styles.notice} role="status">
           {notice}

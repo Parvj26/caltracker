@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { AssignToClientsInput, addDays, compareByLastName, localToday } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
-import { assignOne, copyOne, scheduleOne, todayError, GENERIC } from '@/lib/assign';
+import { fail, type ActionFailure } from '@/lib/action-result';
+import { assignOne, copyOne, scheduleOne, todayError } from '@/lib/assign';
 import { requireCoach } from '@/lib/auth';
 import { readAll } from '@/lib/coach-home';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -89,7 +90,7 @@ export async function loadAssignTargets(input: { programId?: string | null } = {
   };
 }
 
-export type ClientResult = { clientId: string } & ({ ok: true; count: number } | { ok: false; error: string });
+export type ClientResult = { clientId: string } & ({ ok: true; count: number } | ActionFailure);
 
 /**
  * Puts one library workout (or program, or for Copy to… a client's calendar workout) on each target client's calendar, on that client's day. Each client is one
@@ -98,29 +99,29 @@ export type ClientResult = { clientId: string } & ({ ok: true; count: number } |
  */
 export async function assignToClients(
   input: AssignToClientsInput,
-): Promise<{ ok: true; results: ClientResult[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; results: ClientResult[] } | ActionFailure> {
   await requireCoach();
   const parsed = AssignToClientsInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: 'Pick at least one client and a valid date.' };
+  if (!parsed.success) return fail('assign_none_selected', 'action:assign.assignToClients');
   const { kind, sourceId, today, targets } = parsed.data;
   const badToday = todayError(today);
-  if (badToday) return { ok: false, error: badToday };
+  if (badToday) return fail(badToday, 'action:assign.assignToClients');
 
   const supabase = await createServerSupabase();
   const one = async (t: (typeof targets)[number]): Promise<ClientResult> => {
     try {
       if (kind === 'copy') {
         const r = await copyOne(supabase, { newId: t.id, sourceId, clientId: t.clientId, date: t.date, today });
-        return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ok: false, error: r.error };
+        return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ...r };
       }
       if (kind === 'workout') {
         const r = await scheduleOne(supabase, { newId: t.id, workoutId: sourceId, clientId: t.clientId, date: t.date, today });
-        return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ok: false, error: r.error };
+        return r.ok ? { clientId: t.clientId, ok: true, count: 1 } : { clientId: t.clientId, ...r };
       }
       const r = await assignOne(supabase, { assignmentId: t.id, programId: sourceId, clientId: t.clientId, startDate: t.date, today });
-      return r.ok ? { clientId: t.clientId, ok: true, count: r.count } : { clientId: t.clientId, ok: false, error: r.error };
+      return r.ok ? { clientId: t.clientId, ok: true, count: r.count } : { clientId: t.clientId, ...r };
     } catch {
-      return { clientId: t.clientId, ok: false, error: GENERIC };
+      return { clientId: t.clientId, ...fail('assign_save_failed', 'action:assign.assignToClients') };
     }
   };
 

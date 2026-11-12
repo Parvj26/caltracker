@@ -206,6 +206,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
       <button
         type="button"
         className={styles.removeSet}
+        data-ph-capture-attribute-label="workout_remove_set"
         aria-label={`Remove set ${number}`}
         title={canRemove ? 'Remove set' : 'An exercise keeps at least one set'}
         disabled={!canRemove}
@@ -214,7 +215,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         <Icon name="close" size={18} />
       </button>
       {errors.map((message) => (
-        <ErrorText key={message} className={styles.rowError}>
+        <ErrorText key={message} code="workout_fields_invalid" safe={false} className={styles.rowError}>
           {message}
         </ErrorText>
       ))}

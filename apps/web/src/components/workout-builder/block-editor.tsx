@@ -168,7 +168,9 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
         </div>
       </header>
       {(errors.get(`block:${block.id}`) ?? []).map((m) => (
-        <ErrorText key={m}>{m}</ErrorText>
+        <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
       ))}
 
       {block.exercises.map((ex, ei) => {
@@ -200,7 +202,9 @@ export function BlockEditor({ block, index, canMoveUp, canMoveDown, sections, un
               </div>
             ) : null}
             {(errors.get(`exercise:${ex.id}`) ?? []).map((m) => (
-              <ErrorText key={m}>{m}</ErrorText>
+              <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
             ))}
             <SetTable
               sets={ex.sets}
@@ -308,7 +312,7 @@ function SubstituteButton({ exercise, onAdd }: { exercise: WorkoutExerciseDoc; o
 /** "+ Set (copies last set)", shared with the substitute editor. */
 export function AddSetButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" className={styles.addSet} aria-label={label} title="Adds a copy of the last set" onClick={onClick}>
+    <button type="button" className={styles.addSet} aria-label={label} title="Adds a copy of the last set" onClick={onClick} data-ph-capture-attribute-label="workout_add_set">
       + Set <span className={styles.addSetHint}>(copies last set)</span>
     </button>
   );
@@ -369,7 +373,9 @@ function ExerciseOptions({
       {shown.length > 0 ? (
         <div id={tempoId} className={styles.optionsError}>
           {shown.map((m) => (
-            <ErrorText key={m}>{m}</ErrorText>
+            <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+              {m}
+            </ErrorText>
           ))}
         </div>
       ) : null}

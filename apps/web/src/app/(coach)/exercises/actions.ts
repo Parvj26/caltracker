@@ -2,13 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CustomExerciseInput, ExerciseOverrideInput, type Database } from '@caltracker/shared';
+import { CustomExerciseInput, ExerciseOverrideInput, codeForMessage, type Database } from '@caltracker/shared';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-export type SaveOverrideOutcome = { ok: true } | { ok: false; error: string };
+export type SaveOverrideOutcome = { ok: true } | ActionFailure;
 
-const GENERIC_ERROR = "Couldn't save. Please try again.";
 
 // Not .upsert(): its conflict update would also write workspace_id/exercise_id, which coaches lack UPDATE rights on.
 async function writeOverride(
@@ -36,7 +36,7 @@ export async function saveOverride(
 ): Promise<SaveOverrideOutcome> {
   const { workspaceId } = await requireCoach(); // never trust a client-supplied workspace id
   const parsed = ExerciseOverrideInput.safeParse({ exerciseId, ...input });
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? GENERIC_ERROR };
+  if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'field_format'), 'action:exercises.saveOverride');
   const { youtubeUrl, coachNotes } = parsed.data;
 
   const supabase = await createServerSupabase();
@@ -46,7 +46,7 @@ export async function saveOverride(
     .eq('id', parsed.data.exerciseId)
     .eq('source', 'builtin')
     .maybeSingle();
-  if (exists.error || !exists.data) return { ok: false, error: "Couldn't find that exercise." };
+  if (exists.error || !exists.data) return fail('exercise_not_found', 'action:exercises.saveOverride');
 
   const result =
     youtubeUrl === null && coachNotes === null
@@ -56,7 +56,7 @@ export async function saveOverride(
           .eq('workspace_id', workspaceId)
           .eq('exercise_id', parsed.data.exerciseId)
       : await writeOverride(supabase, workspaceId, parsed.data.exerciseId, youtubeUrl, coachNotes);
-  if (result.error) return { ok: false, error: GENERIC_ERROR };
+  if (result.error) return fail('exercise_save_failed', 'action:exercises.saveOverride');
 
   revalidatePath(`/exercises/${parsed.data.exerciseId}`);
   return { ok: true };

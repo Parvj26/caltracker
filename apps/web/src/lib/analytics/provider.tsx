@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { scrubUrl } from '@caltracker/shared';
 import { buildingProgramId, getTaskTracker, identifyPerson, initAnalytics, resetAnalytics, track, type AnalyticsPerson } from './client';
+import { watchAlerts } from './alert-code';
 import { buildProgramLeft, navTarget, slowNavMs } from './nav-rules';
 
 const SLOW_MS = 2000;
@@ -37,25 +38,13 @@ export function AnalyticsProvider({ person, children }: { person: AnalyticsPerso
     if (ms > SLOW_MS) track('slow_screen', { screen: scrubUrl(window.location.pathname), ms });
   }, []);
 
-  // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text.
+  // Error messages on screen (role="alert", e.g. ErrorText): count them without reading their text. An alert whose
+  // code changes in place (one error replacing another) counts again.
   useEffect(() => {
-    const seen = new WeakSet<Node>();
-    const observer = new MutationObserver((records) => {
-      for (const r of records) {
-        for (const node of r.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          const alerts = node.matches('[role="alert"]') ? [node] : [...node.querySelectorAll('[role="alert"]')];
-          for (const el of alerts) {
-            if (seen.has(el)) continue;
-            seen.add(el);
-            getTaskTracker().error();
-            track('error_shown', { code: el.getAttribute('data-error-code') ?? 'alert', screen: scrubUrl(window.location.pathname) });
-          }
-        }
-      }
+    return watchAlerts(document.body, (code) => {
+      getTaskTracker().error();
+      track('error_shown', { code, screen: scrubUrl(window.location.pathname) });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

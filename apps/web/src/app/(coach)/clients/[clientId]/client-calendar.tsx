@@ -3,14 +3,14 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
-import type { CalendarView, IsoDate } from '@caltracker/shared';
+import { errorMessage, type CalendarView, type IsoDate } from '@caltracker/shared';
 import { CalendarToolbar } from '@/components/calendar/calendar-toolbar';
 import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
 import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/stored-view';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
-import { STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
+import { ActionRefusedError, STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
@@ -45,8 +45,8 @@ const useTimeZone = () => useSyncExternalStore(noSubscribe, () => Intl.DateTimeF
 
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
-/** Messages from the server that are meant for the coach (anything else gets the generic undo message). */
-const forCoach = (message: string) => message.startsWith('You ') || message.startsWith('Pick ') || message.includes('date looks wrong');
+/** Refusals worth explaining to the coach; a plain save failure gets the generic undo message. */
+const forCoach = (e: unknown): e is ActionRefusedError => e instanceof ActionRefusedError && !e.code.endsWith('_failed');
 
 /**
  * One client's calendar, 1, 2 or 4 weeks or a month at a time (?view=&from=; without ?view= the coach's last pick in
@@ -168,7 +168,7 @@ export function ClientCalendar({
       .catch((e: unknown) => {
         setItems(undo);
         if (isStaleDeployError(e)) say(STALE_DEPLOY_MESSAGE);
-        else say(e instanceof Error && forCoach(e.message) ? e.message : SAVE_ERROR);
+        else say(forCoach(e) ? errorMessage(e.code) : SAVE_ERROR);
       })
       .finally(() => setInFlight((n) => n - 1));
   }
@@ -181,7 +181,7 @@ export function ClientCalendar({
       (s) => s.map((x) => (x.id === itemId ? { ...x, date } : x)),
       async () => {
         const outcome = await moveClientWorkout({ workoutId: itemId, date, today });
-        if (!outcome.ok) throw new Error(outcome.error);
+        if (!outcome.ok) throw new ActionRefusedError(outcome.code);
       },
       (s) => s.map((x) => (x.id === itemId ? { ...x, date: from } : x)),
     );
@@ -228,7 +228,7 @@ export function ClientCalendar({
             throw e;
           }
           unclear.current.delete(key);
-          if (!outcome.ok) throw new Error(outcome.error);
+          if (!outcome.ok) throw new ActionRefusedError(outcome.code);
         })();
         saves.current.set(newId, save);
         return save;
@@ -291,7 +291,7 @@ export function ClientCalendar({
         </div>
         {readOnly ? null : (
           <div className={styles.titleActions}>
-            <Button variant="secondary" onClick={() => setAssigning(true)}>
+            <Button variant="secondary" onClick={() => setAssigning(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
               Assign program
             </Button>
             <Button onClick={() => setAdding(true)}>+ Add workout</Button>

@@ -247,7 +247,7 @@ export function WorkoutOverview({
           </View>
         ))}
         {can.addExercise ? <Button variant="secondary" title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} /> : null}
-        {can.finish ? <Button variant="finish" title="Finish workout" testID="finish-workout" onPress={onFinish} /> : null}
+        {can.finish ? <Button variant="finish" title="Finish workout" testID="finish-workout" ph-label="log_finish_workout" onPress={onFinish} /> : null}
         {can.discard ? <TextButton testID="discard-workout" title="Discard workout" onPress={onDiscard} /> : null}
       </View>
     </ScrollView>

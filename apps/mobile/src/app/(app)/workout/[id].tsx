@@ -27,6 +27,7 @@ import { blockRounds, formatDayLabel, orList, supersetLetters } from '@/lib/work
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 type Detail = {
   doc: WorkoutDoc;
@@ -47,7 +48,7 @@ export default function WorkoutDetail() {
   const router = useRouter();
   const { text, space } = useTheme();
   const [detail, setDetail] = useState<Detail | null | 'missing'>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -57,7 +58,7 @@ export default function WorkoutDetail() {
     } catch {
       // workouts-api logs the detail; the client only ever sees plain words. blockRounds also lands here if a
       // drop set ever arrives with no set before it.
-      setError('Something went wrong. Try again.');
+      setError({ code: 'server_error' });
     }
   }, [id]);
 
@@ -85,7 +86,7 @@ export default function WorkoutDetail() {
 
       {error ? (
         <Card>
-          <ErrorText>{error}</ErrorText>
+          <ErrorText code={error.code}>{error.text}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => void load()} />
         </Card>
       ) : null}

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ErrorCode } from '@caltracker/shared';
 import { useState, useTransition } from 'react';
 import { COMMENT_BODY_MAX, cardText, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
@@ -62,7 +63,7 @@ export function PostCard({
   units: Units;
   now: number;
 }) {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [comment, setComment] = useState('');
   const [pending, startTransition] = useTransition();
 
@@ -70,7 +71,7 @@ export function PostCard({
     startTransition(async () => {
       setError(null);
       const r = await action();
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(r.code);
       else after?.();
     });
 
@@ -177,7 +178,7 @@ export function PostCard({
           Comment
         </button>
       </form>
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? <ErrorText code={error} /> : null}
     </article>
   );
 }

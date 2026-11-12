@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { AuthShell } from '@/components/auth-shell';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
-import { joinInvite, joinMessage, loadInvite, type InviteDetails, type JoinFailure } from '@/lib/join-invite';
+import { joinCode, joinInvite, joinMessage, loadInvite, type InviteDetails, type JoinFailure } from '@/lib/join-invite';
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
 import { supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import type { ShownError } from '@/lib/error-shown';
 
 // Opened by caltracker://invite/{token} (the "Open in CalTracker" button on the web invite page).
 // The client sees the coach's details pre-filled and only chooses a password; there is no confirmation email.
@@ -31,7 +32,7 @@ export default function JoinInvite() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownError | null>(null);
   const [failure, setFailure] = useState<JoinFailure | null>(null);
 
   const load = useCallback(async () => {
@@ -53,12 +54,12 @@ export default function JoinInvite() {
   async function submit() {
     if (invite?.status !== 'valid') return;
     const first = FirstName.safeParse(firstName);
-    if (!first.success) return setError('Enter your first name (up to 100 characters).');
+    if (!first.success) return setError({ code: 'join_first_name_invalid', text: 'Enter your first name (up to 100 characters).' });
     const last = LastName.safeParse(lastName);
-    if (!last.success) return setError('Last name can be at most 100 characters.');
-    if (password.length < PASSWORD_MIN_LENGTH) return setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
+    if (!last.success) return setError({ code: 'invite_last_name_invalid' });
+    if (password.length < PASSWORD_MIN_LENGTH) return setError({ code: 'password_too_short', text: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` });
     // The limit counts bytes: accented letters and emoji take more than one.
-    if (passwordBytes(password) > PASSWORD_MAX_LENGTH) return setError('That password is too long. Try a shorter one.');
+    if (passwordBytes(password) > PASSWORD_MAX_LENGTH) return setError({ code: 'password_too_long', text: 'That password is too long. Try a shorter one.' });
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -76,7 +77,7 @@ export default function JoinInvite() {
       return;
     }
     setFailure(result);
-    setError(joinMessage(result.reason, invite.workspaceName));
+    setError({ code: joinCode(result.reason), text: joinMessage(result.reason, invite.workspaceName) });
   }
 
   if (joined || invite === null) {
@@ -90,7 +91,7 @@ export default function JoinInvite() {
   if (invite.status === 'offline' || invite.status === 'server') {
     return (
       <AuthShell title="Your invite">
-        <ErrorText>{joinMessage(invite.status, '')}</ErrorText>
+        <ErrorText code={joinCode(invite.status)}>{joinMessage(invite.status, '')}</ErrorText>
         <Button testID="retry" title="Try again" onPress={() => void load()} />
       </AuthShell>
     );
@@ -165,7 +166,7 @@ export default function JoinInvite() {
         title={showPassword ? 'Hide password' : 'Show password'}
         onPress={() => setShowPassword((s) => !s)}
       />
-      {error ? <ErrorText testID="join-error">{error}</ErrorText> : null}
+      {error ? <ErrorText testID="join-error" code={error.code}>{error.text}</ErrorText> : null}
       {offerSignIn ? (
         <Button
           testID="go-sign-in"

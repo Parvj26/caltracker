@@ -63,18 +63,18 @@ describe('saveCoachMeal', () => {
     expect(update?.filters).toMatchObject({ id: MEAL, workspace_id: WS, deleted_at: null });
 
     respond = (c) => (c.op === 'insert' ? { error: { code: '23505', message: 'duplicate' } } : { data: [] });
-    await expect(saveCoachMeal(base)).resolves.toEqual({ error: "This meal can't be changed any more." });
+    await expect(saveCoachMeal(base)).resolves.toEqual({ ok: false, code: 'meal_locked' });
   });
 
   it('rejects a long name and a bad number before saving', async () => {
-    await expect(saveCoachMeal({ ...base, name: 'x'.repeat(41) })).resolves.toEqual({ error: 'Keep the name to 40 characters.' });
-    await expect(saveCoachMeal({ ...base, calories: 'abc' })).resolves.toEqual({ error: 'Enter calories as a number.' });
+    await expect(saveCoachMeal({ ...base, name: 'x'.repeat(41) })).resolves.toEqual({ ok: false, code: 'meal_details_invalid' });
+    await expect(saveCoachMeal({ ...base, calories: 'abc' })).resolves.toEqual({ ok: false, code: 'meal_details_invalid' });
     expect(calls).toEqual([]);
   });
 
   it('rejects a photo outside this meal\'s files', async () => {
     const photo = { path: `${WS}/${OLD}-${PHOTO}.webp`, thumbPath: `${WS}/${OLD}-${PHOTO}-thumb.webp`, width: 100, height: 100 };
-    await expect(saveCoachMeal({ ...base, photo })).resolves.toEqual({ error: "Couldn't save the photo. Please try again." });
+    await expect(saveCoachMeal({ ...base, photo })).resolves.toEqual({ ok: false, code: 'meal_photo_invalid' });
     expect(calls).toEqual([]);
   });
 
@@ -98,6 +98,6 @@ describe('removeCoachMeal', () => {
   });
   it('says when there was nothing to remove', async () => {
     respond = () => ({ data: [] });
-    await expect(removeCoachMeal(MEAL)).resolves.toEqual({ error: "Couldn't find that meal." });
+    await expect(removeCoachMeal(MEAL)).resolves.toEqual({ ok: false, code: 'meal_not_found' });
   });
 });
