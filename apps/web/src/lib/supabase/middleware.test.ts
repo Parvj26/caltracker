@@ -14,9 +14,9 @@ vi.mock('@supabase/ssr', () => ({
   },
 }));
 /** getClaims refreshing an expired session: the library hands the new tokens to setAll, as @supabase/ssr does. */
-const refreshThen = (result: unknown) => async () => {
+const refreshThen = (result: unknown) => () => {
   opts!.cookies.setAll([{ name: 'sb-test-auth-token', value: 'fresh', options: { path: '/', httpOnly: true } }]);
-  return result;
+  return Promise.resolve(result);
 };
 
 import { updateSession } from './middleware';
