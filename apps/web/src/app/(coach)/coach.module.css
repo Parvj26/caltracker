@@ -148,7 +148,7 @@
   /* Room under the last thing on the page so the button never covers it. Toasts and bottom bars lift by
      --coach-menu-room (calendar and program toasts use it). */
   .shell { --coach-menu-room: 88px; }
-  .shell:has([data-bottom-bar], [data-no-menu-button]) { --coach-menu-room: 0px; }
+  .shell:has([data-no-menu-button]) { --coach-menu-room: 0px; }
   .content { padding-bottom: 100px; }
 
   .menuButton {
@@ -173,9 +173,9 @@
   .menuButton { transition: transform 0.2s ease, opacity 0.2s ease; }
   /* Scrolling down tucks the button away below the screen edge; scrolling up brings it back (coach-sidebar.tsx). */
   .menuButton[data-tucked] { transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none; }
-  /* Screens with their own bottom controls hide it: the workout editor (its save bar, data-bottom-bar), a chat thread
-     and a live session (data-no-menu-button). Their Back link leaves the screen. */
-  .shell:has([data-bottom-bar], [data-no-menu-button]) .menuButton { display: none; }
+  /* Screens with their own bottom controls hide it (data-no-menu-button): a chat thread,
+     a live session and the meal form. Their Back link leaves the screen. */
+  .shell:has([data-no-menu-button]) .menuButton { display: none; }
   .shell:has([data-no-menu-button]) .content { padding-bottom: var(--ct-space-4); }
   @media (prefers-reduced-motion: reduce) { .menuButton { transition: none; } }
   .menuDot {
