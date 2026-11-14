@@ -100,6 +100,8 @@
     /* Paints the strip above it (under the notch) too, so nothing scrolls through there. */
     box-shadow: 0 calc(-1 * env(safe-area-inset-top)) 0 var(--ct-bg), 0 6px 12px -10px color-mix(in srgb, var(--ct-ink) 40%, transparent);
   }
+  /* Anything scrolled into view (a #heading link, the current day, a focused field) lands below the bar, not under it. */
+  :global(html):has(.sticky) { scroll-padding-top: calc(env(safe-area-inset-top) + 104px); }
 }
 
 /* Tabs: a row of links that scrolls sideways when it doesn't fit (never wraps under itself). */

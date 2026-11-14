@@ -122,7 +122,7 @@ test('Overview Today card: a workout today offers Log session, and the injury ch
   const chip = page.getByRole('button', { name: /^Injury: Left knee: no deep squats \+1 more/ });
   await expect(chip).toBeInViewport();
   await chip.click();
-  await expect(page.getByText('Lower back: go light')).toBeVisible();
+  await expect(page.getByTestId('injury-chip').getByText(/Lower back: go light/)).toBeVisible();
 
   const today = page.getByRole('region', { name: 'Today', exact: true });
   await expect(today).toHaveAttribute('data-today', 'planned');
