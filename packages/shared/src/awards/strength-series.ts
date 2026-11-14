@@ -1,6 +1,7 @@
 import { formatWeight } from '../units/units';
 import type { Units } from '../units/units';
 import type { IsoDate } from '../dates/dates';
+import { MONTHS_SHORT } from '../dates/format';
 import type { WorkoutLogDoc } from '../logs/schema';
 import { epley1rm, liftsByExercise } from './prs';
 import { localDay } from './streak';
@@ -51,10 +52,9 @@ export function strengthExercises(logs: readonly WorkoutLogDoc[]): Array<{ exerc
     .sort((a, b) => a.name.localeCompare(b.name) || a.exerciseId.localeCompare(b.exerciseId));
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "3 Nov" from a YYYY-MM-DD date. */
 export function shortDate(d: IsoDate): string {
-  return `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1] ?? ''}`;
+  return `${Number(d.slice(8, 10))} ${MONTHS_SHORT[Number(d.slice(5, 7)) - 1] ?? ''}`;
 }
 
 /** A sentence for the chart's text alternative: how the estimated 1RM moved and its best. */

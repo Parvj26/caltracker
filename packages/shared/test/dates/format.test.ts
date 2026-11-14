@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MONTHS_SHORT, formatDateTime, formatDayDate, formatPlainDay } from '../../src/dates/format';
+import {
+  MONTHS_SHORT,
+  formatDateTime,
+  formatDayDate,
+  formatPlainDay,
+  formatPlainDayMonth,
+  formatPlainDayMonthYear,
+  formatPlainLongDay,
+  formatPlainMonth,
+  formatPlainWeekday,
+} from '../../src/dates/format';
 
 // These strings are rendered on the server (Node ICU) and again in the browser (WebKit, Blink). They must match
 // exactly, or React reports a hydration error, so they're built from numbers plus our own month names.
@@ -43,5 +53,32 @@ describe('MONTHS_SHORT', () => {
   it('has twelve three-letter names', () => {
     expect(MONTHS_SHORT).toHaveLength(12);
     expect(MONTHS_SHORT.every((m) => m.length === 3)).toBe(true);
+  });
+});
+
+describe('plain calendar date labels', () => {
+  it('prints day and short month, with "Sep" not "Sept"', () => {
+    expect(formatPlainDayMonth('2026-11-09')).toBe('9 Nov');
+    expect(formatPlainDayMonth('2026-09-07')).toBe('7 Sep');
+  });
+
+  it('prints day, short month and year', () => {
+    expect(formatPlainDayMonthYear('2026-09-30')).toBe('30 Sep 2026');
+    expect(formatPlainDayMonthYear('2027-01-10')).toBe('10 Jan 2027');
+  });
+
+  it('prints the short weekday', () => {
+    expect(formatPlainWeekday('2026-09-07')).toBe('Mon');
+    expect(formatPlainWeekday('2026-11-15')).toBe('Sun');
+  });
+
+  it('prints the long day without commas', () => {
+    expect(formatPlainLongDay('2026-11-09')).toBe('Monday 9 November 2026');
+    expect(formatPlainLongDay('2026-09-05')).toBe('Saturday 5 September 2026');
+  });
+
+  it('prints a YYYY-MM month as its long name and year', () => {
+    expect(formatPlainMonth('2026-09')).toBe('September 2026');
+    expect(formatPlainMonth('2027-01')).toBe('January 2027');
   });
 });
