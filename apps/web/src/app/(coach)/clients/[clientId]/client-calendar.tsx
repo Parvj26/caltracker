@@ -23,7 +23,9 @@ import { AssignmentsPanel } from './assignments-panel';
 import { CalendarEmptyState } from './calendar-empty-state';
 import type { ClientRef } from './client';
 import { DeleteDialog, ItemMenu, MoveDialog } from './item-menu';
+import { cx } from '@/components/ui/cx';
 import styles from '@/components/calendar/calendar.module.css';
+import pageStyles from './client-page.module.css';
 
 export type CalendarEntry = CalendarItem & { date: IsoDate };
 export type AssignmentSummary = {
@@ -305,8 +307,10 @@ export function ClientCalendar({
 
   return (
     <>
-      <header className={styles.titleRow}>
-        <div className={styles.titleBlock}>
+      {/* On a phone the bar above already names the client and tab: the heading is for screen readers only there,
+          and the two buttons share one compact row, so the calendar starts on the first screen. */}
+      <header className={cx(styles.titleRow, pageStyles.trainingHead)}>
+        <div className={cx(styles.titleBlock, pageStyles.trainingTitle)}>
           <h2 className={styles.title}>Training</h2>
           {readOnly ? (
             <p className={styles.caption}>
@@ -317,7 +321,7 @@ export function ClientCalendar({
           )}
         </div>
         {readOnly ? null : (
-          <div className={styles.titleActions}>
+          <div className={cx(styles.titleActions, pageStyles.trainingActions)}>
             <Button variant="secondary" onClick={() => setAssigning(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
               Assign program
             </Button>
@@ -336,7 +340,7 @@ export function ClientCalendar({
 
       <AssignmentsPanel assignments={assignments} today={today} readOnly={readOnly} onMessage={(m) => say(m)} />
 
-      <p role="status" className={styles.status}>
+      <p role="status" className={cx(styles.status, pageStyles.trainingStatus)}>
         {status}
       </p>
 

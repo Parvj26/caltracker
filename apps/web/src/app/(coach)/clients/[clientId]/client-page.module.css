@@ -1,17 +1,106 @@
 /* The client page frame and its Overview. Colours, radii and sizes only via var(--ct-*) (packages/design-tokens). */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
-.back { display: inline-flex; align-items: center; align-self: flex-start; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
-.header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
+/* The bar: back, initials, name, Message and "⋯" in one row. */
+.sticky { display: flex; flex-direction: column; min-width: 0; background: var(--ct-bg); }
+.bar { display: flex; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); min-width: 0; }
+.barBack {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  min-width: var(--ct-tap-min);
+  min-height: var(--ct-tap-min);
+  margin-left: calc(-1 * var(--ct-space-2));
+  padding: 0 var(--ct-space-2) 0 var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+}
+.barBack:hover { background: var(--ct-surface); }
+.barBack:focus-visible, .barIconButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+}
+.avatar-lime { background: var(--ct-lime); }
+.avatar-pink { background: var(--ct-pink); }
+.avatar-blue { background: var(--ct-blue); }
 .name {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--ct-size-screen-title);
   font-weight: var(--ct-weight-screen-title);
   letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
-.headerActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin-left: auto; }
-.flag { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); text-decoration: none; }
-.flag:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-radius: var(--ct-radius-pill); }
+.name:focus { outline: none; }
+.pastChip { flex: none; }
+.barActions { display: flex; flex: none; align-items: center; gap: var(--ct-space-1); margin-left: auto; }
+.barIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ct-space-2);
+  min-width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  text-decoration: none;
+  cursor: pointer;
+}
+.barIconButton:hover, .barIconButton[aria-expanded='true'] { background: var(--ct-surface); }
+/* Message is an outlined round button; from tablet width it also says "Message". */
+.barMessage { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.barMessageText { display: none; }
+.menuWrap { position: relative; }
+.barMenu.barMenu { min-width: 13rem; z-index: 25; }
+.menuDanger { color: var(--ct-danger); font-weight: var(--ct-weight-section-heading); }
+@media (min-width: 600px) {
+  .barBackText { display: inline; }
+  .barMessage { padding: 0 var(--ct-space-4); }
+  .barMessageText { display: inline; }
+  .avatar { width: 44px; height: 44px; font-size: var(--ct-size-body); }
+}
+/* iPhone: the bar is one small row (name at heading size, on one line), and it stays at the top with the tabs. */
+@media (max-width: 599.98px) {
+  .barBackText { display: none; }
+  .name {
+    font-size: var(--ct-size-section-heading);
+    font-weight: var(--ct-weight-section-heading);
+    letter-spacing: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sticky {
+    position: sticky;
+    /* Below the notch / status bar in a home-screen app; 0 in Safari's own window. */
+    top: env(safe-area-inset-top);
+    /* Over the page, under the floating Menu button (30) and its sheet (40+). Dialogs sit in the top layer anyway. */
+    z-index: 20;
+    /* Edge to edge: out over .content's side padding, and up over its top padding. */
+    margin: calc(-1 * var(--ct-space-4-5)) calc(-1 * var(--ct-space-4)) 0;
+    padding: var(--ct-space-1) var(--ct-space-2) 0 var(--ct-space-4);
+    /* Paints the strip above it (under the notch) too, so nothing scrolls through there. */
+    box-shadow: 0 calc(-1 * env(safe-area-inset-top)) 0 var(--ct-bg), 0 6px 12px -10px color-mix(in srgb, var(--ct-ink) 40%, transparent);
+  }
+}
 
 /* Tabs: a row of links that scrolls sideways when it doesn't fit (never wraps under itself). */
 .tabs { overflow-x: auto; border-bottom: var(--ct-border-width-card) solid var(--ct-border); }
@@ -57,6 +146,13 @@
 }
 .tabsArrowBefore { left: 0; }
 .tabsArrowAfter { right: 0; }
+/* iPhone: five tabs nearly fit, so no arrows; the strip is swiped, and its faded edge shows there is more. */
+@media (max-width: 599.98px) {
+  .tabsArrow { display: none; }
+  .tabs { margin-right: calc(-1 * var(--ct-space-2)); scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 0 var(--ct-space-2-5); }
+}
 .tabList { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .tab {
   display: inline-flex;
@@ -73,6 +169,68 @@
 .tab:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
 .tabCurrent { color: var(--ct-ink); border-bottom-color: var(--ct-ink); }
 .panel { display: flex; flex-direction: column; gap: var(--ct-space-4-5); min-width: 0; padding-top: var(--ct-space-2); }
+
+/* ---------- Injury chip (Overview and the Log session screen) ---------- */
+.injury { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-1); min-width: 0; }
+.injuryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-1) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: color-mix(in srgb, var(--ct-amber) 28%, var(--ct-bg));
+  box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-amber);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  text-align: left;
+  cursor: pointer;
+}
+.injuryChip:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.injuryIcon, .injuryChevron { flex: none; }
+.injuryChip[aria-expanded='true'] .injuryChevron { transform: rotate(90deg); }
+.injuryText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.injuryMore { flex: none; color: var(--ct-ink-muted); }
+.injuryNote {
+  margin: 0;
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: color-mix(in srgb, var(--ct-amber) 14%, var(--ct-bg));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.injuryNote[hidden] { display: none; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- Today card (top of Overview) ---------- */
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2-5);
+  max-width: 720px;
+  min-width: 0;
+  padding: var(--ct-space-4) var(--ct-space-4-5) var(--ct-space-4-5);
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  box-shadow: 0 4px 0 var(--ct-ink);
+}
+.todayLoading { min-height: 150px; border-color: var(--ct-border); box-shadow: none; background: var(--ct-surface); }
+.todayTop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.todayTitle { margin: 0; font-size: 20px; font-weight: var(--ct-weight-screen-title); letter-spacing: -0.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.todayLines { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--ct-size-caption); font-variant-numeric: tabular-nums; }
+.todayAction { width: 100%; margin-top: var(--ct-space-1); }
+.todayLive { border-color: var(--ct-ink); background: var(--ct-ink); color: var(--ct-bg); box-shadow: 0 4px 0 var(--ct-lime); }
+.liveLabel { display: inline-flex; align-items: center; gap: var(--ct-space-2); color: var(--ct-lime); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-screen-title); letter-spacing: 0.08em; text-transform: uppercase; }
+.liveDot { width: 10px; height: 10px; border-radius: 50%; background: var(--ct-lime); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ct-lime) 25%, transparent); }
+.liveSince, .liveSets { margin: 0; color: color-mix(in srgb, var(--ct-bg) 75%, transparent); font-size: var(--ct-size-caption); font-variant-numeric: tabular-nums; }
+.liveTrack { height: 8px; border-radius: var(--ct-radius-pill); background: color-mix(in srgb, var(--ct-bg) 18%, transparent); overflow: hidden; }
+.liveFill { display: block; height: 100%; border-radius: inherit; background: var(--ct-lime); }
+.todayLive .todayActionLive { background: var(--ct-lime); color: var(--ct-ink); }
 
 /* ---------- Overview ---------- */
 .grid { display: grid; gap: var(--ct-space-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
@@ -181,3 +339,43 @@
 .note { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-2) 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .status { margin: 0; min-height: 1.25em; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .chart { min-width: 0; }
+
+/* ---------- Training tab: the buttons and the programs line above the calendar ---------- */
+.programs { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.programsSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--ct-space-1) var(--ct-space-2) var(--ct-space-1) var(--ct-space-3-5);
+  border: 0;
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.programsSummary:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.programsText { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.programsCount { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }
+.programsNames { overflow: hidden; color: var(--ct-ink-muted); font-size: var(--ct-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.programsChevron { display: inline-flex; flex: none; transition: transform 0.15s ease; }
+.programsSummary[aria-expanded='true'] .programsChevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .programsChevron { transition: none; } }
+.programsList { display: flex; flex-direction: column; margin: 0; padding: 0 var(--ct-space-1) 0 var(--ct-space-3); list-style: none; }
+.programsList[hidden] { display: none; }
+.programRow { display: flex; align-items: center; gap: var(--ct-space-1); min-width: 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.programRow:first-child { border-top: 0; }
+@media (min-width: 600px) {
+  .programs { max-width: 720px; }
+}
+@media (max-width: 599.98px) {
+  .trainingHead.trainingHead { gap: 0; }
+  .trainingTitle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .trainingActions.trainingActions { flex-wrap: nowrap; width: 100%; gap: var(--ct-space-2-5); margin-left: 0; }
+  .trainingActions.trainingActions > * { flex: 1 1 0; min-width: 0; padding-inline: var(--ct-space-2-5); }
+  /* Empty until something saves; then "Saving…" takes one line. */
+  .trainingStatus.trainingStatus { min-height: 0; }
+}

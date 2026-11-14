@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
+import { useId, useImperativeHandle, useRef, useState, useTransition, type RefObject } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
@@ -22,14 +22,23 @@ type Props = {
   inline?: boolean;
 };
 
-/** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
-export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false }: Props) {
+type DialogProps = Pick<Props, 'title' | 'body' | 'confirmLabel' | 'onConfirm' | 'focusAfterId'> & {
+  dialogRef: RefObject<HTMLDialogElement | null>;
+  /** Clears an earlier error; the opener calls it before showModal(). */
+  resetRef?: RefObject<(() => void) | null>;
+};
+
+/**
+ * The asking part on its own: a native modal dialog (focus is trapped and Escape closes it) that the caller opens with
+ * `dialogRef.current.showModal()`. ConfirmButton uses it, and so does the client page's "⋯ > Remove client".
+ */
+export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfterId, dialogRef, resetRef }: DialogProps) {
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
+  useImperativeHandle(resetRef, () => () => setError(null), []);
 
   function confirm() {
     setError(null);
@@ -42,8 +51,44 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
     });
   }
 
+  return (
+    <dialog
+      ref={dialogRef}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      aria-describedby={bodyId}
+      // Escape must not close it mid-request, or an error would land in a closed dialog.
+      onCancel={(e) => {
+        if (pending) e.preventDefault();
+      }}
+      // After a failure the page may be out of date (for example the invite was accepted meanwhile): refresh it
+      // once the coach has read the message.
+      onClose={() => {
+        if (error) router.refresh();
+      }}
+    >
+      <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
+      <p id={bodyId} className={styles.dialogBody}>{body}</p>
+      {error ? <ErrorText code={error} /> : null}
+      <div className={styles.dialogActions}>
+        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
+          Cancel
+        </Button>
+        <Button onClick={confirm} pending={pending}>
+          {pending ? 'Working…' : confirmLabel}
+        </Button>
+      </div>
+    </dialog>
+  );
+}
+
+/** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
+export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const resetRef = useRef<(() => void) | null>(null);
+
   const open = () => {
-    setError(null);
+    resetRef.current?.();
     dialogRef.current?.showModal();
   };
 
@@ -58,33 +103,15 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
           {label}
         </Button>
       )}
-      <dialog
-        ref={dialogRef}
-        className={styles.dialog}
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        // Escape must not close it mid-request, or an error would land in a closed dialog.
-        onCancel={(e) => {
-          if (pending) e.preventDefault();
-        }}
-        // After a failure the page may be out of date (for example the invite was accepted meanwhile): refresh it
-        // once the coach has read the message.
-        onClose={() => {
-          if (error) router.refresh();
-        }}
-      >
-        <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
-        <p id={bodyId} className={styles.dialogBody}>{body}</p>
-        {error ? <ErrorText code={error} /> : null}
-        <div className={styles.dialogActions}>
-          <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-            Cancel
-          </Button>
-          <Button onClick={confirm} pending={pending}>
-            {pending ? 'Working…' : confirmLabel}
-          </Button>
-        </div>
-      </dialog>
+      <ConfirmDialog
+        title={title}
+        body={body}
+        confirmLabel={confirmLabel}
+        onConfirm={onConfirm}
+        focusAfterId={focusAfterId}
+        dialogRef={dialogRef}
+        resetRef={resetRef}
+      />
     </>
   );
 }

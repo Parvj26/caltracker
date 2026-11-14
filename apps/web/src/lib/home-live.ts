@@ -21,14 +21,15 @@ export type LiveLog = {
 /** A client's workout in progress, as a Today row needs it to pick its button. */
 export type ClientLiveLog = Pick<LiveLog, 'id' | 'loggedBy' | 'workoutId'>;
 
-/** Every workout in progress in the workspace, in one query (Home's "Training now"). */
-export async function loadLiveLogs(supabase: SupabaseClient<Database>, workspaceId: string): Promise<LiveLog[]> {
-  const { data, error } = await supabase
+/** Every workout in progress in the workspace (or of one client), in one query (Home's "Training now"). */
+export async function loadLiveLogs(supabase: SupabaseClient<Database>, workspaceId: string, clientId?: string): Promise<LiveLog[]> {
+  let query = supabase
     .from('workout_logs')
     .select(`client_id, logged_by, ${LOG_TREE_SELECT}`)
     .eq('workspace_id', workspaceId)
-    .eq('status', 'in_progress')
-    .limit(200);
+    .eq('status', 'in_progress');
+  if (clientId) query = query.eq('client_id', clientId);
+  const { data, error } = await query.limit(200);
   if (error) throw new Error(`Could not load workouts in progress: ${error.message}`);
   // The select string is built by concatenation, so supabase-js cannot infer its shape; LogTreeRow describes it.
   const rows = (data ?? []) as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[];
