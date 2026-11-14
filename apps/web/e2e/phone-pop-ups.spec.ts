@@ -46,7 +46,7 @@ async function expectOnScreen(page: Page, control: Locator) {
   expect(box.y + box.height, 'bottom on screen').toBeLessThanOrEqual(viewport.height);
 }
 
-/** Today's two-exercise workout (Barbell Squat, Bench Press; 2 sets each), opened in the logger and started. */
+/** Today's two-exercise workout (Barbell Squat, Barbell Deadlift; 2 sets each), opened in the logger and started. */
 async function startSession(page: Page): Promise<{ client: string; workoutId: string }> {
   const client = await newClient();
   await signInAsCoach(page);
@@ -57,7 +57,7 @@ async function startSession(page: Page): Promise<{ client: string; workoutId: st
     name: `Logger ${unique()}`,
     scheduledOn: today,
     sections: [],
-    blocks: [{ exercises: ['Barbell Squat'] }, { exercises: ['Bench Press'] }],
+    blocks: [{ exercises: ['Barbell Squat'] }, { exercises: ['Barbell Deadlift'] }],
   });
   created.workouts.push(workoutId);
   await page.goto(`/clients/${client}/log/${workoutId}`);
@@ -88,7 +88,7 @@ test.describe('session logger', () => {
 
     const sheet = page.getByRole('dialog', { name: "3 sets aren't ticked" });
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole('listitem')).toHaveText([/Barbell Squat\s*1 of 2 ticked/, /Bench Press\s*0 of 2 ticked/]);
+    await expect(sheet.getByRole('listitem')).toHaveText([/Barbell Squat\s*1 of 2 ticked/, /Barbell Deadlift\s*0 of 2 ticked/]);
     const markAll = sheet.getByRole('button', { name: 'Mark all done and finish' });
     for (const b of [markAll, sheet.getByRole('button', { name: 'Finish anyway (1 set)' }), sheet.getByRole('button', { name: 'Keep logging' })]) {
       await expectOnScreen(page, b);

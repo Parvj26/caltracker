@@ -7,8 +7,6 @@ const PICKER = 'select, input[type="date"], input[type="time"], input[type="date
 const FOCUSABLE =
   'input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
 
-/** Fields that bring up the on-screen keyboard when focused. */
-const TYPING = 'input:not([type]), input[type="text"], input[type="search"], input[type="email"], input[type="number"], input[type="tel"], input[type="url"], textarea';
 /** A touch screen (iPhone, iPad): focusing a text field there pops the keyboard over half the dialog. */
 const isTouchScreen = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -25,8 +23,8 @@ export function showDialog(dialog: HTMLDialogElement, options: { noKeyboardOnTou
     dialog.setAttribute('autofocus', '');
     dialog.tabIndex = -1;
     dialog.showModal();
-    const active = dialog.ownerDocument.activeElement;
-    if (active instanceof HTMLElement && active !== dialog && active.matches(`${TYPING}, ${PICKER}`)) dialog.focus();
+    // Chromium doesn't always apply a dialog's own autofocus: put focus on it here, wherever the browser left it.
+    if (dialog.ownerDocument.activeElement !== dialog) dialog.focus();
     return;
   }
   const first = dialog.querySelector<HTMLElement>(FOCUSABLE);
