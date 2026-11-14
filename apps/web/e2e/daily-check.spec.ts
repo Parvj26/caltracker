@@ -429,7 +429,7 @@ test('on an iPhone each client is one line: avatar, name with "…", one chip an
   await expect(page.getByRole('button', { name: 'Invite client', exact: true })).toHaveText('Invite', { useInnerText: true });
 
   // One chip each; the details stay on the client page.
-  await expect(rowOf('Sami Steady').getByText('On track', { exact: true })).toBeVisible();
+  await expect(rowOf('Sami Steady').getByText('On track', { exact: true }).locator('visible=true')).toHaveCount(1);
   // (The laptop's status line and Plan cell say "Nothing planned" too, hidden on a phone: count the visible one.)
   await expect(rowOf('Nell Nothing').getByText('Nothing planned', { exact: true }).locator('visible=true')).toHaveCount(1);
   if (ids.rowanMissed > 0) await expect(rowOf('Rowan Run').getByText(`Missed ${ids.rowanMissed}`, { exact: true }).locator('visible=true')).toHaveCount(1);
@@ -457,7 +457,7 @@ test('on an iPhone each client is one line: avatar, name with "…", one chip an
   // Invited: a ⋯ menu with Resend and Cancel invite (red, and it still asks first).
   await filters.getByRole('button', { name: /^Invited/ }).click();
   const ivy = rowOf('Ivy Invited');
-  await expect(ivy.getByText('Invited today', { exact: true })).toBeVisible();
+  await expect(ivy.getByText('Invited today', { exact: true }).locator('visible=true')).toHaveCount(1);
   await expect(ivy.getByRole('button', { name: /^Resend invite to/ })).toBeHidden();
   await ivy.getByRole('button', { name: 'More for Ivy Invited' }).click();
   const menu = page.getByRole('menu', { name: 'More for Ivy Invited' });
