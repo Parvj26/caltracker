@@ -343,13 +343,16 @@ export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/s
 export {
   COMPLETION_WINDOW_DAYS,
   compareDirectoryRows,
+  directoryChip,
   directoryCounts,
   directoryRows,
   fourWeekCompletion,
   invitedLabel,
+  invitedShortLabel,
   matchesDirectoryFilter,
 } from './coach-home/client-directory';
 export type {
+  DirectoryChip,
   DirectoryClient,
   DirectoryFilter,
   DirectoryInput,
