@@ -476,8 +476,10 @@ export function ClientCalendar({
                     remove(undoable.entry);
                     say(`Removed ${undoable.entry.name}.`);
                   } else {
-                    move(undoable.entry.id, undoable.from);
-                    say(`Moved ${undoable.entry.name} back to ${formatShortDay(undoable.from)}.`);
+                    // move() gives null when it can't (the workout was deleted since, or its old day has passed).
+                    const day = formatShortDay(undoable.from);
+                    if (move(undoable.entry.id, undoable.from)) say(`Moved ${undoable.entry.name} back to ${day}.`);
+                    else say(`Couldn't move ${undoable.entry.name} back to ${day}.`);
                   }
                 }}
               >
