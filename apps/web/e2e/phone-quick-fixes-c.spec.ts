@@ -72,7 +72,8 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await box.fill(`mobilty ${tag}`);
     const list = page.getByRole('table', { name: 'Workouts' });
     await expect(list.getByRole('link', { name, exact: true })).toBeVisible();
-    await expect(list.getByRole('row')).toHaveCount(2); // header + the one match
+    // Body rows only: on a phone the header row is hidden (workouts.module.css), so it has no row role.
+    await expect(list.locator('tbody tr')).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`[?&]q=mobilty(\\+|%20)${tag}`));
     await box.fill(`zzzz ${tag}`);
     await expect(page.getByText('No workouts match.')).toBeVisible();
