@@ -425,8 +425,24 @@ export function WorkoutBuilder({
           label="Workout name"
           maxLength={100}
           value={doc.name}
+          // A workout's name, not a person's: no contact AutoFill, autocorrect or spell-check underlines.
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
+          spellCheck={false}
           {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
-          onChange={(e) => setDoc((d) => ({ ...d, name: e.target.value }))}
+          onChange={(e) => {
+            const name = e.target.value;
+            setDoc((d) => ({ ...d, name }));
+            // "Enter a name." goes as soon as the name is valid again, not at the next save.
+            if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
+              setErrors((cur) => {
+                const next = new Map(cur);
+                next.delete('name');
+                return next;
+              });
+            }
+          }}
         />
         <TextAreaField
           label="Workout notes (optional)"
