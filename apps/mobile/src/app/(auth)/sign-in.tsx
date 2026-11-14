@@ -1,11 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, Text } from 'react-native';
 import { AuthShell } from '@/components/auth-shell';
 import { LegalLinks } from '@/components/legal-links';
 import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import type { ShownError } from '@/lib/error-shown';
+import { forgotPasswordHref } from '@/lib/forgot-password';
 import { isNetworkFailure } from '@/lib/network-failure';
+import { palette } from '@/theme/theme';
+import { useTheme } from '@/theme/use-theme';
 
 export default function SignIn() {
   // Pre-filled when the Join screen sends someone here ("You already have an account").
@@ -14,6 +18,7 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
+  const { text } = useTheme();
 
   async function submit() {
     setBusy(true);
@@ -48,8 +53,16 @@ export default function SignIn() {
       />
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <Button testID="submit-button" title={busy ? 'Signing in...' : 'Sign in'} onPress={() => void submit()} busy={busy} />
-      <TextButton testID="go-sign-up" href="/sign-up" title="Create an account" />
+      <TextButton testID="go-forgot-password" href={forgotPasswordHref(email)} title="Forgot password?" />
+      {/* Invite only: accounts are made from a coach's invite link, so there is no sign-up here. */}
+      <Text testID="invite-only-note" style={[text('body'), styles.note]}>
+        New here? Ask your coach for an invite.
+      </Text>
       <LegalLinks />
     </AuthShell>
   );
 }
+
+const styles = StyleSheet.create({
+  note: { color: palette.inkMuted, textAlign: 'center' },
+});
