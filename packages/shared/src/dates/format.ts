@@ -1,4 +1,4 @@
-import type { IsoDate } from './dates';
+import { addDays, type IsoDate } from './dates';
 
 /**
  * Date and time labels that come out the same on every JavaScript engine.
@@ -53,4 +53,19 @@ export function formatPlainDay(d: IsoDate): string {
   const [y, m, day] = d.split('-').map(Number) as [number, number, number];
   const weekday = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
   return `${WEEKDAYS_SHORT[weekday]} ${day} ${MONTHS_SHORT[m - 1]}`;
+}
+
+/** A plain calendar date as "Mon 9" (the month is shown elsewhere, as in a week's list of days). */
+export function formatWeekdayDay(d: IsoDate): string {
+  return formatPlainDay(d).split(' ').slice(0, 2).join(' ');
+}
+
+/** The seven days from `monday`: "9–15 Nov", "30 Nov – 6 Dec", or "28 Dec 2026 – 3 Jan 2027" across a new year. */
+export function formatWeekRange(monday: IsoDate): string {
+  const sunday = addDays(monday, 6);
+  const [y1, m1, d1] = monday.split('-').map(Number) as [number, number, number];
+  const [y2, m2, d2] = sunday.split('-').map(Number) as [number, number, number];
+  if (y1 !== y2) return `${d1} ${MONTHS_SHORT[m1 - 1]} ${y1} – ${d2} ${MONTHS_SHORT[m2 - 1]} ${y2}`;
+  if (m1 !== m2) return `${d1} ${MONTHS_SHORT[m1 - 1]} – ${d2} ${MONTHS_SHORT[m2 - 1]}`;
+  return `${d1}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
 }
