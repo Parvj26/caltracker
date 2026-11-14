@@ -6,7 +6,12 @@ import { serviceClient, signInAsCoach } from './helpers';
 // seeds its own meals (unique names) and removes them afterwards.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-const created: { meals: string[]; users: string[] } = { meals: [], users: [] };
+const created: { meals: string[]; users: string[]; names: string[] } = { meals: [], users: [], names: [] };
+/** A meal name this file uses (seeded or typed into the form), so afterAll removes only this file's meals. */
+const track = (name: string) => {
+  created.names.push(name);
+  return name;
+};
 let workspaceId: string;
 
 test.beforeAll(async () => {
@@ -19,10 +24,13 @@ test.afterAll(async () => {
   // Deleting a client removes their meals; then the coach meals can go.
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
   if (created.meals.length) await admin.from('coach_meals').delete().in('id', created.meals);
-  const left = await admin.from('coach_meals').select('id, photo_path, photo_thumb_path').like('name', 'E2E %');
-  const files = (left.data ?? []).flatMap((m) => [m.photo_path, m.photo_thumb_path].filter((p): p is string => p !== null));
-  if (files.length) await admin.storage.from('coach-meal-photos').remove(files);
-  await admin.from('coach_meals').delete().like('name', 'E2E %');
+  // Only this file's meals (by name): other workers' tests may still be using their own "E2E …" meals.
+  if (created.names.length) {
+    const left = await admin.from('coach_meals').select('id, photo_path, photo_thumb_path').eq('workspace_id', workspaceId).in('name', created.names);
+    const files = (left.data ?? []).flatMap((m) => [m.photo_path, m.photo_thumb_path].filter((p): p is string => p !== null));
+    if (files.length) await admin.storage.from('coach-meal-photos').remove(files);
+    await admin.from('coach_meals').delete().eq('workspace_id', workspaceId).in('name', created.names);
+  }
 });
 
 async function seedCoachMeal(name: string, kcal: number): Promise<string> {
@@ -56,8 +64,8 @@ async function seedLoggedBy(coachMealId: string) {
 }
 
 test('the Meals page lists shared meals with how often they were logged', async ({ page }) => {
-  const logged = `E2E Oats ${unique()}`;
-  const fresh = `E2E Chili ${unique()}`;
+  const logged = track(`E2E Oats ${unique()}`);
+  const fresh = track(`E2E Chili ${unique()}`);
   const loggedId = await seedCoachMeal(logged, 450);
   await seedCoachMeal(fresh, 490);
   await seedLoggedBy(loggedId);
@@ -76,7 +84,7 @@ test('the Meals page lists shared meals with how often they were logged', async 
 });
 
 test('the coach adds a meal with a photo, edits it and removes it', async ({ page }) => {
-  const name = `E2E Turkey chili ${unique()}`.slice(0, 40);
+  const name = track(`E2E Turkey chili ${unique()}`.slice(0, 40));
   await signInAsCoach(page);
   await page.goto('/meals');
   await page.getByRole('link', { name: '+ New meal' }).click();
@@ -135,7 +143,7 @@ test('Cancel leaves the meal form, asking "Discard changes?" only after typing',
   await expect(page).toHaveURL(/\/meals$/);
 
   await page.goto('/meals/new');
-  await form.getByLabel('Name').fill(`E2E Unsaved ${unique()}`);
+  await form.getByLabel('Name').fill(track(`E2E Unsaved ${unique()}`));
   await form.getByRole('button', { name: 'Cancel' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('Discard changes?');
@@ -151,8 +159,8 @@ test('Cancel leaves the meal form, asking "Discard changes?" only after typing',
 
 test('the meals search finds a meal despite a typo and keeps the text in the address', async ({ page }) => {
   const tag = unique();
-  const wanted = `E2E Lentil soup ${tag}`;
-  const other = `E2E Banana bread ${tag}`;
+  const wanted = track(`E2E Lentil soup ${tag}`);
+  const other = track(`E2E Banana bread ${tag}`);
   await seedCoachMeal(wanted, 320);
   await seedCoachMeal(other, 410);
   await signInAsCoach(page);
@@ -178,7 +186,7 @@ test.describe('on an iPhone', () => {
 
   test('a tap on a meal opens the full-screen editor; Back returns to the list; ⋯ removes it', async ({ page }) => {
     test.slow();
-    const name = `E2E Phone wrap ${unique()}`.slice(0, 40);
+    const name = track(`E2E Phone wrap ${unique()}`.slice(0, 40));
     const id = await seedCoachMeal(name, 520);
     await signInAsCoach(page);
     await page.goto('/meals');
@@ -244,7 +252,7 @@ test.describe('on an iPhone', () => {
     await expect(page.getByRole('list', { name: 'Shared meals' })).toBeHidden();
 
     // Back with something typed asks first, like Cancel.
-    await form.getByLabel('Name').fill(`E2E Unsaved ${unique()}`);
+    await form.getByLabel('Name').fill(track(`E2E Unsaved ${unique()}`));
     await form.getByRole('link', { name: 'Back to meals' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Discard changes?');
