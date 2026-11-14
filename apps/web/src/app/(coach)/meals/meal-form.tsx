@@ -375,7 +375,7 @@ function MealFormFields({
       </label>
 
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
-      {saved && !isNew ? (
+      {saved && !isNew && !dirty ? (
         <p role="status" className={styles.status}>
           Saved
         </p>
