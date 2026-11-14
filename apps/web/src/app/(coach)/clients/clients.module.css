@@ -322,6 +322,8 @@
 .statusWarn { color: var(--ct-ink); }
 .statusWarn::before, .planWarn::before { content: '● '; color: var(--ct-amber); }
 .statusMuted { color: var(--ct-ink-muted); }
+/* An invite's email, under the name (long addresses wrap instead of widening the row). */
+.inviteEmail { overflow-wrap: anywhere; }
 .statusGood { color: var(--ct-ink); }
 .statusGood::before { content: '● '; color: var(--ct-lime); }
 .inviteActions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-3); }

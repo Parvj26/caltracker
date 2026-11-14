@@ -117,6 +117,12 @@ function InviteDialog({
     };
   }, []);
 
+  // The dialog scrolls; the Sent view is much shorter than the form, so start it at the top (its tick and title),
+  // not wherever the Send button was. Back to the top for "Invite another" too.
+  useEffect(() => {
+    dialogRef.current?.scrollTo({ top: 0 });
+  }, [sent]);
+
   return (
     <dialog
       ref={dialogRef}
@@ -285,20 +291,47 @@ function OneClientForm({
 
   const invalid = (name: FieldError['field']) =>
     fieldError?.field === name ? { 'aria-invalid': true, 'aria-describedby': 'invite-field-error' } : {};
-  const who = firstName.trim() || 'They';
+  // "What Ana gets:" once a first name is typed, "What they get:" before.
+  const getsLead = firstName.trim() ? `What ${firstName.trim()} gets:` : 'What they get:';
   const firstChosen = chosen[0];
 
   return (
     <form onSubmit={onSubmit} className={styles.inviteForm} noValidate>
       <div className={styles.nameGrid}>
-        <TextField label="First name" name="firstName" autoComplete="off" value={firstName} onChange={(e) => setFirstName(e.target.value)} {...invalid('firstName')} />
-        <TextField label="Last name" name="lastName" autoComplete="off" value={lastName} onChange={(e) => setLastName(e.target.value)} {...invalid('lastName')} />
+        {/* Someone else's details, not the coach's: no contact AutoFill, spell-check or autocorrect on names. The
+            name attributes avoid "name"/"email" so Safari's AutoFill heuristics don't offer the coach's own card. */}
+        <TextField
+          label="First name"
+          name="invitee-first"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="words"
+          spellCheck={false}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          {...invalid('firstName')}
+        />
+        <TextField
+          label="Last name"
+          name="invitee-last"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="words"
+          spellCheck={false}
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          {...invalid('lastName')}
+        />
       </div>
       <TextField
         label="Email"
-        name="email"
+        name="invitee-address"
         type="email"
+        inputMode="email"
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         hint="They'll sign in to the app with this email."
@@ -421,7 +454,7 @@ function OneClientForm({
       </section>
 
       <p className={styles.getsLine}>
-        <b>What {who} gets:</b> an email &ldquo;{coachName} invited you to CalTracker&rdquo; with a Join button. The link works for 14 days.
+        <b>{getsLead}</b> an email &ldquo;{coachName} invited you to CalTracker&rdquo; with a Join button. The link works for 14 days.
       </p>
 
       {error ? <ErrorText code={error} /> : null}

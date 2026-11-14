@@ -105,6 +105,9 @@ test('invite one client: the Sent screen, then they show as Invited and can be r
   await expect(row).toContainText('New Client');
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText('Not joined yet');
+  // No plan yet: the Plan cell says so (it used to show the email under the "Plan" label).
+  await expect(row.getByRole('cell').last()).toContainText('Nothing planned');
+  await expect(row.getByRole('cell').last()).not.toContainText(email);
   // A resend right after sending changes nothing: the link already in the inbox keeps working.
   await row.getByRole('button', { name: `Resend invite to ${email}` }).click();
   await expect(row.getByText(/Already sent a moment ago/)).toBeVisible();
