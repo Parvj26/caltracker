@@ -347,7 +347,8 @@
   .setHeader {
     display: grid;
     grid-template-columns: 44px repeat(2, minmax(0, 1fr)) 44px;
-    column-gap: var(--ct-space-1);
+    /* The same 2 px gaps as the set rows below, so the headings stay over their boxes. */
+    column-gap: 2px;
     align-items: center;
     font-size: 13px;
     font-weight: var(--ct-weight-button);
@@ -359,7 +360,7 @@
   .setRow {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;
-    column-gap: var(--ct-space-1);
+    column-gap: 2px;
     align-items: start;
     padding: 0;
     border: 0;
@@ -370,7 +371,7 @@
   .setCells {
     display: grid;
     grid-template-columns: 44px repeat(2, minmax(0, 1fr));
-    column-gap: var(--ct-space-1);
+    column-gap: 2px;
     row-gap: var(--ct-space-1);
     align-items: center;
   }
@@ -392,8 +393,10 @@
   .setRow[data-values='3'] .field[data-col='rest'] .fieldCaption,
   .setRow[data-values='3'] .field[data-col='duration'] .fieldCaption { display: inline; font-size: 14px; }
   .narrow { width: 100%; min-width: 0; min-height: 44px; text-align: center; }
-  .stepper { display: flex; width: 100%; gap: 2px; }
-  .stepper .narrow { flex: 1; width: auto; min-width: 0; padding: 0 2px; }
+  /* A 375 pt iPhone fits five characters ("102.5", "reps") between − and +: no gap or side padding in the box, and
+     2 px gaps in the row. The − and + keep their 44 px height. */
+  .stepper { display: flex; width: 100%; }
+  .stepper .narrow { flex: 1; width: auto; min-width: 0; padding: 0; }
   .stepper .stepButton { width: 32px; height: 44px; }
   .kindButton { width: 44px; height: 44px; }
   .removeSet { position: static; grid-column: 2; grid-row: 1; width: 44px; height: 44px; }
@@ -569,4 +572,15 @@
   .saveBar button { padding-left: var(--ct-space-3-5); padding-right: var(--ct-space-3-5); }
   .wideWord { display: none; }
   .addRow .wideOnly { display: none; }
+}
+
+/* iPhone: a slimmer card edge than iPad portrait, so the set boxes get the width (see the stepper above). After the
+   rule above so it wins. */
+@media (max-width: 599px) {
+  .block { padding-left: var(--ct-space-2); padding-right: var(--ct-space-2); }
+  /* − box + touch: the 4 px gap set for wider screens further up would cost the box its fifth character. */
+  .stepper { gap: 0; }
+  /* A drop row and a substitute's sets lose less width to their indent, so they fit five characters too. */
+  .dropRow { padding-left: var(--ct-space-2); }
+  .substitute { padding-left: 6px; padding-right: 0; }
 }
