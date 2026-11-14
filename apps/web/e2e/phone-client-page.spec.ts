@@ -105,7 +105,7 @@ test('Training: the two buttons share a row, programs fold into one line, and th
   // The calendar's view switch and its first day are on screen without scrolling.
   await expect(page.getByRole('navigation', { name: 'Calendar view' })).toBeInViewport({ ratio: 1 });
   const firstDay = (await page.locator('[data-date]').first().boundingBox())!;
-  expect(firstDay.y).toBeLessThan(667 - 40);
+  expect(firstDay.y).toBeLessThan(page.viewportSize()!.height - 40);
   await expectNoSidewaysScroll(page);
 });
 

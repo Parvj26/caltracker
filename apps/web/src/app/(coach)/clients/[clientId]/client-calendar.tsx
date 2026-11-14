@@ -308,9 +308,10 @@ export function ClientCalendar({
   return (
     <>
       {/* On a phone the bar above already names the client and tab: the heading is for screen readers only there,
-          and the two buttons share one compact row, so the calendar starts on the first screen. */}
+          and the two buttons share one compact row, so the calendar starts on the first screen. A past client keeps
+          the heading and its "removed" date: there are no buttons to make room for. */}
       <header className={cx(styles.titleRow, pageStyles.trainingHead)}>
-        <div className={cx(styles.titleBlock, pageStyles.trainingTitle)}>
+        <div className={cx(styles.titleBlock, !readOnly && pageStyles.trainingTitle)}>
           <h2 className={styles.title}>Training</h2>
           {readOnly ? (
             <p className={styles.caption}>

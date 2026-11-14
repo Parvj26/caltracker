@@ -64,7 +64,10 @@ export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfter
       // After a failure the page may be out of date (for example the invite was accepted meanwhile): refresh it
       // once the coach has read the message.
       onClose={() => {
-        if (error) router.refresh();
+        if (!error) return;
+        router.refresh();
+        // Clear it too, so reopening the dialog (from the client header's ⋯) doesn't show the old failure.
+        setError(null);
       }}
     >
       <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
