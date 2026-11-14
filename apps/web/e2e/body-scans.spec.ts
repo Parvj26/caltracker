@@ -93,7 +93,7 @@ test('adding a scan with values and a PDF shows it in the history and on the cha
   const chart = page.getByRole('group', { name: 'Body fat chart' });
   await expect(chart).toBeVisible();
   await expect(chart.locator('circle')).toHaveCount(2);
-  await expect(page.getByText('−1.5 since')).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Charts' }).getByText('−1.5 since')).toBeVisible();
   // Only BMI has a single value: no chart for it.
   await expect(page.getByRole('group', { name: 'BMI chart' })).toHaveCount(0);
 

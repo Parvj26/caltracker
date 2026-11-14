@@ -144,7 +144,8 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
   await expect(postBar.getByRole('button', { name: /party/ })).toHaveCount(0);
   await expect(postBar.getByRole('button', { name: 'Remove your fire reaction, 2 people' })).toBeVisible();
 
-  // Comments get reactions too; the client hears about it.
+  // Comments get reactions too; the client hears about it. The reload folded the comments again: open them.
+  await mine.getByRole('button', { name: '1 comment', exact: true }).click();
   const commentBar = mine.getByRole('group', { name: 'Reactions to Sam Tester’s comment' });
   await commentBar.getByRole('button', { name: 'Add a reaction' }).click();
   await mine.getByRole('group', { name: 'Choose a reaction' }).getByRole('button', { name: 'React with clap' }).click();
