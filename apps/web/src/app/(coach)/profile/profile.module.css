@@ -44,3 +44,44 @@
 @media (max-width: 480px) {
   .nameRow { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- Sign out (asks first; a bottom sheet on an iPhone) ---------- */
+.signOutRow { display: flex; padding-top: var(--ct-space-4); border-top: 1px solid var(--ct-border); }
+.signOutDialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: var(--ct-space-6);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.signOutDialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 45%, transparent); }
+.signOutDialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.grab { display: none; }
+.signOutTitle { margin: 0; font-size: 20px; font-weight: var(--ct-weight-screen-title); }
+.signOutBody { margin: 0; }
+.signOutActions { display: flex; flex-direction: row-reverse; flex-wrap: wrap; justify-content: flex-start; gap: var(--ct-space-2); margin-top: var(--ct-space-1); }
+
+@media (max-width: 599.98px) {
+  .signOutButton { width: 100%; }
+  .signOutDialog[open] {
+    box-sizing: border-box;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: var(--ct-space-3-5) var(--ct-space-4) calc(26px + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 26px 26px 0 0;
+  }
+  .grab {
+    display: block;
+    align-self: center;
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--ct-ink) 20%, transparent);
+  }
+  .signOutActions { flex-direction: column; gap: var(--ct-space-3); padding-top: var(--ct-space-1); }
+  .signOutActions > * { width: 100%; }
+}

@@ -18,12 +18,15 @@ export function NavLink({
   icon,
   leading,
   badge = 0,
+  className,
 }: {
   href: string;
   label: string;
   icon?: NavIconName;
   leading?: ReactNode;
   badge?: number;
+  /** Extra class, e.g. hiding a page from the phone's More sheet when the tab bar already has it. */
+  className?: string | undefined;
 }) {
   const pathname = usePathname();
   const current = pathname === href || pathname.startsWith(`${href}/`);
@@ -34,7 +37,7 @@ export function NavLink({
       aria-label={badge > 0 ? `${label}, ${badge} unread` : label}
       title={label}
       aria-current={current ? 'page' : undefined}
-      className={cx(styles.navItem, current && styles.navItemCurrent)}
+      className={cx(styles.navItem, current && styles.navItemCurrent, className)}
     >
       {leading ?? (icon ? NAV_ICONS[icon] : null)}
       <span className={styles.navLabel} data-ph-safe="">
