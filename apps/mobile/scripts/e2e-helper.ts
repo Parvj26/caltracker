@@ -126,6 +126,24 @@ export async function confirm(email: string): Promise<void> {
   if (error) throw error;
 }
 
+/** The password the Maestro flows type for accounts this helper creates. */
+const E2E_PASSWORD = 'e2e-password-123';
+
+/**
+ * A confirmed client account with no coach, as if made before sign-up was switched off (the app has no sign-up
+ * screen now: new clients join from an invite link).
+ */
+export async function createUser(email: string, name: string): Promise<void> {
+  const { firstName, lastName } = splitFullName(name);
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    password: E2E_PASSWORD,
+    email_confirm: true,
+    user_metadata: { first_name: firstName, last_name: lastName },
+  });
+  if (error) throw error;
+}
+
 /** What the dashboard's Remove does (remove_client needs a signed-in coach, so the helper writes the same rows). */
 export async function remove(email: string): Promise<void> {
   const id = await findUserId(email);
@@ -843,6 +861,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   if (action === 'log-notes') return logNotes(email);
   if (action === 'invite') await invite(email, name);
   else if (action === 'confirm') await confirm(email);
+  else if (action === 'create-user') await createUser(email, name);
   else if (action === 'cleanup') await cleanup(email);
   else if (action === 'remove') await remove(email);
   else if (action === 'assign') await assign(email);
