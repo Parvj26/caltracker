@@ -192,7 +192,7 @@ export function BlockEditor({
   ];
 
   return (
-    <section aria-labelledby={headingId} className={styles.block} data-open={shown ? '' : undefined}>
+    <section aria-labelledby={headingId} className={styles.block} data-open={shown ? '' : undefined} data-block-id={block.id}>
       {/* Phones and iPad portrait: one tappable line (name, then "4 × 8 @ 60 kg · rest 1:30") and the ⋯ menu. */}
       <div className={styles.fold}>
         <button

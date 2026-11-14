@@ -50,6 +50,7 @@ import { AddSectionMenu } from './add-section-menu';
 import { SectionHeader } from './section-header';
 import { BlockEditor, type BlockActions } from './block-editor';
 import { ExercisePicker } from './exercise-picker';
+import { useKeyboardOffset } from './use-keyboard-offset';
 import styles from './builder.module.css';
 
 export type BuilderMode = 'library' | { clientName: string; date: IsoDate };
@@ -185,6 +186,8 @@ export function WorkoutBuilder({
   const [openId, setOpenId] = useState<string | null>(null);
   const knownBlocks = useRef<Set<string>>(new Set(initial.blocks.map((b) => b.id)));
   const [pending, startTransition] = useTransition();
+  const saveBarRef = useRef<HTMLDivElement>(null);
+  useKeyboardOffset(saveBarRef);
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
   // The workspace's remembered choices per exercise: read with the page, then again after each save. A ref, not
   // state: the picker may hold an onPick from an earlier render.
@@ -204,12 +207,29 @@ export function WorkoutBuilder({
   }, [prefsVersion]);
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
-  // A newly added exercise (or group) opens, so the coach can fill it in straight away.
+  // A newly added exercise (or group) opens, so the coach can fill it in straight away, and scrolls into view.
+  const builderRef = useRef<HTMLDivElement>(null);
+  const scrollToId = useRef<string | null>(null);
   useEffect(() => {
     const added = doc.blocks.find((b) => !knownBlocks.current.has(b.id));
     knownBlocks.current = new Set(doc.blocks.map((b) => b.id));
-    if (added) setOpenId(added.id);
+    if (added) {
+      scrollToId.current = added.id;
+      setOpenId(added.id);
+    }
   }, [doc.blocks]);
+  useEffect(() => {
+    const id = scrollToId.current;
+    if (id === null || id !== openId) return;
+    scrollToId.current = null;
+    const el = builderRef.current?.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+    if (!el) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Phones and iPad portrait: the exercise's top just under the top Save bar (scroll-margin-top). Wider screens
+    // only scroll when it is out of sight.
+    const narrow = window.matchMedia('(max-width: 899.98px)').matches;
+    el.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: narrow ? 'start' : 'nearest' });
+  }, [openId]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -410,7 +430,7 @@ export function WorkoutBuilder({
                 : '';
 
   return (
-    <div className={styles.builder}>
+    <div ref={builderRef} className={styles.builder}>
       {mode !== 'library' ? (
         <p className={styles.modeBanner}>
           {mode.clientName}&apos;s workout for {formatDay(mode.date)}. Changes here don&apos;t touch your library.
@@ -422,8 +442,24 @@ export function WorkoutBuilder({
           label="Workout name"
           maxLength={100}
           value={doc.name}
+          // A workout's name, not a person's: no contact AutoFill, autocorrect or spell-check underlines.
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
+          spellCheck={false}
           {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
-          onChange={(e) => setDoc((d) => ({ ...d, name: e.target.value }))}
+          onChange={(e) => {
+            const name = e.target.value;
+            setDoc((d) => ({ ...d, name }));
+            // "Enter a name." goes as soon as the name is valid again, not at the next save.
+            if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
+              setErrors((cur) => {
+                const next = new Map(cur);
+                next.delete('name');
+                return next;
+              });
+            }
+          }}
         />
         <TextAreaField
           label="Workout notes (optional)"
@@ -499,7 +535,7 @@ export function WorkoutBuilder({
 
       {/* Wide screens: a save bar stuck to the bottom. Phones and iPad portrait: the same bar moves to the top (under
           the notch), with "+ Exercise" beside Save, so neither hides behind the keyboard or the Menu button. */}
-      <div className={styles.saveBar}>
+      <div ref={saveBarRef} className={styles.saveBar}>
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}

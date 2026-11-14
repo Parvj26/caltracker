@@ -57,6 +57,8 @@
 .filter:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .filter[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-lime); }
 
+/* Room for one row of picks before the first is ticked (each chip is 44 px tall). */
+.pickedSlot { flex: none; min-height: var(--ct-tap-min); }
 .picked { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 .picked li {
   display: inline-flex;

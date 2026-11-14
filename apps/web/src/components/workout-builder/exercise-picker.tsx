@@ -47,7 +47,8 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (dialog && !dialog.open) dialog.showModal();
     return () => {
-      if (opener?.isConnected) opener.focus();
+      // Without scrolling: the builder scrolls to what was just added, and the opener was in sight when tapped.
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
 

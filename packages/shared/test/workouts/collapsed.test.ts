@@ -124,6 +124,35 @@ describe('exerciseCollapsedLine', () => {
     expect(exerciseCollapsedLine(ex, 'kg')).toBe('2 × 8');
   });
 
+  it('counts only the filled sets and names the empty ones', () => {
+    const blank = { targetRepsMin: null, targetRepsMax: null, targetWeightKg: null };
+    const ex = exercise('Bench Press', [set({ targetRepsMin: 101, targetRepsMax: 101, targetWeightKg: 27.5 }), set(blank), set(blank)]);
+    expect(exerciseCollapsedLine(ex, 'kg')).toBe('1 × 101 @ 27.5 kg + 2 empty sets · rest 1:30');
+    const one = exercise('Row', [set(), set(), set(blank)]);
+    expect(exerciseCollapsedLine(one, 'kg')).toBe('2 × 8 @ 60 kg + 1 empty set · rest 1:30');
+  });
+
+  it('counts a set with only a weight as filled, and keeps warm-ups in front', () => {
+    const ex = exercise('Squat', [
+      set({ setType: 'warmup', targetWeightKg: 20 }),
+      set({ targetRepsMin: null, targetRepsMax: null, targetWeightKg: 80 }),
+      set({ targetRepsMin: null, targetRepsMax: null, targetWeightKg: null }),
+    ]);
+    expect(exerciseCollapsedLine(ex, 'kg')).toBe('1 warm-up + 1 set @ 80 kg + 1 empty set · rest 1:30');
+  });
+
+  it('does not call a failure set empty', () => {
+    const ex = exercise('Dip', [set(), set({ toFailure: true, targetRepsMin: null, targetRepsMax: null, targetWeightKg: null })], {
+      trackingType: 'weight_reps',
+    });
+    expect(exerciseCollapsedLine(ex, 'kg')).toBe('2 × 8 @ 60 kg · last to failure · rest 1:30');
+  });
+
+  it('shows a rep range as a range, as the summary card does', () => {
+    const ex = exercise('Lunge', times(3, { targetRepsMin: 10, targetRepsMax: 12, targetWeightKg: null }));
+    expect(exerciseCollapsedLine(ex, 'kg')).toBe('3 × 10–12 · rest 1:30');
+  });
+
   it('can leave out the rest and mention substitutes', () => {
     const base = exercise('Lat Pulldown', times(3));
     const sub = { id: id(), exerciseId: id(), exerciseName: 'Pull-up', trackingType: 'reps' as const, note: null, sets: [set()] };
