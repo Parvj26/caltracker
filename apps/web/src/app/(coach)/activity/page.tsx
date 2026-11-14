@@ -87,7 +87,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
   const logRows = (logs.data as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[]).slice(0, PAGE_SIZE);
   const review = logReviewByLog(
-    logRows.map((r) => ({ id: r.id, clientId: r.client_id })),
+    logRows.map((r) => ({ id: r.id, clientId: r.client_id, loggedBy: r.logged_by })),
     comments.data.map((c) => ({ logId: c.log_id, authorId: c.author_id })),
   );
   const rows: FeedRow[] = logRows.flatMap((row) => {

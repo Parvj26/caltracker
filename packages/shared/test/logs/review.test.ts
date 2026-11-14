@@ -46,4 +46,18 @@ describe('logReviewByLog', () => {
     expect(map.get('b')).toEqual({ comments: 1, reviewed: true });
     expect(map.has('z')).toBe(false);
   });
+
+  it('a log the coach logged (in person) counts as reviewed, with or without comments', () => {
+    const map = logReviewByLog(
+      [
+        { id: 'a', clientId: CLIENT, loggedBy: COACH },
+        { id: 'b', clientId: CLIENT, loggedBy: CLIENT },
+        { id: 'c', clientId: CLIENT, loggedBy: null },
+      ],
+      [{ logId: 'b', authorId: CLIENT }],
+    );
+    expect(map.get('a')).toEqual({ comments: 0, reviewed: true });
+    expect(map.get('b')).toEqual({ comments: 1, reviewed: false });
+    expect(map.get('c')).toEqual({ comments: 0, reviewed: false });
+  });
 });
