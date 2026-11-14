@@ -1,7 +1,11 @@
 'use client';
 
 import { cancelInvite, removeClient } from './actions';
-import { ConfirmButton } from './confirm-button';
+import type { RefObject } from 'react';
+import { ConfirmButton, ConfirmDialog } from './confirm-button';
+
+const REMOVE_BODY =
+  "They'll lose access to your workouts, messages and community. Their history stays under Past clients, and re-inviting them brings everything back.";
 
 export function RemoveClientButton({ userId, name, focusAfterId = 'clients-heading' }: { userId: string; name: string; focusAfterId?: string }) {
   const who = name || 'this client';
@@ -10,10 +14,25 @@ export function RemoveClientButton({ userId, name, focusAfterId = 'clients-headi
       label="Remove"
       ariaLabel={`Remove ${who}`}
       title={`Remove ${who}?`}
-      body="They'll lose access to your workouts, messages and community. Their history stays under Past clients, and re-inviting them brings everything back."
+      body={REMOVE_BODY}
       confirmLabel="Remove"
       onConfirm={() => removeClient(userId)}
       focusAfterId={focusAfterId}
+    />
+  );
+}
+
+/** The same "Remove …?" question, opened from elsewhere (the client page's ⋯ menu) with `dialogRef.current.showModal()`. */
+export function RemoveClientDialog({ userId, name, focusAfterId, dialogRef }: { userId: string; name: string; focusAfterId: string; dialogRef: RefObject<HTMLDialogElement | null> }) {
+  const who = name || 'this client';
+  return (
+    <ConfirmDialog
+      title={`Remove ${who}?`}
+      body={REMOVE_BODY}
+      confirmLabel="Remove"
+      onConfirm={() => removeClient(userId)}
+      focusAfterId={focusAfterId}
+      dialogRef={dialogRef}
     />
   );
 }

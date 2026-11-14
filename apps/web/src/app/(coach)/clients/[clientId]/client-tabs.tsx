@@ -13,7 +13,6 @@ export const CLIENT_TABS = [
   { segment: 'body', path: '/body', label: 'Body' },
   { segment: 'food', path: '/food', label: 'Food' },
   { segment: 'documents', path: '/documents', label: 'Documents' },
-  { segment: 'settings', path: '/settings', label: 'Settings' },
 ] as const;
 
 type More = { before: boolean; after: boolean };
@@ -53,11 +52,14 @@ function useScrollHints<T extends HTMLElement>() {
   return { ref, more };
 }
 
-/** The client page's tabs. Each is a link to its own address, so back, reload and shared links all work. */
+/**
+ * The client page's tabs. Each is a link to its own address, so back, reload and shared links all work. Settings is
+ * not a tab: it opens from the bar's "⋯" (its page, /settings, has no current tab).
+ */
 export function ClientTabs({ clientId }: { clientId: string }) {
   const segment = useSelectedLayoutSegment();
   const { ref, more } = useScrollHints<HTMLElement>();
-  // The current tab is always in view, also when it is Documents or Settings on a phone.
+  // The current tab is always in view, also when it is Documents on a phone.
   useEffect(() => {
     // Only the strip scrolls (scrollIntoView could also move the page, e.g. away from a #heading it opened at).
     const strip = ref.current;
@@ -67,6 +69,14 @@ export function ClientTabs({ clientId }: { clientId: string }) {
     if (left < strip.scrollLeft) strip.scrollLeft = Math.max(0, left - 48);
     else if (left + tab.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left + tab.offsetWidth - strip.clientWidth + 48;
   }, [ref, segment]);
+  // Opening a tab at a #heading (Overview's "See bests and stickers"): scroll it into view once the tab is on screen,
+  // so its scroll margin keeps it below the bar stuck at the top on a phone (Mobile Safari's own jump can land under it).
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [segment]);
   const page = (direction: 1 | -1) => {
     const strip = ref.current;
     if (strip) strip.scrollBy({ left: direction * Math.round(strip.clientWidth * 0.7), behavior: 'smooth' });
@@ -91,8 +101,9 @@ export function ClientTabs({ clientId }: { clientId: string }) {
           })}
         </ul>
       </nav>
-      {/* Arrows on a faded edge, only while tabs are hidden behind it (on phones). A finger or mouse can tap them;
-          keyboard and screen reader users reach every tab as a link anyway, so the arrows stay out of their way. */}
+      {/* Arrows on a faded edge, only while tabs are hidden behind it (a narrow window). Phones hide them in CSS: the
+          strip is swiped there, and the fade shows there is more. A mouse can tap them; keyboard and screen reader
+          users reach every tab as a link anyway, so the arrows stay out of their way. */}
       {more.before ? (
         <button type="button" className={cx(styles.tabsArrow, styles.tabsArrowBefore)} onClick={() => page(-1)} aria-hidden="true" tabIndex={-1} data-testid="client-tabs-before">
           <ChevronIcon direction="left" size={18} />

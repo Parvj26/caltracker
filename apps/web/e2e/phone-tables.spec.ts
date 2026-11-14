@@ -70,20 +70,19 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expectNoSidewaysScroll(page);
   });
 
-  test('the client tabs show an arrow while tabs are hidden, and the current tab is in view', async ({ page }) => {
+  test('the client tabs have no arrows on a phone; the strip swipes, and the current tab is in view', async ({ page }) => {
     const client = await newClient('Tess');
     await signInAsCoach(page);
     await page.goto(`/clients/${client.id}`);
     const tabs = page.getByRole('navigation', { name: 'Client sections' });
-    const settings = tabs.getByRole('link', { name: 'Settings' });
-    await expect(settings).not.toBeInViewport({ ratio: 1 });
-    await page.getByTestId('client-tabs-after').click();
-    await expect(settings).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId('client-tabs-after')).toHaveCount(0);
-    await expect(page.getByTestId('client-tabs-before')).toBeVisible();
+    await expect(tabs.getByRole('link', { name: 'Overview' })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('client-tabs-after')).toBeHidden();
+    await expect(page.getByTestId('client-tabs-before')).toBeHidden();
+    // Settings lives in ⋯ now.
+    await expect(tabs.getByRole('link', { name: 'Settings' })).toHaveCount(0);
 
-    await page.goto(`/clients/${client.id}/settings`);
-    await expect(settings).toBeInViewport({ ratio: 1 });
+    await page.goto(`/clients/${client.id}/documents`);
+    await expect(tabs.getByRole('link', { name: 'Documents' })).toBeInViewport({ ratio: 1 });
     await expectNoSidewaysScroll(page);
   });
 });
@@ -93,7 +92,7 @@ test('on a wide screen every client tab fits and there are no arrows', async ({ 
   const client = await newClient('Wade');
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}`);
-  await expect(page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Settings' })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Documents' })).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId('client-tabs-after')).toHaveCount(0);
   await expect(page.getByTestId('client-tabs-before')).toHaveCount(0);
 });

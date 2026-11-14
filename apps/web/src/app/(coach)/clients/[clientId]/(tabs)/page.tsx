@@ -6,6 +6,8 @@ import { loadClientOverview } from '@/lib/client-overview';
 import { getClient } from '@/lib/page-data';
 import { clientPageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { LiveRefresh } from '@/components/live-refresh';
+import { renderTime } from '@/lib/live-refresh';
 import { OverviewView } from '../overview/overview-view';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
@@ -36,13 +38,19 @@ function oldLinkTarget(clientId: string, query: Query): string | null {
 }
 
 export default async function ClientOverviewPage({ params, searchParams }: { params: Promise<{ clientId: string }>; searchParams: Promise<Query> }) {
-  const { workspaceId, units } = await requireCoach();
+  const { workspaceId, units, userId } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
   const client = await getClient(clientId);
   if (!client) notFound();
   const target = oldLinkTarget(client.id, query);
   if (target) redirect(target);
 
-  const data = await loadClientOverview(await createServerSupabase(), workspaceId, client, localToday('UTC'));
-  return <OverviewView data={data} units={units} readOnly={client.removedAt !== null} />;
+  const data = await loadClientOverview(await createServerSupabase(), workspaceId, client, localToday('UTC'), units);
+  return (
+    <>
+      {/* The Today card follows a session as it starts, moves on and finishes. */}
+      {client.removedAt === null ? <LiveRefresh on={[{ table: 'workout_logs', filter: `client_id=eq.${client.id}` }]} renderedAt={renderTime()} /> : null}
+      <OverviewView data={data} units={units} coachId={userId} readOnly={client.removedAt !== null} />
+    </>
+  );
 }

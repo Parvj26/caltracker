@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatDayDate,
   formatPlainDay,
+  formatTimeOfDay,
   formatWeekRange,
   formatWeekdayDay,
   formatPlainDayMonth,
@@ -74,6 +75,14 @@ describe('MONTHS_SHORT', () => {
   it('has twelve three-letter names', () => {
     expect(MONTHS_SHORT).toHaveLength(12);
     expect(MONTHS_SHORT.every((m) => m.length === 3)).toBe(true);
+  });
+});
+
+describe('formatTimeOfDay', () => {
+  it('prints 12-hour time with am or pm, in the given zone', () => {
+    expect(formatTimeOfDay('2026-11-13T17:12:00Z', 'UTC')).toBe('5:12 pm');
+    expect(formatTimeOfDay('2026-11-13T00:05:00Z', 'UTC')).toBe('12:05 am');
+    expect(formatTimeOfDay('2026-11-13T07:30:00Z', 'America/Los_Angeles')).toBe('11:30 pm');
   });
 });
 

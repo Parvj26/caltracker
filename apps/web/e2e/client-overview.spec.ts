@@ -172,11 +172,11 @@ test('Overview is the default tab and shows training, highlights, body metrics, 
   await expect(profile.getByText(/Dubai \(Asia\/Dubai\)/)).toBeVisible();
 });
 
-test('the coach keeps a goal, limitations and notes; the header flags injury notes', async ({ page }) => {
+test('the coach keeps a goal, limitations and notes; an injury chip tops Overview', async ({ page }) => {
   const s = await setup();
   await signIn(page, s);
   await page.goto(`/clients/${s.clientId}`);
-  await expect(page.getByText('Injury notes')).toHaveCount(0);
+  await expect(page.getByTestId('injury-chip')).toHaveCount(0);
 
   const goal = card(page, 'Goal & countdown');
   await goal.getByRole('button', { name: 'Set a goal' }).click();
@@ -192,7 +192,12 @@ test('the coach keeps a goal, limitations and notes; the header flags injury not
   await limits.getByLabel('Limitations and injuries').fill('Left knee: no deep squats.');
   await limits.getByRole('button', { name: 'Save' }).click();
   await expect(limits.getByText('Left knee: no deep squats.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Injury notes' })).toBeVisible();
+  // The chip shows the note's first line; a tap shows the whole note under it.
+  const chip = page.getByRole('button', { name: /^Injury: Left knee: no deep squats/ });
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-expanded', 'true');
 
   const notes = card(page, 'Notes');
   await notes.getByLabel('New note').fill('Prefers morning sessions.');
@@ -214,12 +219,16 @@ test('the coach keeps a goal, limitations and notes; the header flags injury not
   await page.reload();
   await expect(card(page, 'Goal & countdown').getByText('10 days to go')).toBeVisible();
   await expect(card(page, 'Notes').getByText('Prefers early morning sessions.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Injury notes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Injury: Left knee: no deep squats/ })).toBeVisible();
+  // Only on Overview: the other tabs keep their room.
+  await page.goto(`/clients/${s.clientId}/training`);
+  await expect(page.getByRole('button', { name: 'Assign program' })).toBeVisible();
+  await expect(page.getByTestId('injury-chip')).toHaveCount(0);
   const rows = await admin.from('client_notes').select('body').eq('client_id', s.clientId);
   expect(rows.data?.map((r) => r.body)).toEqual(['Prefers early morning sessions.']);
 });
 
-test('the tabs open Training, Body, Documents and Settings, and old links still land in the right place', async ({ page }) => {
+test('the tabs open Training, Body and Documents, ⋯ opens Settings, and old links still land in the right place', async ({ page }) => {
   const s = await setup();
   await signIn(page, s);
   await page.goto(`/clients/${s.clientId}`);
@@ -239,7 +248,11 @@ test('the tabs open Training, Body, Documents and Settings, and old links still 
   await tabs.getByRole('link', { name: 'Documents' }).click();
   await expect(page.getByRole('heading', { name: 'Add a document' })).toBeVisible();
 
-  await tabs.getByRole('link', { name: 'Settings' }).click();
+  // Settings is no longer a tab: it is in the bar's ⋯, at its old address.
+  await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Training', 'Body', 'Food', 'Documents']);
+  await page.getByRole('button', { name: 'More for this client' }).click();
+  await page.getByRole('menuitem', { name: 'Client settings' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/settings$`));
   await expect(page.getByRole('button', { name: 'Remove Tara Track' })).toBeVisible();
 
   // Home's Add scan shortcut, and links made before the tabs. An old Assign link (?assign=1) lands on Training,
