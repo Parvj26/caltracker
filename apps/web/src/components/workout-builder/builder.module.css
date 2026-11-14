@@ -698,7 +698,20 @@
   text-decoration: underline;
   cursor: pointer;
 }
-.sheetActions { display: flex; align-items: center; gap: var(--ct-space-2); }
+/* Pinned to the sheet's bottom edge, so Done stays in reach when the keyboard shrinks the sheet and the rest scrolls. */
+.sheetActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  /* Over the sheet's side and bottom padding, so it meets the sheet's edges. */
+  margin: 0 calc(-1 * var(--ct-space-4)) calc(-1 * (var(--ct-space-4) + env(safe-area-inset-bottom)));
+  padding: var(--ct-space-2) var(--ct-space-4) calc(var(--ct-space-4) + env(safe-area-inset-bottom));
+  background: var(--ct-bg);
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+}
 .sheetRemove { color: var(--ct-danger); }
 .sheetDone {
   flex: 1;

@@ -50,7 +50,7 @@ const useTimeZone = () => useSyncExternalStore(noSubscribe, () => Intl.DateTimeF
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 /** What the toast's Undo takes back: an add (removes it) or a "Move to…" (moves it back to its old day). */
-type Undoable = { kind: 'add'; entry: CalendarEntry } | { kind: 'move'; entry: CalendarEntry; from: IsoDate };
+type Undoable = { kind: 'add'; entry: CalendarEntry } | { kind: 'move'; entry: CalendarEntry; from: IsoDate; to: IsoDate };
 
 /** Refusals worth explaining to the coach; a plain save failure gets the generic undo message. */
 const forCoach = (e: unknown): e is ActionRefusedError => e instanceof ActionRefusedError && !e.code.endsWith('_failed');
@@ -191,8 +191,12 @@ export function ClientCalendar({
       .finally(() => setInFlight((n) => n - 1));
   }
 
-  function move(itemId: string, date: IsoDate) {
-    const entry = items.find((x) => x.id === itemId);
+  /**
+   * `known` is the workout as last seen, for one that's no longer in the shown range (moved to another week, then
+   * Undo): the server refresh only sends the days on screen, so it isn't in `items` any more.
+   */
+  function move(itemId: string, date: IsoDate, known?: CalendarEntry) {
+    const entry = items.find((x) => x.id === itemId) ?? known;
     if (!entry || entry.date === date || date < today) return null;
     const from = entry.date;
     // After the workout's previous add or move has landed, so an Undo straight after a move can't overtake it.
@@ -218,7 +222,7 @@ export function ClientCalendar({
   function moveWithUndo(itemId: string, date: IsoDate) {
     const entry = move(itemId, date);
     if (!entry) return;
-    say(`Moved ${entry.name} to ${formatShortDay(date)}.`, entry.date >= today ? { kind: 'move', entry, from: entry.date } : null);
+    say(`Moved ${entry.name} to ${formatShortDay(date)}.`, entry.date >= today ? { kind: 'move', entry, from: entry.date, to: date } : null);
   }
 
   function remove(entry: CalendarEntry) {
@@ -496,7 +500,7 @@ export function ClientCalendar({
                   } else {
                     // move() gives null when it can't (the workout was deleted since, or its old day has passed).
                     const day = formatShortDay(undoable.from);
-                    if (move(undoable.entry.id, undoable.from)) say(`Moved ${undoable.entry.name} back to ${day}.`);
+                    if (move(undoable.entry.id, undoable.from, { ...undoable.entry, date: undoable.to })) say(`Moved ${undoable.entry.name} back to ${day}.`);
                     else say(`Couldn't move ${undoable.entry.name} back to ${day}.`);
                   }
                 }}
