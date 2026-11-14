@@ -43,6 +43,13 @@ export async function signInAsCoach(page: Page) {
   await page.goto('/clients');
 }
 
+/** Signs out the way a coach does: Profile, Sign out, then Sign out again in the "Sign out?" check. */
+export async function signOutFromProfile(page: Page) {
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out' }).click();
+}
+
 /** Service-role client: test fixtures and cleanup only, never app code. */
 export function serviceClient(): SupabaseClient<Database> {
   let url = process.env.SUPABASE_URL;

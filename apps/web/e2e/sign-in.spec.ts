@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { signOutFromProfile } from './helpers';
 
 const PASSWORD = 'demo-password-123';
 
@@ -39,10 +40,18 @@ test('a client account sees the coaches-only message', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /This dashboard is for coaches/ })).toBeVisible();
 });
 
-test('coach can sign out', async ({ page }) => {
+test('coach can sign out from Profile, after a check', async ({ page }) => {
   await signIn(page, 'coach@demo.local', PASSWORD);
   await expect(page).toHaveURL(/\/home$/);
+  await page.goto('/profile');
+  // "Stay signed in" changes nothing.
   await page.getByRole('button', { name: 'Sign out' }).click();
+  const check = page.getByRole('dialog', { name: 'Sign out?' });
+  await expect(check).toBeVisible();
+  await check.getByRole('button', { name: 'Stay signed in' }).click();
+  await expect(check).toBeHidden();
+  await expect(page).toHaveURL(/\/profile$/);
+  await signOutFromProfile(page);
   await expect(page).toHaveURL(/\/sign-in/);
   await page.goto('/clients');
   await expect(page).toHaveURL(/\/sign-in/);
