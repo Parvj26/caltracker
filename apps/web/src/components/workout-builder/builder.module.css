@@ -585,6 +585,6 @@
   /* − box + touch: the 4 px gap set for wider screens further up would cost the box its fifth character. */
   .stepper { gap: 0; }
   /* A drop row and a substitute's sets lose less width to their indent, so they fit five characters too. */
-  .dropRow { padding-left: var(--ct-space-2); }
+  .dropRow { padding-left: var(--ct-space-2-5); }
   .substitute { padding-left: 6px; padding-right: 0; }
 }
