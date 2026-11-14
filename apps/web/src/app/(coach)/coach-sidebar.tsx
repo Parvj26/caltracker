@@ -108,6 +108,12 @@ export function CoachSidebar({
         onClick={onSheetClick}
       >
         <span className={styles.grabHandle} aria-hidden="true" />
+        {/* Screen readers treat everything outside a modal sheet as hidden, so it needs its own way out. */}
+        {open ? (
+          <button type="button" className={styles.srClose} onClick={close}>
+            Close menu
+          </button>
+        ) : null}
         {children}
       </aside>
     </UnreadTotalContext.Provider>

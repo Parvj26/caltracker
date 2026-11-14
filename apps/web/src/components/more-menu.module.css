@@ -51,4 +51,8 @@
   cursor: pointer;
 }
 .item:hover, .item:focus-visible { outline: none; background: var(--ct-surface); }
+/* Busy ("Sending…", "Duplicating…"): muted and not tinted on hover, since a tap does nothing. */
+.item:disabled { color: var(--ct-ink-muted); cursor: progress; }
+.item:disabled:hover { background: transparent; }
+.button[aria-busy='true'] { cursor: progress; }
 .danger { color: var(--ct-danger); font-weight: var(--ct-weight-section-heading); }
