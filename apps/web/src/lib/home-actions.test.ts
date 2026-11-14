@@ -20,9 +20,21 @@ describe('todayAction', () => {
 
   it('offers Watch live, not Log session, when the client already has another workout in progress', () => {
     // Log session would open a page that refuses to start ("They need to finish it first").
-    expect(todayAction(row({ kind: 'not_started' }), COACH, 'l9')).toEqual({ label: 'Watch live', href: '/clients/c1/logs/l9', style: 'outlined' });
+    const theirs = { id: 'l9', loggedBy: 'c1', workoutId: 'w9' };
+    expect(todayAction(row({ kind: 'not_started' }), COACH, theirs)).toEqual({ label: 'Watch live', href: '/clients/c1/logs/l9', style: 'outlined' });
     // The row's own live or finished log still wins.
-    expect(todayAction(row({ kind: 'done', logId: 'l1', durationS: 60 }), COACH, 'l9').label).toBe('View');
+    expect(todayAction(row({ kind: 'done', logId: 'l1', durationS: 60 }), COACH, theirs).label).toBe('View');
+  });
+
+  it('offers Continue (the logger) when that other workout is the coach\'s own session in progress', () => {
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: COACH, workoutId: 'w9' })).toEqual({
+      label: 'Continue',
+      href: '/clients/c1/log/w9',
+      style: 'filled',
+    });
+    // Another coach's session (or one with no workout to open the logger on) is watched instead.
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: 'coach2', workoutId: 'w9' }).label).toBe('Watch live');
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: COACH, workoutId: null }).label).toBe('Watch live');
   });
 
   it('treats a log with no logger (an old row) as the client training: Watch', () => {
@@ -51,7 +63,7 @@ describe('todayMenu', () => {
 
 describe('liveLogByClient', () => {
   const log = (id: string, clientId: string, startedAt: string): LiveLog => ({
-    id, clientId, name: 'W', startedAt, lastActivityAt: startedAt, done: 0, total: 1,
+    id, clientId, name: 'W', startedAt, lastActivityAt: startedAt, done: 0, total: 1, loggedBy: clientId, workoutId: `w-${id}`,
   });
 
   it('maps each client to their latest-started workout in progress, idle or not', () => {
@@ -60,8 +72,8 @@ describe('liveLogByClient', () => {
       log('b', 'c1', '2026-11-07T09:00:00Z'),
       log('c', 'c2', '2026-11-01T09:00:00Z'),
     ]);
-    expect(map.get('c1')).toBe('b');
-    expect(map.get('c2')).toBe('c');
+    expect(map.get('c1')).toEqual({ id: 'b', loggedBy: 'c1', workoutId: 'w-b' });
+    expect(map.get('c2')?.id).toBe('c');
     expect(map.get('c3')).toBeUndefined();
   });
 });
@@ -76,6 +88,8 @@ describe('trainingNow', () => {
     lastActivityAt: new Date(NOW - idleMinAgo * 60_000).toISOString(),
     done: 1,
     total: 4,
+    loggedBy: clientId,
+    workoutId: null,
   });
 
   it('keeps current clients, one card each (latest start), earliest first, and drops long-idle ones', () => {
