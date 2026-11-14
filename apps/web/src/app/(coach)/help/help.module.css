@@ -1,0 +1,103 @@
+/* Help page (round 2 mockup "Help opens a page, not Mail"). Colours and sizes only via var(--ct-*). */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4); max-width: 640px; }
+.header { display: flex; flex-direction: column; gap: 6px; }
+.title {
+  margin: 0;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  line-height: 1.15;
+}
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.howTo { border-bottom: 1px solid var(--ct-border); }
+.howTo[open] { padding-bottom: var(--ct-space-3-5); }
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  min-height: 60px;
+  cursor: pointer;
+  list-style: none;
+}
+.summary::-webkit-details-marker { display: none; }
+.summary:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-radius: var(--ct-radius-input); }
+.number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ct-lime);
+  color: var(--ct-ink);
+  font-size: 14px;
+  font-weight: var(--ct-weight-button);
+}
+.howToTitle { flex: 1; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.chevron { flex: none; transition: transform 0.15s ease; }
+.howTo[open] .chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
+
+.steps { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0 0 var(--ct-space-2-5); padding: 0 0 0 44px; list-style: none; }
+.step { display: flex; align-items: flex-start; gap: 10px; }
+.stepNumber { flex: none; width: 14px; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; line-height: 1.5; }
+.goLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  margin-left: 44px;
+  color: var(--ct-ink);
+  font-size: 15px;
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.support { display: flex; flex-direction: column; gap: var(--ct-space-2-5); padding-top: var(--ct-space-3-5); }
+.supportHeading { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mailbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 6px 0 14px;
+  border-radius: 12px;
+  background: var(--ct-surface);
+}
+.address { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: var(--ct-weight-button); user-select: text; -webkit-user-select: text; }
+.copy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ct-tap-min);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.copy:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.copyStatus { margin: 0; min-height: 1lh; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.copyStatus:empty { min-height: 0; }
+.mailLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  align-self: flex-start;
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
