@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 
-// The client page's Food tab: the coach sets daily targets, sees the week's totals against them and each meal with
-// its photo, and "Reply about this meal" opens Messages with the reply started. Each test seeds its own client.
+// The client page's Food tab (desktop): today's totals and meals first, the targets in one line with Edit opening the
+// form, then the week's table. "Message about this meal" opens Messages with the reply started. Each test seeds its own
+// client. The phone layout is in phone-food.spec.ts.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 const created: { users: string[]; files: string[] } = { users: [], files: [] };
@@ -27,7 +28,8 @@ test.afterAll(async () => {
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
 
-const today = () => new Intl.DateTimeFormat('en-CA').format(new Date());
+const localDay = (d: Date) => new Intl.DateTimeFormat('en-CA').format(d);
+const today = () => localDay(new Date());
 
 async function newClient(): Promise<{ id: string; last: string }> {
   const last = `Food${unique()}`;
@@ -44,10 +46,11 @@ async function newClient(): Promise<{ id: string; last: string }> {
   return { id: u.data.user.id, last };
 }
 
-/** A meal eaten today at local noon (the browser and this runner share a clock and time zone). */
-async function seedMeal(clientId: string, o: { name: string | null; calories?: number; protein?: number; note?: string; photo?: boolean }) {
+/** A meal eaten at local 12:15, today or `daysAgo` days before (the browser and this runner share a clock and zone). */
+async function seedMeal(clientId: string, o: { name: string | null; calories?: number; protein?: number; note?: string; photo?: boolean; daysAgo?: number }) {
   const id = randomUUID();
   const noon = new Date();
+  noon.setDate(noon.getDate() - (o.daysAgo ?? 0));
   noon.setHours(12, 15, 0, 0);
   let photo: { photo_path: string; photo_thumb_path: string; photo_width: number; photo_height: number } | object = {};
   if (o.photo) {
@@ -66,7 +69,7 @@ async function seedMeal(clientId: string, o: { name: string | null; calories?: n
     workspace_id: workspaceId,
     client_id: clientId,
     eaten_at: noon.toISOString(),
-    eaten_on: today(),
+    eaten_on: localDay(noon),
     name: o.name,
     note: o.note ?? '',
     calories: o.calories ?? null,
@@ -76,55 +79,80 @@ async function seedMeal(clientId: string, o: { name: string | null; calories?: n
   if (r.error) throw r.error;
 }
 
-test('the coach sets targets and sees the day against them', async ({ page }) => {
+test('the coach sets targets in the sheet and sees today against them', async ({ page }) => {
+  test.slow();
   const client = await newClient();
   await seedMeal(client.id, { name: 'Lunch', calories: 650, protein: 42 });
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}`);
   await page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Food' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/food$`));
-  await expect(page.getByText('No targets yet. Set them above to see each day against them.')).toBeVisible();
+  await expect(page.getByTestId('food-targets-line')).toHaveText('None yet. Fay sees them in the app.');
+  await expect(page.getByText('No targets yet. Set them to see each day against them.')).toBeVisible();
 
+  const totals = page.getByTestId('food-today-totals');
+  await expect(totals).toContainText('650 kcal');
   const todayRow = page.getByTestId(`food-day-${today()}`);
   await expect(todayRow).toContainText('650');
   await expect(todayRow).toContainText('42');
 
-  await page.getByLabel('Calories (kcal)').fill('2000');
-  await page.getByLabel('Protein (g)').fill('150');
-  await page.getByRole('button', { name: 'Save targets' }).click();
+  // The form opens in a dialog; nothing to fill on the page itself.
+  await expect(page.getByLabel('Calories (kcal)')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Set targets' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Daily targets' });
+  await dialog.getByLabel('Calories (kcal)').fill('2000');
+  await dialog.getByLabel('Protein (g)').fill('150');
+  await dialog.getByRole('button', { name: 'Save targets' }).click();
   await expect(page.getByRole('status')).toHaveText('Saved');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('food-targets-line')).toHaveText('2,000 kcal · 150 P');
+
   await page.reload();
-  await expect(page.getByLabel('Calories (kcal)')).toHaveValue('2000');
-  await expect(page.getByLabel('Carbs (g)')).toHaveValue('');
+  await expect(page.getByTestId('food-targets-line')).toHaveText('2,000 kcal · 150 P');
+  await expect(totals).toContainText('650 / 2,000 kcal');
+  await expect(page.getByTestId('food-today-gap')).toHaveText('1,350 left');
+  await expect(totals).toContainText('42 / 150 g');
   await expect(todayRow).toContainText('650 / 2,000');
   await expect(todayRow).toContainText('42 / 150');
+  await page.getByRole('button', { name: 'Edit targets' }).click();
+  await expect(dialog.getByLabel('Calories (kcal)')).toHaveValue('2000');
+  await expect(dialog.getByLabel('Carbs (g)')).toHaveValue('');
 
   const row = await admin.from('nutrition_targets').select('calories, protein_g, carbs_g').eq('client_id', client.id).single();
   expect(row.data).toEqual({ calories: 2000, protein_g: 150, carbs_g: null });
 });
 
-test('a bad target is refused with a message', async ({ page }) => {
+test('a bad target is refused with a message, and the sheet stays open', async ({ page }) => {
   const client = await newClient();
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}/food`);
-  await page.getByLabel('Fat (g)').fill('5000');
-  await page.getByRole('button', { name: 'Save targets' }).click();
-  await expect(page.getByText('Fat can be at most 1,000 g.')).toBeVisible();
+  await page.getByRole('button', { name: 'Set targets' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Daily targets' });
+  await dialog.getByLabel('Fat (g)').fill('5000');
+  await dialog.getByRole('button', { name: 'Save targets' }).click();
+  await expect(dialog.getByText('Fat can be at most 1,000 g.')).toBeVisible();
+  await expect(dialog).toBeVisible();
 });
 
-test('meals show with their photos, and "Reply about this meal" starts a message', async ({ page }) => {
+test('today\'s meals show with their photos, and the message link starts a message', async ({ page }) => {
+  test.slow();
   const client = await newClient();
   await seedMeal(client.id, { name: 'Lunch', calories: 650, protein: 42, note: 'Chicken and rice', photo: true });
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}/food`);
-  const meal = page.getByTestId('coach-meal');
+  const meal = page.getByTestId('food-today').getByTestId('coach-meal');
   await expect(meal).toContainText('Lunch');
-  await expect(meal).toContainText('12:15 pm');
-  await expect(meal).toContainText('650 kcal · P 42 g');
+  await expect(meal).toContainText('12:15 pm · 650 kcal · P 42 g');
   await expect(meal).toContainText('Chicken and rice');
-  await expect(meal.getByRole('img', { name: 'Lunch photo' })).toBeVisible();
 
-  await meal.getByRole('link', { name: 'Reply about this meal' }).click();
+  // The small photo opens the whole photo.
+  await meal.getByRole('button', { name: 'See Lunch photo larger' }).click();
+  const photo = page.getByRole('dialog', { name: 'Lunch' });
+  await expect(photo.getByRole('img', { name: 'Lunch photo' })).toBeVisible();
+  await photo.getByRole('button', { name: 'Close' }).last().click();
+  await expect(photo).toHaveCount(0);
+
+  await meal.getByRole('link', { name: 'Message Fay about Lunch' }).click();
   await expect(page).toHaveURL(new RegExp(`/messages/${client.id}\\?about=`));
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('About your Lunch today (12:15 pm): ');
   // The bare start says nothing yet: Send waits for the coach's own words.
@@ -133,13 +161,32 @@ test('meals show with their photos, and "Reply about this meal" starts a message
   await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled();
 });
 
-test('an empty week says so, and the next week stops at this week', async ({ page }) => {
+test('a client who never logged food gets one message instead of a week of zeros', async ({ page }) => {
   const client = await newClient();
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}/food`);
-  await expect(page.getByTestId('food-empty')).toHaveText('Fay hasn’t logged any meals this week.');
+  const empty = page.getByTestId('food-empty');
+  await expect(empty.getByRole('heading', { name: 'Fay hasn’t logged any meals yet' })).toBeVisible();
+  await expect(empty).toContainText('They’ll appear here.');
+  await expect(empty.getByRole('link', { name: 'Message Fay' })).toHaveAttribute('href', `/messages/${client.id}`);
+  await expect(page.getByTestId('food-week')).toHaveCount(0);
+  await expect(page.getByTestId('food-today')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Set targets' })).toBeVisible();
+});
+
+test('a quiet week shows today empty, and the week arrows stop at this week', async ({ page }) => {
+  test.slow();
+  const client = await newClient();
+  await seedMeal(client.id, { name: 'Old lunch', calories: 500, daysAgo: 7 });
+  await signInAsCoach(page);
+  await page.goto(`/clients/${client.id}/food`);
+  await expect(page.getByTestId('food-today-empty')).toHaveText('No meals logged yet today.');
+  await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
   await expect(page.getByTestId('food-next-week')).toHaveCount(0);
-  await page.getByTestId('food-prev-week').click();
+  await page.getByRole('link', { name: 'Previous week' }).click();
   await expect(page).toHaveURL(/\?week=\d{4}-\d{2}-\d{2}$/);
+  // A past week has no "today" section, just the week and its meals.
+  await expect(page.getByTestId('food-today')).toHaveCount(0);
+  await expect(page.getByTestId('coach-meal').filter({ hasText: 'Old lunch' })).toBeVisible();
   await expect(page.getByTestId('food-next-week')).toBeVisible();
 });
