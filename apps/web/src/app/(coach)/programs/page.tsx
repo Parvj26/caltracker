@@ -54,7 +54,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
         <div className={styles.titleActions}>
           {/* Phones: a small outlined "+ New" (named "New program" for screen readers). */}
           <ButtonLink href="/programs/new" className={styles.newButton} aria-label="New program" data-ph-capture-attribute-label="program_new">
-            <span aria-hidden="true" className={styles.phoneOnly}>+&nbsp;</span>New<span className={styles.newWord}> program</span>
+            <span aria-hidden="true" className={styles.phoneOnly}>+</span>New<span className={styles.newWord}> program</span>
           </ButtonLink>
         </div>
       </header>

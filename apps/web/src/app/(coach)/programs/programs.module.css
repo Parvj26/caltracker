@@ -123,6 +123,7 @@
   .listIntro { display: none; }
   .newWord { display: none; }
   .newButton {
+    gap: var(--ct-space-1);
     min-height: var(--ct-tap-min);
     padding: var(--ct-space-2) var(--ct-space-4);
     background: transparent;
