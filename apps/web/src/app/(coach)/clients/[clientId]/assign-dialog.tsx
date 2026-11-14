@@ -217,6 +217,7 @@ export function AssignDialog({
               setError(null);
             }}
             inputId={dateInputId}
+            captureLabel="assign_pick_date"
             fieldLabel="Start date"
             fieldMin={earliestProgramStart(today)}
             error={startError}

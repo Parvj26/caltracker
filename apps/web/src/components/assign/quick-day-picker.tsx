@@ -25,6 +25,7 @@ export function QuickDayPicker({
   fieldMin,
   inputId,
   error,
+  captureLabel,
   ref,
 }: {
   legend: string;
@@ -40,6 +41,8 @@ export function QuickDayPicker({
   fieldMin: IsoDate;
   inputId?: string;
   error?: string | null;
+  /** Analytics label on the whole picker (quick days and the date field). */
+  captureLabel?: string;
   ref?: Ref<QuickDayPickerHandle>;
 }) {
   const days = quickDays(today, { ...(min ? { min } : {}), ...(exclude ? { exclude } : {}), ...(workoutsOn ? { workoutsOn } : {}) });
@@ -64,7 +67,7 @@ export function QuickDayPicker({
   }, [fieldOpen, fieldId]);
 
   return (
-    <fieldset className={styles.quickDays}>
+    <fieldset className={styles.quickDays} {...(captureLabel ? { 'data-ph-capture-attribute-label': captureLabel } : {})}>
       <legend className={styles.quickLegend}>{legend}</legend>
       <div className={styles.dayChips}>
         {days.map((d) => (

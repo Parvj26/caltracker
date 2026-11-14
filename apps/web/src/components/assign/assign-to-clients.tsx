@@ -381,6 +381,7 @@ export function AssignToClientsDialog({
                 setError(null);
               }}
               inputId={dateInputId}
+              captureLabel="assign_pick_date"
               fieldLabel={isWorkout ? 'Date' : 'Start date'}
               fieldMin={isWorkout ? today : earliestProgramStart(today)}
               error={dateError}
