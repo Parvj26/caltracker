@@ -189,7 +189,76 @@ test('the whole Programs row opens the program; Assign stays its own button', as
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/programs$/);
-  // A tap on the weeks column opens the program.
-  await row.getByRole('cell', { name: '3', exact: true }).click();
+  // A tap on the card's "3 weeks" opens the program.
+  await row.getByRole('cell', { name: '3 weeks', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
+});
+
+test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯ with Duplicate and Delete', async ({ page }, testInfo) => {
+  test.slow();
+  await signInAsCoach(page);
+  const tag = unique();
+  const workspaceId = await demoWorkspace(admin);
+  const workout = await seedLibraryWorkout(admin, workspaceId, `Card workout ${tag}`);
+  created.workouts.push(`Card workout ${tag}`);
+  const long = `12-Week Hypertrophy Block — Phase 1 with a very long name for the card ${tag}`;
+  const other = `Strength Foundations ${tag}`;
+  created.programs.push(long, other);
+  await seedProgram(admin, workspaceId, long, 4, [
+    { week: 1, day: 1, workoutId: workout },
+    { week: 1, day: 3, workoutId: workout },
+  ]);
+  await seedProgram(admin, workspaceId, other, 1, []);
+
+  await page.goto('/programs');
+  const width = page.viewportSize()!.width;
+  const table = page.getByRole('table', { name: 'Programs' });
+  const card = (name: string) => table.getByRole('row').filter({ has: page.getByRole('link', { name, exact: true }) });
+
+  // A typo still finds it ("hypertrphy"), and the other program drops out.
+  const search = page.getByRole('searchbox', { name: 'Search programs' });
+  await search.fill(`hypertrphy ${tag}`);
+  await expect(card(long)).toBeVisible();
+  await expect(card(other)).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: /^1 of \d+ programs?$/ })).toBeVisible();
+  await expect(page).toHaveURL(/\?q=/);
+
+  // The card: the name on at most 2 lines, "4 weeks · 2 workouts", lime Assign and ⋯, all on screen.
+  const row = card(long);
+  await expect(row).toContainText('4 weeks');
+  await expect(row).toContainText('· 2 workouts');
+  const name = row.getByRole('link', { name: long, exact: true });
+  const lines = await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+  expect(lines).toBeLessThanOrEqual(2);
+  for (const button of [row.getByRole('button', { name: `Assign ${long}` }), row.getByRole('button', { name: `More for ${long}` })]) {
+    await expect(button).toBeInViewport({ ratio: 1 });
+    const box = (await button.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+  }
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  // ⋯ holds Duplicate and Delete…; Delete asks first.
+  await row.getByRole('button', { name: `More for ${long}` }).click();
+  const menu = page.getByRole('menu', { name: `More for ${long}` });
+  await expect(menu.getByRole('menuitem')).toHaveText(['Duplicate', 'Delete…']);
+  await testInfo.attach('programs-375', { body: await page.screenshot(), contentType: 'image/png' });
+  await menu.getByRole('menuitem', { name: 'Delete…' }).click();
+  const confirm = page.getByRole('dialog', { name: `Delete ${long}?` });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Cancel' }).click();
+  await expect(confirm).toBeHidden();
+
+  // The whole card opens the program.
+  await row.getByText('4 weeks').click();
+  await expect(page).toHaveURL(/\/programs\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { level: 1, name: long })).toBeVisible();
+
+  // Delete from the list: the card goes.
+  await page.goto(`/programs?q=${encodeURIComponent(other)}`);
+  await card(other).getByRole('button', { name: `More for ${other}` }).click();
+  await page.getByRole('menu', { name: `More for ${other}` }).getByRole('menuitem', { name: 'Delete…' }).click();
+  await page.getByRole('dialog', { name: `Delete ${other}?` }).getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('link', { name: other, exact: true })).toHaveCount(0);
 });

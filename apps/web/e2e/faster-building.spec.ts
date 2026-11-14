@@ -113,7 +113,8 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
 
   // Duplicate from the list: same weeks and workouts, its own page.
   await page.goto('/programs');
-  await page.getByRole('button', { name: `Duplicate ${program}`, exact: true }).click();
+  await page.getByRole('button', { name: `More for ${program}`, exact: true }).click();
+  await page.getByRole('menu', { name: `More for ${program}` }).getByRole('menuitem', { name: 'Duplicate' }).click();
   await expect(page.getByRole('heading', { level: 1, name: `${program} (copy)` })).toBeVisible();
   await expect(page.getByText('Copied. Workouts are shared with the original — editing a workout changes both.')).toBeVisible();
   await expect(chip(1, 1)).toBeVisible();
