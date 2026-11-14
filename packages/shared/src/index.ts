@@ -93,7 +93,11 @@ export {
   formatPlainLongDay,
   formatPlainMonth,
   formatPlainWeekday,
+  formatRelativeDay,
+  formatTimeOfDay,
+  groupByLocalDay,
 } from './dates/format';
+export type { DayGroup } from './dates/format';
 export {
   CALENDAR_VIEWS,
   DEFAULT_CALENDAR_VIEW,
@@ -243,6 +247,8 @@ export {
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
 export { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { logReviewByLog } from './logs/review';
+export type { LogReview } from './logs/review';
 export { rebaseEdits } from './logs/rebase';
 export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
