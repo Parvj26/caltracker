@@ -47,5 +47,18 @@ export function trainingNow(logs: readonly LiveLog[], currentClientIds: Readonly
   return [...latest.values()].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
 }
 
+/**
+ * Each client's workout in progress (the latest start), from the same logs as "Training now" but without dropping
+ * long-idle ones: any log in progress blocks starting another workout for that client.
+ */
+export function liveLogByClient(logs: readonly LiveLog[]): Map<string, string> {
+  const latest = new Map<string, LiveLog>();
+  for (const l of logs) {
+    const seen = latest.get(l.clientId);
+    if (!seen || Date.parse(l.startedAt) > Date.parse(seen.startedAt)) latest.set(l.clientId, l);
+  }
+  return new Map([...latest].map(([clientId, l]) => [clientId, l.id]));
+}
+
 /** Whole minutes since the start, never negative. */
 export const minutesSince = (startedAt: string, nowMs: number): number => Math.max(0, Math.floor((nowMs - Date.parse(startedAt)) / 60_000));

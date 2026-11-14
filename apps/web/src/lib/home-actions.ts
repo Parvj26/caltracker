@@ -2,18 +2,21 @@ import type { TodayRow } from '@caltracker/shared';
 
 /** Filled for something to start or carry on, outlined to watch, light to look back. */
 export type ActionStyle = 'filled' | 'outlined' | 'light';
-export type TodayAction = { label: 'Log session' | 'Continue' | 'Watch' | 'View'; href: string; style: ActionStyle };
+export type TodayAction = { label: 'Log session' | 'Continue' | 'Watch' | 'Watch live' | 'View'; href: string; style: ActionStyle };
 export type TodayPill = { label: string; tone: 'idle' | 'live' | 'done' };
 
 /**
  * The one button on a Today row, chosen by the workout's state: log the session when nobody has started, continue the
  * coach's own session, watch the client's live, view the finished log. Message, Assign and Open client sit in "⋯".
+ * `liveLogId` is a different workout the client has in progress (liveLogByClient): starting this one would be refused
+ * (one workout at a time), so the row offers to watch that one live instead.
  */
-export function todayAction(row: TodayRow, coachId: string): TodayAction {
+export function todayAction(row: TodayRow, coachId: string, liveLogId?: string): TodayAction {
   const client = row.client.id;
   const session = `/clients/${client}/log/${row.workout.id}`;
   switch (row.status.kind) {
     case 'not_started':
+      if (liveLogId) return { label: 'Watch live', href: `/clients/${client}/logs/${liveLogId}`, style: 'outlined' };
       return { label: 'Log session', href: session, style: 'filled' };
     case 'training':
       if (row.status.loggedBy === coachId) return { label: 'Continue', href: session, style: 'filled' };
