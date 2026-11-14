@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
 import { errorMessage, type CalendarView, type IsoDate } from '@caltracker/shared';
 import { CalendarToolbar } from '@/components/calendar/calendar-toolbar';
@@ -127,6 +127,15 @@ export function ClientCalendar({
   }, [openOnLoad]);
   const [picker, setPicker] = useState<{ date: IsoDate } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
+  // Every workout this page knows about, by day, for the Move and Add windows' quick days ("free", "1 workout"):
+  // the days on screen as they are now, and the server's list of upcoming ones for the days beyond.
+  const dayWorkouts = useMemo(
+    () => [
+      ...items.map((i) => ({ id: i.id, date: i.date, name: i.name })),
+      ...upcomingWorkouts.filter((w) => w.date < range.start || w.date > range.end),
+    ],
+    [items, upcomingWorkouts, range.start, range.end],
+  );
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);
   const [copying, setCopying] = useState<CalendarEntry | null>(null);
   const [inFlight, setInFlight] = useState(0);
@@ -409,6 +418,7 @@ export function ClientCalendar({
           library={library}
           hints={hints}
           today={today}
+          dayWorkouts={dayWorkouts}
           onPick={(workout, date) => {
             setAdding(false);
             schedule(workout, date);
@@ -433,7 +443,9 @@ export function ClientCalendar({
       {moving ? (
         <MoveDialog
           entry={moving}
+          clientName={client.name}
           today={today}
+          dayWorkouts={dayWorkouts}
           onMove={(date) => {
             moveWithUndo(moving.id, date);
             setMoving(null);

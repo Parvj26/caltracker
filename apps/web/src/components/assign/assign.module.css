@@ -61,3 +61,78 @@
 
 /* "✓ chosen" on a picked workout (the row itself turns lime via aria-pressed). */
 .chosenTag { flex: none; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
+
+/* ---------- One pop-up pattern (assign, move, add a workout, assign a program) ---------- */
+.dialogHeader { align-items: flex-start; }
+.dialogHeading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dialogTitleText { overflow-wrap: anywhere; }
+.dialogSubtitle { margin: 0; color: var(--ct-ink-muted); font-size: var(--ct-size-caption); }
+
+/* Quick days: two-line chips (Tomorrow / Sat 14), then "Pick a date…". */
+.quickDays { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
+.quickLegend { margin-bottom: var(--ct-space-2); padding: 0; font-weight: var(--ct-weight-section-heading); }
+.dayChips { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--ct-space-2); }
+.dayChip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dayChip:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.dayChip:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+/* Text on a pastel fill is always ink. */
+.dayChip[aria-pressed='true'] { background: var(--ct-lime); box-shadow: inset 0 0 0 2px var(--ct-ink); }
+.dayChipLabel { font-weight: var(--ct-weight-section-heading); }
+.dayChipDetail { color: var(--ct-ink-muted); font-size: var(--ct-size-caption); }
+.dayChip[aria-pressed='true'] .dayChipDetail { color: var(--ct-ink); }
+/* A day that already has workouts: an amber dot before its detail (the words say how many). */
+.dayChipBusy .dayChipDetail::before { content: '●\00a0'; color: var(--ct-amber); }
+.quickDays .linkButton { align-self: flex-start; padding-left: 0; }
+
+/* Client rows: avatar, name, and a status chip on the right. */
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ct-radius-pill);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.avatar-lime { background: var(--ct-lime); }
+.avatar-pink { background: var(--ct-pink); }
+.avatar-blue { background: var(--ct-blue); }
+.clientName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--ct-weight-section-heading); }
+.statusChip { flex: none; }
+
+/* On a phone the title bar sticks to the top of the full-screen sheet, as the buttons stick to the bottom. */
+@media (max-width: 599.98px) {
+  .dialogHeader {
+    position: sticky;
+    top: calc(-1 * (var(--ct-space-4) + env(safe-area-inset-top)));
+    z-index: 1;
+    margin: calc(-1 * (var(--ct-space-4) + env(safe-area-inset-top))) calc(-1 * var(--ct-space-4)) 0;
+    padding: calc(var(--ct-space-2) + env(safe-area-inset-top)) var(--ct-space-2) var(--ct-space-2) var(--ct-space-4);
+    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+    background: var(--ct-bg);
+    align-items: center;
+    min-height: 60px;
+  }
+  .dialogTitleText { font-size: 18px; }
+  .dayChips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .client { min-height: 52px; padding: 0 var(--ct-space-2); }
+}

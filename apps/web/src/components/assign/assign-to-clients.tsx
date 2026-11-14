@@ -11,6 +11,7 @@ import {
   filterClients,
   nextFreeDay,
   nextMonday,
+  plannedLabel,
   programClashes,
   programStartError,
   scheduleDateError,
@@ -26,12 +27,15 @@ import {
 } from '@/app/(coach)/assign/actions';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
+import { Button, Chip, ErrorText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
+import { DialogHeader } from './dialog-header';
+import { QuickDayPicker, type QuickDayPickerHandle } from './quick-day-picker';
 import styles from './assign.module.css';
 
 export type AssignKind = 'workout' | 'program' | 'copy';
@@ -115,6 +119,7 @@ export function AssignToClientsDialog({
   const titleId = useId();
   const listId = useId();
   const dateInputId = useId();
+  const dayPicker = useRef<QuickDayPickerHandle>(null);
   const clashTitleId = useId();
   // A copy is placed like a single workout: one day per client.
   const isWorkout = source.kind !== 'program';
@@ -148,7 +153,8 @@ export function AssignToClientsDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog);
+    // The client list shows with its search box ready; on a phone the keyboard waits for a tap on it.
+    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
     return () => {
       if (opener?.isConnected) opener.focus();
     };
@@ -197,6 +203,7 @@ export function AssignToClientsDialog({
   };
 
   const clients = targets?.clients ?? [];
+  const planned = (clientId: string) => plannedLabel(today, (byClient.get(clientId) ?? []).map((w) => w.date));
   const shown = filterClients(clients, query);
   const assigned = (id: string) => results.get(id)?.ok === true;
   const chosen = clients.filter((c) => selected.has(c.id) && !assigned(c.id));
@@ -271,9 +278,12 @@ export function AssignToClientsDialog({
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={calendar.dialogTitle}>
-        {isCopy ? `Copy ${source.name} to…` : `Assign ${source.name}`}
-      </h2>
+      <DialogHeader
+        titleId={titleId}
+        title={isCopy ? `Copy ${source.name} to…` : `Assign ${source.name}`}
+        onClose={() => dialogRef.current?.close()}
+        disabled={pending}
+      />
       {isCopy ? (
         <p className={calendar.dialogBody}>
           Copies it as it is now, with your changes, as a separate workout: later program or library edits won&apos;t
@@ -324,7 +334,10 @@ export function AssignToClientsDialog({
                 <li key={c.id} className={styles.client}>
                   <label className={styles.clientLabel}>
                     <input type="checkbox" checked={on || assigned(c.id)} disabled={assigned(c.id) || pending} onChange={() => toggle(c.id)} data-ph-capture-attribute-label="assign_pick_client" />
-                    <span>{nameOf(c)}</span>
+                    <span aria-hidden="true" className={cx(styles.avatar, styles[`avatar-${avatarTone(c.id)}`])}>
+                      {initials(nameOf(c))}
+                    </span>
+                    <span className={styles.clientName}>{nameOf(c)}</span>
                   </label>
                   {result?.ok ? (
                     <span className={styles.done}>{verb} ✓</span>
@@ -334,7 +347,11 @@ export function AssignToClientsDialog({
                     <span className={styles.note}>{formatShortDay(dayFor(c.id))}</span>
                   ) : clashes.length > 0 ? (
                     <span className={styles.note}>{isWorkout ? 'Has a workout that day' : 'Has workouts on some days'}</span>
-                  ) : null}
+                  ) : (
+                    <Chip tone={planned(c.id) === 'Nothing planned' ? 'lime' : 'grey'} className={styles.statusChip}>
+                      {planned(c.id)}
+                    </Chip>
+                  )}
                 </li>
               );
             })}
@@ -342,7 +359,7 @@ export function AssignToClientsDialog({
 
           {isWorkout ? (
             <fieldset className={styles.modes}>
-              <legend>Day</legend>
+              <legend>Which day</legend>
               <label className={styles.mode}>
                 <input type="radio" name={`${titleId}-mode`} checked={!freeDay} onChange={() => setFreeDay(false)} />
                 <span>The same day for everyone</span>
@@ -354,18 +371,19 @@ export function AssignToClientsDialog({
             </fieldset>
           ) : null}
           {useFreeDay ? null : (
-            <TextField
-              id={dateInputId}
-              label={isWorkout ? 'Date' : 'Start date'}
-              type="date"
-              data-ph-capture-attribute-label="assign_pick_date"
-              min={isWorkout ? today : earliestProgramStart(today)}
+            <QuickDayPicker
+              ref={dayPicker}
+              legend={isWorkout ? 'Day' : 'Start'}
+              today={today}
               value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
+              onChange={(d) => {
+                setDate(d);
                 setError(null);
               }}
-              {...(dateError ? { error: errorFromText(dateError, 'assign_date_invalid') } : {})}
+              inputId={dateInputId}
+              fieldLabel={isWorkout ? 'Date' : 'Start date'}
+              fieldMin={isWorkout ? today : earliestProgramStart(today)}
+              error={dateError}
             />
           )}
           {!isWorkout && !dateError && date < today ? (
@@ -411,7 +429,7 @@ export function AssignToClientsDialog({
           {results.size > 0 ? 'Close' : 'Cancel'}
         </Button>
         {clashing.length > 0 && !useFreeDay ? (
-          <Button variant="secondary" onClick={() => document.getElementById(dateInputId)?.focus()} disabled={pending}>
+          <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
             Pick another date
           </Button>
         ) : null}

@@ -15,7 +15,11 @@ import {
 import type { ErrorCode, IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ButtonLink, ErrorText, TextField, errorFromText } from '@/components/ui';
+import { DialogHeader } from '@/components/assign/dialog-header';
+import { QuickDayPicker, type QuickDayPickerHandle } from '@/components/assign/quick-day-picker';
+import { Button, ButtonLink, ErrorText } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
+import sheet from '@/components/ui/sheet.module.css';
 import { failureCode } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
@@ -120,7 +124,7 @@ export function AssignDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog);
+    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
     return () => {
       if (opener?.isConnected) opener.focus();
     };
@@ -135,6 +139,7 @@ export function AssignDialog({
   const clashes = program && startError === null ? programClashes(program, startDate, existing) : [];
   const dateInputId = useId();
   const clashTitleId = useId();
+  const dayPicker = useRef<QuickDayPickerHandle>(null);
 
   async function assign() {
     if (busy.current || !program || startError) return;
@@ -161,14 +166,21 @@ export function AssignDialog({
   return (
     <dialog
       ref={dialogRef}
-      className={styles.dialog}
+      // On a phone it fills the screen, with the buttons stuck to the bottom.
+      className={cx(styles.dialog, sheet.sheet)}
       aria-labelledby={titleId}
       onCancel={(e) => {
         if (pending) e.preventDefault();
       }}
       onClose={onClose}
     >
-      <h2 id={titleId} className={styles.dialogTitle} data-ph-safe="">Assign a program</h2>
+      <DialogHeader
+        titleId={titleId}
+        title="Assign a program"
+        titleSafe
+        onClose={() => dialogRef.current?.close()}
+        disabled={pending}
+      />
       {programs.length === 0 ? (
         <>
           <p className={styles.dialogBody}>
@@ -195,18 +207,19 @@ export function AssignDialog({
               setError(null);
             }}
           />
-          <TextField
-            id={dateInputId}
-            label="Start date"
-            type="date"
-            data-ph-capture-attribute-label="assign_pick_date"
-            min={earliestProgramStart(today)}
+          <QuickDayPicker
+            ref={dayPicker}
+            legend="Start"
+            today={today}
             value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
+            onChange={(d) => {
+              setStartDate(d);
               setError(null);
             }}
-            {...(startError ? { error: errorFromText(startError, 'assign_date_invalid') } : {})}
+            inputId={dateInputId}
+            fieldLabel="Start date"
+            fieldMin={earliestProgramStart(today)}
+            error={startError}
           />
           {program && startError === null ? <p className={styles.preview}>{assignPreview(program, startDate)}</p> : null}
           {inPast ? (
@@ -237,13 +250,13 @@ export function AssignDialog({
         </>
       )}
       {error ? <ErrorText code={error} /> : null}
-      <div className={styles.dialogActions}>
+      <div className={cx(styles.dialogActions, sheet.actions)}>
         {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
         <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
           Cancel
         </Button>
         {clashes.length > 0 ? (
-          <Button variant="secondary" onClick={() => document.getElementById(dateInputId)?.focus()} disabled={pending}>
+          <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
             Pick another date
           </Button>
         ) : null}
