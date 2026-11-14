@@ -5,8 +5,9 @@ import { ClientCombobox, type ComboClient } from '@/components/client-combobox/c
 import styles from './activity.module.css';
 
 /**
- * The Activity client filter: type a name (typos forgiven), pick a suggestion and the feed narrows straight away via
- * ?client=<id> (so links and Back keep working). The × shows everyone again.
+ * The Activity client filter, drawn as a dropdown ("Client: All ▾"): tap it for every client, or type a name (typos
+ * forgiven), pick one and the feed narrows straight away via ?client=<id> (so links and Back keep working). The × shows
+ * everyone again.
  */
 export function ClientFilter({ clients, selectedId }: { clients: { id: string; name: string }[]; selectedId: string | null }) {
   const router = useRouter();
@@ -17,7 +18,8 @@ export function ClientFilter({ clients, selectedId }: { clients: { id: string; n
     <ClientCombobox
       clients={options}
       label="Filter by client"
-      placeholder="All clients"
+      placeholder="All"
+      dropdown={{ prefix: 'Client:' }}
       committed={selected?.name ?? ''}
       clearLabel="Show all clients"
       className={styles.filter}

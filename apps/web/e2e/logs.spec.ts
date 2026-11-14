@@ -38,6 +38,12 @@ const ago = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).t
 // "4 Nov", as formatDateTime (packages/shared) prints it on every engine: "Sep", never Node's en-GB "Sept".
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortDay = (d: string) => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** The Activity feed's day heading for a day at least 2 days back: "Tue 10 Nov", plus the year when it isn't this year. */
+const dayHeading = (d: string, today: string) =>
+  `${WEEKDAYS[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${shortDay(d)}${d.slice(0, 4) === today.slice(0, 4) ? '' : ` ${d.slice(0, 4)}`}`;
+/** One workout in the Activity feed: a list item whose whole row is a link to the log. */
+const feedItem = (page: Page, text: string) => page.getByRole('main').getByRole('listitem').filter({ hasText: text });
 
 /* ---------- Plain YYYY-MM-DD maths (UTC only) ---------- */
 const MS_DAY = 86_400_000;
@@ -99,15 +105,17 @@ test('a finished workout shows in the activity feed with its sets and volume in 
   await expect(page).toHaveURL(/\/activity$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible();
 
-  const row = page.getByRole('row').filter({ hasText: name });
+  const row = feedItem(page, name);
   await expect(row).toHaveCount(1);
-  await expect(row.getByRole('link', { name })).toHaveAttribute('href', `/clients/${mine}/logs/${id}`);
+  // The whole row is one link to the log.
+  await expect(row.getByRole('link')).toHaveAttribute('href', `/clients/${mine}/logs/${id}`);
   await expect(row.getByText('Lena')).toBeVisible();
-  await expect(row.getByText('3 sets')).toBeVisible();
-  await expect(row.getByText('53 min')).toBeVisible();
   // 3 sets x 8 reps x 60 kg = 1,440 kg = 3,175 lb.
-  await expect(row.getByText('3,175 lb lifted')).toBeVisible();
+  await expect(row).toContainText('53 min · 3 sets · 3,175 lb lifted');
   await expect(row.getByText('Unplanned')).toBeVisible();
+  // No comment from the coach yet: the dot shows, and the title counts it.
+  await expect(row.getByRole('img', { name: 'Not reviewed' })).toBeVisible();
+  await expect(page.getByText(/1 to review/)).toBeVisible();
 });
 
 test('the feed shows only completed logs, with the auto-finished chip', async ({ page }) => {
@@ -117,7 +125,7 @@ test('the feed shows only completed logs, with the auto-finished chip', async ({
   await log({ workspaceId, clientId, name: gone, status: 'discarded', sets: 0, startedAt: ago(50) });
   await signInAsCoach(page);
   await page.goto('/activity');
-  await expect(page.getByRole('row').filter({ hasText: done }).getByText('Auto-finished')).toBeVisible();
+  await expect(feedItem(page, done).getByText('Auto-finished')).toBeVisible();
   await expect(page.getByText(gone)).toHaveCount(0);
 });
 
@@ -136,7 +144,12 @@ test('the client filter narrows the feed', async ({ page }) => {
   // No Filter button: typing a name with a typo and picking the suggestion narrows the feed straight away.
   await expect(page.getByRole('button', { name: 'Filter' })).toHaveCount(0);
   const box = page.getByRole('combobox', { name: 'Filter by client' });
-  await expect(box).toHaveAttribute('placeholder', 'All clients');
+  // It looks like a dropdown ("Client: All ▾"), and tapping it lists every client without typing.
+  await expect(box).toHaveAttribute('placeholder', 'All');
+  await expect(page.getByText('Client:', { exact: true })).toBeVisible();
+  await box.click();
+  await expect(box).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('option', { name: `Sam ${last}`, exact: true })).toBeVisible();
   const typo = `${last.slice(0, 2)}${last[3]}${last[2]}${last.slice(4)}`;
   await box.fill(`sam ${typo}`);
   await expect(box).toHaveAttribute('aria-expanded', 'true');
@@ -274,8 +287,11 @@ test.describe('in Los Angeles', () => {
 
     // The feed shows the finish time in the browser's zone: the planned day at 11:30 pm.
     await page.goto(`/activity?client=${mine}`);
-    const row = page.getByRole('row').filter({ hasText: name });
-    await expect(row.locator('time')).toHaveText(`${shortDay(plannedDay)}, 11:30 pm`);
+    const row = feedItem(page, name);
+    await expect(row.locator('time')).toHaveText('11:30 pm');
+    // Under the heading of its local day, not the UTC day after it.
+    const section = page.getByRole('region', { name: dayHeading(plannedDay, today) });
+    await expect(section.getByRole('listitem').filter({ hasText: name })).toHaveCount(1);
     await page.screenshot({ path: process.env.SHOT_ACTIVITY ?? 'test-results/activity.png', fullPage: true });
   });
 

@@ -14,6 +14,7 @@ import {
   measurementSeries,
 } from '@caltracker/shared';
 import type { BuiltInMetricKey, ChartRange, IsoDate, Units } from '@caltracker/shared';
+import { MoreMenu, type MoreMenuItem } from '@/components/more-menu';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, Chip, ErrorText } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, failureCode } from '@/lib/action-errors';
@@ -122,6 +123,38 @@ export function ProgressSection({
   }
 
   const sorted = keys.filter((k) => scans.some((s) => s.values[k] !== undefined));
+
+  // The phone card's ⋯: Edit (or, for a client's own entry, Add a new scan instead), then Delete in red.
+  const scanMenu = (s: ScanRow): MoreMenuItem[] => [
+    s.source === 'coach'
+      ? { label: 'Edit scan', onSelect: () => setEditing({ scan: s }) }
+      : { label: 'Add a new scan instead', onSelect: () => setEditing({ scan: null, presetDate: s.measuredOn }) },
+    {
+      label: 'Delete scan…',
+      danger: true,
+      onSelect: () => {
+        setDeleteError(null);
+        setDeleting(s);
+      },
+    },
+  ];
+  // Change from the scan before (scans are newest first): "−0.6 since 6 Nov" on the first value, "−0.8" after it.
+  const changeFrom = (index: number, key: string, first: boolean): string | null => {
+    const scan = scans[index]!;
+    const before = scans.slice(index + 1).find((p) => p.values[key] !== undefined);
+    if (!before) return null;
+    const text = changeSince(
+      [
+        { date: before.measuredOn, value: before.values[key]! },
+        { date: scan.measuredOn, value: scan.values[key]! },
+      ],
+      key,
+      units,
+      today,
+    );
+    return text && !first ? text.replace(/ since .*$/, '') : text;
+  };
+
   return (
     <section className={styles.section} aria-labelledby="progress-heading">
       <div className={styles.head}>
@@ -164,6 +197,50 @@ export function ProgressSection({
       ) : null}
 
       {scans.length > 0 ? (
+        <>
+          {/* Phones: one card per scan. Tablets and desktops: the table below (only one of the two is shown). */}
+          <div className={styles.scanCards}>
+            <div className={styles.cardsHead}>
+              <h3 className={styles.cardsTitle}>Scan history</h3>
+              <span className={styles.cardsNote}>newest first</span>
+            </div>
+            <ul className={styles.cardList} aria-label="Scan history, newest first">
+              {scans.map((s, i) => {
+                const when = formatShortDate(s.measuredOn, today);
+                const shown = sorted.filter((k) => s.values[k] !== undefined);
+                return (
+                  <li key={s.id} className={styles.scanCard}>
+                    <div className={styles.scanCardTop}>
+                      <div className={styles.scanWho}>
+                        <span className={styles.scanDate}>{when}</span>
+                        <span className={styles.scanBy}>Entered by {s.source === 'client' ? client.name : 'you'}</span>
+                      </div>
+                      {s.printoutUrl ? (
+                        <a className={styles.printout} href={s.printoutUrl} target="_blank" rel="noopener noreferrer" aria-label={`Printout of ${when}`}>
+                          Printout
+                        </a>
+                      ) : s.hasPrintout ? (
+                        <span className={styles.scanBy}>Printout unavailable</span>
+                      ) : null}
+                      {readOnly ? null : <MoreMenu label={`More for the ${when} scan`} items={scanMenu(s)} />}
+                    </div>
+                    <dl className={styles.scanValues}>
+                      {shown.map((k, j) => {
+                        const change = changeFrom(i, k, j === 0);
+                        return (
+                          <div key={k} className={styles.scanValue}>
+                            <dt>{nameOf(k)}</dt>
+                            <dd className={styles.scanNumber}>{format(k, s.values[k]!)}</dd>
+                            {change ? <dd className={styles.scanChange}>{change}</dd> : null}
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className={styles.tableCaption}>Scan history, newest first</caption>
@@ -236,6 +313,7 @@ export function ProgressSection({
             </tbody>
           </table>
         </div>
+        </>
       ) : null}
 
       {editing ? (

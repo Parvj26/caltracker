@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
+import { deleteCoach, newCoachWithClient, signInAs } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // Community on the website: the coach posts (text and a photo), clients (signed in with the anon key, as the phone is)
@@ -72,6 +73,7 @@ async function openCommunity(page: Page) {
 }
 
 test('the coach posts with a photo, a client reacts and comments live, and the coach reacts, pins and moderates', async ({ page }) => {
+  test.slow();
   const sam = await newClient('Sam');
   await openCommunity(page);
 
@@ -111,6 +113,12 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
   const postBar = mine.getByRole('group', { name: /^Reactions to .*’s post$/ });
   await expect(postBar.getByRole('button', { name: 'React with fire, 1 person' })).toBeVisible();
   await expect(postBar.getByRole('button', { name: 'React with muscle, 1 person' })).toBeVisible();
+  // Comments arrive folded: "1 comment", opened with a tap. No comment box is open until Comment is tapped.
+  const folded = mine.getByRole('button', { name: '1 comment', exact: true });
+  await expect(folded).toHaveAttribute('aria-expanded', 'false');
+  await expect(mine.getByText('Glad to be here!')).toHaveCount(0);
+  await expect(mine.getByRole('textbox')).toHaveCount(0);
+  await folded.click();
   await expect(mine.getByText('Glad to be here!')).toBeVisible();
   // Two reactions from Sam on one post are one notification for the coach.
   const coachNotes = await admin.from('community_notifications').select('kind, actor_id').eq('post_id', postId).eq('kind', 'reaction');
@@ -136,7 +144,8 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
   await expect(postBar.getByRole('button', { name: /party/ })).toHaveCount(0);
   await expect(postBar.getByRole('button', { name: 'Remove your fire reaction, 2 people' })).toBeVisible();
 
-  // Comments get reactions too; the client hears about it.
+  // Comments get reactions too; the client hears about it. The reload folded the comments again: open them.
+  await mine.getByRole('button', { name: '1 comment', exact: true }).click();
   const commentBar = mine.getByRole('group', { name: 'Reactions to Sam Tester’s comment' });
   await commentBar.getByRole('button', { name: 'Add a reaction' }).click();
   await mine.getByRole('group', { name: 'Choose a reaction' }).getByRole('button', { name: 'React with clap' }).click();
@@ -148,17 +157,41 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
     })
     .toBe(1);
 
-  // Pin, then delete the client's comment.
-  await mine.getByRole('button', { name: 'Pin', exact: true }).click();
+  // The coach answers with the Comment button, which opens the box.
+  await mine.getByRole('button', { name: 'Comment', exact: true }).click();
+  const box = mine.getByRole('textbox', { name: /^Comment on / });
+  await expect(box).toBeFocused();
+  await box.fill('Welcome, Sam!');
+  await mine.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(mine.getByText('Welcome, Sam!')).toBeVisible();
+  await expect(mine.getByRole('button', { name: '2 comments', exact: true })).toBeVisible();
+
+  // Pin from the post's ⋯ menu (no Pin button on the card); a pinned post shows "Pinned" and goes to the top.
+  await expect(mine.getByRole('button', { name: 'Pin', exact: true })).toHaveCount(0);
+  await mine.getByRole('button', { name: 'More for this post' }).click();
+  await mine.getByRole('menuitem', { name: 'Pin to top' }).click();
   await expect(mine.getByText('Pinned', { exact: true })).toBeVisible();
   await expect(page.getByTestId('community-post').first()).toContainText(text);
+  await mine.getByRole('button', { name: 'More for this post' }).click();
+  await expect(mine.getByRole('menuitem', { name: 'Unpin' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Delete the client's comment from its own ⋯ menu; saying no first keeps it.
+  await expect(mine.getByRole('button', { name: 'Delete comment' })).toHaveCount(0);
+  const commentMenu = mine.getByRole('button', { name: 'More for Sam Tester’s comment' });
+  page.once('dialog', (d) => void d.dismiss());
+  await commentMenu.click();
+  await mine.getByRole('menuitem', { name: 'Delete comment…' }).click();
+  await expect(mine.getByText('Glad to be here!')).toBeVisible();
   page.once('dialog', (d) => void d.accept());
-  await mine.getByRole('button', { name: 'Delete comment' }).click();
+  await commentMenu.click();
+  await mine.getByRole('menuitem', { name: 'Delete comment…' }).click();
   await expect(mine.getByText('Glad to be here!')).toHaveCount(0);
 
   // Delete the post (and its photo).
   page.once('dialog', (d) => void d.accept());
-  await mine.getByRole('button', { name: 'Delete', exact: true }).click();
+  await mine.getByRole('button', { name: 'More for this post' }).click();
+  await mine.getByRole('menuitem', { name: 'Delete post…' }).click();
   await expect(mine).toHaveCount(0);
   const gone = await admin.from('community_post_images').select('id').eq('post_id', postId);
   expect(gone.data).toEqual([]);
@@ -177,7 +210,8 @@ test('a client reports a post and the coach removes it from the Reports queue', 
 
   await openCommunity(page);
   await expect(post(page, text)).toBeVisible();
-  await page.getByRole('link', { name: /^Reports/ }).click();
+  // Open reports show as "N reports to review" (other tests may add theirs).
+  await page.getByRole('link', { name: /^\d+ reports? to review$/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Reports' })).toBeVisible();
   const card = page.getByTestId('report').filter({ hasText: text });
   await expect(card).toContainText('Lee Tester reported Kim Tester’s post');
@@ -189,6 +223,21 @@ test('a client reports a post and the coach removes it from the Reports queue', 
 
   const after = await kim.phone.from('community_posts').select('id').eq('body', text);
   expect(after.data).toEqual([]);
+});
+
+test('with nothing to review there is no Reports button, but the Reports page still opens', async ({ page }) => {
+  // Its own coach and workspace, so no other test's open report shows here.
+  const c = await newCoachWithClient(admin, 'NoReports');
+  try {
+    await signInAs(page, c.email);
+    await page.goto('/community');
+    await expect(page.getByRole('heading', { level: 1, name: 'Community' })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: /report/i })).toHaveCount(0);
+    await page.goto('/community/reports');
+    await expect(page.getByRole('heading', { level: 1, name: 'Reports' })).toBeVisible();
+  } finally {
+    await deleteCoach(admin, c);
+  }
 });
 
 test('the coach removes a client from the community only, then adds them back', async ({ page }) => {

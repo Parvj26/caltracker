@@ -37,9 +37,12 @@ export default async function CommunityPage() {
           <h1 className={styles.title}>Community</h1>
           <p className={styles.caption}>A private space for you and your clients. Members only see each other’s name and photo.</p>
         </div>
-        <Link href="/community/reports" className={styles.smallButton}>
-          Reports{data.openReports > 0 ? ` (${data.openReports})` : ''}
-        </Link>
+        {/* Only when something needs looking at; /community/reports itself stays reachable. */}
+        {data.openReports > 0 ? (
+          <Link href="/community/reports" className={`${styles.smallButton} ${styles.reportsLink}`}>
+            {data.openReports} {data.openReports === 1 ? 'report' : 'reports'} to review
+          </Link>
+        ) : null}
       </header>
 
       <div className={styles.layout}>

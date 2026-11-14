@@ -1,32 +1,55 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import menuStyles from '@/components/calendar/calendar.module.css';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { shouldOpenUp } from '@/components/calendar/menu-placement';
 import { cx } from '@/components/ui/cx';
 import styles from './more-menu.module.css';
 
 export type MoreMenuItem = {
   label: string;
   onSelect: () => void;
-  /** Destructive (Delete, Cancel invite): shown in red. It should ask before doing anything. */
+  /** Destructive (Delete…): shown in red. */
   danger?: boolean;
+  /** A small line icon before the label (decorative). */
+  icon?: ReactNode;
   disabled?: boolean;
 };
 
 /**
- * A list row's "⋯" button and its menu of actions (Duplicate, Delete…; Resend, Cancel invite…). Keyboard-driven like
- * the calendar's item menu (same look): arrows move, Escape closes and returns focus, Tab or a click outside closes.
+ * A "⋯" button with a short menu of actions. Keyboard-driven like the other ⋯ menus: arrows move, Escape closes and
+ * returns focus, Tab or a tap outside closes. Opens upward when there's no room below. `label` names both the button
+ * and the menu ("More for this post").
  */
-export function MoreMenu({ label, items, busy = false, className }: { label: string; items: MoreMenuItem[]; busy?: boolean; className?: string }) {
+export function MoreMenu({
+  label,
+  items,
+  disabled = false,
+  busy = false,
+  className,
+}: {
+  label: string;
+  items: MoreMenuItem[];
+  disabled?: boolean;
+  /** An action from this menu is running (for example Resend invite). */
+  busy?: boolean;
+  className?: string | undefined;
+}) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    const menu = menuRef.current;
+    if (open && button && menu) menu.dataset.placement = shouldOpenUp(button, menu) ? 'up' : 'down';
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    itemsRef.current.find((el) => el && !el.disabled)?.focus();
+    itemsRef.current.find((el) => el && !el.disabled)?.focus({ preventScroll: true });
     const outside = (e: PointerEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -55,37 +78,40 @@ export function MoreMenu({ label, items, busy = false, className }: { label: str
       <button
         type="button"
         ref={buttonRef}
-        className={styles.more}
+        className={styles.button}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        disabled={disabled}
         aria-busy={busy || undefined}
         onClick={() => setOpen((o) => !o)}
       >
-        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
           <circle cx="5" cy="12" r="2" />
           <circle cx="12" cy="12" r="2" />
           <circle cx="19" cy="12" r="2" />
         </svg>
       </button>
       {open ? (
-        <ul id={menuId} role="menu" aria-label={label} className={cx(menuStyles.menu, styles.menu)} onKeyDown={onMenuKey}>
+        <ul id={menuId} ref={menuRef} role="menu" aria-label={label} className={styles.menu} onKeyDown={onMenuKey}>
           {items.map((item, i) => (
-            <li role="none" key={item.label}>
+            <li role="none" key={item.label} className={item.danger && i > 0 ? styles.separated : undefined}>
               <button
                 type="button"
                 role="menuitem"
                 ref={(el) => {
                   itemsRef.current[i] = el;
                 }}
-                className={cx(menuStyles.menuItem, item.danger && styles.danger)}
+                className={cx(styles.item, item.danger && styles.danger)}
                 disabled={item.disabled}
                 onClick={() => {
                   setOpen(false);
+                  buttonRef.current?.focus();
                   item.onSelect();
                 }}
               >
+                {item.icon}
                 {item.label}
               </button>
             </li>

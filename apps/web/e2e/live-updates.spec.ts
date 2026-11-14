@@ -199,7 +199,8 @@ test('a finished workout appears on Activity and turns Done on the client calend
   await signInAsCoach(page);
   await page.goto('/activity');
   await waitUntilLive(page);
-  const feed = page.getByRole('link', { name, exact: true });
+  // The whole feed row is a link that holds the workout's name.
+  const feed = page.getByRole('main').getByRole('listitem').filter({ hasText: name });
   await expect(feed).toHaveCount(0);
   await log.save(client.phone, 1, 'completed');
   await expect(feed).toBeVisible(LIVE_BUSY);

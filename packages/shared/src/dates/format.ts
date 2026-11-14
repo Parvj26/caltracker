@@ -1,4 +1,4 @@
-import { addDays, type IsoDate } from './dates';
+import { addDays, diffDays, localDateOf, type IsoDate } from './dates';
 
 /**
  * Date and time labels that come out the same on every JavaScript engine.
@@ -61,6 +61,43 @@ export function formatDateTime(instant: string | Date, timeZone?: string): strin
 /** "5:12 pm" in the given time zone (default: the viewer's own). */
 export function formatTimeOfDay(instant: string | Date, timeZone?: string): string {
   return clock(zonedParts(instant, timeZone));
+}
+
+/** A day heading relative to `today`: "Today", "Yesterday", else "Mon 9 Nov" (with the year when it isn't this year). */
+export function formatRelativeDay(day: IsoDate, today: IsoDate): string {
+  const ago = diffDays(day, today);
+  if (ago === 0) return 'Today';
+  if (ago === 1) return 'Yesterday';
+  const label = formatPlainDay(day);
+  return day.slice(0, 4) === today.slice(0, 4) ? label : `${label} ${day.slice(0, 4)}`;
+}
+
+/** Items gathered under one heading per local day, as `groupByLocalDay` returns them. */
+export interface DayGroup<T> {
+  day: IsoDate;
+  /** "Today", "Yesterday" or "Mon 9 Nov". */
+  label: string;
+  items: T[];
+}
+
+/**
+ * Newest-first items under one heading per calendar day in the given time zone (default: the viewer's own), e.g. the
+ * Activity feed's "Today / Yesterday / Mon 9 Nov". Groups follow the order each day first appears; items keep their
+ * order within a day. `now` decides which day is today, in the same zone.
+ */
+export function groupByLocalDay<T>(items: readonly T[], instantOf: (item: T) => string | Date, now: string | Date, timeZone?: string): DayGroup<T>[] {
+  const today = localDateOf(now, timeZone);
+  const groups = new Map<IsoDate, DayGroup<T>>();
+  for (const item of items) {
+    const day = localDateOf(instantOf(item), timeZone);
+    let group = groups.get(day);
+    if (!group) {
+      group = { day, label: formatRelativeDay(day, today), items: [] };
+      groups.set(day, group);
+    }
+    group.items.push(item);
+  }
+  return [...groups.values()];
 }
 
 /** "12 Nov 2026" for the day an instant falls on in the given time zone (default: the viewer's own). */
