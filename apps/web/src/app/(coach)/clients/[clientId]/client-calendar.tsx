@@ -146,6 +146,8 @@ export function ClientCalendar({
   const [undoable, setUndoable] = useState<Undoable | null>(null);
   // Each workout's latest add or move save, by its id, so Undo (and the next change) waits for it to land first.
   const saves = useRef(new Map<string, Promise<void>>());
+  // Workouts deleted from this calendar (a failed delete takes its id back out), so Undo of an earlier move refuses them.
+  const deleted = useRef(new Set<string>());
   // Adds that got no clear answer, by "workout id|day": their id, reused if the coach picks the same again.
   const unclear = useRef(new Map<string, string>());
   const say = (message: string | null, undo: Undoable | null = null) => {
@@ -196,7 +198,8 @@ export function ClientCalendar({
    * Undo): the server refresh only sends the days on screen, so it isn't in `items` any more.
    */
   function move(itemId: string, date: IsoDate, known?: CalendarEntry) {
-    const entry = items.find((x) => x.id === itemId) ?? known;
+    // A workout deleted here since can't be moved back, even when Undo still holds a copy of it.
+    const entry = items.find((x) => x.id === itemId) ?? (deleted.current.has(itemId) ? undefined : known);
     if (!entry || entry.date === date || date < today) return null;
     const from = entry.date;
     // After the workout's previous add or move has landed, so an Undo straight after a move can't overtake it.
@@ -226,6 +229,7 @@ export function ClientCalendar({
   }
 
   function remove(entry: CalendarEntry) {
+    deleted.current.add(entry.id);
     // As it is now (Undo's copy is from when it was added; it may have been moved since), so a failed delete puts it
     // back where it now is.
     const current = items.find((x) => x.id === entry.id) ?? entry;
@@ -233,7 +237,14 @@ export function ClientCalendar({
     const added = saves.current.get(entry.id) ?? Promise.resolve();
     optimistic(
       (s) => s.filter((x) => x.id !== entry.id),
-      () => added.catch(() => undefined).then(() => deleteClientWorkout(entry.id)),
+      () =>
+        added
+          .catch(() => undefined)
+          .then(() => deleteClientWorkout(entry.id))
+          .catch((e: unknown) => {
+            deleted.current.delete(entry.id);
+            throw e;
+          }),
       (s) => (s.some((x) => x.id === entry.id) ? s : [...s, current]),
     );
   }
