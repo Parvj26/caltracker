@@ -50,6 +50,7 @@ import { AddSectionMenu } from './add-section-menu';
 import { SectionHeader } from './section-header';
 import { BlockEditor, type BlockActions } from './block-editor';
 import { ExercisePicker } from './exercise-picker';
+import { useKeyboardOffset } from './use-keyboard-offset';
 import styles from './builder.module.css';
 
 export type BuilderMode = 'library' | { clientName: string; date: IsoDate };
@@ -185,6 +186,8 @@ export function WorkoutBuilder({
   const [openId, setOpenId] = useState<string | null>(null);
   const knownBlocks = useRef<Set<string>>(new Set(initial.blocks.map((b) => b.id)));
   const [pending, startTransition] = useTransition();
+  const saveBarRef = useRef<HTMLDivElement>(null);
+  useKeyboardOffset(saveBarRef);
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
   // The workspace's remembered choices per exercise: read with the page, then again after each save. A ref, not
   // state: the picker may hold an onPick from an earlier render.
@@ -499,7 +502,7 @@ export function WorkoutBuilder({
 
       {/* Wide screens: a save bar stuck to the bottom. Phones and iPad portrait: the same bar moves to the top (under
           the notch), with "+ Exercise" beside Save, so neither hides behind the keyboard or the Menu button. */}
-      <div className={styles.saveBar}>
+      <div ref={saveBarRef} className={styles.saveBar}>
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}

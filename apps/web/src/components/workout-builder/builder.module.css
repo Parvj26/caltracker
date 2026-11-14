@@ -555,7 +555,9 @@
     order: -1;
     position: sticky;
     z-index: 11;
-    top: env(safe-area-inset-top);
+    /* --keyboard-offset (useKeyboardOffset): how far iOS has panned the screen down while the keyboard is open, so
+       Save stays at the top of what the coach can see instead of scrolling off with the page. */
+    top: calc(env(safe-area-inset-top) + var(--keyboard-offset, 0px));
     bottom: auto;
     padding: var(--ct-space-2) 0;
     border-top: 0;
