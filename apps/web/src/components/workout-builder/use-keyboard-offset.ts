@@ -51,3 +51,38 @@ export function useKeyboardOffset(ref: RefObject<HTMLElement | null>) {
     };
   }, [ref]);
 }
+
+/**
+ * Keeps a bottom sheet (the phone set editor) above the on-screen keyboard. iOS Safari doesn't shrink the layout
+ * viewport when the keyboard opens, so an element fixed to `bottom: 0` ends up behind it. This sets two properties on
+ * the element from visualViewport: `--sheet-keyboard`, how much of the layout viewport the keyboard covers (the CSS
+ * lifts the sheet by that much), and `--sheet-viewport`, the visible height (the CSS caps the sheet's height to it, so
+ * it scrolls rather than running off the top).
+ */
+export function useSheetKeyboardInset(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    const viewport = window.visualViewport;
+    if (!el || !viewport) return;
+    let frame = 0;
+    const apply = () => {
+      frame = 0;
+      const covered = window.innerHeight - (viewport.height + viewport.offsetTop);
+      el.style.setProperty('--sheet-keyboard', `${Math.max(0, Math.round(covered))}px`);
+      el.style.setProperty('--sheet-viewport', `${Math.round(viewport.height)}px`);
+    };
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(apply);
+    };
+    apply();
+    viewport.addEventListener('resize', schedule);
+    viewport.addEventListener('scroll', schedule);
+    return () => {
+      viewport.removeEventListener('resize', schedule);
+      viewport.removeEventListener('scroll', schedule);
+      if (frame !== 0) cancelAnimationFrame(frame);
+      el.style.removeProperty('--sheet-keyboard');
+      el.style.removeProperty('--sheet-viewport');
+    };
+  }, [ref]);
+}
