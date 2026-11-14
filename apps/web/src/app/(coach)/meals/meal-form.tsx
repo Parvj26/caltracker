@@ -19,7 +19,7 @@ import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { removeCoachMeal, saveCoachMeal, type CoachMealInput } from './actions';
-import { mealFormDirty } from './form-dirty';
+import { mealFormDirty, type MealFormSnapshot } from './form-dirty';
 import { loggedLabel, mealInitial } from './meal-labels';
 import { tileColour } from './meal-list';
 import styles from './meals.module.css';
@@ -93,6 +93,17 @@ function MealFormFields({
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<FieldError | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // What "unchanged" means for Cancel and ‹ Meals: the meal as opened, then as last saved. A save is on screen before
+  // the page refresh brings the saved meal back, and leaving in between mustn't ask "Discard changes?".
+  const [baseline, setBaseline] = useState<MealFormSnapshot>(() => ({
+    name: initial.name,
+    macroText: { calories: toText(initial.macros.calories), protein: toText(initial.macros.protein), carbs: toText(initial.macros.carbs), fat: toText(initial.macros.fat) },
+    ingredients: initial.ingredients,
+    howTo: initial.howTo,
+    photoPath: initial.photo?.path ?? null,
+    newFile: false,
+  }));
+  const [savedFile, setSavedFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -183,6 +194,8 @@ function MealFormFields({
         return;
       }
       setSaved(true);
+      setBaseline({ ...current, newFile: false });
+      setSavedFile(file);
       // Replace: Back from the saved meal goes to the list, not to an empty New meal form.
       if (isNew) router.replace(`/meals/${initial.id}`);
       else router.refresh();
@@ -193,17 +206,8 @@ function MealFormFields({
     }
   }
 
-  const dirty = mealFormDirty(
-    {
-      name: initial.name,
-      macroText: { calories: toText(initial.macros.calories), protein: toText(initial.macros.protein), carbs: toText(initial.macros.carbs), fat: toText(initial.macros.fat) },
-      ingredients: initial.ingredients,
-      howTo: initial.howTo,
-      photoPath: initial.photo?.path ?? null,
-      newFile: false,
-    },
-    { name, macroText, ingredients, howTo, photoPath: stored?.path ?? null, newFile: file !== null },
-  );
+  const current: MealFormSnapshot = { name, macroText, ingredients, howTo, photoPath: stored?.path ?? null, newFile: file !== null && file !== savedFile };
+  const dirty = mealFormDirty(baseline, current);
 
   /** Back to the list without saving; asks first if anything was typed. */
   function cancel() {
