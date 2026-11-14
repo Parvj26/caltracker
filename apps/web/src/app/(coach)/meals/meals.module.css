@@ -8,7 +8,36 @@
 .newButton { min-height: 48px; padding: 0 18px; border-radius: var(--ct-radius-button); border: 2px solid var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); box-shadow: none; }
 
 .columns { display: flex; flex-wrap: wrap; gap: var(--ct-space-6); align-items: flex-start; }
-.list { flex: 1 1 340px; display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+.listColumn { flex: 1 1 340px; display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
+.list { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+
+/* The smart search box: a grey pill with a magnifier, 48 px tall and 16 px text (Safari doesn't zoom). */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-button-min-height);
+  padding: 0 var(--ct-space-3-5);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink-muted);
+  box-sizing: border-box;
+}
+.search:focus-within { border-color: var(--ct-ink); background: var(--ct-bg); color: var(--ct-ink); }
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.searchInput:focus { outline: none; }
+.searchInput::placeholder { color: var(--ct-ink-muted); }
 .row {
   display: flex;
   align-items: center;
@@ -23,10 +52,13 @@
 .row:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .rowSelected { border-color: var(--ct-ink); background: var(--ct-celebrate-bg); }
 .thumb { width: 56px; height: 56px; flex-shrink: 0; border-radius: var(--ct-radius-input); border: 2px solid var(--ct-ink); object-fit: cover; box-sizing: border-box; }
+/* No photo: the meal's first letter on its colour tile (not an empty square that looks like a broken image). */
+.thumbInitial { display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: var(--ct-ink); }
 .rowText { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .rowName { font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
 .rowMacros { font-size: 13px; font-weight: 600; color: var(--ct-ink-muted); }
-.rowLogged { font-size: 12px; font-weight: 700; color: var(--ct-ink-muted); white-space: nowrap; }
+.rowLogged { font-size: var(--ct-size-caption); font-weight: 600; color: var(--ct-ink-muted); }
+.chevron { flex: none; color: var(--ct-ink-muted); }
 .empty { margin: 0; font-size: 15px; color: var(--ct-ink-muted); }
 
 .panel {
@@ -41,6 +73,64 @@
 }
 .panelQuiet { border-color: var(--ct-border); }
 .panelTitle { margin: 0; font-size: 18px; font-weight: 800; }
+
+/* The editor's top bar. From 768 px up only the title shows (the panel's heading); a phone gets ‹ Meals and ⋯ too. */
+.topBar { display: flex; align-items: center; gap: var(--ct-space-2); }
+.back, .more, .topBarSpacer { display: none; }
+.back {
+  align-items: center;
+  gap: 2px;
+  min-height: var(--ct-tap-min);
+  padding: 0 10px 0 4px;
+  color: var(--ct-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.back:focus-visible, .moreButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.more { position: relative; }
+.moreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.moreButton[aria-expanded='true'] { background: var(--ct-surface); }
+.menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  padding: var(--ct-space-1);
+  border: 2px solid var(--ct-ink);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  box-shadow: 0 4px 0 var(--ct-ink);
+}
+.menuDanger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ct-magenta-deep);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.menuDanger:hover, .menuDanger:focus-visible { background: var(--ct-surface); outline: none; }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { font-size: 13px; font-weight: 800; }
@@ -63,9 +153,13 @@
 .macroLabel { font-size: 12px; font-weight: 800; }
 .macroInput { min-height: 40px; border-radius: 10px; padding: 0 var(--ct-space-2); }
 
-.photoRow { display: flex; align-items: center; gap: var(--ct-space-3); flex-wrap: wrap; }
-.photo { width: 72px; height: 72px; border-radius: 14px; border: 2px solid var(--ct-ink); object-fit: cover; box-sizing: border-box; }
-.photoEmpty { background: var(--ct-surface); border-style: dashed; }
+.photoRow { display: flex; align-items: center; gap: var(--ct-space-3-5); }
+.photo { width: 72px; height: 72px; flex: none; border-radius: 14px; border: 2px solid var(--ct-ink); object-fit: cover; box-sizing: border-box; }
+.photoEmpty { display: flex; align-items: center; justify-content: center; background: var(--ct-surface); border-style: dashed; border-color: var(--ct-ink-muted); color: var(--ct-ink-muted); }
+.photoInitial { display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; color: var(--ct-ink); }
+.photoSide { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.photoButtons { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+.caption { font-size: var(--ct-size-caption); font-weight: 600; color: var(--ct-ink-muted); }
 .smallButton {
   min-height: 40px;
   padding: 0 14px;
@@ -175,3 +269,57 @@
 .dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .dialogTitle { margin: 0; font-size: 18px; font-weight: 800; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+
+/* ---------- Phones (below 768 px) ----------
+   The list is its own screen; a meal and New meal open as a full-screen editor (data-editing) with ‹ Meals, the
+   title and ⋯ in a top bar that sticks, and Save / Cancel stuck to the bottom. Tablets and laptops keep the list and
+   the editor side by side. */
+@media (max-width: 767.98px) {
+  .titleRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ct-space-1) var(--ct-space-3); }
+  .titleText { display: contents; }
+  .title { grid-column: 1; grid-row: 1; align-self: center; }
+  .newButton { grid-column: 2; grid-row: 1; min-height: var(--ct-tap-min); padding: 0 14px; }
+  .subtitle { grid-column: 1 / -1; }
+  .columns { gap: var(--ct-space-4); }
+  .listColumn { flex-basis: 100%; }
+  .list { gap: 10px; }
+  .row { padding: 10px 6px 10px var(--ct-space-3); }
+  .rowName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+  .hintPanel { display: none; }
+
+  .page[data-editing] { gap: 0; }
+  .page[data-editing] .titleRow,
+  .page[data-editing] .columns > :not(.panel) { display: none; }
+  .page[data-editing] .panel { flex: 1 1 100%; padding: 0; border: 0; border-radius: 0; gap: var(--ct-space-3-5); }
+
+  .topBar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    min-height: 56px;
+    margin: calc(-1 * var(--ct-space-4-5)) calc(-1 * var(--ct-space-4)) 0;
+    padding: env(safe-area-inset-top) var(--ct-space-1) 0;
+    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+    background: var(--ct-bg);
+  }
+  .back { display: inline-flex; justify-self: start; }
+  .panelTitle { font-size: 17px; text-align: center; }
+  .more { display: block; justify-self: end; }
+  .topBarSpacer { display: block; }
+
+  .photo { width: 88px; height: 88px; border-radius: 18px; }
+  .photoInitial { font-size: 36px; }
+  .macroLabel { font-size: 14px; }
+  .wideOnly { display: none; }
+
+  .actions {
+    flex-wrap: nowrap;
+    margin: 0 calc(-1 * var(--ct-space-4)) calc(-1 * var(--ct-space-4));
+    padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+    border-radius: 0;
+  }
+  .save { flex: 1; min-height: var(--ct-button-min-height); }
+  .cancel { min-height: var(--ct-button-min-height); padding: 0 20px; }
+}

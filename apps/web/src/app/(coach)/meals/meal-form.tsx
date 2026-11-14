@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
@@ -19,6 +20,8 @@ import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { removeCoachMeal, saveCoachMeal, type CoachMealInput } from './actions';
 import { mealFormDirty } from './form-dirty';
+import { loggedLabel, mealInitial } from './meal-labels';
+import { tileColour } from './meal-list';
 import styles from './meals.module.css';
 
 type StoredPhoto = { path: string; thumbPath: string; width: number; height: number; url: string | null };
@@ -31,7 +34,7 @@ export type MealFormValue = {
   photo: StoredPhoto | null;
 };
 
-const LABEL: Record<MacroKey, string> = { calories: 'kcal', protein: 'Protein g', carbs: 'Carbs g', fat: 'Fat g' };
+const LABEL: Record<MacroKey, string> = { calories: 'Calories (kcal)', protein: 'Protein (g)', carbs: 'Carbs (g)', fat: 'Fat (g)' };
 const toText = (n: number | null) => (n === null ? '' : String(n));
 export const DISCARD_CONFIRM = 'Discard changes?';
 export const REMOVE_CONFIRM = "Remove this meal? Clients won't see it any more. Meals they already logged stay.";
@@ -45,11 +48,36 @@ async function sizeOf(blob: Blob): Promise<{ width: number; height: number }> {
   }
 }
 
+type MealFormProps = {
+  workspaceId: string;
+  initial: MealFormValue;
+  isNew: boolean;
+  /** The saved meal's version (its updatedAt): when it changes after a save, the fields reset to the saved values. */
+  version: string;
+  /** How often clients logged it (shown under the photo when editing). */
+  logged: number;
+};
+
 /**
  * New or edit form for a shared meal. A new photo is compressed in the browser (1600 px + 320 px thumbnail) and
  * uploaded to the meal's own files before saving; the files of a replaced or removed photo are deleted after.
+ *
+ * The "Saved" message lives here, above the fields: a save refreshes the page, which remounts the fields with the
+ * saved meal (a new version), and the message has to survive that.
  */
-export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string; initial: MealFormValue; isNew: boolean }) {
+export function MealForm(props: MealFormProps) {
+  const [saved, setSaved] = useState(false);
+  return <MealFormFields key={props.version} {...props} saved={saved} setSaved={setSaved} />;
+}
+
+function MealFormFields({
+  workspaceId,
+  initial,
+  isNew,
+  logged,
+  saved,
+  setSaved,
+}: MealFormProps & { saved: boolean; setSaved: (saved: boolean) => void }) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
   const [macroText, setMacroText] = useState<Record<MacroKey, string>>({
@@ -64,12 +92,14 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<FieldError | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const discardRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const menuId = useId();
+  const menuRef = useRef<HTMLDivElement>(null);
   const discardTitleId = useId();
 
   // The local preview's link is freed when it is replaced and when the form goes away.
@@ -83,6 +113,23 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
   useEffect(() => () => {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
   }, []);
+
+  // The ⋯ menu closes on a tap outside it or Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   const shownPhoto = file ? preview : stored?.url ?? null;
   const hasPhoto = file !== null || stored !== null;
@@ -136,7 +183,8 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
         return;
       }
       setSaved(true);
-      if (isNew) router.push(`/meals/${initial.id}`);
+      // Replace: Back from the saved meal goes to the list, not to an empty New meal form.
+      if (isNew) router.replace(`/meals/${initial.id}`);
       else router.refresh();
     } catch (err) {
       setError(err instanceof PhotoError ? errorFromText(err.message, 'meal_photo_failed') : { code: 'meal_save_failed' });
@@ -177,52 +225,127 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
     router.refresh();
   }
 
+  const nameField = (
+    <label className={styles.field}>
+      <span className={styles.label}>Name</span>
+      <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={COACH_MEAL_LIMITS.name + 10} required />
+    </label>
+  );
+
   return (
     // data-no-menu-button: on an iPhone the floating Menu button would sit on the sticky Save bar; Cancel leaves.
     <form className={styles.panel} aria-label={isNew ? 'New meal' : 'Edit meal'} onSubmit={(e) => void save(e)} noValidate data-no-menu-button="">
-      <h2 className={styles.panelTitle}>{isNew ? 'New meal' : 'Edit meal'}</h2>
+      {/* On a phone this is the full-screen editor's top bar: ‹ Meals, the title, and ⋯ (Remove). From 768 px up only
+          the title shows, as the panel's heading. */}
+      <div className={styles.topBar}>
+        <Link
+          href="/meals"
+          className={styles.back}
+          aria-label="Back to meals"
+          onClick={(e) => {
+            if (!dirty) return;
+            e.preventDefault();
+            discardRef.current?.showModal();
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+          Meals
+        </Link>
+        <h2 className={styles.panelTitle}>{isNew ? 'New meal' : 'Edit meal'}</h2>
+        {!isNew ? (
+          <div className={styles.more} ref={menuRef}>
+            <button
+              type="button"
+              className={styles.moreButton}
+              aria-label="More"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-controls={menuOpen ? menuId : undefined}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+            {menuOpen ? (
+              <div id={menuId} role="menu" aria-label="Meal actions" className={styles.menu}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.menuDanger}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    dialogRef.current?.showModal();
+                  }}
+                >
+                  Remove meal
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <span className={styles.topBarSpacer} aria-hidden="true" />
+        )}
+      </div>
 
-      <label className={styles.field}>
-        <span className={styles.label}>Name</span>
-        <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={COACH_MEAL_LIMITS.name + 10} required />
-      </label>
+      {isNew ? nameField : null}
 
       <div className={styles.photoRow}>
         {shownPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- a local preview or a short-lived signed link
           <img src={shownPhoto} alt="Meal photo" className={styles.photo} />
+        ) : isNew || !name.trim() ? (
+          <span className={cx(styles.photo, styles.photoEmpty)} aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
         ) : (
-          <span className={cx(styles.photo, styles.photoEmpty)} aria-hidden="true" />
+          <span className={cx(styles.photo, styles.photoInitial)} style={{ background: tileColour(initial.id) }} aria-hidden="true">
+            {mealInitial(name)}
+          </span>
         )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className={styles.fileInput}
-          aria-label="Meal photo file"
-          data-testid="coach-meal-photo-input"
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            if (f) pickFile(f);
-            e.target.value = '';
-          }}
-        />
-        <button type="button" className={styles.smallButton} onClick={() => fileRef.current?.click()}>
-          {hasPhoto ? 'Change photo' : 'Add photo'}
-        </button>
-        {hasPhoto ? (
-          <button
-            type="button"
-            className={styles.smallButton}
-            onClick={() => {
-              pickFile(null);
-              setStored(null);
-            }}
-          >
-            Remove photo
-          </button>
-        ) : null}
+        <div className={styles.photoSide}>
+          <div className={styles.photoButtons}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className={styles.fileInput}
+              aria-label="Meal photo file"
+              data-testid="coach-meal-photo-input"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                if (f) pickFile(f);
+                e.target.value = '';
+              }}
+            />
+            <button type="button" className={styles.smallButton} onClick={() => fileRef.current?.click()}>
+              {hasPhoto ? 'Change photo' : 'Add photo'}
+            </button>
+            {hasPhoto ? (
+              <button
+                type="button"
+                className={styles.smallButton}
+                onClick={() => {
+                  pickFile(null);
+                  setStored(null);
+                }}
+              >
+                Remove photo
+              </button>
+            ) : null}
+          </div>
+          <span className={styles.caption}>{isNew ? 'Optional. Clients see it when they log.' : loggedLabel(logged)}</span>
+        </div>
       </div>
+
+      {isNew ? null : nameField}
 
       <div className={styles.macros}>
         {MACRO_KEYS.map((k) => (
@@ -256,13 +379,13 @@ export function MealForm({ workspaceId, initial, isNew }: { workspaceId: string;
 
       <div className={styles.actions}>
         <button type="submit" className={styles.save} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? 'Saving…' : isNew ? 'Save meal' : 'Save'}
         </button>
         <button type="button" className={styles.cancel} onClick={cancel} disabled={pending}>
           Cancel
         </button>
         {!isNew ? (
-          <button type="button" className={styles.remove} onClick={() => dialogRef.current?.showModal()}>
+          <button type="button" className={cx(styles.remove, styles.wideOnly)} onClick={() => dialogRef.current?.showModal()}>
             Remove meal
           </button>
         ) : null}
