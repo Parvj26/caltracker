@@ -430,8 +430,9 @@ test('on an iPhone each client is one line: avatar, name with "…", one chip an
 
   // One chip each; the details stay on the client page.
   await expect(rowOf('Sami Steady').getByText('On track', { exact: true })).toBeVisible();
-  await expect(rowOf('Nell Nothing').getByText('Nothing planned', { exact: true })).toBeVisible();
-  if (ids.rowanMissed > 0) await expect(rowOf('Rowan Run').getByText(`Missed ${ids.rowanMissed}`, { exact: true })).toBeVisible();
+  // (The laptop's status line and Plan cell say "Nothing planned" too, hidden on a phone: count the visible one.)
+  await expect(rowOf('Nell Nothing').getByText('Nothing planned', { exact: true }).locator('visible=true')).toHaveCount(1);
+  if (ids.rowanMissed > 0) await expect(rowOf('Rowan Run').getByText(`Missed ${ids.rowanMissed}`, { exact: true }).locator('visible=true')).toHaveCount(1);
   await expect(rowOf('Sami Steady').getByText('Hypertrophy 8')).toBeHidden();
   await expect(rowOf('Sami Steady').getByText('Active', { exact: true })).toBeHidden();
 
