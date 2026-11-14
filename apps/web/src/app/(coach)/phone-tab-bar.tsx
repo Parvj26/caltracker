@@ -35,7 +35,8 @@ export function PhoneTabBar({
   const here = currentTab(pathname);
   const lit = moreOpen ? 'more' : here;
   return (
-    <nav aria-label="Tabs" className={styles.tabBar} data-tab-bar="">
+    // data-overlay-edge: calendar ⋯ menus keep clear of it (menu-placement.ts).
+    <nav aria-label="Tabs" className={styles.tabBar} data-tab-bar="" data-overlay-edge="bottom">
       {TABS.map((t) => {
         const badge = t.id === 'messages' ? unread : 0;
         return (

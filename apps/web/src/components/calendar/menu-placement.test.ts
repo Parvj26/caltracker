@@ -36,3 +36,48 @@ it('reads the button and menu from the page', () => {
   button.getBoundingClientRect = rect(20, 44);
   expect(shouldOpenUp(button, menu)).toBe(false);
 });
+
+it('treats a stuck bar on top and a toast at the bottom as edges of what is visible', () => {
+  // A 700 px window: a client bar stuck over the top 100 px, and a toast over the bottom from 600.
+  document.body.innerHTML = '<div data-overlay-edge="top" style="position: sticky"></div><div data-overlay-edge="bottom" style="position: fixed"></div><button></button><ul></ul>';
+  const [bar, toast] = [...document.querySelectorAll<HTMLElement>('[data-overlay-edge]')];
+  const button = document.querySelector('button')!;
+  const menu = document.querySelector('ul')!;
+  const rect = (top: number, height: number) => () => ({ top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true });
+  bar!.getBoundingClientRect = rect(0, 100);
+  toast!.getBoundingClientRect = rect(600, 60);
+  menu.getBoundingClientRect = rect(0, 300);
+  // 248 px free below (to the toast), 192 above (to the bar's bottom, not the window's top): stays below.
+  button.getBoundingClientRect = rect(300, 44);
+  expect(shouldOpenUp(button, menu)).toBe(false);
+  // Lower down, with the toast close below: more room above, so up.
+  button.getBoundingClientRect = rect(480, 44);
+  expect(shouldOpenUp(button, menu)).toBe(true);
+  // A bar that isn't stuck (static, as on a laptop) is not an edge: 292 px above beats 248 below.
+  bar!.style.position = 'static';
+  button.getBoundingClientRect = rect(300, 44);
+  expect(shouldOpenUp(button, menu)).toBe(true);
+});
+
+it('keeps clear of both the stuck client bar on top and the phone tab bar at the bottom', () => {
+  // A 700 px phone window: the client bar and tabs stuck over the top 104 px, the tab bar fixed over the bottom 64.
+  document.body.innerHTML = '<div data-overlay-edge="top" style="position: sticky"></div><nav data-overlay-edge="bottom" style="position: fixed"></nav><button></button><ul></ul>';
+  const [bar, tabBar] = [...document.querySelectorAll<HTMLElement>('[data-overlay-edge]')];
+  const button = document.querySelector('button')!;
+  const menu = document.querySelector('ul')!;
+  const rect = (top: number, height: number) => () => ({ top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true });
+  bar!.getBoundingClientRect = rect(0, 104);
+  tabBar!.getBoundingClientRect = rect(636, 64);
+  menu.getBoundingClientRect = rect(0, 280);
+  // 292 px free below (to the tab bar's top) fits the 280 px menu: below.
+  button.getBoundingClientRect = rect(292, 44);
+  expect(shouldOpenUp(button, menu)).toBe(false);
+  // 234 below (to the tab bar's top, not the window's 298) and 238 above (to the stuck bar's bottom): up.
+  button.getBoundingClientRect = rect(350, 44);
+  expect(shouldOpenUp(button, menu)).toBe(true);
+  // On iPad and desktop the tab bar is hidden (no height): the window's bottom is the edge, 298 below, so below.
+  tabBar!.getBoundingClientRect = rect(0, 0);
+  expect(shouldOpenUp(button, menu)).toBe(false);
+});

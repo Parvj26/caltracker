@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
   return clientPageTitle((await params).clientId, 'Food');
 }
 
-/** Food: the client's daily targets (editable), one week of daily totals against them, and each day's meals with photos. */
+/** Food: today's totals against the targets and today's meals, the targets in one line (Edit opens the form), then one week. */
 export default async function ClientFoodPage({
   params,
   searchParams,
@@ -53,6 +53,7 @@ export default async function ClientFoodPage({
       monday={monday}
       targets={week.targets}
       meals={week.meals}
+      everLogged={week.everLogged}
       readOnly={client.removedAt !== null}
       serverZone={fromBrowser}
       pickedWeek={typeof query.week === 'string'}

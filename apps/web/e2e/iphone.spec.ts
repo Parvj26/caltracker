@@ -127,13 +127,14 @@ test('client overview links, calendar controls and other small links are easy to
   await expectTappable(page.getByRole('link', { name: 'Plan workouts in Programs' }));
 });
 
-test('the client tabs show that they scroll', async ({ page }) => {
+test('the client tabs swipe with no arrows, and the bar and tabs fit the phone', async ({ page }) => {
   await page.goto(CLIENT);
   const tabs = page.getByRole('navigation', { name: 'Client sections' });
-  await expect(tabs).toHaveAttribute('data-more-after', '');
+  await expect(page.getByTestId('client-tabs-after')).toBeHidden();
   await tabs.evaluate((el) => el.scrollTo({ left: el.scrollWidth }));
-  await expect(tabs).not.toHaveAttribute('data-more-after', '');
-  await expect(tabs).toHaveAttribute('data-more-before', '');
+  await expect(tabs.getByRole('link', { name: 'Documents' })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('client-tabs-before')).toBeHidden();
+  await expectNoSidewaysScroll(page);
 });
 
 test('the invite window fits, has no zooming fields and big enough choices', async ({ page }) => {

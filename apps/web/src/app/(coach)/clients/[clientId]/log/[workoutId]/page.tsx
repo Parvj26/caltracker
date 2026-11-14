@@ -7,7 +7,8 @@ import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
 import { laterDayNotice, loadLastTimes, loadSessionState } from '@/lib/coach-session';
 import { loadProgression } from '@/lib/progression';
-import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
+import { getClient, getClientLimitations, getLog, getWorkoutDoc } from '@/lib/page-data';
+import { InjuryChip } from '../../injury-chip';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { TrainingNowHost } from '@/components/training-now/training-now-host';
@@ -55,6 +56,8 @@ export default async function SessionPage({
       ← {client.name}&apos;s calendar
     </Link>
   );
+  // The coach's injury note, near the top while they log (Overview shows the same chip).
+  const injury = <InjuryChip text={await getClientLimitations(client.id)} />;
 
   if (state.kind === 'other_workout') {
     return (
@@ -104,6 +107,7 @@ export default async function SessionPage({
     return (
       <div className={styles.page}>
         {back}
+        {injury}
         {/* Live progress: the page re-renders when the log row changes (each save of the phone updates it). */}
         <LiveRefresh on={[{ table: 'workout_logs', filter: `id=eq.${log.id}` }]} renderedAt={renderTime()} />
         <ClientLogging holder={holder} log={log} units={units} done={completedSetCount(log)} />
@@ -116,8 +120,19 @@ export default async function SessionPage({
     const now = await loadTrainingNow(supabase, { workspaceId, coachId: userId });
     const active = pickActivePane(now.panes, [typeof query.with === 'string' ? query.with : null, log.id]);
     if (active) {
-      return (
+      const host = (
         <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+      );
+      // With one person training the screen is only this client's, so their injury note goes on top. With several,
+      // the host switches between people, and the note would belong to only one of them.
+      const onlyThisClient = now.panes.length === 1 && now.panes[0]?.clientId === client.id;
+      return onlyThisClient ? (
+        <div className={styles.wide}>
+          {injury}
+          {host}
+        </div>
+      ) : (
+        host
       );
     }
   }
@@ -125,6 +140,7 @@ export default async function SessionPage({
   return (
     <div className={styles.wide}>
       {back}
+      {injury}
       <SessionLogger
         // A take-over or a new session is a different log: start the screen afresh.
         key={log?.id ?? 'new'}

@@ -32,14 +32,48 @@
 .chipButton[aria-pressed='true'] > span { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .chipOn { font-weight: var(--ct-weight-button); }
 
-/* The shared list + preview, filling the page. */
+/* From 768 px up: the shared list + preview, filling the page (the list scrolls inside it). Phones get the plain list
+   below instead, which scrolls with the page. */
 .browse { display: flex; flex-direction: column; height: max(520px, calc(100dvh - 240px)); }
+/* Before the browser knows the screen width (first paint), keep the room the list will take. */
+.browsePending { min-height: 50dvh; }
+.phoneOnly { display: none; }
 
 /* ---------- Detail ---------- */
-.meta { display: grid; grid-template-columns: max-content 1fr; gap: var(--ct-space-1) var(--ct-space-4); margin: 0; }
-.meta dt { font-weight: var(--ct-weight-section-heading); }
-.meta dd { margin: 0; }
-.images { display: flex; gap: var(--ct-space-3); flex-wrap: wrap; margin-top: var(--ct-space-4); }
+.detailBar { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); margin-bottom: calc(-1 * var(--ct-space-2)); }
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--ct-tap-min);
+  padding: 0 10px 0 4px;
+  margin-left: -4px;
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+  text-decoration: none;
+}
+.back:hover { text-decoration: underline; }
+.back:focus-visible, .topStar:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.topStar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.topStarError { flex-basis: 100%; }
+.detailHead { display: flex; flex-direction: column; gap: 2px; }
+.detailCaption { margin: 0; font-size: 14px; font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.detailSection { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.detailHeading { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.muscleChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.images { display: flex; gap: var(--ct-space-3); flex-wrap: wrap; }
 .images img { max-width: 100%; height: auto; border-radius: var(--ct-radius-input); }
 .steps { margin: 0; padding-left: var(--ct-space-6); display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -51,8 +85,159 @@
 .submit { align-self: flex-start; }
 .saved { margin: 0; font-weight: var(--ct-weight-section-heading); }
 
-@media (max-width: 520px) {
-  .newButton { margin-left: 0; }
-  .meta { grid-template-columns: 1fr; }
-  .meta dd { margin-bottom: var(--ct-space-2); }
+/* ---------- Phones (below 768 px): the approved row-5 mockups ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-button-min-height);
+  padding: 0 var(--ct-space-3-5);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink-muted);
+  box-sizing: border-box;
+}
+.search:focus-within { border-color: var(--ct-ink); background: var(--ct-bg); color: var(--ct-ink); }
+.searchInput { flex: 1; min-width: 0; min-height: 44px; border: 0; padding: 0; background: transparent; color: var(--ct-ink); font: inherit; font-size: 16px; }
+.searchInput:focus { outline: none; }
+.searchInput::placeholder { color: var(--ct-ink-muted); }
+
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3-5);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pill[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-lime); }
+.pill:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.pillFilters { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.pillCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-ink);
+  color: var(--ct-lime);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.phoneList { display: flex; flex-direction: column; }
+/* Search and chips stick to the top while the list scrolls under them (the whole page scrolls, not a box). */
+.phoneBar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: calc(-1 * var(--ct-space-1)) calc(-1 * var(--ct-space-4)) 0;
+  padding: var(--ct-space-1) var(--ct-space-4) 10px;
+  background: var(--ct-bg);
+}
+.pillRow {
+  display: flex;
+  gap: var(--ct-space-2);
+  margin: 0 calc(-1 * var(--ct-space-4));
+  padding: 0 var(--ct-space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, black 88%, transparent);
+  mask-image: linear-gradient(to right, black 88%, transparent);
+}
+.pillRow::-webkit-scrollbar { display: none; }
+.phoneRows { margin: 0; padding: 0; list-style: none; }
+.phoneRow { display: flex; align-items: center; gap: var(--ct-space-2); min-height: 70px; border-bottom: 1px solid var(--ct-border); }
+.phoneRowLink { flex: 1; display: flex; align-items: center; gap: var(--ct-space-3); min-width: 0; padding: var(--ct-space-2) 0; color: var(--ct-ink); text-decoration: none; }
+.phoneRowLink:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.phoneThumb { width: 54px; height: 54px; flex: none; border-radius: 10px; object-fit: cover; }
+.phoneRowText { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.phoneRowName { font-size: 16px; font-weight: var(--ct-weight-button); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phoneTags { display: flex; gap: 6px; overflow: hidden; }
+.phoneTags > * { flex: none; }
+.phoneEmpty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-3); padding: var(--ct-space-4) 0; }
+.phoneEmpty p { margin: 0; }
+.textLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); color: var(--ct-ink); font-weight: var(--ct-weight-button); text-decoration: underline; text-underline-offset: 3px; }
+.showMore { margin-top: var(--ct-space-3); }
+
+/* The Filters sheet: slides up from the bottom over a dimmed page. */
+.sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85dvh;
+  margin: auto auto 0;
+  padding: 10px var(--ct-space-4) 0;
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sheet[open] { display: flex; flex-direction: column; gap: 18px; }
+.sheet::backdrop { background: color-mix(in srgb, var(--ct-ink) 45%, transparent); }
+.grab { align-self: center; width: 40px; height: 5px; border-radius: var(--ct-radius-pill); background: var(--ct-border); }
+.sheetTitle { margin: 0; font-size: 20px; font-weight: 800; }
+.clear { min-height: var(--ct-tap-min); padding: 0 6px; border: 0; background: transparent; color: var(--ct-ink); font: inherit; font-weight: var(--ct-weight-button); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.clear:disabled { opacity: 0.45; cursor: default; }
+.sheetGroup { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.sheetGroupLabel { font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.sheetPills { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+.sheetFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  margin: auto calc(-1 * var(--ct-space-4)) 0;
+  padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  background: var(--ct-bg);
+}
+.sheetDone { flex: 1; }
+
+@media (max-width: 767.98px) {
+  .titleRow { flex-wrap: nowrap; justify-content: space-between; }
+  .wideOnly { display: none; }
+  .phoneOnly { display: inline; }
+  /* A small lime "+ New" instead of the big black button. */
+  .titleRow .newButton {
+    min-height: var(--ct-tap-min);
+    padding: 0 var(--ct-space-4);
+    border: 2px solid var(--ct-ink);
+    background: var(--ct-lime);
+    color: var(--ct-ink);
+    box-shadow: none;
+  }
+
+  .detailBar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    min-height: 56px;
+    margin: calc(-1 * var(--ct-space-4-5)) calc(-1 * var(--ct-space-4)) calc(-1 * var(--ct-space-1));
+    padding: env(safe-area-inset-top) var(--ct-space-1) 0;
+    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+    background: var(--ct-bg);
+  }
+  .back { margin-left: 0; }
+  .images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-2); }
+  .images img { width: 100%; height: 120px; object-fit: cover; border-radius: 14px; }
 }

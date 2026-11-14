@@ -152,7 +152,7 @@ test.describe('iPhone SE (375 x 667)', () => {
     const form = page.getByRole('form', { name: 'New meal' });
     await form.getByLabel('Name').scrollIntoViewIfNeeded();
     await expect(tabBar(page)).toBeHidden();
-    for (const label of ['Name', 'kcal', 'Protein g', 'Carbs g', 'Fat g']) {
+    for (const label of ['Name', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)']) {
       expect((await form.getByLabel(label, { exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
     }
     await expect(form.getByRole('button', { name: 'Save' })).toBeInViewport({ ratio: 1 });

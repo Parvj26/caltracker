@@ -1,4 +1,4 @@
-import type { IsoDate } from './dates';
+import { addDays, type IsoDate } from './dates';
 
 /**
  * Date and time labels that come out the same on every JavaScript engine.
@@ -50,11 +50,17 @@ function zonedParts(instant: string | Date, timeZone?: string): ZonedParts {
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') % 24, minute: get('minute') };
 }
 
+const clock = (p: ZonedParts) => `${p.hour % 12 === 0 ? 12 : p.hour % 12}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
+
 /** "12 Nov, 2:38 am" in the given time zone (default: the viewer's own). */
 export function formatDateTime(instant: string | Date, timeZone?: string): string {
   const p = zonedParts(instant, timeZone);
-  const hour = p.hour % 12 === 0 ? 12 : p.hour % 12;
-  return `${p.day} ${MONTHS_SHORT[p.month - 1]}, ${hour}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]}, ${clock(p)}`;
+}
+
+/** "5:12 pm" in the given time zone (default: the viewer's own). */
+export function formatTimeOfDay(instant: string | Date, timeZone?: string): string {
+  return clock(zonedParts(instant, timeZone));
 }
 
 /** "12 Nov 2026" for the day an instant falls on in the given time zone (default: the viewer's own). */
@@ -102,4 +108,19 @@ export function formatPlainLongDay(d: IsoDate): string {
 export function formatPlainMonth(month: string): string {
   const [year, m] = month.split('-').map(Number) as [number, number];
   return `${MONTHS_LONG[m - 1]} ${year}`;
+}
+
+/** A plain calendar date as "Mon 9" (the month is shown elsewhere, as in a week's list of days). */
+export function formatWeekdayDay(d: IsoDate): string {
+  return formatPlainDay(d).split(' ').slice(0, 2).join(' ');
+}
+
+/** The seven days from `monday`: "9–15 Nov", "30 Nov – 6 Dec", or "28 Dec 2026 – 3 Jan 2027" across a new year. */
+export function formatWeekRange(monday: IsoDate): string {
+  const sunday = addDays(monday, 6);
+  const [y1, m1, d1] = monday.split('-').map(Number) as [number, number, number];
+  const [y2, m2, d2] = sunday.split('-').map(Number) as [number, number, number];
+  if (y1 !== y2) return `${d1} ${MONTHS_SHORT[m1 - 1]} ${y1} – ${d2} ${MONTHS_SHORT[m2 - 1]} ${y2}`;
+  if (m1 !== m2) return `${d1} ${MONTHS_SHORT[m1 - 1]} – ${d2} ${MONTHS_SHORT[m2 - 1]}`;
+  return `${d1}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
 }

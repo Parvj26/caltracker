@@ -20,8 +20,12 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
     <div className={styles.page}>
       <header className={styles.titleRow}>
         <h1 className={styles.title}>Exercises</h1>
-        <ButtonLink href="/exercises/new" className={styles.newButton}>
-          New custom exercise
+        {/* A phone shows a small lime "+ New"; the name stays "New custom exercise" for screen readers. */}
+        <ButtonLink href="/exercises/new" className={styles.newButton} aria-label="New custom exercise">
+          <span className={styles.wideOnly}>New custom exercise</span>
+          <span className={styles.phoneOnly} aria-hidden="true">
+            + New
+          </span>
         </ButtonLink>
       </header>
       <ExerciseBrowser

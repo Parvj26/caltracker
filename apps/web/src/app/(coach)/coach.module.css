@@ -207,6 +207,8 @@
      form. Their Back link leaves the screen. */
   .shell:has([data-no-menu-button]) .tabBar { display: none; }
   .shell:has([data-no-menu-button]) .content { padding-bottom: var(--ct-space-4); }
+  /* A focused field or a #link scrolled into view lands above the tab bar, not under it. */
+  :global(html):has([data-tab-bar]):not(:has([data-no-menu-button])) { scroll-padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 
   .backdrop {
     position: fixed;

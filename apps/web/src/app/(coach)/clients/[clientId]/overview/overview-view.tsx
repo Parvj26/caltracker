@@ -5,15 +5,20 @@ import { useLocalToday } from '@/lib/local-today';
 import type { ClientOverview } from '@/lib/client-overview';
 import { BodyMetricsCard, HighlightsCard, ProfileCard, TrainingCard, UpdatesCard } from './cards';
 import { GoalCard, LimitationsCard, NotesCard } from './editors';
+import { TodayCard } from './today-card';
+import { InjuryChip } from '../injury-chip';
 import styles from '../client-page.module.css';
 
 /**
- * The client Overview: Training & Highlights, Body metrics & Updates, and the coach's side panel (Profile, Goal,
+ * The client Overview: the injury chip and the Today card on top, then Training & Highlights, Body metrics & Updates, and the coach's side panel (Profile, Goal,
  * Limitations, Notes). Three columns from 1024 px (iPad landscape, laptop), two from 700 px, one below.
  */
-export function OverviewView({ data, units, readOnly }: { data: ClientOverview; units: Units; readOnly: boolean }) {
+export function OverviewView({ data, units, coachId, readOnly }: { data: ClientOverview; units: Units; coachId: string; readOnly: boolean }) {
   const today = useLocalToday();
   return (
+    <>
+    <InjuryChip text={data.limitations} />
+    {readOnly ? null : <TodayCard data={data} today={today} coachId={coachId} />}
     <div className={styles.grid}>
       <div className={styles.column}>
         <TrainingCard data={data} today={today} />
@@ -30,5 +35,6 @@ export function OverviewView({ data, units, readOnly }: { data: ClientOverview; 
         <NotesCard clientId={data.clientId} notes={data.notes} readOnly={readOnly} />
       </aside>
     </div>
+    </>
   );
 }

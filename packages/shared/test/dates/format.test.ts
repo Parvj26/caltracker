@@ -4,6 +4,9 @@ import {
   formatDateTime,
   formatDayDate,
   formatPlainDay,
+  formatTimeOfDay,
+  formatWeekRange,
+  formatWeekdayDay,
   formatPlainDayMonth,
   formatPlainDayMonthYear,
   formatPlainLongDay,
@@ -49,10 +52,37 @@ describe('formatPlainDay', () => {
   });
 });
 
+describe('formatWeekdayDay', () => {
+  it('prints a calendar date as weekday and day of the month', () => {
+    expect(formatWeekdayDay('2026-11-09')).toBe('Mon 9');
+    expect(formatWeekdayDay('2026-11-15')).toBe('Sun 15');
+  });
+});
+
+describe('formatWeekRange', () => {
+  it('names the month once when the week stays in it', () => {
+    expect(formatWeekRange('2026-11-09')).toBe('9–15 Nov');
+  });
+  it('names both months when the week crosses into the next', () => {
+    expect(formatWeekRange('2026-11-30')).toBe('30 Nov – 6 Dec');
+  });
+  it('adds the years when the week crosses into the next year', () => {
+    expect(formatWeekRange('2026-12-28')).toBe('28 Dec 2026 – 3 Jan 2027');
+  });
+});
+
 describe('MONTHS_SHORT', () => {
   it('has twelve three-letter names', () => {
     expect(MONTHS_SHORT).toHaveLength(12);
     expect(MONTHS_SHORT.every((m) => m.length === 3)).toBe(true);
+  });
+});
+
+describe('formatTimeOfDay', () => {
+  it('prints 12-hour time with am or pm, in the given zone', () => {
+    expect(formatTimeOfDay('2026-11-13T17:12:00Z', 'UTC')).toBe('5:12 pm');
+    expect(formatTimeOfDay('2026-11-13T00:05:00Z', 'UTC')).toBe('12:05 am');
+    expect(formatTimeOfDay('2026-11-13T07:30:00Z', 'America/Los_Angeles')).toBe('11:30 pm');
   });
 });
 
