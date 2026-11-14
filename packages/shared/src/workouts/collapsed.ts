@@ -54,8 +54,9 @@ function workingSets(sets: readonly WorkoutSetDoc[]): WorkoutSetDoc[] {
  * The one line a folded exercise shows in the builder on a phone, under its name: "4 × 8 @ 60 kg · rest 1:30".
  * Differing sets read as ranges ("3 × 8–10 @ 22–24 kg"); warm-ups are counted in front ("1 warm-up + 3 × 8"), and
  * failure sets, drop sets, the rest, the tempo and substitutes follow. Time and distance read as "3 × 0:45" and
- * "2 × 400 m"; with no target filled in it is just "3 sets". `rest: false` leaves the rest out (a superset shows the
- * rest after each round once, for the whole block).
+ * "2 × 400 m"; with no target filled in it is just "3 sets". When only some sets are filled in, the count is of those
+ * and the rest are named ("1 × 10 @ 27.5 kg + 2 empty sets"), so a half-done exercise doesn't read as finished.
+ * `rest: false` leaves the rest out (a superset shows the rest after each round once, for the whole block).
  */
 export function exerciseCollapsedLine(
   exercise: Pick<WorkoutExerciseDoc, 'sets' | 'trackingType' | 'eachSide' | 'tempo'> & { substitutes?: readonly unknown[] },
@@ -63,7 +64,18 @@ export function exerciseCollapsedLine(
   opts: { rest?: boolean } = {},
 ): string {
   const fields = targetFieldsFor(exercise.trackingType);
-  const working = workingSets(exercise.sets);
+  const all = workingSets(exercise.sets);
+  // A set with no target the tracking type uses (and not to failure) is still empty: it isn't counted in "3 × 8".
+  const isEmpty = (s: WorkoutSetDoc) =>
+    !s.toFailure &&
+    (!fields.includes('reps') || (s.targetRepsMin === null && s.targetRepsMax === null)) &&
+    (!fields.includes('weight') || s.targetWeightKg === null) &&
+    (!fields.includes('duration') || s.targetDurationS === null) &&
+    (!fields.includes('distance') || s.targetDistanceM === null);
+  const filled = all.filter((s) => !isEmpty(s));
+  // Nothing filled in yet reads as plain "3 sets".
+  const working = filled.length > 0 ? filled : all;
+  const empty = all.length - working.length;
   const warmups = exercise.sets.filter((s) => s.setType === 'warmup').length;
   const hasNormal = exercise.sets.some((s) => s.setType === 'normal');
   const drops = exercise.sets.filter((s) => s.setType === 'drop').length;
@@ -89,6 +101,7 @@ export function exerciseCollapsedLine(
   if (exercise.eachSide) head += ' each side';
   const weight = fields.includes('weight') ? weightSpan(working, units) : null;
   if (weight) head += ` @ ${weight}`;
+  if (empty > 0) head += ` + ${plural(empty, 'empty set')}`;
   if (warmups > 0 && hasNormal) head = `${plural(warmups, 'warm-up')} + ${head}`;
 
   const parts = [head];
@@ -98,7 +111,7 @@ export function exerciseCollapsedLine(
   }
   if (drops > 0) parts.push(plural(drops, 'drop set'));
   if (opts.rest !== false) {
-    const rest = restText(working.map((s) => s.restSeconds));
+    const rest = restText(all.map((s) => s.restSeconds));
     if (rest) parts.push(rest);
   }
   if (exercise.tempo) parts.push(`tempo ${exercise.tempo}`);
