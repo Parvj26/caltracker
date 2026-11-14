@@ -79,13 +79,15 @@ export {
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
 export {
-  MONTHS_LONG,
   MONTHS_SHORT,
-  WEEKDAYS_LONG,
   WEEKDAYS_SHORT,
   formatDateTime,
   formatDayDate,
   formatPlainDay,
+  formatWeekRange,
+  formatWeekdayDay,
+  MONTHS_LONG,
+  WEEKDAYS_LONG,
   formatPlainDayMonth,
   formatPlainDayMonthYear,
   formatPlainLongDay,
@@ -599,6 +601,7 @@ export {
   mealsByDay,
   parseMacroInput,
   shortDayLabel,
+  targetGap,
   todayFoodSummary,
   weekDays,
 } from './food/food';

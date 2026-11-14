@@ -20,6 +20,7 @@ import {
   mealReference,
   mealsByDay,
   parseMacroInput,
+  targetGap,
   todayFoodSummary,
   weekDays,
   type MealMacros,
@@ -119,6 +120,24 @@ describe('macroProgress', () => {
   it('has no fraction without a target (or a zero target)', () => {
     expect(macroProgress(80, null)).toEqual({ total: 80, target: null, fraction: null, over: false, remaining: null });
     expect(macroProgress(80, 0)).toEqual({ total: 80, target: 0, fraction: null, over: true, remaining: 0 });
+  });
+});
+
+describe('targetGap', () => {
+  it('says what is left before the target', () => {
+    expect(targetGap('calories', 1240, 2100)).toBe('860 left');
+    expect(targetGap('protein', 85, 150.5)).toBe('65.5 g left');
+  });
+  it('says how far over the target it went', () => {
+    expect(targetGap('calories', 2240, 2100)).toBe('140 over');
+    expect(targetGap('fat', 80, 70)).toBe('10 g over');
+  });
+  it('says on target when it is exactly reached', () => {
+    expect(targetGap('calories', 2100, 2100)).toBe('on target');
+  });
+  it('is nothing without a target', () => {
+    expect(targetGap('calories', 1240, null)).toBeNull();
+    expect(targetGap('calories', 1240, 0)).toBeNull();
   });
 });
 
