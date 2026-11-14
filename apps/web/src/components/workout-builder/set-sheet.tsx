@@ -67,14 +67,15 @@ function Arrow({ label, flip, disabled, onClick }: { label: string; flip?: boole
 /**
  * The phone set editor (round 2 mockup #3, option A): a bottom sheet over the builder for one set. Big boxes for the
  * set's values (reps and weight with − / + that start from the set before when the box is empty), quick rep chips,
- * rest, set type, "Apply to all N sets", ‹ › to the set before or after, and Done. Every change goes straight into
+ * rest, set type, "Apply to all N sets" (one tap, with Undo), ‹ › to the set before or after, and Done. Every change goes straight into
  * the workout, as the inline boxes do, so Done only closes. Stays above the iOS keyboard (useSheetKeyboardInset).
  */
 export function SetSheet({ sets, index, exerciseName, trackingType, units, restShown, onUpdate, onRemove, onGoTo, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
-  const [applyAll, setApplyAll] = useState(false);
+  // After "Apply to all": what it did, and the changes that put the other sets back (Undo).
+  const [applied, setApplied] = useState<{ count: number; undo: Array<{ id: string; patch: SetPatch }> } | null>(null);
   useSheetKeyboardInset(ref);
 
   useEffect(() => {
@@ -93,16 +94,25 @@ export function SetSheet({ sets, index, exerciseName, trackingType, units, restS
   const reps = singleReps(set.targetRepsMin, set.targetRepsMax);
   const source = stepSource(sets, index, fields.filter((f) => f === 'reps' || f === 'weight'));
 
-  // While "Apply to all" is ticked, every change to this set goes to the others too.
-  useEffect(() => {
-    if (!applyAll) return;
-    for (const { id, patch } of applyToAllPatches(sets, index, restShown)) onUpdate(id, patch);
-  }, [applyAll, sets, index, restShown, onUpdate]);
-
-  const update = (patch: SetPatch) => onUpdate(set.id, patch);
+  const update = (patch: SetPatch) => {
+    setApplied(null);
+    onUpdate(set.id, patch);
+  };
+  /** One tap: this set's values (and rest, where it applies) onto every other set; each keeps its own type. */
+  const applyToAll = () => {
+    const patches = applyToAllPatches(sets, index, restShown);
+    const undo = patches.map(({ id, patch }) => {
+      const before = sets.find((s) => s.id === id)!;
+      const back: SetPatch = {};
+      for (const k of Object.keys(patch) as Array<keyof typeof patch>) Object.assign(back, { [k]: before[k] });
+      return { id, patch: back };
+    });
+    for (const { id, patch } of patches) onUpdate(id, patch);
+    setApplied({ count: patches.length, undo });
+  };
   const setReps = (n: number | null) => update({ targetRepsMin: n, targetRepsMax: n });
   const goTo = (i: number) => {
-    setApplyAll(false);
+    setApplied(null);
     onGoTo(i);
     headingRef.current?.focus();
   };
@@ -287,10 +297,30 @@ export function SetSheet({ sets, index, exerciseName, trackingType, units, restS
         </div>
 
         {sets.length > 1 ? (
-          <label className={styles.sheetApply}>
-            <input type="checkbox" className={styles.checkbox} checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} />
-            <span>Apply to all {sets.length} sets</span>
-          </label>
+          <div className={styles.sheetApply}>
+            <button type="button" className={styles.smallButton} onClick={applyToAll} data-ph-capture-attribute-label="workout_sheet_apply_all">
+              Apply to all {sets.length} sets
+            </button>
+            <span role="status" className={styles.sheetApplied}>
+              {applied === null
+                ? ''
+                : applied.count === 0
+                  ? 'All sets already match'
+                  : `Copied to ${applied.count} ${applied.count === 1 ? 'set' : 'sets'}`}
+            </span>
+            {applied !== null && applied.count > 0 ? (
+              <button
+                type="button"
+                className={styles.sheetUndo}
+                onClick={() => {
+                  for (const { id, patch } of applied.undo) onUpdate(id, patch);
+                  setApplied(null);
+                }}
+              >
+                Undo
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <div className={styles.sheetActions}>

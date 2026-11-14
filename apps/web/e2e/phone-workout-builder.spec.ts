@@ -271,21 +271,33 @@ test('Apply to all copies one set to every set, and a set type shows as a chip',
   const s = await openSet(page, ex, 1);
   await s.getByLabel('Reps', { exact: true }).fill('15');
   await s.getByLabel('Weight (kg)').fill('30');
-  await s.getByRole('checkbox', { name: 'Apply to all 3 sets' }).check();
+  // One tap copies set 1 to the others; Undo puts them back.
+  await s.getByRole('button', { name: 'Apply to all 3 sets' }).click();
+  await expect(s.getByRole('status')).toHaveText('Copied to 2 sets');
+  await s.getByRole('button', { name: 'Undo' }).click();
+  await expect(s.getByRole('button', { name: 'Undo' })).toHaveCount(0);
   await done(page);
-  for (const n of [1, 2, 3]) await expect(setLine(page, ex, n)).toContainText('15 × 30 kg');
+  await expect(setLine(page, ex, 2)).toContainText('8 × 20 kg');
+  await openSet(page, ex, 1);
+  await s.getByRole('button', { name: 'Apply to all 3 sets' }).click();
+  await expect(s.getByRole('status')).toHaveText('Copied to 2 sets');
+  // Further edits stay on this set only.
+  await s.getByRole('button', { name: 'One more rep' }).click();
+  await done(page);
+  await expect(setLine(page, ex, 1)).toContainText('16 × 30 kg');
+  for (const n of [2, 3]) await expect(setLine(page, ex, n)).toContainText('15 × 30 kg');
 
   // Set 1 as a warm-up: a W chip on its line; the others stay normal (no chip).
   await openSet(page, ex, 1);
   await sheet(page).getByRole('button', { name: 'Warm-up' }).click();
   await done(page);
-  await expect(setLine(page, ex, 1)).toHaveAccessibleName(`Edit ${ex} set 1: Warm-up, 15 × 30 kg, rest 1:30`);
+  await expect(setLine(page, ex, 1)).toHaveAccessibleName(`Edit ${ex} set 1: Warm-up, 16 × 30 kg, rest 1:30`);
   await expect(setLine(page, ex, 1)).toContainText('W');
   await expect(setLine(page, ex, 2)).toHaveAccessibleName(`Edit ${ex} set 2: 15 × 30 kg, rest 1:30`);
 
   await saveAndWait(page);
   expect(await savedSets(id, ex)).toEqual([
-    { reps: 15, kg: 30 },
+    { reps: 16, kg: 30 },
     { reps: 15, kg: 30 },
     { reps: 15, kg: 30 },
   ]);

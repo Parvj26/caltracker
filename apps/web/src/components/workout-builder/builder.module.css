@@ -684,7 +684,20 @@
 .sheetSegItem[aria-pressed='true'] { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-ink); }
 .sheetSegItem:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
 .sheetRestInput { flex: 0 0 4.5rem; width: 4.5rem; min-height: 40px; padding: 0 var(--ct-space-1); background: var(--ct-bg); text-align: center; }
-.sheetApply { display: flex; align-items: center; gap: var(--ct-space-2-5); min-height: var(--ct-tap-min); font-weight: var(--ct-weight-button); cursor: pointer; }
+.sheetApply { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); min-height: var(--ct-tap-min); }
+.sheetApplied { font-size: 14px; font-weight: var(--ct-weight-section-heading); }
+.sheetApplied:empty { display: none; }
+.sheetUndo {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .sheetActions { display: flex; align-items: center; gap: var(--ct-space-2); }
 .sheetRemove { color: var(--ct-danger); }
 .sheetDone {
