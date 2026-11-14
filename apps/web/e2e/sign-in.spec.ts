@@ -19,6 +19,9 @@ test('wrong password shows a generic error', async ({ page }) => {
   await signIn(page, 'coach@demo.local', 'wrong-password');
   await expect(page.getByText('Wrong email or password.')).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in/);
+  // Only the password clears, so the coach can just retype it.
+  await expect(page.getByLabel('Email')).toHaveValue('coach@demo.local');
+  await expect(page.getByLabel('Password')).toHaveValue('');
 });
 
 test('unknown email shows the same error', async ({ page }) => {
@@ -43,4 +46,12 @@ test('coach can sign out', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/);
   await page.goto('/clients');
   await expect(page).toHaveURL(/\/sign-in/);
+});
+
+test('sign-out redirects with a relative address, so it never points at the server bind address (0.0.0.0)', async ({ page }) => {
+  await signIn(page, 'coach@demo.local', PASSWORD);
+  await expect(page).toHaveURL(/\/home$/);
+  const res = await page.request.post('/auth/sign-out', { maxRedirects: 0 });
+  expect(res.status()).toBe(303);
+  expect(res.headers()['location']).toBe('/sign-in');
 });
