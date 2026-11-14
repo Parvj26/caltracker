@@ -204,6 +204,8 @@ test.describe('on an iPhone', () => {
     await form.getByLabel('Calories (kcal)').fill('530');
     await form.getByRole('button', { name: 'Save' }).click();
     await expect(form.getByRole('status')).toHaveText('Saved');
+    // In the Save bar stuck to the bottom, so it shows without scrolling.
+    await expect(form.getByRole('status')).toBeInViewport();
     await expect.poll(async () => (await admin.from('coach_meals').select('calories').eq('id', id).single()).data?.calories).toBe(530);
     await expect(form.getByRole('status')).toHaveText('Saved');
 

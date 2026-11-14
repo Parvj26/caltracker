@@ -131,8 +131,10 @@ test.describe('on an iPhone', () => {
     await expect(page.getByRole('heading', { name: 'Muscles' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Favourite Barbell Squat' })).toBeVisible();
     await page.getByRole('link', { name: 'Back to exercises' }).click();
-    await expect(page).toHaveURL(/\/exercises(\?|$)/);
-    await expect(list(page).getByRole('link').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/exercises\?q=bb/);
+    // The search is kept, so the coach is back where they were.
+    await expect(page.getByRole('searchbox', { name: 'Search exercises' })).toHaveValue('bb squat');
+    await expect(list(page).getByRole('link').first()).toHaveAccessibleName('Barbell Squat');
   });
 
   test('tracking type and equipment sit in the Filters sheet', async ({ page }) => {
@@ -150,7 +152,10 @@ test.describe('on an iPhone', () => {
     await time.click();
     await expect(time).toHaveAttribute('aria-pressed', 'true');
     await expect(page).toHaveURL(/tracking=time/);
-    await sheet.getByRole('button', { name: /^Show \d+ exercises?$/ }).click();
+    const show = sheet.getByRole('button', { name: /^Show \d+ exercises?$/ });
+    // Stuck to the bottom of the sheet: reachable without scrolling inside it.
+    await expect(show).toBeInViewport({ ratio: 1 });
+    await show.click();
     await expect(sheet).toBeHidden();
     await expect(page.getByRole('button', { name: /^Filters/ })).toHaveText(/1/);
     await expect(list(page).getByRole('link', { name: 'Barbell Squat', exact: true })).toHaveCount(0);

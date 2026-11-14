@@ -18,6 +18,7 @@ import { exerciseImageUrl, loadExerciseIndex, type LoadedExerciseIndex } from '@
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { TRACKING_LABELS } from './filters';
 import { matchesListFilter, sheetFilterCount } from './list-filter';
+import { clearListReturn, readListReturn, saveListReturn } from './list-return';
 import { useFavourites } from './use-favourites';
 import styles from './exercises.module.css';
 
@@ -54,12 +55,20 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   const { favourites, toggle: toggleStar, error: starError, reset: resetFavourites } = useFavourites([]);
   const sheetRef = useRef<HTMLDialogElement>(null);
   const sheetTitleId = useId();
+  const restoreY = useRef<number | null>(null);
 
   useEffect(() => {
     let stale = false;
     loadExerciseIndex(supabase, workspaceId)
       .then((d) => {
         if (stale) return;
+        // Back from an exercise: show as many rows as before, then scroll to where the coach was (below).
+        const place = readListReturn();
+        if (place && place.url === `${window.location.pathname}${window.location.search}`) {
+          setShown(Math.max(PAGE_SIZE, Math.min(place.shown, 2000)));
+          restoreY.current = place.y;
+        }
+        clearListReturn();
         setData(d);
         resetFavourites(d.favourites);
       })
@@ -70,6 +79,13 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
       stale = true;
     };
   }, [supabase, workspaceId, resetFavourites]);
+
+  useEffect(() => {
+    if (!data || restoreY.current === null) return;
+    const y = restoreY.current;
+    restoreY.current = null;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [data]);
 
   const index = useMemo(() => (data ? buildExerciseIndex(data.index) : null), [data]);
   // Ranking uses the favourites as loaded, so starring a row doesn't make it jump while the coach looks at it.
@@ -184,7 +200,11 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
         <ul className={styles.phoneRows} aria-label="Exercises" aria-busy={!data && !loadFailed}>
           {hits.slice(0, shown).map(({ row }) => (
             <li key={row.id} className={styles.phoneRow}>
-              <Link href={`/exercises/${row.id}`} className={styles.phoneRowLink}>
+              <Link
+                href={`/exercises/${row.id}`}
+                className={styles.phoneRowLink}
+                onClick={() => saveListReturn({ url: `${window.location.pathname}${window.location.search}`, y: window.scrollY, shown })}
+              >
                 <Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={54} height={54} className={styles.phoneThumb ?? ''} />
                 <span className={styles.phoneRowText}>
                   <span className={styles.phoneRowName}>{row.name}</span>
@@ -216,14 +236,9 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
         }}
       >
         <span className={styles.grab} aria-hidden="true" />
-        <div className={styles.sheetHeader}>
-          <h2 id={sheetTitleId} className={styles.sheetTitle}>
-            Filters
-          </h2>
-          <button type="button" className={styles.clear} onClick={clearAll} disabled={inSheet === 0}>
-            Clear
-          </button>
-        </div>
+        <h2 id={sheetTitleId} className={styles.sheetTitle}>
+          Filters
+        </h2>
         <div className={styles.sheetGroup} role="group" aria-labelledby={`${sheetTitleId}-tracking`}>
           <span id={`${sheetTitleId}-tracking`} className={styles.sheetGroupLabel}>
             Tracking type
@@ -278,9 +293,15 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
             </button>
           </div>
         </div>
-        <Button className={styles.sheetDone} onClick={() => sheetRef.current?.close()}>
-          {data ? `Show ${hits.length} ${hits.length === 1 ? 'exercise' : 'exercises'}` : 'Done'}
-        </Button>
+        {/* Stuck to the bottom of the sheet, so Show N is reachable without scrolling on a small iPhone. */}
+        <div className={styles.sheetFooter}>
+          <button type="button" className={styles.clear} onClick={clearAll} disabled={inSheet === 0}>
+            Clear
+          </button>
+          <Button className={styles.sheetDone} onClick={() => sheetRef.current?.close()}>
+            {data ? `Show ${hits.length} ${hits.length === 1 ? 'exercise' : 'exercises'}` : 'Done'}
+          </Button>
+        </div>
       </dialog>
     </div>
   );

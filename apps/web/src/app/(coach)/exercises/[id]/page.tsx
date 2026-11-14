@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { exercisePageTitle } from '@/lib/page-titles';
 import { getExercise } from '@/lib/page-data';
 import { notFound } from 'next/navigation';
@@ -10,6 +9,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { ExerciseForm } from '../exercise-form';
 import { TRACKING_LABELS } from '../filters';
 import styles from '../exercises.module.css';
+import { BackToExercises } from './back-link';
 import { DetailStar } from './detail-star';
 import { OverrideForm } from './override-form';
 
@@ -53,12 +53,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
   return (
     <div className={styles.page}>
       <div className={styles.detailBar}>
-        <Link href="/exercises" className={styles.back} aria-label="Back to exercises">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-          Exercises
-        </Link>
+        <BackToExercises />
         <DetailStar id={ex.id} name={ex.name} initial={favourite.data !== null} />
       </div>
 

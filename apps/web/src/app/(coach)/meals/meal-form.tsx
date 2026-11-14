@@ -375,12 +375,6 @@ function MealFormFields({
       </label>
 
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
-      {saved && !isNew && !dirty ? (
-        <p role="status" className={styles.status}>
-          Saved
-        </p>
-      ) : null}
-
       <div className={styles.actions}>
         <button type="submit" className={styles.save} disabled={pending} aria-busy={pending || undefined}>
           {pending ? 'Saving…' : isNew ? 'Save meal' : 'Save'}
@@ -392,6 +386,12 @@ function MealFormFields({
           <button type="button" className={cx(styles.remove, styles.wideOnly)} onClick={() => dialogRef.current?.showModal()}>
             Remove meal
           </button>
+        ) : null}
+        {/* In the Save bar, so on a phone (where the bar sticks to the bottom) it shows where the coach just tapped. */}
+        {saved && !isNew && !dirty ? (
+          <p role="status" className={styles.status}>
+            Saved
+          </p>
         ) : null}
       </div>
 
