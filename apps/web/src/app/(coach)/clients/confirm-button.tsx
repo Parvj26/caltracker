@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
+import { useId, useImperativeHandle, useRef, useState, useTransition, type Ref } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
@@ -20,10 +20,16 @@ type Props = {
   focusAfterId: string;
   /** A small text button (inside a row's status line) instead of a bordered row button. */
   inline?: boolean;
+  /** Opens the dialog from elsewhere (a row's ⋯ menu). */
+  handle?: Ref<ConfirmHandle> | undefined;
+  /** False: only the dialog, opened through `handle` (the caller draws its own buttons). */
+  trigger?: boolean;
 };
 
+export type ConfirmHandle = { open: () => void };
+
 /** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
-export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false }: Props) {
+export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false, handle, trigger = true }: Props) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -46,10 +52,11 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
     setError(null);
     dialogRef.current?.showModal();
   };
+  useImperativeHandle(handle, () => ({ open }));
 
   return (
     <>
-      {inline ? (
+      {!trigger ? null : inline ? (
         <button type="button" className={styles.inlineAction} aria-label={ariaLabel} onClick={open}>
           {label}
         </button>

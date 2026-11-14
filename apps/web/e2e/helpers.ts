@@ -336,3 +336,10 @@ export async function seedSectionedWorkout(
   }
   return w.data.id;
 }
+
+/** The Clients list opens on Active; pending invites wait under their own "Invited" chip. */
+export async function showInvites(page: Page): Promise<void> {
+  const chip = page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Invited/ });
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+}

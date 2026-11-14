@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { formatPlainDay } from '@caltracker/shared';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, showInvites, signInAsCoach } from './helpers';
 
 // The invite window (+ Invite client): one client with an optional plan, or many from a CSV. Invites show on the
-// Clients list as "Invited" until they join; a plan chosen while inviting goes on their calendar when they do.
+// Clients list under the "Invited" chip until they join (the list switches to it after a send); a plan chosen while
+// inviting goes on their calendar when they do.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 const MS_DAY = 86_400_000;
@@ -22,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openInvite(page: Page) {
-  await page.getByRole('button', { name: '+ Invite client' }).click();
+  await page.getByRole('button', { name: 'Invite client', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Invite a client' });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -101,6 +102,8 @@ test('invite one client: the Sent screen, then they show as Invited and can be r
   await sent.getByRole('button', { name: 'Done' }).click();
   await expect(sent).toBeHidden();
 
+  // The list switches to Invited to show the new invite.
+  await expect(page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Invited/ })).toHaveAttribute('aria-pressed', 'true');
   const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: email });
   await expect(row).toContainText('New Client');
   await expect(row).toContainText('Invited today');
@@ -138,7 +141,8 @@ test('invite with a program: it shows on the Invited row and goes on their calen
   await expect(row).toContainText(program.name);
   await expect(row).toContainText(`starts ${shortDay(start)}`);
 
-  // They join: the program is on their calendar from its start day, and the list shows them as a client with it.
+  // They join: the program is on their calendar from its start day, and the list (on Active again after a reload)
+  // shows them as a client with it.
   const clientId = await joinAs(email, 'Pat', `Program${tag}`);
   const copies = await admin.from('workouts').select('scheduled_on, assignment_id').eq('client_id', clientId).order('scheduled_on');
   expect(copies.error).toBeNull();
@@ -224,7 +228,7 @@ test('the chosen single workout is marked in the picker', async ({ page }) => {
   await expect(pick).toContainText('✓ chosen');
 });
 
-test('invites are listed newest first, after the clients', async ({ page }) => {
+test('invites are listed newest first under Invited, apart from the clients', async ({ page }) => {
   const run = unique();
   const add = async (firstName: string, lastName: string, email: string) => {
     const dialog = await openInvite(page);
@@ -239,11 +243,17 @@ test('invites are listed newest first, after the clients', async ({ page }) => {
   await add('Ada', 'Aardvark', older);
   await add('Zoe', 'Zulu', newer);
   await page.reload();
-  const rows = await page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').allTextContents();
+  // Active (the default) lists clients only; invites wait under Invited.
+  const table = page.getByRole('table', { name: 'Clients', exact: true });
+  await expect(table.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();
+  await expect(table.getByRole('row').filter({ hasText: newer })).toHaveCount(0);
+  await showInvites(page);
+  await expect(table.getByRole('row').filter({ hasText: newer })).toBeVisible();
+  const rows = await table.getByRole('row').allTextContents();
   const at = (text: string) => rows.findIndex((r) => r.includes(text));
   expect(at(newer)).toBeGreaterThan(-1);
   expect(at(newer)).toBeLessThan(at(older));
-  expect(at('Demo Client')).toBeLessThan(at(newer));
+  expect(at('Demo Client')).toBe(-1);
 });
 
 test('a 45-row CSV is sent in chunks and every row is reported', async ({ page }) => {

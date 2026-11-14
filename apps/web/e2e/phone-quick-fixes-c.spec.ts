@@ -35,7 +35,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     created.inviteEmails.push(email);
     await signInAsCoach(page);
     await page.goto('/clients');
-    await page.getByRole('button', { name: '+ Invite client' }).click();
+    await page.getByRole('button', { name: 'Invite client', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Invite a client' });
     await expect(dialog.getByText('What they get:', { exact: true })).toBeVisible();
 

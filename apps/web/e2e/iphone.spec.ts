@@ -138,7 +138,7 @@ test('the client tabs show that they scroll', async ({ page }) => {
 
 test('the invite window fits, has no zooming fields and big enough choices', async ({ page }) => {
   await page.goto('/clients');
-  await page.getByRole('button', { name: '+ Invite client' }).click();
+  await page.getByRole('button', { name: 'Invite client', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Invite a client' });
   await expect(dialog).toBeVisible();
   await expectNoSidewaysScroll(page);

@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
 import { expect, test } from '@playwright/test';
-import { signInAsCoach } from './helpers';
+import { showInvites, signInAsCoach } from './helpers';
 
 // Remove client, Past clients and Cancel invite (docs/superpowers/specs/2026-11-04-remove-client-design.md).
 
@@ -129,12 +129,14 @@ test('remove a client: confirm, they move to Past clients, then re-invite them',
   // Re-invite sends a fresh invite (it shows as Invited on the list until they accept).
   await past.getByRole('button', { name: `Re-invite ${client.name}` }).click();
   await expect(past.getByText('Invite sent')).toBeVisible();
+  await showInvites(page);
   await expect(clients.getByRole('row').filter({ hasText: client.email })).toContainText('Invited');
 });
 
 test('cancel an invite: confirm, it disappears, and its link stops working', async ({ page }) => {
   const invite = await makePendingInvite();
   await signInAsCoach(page);
+  await showInvites(page);
   const pending = page.getByRole('table', { name: 'Clients', exact: true });
   const row = pending.getByRole('row').filter({ hasText: invite.email });
   await expect(row).toContainText('Invited today');
@@ -153,6 +155,7 @@ test('cancel an invite: confirm, it disappears, and its link stops working', asy
 test('cancelling an invite that was accepted meanwhile says so instead of pretending', async ({ page }) => {
   const invite = await makePendingInvite();
   await signInAsCoach(page);
+  await showInvites(page);
   const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: invite.email });
   await row.getByRole('button', { name: `Cancel invite to ${invite.email}` }).click();
   // The client accepts while the coach is reading the dialog.

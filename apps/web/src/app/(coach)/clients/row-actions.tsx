@@ -1,7 +1,8 @@
 'use client';
 
 import { cancelInvite, removeClient } from './actions';
-import { ConfirmButton } from './confirm-button';
+import type { Ref } from 'react';
+import { ConfirmButton, type ConfirmHandle } from './confirm-button';
 
 export function RemoveClientButton({ userId, name, focusAfterId = 'clients-heading' }: { userId: string; name: string; focusAfterId?: string }) {
   const who = name || 'this client';
@@ -18,10 +19,26 @@ export function RemoveClientButton({ userId, name, focusAfterId = 'clients-headi
   );
 }
 
-export function CancelInviteButton({ inviteId, email, inline = false }: { inviteId: string; email: string; inline?: boolean }) {
+export function CancelInviteButton({
+  inviteId,
+  email,
+  inline = false,
+  handle,
+  trigger = true,
+}: {
+  inviteId: string;
+  email: string;
+  inline?: boolean;
+  /** Opens the confirm step from elsewhere (the row's ⋯ menu on a phone). */
+  handle?: Ref<ConfirmHandle>;
+  /** False: only the confirm dialog, opened through `handle`. */
+  trigger?: boolean;
+}) {
   return (
     <ConfirmButton
       inline={inline}
+      handle={handle}
+      trigger={trigger}
       label={inline ? 'Cancel' : 'Cancel invite'}
       ariaLabel={`Cancel invite to ${email}`}
       title="Cancel this invite?"
