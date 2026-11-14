@@ -43,11 +43,11 @@ export function useUnreadTotal(userId: string, workspaceId: string, initial: num
   return count;
 }
 
-/** The unread total, shared by the Inbox item and the phone menu button (provided by CoachSidebar). */
+/** The unread total, shared by the Messages item and the phone tab bar (provided by CoachSidebar). */
 export const UnreadTotalContext = createContext(0);
 
-/** The Inbox menu item with the unread total. */
-export function MessagesNavLink() {
+/** The Messages menu item with the unread total. `className` hides it from the phone's More sheet (it is a tab there). */
+export function MessagesNavLink({ className }: { className?: string | undefined }) {
   const count = useContext(UnreadTotalContext);
-  return <NavLink href="/messages" label="Inbox" icon="messages" badge={count} />;
+  return <NavLink href="/messages" label="Messages" icon="messages" badge={count} className={className} />;
 }

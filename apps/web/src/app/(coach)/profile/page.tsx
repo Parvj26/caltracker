@@ -5,6 +5,7 @@ import { requireCoach } from '@/lib/auth';
 import { AvatarPicker } from './avatar-picker';
 import { PasswordForm } from './password-form';
 import { ProfileForm } from './profile-form';
+import { SignOut } from './sign-out';
 import styles from './profile.module.css';
 
 export const metadata = { title: 'Profile' };
@@ -47,6 +48,10 @@ export default async function ProfilePage() {
         <h2 className={styles.sectionHeading}>Change password</h2>
         <PasswordForm />
       </Card>
+
+      <div className={styles.signOutRow}>
+        <SignOut />
+      </div>
     </div>
   );
 }

@@ -26,6 +26,8 @@ test.afterAll(async () => {
 });
 
 test('coach pages have specific tab titles', async ({ page }) => {
+  // Many page loads in one test.
+  test.slow();
   const workoutName = `Upper Body ${unique()}`;
   const programName = `Strength ${unique()}`;
   const w = await admin.from('workouts').insert({ workspace_id: workspaceId, name: workoutName }).select('id').single();
@@ -54,6 +56,8 @@ test('coach pages have specific tab titles', async ({ page }) => {
     ['/community', 'Community · CalTracker'],
     ['/community/reports', 'Reports · Community · CalTracker'],
     ['/profile', 'Profile · CalTracker'],
+    ['/messages', 'Messages · CalTracker'],
+    ['/help', 'Help · CalTracker'],
   ];
   for (const [path, title] of expected) {
     await page.goto(path);

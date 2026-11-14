@@ -7,7 +7,10 @@ const sans = Bricolage_Grotesque({ subsets: ['latin'], weight: ['500', '700', '8
 const hand = Caveat({ subsets: ['latin'], weight: '700', variable: '--ct-font-hand' });
 
 // Pages name themselves ("Home", "Maya Patel · Clients"); the template adds the product name to every tab.
-export const metadata: Metadata = { title: { template: '%s · CalTracker', default: 'CalTracker' }, description: 'Coach dashboard' };
+export const metadata: Metadata = { title: { template: '%s · CalTracker', default: 'CalTracker' }, description: 'Coach dashboard',
+  // iOS Safari turns long digit runs (names like "Week 1794…") into phone links, which breaks hydration.
+  formatDetection: { telephone: false },
+};
 export const viewport: Viewport = { colorScheme: 'light' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

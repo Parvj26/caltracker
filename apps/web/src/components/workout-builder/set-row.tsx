@@ -26,13 +26,13 @@ import styles from './builder.module.css';
 export type SetPatch = Partial<Omit<WorkoutSetDoc, 'id'>>;
 
 /** Blank text is null; text that is not a number is NaN (kept in the box, not saved). */
-function parseDecimal(text: string): number | null {
+export function parseDecimal(text: string): number | null {
   const t = text.trim();
   if (t === '') return null;
   return /^(\d+\.?\d*|\.\d+)$/.test(t) ? Number(t) : NaN;
 }
 
-function parseWhole(text: string): number | null {
+export function parseWhole(text: string): number | null {
   const t = text.trim();
   if (t === '') return null;
   return /^\d+$/.test(t) ? Number(t) : NaN;
@@ -56,7 +56,7 @@ function selectAll(el: HTMLInputElement) {
  * rewritten mid-entry); each readable value is saved to the doc at once. On blur it shows the doc's value again.
  * Tapping or tabbing into a filled box selects its number, so typing replaces it instead of landing mid-number.
  */
-function NumberInput({ label, value, format, parse, onCommit, className, onFocus, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
+export function NumberInput({ label, value, format, parse, onCommit, className, onFocus, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   // True during a tap that focuses the box: Safari places the caret when that tap ends, undoing the selection.
   const focusingTap = useRef(false);

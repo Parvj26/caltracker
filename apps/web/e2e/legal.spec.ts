@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { signInAsCoach } from './helpers';
 
 // The privacy policy and terms are public (linked from the App Store and the sign-in screens), and every surface links
-// them. Help & feedback on the coach website opens an email to support with the version, browser and page.
+// them. Help on the coach website is a page (help.spec.ts).
 
 for (const [path, heading, other] of [
   ['/privacy', 'Privacy policy', 'Terms'],
@@ -46,18 +46,10 @@ test('the sign-in page links both pages', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Privacy policy' })).toBeVisible();
 });
 
-test('the coach sidebar has Help & feedback and the legal footer', async ({ page }) => {
+test('the coach sidebar has Help (a page) and the legal footer', async ({ page }) => {
   await signInAsCoach(page);
   const sidebar = page.locator('[data-coach-sidebar]');
-  const help = sidebar.getByRole('link', { name: 'Help & feedback' });
-  await expect(help).toHaveAttribute('href', /^mailto:support@caltracker\.app\?subject=CalTracker%20help&body=/);
-  // The browser and page are filled in once the menu hydrates (the server renders the link without them).
-  await expect(help).toHaveAttribute('href', /Page%3A%20/);
-  const body = new URL((await help.getAttribute('href'))!).searchParams.get('body')!;
-  expect(body).toContain('App: Coach website');
-  expect(body).toMatch(/Version: \S+/);
-  expect(body).toMatch(/Device: Mozilla\//);
-  expect(body).toMatch(/Page: http:\/\/localhost:\d+\/clients$/);
+  await expect(sidebar.getByRole('link', { name: 'Help' })).toHaveAttribute('href', '/help');
   const footer = sidebar.getByRole('navigation', { name: 'Legal' });
   await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
   await expect(footer.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');

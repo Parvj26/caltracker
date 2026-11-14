@@ -108,3 +108,36 @@ export function isPlannedLog(log: Pick<WorkoutLogDoc, 'blocks'>): boolean {
 export function isAddedExercise(log: Pick<WorkoutLogDoc, 'blocks'>, ex: Pick<LogExerciseDoc, 'plannedWorkoutExerciseId'>): boolean {
   return ex.plannedWorkoutExerciseId === null && isPlannedLog(log);
 }
+
+/** One line of the "N sets aren't ticked" warning: an exercise (or a pick-one group still to pick) with open sets. */
+export type UntickedRow = {
+  /** The log exercise's id, or the block's id for a pick-one group still to pick. */
+  key: string;
+  name: string;
+  done: number;
+  total: number;
+  /** A pick-one group with no pick yet: "Mark all" can't tick it until an option is picked. */
+  needsPick: boolean;
+};
+
+/**
+ * What the coach's Finish warns about: the open sets (counted as openSetCount does), the ticked ones, and each
+ * exercise that still has open sets, in page order. No rows means nothing is left to tick.
+ */
+export function untickedSets(log: WorkoutLogDoc): { open: number; done: number; rows: UntickedRow[] } {
+  const rows: UntickedRow[] = [];
+  for (const b of log.blocks) {
+    if (needsPick(b)) {
+      const total = b.exercises[0]?.sets.filter((s) => s.setType === 'normal').length ?? 0;
+      rows.push({ key: b.id, name: b.exercises.map((e) => e.exerciseName).join(' or '), done: 0, total, needsPick: true });
+      continue;
+    }
+    for (const { exercise } of liveExercises(b)) {
+      const done = exercise.sets.filter((s) => s.completedAt !== null).length;
+      if (done < exercise.sets.length) {
+        rows.push({ key: exercise.id, name: exercise.exerciseName, done, total: exercise.sets.length, needsPick: false });
+      }
+    }
+  }
+  return { open: openSetCount(log), done: completedSetCount(log), rows };
+}

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
-import { MAILPIT_URL, WEB_URL } from './helpers';
+import { MAILPIT_URL, WEB_URL, signOutFromProfile } from './helpers';
 
 // Local Supabase's mail catcher (Mailpit) HTTP API.
 const MAILPIT = `${MAILPIT_URL}/api/v1`;
@@ -87,7 +87,7 @@ test('provisioned coach opens the invite link, sets a password, then signs in wi
     await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByText('Fresh Gym')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await signOutFromProfile(page);
     await expect(page).toHaveURL(/\/sign-in/);
 
     await page.getByLabel('Email').fill(email);

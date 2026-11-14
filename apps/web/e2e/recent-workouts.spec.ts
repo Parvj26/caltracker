@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { formatPlainDay } from '@caltracker/shared';
-import { serviceClient } from './helpers';
+import { serviceClient, dateField } from './helpers';
 import {
   addDays,
   browserToday,
@@ -66,7 +66,7 @@ test('+ Add workout opens with Recent and Most used, and one tap on a recent wor
   await expect.poll(() => names(recent)).toEqual(['Lib A', 'Lib B', 'Lib C', 'Lib D', 'Lib E', 'Lib F', 'Lib G', 'Lib H']);
   expect(await names(dialog.getByRole('region', { name: 'Most used' }))).toEqual(['Lib I']);
   expect(await names(dialog.getByRole('region', { name: 'All workouts' }))).toEqual(['Lib J']);
-  await expect(dialog.getByLabel('Date')).toHaveValue(today);
+  await expect((await dateField(dialog))).toHaveValue(today);
 
   await clicks.on(recent.getByRole('button', { name: 'Lib A', exact: true }));
   await expect(dialog).toBeHidden();

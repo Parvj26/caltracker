@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareDirectoryRows,
+  directoryChip,
   directoryCounts,
   directoryRows,
   fourWeekCompletion,
   invitedLabel,
+  invitedShortLabel,
   matchesDirectoryFilter,
 } from '../../src/coach-home/client-directory';
 import type { DirectoryClient, DirectoryInput, DirectoryRow, DirectoryWorkout } from '../../src/coach-home/client-directory';
@@ -161,11 +163,11 @@ describe('filters, counts and sort', () => {
     expect(ids(rows.filter((r) => matchesDirectoryFilter(r, 'plan_ending')))).toEqual(['c']);
     expect(ids(rows.filter((r) => matchesDirectoryFilter(r, 'nothing_planned')))).toEqual(['b']);
     expect(rows.filter((r) => matchesDirectoryFilter(r, 'invited'))).toEqual([]);
-    expect(rows.every((r) => matchesDirectoryFilter(r, 'all'))).toBe(true);
+    expect(rows.every((r) => matchesDirectoryFilter(r, 'active'))).toBe(true);
   });
 
   it('counts each chip', () => {
-    expect(directoryCounts(rows)).toEqual({ all: 3, missed: 1, plan_ending: 1, nothing_planned: 1 });
+    expect(directoryCounts(rows)).toEqual({ active: 3, missed: 1, plan_ending: 1, nothing_planned: 1 });
   });
 
   it('sorts by last workout, name, completion and plan end', () => {
@@ -182,5 +184,40 @@ describe('invitedLabel', () => {
     expect(invitedLabel(TODAY, TODAY)).toBe('Invited today');
     expect(invitedLabel('2026-11-04', TODAY)).toBe('Invited yesterday');
     expect(invitedLabel('2026-11-03', TODAY)).toBe('Invited 2 days ago');
+  });
+});
+
+describe('directoryChip (the one chip on a phone row)', () => {
+  it('is Missed N when any workout was missed this week, even while training or with nothing planned', () => {
+    expect(directoryChip(only({ workouts: [wk('2026-11-02'), wk('2026-11-04'), tomorrow()] }))).toEqual({ kind: 'missed', count: 2 });
+    const training = only({ workouts: [wk('2026-11-03'), wk(TODAY, { logs: [log({ status: 'in_progress', finishedAt: null })] })] });
+    expect(directoryChip(training)).toEqual({ kind: 'missed', count: 1 });
+    expect(directoryChip(only({ workouts: [wk('2026-11-03')] }))).toEqual({ kind: 'missed', count: 1 });
+  });
+
+  it('is Nothing planned with nothing coming up and nothing missed', () => {
+    expect(directoryChip(only({ workouts: [wk('2026-11-03', { logs: done() })] }))).toEqual({ kind: 'nothing_planned' });
+  });
+
+  it('is On track otherwise: active, training with nothing missed, or a plan ending', () => {
+    expect(directoryChip(only({ workouts: [wk('2026-11-03', { logs: done() }), tomorrow()], assignments: [asg()] }))).toEqual({ kind: 'on_track' });
+    const training = only({ workouts: [wk(TODAY, { logs: [log({ status: 'in_progress', finishedAt: null })] }), tomorrow()] });
+    expect(directoryChip(training)).toEqual({ kind: 'on_track' });
+    expect(directoryChip(only({ workouts: [tomorrow()], assignments: [asg({ endDate: '2026-11-06' })] }))).toEqual({ kind: 'on_track' });
+  });
+});
+
+describe('invitedShortLabel', () => {
+  it('says how long ago in days, then weeks', () => {
+    expect(invitedShortLabel(TODAY, TODAY)).toBe('Invited today');
+    expect(invitedShortLabel('2026-11-04', TODAY)).toBe('Invited 1 d');
+    expect(invitedShortLabel('2026-10-30', TODAY)).toBe('Invited 6 d');
+    expect(invitedShortLabel('2026-10-29', TODAY)).toBe('Invited 1 wk');
+    expect(invitedShortLabel('2026-10-23', TODAY)).toBe('Invited 1 wk');
+    expect(invitedShortLabel('2026-10-22', TODAY)).toBe('Invited 2 wk');
+  });
+
+  it('never goes negative', () => {
+    expect(invitedShortLabel('2026-11-06', TODAY)).toBe('Invited today');
   });
 });

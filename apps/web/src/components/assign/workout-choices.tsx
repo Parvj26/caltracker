@@ -1,10 +1,10 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { pickerSections, type WorkoutHints } from '@caltracker/shared';
+import { pickerSections, smartFilter, type WorkoutHints } from '@caltracker/shared';
 import { EmptyLibrary } from '@/components/empty-library';
-import { matchesSearch } from '@/app/(coach)/programs/[id]/search';
 import calendar from '@/components/calendar/calendar.module.css';
+import { cx } from '@/components/ui/cx';
 import styles from './assign.module.css';
 
 export type ChoiceWorkout = { id: string; name: string };
@@ -12,7 +12,7 @@ export type ChoiceWorkout = { id: string; name: string };
 /**
  * A searchable list of library workouts where one tap picks a workout (the caller decides what picking does).
  * Before anything is typed it opens with the coach's shortcuts: "Recent" (their last-used workouts) and "Most used",
- * then "All workouts" (the rest), so each workout shows once. Typing searches the whole library in one list.
+ * then "All workouts" (the rest), so each workout shows once. Typing searches the whole library in one list, with the shared smart search (typos, partial words, best first).
  * Every workout picker uses it: the calendar's "+ Add workout" and day "+", the program grid's "+", and Home's Assign.
  */
 export function WorkoutChoices({
@@ -22,6 +22,7 @@ export function WorkoutChoices({
   disabled = false,
   forProgram = false,
   chosenIds,
+  listClassName,
 }: {
   library: readonly ChoiceWorkout[];
   hints?: WorkoutHints;
@@ -31,6 +32,8 @@ export function WorkoutChoices({
   forProgram?: boolean;
   /** Workouts already picked (the invite window's single workouts): marked "✓ chosen" and pressed. */
   chosenIds?: ReadonlySet<string>;
+  /** Extra class on the scrolling list (a full-screen sheet lets it take the spare height). */
+  listClassName?: string | undefined;
 }) {
   const resultsId = useId();
   const [query, setQuery] = useState('');
@@ -76,15 +79,15 @@ export function WorkoutChoices({
         />
       </label>
       {sections && (sections.recent.length > 0 || sections.mostUsed.length > 0) ? (
-        <div id={resultsId} className={styles.pickerScroll}>
+        <div id={resultsId} className={cx(styles.pickerScroll, listClassName)}>
           {section('Recent', sections.recent)}
           {section('Most used', sections.mostUsed)}
           {section('All workouts', sections.rest)}
         </div>
       ) : (
-        <ul id={resultsId} className={calendar.results} aria-label="Library workouts">
+        <ul id={resultsId} className={cx(calendar.results, listClassName)} aria-label="Library workouts">
           {(() => {
-            const results = library.filter((w) => matchesSearch(w.name, query));
+            const results = smartFilter(library, query, (w) => w.name);
             return results.length === 0 ? <li className={calendar.caption}>No workouts match.</li> : results.map(button);
           })()}
         </ul>

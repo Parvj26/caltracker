@@ -328,6 +328,7 @@ export function BlockEditor({
             ))}
             <SetTable
               sets={ex.sets}
+              exerciseName={ex.exerciseName}
               names={names.map((n) => `${ex.exerciseName} ${n}`)}
               trackingType={ex.trackingType}
               units={units}

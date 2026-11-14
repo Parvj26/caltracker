@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { formatPlainDay, formatPlainDayMonth } from '@caltracker/shared';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach, dateField, moveButton } from './helpers';
 
 // Client calendar and assignment (phase 2 Task 16). Every test builds its own workouts and programs with unique
 // names, so tests can share the demo client and still run side by side.
@@ -94,7 +94,7 @@ async function assignFromNextMonday(page: Page, program: string, client: string)
   await page.goto(calendarUrl(undefined, client));
   const monday = nextMonday(await browserToday(page));
   const dialog = await openAssign(page, program);
-  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(monday);
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();
   return monday;
@@ -128,7 +128,7 @@ test('assign a program from next Monday; a double click still copies it once', a
   const monday = nextMonday(await browserToday(page));
   const end = addDays(monday, 13);
   const dialog = await openAssign(page, program);
-  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(monday);
   await expect(dialog.getByText(`2 workouts from ${fmt(monday, true)} to ${fmt(end, true)}`)).toBeVisible();
 
   await dialog.getByRole('button', { name: 'Assign', exact: true }).dblclick();
@@ -177,18 +177,18 @@ test('a lost response, then a different date, then the same date again still cop
     await route.fulfill({ status: 500, body: 'lost' });
   });
   const dialog = await openAssign(page, program);
-  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(monday);
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog.getByText("Couldn't assign. Check your connection and try again.")).toBeVisible();
   await page.unroute(pageUrl);
 
   // A different date with the same dialog is refused, not copied a second time.
-  await dialog.getByLabel('Start date').fill(addDays(monday, 7));
+  await (await dateField(dialog, 'Start date')).fill(addDays(monday, 7));
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog.getByText('Assign was already sent with a different program or start date.', { exact: false })).toBeVisible();
 
   // Back to the first date: the retry finds the assignment already made.
-  await dialog.getByLabel('Start date').fill(monday);
+  await (await dateField(dialog, 'Start date')).fill(monday);
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();
 
@@ -309,12 +309,12 @@ test('move one item with "Move to…", drag another, then delete one', async ({ 
   await day(page, d(10)).getByRole('menuitem', { name: 'Move to…' }).click();
   const move = page.getByRole('dialog', { name: `Move ${first}` });
   // Single workouts go on today or later.
-  await move.getByLabel('Date').fill(addDays(await browserToday(page), -1));
+  await (await dateField(move)).fill(addDays(await browserToday(page), -1));
   await expect(move.getByText('Pick today or a later date.')).toBeVisible();
-  await expect(move.getByRole('button', { name: 'Move', exact: true })).toBeDisabled();
-  await move.getByLabel('Date').fill(d(15));
+  await expect(moveButton(move)).toBeDisabled();
+  await (await dateField(move)).fill(d(15));
   await expect(move.getByText('Pick today or a later date.')).toHaveCount(0);
-  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  await moveButton(move).click();
   await expect(move).toBeHidden();
   await expect(item(page, d(15), first)).toBeVisible();
   await expect(item(page, d(10), first)).toHaveCount(0);
@@ -522,18 +522,18 @@ test('+ Add workout: set the date, then one tap on a workout adds it (no confirm
   const date = `${nextMonth(monthOf(today))}-12`;
 
   const dialog = await openAddWorkout(page);
-  await expect(dialog.getByLabel('Date')).toHaveValue(today);
-  await expect(dialog.getByLabel('Date')).toHaveAttribute('min', today);
+  await expect((await dateField(dialog))).toHaveValue(today);
+  await expect((await dateField(dialog))).toHaveAttribute('min', today);
   // There is no separate Add button any more.
   await expect(dialog.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
 
   // Yesterday is refused, and the workouts can't be picked meanwhile.
-  await dialog.getByLabel('Date').fill(addDays(today, -1));
+  await (await dateField(dialog)).fill(addDays(today, -1));
   await expect(dialog.getByText('Pick today or a later date.')).toBeVisible();
   await dialog.getByLabel('Search workouts').fill(workout);
   await expect(dialog.getByRole('button', { name: workout, exact: true })).toBeDisabled();
 
-  await dialog.getByLabel('Date').fill(date);
+  await (await dateField(dialog)).fill(date);
   await expect(dialog.getByText('Pick today or a later date.')).toHaveCount(0);
   await dialog.getByRole('button', { name: workout, exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -630,12 +630,12 @@ test('a program can start up to 7 days ago: 8 days is refused, 3 days is assigne
   const today = await browserToday(page);
 
   const dialog = await openAssign(page, program);
-  await expect(dialog.getByLabel('Start date')).toHaveAttribute('min', addDays(today, -7));
-  await dialog.getByLabel('Start date').fill(addDays(today, -8));
+  await expect((await dateField(dialog, 'Start date'))).toHaveAttribute('min', addDays(today, -7));
+  await (await dateField(dialog, 'Start date')).fill(addDays(today, -8));
   await expect(dialog.getByText('Programs can start up to 7 days ago.')).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toBeDisabled();
 
-  await dialog.getByLabel('Start date').fill(addDays(today, -3));
+  await (await dateField(dialog, 'Start date')).fill(addDays(today, -3));
   await expect(dialog.getByText('Programs can start up to 7 days ago.')).toHaveCount(0);
   await expect(dialog.getByText('This start date is in the past. Workouts before today will show as missed later.')).toBeVisible();
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
@@ -783,8 +783,8 @@ test('Undo after moving the added workout: if the delete fails, it stays on the 
   await day(page, first).getByRole('button', { name: `Options for ${workout}`, exact: true }).click();
   await day(page, first).getByRole('menuitem', { name: 'Move to…' }).click();
   const move = page.getByRole('dialog', { name: `Move ${workout}` });
-  await move.getByLabel('Date').fill(second);
-  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  await (await dateField(move)).fill(second);
+  await moveButton(move).click();
   await expect(item(page, second, workout)).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
@@ -874,13 +874,13 @@ test('assigning over days that already have workouts warns first, lists the days
 
   // "Pick another date" puts the coach in the date box; a start that misses the Wednesday clears the warning.
   await dialog.getByRole('button', { name: 'Pick another date' }).click();
-  await expect(dialog.getByLabel('Start date')).toBeFocused();
-  await dialog.getByLabel('Start date').fill(addDays(monday, 3));
+  await expect((await dateField(dialog, 'Start date'))).toBeFocused();
+  await (await dateField(dialog, 'Start date')).fill(addDays(monday, 3));
   await expect(warning).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Assign', exact: true })).toBeVisible();
 
   // Back to Monday, and choose to add alongside: both workouts are on the Wednesday.
-  await dialog.getByLabel('Start date').fill(monday);
+  await (await dateField(dialog, 'Start date')).fill(monday);
   await expect(warning).toBeVisible();
   await dialog.getByRole('button', { name: 'Add alongside' }).click();
   await expect(dialog).toBeHidden();
@@ -924,12 +924,12 @@ test('a missed workout is rescheduled with "Move to another day"; a done one off
     await cell.getByRole('button', { name: `Options for ${missed}`, exact: true }).click();
     await cell.getByRole('menuitem', { name: 'Move to another day' }).click();
     const dialog = page.getByRole('dialog', { name: `Move ${missed}` });
-    await expect(dialog.getByLabel('Date')).toHaveAttribute('min', today);
+    await expect((await dateField(dialog))).toHaveAttribute('min', today);
     // Its own (past) day can't be picked, so the dialog starts on today.
-    await expect(dialog.getByLabel('Date')).toHaveValue(today);
-    await expect(dialog.getByRole('button', { name: 'Move', exact: true })).toBeEnabled();
-    await dialog.getByLabel('Date').fill(target);
-    await dialog.getByRole('button', { name: 'Move', exact: true }).click();
+    await expect((await dateField(dialog))).toHaveValue(today);
+    await expect(moveButton(dialog)).toBeEnabled();
+    await (await dateField(dialog)).fill(target);
+    await moveButton(dialog).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
     const moved = await admin.from('workouts').select('scheduled_on').eq('name', missed).single();

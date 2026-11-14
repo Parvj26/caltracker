@@ -14,7 +14,7 @@ const OWN_CLICKS = 'a, button, input, select, textarea, label, summary, dialog, 
  * cells are tested by); the action buttons stay separate controls, never inside a link. Ctrl/Cmd-click and
  * middle-click open a new tab, like a link. A click that ends a text selection doesn't open anything.
  */
-export function LinkRow({ href, className, children }: { href: string; className?: string; children: ReactNode }) {
+export function LinkRow({ href, className, role, children }: { href: string; className?: string; role?: 'row'; children: ReactNode }) {
   const router = useRouter();
   const target = (event: MouseEvent<HTMLTableRowElement>) => {
     const el = event.target as HTMLElement;
@@ -25,6 +25,8 @@ export function LinkRow({ href, className, children }: { href: string; className
   };
   return (
     <tr
+      // An explicit role keeps it a row for screen readers when CSS lays the table out as cards.
+      role={role}
       className={cx(styles.row, className)}
       onClick={(event) => {
         const to = target(event);

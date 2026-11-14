@@ -139,7 +139,7 @@ test('the client tabs swipe with no arrows, and the bar and tabs fit the phone',
 
 test('the invite window fits, has no zooming fields and big enough choices', async ({ page }) => {
   await page.goto('/clients');
-  await page.getByRole('button', { name: '+ Invite client' }).click();
+  await page.getByRole('button', { name: 'Invite client', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Invite a client' });
   await expect(dialog).toBeVisible();
   await expectNoSidewaysScroll(page);
@@ -177,9 +177,8 @@ test('a tap on a link shows the loading bar straight away', async ({ page }) => 
     await new Promise((r) => setTimeout(r, 1500));
     await route.continue();
   });
-  // On an iPhone the menu is the floating button's sheet of tiles.
-  await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Programs' }).click();
+  // On an iPhone Programs is a tab in the bottom tab bar.
+  await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: 'Programs' }).click();
   await expect(page.getByTestId('nav-progress')).toBeVisible({ timeout: 1000 });
   await expect(page).toHaveURL(/\/programs$/);
   await expect(page.getByTestId('nav-progress')).toBeHidden();

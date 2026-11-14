@@ -94,7 +94,10 @@ export {
   formatPlainLongDay,
   formatPlainMonth,
   formatPlainWeekday,
+  formatRelativeDay,
+  groupByLocalDay,
 } from './dates/format';
+export type { DayGroup } from './dates/format';
 export {
   CALENDAR_VIEWS,
   DEFAULT_CALENDAR_VIEW,
@@ -107,6 +110,8 @@ export {
 } from './dates/calendar-range';
 export type { CalendarRange, CalendarView } from './dates/calendar-range';
 export { SWIPE_MIN_PX, calendarSwipeStep, phoneCalendarDay } from './dates/calendar-phone';
+export { busyLabel, plannedLabel, quickDays } from './dates/quick-days';
+export type { QuickDay, QuickDayOptions } from './dates/quick-days';
 export {
   BLOCK_KINDS,
   SET_TYPES,
@@ -144,6 +149,17 @@ export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
 export type { WorkoutSummaryRow } from './workouts/summary';
 export { blockCollapsedSummary, exerciseCollapsedLine, stepReps, stepWeight, weightStep } from './workouts/collapsed';
 export type { CollapsedBlock } from './workouts/collapsed';
+export {
+  DEFAULT_REPS,
+  QUICK_REPS,
+  REST_PRESETS,
+  applyToAllPatches,
+  setLineParts,
+  stepRepsFrom,
+  stepSource,
+  stepWeightFrom,
+} from './workouts/set-editor';
+export type { SetValuesPatch } from './workouts/set-editor';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
@@ -243,7 +259,9 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
-export { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { canStartSessionOn, coachSessionState, completeAllOpenSets, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { logReviewByLog } from './logs/review';
+export type { LogReview } from './logs/review';
 export { rebaseEdits } from './logs/rebase';
 export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
@@ -303,7 +321,9 @@ export {
   logVolumeKg,
   openSetCount,
   shouldAutoFinish,
+  untickedSets,
 } from './logs/summary';
+export type { UntickedRow } from './logs/summary';
 export {
   ENDING_WITHIN_DAYS,
   LAST_WORKOUT_LOOKBACK_DAYS,
@@ -346,13 +366,16 @@ export { SEARCH_MAX_RESULTS, foldForSearch, searchClients } from './coach-home/s
 export {
   COMPLETION_WINDOW_DAYS,
   compareDirectoryRows,
+  directoryChip,
   directoryCounts,
   directoryRows,
   fourWeekCompletion,
   invitedLabel,
+  invitedShortLabel,
   matchesDirectoryFilter,
 } from './coach-home/client-directory';
 export type {
+  DirectoryChip,
   DirectoryClient,
   DirectoryFilter,
   DirectoryInput,

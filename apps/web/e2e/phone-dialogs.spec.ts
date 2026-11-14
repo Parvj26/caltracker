@@ -23,7 +23,7 @@ test.afterAll(async () => {
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
 
-const menuButton = (page: Page) => page.getByRole('button', { name: 'Menu', exact: true });
+const tabBar = (page: Page) => page.getByRole('navigation', { name: 'Tabs' });
 
 /** The control's box is at least 44 px tall (and, with `wide`, 44 px wide). */
 async function expectTappable(control: Locator, { wide = false } = {}) {
@@ -63,7 +63,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('a community post keeps Delete behind ⋯, and it still asks first', async ({ page }) => {
+  test('a community post keeps Pin and Delete behind ⋯, and Delete still asks first', async ({ page }) => {
     const ws = await demoWorkspace(admin);
     const community = await admin.from('communities').select('id').eq('workspace_id', ws).eq('is_default', true).single();
     if (community.error) throw community.error;
@@ -83,20 +83,24 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await signInAsCoach(page);
     await page.goto('/community');
     const post = page.getByTestId('community-post').filter({ hasText: body });
-    await expect(post.getByRole('button', { name: 'Pin', exact: true })).toBeVisible();
+    await expect(post.getByRole('button', { name: 'Pin', exact: true })).toHaveCount(0);
     await expect(post.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
     const more = post.getByRole('button', { name: 'More for this post' });
     await expectTappable(more, { wide: true });
 
-    // Saying no to the question keeps the post.
+    // Pin sits in the menu next to Delete.
     await more.click();
+    await expect(post.getByRole('menuitem', { name: 'Pin to top' })).toBeVisible();
+    await expectTappable(post.getByRole('menuitem', { name: 'Pin to top' }));
+
+    // Saying no to the question keeps the post.
     page.once('dialog', (d) => void d.dismiss());
-    await post.getByRole('menuitem', { name: 'Delete post' }).click();
+    await post.getByRole('menuitem', { name: 'Delete post…' }).click();
     await expect(post).toHaveCount(1);
 
     page.once('dialog', (d) => void d.accept());
     await more.click();
-    await post.getByRole('menuitem', { name: 'Delete post' }).click();
+    await post.getByRole('menuitem', { name: 'Delete post…' }).click();
     await expect(post).toHaveCount(0);
   });
 
@@ -129,7 +133,7 @@ test.describe('iPhone SE (375 x 667)', () => {
 
   test('the invite plan choice is three stacked full-width rows', async ({ page }) => {
     await signInAsCoach(page);
-    await page.getByRole('button', { name: '+ Invite client' }).click();
+    await page.getByRole('button', { name: 'Invite client', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Invite a client' });
     const boxes = await Promise.all(
       ['Program', 'Single workout', 'Nothing yet'].map(async (n) => (await dialog.getByRole('button', { name: n, exact: true }).boundingBox())!),
@@ -146,12 +150,12 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expect(dialog.getByRole('button', { name: 'Program', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('the meal form has 48 px fields and its Save bar stays on screen, with the Menu button out of the way', async ({ page }) => {
+  test('the meal form has 48 px fields and its Save bar stays on screen, with the tab bar out of the way', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/meals/new');
     const form = page.getByRole('form', { name: 'New meal' });
     await form.getByLabel('Name').scrollIntoViewIfNeeded();
-    await expect(menuButton(page)).toBeHidden();
+    await expect(tabBar(page)).toBeHidden();
     for (const label of ['Name', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)']) {
       expect((await form.getByLabel(label, { exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
     }

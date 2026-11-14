@@ -144,7 +144,8 @@ test('the next time an exercise is added it starts with the last saved measureme
   await expect(region.getByLabel(`Tempo for ${ex}`)).toHaveValue('');
 });
 
-test('at iPhone width each exercise is one compact table', async ({ page }) => {
+test('at iPhone width each set is one line, edited in a sheet that shows the measured boxes', async ({ page }) => {
+  test.slow();
   const ex = await customExercise('Curl');
   await page.setViewportSize({ width: 390, height: 844 });
   await signInAsCoach(page);
@@ -152,36 +153,40 @@ test('at iPhone width each exercise is one compact table', async ({ page }) => {
   const region = page.getByRole('region', { name: ex });
   // A newly added exercise opens (phones fold the others to one line).
   await expect(region.getByRole('button', { name: new RegExp(`^${ex}: `) })).toHaveAttribute('aria-expanded', 'true');
-  await setRow(page, ex, 'set 2').getByRole('button', { name: /^Set type: / }).click();
-  await setRow(page, ex, 'set 2').getByRole('menuitemradio', { name: 'Drop set', exact: true }).click();
+  const line = (n: number) => region.getByRole('button', { name: new RegExp(`^Edit ${ex} set ${n}: `) });
+  const sheet = page.getByRole('dialog', { name: /^Set \d+ of \d+$/ });
 
-  // One header row for the exercise, naming the first line's boxes, weight first.
-  const header = region.locator('[class*="setHeader"]');
-  await expect(header).toHaveCount(1);
-  await expect(header).toBeVisible();
-  await expect(header.locator('span:visible')).toHaveText(['SET', 'KG', 'REPS']);
+  // No inline set rows: one line per set, blank ones say so.
+  await expect(setRow(page, ex, 'set 1')).toHaveCount(0);
+  await expect(line(1)).toContainText('Not filled yet');
+  for (const n of [1, 2, 3]) expect((await line(n).boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  // Each set: the letter, weight and reps with − / +, and × on one line; rest (with its caption) under them.
-  for (const n of [1, 2, 3]) {
-    const row = setRow(page, ex, `set ${n}`);
-    const box = (await row.boundingBox())!;
-    expect(box.height).toBeLessThan(n === 2 ? 56 : 104);
-    const letter = (await row.getByRole('button', { name: /^Set type: / }).boundingBox())!;
-    const remove = (await row.getByRole('button', { name: `Remove set ${n}` }).boundingBox())!;
-    const plus = (await row.getByRole('button', { name: 'More reps' }).boundingBox())!;
-    expect(Math.abs(letter.y - remove.y)).toBeLessThan(8);
-    expect(Math.abs(letter.y - plus.y)).toBeLessThan(8);
-    expect(remove.x).toBeGreaterThan(letter.x + 200);
-    expect(remove.width).toBeGreaterThanOrEqual(44);
-    await expect(row.getByText('Weight', { exact: true })).toBeHidden();
-  }
-  await expect(setRow(page, ex, 'set 1').getByText('Rest', { exact: true })).toBeVisible();
-  // A drop row is indented and has no rest box.
-  const drop = setRow(page, ex, 'set 2');
-  await expect(drop.getByLabel('Rest (m:ss)')).toHaveCount(0);
-  const dropLetter = (await drop.getByRole('button', { name: /^Set type: / }).boundingBox())!;
-  const firstLetter = (await setRow(page, ex, 'set 1').getByRole('button', { name: /^Set type: / }).boundingBox())!;
-  expect(dropLetter.x).toBeGreaterThan(firstLetter.x + 8);
+  // Set 2 as a drop set: a D chip, indented, and no rest.
+  await line(2).click();
+  await sheet.getByRole('button', { name: 'Drop', exact: true }).click();
+  await expect(sheet.getByLabel('Rest (m:ss)')).toHaveCount(0);
+  await expect(sheet.getByRole('group', { name: 'Rest after this set' })).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await expect(line(2)).toHaveAccessibleName(new RegExp(`^Edit ${ex} set 2: Drop set, .*no rest$`));
+  expect((await line(2).boundingBox())!.x).toBeGreaterThan((await line(1).boundingBox())!.x + 8);
+  // The first set can't be a drop.
+  await line(1).click();
+  await expect(sheet.getByRole('button', { name: 'Drop', exact: true })).toBeDisabled();
+
+  // The sheet follows the measurements: Weight · Reps, then with Time added a time box too.
+  await expect(sheet.getByLabel('Weight (kg)')).toBeVisible();
+  await expect(sheet.getByLabel('Reps', { exact: true })).toBeVisible();
+  await expect(sheet.getByLabel('Duration (m:ss)')).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await measurements(page, ex).click();
+  const menu = page.getByRole('dialog', { name: `Measurements for ${ex}` });
+  await menu.getByRole('checkbox', { name: 'Time' }).check();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await line(1).click();
+  await sheet.getByLabel('Duration (m:ss)').fill('0:45');
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await expect(line(1)).toContainText('0:45');
 
   // The measurements tab stays in the open exercise; swap, substitute, move and remove are in ⋯.
   await expect(measurements(page, ex)).toBeVisible();

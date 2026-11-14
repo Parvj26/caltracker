@@ -1,7 +1,7 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { formatPlainDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, dateField, moveButton } from './helpers';
 
 // iPhone quick fixes B (2026-11-13 Safari review): the calendar, its dialogs, Programs and the live view. CI runs
 // Chromium with iPhone and iPad sizes, so iOS-only behaviour (a native picker popping open, Safari's wide date field,
@@ -75,17 +75,17 @@ async function addToday(page: Page, workout: string) {
 test.describe('iPhone SE (375 x 667)', () => {
   test.use({ ...iphone13, viewport: SE });
 
-  test('"Add a workout" starts on the search box, not the date field, which stays inside the window', async ({ page }) => {
+  test('"Add a workout" opens with no keyboard and no date picker, and its date field stays inside the window', async ({ page }) => {
     const client = await newClient();
     await libraryWorkout(`Focus ${unique()}`);
     await signInAsCoach(page);
     await page.goto(`/clients/${client}/training`);
     await page.getByRole('button', { name: '+ Add workout' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add a workout' });
-    const date = dialog.getByLabel('Date');
-    await expect(dialog.getByLabel('Search workouts')).toBeFocused();
-    await expect(date).not.toBeFocused();
-    await expectWithin(date, dialog);
+    // On a touch screen the window itself has focus: the search box is ready but the keyboard waits for a tap.
+    await expect(dialog).toBeFocused();
+    await expect(dialog.getByLabel('Search workouts')).not.toBeFocused();
+    await expectWithin(await dateField(dialog), dialog);
   });
 
   test('the toast\'s Undo and Dismiss keep their words inside the button', async ({ page }) => {
@@ -116,16 +116,16 @@ test.describe('iPhone SE (375 x 667)', () => {
     const { scrollHeight, clientHeight } = await row.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
     expect(scrollHeight, 'the row is squashed').toBeLessThanOrEqual(clientHeight);
     await expect(row.getByText('12 weeks')).toBeVisible();
-    await expectWithin(dialog.getByLabel('Start date'), dialog);
+    await expectWithin((await dateField(dialog, 'Start date')), dialog);
   });
 
-  test('the Programs list fits: Assign and Duplicate are whole and on screen, with no sideways scroll', async ({ page }) => {
+  test('the Programs list fits: Assign and ⋯ are whole and on screen, with no sideways scroll', async ({ page }) => {
     const name = `12-Week Hypertrophy Block — Phase 1 ${unique()}`;
     created.programs.push(await seedProgram(admin, workspaceId, name, 12, []));
     await signInAsCoach(page);
     await page.goto('/programs');
     const row = page.getByRole('table', { name: 'Programs' }).getByRole('row').filter({ hasText: name });
-    for (const button of [row.getByRole('button', { name: `Assign ${name}` }), row.getByRole('button', { name: /^Duplicate/ })]) {
+    for (const button of [row.getByRole('button', { name: `Assign ${name}` }), row.getByRole('button', { name: `More for ${name}` })]) {
       await button.scrollIntoViewIfNeeded();
       await expect(button).toBeInViewport({ ratio: 1 });
       await expectTextInside(button);
@@ -151,10 +151,11 @@ test('"Move to…" says where it went, and Undo moves it back', async ({ page })
   await day(today).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await day(today).getByRole('menuitem', { name: 'Move to…' }).click();
   const move = page.getByRole('dialog', { name: `Move ${name}` });
-  // The date field is not where the window starts (iOS would open its picker).
-  await expect(move.getByLabel('Date')).not.toBeFocused();
-  await move.getByLabel('Date').fill(later);
-  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  // Quick days come first; the date field (where iOS would open its picker) waits behind "Pick a date…".
+  await expect(move.getByRole('button', { name: 'Pick a date…' })).toBeVisible();
+  await expect(move.getByLabel('Date', { exact: true })).toHaveCount(0);
+  await (await dateField(move)).fill(later);
+  await moveButton(move).click();
   await expect(page.getByText(`Moved ${name} to ${shortDay(later)}.`)).toBeVisible();
   await expect(day(later).getByRole('button', { name, exact: true })).toBeVisible();
 
@@ -183,8 +184,8 @@ test('Undo after "Move to…" only says it moved back when it could: a workout d
   await day(today).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await day(today).getByRole('menuitem', { name: 'Move to…' }).click();
   const move = page.getByRole('dialog', { name: `Move ${name}` });
-  await move.getByLabel('Date').fill(later);
-  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  await (await dateField(move)).fill(later);
+  await moveButton(move).click();
   await expect(page.getByText(`Moved ${name} to ${shortDay(later)}.`)).toBeVisible();
 
   // Deleted while the move's toast (and its Undo) is still showing.

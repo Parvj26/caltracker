@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, dateField } from './helpers';
 import {
   addDays,
   browserToday,
@@ -53,7 +53,7 @@ test('assign a library workout to three clients from the Workouts list in 5 clic
 
   await clicks.on(page.getByRole('button', { name: `Assign ${name}`, exact: true }));
   const dialog = page.getByRole('dialog', { name: `Assign ${name}` });
-  await expect(dialog.getByLabel('Date')).toHaveValue(today);
+  await expect((await dateField(dialog))).toHaveValue(today);
   // Search narrows the list (typing isn't a click).
   await dialog.getByLabel('Search clients').fill(last);
   for (const n of names) await clicks.on(dialog.getByRole('checkbox', { name: n, exact: true }));
@@ -108,7 +108,7 @@ test('assign a program from its page: a clash shows first, then Add alongside as
   const clicks = clickCounter();
   await clicks.on(page.getByRole('button', { name: 'Assign program', exact: true }));
   const dialog = page.getByRole('dialog', { name: `Assign ${program}` });
-  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(monday);
   await dialog.getByLabel('Search clients').fill(last);
   await clicks.on(dialog.getByRole('button', { name: 'Select all shown', exact: true }));
   await expect(dialog.getByText('1 client already has a workout on some of these days')).toBeVisible();

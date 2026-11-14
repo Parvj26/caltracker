@@ -12,11 +12,11 @@ export function menuOpensUp(input: { buttonTop: number; buttonBottom: number; me
   return menuHeight > below && above > below;
 }
 
-/** Height of the iPhone's home-indicator area (0 elsewhere), from env(safe-area-inset-bottom). */
-function safeAreaBottom(doc: Document): number {
-  const probe = doc.createElement('div');
-  probe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom, 0px);visibility:hidden;pointer-events:none';
-  doc.body.appendChild(probe);
+/** A CSS length in pixels (env() can't be read as a number), measured with a probe under `parent`. */
+function measure(parent: Element, length: string): number {
+  const probe = parent.ownerDocument.createElement('div');
+  probe.style.cssText = `position:fixed;left:0;bottom:0;width:0;height:${length};visibility:hidden;pointer-events:none`;
+  parent.appendChild(probe);
   const height = probe.getBoundingClientRect().height;
   probe.remove();
   return height;
@@ -24,7 +24,7 @@ function safeAreaBottom(doc: Document): number {
 
 /**
  * Bars that cover the page while stuck or fixed: `data-overlay-edge="top"` (the client page's sticky bar and tabs on a
- * phone) or `"bottom"` (a toast). Returns the lowest top bar's bottom and the highest bottom bar's top; a bar that
+ * phone) or `"bottom"` (a toast, the phone's tab bar). Returns the lowest top bar's bottom and the highest bottom bar's top; a bar that
  * scrolls with the page (static, as on a laptop) doesn't count.
  */
 function overlayEdges(doc: Document, top: number, bottom: number): { top: number; bottom: number } {
@@ -43,7 +43,7 @@ function overlayEdges(doc: Document, top: number, bottom: number): { top: number
 /**
  * For an open menu under `button`: true when it should flip above the button to stay on screen. Uses the visual
  * viewport (the part of the page left on screen when Safari's bars or the keyboard cover some of it) and keeps clear
- * of the home indicator, the phone's floating menu button, a stuck bar on top and a toast at the bottom.
+ * of the home indicator, a stuck bar on top, and the phone's tab bar or a toast at the bottom.
  */
 export function shouldOpenUp(button: HTMLElement, menu: HTMLElement): boolean {
   const doc = button.ownerDocument;
@@ -52,9 +52,8 @@ export function shouldOpenUp(button: HTMLElement, menu: HTMLElement): boolean {
   const vv = win.visualViewport;
   const top = vv ? vv.offsetTop : 0;
   const height = vv ? vv.height : win.innerHeight;
-  const menuRoom = parseFloat(win.getComputedStyle(button).getPropertyValue('--coach-menu-room')) || 0;
   const b = button.getBoundingClientRect();
-  const edges = overlayEdges(doc, top, top + height - Math.max(safeAreaBottom(doc), menuRoom));
+  const edges = overlayEdges(doc, top, top + height - measure(doc.body, 'env(safe-area-inset-bottom, 0px)'));
   return menuOpensUp({
     buttonTop: b.top,
     buttonBottom: b.bottom,

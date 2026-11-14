@@ -6,6 +6,7 @@ import {
   addLogSet,
   blockRoundCount,
   canStartSessionOn,
+  completeAllOpenSets,
   completeAllSets,
   completeSetWith,
   completedSetCount,
@@ -40,6 +41,7 @@ import {
   toMeters,
   toTrackingType,
   uncompleteSet,
+  untickedSets,
   updateActual,
   withSuggestion,
   type ActualPatch,
@@ -61,6 +63,7 @@ import { failureMessage } from '@/lib/action-errors';
 import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
 import { useBrowserToday } from '@/lib/local-today';
 import { handBackSession, loadSession, saveSession } from './actions';
+import { DiscardSheet, UntickedSheet } from './finish-sheets';
 import styles from './session.module.css';
 
 type Field = 'weight' | 'reps' | 'time' | 'distance';
@@ -411,6 +414,8 @@ export function SessionLogger({
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const [notice, setNotice] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  /** Finish's "N sets aren't ticked" sheet, or Cancel session's "Discard this session?". */
+  const [sheet, setSheet] = useState<'unticked' | 'discard' | null>(null);
   const [notes, setNotesState] = useState(initialLog?.notes ?? '');
   // What the session note box shows, for the save loop (state would be stale in its closure).
   const notesRef = useRef(initialLog?.notes ?? '');
@@ -561,15 +566,32 @@ export function SessionLogger({
     void flush();
   }
 
-  async function finish() {
+  /** Finish: with sets still open it first asks (Mark all done and finish, Finish anyway, Keep logging). */
+  function requestFinish() {
     const current = logRef.current;
     if (!current) return;
-    // A note typed but not yet left (no blur) still goes with the finish. One operation, so a stale save re-applies
-    // the finish on the server's copy too.
+    if (untickedSets(current).open > 0) setSheet('unticked');
+    else void finish(false);
+  }
+
+  /** Last time with Auto progression's suggestion applied, as each page's Mark all fills it. */
+  const prefillOf = (l: WorkoutLogDoc, blockId: string, exerciseId: string) => {
+    const ex = l.blocks.find((b) => b.id === blockId)?.exercises.find((e) => e.exerciseId === exerciseId);
+    const last = lastTimes[exerciseId] ?? [];
+    return ex ? prefillLastTime(ex, last, progression, units) : last;
+  };
+
+  async function finish(markAll: boolean) {
+    setSheet(null);
+    const current = logRef.current;
+    if (!current) return;
+    // A note typed but not yet left (no blur) still goes with the finish, and Mark all done with it. One operation,
+    // so a stale save re-applies all of it on the server's copy too.
     const at = nowIso();
     const typed = notes;
     const finishOp: Op = (l) => {
-      const withNotes = setLogNotes(l, typed, at);
+      const ticked = markAll ? completeAllOpenSets(l, (blockId, exerciseId) => prefillOf(l, blockId, exerciseId), at) : l;
+      const withNotes = setLogNotes(ticked, typed, at);
       const finished = finishLog(withNotes, at);
       return finished === withNotes ? l : finished;
     };
@@ -590,14 +612,10 @@ export function SessionLogger({
     router.push(`/clients/${client.id}/logs/${finished.id}?award=1`);
   }
 
+  /** Discard session, after "Discard this session?". */
   async function cancel() {
-    const current = logRef.current;
-    const who = client.firstName || 'the client';
-    const warning =
-      earlierSets > 0
-        ? `Cancel this session? This throws away the whole workout, including the ${earlierSets} ${earlierSets === 1 ? 'set' : 'sets'} already logged before you opened it (after a take over, those are the ones ${who} logged on their phone). Nothing is saved to ${who}'s history.`
-        : `Cancel this session? Nothing is saved to ${who}'s history.`;
-    if (!current || !window.confirm(warning)) return;
+    setSheet(null);
+    if (!logRef.current) return;
     const at = nowIso();
     applyLocal((l) => discardLog(l, at));
     if (await flush()) router.push(`/clients/${client.id}/training`);
@@ -779,17 +797,40 @@ export function SessionLogger({
           />
         </label>
         <div className={styles.footerActions}>
-          <Button variant="finish" className={styles.footerButton} onClick={() => void finish()} pending={finishing}>
+          <Button className={styles.footerButton} onClick={requestFinish} pending={finishing}>
             {finishing ? 'Finishing…' : 'Finish session'}
           </Button>
           <Button variant="secondary" className={cx(styles.footerButton, styles.ledgeButton)} onClick={() => void handBack()} pending={handingBack}>
             Hand back to {client.firstName || 'client'}
           </Button>
-          <Button variant="secondary" className={cx(styles.footerButton, styles.quietButton)} onClick={() => void cancel()}>
-            Cancel session
-          </Button>
+        </div>
+        {/* Kept apart from Finish and Hand back, at the very bottom, so it is never tapped by mistake. */}
+        <div className={styles.cancelZone}>
+          <button type="button" className={styles.cancelButton} onClick={() => setSheet('discard')}>
+            Cancel session…
+          </button>
+          <span className={styles.caption}>Deletes everything logged in this session</span>
         </div>
       </fieldset>
+      {sheet === 'unticked' ? (
+        <UntickedSheet
+          {...untickedSets(log)}
+          clientName={client.firstName || 'your client'}
+          onMarkAllAndFinish={() => void finish(true)}
+          onFinishAnyway={() => void finish(false)}
+          onKeepLogging={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === 'discard' ? (
+        <DiscardSheet
+          done={done}
+          earlierSets={earlierSets}
+          workoutName={log.name}
+          clientName={client.firstName || 'the client'}
+          onDiscard={() => void cancel()}
+          onKeepLogging={() => setSheet(null)}
+        />
+      ) : null}
     </div>
   );
 }

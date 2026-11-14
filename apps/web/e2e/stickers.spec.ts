@@ -96,7 +96,7 @@ test('a log that set a personal best shows a PR chip in activity and on the log 
   const { clientId, logId } = await seedClient(`Chip${unique()}`);
   await signInAsCoach(page);
   await page.goto(`/activity?client=${clientId}`);
-  const row = page.getByRole('row').filter({ has: page.locator(`a[href$="/logs/${logId}"]`) });
+  const row = page.locator(`a[href$="/logs/${logId}"]`);
   await expect(row.getByText('PR', { exact: true })).toBeVisible();
 
   await page.goto(`/clients/${clientId}/logs/${logId}`);
@@ -109,7 +109,8 @@ test('a log with no personal best has no PR chip', async ({ page }) => {
   if (cleared.error) throw cleared.error;
   await signInAsCoach(page);
   await page.goto(`/activity?client=${clientId}`);
-  await expect(page.getByRole('link', { name: /^Stk / })).toBeVisible();
+  // The whole row is the link; its name starts with the client's name and includes the workout's.
+  await expect(page.getByRole('main').getByRole('link', { name: /Stk / })).toBeVisible();
   await expect(page.getByText('PR', { exact: true })).toHaveCount(0);
 });
 

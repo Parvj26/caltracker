@@ -43,6 +43,13 @@ export async function signInAsCoach(page: Page) {
   await page.goto('/clients');
 }
 
+/** Signs out the way a coach does: Profile, Sign out, then Sign out again in the "Sign out?" check. */
+export async function signOutFromProfile(page: Page) {
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out' }).click();
+}
+
 /** Service-role client: test fixtures and cleanup only, never app code. */
 export function serviceClient(): SupabaseClient<Database> {
   let url = process.env.SUPABASE_URL;
@@ -336,3 +343,26 @@ export async function seedSectionedWorkout(
   }
   return w.data.id;
 }
+
+/** The Clients list opens on Active; pending invites wait under their own "Invited" chip. */
+export async function showInvites(page: Page): Promise<void> {
+  const chip = page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Invited/ });
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+}
+
+/**
+ * The date field of a pop-up window's day picker (Assign, Move to…, Add a workout, Assign a program). Quick days come
+ * first and the field opens with "Pick a date…", so this opens it when it is still closed.
+ */
+export async function dateField(dialog: Locator, label: 'Date' | 'Start date' = 'Date'): Promise<Locator> {
+  const field = dialog.getByLabel(label, { exact: true });
+  const open = dialog.getByRole('button', { name: 'Pick a date…' });
+  await expect(field.or(open).first()).toBeVisible();
+  if (await open.isVisible()) await open.click();
+  await expect(field).toBeVisible();
+  return field;
+}
+
+/** The Move button of "Move to…": "Move to Sat 14 Nov" once a day is picked, plain "Move" while the date is invalid. */
+export const moveButton = (dialog: Locator) => dialog.getByRole('button', { name: /^Move( to .+)?$/ });

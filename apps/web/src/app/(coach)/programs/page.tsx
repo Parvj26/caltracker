@@ -1,30 +1,41 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { AssignButton } from '@/components/assign/assign-to-clients';
-import { DuplicateButton } from '@/components/duplicate-button';
-import { LinkRow } from '@/components/link-row';
-import { ButtonLink, Card } from '@/components/ui';
+import { ButtonLink } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { escapeLike } from '../exercises/filters';
+import { ProgramList } from './program-list';
 import styles from './programs.module.css';
-import assignStyles from '@/components/assign/assign.module.css';
 
 export const metadata: Metadata = { title: 'Programs' };
 
 // Program lists stay small in V1; past this the list says so instead of paging.
 const LIMIT = 200;
 
-export default async function ProgramsPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
+
+export default async function ProgramsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { workspaceId } = await requireCoach();
+  const q = one((await searchParams).q).trim().slice(0, 100);
   const supabase = await createServerSupabase();
-  const { data, error } = await supabase
-    .from('programs')
-    .select('id, name, weeks, program_workouts(count)')
-    .eq('workspace_id', workspaceId)
-    .order('updated_at', { ascending: false })
-    .limit(LIMIT + 1);
+  const programs = () => supabase.from('programs').select('id, name, weeks, program_workouts(count)').eq('workspace_id', workspaceId);
+  // The list filters in the browser with the shared smart search (typos forgiven), as you type, over the most recent
+  // LIMIT. A bigger list also gets the plain name match from the server for a submitted search (?q=), so an older
+  // program can still be found by its name.
+  const [{ data, error }, counted] = await Promise.all([
+    programs().order('updated_at', { ascending: false }).limit(LIMIT + 1),
+    supabase.from('programs').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
+  ]);
   if (error) throw new Error(`Could not load programs: ${error.message}`);
-  const rows = data.slice(0, LIMIT).map((p) => ({
+  const limited = data.length > LIMIT;
+  const found = data.slice(0, LIMIT);
+  if (limited && q) {
+    const older = await programs().ilike('name', `%${escapeLike(q)}%`).order('updated_at', { ascending: false }).limit(LIMIT);
+    if (older.error) throw new Error(`Could not search programs: ${older.error.message}`);
+    const seen = new Set(found.map((p) => p.id));
+    found.push(...older.data.filter((p) => !seen.has(p.id)));
+  }
+  const rows = found.map((p) => ({
     id: p.id,
     name: p.name,
     weeks: p.weeks,
@@ -36,54 +47,19 @@ export default async function ProgramsPage() {
       <header className={styles.titleRow}>
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>Programs</h1>
-          <p className={styles.caption}>
+          <p className={`${styles.caption} ${styles.listIntro}`}>
             A program arranges workouts into weeks. Assign it to a client and every workout lands on their calendar.
           </p>
         </div>
         <div className={styles.titleActions}>
-          <ButtonLink href="/programs/new" data-ph-capture-attribute-label="program_new">New program</ButtonLink>
+          {/* Phones: a small outlined "+ New" (named "New program" for screen readers). */}
+          <ButtonLink href="/programs/new" className={styles.newButton} aria-label="New program" data-ph-capture-attribute-label="program_new">
+            <span aria-hidden="true" className={styles.phoneOnly}>+</span>New<span className={styles.newWord}> program</span>
+          </ButtonLink>
         </div>
       </header>
 
-      {rows.length === 0 ? (
-        <p className={styles.empty}>No programs yet. Build your first one.</p>
-      ) : (
-        <Card className={styles.listCard}>
-          <table className={styles.table} aria-label="Programs">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Weeks</th>
-                <th scope="col">Workouts</th>
-                <th scope="col">
-                  <span className={styles.visuallyHidden}>Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                // The whole row opens the program; Assign and Duplicate stay their own buttons.
-                <LinkRow key={p.id} href={`/programs/${p.id}`}>
-                  <td>
-                    <Link href={`/programs/${p.id}`} className={styles.nameLink}>
-                      {p.name}
-                    </Link>
-                  </td>
-                  <td className={styles.numeric}>{p.weeks}</td>
-                  <td className={styles.numeric}>{p.slots}</td>
-                  <td>
-                    <div className={assignStyles.actions} data-row-actions>
-                      <AssignButton kind="program" id={p.id} name={p.name} compact />
-                      <DuplicateButton kind="program" id={p.id} name={p.name} compact />
-                    </div>
-                  </td>
-                </LinkRow>
-              ))}
-            </tbody>
-          </table>
-          {data.length > LIMIT ? <p className={styles.caption}>Showing the {LIMIT} most recently updated.</p> : null}
-        </Card>
-      )}
+      <ProgramList rows={rows} total={counted.count ?? found.length} initialQuery={q} limited={limited} limit={LIMIT} />
     </div>
   );
 }

@@ -111,7 +111,8 @@ test('coach shell: sidebar nav marks Clients as the current page and the page us
   await expect(clients).toHaveCSS('background-color', 'rgb(18, 18, 18)');
   await expect(clients).toHaveCSS('color', 'rgb(255, 255, 255)');
   await expect(nav.getByRole('link', { name: 'Exercises' })).not.toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  // Sign out lives on Profile now (it asks first), not in the sidebar.
+  await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
 
   const cardBorders = await page.evaluate(() => {
     const token = getComputedStyle(document.documentElement).getPropertyValue('--ct-border').trim();
@@ -142,21 +143,21 @@ test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(page.locator('[data-coach-sidebar]').getByRole('link', { name: 'Profile' })).toBeVisible();
   // Mouse users get the name as a tooltip.
   await expect(nav.getByRole('link', { name: 'Workouts' })).toHaveAttribute('title', 'Workouts');
 });
 
-test('on a short screen the icon rail scrolls, so Profile and Sign out stay reachable', async ({ page }) => {
+test('on a short screen the icon rail scrolls, so Help and Profile stay reachable', async ({ page }) => {
   // About what an iPad in landscape split view or a 200% zoom leaves.
   await page.setViewportSize({ width: 1024, height: 420 });
   await signInAsDemoCoach(page);
   const sidebar = page.locator('[data-coach-sidebar]');
   expect(await sidebar.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
-  const signOut = page.getByRole('button', { name: 'Sign out' });
-  await signOut.scrollIntoViewIfNeeded();
-  await expect(signOut).toBeInViewport();
-  await expect(page.getByRole('link', { name: 'Profile' })).toBeVisible();
+  const profile = sidebar.getByRole('link', { name: 'Profile' });
+  await profile.scrollIntoViewIfNeeded();
+  await expect(profile).toBeInViewport();
+  await expect(sidebar.getByRole('link', { name: 'Help' })).toBeVisible();
 });
 
 test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({ page }) => {
@@ -174,7 +175,7 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
   // "+ Invite client" sits in the page header, above the list, so it is always in view on a laptop.
-  const invite = page.getByRole('button', { name: '+ Invite client' });
+  const invite = page.getByRole('button', { name: 'Invite client', exact: true });
   expect((await invite.boundingBox())!.y).toBeLessThan((await clients.boundingBox())!.y);
   await expect(invite).toBeInViewport();
 });
@@ -182,7 +183,7 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
 test('bulk CSV invite is its own tab of the invite window, explains itself and offers an example file', async ({ page }) => {
   await signInAsDemoCoach(page);
   // The invite window opens on One client; the CSV upload is the second tab.
-  await page.getByRole('button', { name: '+ Invite client' }).click();
+  await page.getByRole('button', { name: 'Invite client', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Invite a client' });
   const tab = dialog.getByRole('tab', { name: 'Many (CSV)' });
   await expect(tab).toHaveAttribute('aria-selected', 'false');
