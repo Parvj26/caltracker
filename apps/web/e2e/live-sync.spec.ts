@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach, dateField } from './helpers';
 
 // Program Live Sync (spec: docs/superpowers/specs/2026-11-06-live-sync-design.md): with the switch on, program edits
 // reach the calendars of clients already on the program.
@@ -88,7 +88,7 @@ test('Live Sync on: program edits reach the client calendar, tagged Live; off: t
   await page.getByRole('button', { name: 'Assign program' }).click();
   const dialog = page.getByRole('dialog', { name: 'Assign a program' });
   await dialog.getByRole('radio', { name: program, exact: true }).check();
-  await expect(dialog.getByLabel('Start date')).toHaveValue(monday);
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(monday);
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(await calendarItem(page, client, monday, legs)).toHaveCount(1);

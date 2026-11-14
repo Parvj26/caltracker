@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { formatPlainDay, formatPlainLongDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, nextMonday, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, dateField } from './helpers';
 
 // Phone fixes, batch 2: the client Training tab (calendar swipes, arrows by the dates, the month as dots, assigned
 // program rows that open the program), the assign dialog's program rows and the Programs list's row links. Chromium
@@ -159,7 +159,7 @@ test('the assign dialog lists programs with full names; the assigned row opens t
   await expectNoSidewaysScroll(page);
   await nameText.click();
   await expect(choice).toBeChecked();
-  await expect(dialog.getByLabel('Start date')).toHaveValue(nextMonday(await browserToday(page)));
+  await expect((await dateField(dialog, 'Start date'))).toHaveValue(nextMonday(await browserToday(page)));
   await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();
 
