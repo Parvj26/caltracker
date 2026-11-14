@@ -77,7 +77,7 @@ async function clientReads(email: string, conversationId: string) {
   if (error) throw error;
 }
 
-const nav = (page: Page) => page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /^Inbox/ });
+const nav = (page: Page) => page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /^Messages/ });
 async function unreadTotal(page: Page): Promise<number> {
   const label = (await nav(page).getAttribute('aria-label')) ?? '';
   return Number(/(\d+) unread/.exec(label)?.[1] ?? 0);

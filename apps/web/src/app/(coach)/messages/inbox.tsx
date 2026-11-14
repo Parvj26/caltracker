@@ -78,7 +78,7 @@ export function MessagesShell({
     <div className={styles.shell} data-screen={segment ? 'thread' : 'list'}>
       <section className={cx(styles.pane, styles.inboxPane)} aria-labelledby="inbox-heading">
         <div className={styles.inboxHead}>
-          <h1 id="inbox-heading" className={styles.heading}>Inbox</h1>
+          <h1 id="inbox-heading" className={styles.heading}>Messages</h1>
           <div className={styles.filters}>
             <input
               type="search"
