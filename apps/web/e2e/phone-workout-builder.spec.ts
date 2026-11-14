@@ -205,6 +205,8 @@ test.describe('iPhone SE (375 pt)', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('a set box fits "102.5", a tap selects its number, and the fold line names the empty sets', async ({ page }) => {
+    // Seeds an 8-exercise workout, then edits several boxes: close to the 30 s limit.
+    test.slow();
     await openSeeded(page);
     const ex = EXERCISES[0]!;
     await fold(page, ex).click();
@@ -234,6 +236,8 @@ test.describe('iPhone SE (375 pt)', () => {
   });
 
   test('a new exercise scrolls into view, and the name error goes once a name is typed', async ({ page }) => {
+    // Seeds an 8-exercise workout, then edits several boxes: close to the 30 s limit.
+    test.slow();
     await openSeeded(page);
     const name = page.getByLabel('Workout name');
     await expect(name).toHaveAttribute('autocomplete', 'off');

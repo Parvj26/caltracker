@@ -72,7 +72,8 @@ test.describe('iPhone SE (375 x 667)', () => {
     await first.click();
     await expect(first).toHaveAttribute('aria-selected', 'true');
     await expect(dialog.getByRole('list', { name: "Picked, in the order they're done" })).toBeVisible();
-    expect((await options.nth(1).boundingBox())!.y).toBeCloseTo(before, 0);
+    // Within 2 px (sub-pixel rounding); the old jump was about 45 px.
+    expect(Math.abs((await options.nth(1).boundingBox())!.y - before)).toBeLessThanOrEqual(2);
     await options.nth(1).click();
     await expect(options.nth(2)).toBeVisible();
     await expect(dialog.getByRole('button', { name: '← Back to list' })).toBeHidden();
