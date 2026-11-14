@@ -216,6 +216,8 @@ test.describe('pop-up windows', () => {
     const client = await newClient();
     const program = `Phone pop program ${unique()}`;
     created.programs.push(await seedProgram(admin, workspaceId, program, 4, []));
+    // The day picker shows once there is a workout to add (each CI shard starts with an empty library).
+    created.workouts.push(await seedLibraryWorkout(admin, workspaceId, `Phone pop add ${unique()}`));
     await signInAsCoach(page);
     const today = await browserToday(page);
     await page.goto(`/clients/${client}/training`);
