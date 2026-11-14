@@ -399,6 +399,15 @@ export function SessionLogger({
     const open = initialLog?.blocks.findIndex((b) => !isBlockDone(b)) ?? 0;
     return open < 0 ? 0 : open;
   });
+  const currentRef = useRef<HTMLDivElement>(null);
+  const scrollToHeading = useRef(false);
+  useEffect(() => {
+    if (!scrollToHeading.current) return;
+    scrollToHeading.current = false;
+    const heading = currentRef.current?.querySelector('h2');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    heading?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  }, [page]);
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const [notice, setNotice] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
@@ -667,6 +676,11 @@ export function SessionLogger({
   }
 
   const block = log.blocks[page] ?? log.blocks[0];
+  /** Previous / Next sit below the sets: bring the new exercise's heading into view instead of staying at the bottom. */
+  const turnPage = (to: number) => {
+    scrollToHeading.current = true;
+    setPage(to);
+  };
   const done = completedSetCount(log);
   const total = done + openSetCount(log);
   const locked = log.status !== 'in_progress' || save.kind === 'final' || handingBack;
@@ -731,19 +745,19 @@ export function SessionLogger({
           ))}
         </nav>
 
-        <div className={styles.current} aria-label="Current exercise">
+        <div ref={currentRef} className={styles.current} aria-label="Current exercise">
           {/* While locked the boxes and buttons stay visible but cannot change anything. */}
           <fieldset disabled={locked} className={styles.fieldset}>
             {block ? <BlockPage key={`${block.id}:${reloads}`} block={block} units={units} lastTimes={lastTimes} progression={progression} edit={edit} /> : null}
             <div className={styles.pager}>
-              <Button variant="secondary" className={styles.big} disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+              <Button variant="secondary" className={styles.big} disabled={page === 0} onClick={() => turnPage(Math.max(0, page - 1))}>
                 ← Previous
               </Button>
               <Button
                 variant="secondary"
                 className={styles.big}
                 disabled={page >= log.blocks.length - 1}
-                onClick={() => setPage((p) => Math.min(log.blocks.length - 1, p + 1))}
+                onClick={() => turnPage(Math.min(log.blocks.length - 1, page + 1))}
               >
                 Next →
               </Button>
