@@ -1,4 +1,5 @@
-# Client without an invite sees the waiting screen, then gets linked after the coach invites them.
+# Client without a coach sees the waiting screen, then gets linked after the coach invites them.
+# Sign-up is invite only now, so the helper makes the account (as if it predates that).
 appId: app.caltracker.client
 env:
   EMAIL: nobody@x.com
@@ -7,33 +8,13 @@ env:
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup, EMAIL: '${EMAIL}' }
-- launchApp:
-    clearState: true
-- tapOn:
-    id: go-sign-up
-- tapOn:
-    id: name-input
-- inputText: Nobody
-- tapOn:
-    id: last-name-input
-- inputText: Here
-- tapOn:
-    id: email-input
-- inputText: ${EMAIL}
-- tapOn:
-    id: password-input
-- inputText: ${PASSWORD}
-- runFlow: helpers/submit.yaml
-# iOS may offer to save the password; dismiss it if shown.
-- tapOn:
-    text: Not Now
-    optional: true
-- assertVisible: 'We sent a link to ${EMAIL}. Tap it, then come back and sign in.'
 - runScript:
     file: helpers/call.js
-    env: { ACTION: confirm, EMAIL: '${EMAIL}' }
-- tapOn:
-    id: go-sign-in
+    env: { ACTION: create-user, EMAIL: '${EMAIL}', NAME: 'Nobody Here' }
+- launchApp:
+    clearState: true
+- assertVisible: 'New here? Ask your coach for an invite.'
+- assertNotVisible: 'Create an account'
 - tapOn:
     id: email-input
 - inputText: ${EMAIL}

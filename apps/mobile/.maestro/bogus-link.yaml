@@ -24,4 +24,4 @@ appId: app.caltracker.client
     text: "This link didn't work. Sign in instead."
 - tapOn:
     id: go-sign-in
-- assertVisible: 'Create an account'
+- assertVisible: 'New here? Ask your coach for an invite.'

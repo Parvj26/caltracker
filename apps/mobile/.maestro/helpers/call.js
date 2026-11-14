@@ -3,6 +3,7 @@
 // Maestro scripts cannot run shell commands, so the bridge wraps the service-role helpers.
 // Inputs (env): ACTION, EMAIL, NAME (invite only), HELPER_URL. Actions:
 //   invite | confirm | cleanup | remove   per EMAIL (see scripts/e2e-helper.ts)
+//   create-user        a confirmed account for EMAIL (name NAME, password e2e-password-123) with no coach
 //   assign             the seed coach assigns a 1-week "E2E Program" (workout "E2E Upper") to EMAIL starting today
 //   cleanup-workouts   deletes every "E2E " workout, program and assignment (EMAIL is ignored; pass '-')
 //   assign-today       clears EMAIL's logs, then assigns "E2E Log" today: Barbell Squat 3 x 8 @ 60 kg, 90 s rests

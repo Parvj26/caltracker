@@ -1,11 +1,14 @@
 # CalTracker mobile (Expo)
 
-Client app (iPhone and iPad). Clients are invited by their coach, sign up with the invited email,
-and are linked to the coach's workspace automatically (`claim_invites()`).
+Client app (iPhone and iPad). Invite only: clients join from their coach's invite link
+(`caltracker://invite/<token>`, the `accept-invite` Edge Function makes the account) and are linked to the
+coach's workspace. Sign-in has no "Create an account"; "Forgot password?" emails a link that opens the website's
+`/set-password` page, then the client signs in on the app.
 
 Expo SDK 58, expo-router. Source is in `src/app` (screens) and `src/lib` (Supabase, claiming, session).
 Session storage: AES key in expo-secure-store, encrypted session in AsyncStorage (see `src/lib/secure-storage.ts`).
-Deep link: `caltracker://auth/confirmed` (email confirmation).
+Deep links: `caltracker://invite/<token>` (join) and `caltracker://auth/confirmed` (email confirmation for accounts
+made before sign-up was switched off).
 
 ## Setup
 
@@ -45,14 +48,13 @@ pnpm --filter mobile start                    # scan the QR code with Expo Go
 ```
 
 Local Supabase listens on all interfaces by default, so no further change is needed. Invite an email
-from the coach dashboard, sign up with it in the app, then confirm the email: local mail arrives in
-Mailpit (http://127.0.0.1:54324), and its link opens `caltracker://auth/confirmed` only on a device
-where the app is installed. In Expo Go, either use the link `exp://<ip>:8081/--/auth/confirmed...` or
-simply confirm with `pnpm --filter mobile e2e:confirm <email>`, then sign in.
+from the coach dashboard and open the invite link on the phone (local mail arrives in Mailpit,
+http://127.0.0.1:54324). The `caltracker://invite/...` link opens only where the app is installed; in Expo Go use
+`exp://<ip>:8081/--/invite/<token>`.
 
 ## Install on your own iPhone against staging (free Apple ID)
 
-Expo Go cannot open the app's `caltracker://` confirmation link, so for real sign-ups against
+Expo Go cannot open the app's `caltracker://` invite link, so for real joins against
 staging install the app itself from Xcode. A free Apple ID is enough; the install works for 7 days,
 then repeat the last step.
 
@@ -72,7 +74,7 @@ then repeat the last step.
    Team = your Apple ID ("Personal Team"), then run the command again.
 5. First launch only: iPhone Settings -> General -> VPN & Device Management -> your Apple ID -> **Trust**.
 6. Test: invite your own address (e.g. `you+client@gmail.com`) from https://staging.caltracker.app,
-   sign up with it in the app, open the confirmation email **on the iPhone** (the link opens the app).
+   open the invite email **on the iPhone** (the link opens the app) and join.
 
 Switch back to local with `pnpm --filter mobile env:local` and rebuild.
 
