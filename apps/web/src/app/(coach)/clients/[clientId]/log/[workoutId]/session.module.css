@@ -142,10 +142,9 @@
 .pager { display: flex; justify-content: space-between; gap: var(--ct-space-3); }
 .footer { padding-top: var(--ct-space-4-5); border-top: var(--ct-border-width-card) solid var(--ct-border); }
 
-/* Finish, Hand back and Cancel: one height (48 px), one type size and padding, on one line. The size is Finish's
-   (white on magenta needs at least 19 px bold). Finish's 4 px bottom shadow is drawn outside the box, so the row keeps
-   that much room below and the three boxes stay aligned. Cancel is the quiet one: no outline, underlined. When the row
-   wraps (iPhone width), the line gap adds a base's height so a base never touches the button below it. */
+/* Finish (the standard black primary) and Hand back: one height (48 px), one type size and padding, on one line.
+   Finish's 4 px lime base is drawn outside the box, so the row keeps that much room below. When the row wraps, the line
+   gap adds a base's height so a base never touches the button below it. On a phone both fill the width. */
 .footerActions {
   display: flex;
   flex-wrap: wrap;
@@ -161,10 +160,77 @@
   line-height: 1;
   white-space: nowrap;
 }
-/* Hand back gets the same 4 px ink base under its outline as Finish has in magenta-deep, so the two read as equal-height
-   pressable buttons. Cancel (also secondary) stays flat: quietButton removes every shadow. */
+/* Hand back gets a 4 px ink base under its outline, as Finish has in lime, so the two read as equal-height buttons. */
 .footerActions .ledgeButton { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink), 0 var(--ct-base) 0 var(--ct-ink); }
 .footerActions .ledgeButton:active:not(:disabled) {
   box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink), 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-ink);
 }
-.footerActions .quietButton { box-shadow: none; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+@media (max-width: 599.98px) {
+  .footerActions { flex-direction: column; align-items: stretch; }
+}
+
+/* Cancel session…: red, at the very bottom, set apart from Finish and Hand back by space and a rule. */
+.cancelZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ct-space-1);
+  margin-top: var(--ct-space-6);
+  padding-top: var(--ct-space-3);
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  text-align: center;
+}
+.cancelButton {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--ct-danger);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cancelButton:disabled { opacity: 0.5; cursor: default; }
+
+/* Finish's and Cancel's sheets: up from the bottom on a phone, a centred box from 600 px. */
+.sheet {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: var(--ct-space-6);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sheet::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.sheet[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.grab { display: none; }
+.sheetTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.sheetBody { margin: 0; }
+.untickedList { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+.untickedRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ct-space-3); }
+.untickedName { min-width: 0; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.sheetActions { display: flex; flex-direction: column; gap: calc(var(--ct-space-3) + var(--ct-base)); padding-top: var(--ct-space-1); }
+.sheetActions .sheetButton { width: 100%; min-height: var(--ct-button-min-height); }
+.sheetActions .textButton { align-self: center; }
+.dangerButton { background: var(--ct-danger); color: var(--ct-bg); box-shadow: 0 var(--ct-base) 0 var(--ct-danger-deep); }
+.dangerButton:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-danger-deep); }
+
+@media (max-width: 599.98px) {
+  .sheet[open] {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: 90dvh;
+    margin: 0;
+    padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-4) + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: var(--ct-radius-card) var(--ct-radius-card) 0 0;
+  }
+  .grab { display: block; align-self: center; width: 40px; height: 5px; border-radius: var(--ct-radius-pill); background: var(--ct-border); }
+}
