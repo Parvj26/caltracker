@@ -33,6 +33,7 @@ import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from '
 import type { ConfirmHandle } from './confirm-button';
 import { useResendInvite } from './resend-button';
 import { CancelInviteButton } from './row-actions';
+import { searchScope } from './search-scope';
 import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 
@@ -330,11 +331,15 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
   const chips = FILTERS.filter((f) => f === 'active' || f === filter || counts[f] > 0);
   const total = people.length + invites.length;
 
+  const scope = searchScope(filter, query);
+  const searching = query.trim() !== '';
   const shownClients = useMemo(() => {
+    const { clientFilter } = searchScope(filter, query);
+    if (clientFilter === null) return [];
     const nameOf = (c: { firstName: string; lastName: string }) => `${c.firstName} ${c.lastName}`.trim();
     const list = people.filter((c) => {
       const row = rowById.get(c.id);
-      return filter === 'active' || (row !== undefined && matchesDirectoryFilter(row, filter));
+      return clientFilter === 'active' || (row !== undefined && matchesDirectoryFilter(row, clientFilter));
     });
     const cmp = compareDirectoryRows(sort);
     const sorted = list
@@ -347,7 +352,7 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
     // The shared smart search (typos, partial words, any order): best match first, the sort order within a tier.
     return smartFilter(sorted, query, (c) => c.name);
   }, [people, rowById, filter, query, sort]);
-  const shownInvites = useMemo(() => (filter === 'invited' ? searchInvites(invites, query) : []), [filter, invites, query]);
+  const shownInvites = useMemo(() => (scope.invites ? searchInvites(invites, query) : []), [scope.invites, invites, query]);
 
   const shownTotal = shownClients.length + shownInvites.length;
   const filtering = query.trim() !== '' || filter !== 'active';
@@ -385,7 +390,9 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
           ))}
         </div>
         {/* Phones: how many show, beside Sort ("41 active"). The status line below says it for screen readers. */}
-        <span aria-hidden="true" className={cx(styles.phoneOnly, styles.shownCaption)}>{shownCaption(filter, shownTotal)}</span>
+        <span aria-hidden="true" className={cx(styles.phoneOnly, styles.shownCaption)}>
+          {searching ? `${shownTotal} found` : shownCaption(filter, shownTotal)}
+        </span>
         <label className={styles.sortField}>
           <span>Sort:</span>
           <select value={sort} onChange={(e) => setSort(e.target.value as DirectorySort)} className={styles.sortSelect}>
@@ -397,7 +404,11 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
       </div>
       {/* Always rendered (never display: none), so screen readers announce each change. */}
       <p role="status" className={styles.visuallyHidden}>
-        {filtering ? `Showing ${shownTotal} of ${counts.active} active` : `Showing all ${counts.active} active`}
+        {searching
+          ? `Showing ${shownTotal} of ${total}`
+          : filtering
+            ? `Showing ${shownTotal} of ${counts.active} active`
+            : `Showing all ${counts.active} active`}
       </p>
 
       <div className={styles.tableWrap}>

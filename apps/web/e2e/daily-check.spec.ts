@@ -334,7 +334,8 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   const search = page.getByRole('searchbox', { name: 'Search clients' });
   await search.pressSequentially('ste');
   await expect.poll(names).toEqual(['Sami Steady']);
-  await expect(page.getByRole('status').filter({ hasText: 'Showing 1 of 7 active' })).toBeAttached();
+  // A search looks through everyone (clients and invites), whatever chip is picked.
+  await expect(page.getByRole('status').filter({ hasText: 'Showing 1 of 8' })).toBeAttached();
   // The shared smart search forgives typos and takes words in any order.
   await search.fill('steddy');
   await expect.poll(names).toEqual(['Sami Steady']);
@@ -480,4 +481,38 @@ test('on an iPhone each client is one line: avatar, name with "…", one chip an
   await page.goto('/clients');
   await rowOf('Sami Steady').getByText('On track', { exact: true }).click({ force: true });
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.steady}$`));
+});
+
+test('on an iPhone, search finds an invited person while Active is selected', async ({ page }) => {
+  test.slow();
+  const coach = await newCoach();
+  await seedList(coach);
+  await page.setViewportSize({ width: 375, height: 667 });
+  await signIn(page, coach);
+  await page.goto('/clients');
+  const table = page.getByRole('table', { name: 'Clients', exact: true });
+  const ivy = table.getByRole('row').filter({ hasText: 'Ivy Invited' });
+  const active = page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Active/ });
+  await expect(active).toHaveAttribute('aria-pressed', 'true');
+  await expect(ivy).toHaveCount(0);
+
+  // Typing searches clients and invites alike (typos forgiven); the invite keeps its chip and ⋯ menu.
+  const search = page.getByRole('searchbox', { name: 'Search clients' });
+  await search.fill('ivvy');
+  await expect(ivy).toBeVisible();
+  await expect(table.locator('[data-client-id]')).toHaveCount(0);
+  await expect(ivy.getByText('Invited today', { exact: true }).locator('visible=true')).toHaveCount(1);
+  await ivy.getByRole('button', { name: 'More for Ivy Invited' }).click();
+  await expect(page.getByRole('menu', { name: 'More for Ivy Invited' }).getByRole('menuitem')).toHaveText(['Resend invite', 'Cancel invite…']);
+  await page.keyboard.press('Escape');
+
+  // Their email matches too.
+  await search.fill('example');
+  await expect(ivy).toBeVisible();
+
+  // Clearing the box goes back to the picked chip.
+  await search.fill('');
+  await expect(ivy).toHaveCount(0);
+  await expect(active).toHaveAttribute('aria-pressed', 'true');
+  await expect(table.getByRole('row').filter({ hasText: 'Sami Steady' })).toBeVisible();
 });
