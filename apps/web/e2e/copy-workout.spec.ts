@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { seedLog, seedSectionedWorkout, serviceClient, signInAsCoach } from './helpers';
+import { seedLog, seedSectionedWorkout, serviceClient, signInAsCoach, dateField } from './helpers';
 import { addDays, browserToday, clickCounter, demoWorkspace, freshClient, unique } from './assign-helpers';
 
 // Copy to… (the calendar card's ⋯ menu): a client's workout, as it is, onto another day and/or other clients.
@@ -42,7 +42,7 @@ test("copy a client's customised workout to next week and to another client in 4
   await clicks.on(page.getByRole('menuitem', { name: 'Copy to…' }));
   const dialog = page.getByRole('dialog', { name: `Copy ${name} to…` });
   // A week later, with Ada already ticked.
-  await expect(dialog.getByLabel('Date')).toHaveValue(addDays(date, 7));
+  await expect((await dateField(dialog))).toHaveValue(addDays(date, 7));
   await dialog.getByLabel('Search clients').fill(`Copy${tag}`);
   await expect(dialog.getByRole('checkbox', { name: `Ada Copy${tag}`, exact: true })).toBeChecked();
   await clicks.on(dialog.getByRole('checkbox', { name: `Bea Copy${tag}`, exact: true }));
@@ -84,7 +84,7 @@ test('a done workout copies as a fresh plan, with no log', async ({ page }) => {
   await (await openMenu(page, a, date, name)).click();
   await page.getByRole('menuitem', { name: 'Copy to…' }).click();
   const dialog = page.getByRole('dialog', { name: `Copy ${name} to…` });
-  await expect(dialog.getByLabel('Date')).toHaveValue(addDays(date, 7));
+  await expect((await dateField(dialog))).toHaveValue(addDays(date, 7));
   await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(`Copied ${name} to 1 client.`)).toBeVisible();

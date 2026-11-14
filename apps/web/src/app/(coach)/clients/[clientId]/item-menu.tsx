@@ -3,12 +3,16 @@
 import { showDialog } from '@/components/calendar/show-dialog';
 import Link from 'next/link';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { IsoDateSchema, scheduleDateError } from '@caltracker/shared';
+import { IsoDateSchema, quickDays, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { calendarAddDomId, calendarItemDomId, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
 import { shouldOpenUp } from '@/components/calendar/menu-placement';
-import { Button, TextField, errorFromText } from '@/components/ui';
+import { DialogHeader } from '@/components/assign/dialog-header';
+import { QuickDayPicker } from '@/components/assign/quick-day-picker';
+import { Button } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
+import sheet from '@/components/ui/sheet.module.css';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 
@@ -226,24 +230,32 @@ export function ItemMenu({
 
 export function MoveDialog({
   entry,
+  clientName,
   today,
+  dayWorkouts = [],
   onMove,
   onClose,
 }: {
   entry: CalendarEntry;
+  clientName?: string;
   /** The coach's own today, from the browser: single workouts move to today or later. */
   today: IsoDate;
+  /** Workouts the calendar knows about, by day: quick days say "free" or how many, and a busy pick says so. */
+  dayWorkouts?: readonly { date: IsoDate; name: string; id?: string }[];
   onMove: (date: IsoDate) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  // A missed workout from a past day starts on today: its own day can't be picked.
-  const [date, setDate] = useState(entry.date < today ? today : entry.date);
+  // The others on each day (not this workout itself).
+  const others = dayWorkouts.filter((w) => w.id !== entry.id);
+  const workoutsOn = (d: IsoDate) => others.filter((w) => w.date === d).length;
+  // Quick days leave out the workout's own day; the first one is picked to start with.
+  const [date, setDate] = useState<string>(() => quickDays(today, { exclude: [entry.date] })[0]?.date ?? today);
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog);
+    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
     // The item remounts on its new day: put focus back on it there.
     return () => {
       focusSoon(calendarItemDomId(entry.id));
@@ -251,26 +263,38 @@ export function MoveDialog({
   }, [entry.id]);
 
   const parsed = IsoDateSchema.safeParse(date);
-  const error = !parsed.success ? 'Pick a date.' : scheduleDateError(parsed.data, today);
+  const error = !parsed.success ? 'Pick a date.' : date === entry.date ? 'It is already on this day.' : scheduleDateError(parsed.data, today);
+  const already = parsed.success && error === null ? others.filter((w) => w.date === parsed.data).map((w) => w.name) : [];
 
   return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>Move {entry.name}</h2>
-      <p className={styles.dialogBody}>Now on {formatShortDay(entry.date)}.</p>
-      <TextField
-        label="Date"
-        type="date"
-        min={today}
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-        {...(error ? { error: errorFromText(error, 'assign_date_invalid') } : {})}
+    <dialog ref={dialogRef} className={cx(styles.dialog, sheet.sheet)} aria-labelledby={titleId} onClose={onClose}>
+      <DialogHeader
+        titleId={titleId}
+        title={`Move ${entry.name}`}
+        subtitle={`${clientName ? `${clientName} · ` : ''}now on ${formatShortDay(entry.date)}`}
+        onClose={() => dialogRef.current?.close()}
       />
-      <div className={styles.dialogActions}>
+      <QuickDayPicker
+        legend="Move to"
+        today={today}
+        value={date}
+        onChange={setDate}
+        exclude={[entry.date]}
+        workoutsOn={workoutsOn}
+        fieldMin={today}
+        error={error}
+      />
+      {already.length > 0 ? (
+        <p className={styles.dialogBody}>
+          {formatShortDay(parsed.data!)} already has {already.join(', ')}. Moving there adds this alongside it.
+        </p>
+      ) : null}
+      <div className={cx(styles.dialogActions, sheet.actions)}>
         <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
           Cancel
         </Button>
         <Button disabled={error !== null} onClick={() => parsed.success && error === null && onMove(parsed.data)}>
-          Move
+          {parsed.success && error === null ? `Move to ${formatShortDay(parsed.data)}` : 'Move'}
         </Button>
       </div>
     </dialog>

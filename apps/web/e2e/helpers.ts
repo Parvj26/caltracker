@@ -350,3 +350,19 @@ export async function showInvites(page: Page): Promise<void> {
   await chip.click();
   await expect(chip).toHaveAttribute('aria-pressed', 'true');
 }
+
+/**
+ * The date field of a pop-up window's day picker (Assign, Move to…, Add a workout, Assign a program). Quick days come
+ * first and the field opens with "Pick a date…", so this opens it when it is still closed.
+ */
+export async function dateField(dialog: Locator, label: 'Date' | 'Start date' = 'Date'): Promise<Locator> {
+  const field = dialog.getByLabel(label, { exact: true });
+  const open = dialog.getByRole('button', { name: 'Pick a date…' });
+  await expect(field.or(open).first()).toBeVisible();
+  if (await open.isVisible()) await open.click();
+  await expect(field).toBeVisible();
+  return field;
+}
+
+/** The Move button of "Move to…": "Move to Sat 14 Nov" once a day is picked, plain "Move" while the date is invalid. */
+export const moveButton = (dialog: Locator) => dialog.getByRole('button', { name: /^Move( to .+)?$/ });

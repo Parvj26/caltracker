@@ -65,3 +65,33 @@ it('does nothing to a dialog that is already open', () => {
   showDialog(dialog);
   expect(dialog.hasAttribute('autofocus')).toBe(false);
 });
+
+const touchScreen = (touch: boolean) => {
+  window.matchMedia = ((query: string) => ({ matches: touch && query.includes('coarse'), media: query })) as unknown as typeof window.matchMedia;
+};
+
+it('on a touch screen, starts on the dialog instead of the search box when asked, so no keyboard pops up', () => {
+  touchScreen(true);
+  const dialog = dialogWith('<input type="search" aria-label="Search" /><input type="date" />');
+  showDialog(dialog, { noKeyboardOnTouch: true });
+  expect(document.activeElement).toBe(dialog);
+  expect(dialog.tabIndex).toBe(-1);
+});
+
+it('with a mouse, still starts on the search box when asked for no keyboard on touch', () => {
+  touchScreen(false);
+  const dialog = dialogWith('<input type="search" aria-label="Search" />');
+  showDialog(dialog, { noKeyboardOnTouch: true });
+  expect(document.activeElement).toBe(dialog.querySelector('input[type="search"]'));
+});
+
+it('on a touch screen, moves off a text field when the browser ignores autofocus', () => {
+  touchScreen(true);
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.setAttribute('open', '');
+    this.querySelector<HTMLElement>('input')?.focus();
+  };
+  const dialog = dialogWith('<input type="search" aria-label="Search" />');
+  showDialog(dialog, { noKeyboardOnTouch: true });
+  expect(document.activeElement).toBe(dialog);
+});
