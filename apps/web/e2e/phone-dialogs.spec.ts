@@ -63,7 +63,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('a community post keeps Delete behind ⋯, and it still asks first', async ({ page }) => {
+  test('a community post keeps Pin and Delete behind ⋯, and Delete still asks first', async ({ page }) => {
     const ws = await demoWorkspace(admin);
     const community = await admin.from('communities').select('id').eq('workspace_id', ws).eq('is_default', true).single();
     if (community.error) throw community.error;
@@ -83,20 +83,24 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await signInAsCoach(page);
     await page.goto('/community');
     const post = page.getByTestId('community-post').filter({ hasText: body });
-    await expect(post.getByRole('button', { name: 'Pin', exact: true })).toBeVisible();
+    await expect(post.getByRole('button', { name: 'Pin', exact: true })).toHaveCount(0);
     await expect(post.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
     const more = post.getByRole('button', { name: 'More for this post' });
     await expectTappable(more, { wide: true });
 
-    // Saying no to the question keeps the post.
+    // Pin sits in the menu next to Delete.
     await more.click();
+    await expect(post.getByRole('menuitem', { name: 'Pin to top' })).toBeVisible();
+    await expectTappable(post.getByRole('menuitem', { name: 'Pin to top' }));
+
+    // Saying no to the question keeps the post.
     page.once('dialog', (d) => void d.dismiss());
-    await post.getByRole('menuitem', { name: 'Delete post' }).click();
+    await post.getByRole('menuitem', { name: 'Delete post…' }).click();
     await expect(post).toHaveCount(1);
 
     page.once('dialog', (d) => void d.accept());
     await more.click();
-    await post.getByRole('menuitem', { name: 'Delete post' }).click();
+    await post.getByRole('menuitem', { name: 'Delete post…' }).click();
     await expect(post).toHaveCount(0);
   });
 

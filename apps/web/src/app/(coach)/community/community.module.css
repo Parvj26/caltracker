@@ -109,15 +109,31 @@
 .postHeader { display: flex; align-items: center; gap: var(--ct-space-3); }
 .postWho { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .postAuthor { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
-.postTools { display: flex; gap: var(--ct-space-2); }
-/* With a mouse, Pin and Delete sit side by side. On touch screens Delete moves into the post's ⋯ menu (post-menu.tsx),
-   so a thumb aiming at Pin can't hit it. */
-.menuWrap { position: relative; flex: none; }
-.touchOnly { display: none; }
-@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
-  .mouseOnly { display: none; }
-  .touchOnly { display: block; }
+.postMeta { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.pinned { display: inline-flex; align-items: center; gap: 3px; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+/* React, Comment and the folded "3 comments" on one line; they wrap on a narrow phone. */
+.postActions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--ct-space-2); }
+.buttonText { margin-left: var(--ct-space-1); }
+.commentToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  min-height: var(--ct-tap-min);
+  margin-left: auto;
+  padding: 0 var(--ct-space-2);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
 }
+.commentToggle:hover { text-decoration: underline; }
+.commentToggle[aria-expanded='true'] .toggleChevron { transform: rotate(180deg); }
+/* Shown only when there are open reports: "2 reports to review", outlined in amber. */
+.reportsLink { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber); }
 .postBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reactions { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .reactionBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
@@ -184,7 +200,9 @@
 .shiny { filter: saturate(1.4) drop-shadow(0 0 6px var(--ct-amber)); }
 
 .comments { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
-.comment { padding: var(--ct-space-2) var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-bg); }
+.comment { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-2) var(--ct-space-1) var(--ct-space-2) var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-bg); }
+.commentTop { display: flex; align-items: flex-start; gap: var(--ct-space-2); }
+.commentText { flex: 1; min-width: 0; }
 .commentBody { margin: 0; overflow-wrap: anywhere; }
 .commentForm { display: flex; gap: var(--ct-space-2); }
 .commentLabel { flex: 1; display: block; }
