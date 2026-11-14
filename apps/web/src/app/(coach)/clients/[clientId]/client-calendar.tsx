@@ -47,6 +47,9 @@ const useTimeZone = () => useSyncExternalStore(noSubscribe, () => Intl.DateTimeF
 
 const SAVE_ERROR = "Couldn't save that change, so it was undone. Please try again.";
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
+/** What the toast's Undo takes back: an add (removes it) or a "Move to…" (moves it back to its old day). */
+type Undoable = { kind: 'add'; entry: CalendarEntry } | { kind: 'move'; entry: CalendarEntry; from: IsoDate };
+
 /** Refusals worth explaining to the coach; a plain save failure gets the generic undo message. */
 const forCoach = (e: unknown): e is ActionRefusedError => e instanceof ActionRefusedError && !e.code.endsWith('_failed');
 
@@ -127,13 +130,14 @@ export function ClientCalendar({
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  // The workout the toast can take back ("Added Legs to Mon 9 Nov. Undo"): null for any other message.
-  const [undoable, setUndoable] = useState<CalendarEntry | null>(null);
-  // Each add's save, by its new id, so Undo waits for the add to land before removing it.
+  // What the toast can take back ("Added Legs to Mon 9 Nov. Undo", "Moved Legs to Tue 10 Nov. Undo"): null for any
+  // other message.
+  const [undoable, setUndoable] = useState<Undoable | null>(null);
+  // Each workout's latest add or move save, by its id, so Undo (and the next change) waits for it to land first.
   const saves = useRef(new Map<string, Promise<void>>());
   // Adds that got no clear answer, by "workout id|day": their id, reused if the coach picks the same again.
   const unclear = useRef(new Map<string, string>());
-  const say = (message: string | null, undo: CalendarEntry | null = null) => {
+  const say = (message: string | null, undo: Undoable | null = null) => {
     setToast(message);
     setUndoable(undo);
   };
@@ -178,16 +182,32 @@ export function ClientCalendar({
 
   function move(itemId: string, date: IsoDate) {
     const entry = items.find((x) => x.id === itemId);
-    if (!entry || entry.date === date || date < today) return;
+    if (!entry || entry.date === date || date < today) return null;
     const from = entry.date;
+    // After the workout's previous add or move has landed, so an Undo straight after a move can't overtake it.
+    const before = saves.current.get(itemId) ?? Promise.resolve();
     optimistic(
       (s) => s.map((x) => (x.id === itemId ? { ...x, date } : x)),
-      async () => {
-        const outcome = await moveClientWorkout({ workoutId: itemId, date, today });
-        if (!outcome.ok) throw new ActionRefusedError(outcome.code);
+      () => {
+        const save = before
+          .catch(() => undefined)
+          .then(async () => {
+            const outcome = await moveClientWorkout({ workoutId: itemId, date, today });
+            if (!outcome.ok) throw new ActionRefusedError(outcome.code);
+          });
+        saves.current.set(itemId, save);
+        return save;
       },
       (s) => s.map((x) => (x.id === itemId ? { ...x, date: from } : x)),
     );
+    return entry;
+  }
+
+  /** "Move to…": moves it and says so, with Undo while its old day can still take it (today or later). */
+  function moveWithUndo(itemId: string, date: IsoDate) {
+    const entry = move(itemId, date);
+    if (!entry) return;
+    say(`Moved ${entry.name} to ${formatShortDay(date)}.`, entry.date >= today ? { kind: 'move', entry, from: entry.date } : null);
   }
 
   function remove(entry: CalendarEntry) {
@@ -238,7 +258,7 @@ export function ClientCalendar({
       },
       (s) => s.filter((x) => x.id !== newId),
     );
-    say(`Added ${workout.name} to ${formatShortDay(date)}.`, entry);
+    say(`Added ${workout.name} to ${formatShortDay(date)}.`, { kind: 'add', entry });
   }
 
   const logHref = (logId: string) => `/clients/${client.id}/logs/${logId}`;
@@ -410,7 +430,7 @@ export function ClientCalendar({
           entry={moving}
           today={today}
           onMove={(date) => {
-            move(moving.id, date);
+            moveWithUndo(moving.id, date);
             setMoving(null);
           }}
           onClose={() => setMoving(null)}
@@ -452,8 +472,13 @@ export function ClientCalendar({
                 type="button"
                 className={styles.smallButton}
                 onClick={() => {
-                  remove(undoable);
-                  say(`Removed ${undoable.name}.`);
+                  if (undoable.kind === 'add') {
+                    remove(undoable.entry);
+                    say(`Removed ${undoable.entry.name}.`);
+                  } else {
+                    move(undoable.entry.id, undoable.from);
+                    say(`Moved ${undoable.entry.name} back to ${formatShortDay(undoable.from)}.`);
+                  }
                 }}
               >
                 Undo

@@ -1,5 +1,6 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -147,7 +148,7 @@ export function AssignToClientsDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

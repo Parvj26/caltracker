@@ -2,15 +2,17 @@
 
 import Link from 'next/link';
 import { CALENDAR_VIEWS, type CalendarView } from '@caltracker/shared';
+import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import styles from './calendar.module.css';
 
-export const VIEW_LABELS: Record<CalendarView, string> = { '1w': '1 Week', '2w': '2 Week', '4w': '4 Week', month: 'Month' };
+export const VIEW_LABELS: Record<CalendarView, string> = { '1w': '1 week', '2w': '2 weeks', '4w': '4 weeks', month: 'Month' };
 const STEP_WORDS: Record<CalendarView, string> = { '1w': 'week', '2w': '2 weeks', '4w': '4 weeks', month: 'month' };
 
 /**
  * Above the calendar: TODAY, ‹ › (one view length back or on) around the range on screen, and the view switcher. Every
- * control is a link with ?view=&from=, so reloading or sharing the address shows the same days.
+ * control is a link with ?view=&from=, so reloading or sharing the address shows the same days. None of them scrolls
+ * the page: it stays where it is, at the calendar.
  */
 export function CalendarToolbar({
   view,
@@ -34,19 +36,19 @@ export function CalendarToolbar({
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbarNav}>
-        <Link href={todayHref} className={cx(styles.monthLink, styles.todayLink)}>
+        <Link href={todayHref} scroll={false} className={cx(styles.monthLink, styles.todayLink)}>
           Today
         </Link>
         {/* ‹ title ›: on phones and iPads the arrows sit either side of the dates; wider screens show the title after
             both arrows, as before (CSS order). */}
-        <Link href={prevHref} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Previous ${STEP_WORDS[view]}`}>
-          <span aria-hidden="true">‹</span>
+        <Link href={prevHref} scroll={false} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Previous ${STEP_WORDS[view]}`}>
+          <ChevronIcon direction="left" />
         </Link>
         <h2 className={styles.monthTitle} aria-live="polite">
           {title}
         </h2>
-        <Link href={nextHref} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Next ${STEP_WORDS[view]}`}>
-          <span aria-hidden="true">›</span>
+        <Link href={nextHref} scroll={false} className={cx(styles.monthLink, styles.navArrow)} aria-label={`Next ${STEP_WORDS[view]}`}>
+          <ChevronIcon direction="right" />
         </Link>
       </div>
       <nav aria-label="Calendar view" className={styles.viewSwitch}>
@@ -54,6 +56,7 @@ export function CalendarToolbar({
           <Link
             key={v}
             href={viewHref(v)}
+            scroll={false}
             className={cx(styles.viewLink, v === view && styles.viewLinkOn)}
             aria-current={v === view ? 'page' : undefined}
             onClick={() => onPickView(v)}

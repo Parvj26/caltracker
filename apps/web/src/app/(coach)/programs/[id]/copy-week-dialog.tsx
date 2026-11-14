@@ -1,5 +1,6 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import { followingWeeks, slotsInWeeks } from '@caltracker/shared';
 import { Button, SelectField } from '@/components/ui';
@@ -48,7 +49,7 @@ export function CopyWeekDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     return () => {
       focusSoon(copyWeekButtonDomId(week));
     };

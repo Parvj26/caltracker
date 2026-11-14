@@ -128,7 +128,7 @@
 .railLine { flex: 1; border-left: 2px dotted color-mix(in srgb, var(--ct-ink) 20%, transparent); margin-top: var(--ct-space-1); }
 .section:last-child .railLine { display: none; }
 .sectionBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ct-space-3-5); }
-.sectionTitle { margin: 0; font-size: 24px; font-weight: var(--ct-weight-screen-title); }
+.sectionTitle { margin: 0; font-size: 24px; font-weight: var(--ct-weight-screen-title); overflow-wrap: anywhere; }
 .onNow { font-size: 14px; color: var(--ct-magenta); vertical-align: middle; margin-left: var(--ct-space-1); }
 .blockLabel { margin: 0; font-size: 13px; font-weight: var(--ct-weight-screen-title); letter-spacing: 0.06em; color: color-mix(in srgb, var(--ct-ink) 55%, transparent); }
 .list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ct-space-3-5); }
@@ -152,7 +152,7 @@
 }
 .photo { width: 72px; height: 72px; border-radius: 14px; flex: none; object-fit: cover; background: var(--ct-surface); }
 .exerciseText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ct-space-1); }
-.exerciseName { font-size: 18px; font-weight: var(--ct-weight-screen-title); }
+.exerciseName { font-size: 18px; font-weight: var(--ct-weight-screen-title); overflow-wrap: anywhere; }
 .hereTag {
   margin-left: var(--ct-space-1);
   font-size: 12px;
@@ -187,6 +187,8 @@
   .exercise { gap: var(--ct-space-3); }
   .photo { width: 56px; height: 56px; border-radius: 12px; }
   .section { gap: var(--ct-space-3); }
+  /* The current exercise's card reaches left over the rail gap only: on the right it stops at the page gutter. */
+  .here { margin-right: 0; }
 }
 
 /* ---------- Up next: beside the workout on a landscape iPad (1000-1199 px), which had a wide empty strip ---------- */

@@ -1,5 +1,6 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef } from 'react';
 import type { WorkoutHints } from '@caltracker/shared';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
@@ -33,7 +34,7 @@ export function WorkoutPicker({ cellLabel, library, hints, onPick, onClose, forP
     const dialog = dialogRef.current;
     // The picker unmounts when it closes, so hand focus back to the "+" button that opened it.
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

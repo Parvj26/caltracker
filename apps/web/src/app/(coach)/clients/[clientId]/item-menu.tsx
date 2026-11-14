@@ -1,11 +1,13 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { IsoDateSchema, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
 import { calendarAddDomId, calendarItemDomId, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
+import { shouldOpenUp } from '@/components/calendar/menu-placement';
 import { Button, TextField, errorFromText } from '@/components/ui';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
@@ -46,10 +48,20 @@ export function ItemMenu({
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const itemsRef = useRef<(HTMLElement | null)[]>([]);
+  const menuRef = useRef<HTMLUListElement>(null);
+
+  // A card low on the screen opens its menu upward, so the menu isn't hidden below the screen's edge. Measured before
+  // the menu is painted; set on the element (not rendered), so later renders keep it.
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    const menu = menuRef.current;
+    if (open && button && menu) menu.dataset.placement = shouldOpenUp(button, menu) ? 'up' : 'down';
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    itemsRef.current.find((x) => x != null)?.focus();
+    // No scroll: the menu may still be flipping above its button, and it is placed to be on screen.
+    itemsRef.current.find((x) => x != null)?.focus({ preventScroll: true });
     const outside = (e: PointerEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -88,7 +100,14 @@ export function ItemMenu({
         <span aria-hidden="true">⋯</span>
       </button>
       {open ? (
-        <ul id={menuId} role="menu" aria-label={`Options for ${item.name}`} className={styles.menu} onKeyDown={onMenuKey}>
+        <ul
+          id={menuId}
+          ref={menuRef}
+          role="menu"
+          aria-label={`Options for ${item.name}`}
+          className={styles.menu}
+          onKeyDown={onMenuKey}
+        >
           {sessionHref ? (
             <li role="none">
               <Link
@@ -224,7 +243,7 @@ export function MoveDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     // The item remounts on its new day: put focus back on it there.
     return () => {
       focusSoon(calendarItemDomId(entry.id));
@@ -274,7 +293,7 @@ export function DeleteDialog({
   const bodyId = useId();
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     // The menu that opened this is gone: back to the item if it is still there, else to its day's "+".
     return () => {
       requestAnimationFrame(() =>

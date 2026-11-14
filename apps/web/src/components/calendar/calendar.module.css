@@ -220,6 +220,7 @@
   background: var(--ct-bg);
   box-shadow: var(--ct-shadow-sticker);
 }
+.menu[data-placement='up'] { top: auto; bottom: 100%; margin: 0 0 var(--ct-space-1); }
 .menuItem {
   display: flex;
   align-items: center;
@@ -335,6 +336,9 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 }
 .programChoice {
   display: grid;
+  /* A row in the scrolling list keeps its full height: the list scrolls instead of squashing rows (a long name that
+     wraps would otherwise hide the row's size line). */
+  flex-shrink: 0;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 2px var(--ct-space-3);
@@ -425,8 +429,11 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
   box-shadow: var(--ct-shadow-sticker);
 }
 .smallButton {
+  /* flex: none so the label never spills out: a min-width would replace the flex item's content-size minimum. */
+  flex: none;
   min-height: var(--ct-tap-min);
   min-width: var(--ct-tap-min);
+  white-space: nowrap;
   padding: 0 var(--ct-space-3);
   border: 0;
   border-radius: var(--ct-radius-input);
@@ -472,7 +479,8 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 /* Phones and iPads: ‹ and › either side of the dates, 48 px with a bigger arrow. */
 @media (max-width: 1199.98px), (hover: none) and (pointer: coarse) {
   .toolbarNav .monthTitle { order: 0; }
-  .navArrow { min-width: 48px; min-height: 48px; font-size: 1.75rem; line-height: 1; }
+  .navArrow { min-width: 48px; min-height: 48px; }
+  .navArrow svg { width: 24px; height: 24px; }
 }
 .todayLink { padding: 0 var(--ct-space-3); }
 .viewSwitch {
