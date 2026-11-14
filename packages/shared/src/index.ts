@@ -128,6 +128,17 @@ export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
 export type { WorkoutSummaryRow } from './workouts/summary';
 export { blockCollapsedSummary, exerciseCollapsedLine, stepReps, stepWeight, weightStep } from './workouts/collapsed';
 export type { CollapsedBlock } from './workouts/collapsed';
+export {
+  DEFAULT_REPS,
+  QUICK_REPS,
+  REST_PRESETS,
+  applyToAllPatches,
+  setLineParts,
+  stepRepsFrom,
+  stepSource,
+  stepWeightFrom,
+} from './workouts/set-editor';
+export type { SetValuesPatch } from './workouts/set-editor';
 export type { PreviewLine, WorkoutPreview } from './workouts/preview';
 export {
   addDrop,
