@@ -200,3 +200,60 @@ test('− and + change reps and weight, and typing still works', async ({ page }
     { reps: 8, kg: 20 },
   ]);
 });
+
+test.describe('iPhone SE (375 pt)', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('a set box fits "102.5", a tap selects its number, and the fold line names the empty sets', async ({ page }) => {
+    await openSeeded(page);
+    const ex = EXERCISES[0]!;
+    await fold(page, ex).click();
+    const row = setRow(page, ex, 'set 1');
+    const weight = row.getByLabel('Weight (kg)');
+    const reps = row.getByLabel('Reps', { exact: true });
+    await weight.fill('102.5');
+    const clipped = (l: typeof weight) => l.evaluate((el: HTMLInputElement) => el.scrollWidth > el.clientWidth);
+    expect(await clipped(weight)).toBe(false);
+    // The "reps" placeholder fits too.
+    await reps.fill('');
+    expect(await clipped(reps)).toBe(false);
+    await reps.fill('10');
+    await reps.blur();
+
+    // Tapping a filled box selects it, so typing replaces the number (10 → 6, not 106).
+    await reps.click();
+    await page.keyboard.type('6');
+    await expect(reps).toHaveValue('6');
+
+    // Sets 2 and 3 emptied: the fold line counts only the filled one.
+    for (const n of [2, 3]) {
+      await setRow(page, ex, `set ${n}`).getByLabel('Weight (kg)').fill('');
+      await setRow(page, ex, `set ${n}`).getByLabel('Reps', { exact: true }).fill('');
+    }
+    await expect(fold(page, ex)).toHaveAccessibleName(`${ex}: 1 × 6 @ 102.5 kg + 2 empty sets · rest 1:30`);
+  });
+
+  test('a new exercise scrolls into view, and the name error goes once a name is typed', async ({ page }) => {
+    await openSeeded(page);
+    const name = page.getByLabel('Workout name');
+    await expect(name).toHaveAttribute('autocomplete', 'off');
+    await expect(name).toHaveAttribute('spellcheck', 'false');
+    await name.fill('');
+    await page.getByRole('button', { name: 'Save workout' }).click();
+    await expect(page.getByText('Enter a name.')).toBeVisible();
+    await name.fill('Leg day');
+    await expect(page.getByText('Enter a name.')).toBeHidden();
+
+    await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add exercises' });
+    const option = dialog.getByRole('option').first();
+    const picked = (await option.getAttribute('aria-label'))!;
+    await option.click();
+    await dialog.getByRole('button', { name: 'Add 1 exercise' }).click();
+    await expect(dialog).toBeHidden();
+    // The 9th exercise, added at the end and opened, is on screen (the page doesn't jump to the top).
+    const added = page.getByRole('button', { name: new RegExp(`^${picked.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: `) }).last();
+    await expect(added).toHaveAttribute('aria-expanded', 'true');
+    await expect(added).toBeInViewport();
+  });
+});

@@ -66,8 +66,13 @@ test.describe('iPhone SE (375 x 667)', () => {
     // A tap ticks the row and leaves the list in place.
     const first = options.nth(0);
     const name = (await first.getAttribute('aria-label'))!;
+    // The first tick must not push the list down (the picks row has its room already), or a quick second tap would
+    // land on the same row and untick it.
+    const before = (await options.nth(1).boundingBox())!.y;
     await first.click();
     await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(dialog.getByRole('list', { name: "Picked, in the order they're done" })).toBeVisible();
+    expect((await options.nth(1).boundingBox())!.y).toBeCloseTo(before, 0);
     await options.nth(1).click();
     await expect(options.nth(2)).toBeVisible();
     await expect(dialog.getByRole('button', { name: '← Back to list' })).toBeHidden();
