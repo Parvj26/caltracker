@@ -78,6 +78,7 @@ export {
   startOfWeek,
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
+export { MONTHS_SHORT, WEEKDAYS_SHORT, formatDateTime, formatDayDate, formatPlainDay } from './dates/format';
 export {
   CALENDAR_VIEWS,
   DEFAULT_CALENDAR_VIEW,
@@ -424,7 +425,7 @@ export type {
   SearchFilters,
   SearchHit,
 } from './exercises/search';
-export { buildSmartIndex, smartMatch } from './search/smart-search';
+export { buildSmartIndex, smartFilter, smartMatch } from './search/smart-search';
 export type { SmartDoc, SmartHit, SmartIndex } from './search/smart-search';
 export {
   BIO_MAX_LENGTH,

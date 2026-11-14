@@ -1,5 +1,6 @@
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
+import { MONTHS_SHORT } from '../dates/format';
 import type { Units } from '../units/units';
 import { displayValue } from './metrics';
 
@@ -33,12 +34,11 @@ export function measurementSeries(
   return points.length >= 2 ? points : [];
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "6 Oct", or "6 Oct 2025" when not in the current year. Same output as en-GB short month, without depending on ICU. */
 export function formatShortDate(d: IsoDate, today: IsoDate): string {
   const [y, m, day] = d.split('-').map(Number) as [number, number, number];
-  const base = `${day} ${MONTHS[m - 1]}`;
+  const base = `${day} ${MONTHS_SHORT[m - 1]}`;
   return d.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${y}`;
 }
 
