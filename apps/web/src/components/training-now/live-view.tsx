@@ -280,13 +280,15 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
                   <span className={styles.railLine} />
                 </div>
                 <div className={styles.sectionBody}>
+                  {/* "ON NOW" in words only: the pulsing dot on the rail beside it is the one live marker (a dot glyph
+                      in the text made a second one). */}
                   {run.section ? (
                     <h2 className={styles.sectionTitle}>
                       {run.section.name}
-                      {onNow ? <span className={styles.onNow}>● ON NOW</span> : null}
+                      {onNow ? <span className={styles.onNow}>ON NOW</span> : null}
                     </h2>
                   ) : onNow ? (
-                    <p className={styles.onNow}>● ON NOW</p>
+                    <p className={styles.onNow}>ON NOW</p>
                   ) : null}
                   {blocks.map(({ block, index }) => {
                     const hereBlock = position?.blockIndex === index;
