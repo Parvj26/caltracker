@@ -2,11 +2,11 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { useId, useRef, useState } from 'react';
+import { smartFilter } from '@caltracker/shared';
 import { EmptyLibrary } from '@/components/empty-library';
 import { cx } from '@/components/ui/cx';
 import { libraryItemDomId } from './grid-ids';
 import type { DragData, LibraryWorkout } from './program-grid';
-import { matchesSearch } from './search';
 import styles from '../programs.module.css';
 
 /**
@@ -25,7 +25,7 @@ export function LibraryPanel({
 }) {
   const [query, setQuery] = useState('');
   const headingId = useId();
-  const results = library.filter((w) => matchesSearch(w.name, query));
+  const results = smartFilter(library, query, (w) => w.name);
   return (
     <section className={styles.library} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.sectionHeading}>Library</h2>
