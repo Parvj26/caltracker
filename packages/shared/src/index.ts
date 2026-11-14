@@ -95,7 +95,6 @@ export {
   formatPlainMonth,
   formatPlainWeekday,
   formatRelativeDay,
-  formatTimeOfDay,
   groupByLocalDay,
 } from './dates/format';
 export type { DayGroup } from './dates/format';

@@ -63,13 +63,6 @@ export function formatTimeOfDay(instant: string | Date, timeZone?: string): stri
   return clock(zonedParts(instant, timeZone));
 }
 
-/** "9:40 am": the time of day of an instant in the given time zone (default: the viewer's own). */
-export function formatTimeOfDay(instant: string | Date, timeZone?: string): string {
-  const p = zonedParts(instant, timeZone);
-  const hour = p.hour % 12 === 0 ? 12 : p.hour % 12;
-  return `${hour}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
-}
-
 /** A day heading relative to `today`: "Today", "Yesterday", else "Mon 9 Nov" (with the year when it isn't this year). */
 export function formatRelativeDay(day: IsoDate, today: IsoDate): string {
   const ago = diffDays(day, today);
