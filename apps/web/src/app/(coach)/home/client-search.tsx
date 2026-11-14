@@ -3,19 +3,26 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { ClientCombobox, type ComboClient } from '@/components/client-combobox/client-combobox';
+import { shortcutHint } from '@/lib/shortcut-hint';
 import styles from './home.module.css';
 
 const noop = () => () => {};
-/** "⌘K" on Apple devices, "Ctrl K" everywhere else (and on the server, until the browser says otherwise). */
+/**
+ * "⌘K" on a Mac, "Ctrl K" on other computers, nothing on phones, tablets and other touch-first devices (no keyboard
+ * to press it on). Nothing on the server either, until the browser says otherwise.
+ */
 function useShortcutHint(): string {
   return useSyncExternalStore(
     noop,
     () => {
       const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-      const platform = nav.userAgentData?.platform ?? navigator.platform ?? '';
-      return /mac|iphone|ipad/i.test(platform) ? '⌘K' : 'Ctrl K';
+      return shortcutHint({
+        platform: nav.userAgentData?.platform ?? navigator.platform ?? '',
+        finePointer: window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+        maxTouchPoints: navigator.maxTouchPoints ?? 0,
+      });
     },
-    () => 'Ctrl K',
+    () => '',
   );
 }
 
@@ -41,7 +48,7 @@ export function ClientSearch({ clients }: { clients: ComboClient[] }) {
     <ClientCombobox
       clients={clients}
       label="Find a client"
-      placeholder={`Find a client  ${hint}`}
+      placeholder={hint ? `Find a client  ${hint}` : 'Find a client'}
       emptyOnPick
       inputRef={inputRef}
       className={styles.search}
