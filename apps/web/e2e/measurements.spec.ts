@@ -181,7 +181,8 @@ test('at iPhone width each exercise is one compact table', async ({ page }) => {
   await expect(drop.getByLabel('Rest (m:ss)')).toHaveCount(0);
   const dropLetter = (await drop.getByRole('button', { name: /^Set type: / }).boundingBox())!;
   const firstLetter = (await setRow(page, ex, 'set 1').getByRole('button', { name: /^Set type: / }).boundingBox())!;
-  expect(dropLetter.x).toBeGreaterThan(firstLetter.x + 8);
+  // 8 px at iPhone width (it was 14): any more and a drop's kg box can't fit five characters ("102.5") at 375 pt.
+  expect(dropLetter.x).toBeGreaterThanOrEqual(firstLetter.x + 8);
 
   // The measurements tab stays in the open exercise; swap, substitute, move and remove are in ⋯.
   await expect(measurements(page, ex)).toBeVisible();
