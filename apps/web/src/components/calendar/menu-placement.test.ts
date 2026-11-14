@@ -36,3 +36,26 @@ it('reads the button and menu from the page', () => {
   button.getBoundingClientRect = rect(20, 44);
   expect(shouldOpenUp(button, menu)).toBe(false);
 });
+
+it('treats a stuck bar on top and a toast at the bottom as edges of what is visible', () => {
+  // A 700 px window: a client bar stuck over the top 100 px, and a toast over the bottom from 600.
+  document.body.innerHTML = '<div data-overlay-edge="top" style="position: sticky"></div><div data-overlay-edge="bottom" style="position: fixed"></div><button></button><ul></ul>';
+  const [bar, toast] = [...document.querySelectorAll<HTMLElement>('[data-overlay-edge]')];
+  const button = document.querySelector('button')!;
+  const menu = document.querySelector('ul')!;
+  const rect = (top: number, height: number) => () => ({ top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true });
+  bar!.getBoundingClientRect = rect(0, 100);
+  toast!.getBoundingClientRect = rect(600, 60);
+  menu.getBoundingClientRect = rect(0, 300);
+  // 248 px free below (to the toast), 192 above (to the bar's bottom, not the window's top): stays below.
+  button.getBoundingClientRect = rect(300, 44);
+  expect(shouldOpenUp(button, menu)).toBe(false);
+  // Lower down, with the toast close below: more room above, so up.
+  button.getBoundingClientRect = rect(480, 44);
+  expect(shouldOpenUp(button, menu)).toBe(true);
+  // A bar that isn't stuck (static, as on a laptop) is not an edge: 292 px above beats 248 below.
+  bar!.style.position = 'static';
+  button.getBoundingClientRect = rect(300, 44);
+  expect(shouldOpenUp(button, menu)).toBe(true);
+});

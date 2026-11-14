@@ -84,6 +84,7 @@ export {
   formatDateTime,
   formatDayDate,
   formatPlainDay,
+  formatTimeOfDay,
   formatWeekRange,
   formatWeekdayDay,
   MONTHS_LONG,

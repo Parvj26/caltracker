@@ -50,11 +50,17 @@ function zonedParts(instant: string | Date, timeZone?: string): ZonedParts {
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') % 24, minute: get('minute') };
 }
 
+const clock = (p: ZonedParts) => `${p.hour % 12 === 0 ? 12 : p.hour % 12}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
+
 /** "12 Nov, 2:38 am" in the given time zone (default: the viewer's own). */
 export function formatDateTime(instant: string | Date, timeZone?: string): string {
   const p = zonedParts(instant, timeZone);
-  const hour = p.hour % 12 === 0 ? 12 : p.hour % 12;
-  return `${p.day} ${MONTHS_SHORT[p.month - 1]}, ${hour}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]}, ${clock(p)}`;
+}
+
+/** "5:12 pm" in the given time zone (default: the viewer's own). */
+export function formatTimeOfDay(instant: string | Date, timeZone?: string): string {
+  return clock(zonedParts(instant, timeZone));
 }
 
 /** "9:40 am": the time of day of an instant in the given time zone (default: the viewer's own). */

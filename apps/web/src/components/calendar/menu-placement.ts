@@ -23,9 +23,27 @@ function safeAreaBottom(doc: Document): number {
 }
 
 /**
+ * Bars that cover the page while stuck or fixed: `data-overlay-edge="top"` (the client page's sticky bar and tabs on a
+ * phone) or `"bottom"` (a toast). Returns the lowest top bar's bottom and the highest bottom bar's top; a bar that
+ * scrolls with the page (static, as on a laptop) doesn't count.
+ */
+function overlayEdges(doc: Document, top: number, bottom: number): { top: number; bottom: number } {
+  const win = doc.defaultView;
+  for (const el of doc.querySelectorAll<HTMLElement>('[data-overlay-edge]')) {
+    const position = win?.getComputedStyle(el).position;
+    if (position !== 'sticky' && position !== 'fixed') continue;
+    const r = el.getBoundingClientRect();
+    if (r.height === 0) continue;
+    if (el.dataset.overlayEdge === 'top') top = Math.max(top, r.bottom);
+    else if (el.dataset.overlayEdge === 'bottom') bottom = Math.min(bottom, r.top);
+  }
+  return { top, bottom };
+}
+
+/**
  * For an open menu under `button`: true when it should flip above the button to stay on screen. Uses the visual
  * viewport (the part of the page left on screen when Safari's bars or the keyboard cover some of it) and keeps clear
- * of the home indicator and the phone's floating menu button.
+ * of the home indicator, the phone's floating menu button, a stuck bar on top and a toast at the bottom.
  */
 export function shouldOpenUp(button: HTMLElement, menu: HTMLElement): boolean {
   const doc = button.ownerDocument;
@@ -36,11 +54,12 @@ export function shouldOpenUp(button: HTMLElement, menu: HTMLElement): boolean {
   const height = vv ? vv.height : win.innerHeight;
   const menuRoom = parseFloat(win.getComputedStyle(button).getPropertyValue('--coach-menu-room')) || 0;
   const b = button.getBoundingClientRect();
+  const edges = overlayEdges(doc, top, top + height - Math.max(safeAreaBottom(doc), menuRoom));
   return menuOpensUp({
     buttonTop: b.top,
     buttonBottom: b.bottom,
     menuHeight: menu.getBoundingClientRect().height,
-    visibleTop: top,
-    visibleBottom: top + height - Math.max(safeAreaBottom(doc), menuRoom),
+    visibleTop: edges.top,
+    visibleBottom: edges.bottom,
   });
 }

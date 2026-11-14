@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { STICKERS, addDays } from '@caltracker/shared';
-import type { Database, HomeWorkout, IsoDate, OverviewScan } from '@caltracker/shared';
+import { STICKERS, WORKOUT_TREE_SELECT, addDays, workoutPreview, workoutRowToDoc } from '@caltracker/shared';
+import type { Database, HomeWorkout, IsoDate, OverviewScan, Units, WorkoutPreview, WorkoutTreeRow } from '@caltracker/shared';
+import { loadLiveLogs, type LiveLog } from './home-live';
 
 /**
  * Everything the client Overview shows, in a fixed number of queries, read with the coach's own session (RLS limits
@@ -30,7 +31,15 @@ export type ClientOverview = {
   goal: { goal: string; targetDate: IsoDate | null } | null;
   limitations: string;
   notes: OverviewNote[];
+  /** The Today card: the first exercises and program of each workout planned around today (UTC, a day either side). */
+  todayPreviews: Record<string, { preview: WorkoutPreview; programName: string | null }>;
+  /** The client's workouts in progress (the Today card's "Training now"). */
+  live: LiveLog[];
 };
+
+// The select string is built by concatenation, so supabase-js cannot infer its shape; TodayTreeRow describes it.
+const TODAY_SELECT = `${WORKOUT_TREE_SELECT}, program_assignments(program_name)`;
+type TodayTreeRow = WorkoutTreeRow & { program_assignments: { program_name: string } | null };
 
 const NOTES_LIMIT = 200;
 const SCANS_LIMIT = 500;
@@ -40,14 +49,15 @@ export async function loadClientOverview(
   workspaceId: string,
   client: { id: string; firstName: string; removedAt: string | null },
   utcToday: IsoDate,
+  units: Units,
 ): Promise<ClientOverview> {
   const clientId = client.id;
   const since = `${addDays(utcToday, -32)}T00:00:00Z`;
-  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentScans, recentLogs, profile, member, invite, past, goal, limitations, notes] =
+  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentScans, recentLogs, profile, member, invite, past, goal, limitations, notes, todays, live] =
     await Promise.all([
       supabase
         .from('workouts')
-        .select('id, name, scheduled_on, workout_logs(id, status, started_at, finished_at, last_activity_at)')
+        .select('id, name, scheduled_on, workout_logs(id, status, started_at, finished_at, last_activity_at, logged_by)')
         .eq('workspace_id', workspaceId)
         .eq('client_id', clientId)
         .gte('scheduled_on', addDays(utcToday, -31))
@@ -117,6 +127,15 @@ export async function loadClientOverview(
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
         .limit(NOTES_LIMIT),
+      supabase
+        .from('workouts')
+        .select(TODAY_SELECT)
+        .eq('workspace_id', workspaceId)
+        .eq('client_id', clientId)
+        .gte('scheduled_on', addDays(utcToday, -1))
+        .lte('scheduled_on', addDays(utcToday, 1)),
+      // A past client can't be training: skip the query.
+      client.removedAt === null ? loadLiveLogs(supabase, workspaceId, clientId) : Promise.resolve([]),
     ]);
   for (const [what, r] of [
     ['workouts', workouts],
@@ -134,6 +153,7 @@ export async function loadClientOverview(
     ['goal', goal],
     ['limitations', limitations],
     ['notes', notes],
+    ["today's workouts", todays],
   ] as const) {
     if (r.error) throw new Error(`Could not load ${what}: ${r.error.message}`);
   }
@@ -183,6 +203,7 @@ export async function loadClientOverview(
                 startedAt: l.started_at,
                 finishedAt: l.finished_at,
                 lastActivityAt: l.last_activity_at,
+                loggedBy: l.logged_by,
               })),
             },
           ]
@@ -208,5 +229,12 @@ export async function loadClientOverview(
     goal: goal.data ? { goal: goal.data.goal, targetDate: goal.data.target_date } : null,
     limitations: limitations.data?.body ?? '',
     notes: (notes.data ?? []).map((n) => ({ id: n.id, body: n.body, createdAt: n.created_at, updatedAt: n.updated_at })),
+    todayPreviews: Object.fromEntries(
+      ((todays.data ?? []) as unknown as TodayTreeRow[]).map((w) => [
+        w.id,
+        { preview: workoutPreview(workoutRowToDoc(w), units), programName: w.program_assignments?.program_name ?? null },
+      ]),
+    ),
+    live,
   };
 }
