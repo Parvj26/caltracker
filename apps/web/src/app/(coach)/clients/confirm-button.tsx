@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useId, useImperativeHandle, useRef, useState, useTransition, type RefObject } from 'react';
+import { useId, useImperativeHandle, useRef, useState, useTransition, type Ref, type RefObject } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
@@ -20,7 +20,13 @@ type Props = {
   focusAfterId: string;
   /** A small text button (inside a row's status line) instead of a bordered row button. */
   inline?: boolean;
+  /** Opens the dialog from elsewhere (a row's ⋯ menu). */
+  handle?: Ref<ConfirmHandle> | undefined;
+  /** False: only the dialog, opened through `handle` (the caller draws its own buttons). */
+  trigger?: boolean;
 };
+
+export type ConfirmHandle = { open: () => void };
 
 type DialogProps = Pick<Props, 'title' | 'body' | 'confirmLabel' | 'onConfirm' | 'focusAfterId'> & {
   dialogRef: RefObject<HTMLDialogElement | null>;
@@ -86,7 +92,7 @@ export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfter
 }
 
 /** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
-export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false }: Props) {
+export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false, handle, trigger = true }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const resetRef = useRef<(() => void) | null>(null);
 
@@ -94,10 +100,11 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
     resetRef.current?.();
     dialogRef.current?.showModal();
   };
+  useImperativeHandle(handle, () => ({ open }));
 
   return (
     <>
-      {inline ? (
+      {!trigger ? null : inline ? (
         <button type="button" className={styles.inlineAction} aria-label={ariaLabel} onClick={open}>
           {label}
         </button>

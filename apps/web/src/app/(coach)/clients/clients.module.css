@@ -8,7 +8,9 @@
 
 .titleRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-3) var(--ct-space-4); }
 .titleCount { font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
-.inviteButton { flex: none; }
+/* A small outlined button (inviting is the rarer job here). Phones say just "+ Invite". */
+.inviteButton { flex: none; min-height: var(--ct-tap-min); padding: var(--ct-space-2) var(--ct-space-4); gap: var(--ct-space-1); font-size: 15px; }
+@media (max-width: 599.98px) { .inviteWord { display: none; } }
 .title {
   margin: 0;
   font-size: var(--ct-size-screen-title);
@@ -556,4 +558,78 @@
 
 @media (max-width: 520px) {
   .programGrid, .chosenItem { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Phones (under 600 px): one line per client ---------- */
+/* Avatar, name (one line, "…"), one chip and ›, about 9 to a screen; the details live on the client page. Invites get
+   a ⋯ menu (Resend, Cancel invite…); clients with nothing planned get Assign instead of ›. */
+.directory .phoneOnly { display: none; }
+@media (max-width: 599.98px) {
+  .directory .phoneOnly { display: inline-flex; }
+  .directory .wideOnly { display: none; }
+  .directory { gap: var(--ct-space-2); }
+
+  .toolbar { gap: var(--ct-space-2-5) var(--ct-space-2); }
+  .searchField { min-height: 48px; border-radius: var(--ct-radius-input); }
+  .searchInput { font-size: 16px; }
+  /* Chips stay on one line and scroll sideways, fading at the edge. */
+  .filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--ct-space-4));
+    padding-inline: var(--ct-space-4);
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, black 88%, transparent);
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filterChip { flex: none; white-space: nowrap; }
+  .shownCaption { align-items: center; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+  .sortField { font-size: var(--ct-size-caption); }
+
+  .table { border: 0; border-radius: 0; overflow: visible; }
+  .table .row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
+    gap: 0;
+    min-height: 50px;
+    padding: var(--ct-space-1) 0;
+    border-top: 0;
+    border-bottom: var(--ct-border-width-secondary-button) solid var(--ct-border);
+  }
+  .table .emptyRow { padding: var(--ct-space-4) 0; border-top: 0; }
+  .cellClient { grid-area: auto; }
+  .cellLast, .cellWeek, .cellFour, .cellPlan { display: none; }
+  .clientCell { gap: var(--ct-space-2-5); }
+  .clientCell .avatar { width: 32px; height: 32px; }
+  .nameStack { flex: 1 1 0; }
+  .rowLink, .rowName { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; font-size: 16px; }
+  .rowChip { flex: none; }
+  .chipLine { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border); }
+  .rowChevron { flex: none; color: var(--ct-ink-muted); }
+  .rowMore { margin-right: calc(-1 * var(--ct-space-2-5)); }
+  /* Assign on a row with nothing planned: a small outlined button with a full 44 px tap area. */
+  .quickAssign {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    align-items: center;
+    min-height: var(--ct-tap-min);
+    padding: 0 var(--ct-space-3);
+    color: var(--ct-ink);
+    font-size: 14px;
+    font-weight: var(--ct-weight-button);
+    text-decoration: none;
+  }
+  .quickAssign::before {
+    content: '';
+    position: absolute;
+    inset: 6px 0;
+    z-index: -1;
+    border-radius: var(--ct-radius-input);
+    background: var(--ct-bg);
+    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+  }
+  .quickAssign:active::before { background: var(--ct-lime); }
+  /* A resend result goes under the name. */
+  .inlineStatus { padding-bottom: var(--ct-space-1); }
 }

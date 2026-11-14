@@ -129,7 +129,7 @@ test.describe('iPhone SE (375 x 667)', () => {
 
   test('the invite plan choice is three stacked full-width rows', async ({ page }) => {
     await signInAsCoach(page);
-    await page.getByRole('button', { name: '+ Invite client' }).click();
+    await page.getByRole('button', { name: 'Invite client', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Invite a client' });
     const boxes = await Promise.all(
       ['Program', 'Single workout', 'Nothing yet'].map(async (n) => (await dialog.getByRole('button', { name: n, exact: true }).boundingBox())!),

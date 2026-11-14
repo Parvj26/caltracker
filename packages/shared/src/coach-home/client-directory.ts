@@ -65,7 +65,7 @@ export type DirectoryRow = {
   check: ClientCheck;
 };
 
-export type DirectoryFilter = 'all' | 'missed' | 'plan_ending' | 'nothing_planned' | 'invited';
+export type DirectoryFilter = 'active' | 'missed' | 'plan_ending' | 'nothing_planned' | 'invited';
 export type DirectorySort = 'last_workout' | 'name' | 'completion' | 'plan_end';
 
 const isDone = (w: HomeWorkout) => workoutStatus(w).kind === 'done';
@@ -154,10 +154,13 @@ export function directoryRows(input: DirectoryInput): DirectoryRow[] {
   });
 }
 
-/** Whether a row shows under a filter chip ("invited" is for invites only, so no client matches it). */
+/**
+ * Whether a row shows under a filter chip. "active" is every current client (the default view); "invited" is for
+ * invites only, so no client matches it.
+ */
 export function matchesDirectoryFilter(row: DirectoryRow, filter: DirectoryFilter): boolean {
   switch (filter) {
-    case 'all':
+    case 'active':
       return true;
     case 'missed':
       return row.flags.missed;
@@ -173,7 +176,7 @@ export function matchesDirectoryFilter(row: DirectoryRow, filter: DirectoryFilte
 /** How many clients each chip would show ("invited" is counted by the caller, from the invites). */
 export function directoryCounts(rows: readonly DirectoryRow[]): Record<Exclude<DirectoryFilter, 'invited'>, number> {
   return {
-    all: rows.length,
+    active: rows.length,
     missed: rows.filter((r) => r.flags.missed).length,
     plan_ending: rows.filter((r) => r.flags.planEnding).length,
     nothing_planned: rows.filter((r) => r.flags.nothingPlanned).length,
@@ -214,4 +217,25 @@ export function invitedLabel(sentOn: IsoDate, today: IsoDate): string {
   if (days === 0) return 'Invited today';
   if (days === 1) return 'Invited yesterday';
   return `Invited ${days} days ago`;
+}
+
+/** "Invited today", "Invited 3 d", "Invited 2 wk": the short form for a phone row's chip. */
+export function invitedShortLabel(sentOn: IsoDate, today: IsoDate): string {
+  const days = Math.max(0, diffDays(sentOn, today));
+  if (days === 0) return 'Invited today';
+  if (days < 7) return `Invited ${days} d`;
+  return `Invited ${Math.floor(days / 7)} wk`;
+}
+
+/** The one chip a client's row shows on a phone. */
+export type DirectoryChip = { kind: 'missed'; count: number } | { kind: 'nothing_planned' } | { kind: 'on_track' };
+
+/**
+ * A phone row's single chip, from the row's own flags: missed workouts this week come first (even while training now
+ * or with nothing planned ahead), then nothing planned; anything else (active, training, a plan ending) is on track.
+ */
+export function directoryChip(row: Pick<DirectoryRow, 'flags' | 'week'>): DirectoryChip {
+  if (row.flags.missed) return { kind: 'missed', count: row.week.missed };
+  if (row.flags.nothingPlanned) return { kind: 'nothing_planned' };
+  return { kind: 'on_track' };
 }

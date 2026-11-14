@@ -119,13 +119,13 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expectWithin(dialog.getByLabel('Start date'), dialog);
   });
 
-  test('the Programs list fits: Assign and Duplicate are whole and on screen, with no sideways scroll', async ({ page }) => {
+  test('the Programs list fits: Assign and ⋯ are whole and on screen, with no sideways scroll', async ({ page }) => {
     const name = `12-Week Hypertrophy Block — Phase 1 ${unique()}`;
     created.programs.push(await seedProgram(admin, workspaceId, name, 12, []));
     await signInAsCoach(page);
     await page.goto('/programs');
     const row = page.getByRole('table', { name: 'Programs' }).getByRole('row').filter({ hasText: name });
-    for (const button of [row.getByRole('button', { name: `Assign ${name}` }), row.getByRole('button', { name: /^Duplicate/ })]) {
+    for (const button of [row.getByRole('button', { name: `Assign ${name}` }), row.getByRole('button', { name: `More for ${name}` })]) {
       await button.scrollIntoViewIfNeeded();
       await expect(button).toBeInViewport({ ratio: 1 });
       await expectTextInside(button);

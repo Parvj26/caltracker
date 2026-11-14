@@ -68,8 +68,8 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
   // The list shows it with its length and number of workouts.
   await page.goto('/programs');
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: program, exact: true }) });
-  await expect(row.getByRole('cell').nth(1)).toHaveText('1');
-  await expect(row.getByRole('cell').nth(2)).toHaveText('1');
+  await expect(row.getByRole('cell').nth(1)).toHaveText('1', { useInnerText: true });
+  await expect(row.getByRole('cell').nth(2)).toHaveText('1', { useInnerText: true });
 });
 
 test('remove a workout from the grid with its menu', async ({ page }) => {

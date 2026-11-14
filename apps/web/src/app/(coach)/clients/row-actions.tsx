@@ -1,8 +1,8 @@
 'use client';
 
 import { cancelInvite, removeClient } from './actions';
-import type { RefObject } from 'react';
-import { ConfirmButton, ConfirmDialog } from './confirm-button';
+import type { Ref, RefObject } from 'react';
+import { ConfirmButton, ConfirmDialog, type ConfirmHandle } from './confirm-button';
 
 const REMOVE_BODY =
   "They'll lose access to your workouts, messages and community. Their history stays under Past clients, and re-inviting them brings everything back.";
@@ -37,10 +37,26 @@ export function RemoveClientDialog({ userId, name, focusAfterId, dialogRef }: { 
   );
 }
 
-export function CancelInviteButton({ inviteId, email, inline = false }: { inviteId: string; email: string; inline?: boolean }) {
+export function CancelInviteButton({
+  inviteId,
+  email,
+  inline = false,
+  handle,
+  trigger = true,
+}: {
+  inviteId: string;
+  email: string;
+  inline?: boolean;
+  /** Opens the confirm step from elsewhere (the row's ⋯ menu on a phone). */
+  handle?: Ref<ConfirmHandle>;
+  /** False: only the confirm dialog, opened through `handle`. */
+  trigger?: boolean;
+}) {
   return (
     <ConfirmButton
       inline={inline}
+      handle={handle}
+      trigger={trigger}
       label={inline ? 'Cancel' : 'Cancel invite'}
       ariaLabel={`Cancel invite to ${email}`}
       title="Cancel this invite?"

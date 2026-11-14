@@ -174,7 +174,7 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
   // "+ Invite client" sits in the page header, above the list, so it is always in view on a laptop.
-  const invite = page.getByRole('button', { name: '+ Invite client' });
+  const invite = page.getByRole('button', { name: 'Invite client', exact: true });
   expect((await invite.boundingBox())!.y).toBeLessThan((await clients.boundingBox())!.y);
   await expect(invite).toBeInViewport();
 });
@@ -182,7 +182,7 @@ test('clients page: clients show round initials avatars', async ({ page }) => {
 test('bulk CSV invite is its own tab of the invite window, explains itself and offers an example file', async ({ page }) => {
   await signInAsDemoCoach(page);
   // The invite window opens on One client; the CSV upload is the second tab.
-  await page.getByRole('button', { name: '+ Invite client' }).click();
+  await page.getByRole('button', { name: 'Invite client', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Invite a client' });
   const tab = dialog.getByRole('tab', { name: 'Many (CSV)' });
   await expect(tab).toHaveAttribute('aria-selected', 'false');

@@ -1,0 +1,22 @@
+/* A list row's ⋯ button and menu. Colours, radii and sizes only via var(--ct-*). */
+/* Above a row's stretched link (z-index 1), so the button and menu get their own taps. */
+.wrap { position: relative; z-index: 1; flex: none; display: inline-flex; }
+.more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.more:hover, .more[aria-expanded='true'] { background: var(--ct-surface); }
+.more:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+.more[aria-busy='true'] { cursor: progress; color: var(--ct-ink-muted); }
+.menu { min-width: 12.5rem; }
+.danger { color: var(--ct-danger); }
+.menu button:disabled { color: var(--ct-ink-muted); cursor: progress; }

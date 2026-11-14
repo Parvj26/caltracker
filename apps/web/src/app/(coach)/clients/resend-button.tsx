@@ -20,7 +20,8 @@ type Props = {
   inline?: boolean;
 };
 
-export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel, inline = false }: Props) {
+/** Sends an invite again; `message` is the result to show (a chip). Shared by Resend buttons and row menus. */
+export function useResendInvite({ email, firstName, lastName }: { email: string; firstName: string; lastName: string }) {
   const [message, setMessage] = useState<StatusView | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -33,6 +34,11 @@ export function ResendButton({ email, firstName, lastName, label = 'Resend', ari
       setMessage(result ? statusView(result.status, result.message) : null);
     });
   }
+  return { resend, pending, message };
+}
+
+export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel, inline = false }: Props) {
+  const { resend, pending, message } = useResendInvite({ email, firstName, lastName });
 
   if (inline) {
     return (

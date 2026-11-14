@@ -73,8 +73,11 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
   const [round, setRound] = useState(0);
   return (
     <>
+      {/* Secondary and small: finding a client is the page's main job, inviting one is rarer. */}
       <Button
+        variant="secondary"
         className={styles.inviteButton}
+        aria-label="Invite client"
         data-ph-capture-attribute-label="invite_open"
         data-ph-safe=""
         onClick={() => {
@@ -82,7 +85,10 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
           setOpen(true);
         }}
       >
-        + Invite client
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Invite<span className={styles.inviteWord}> client</span>
       </Button>
       {open ? <InviteDialog key={round} {...props} onClose={() => setOpen(false)} /> : null}
     </>
