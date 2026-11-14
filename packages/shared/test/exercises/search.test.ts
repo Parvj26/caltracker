@@ -107,8 +107,8 @@ describe('word endings and typos', () => {
     expect(h?.tier).toBe(4);
   });
 
-  it('cul does not match Barbell Curl', () => {
-    expect(names('cul')).not.toContain('Barbell Curl');
+  it('cul matches Barbell Curl only as a typo (tier 4), never as a starts-with match', () => {
+    expect(hits('cul').find((x) => x.row.name === 'Barbell Curl')?.tier).toBe(4);
   });
 });
 

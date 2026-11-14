@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { formatPlainDay, formatPlainDayMonth } from '@caltracker/shared';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
 
@@ -41,13 +42,8 @@ const toMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const addDays = (d: string, n: number) => new Date(toMs(d) + n * MS_DAY).toISOString().slice(0, 10);
 const weekday = (d: string) => new Date(toMs(d)).getUTCDay() || 7; // Monday 1 ... Sunday 7
 const nextMonday = (today: string) => addDays(today, 8 - weekday(today));
-const fmt = (d: string, weekdayToo: boolean) =>
-  new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    ...(weekdayToo ? { weekday: 'short' } : {}),
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(toMs(d)));
+// The app's own formatter: Node's Intl writes "Sept" where Safari and the app write "Sep".
+const fmt = (d: string, weekdayToo: boolean) => (weekdayToo ? formatPlainDay(d) : formatPlainDayMonth(d));
 const monthOf = (d: string) => d.slice(0, 7);
 const nextMonth = (month: string) => addDays(`${month}-28`, 7).slice(0, 7);
 

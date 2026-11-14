@@ -29,6 +29,9 @@ import styles from './clients.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
 
+/** Asks password managers not to offer a contact or login here (Safari's own AutoFill ignores everything but cues). */
+const NOT_A_CONTACT = { 'data-1p-ignore': '', 'data-lpignore': 'true', 'data-form-type': 'other' } as const;
+
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
 type PlanKind = InvitePlan['kind'];
@@ -298,11 +301,13 @@ function OneClientForm({
   return (
     <form onSubmit={onSubmit} className={styles.inviteForm} noValidate>
       <div className={styles.nameGrid}>
-        {/* Someone else's details, not the coach's: no contact AutoFill, spell-check or autocorrect on names. The
-            name attributes avoid "name"/"email" so Safari's AutoFill heuristics don't offer the coach's own card. */}
+        {/* Someone else's details, not the coach's: no contact AutoFill, spell-check or autocorrect on names. Safari
+            ignores autocomplete="off" and guesses from the field's name attribute (a dash in it brings up the contact
+            card), so these fields have none: the form reads React state, not form data. The data- attributes tell
+            password managers (1Password, LastPass, Dashlane) to stay out too. */}
         <TextField
           label="First name"
-          name="invitee-first"
+          {...NOT_A_CONTACT}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="words"
@@ -313,7 +318,7 @@ function OneClientForm({
         />
         <TextField
           label="Last name"
-          name="invitee-last"
+          {...NOT_A_CONTACT}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="words"
@@ -325,7 +330,7 @@ function OneClientForm({
       </div>
       <TextField
         label="Email"
-        name="invitee-address"
+        {...NOT_A_CONTACT}
         type="email"
         inputMode="email"
         autoComplete="off"

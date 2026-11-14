@@ -10,6 +10,21 @@ import { addDays, type IsoDate } from './dates';
 
 export const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+export const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+export const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 interface ZonedParts {
   year: number;
@@ -48,11 +63,45 @@ export function formatDayDate(instant: string | Date, timeZone?: string): string
   return `${p.day} ${MONTHS_SHORT[p.month - 1]} ${p.year}`;
 }
 
+/** Numeric parts of a plain YYYY-MM-DD date, plus its weekday (0 = Sunday). No time zone is involved. */
+function plainParts(d: IsoDate) {
+  const [year, month, day] = d.split('-').map(Number) as [number, number, number];
+  return { year, month, day, weekday: new Date(Date.UTC(year, month - 1, day)).getUTCDay() };
+}
+
 /** A plain calendar date (no time zone) as "Sat 31 Oct". */
 export function formatPlainDay(d: IsoDate): string {
-  const [y, m, day] = d.split('-').map(Number) as [number, number, number];
-  const weekday = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
-  return `${WEEKDAYS_SHORT[weekday]} ${day} ${MONTHS_SHORT[m - 1]}`;
+  const p = plainParts(d);
+  return `${WEEKDAYS_SHORT[p.weekday]} ${p.day} ${MONTHS_SHORT[p.month - 1]}`;
+}
+
+/** A plain calendar date as "31 Oct". */
+export function formatPlainDayMonth(d: IsoDate): string {
+  const p = plainParts(d);
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]}`;
+}
+
+/** A plain calendar date as "31 Oct 2026". */
+export function formatPlainDayMonthYear(d: IsoDate): string {
+  const p = plainParts(d);
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]} ${p.year}`;
+}
+
+/** A plain calendar date's short weekday, "Sat". */
+export function formatPlainWeekday(d: IsoDate): string {
+  return WEEKDAYS_SHORT[plainParts(d).weekday] ?? '';
+}
+
+/** A plain calendar date as "Saturday 31 October 2026". */
+export function formatPlainLongDay(d: IsoDate): string {
+  const p = plainParts(d);
+  return `${WEEKDAYS_LONG[p.weekday]} ${p.day} ${MONTHS_LONG[p.month - 1]} ${p.year}`;
+}
+
+/** A YYYY-MM month as "October 2026". */
+export function formatPlainMonth(month: string): string {
+  const [year, m] = month.split('-').map(Number) as [number, number];
+  return `${MONTHS_LONG[m - 1]} ${year}`;
 }
 
 /** A plain calendar date as "Mon 9" (the month is shown elsewhere, as in a week's list of days). */

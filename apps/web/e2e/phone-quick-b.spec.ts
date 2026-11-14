@@ -1,4 +1,5 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test';
+import { formatPlainDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
@@ -29,8 +30,7 @@ test.afterAll(async () => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
 const SE = { width: 375, height: 667 };
-const shortDay = (d: string) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${d}T00:00:00Z`));
+const shortDay = formatPlainDay;
 
 async function newClient(): Promise<string> {
   const id = await freshClient(admin, workspaceId, 'Quinn', `QuickB${unique()}`);
@@ -165,6 +165,39 @@ test('"Move to…" says where it went, and Undo moves it back', async ({ page })
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
   const saved = await admin.from('workouts').select('scheduled_on').eq('client_id', client).eq('name', name).single();
   expect(saved.data?.scheduled_on).toBe(today);
+});
+
+test('Undo after "Move to…" only says it moved back when it could: a workout deleted since is not "moved back"', async ({ page }) => {
+  test.slow();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const client = await newClient();
+  const name = `Move gone ${unique()}`;
+  await libraryWorkout(name);
+  await signInAsCoach(page);
+  await page.goto(`/clients/${client}/training?view=2w`);
+  const today = await browserToday(page);
+  const later = addDays(today, 2);
+  await addToday(page, name);
+  const day = (d: string) => page.locator(`[data-date="${d}"]`);
+
+  await day(today).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
+  await day(today).getByRole('menuitem', { name: 'Move to…' }).click();
+  const move = page.getByRole('dialog', { name: `Move ${name}` });
+  await move.getByLabel('Date').fill(later);
+  await move.getByRole('button', { name: 'Move', exact: true }).click();
+  await expect(page.getByText(`Moved ${name} to ${shortDay(later)}.`)).toBeVisible();
+
+  // Deleted while the move's toast (and its Undo) is still showing.
+  await day(later).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
+  await day(later).getByRole('menuitem', { name: 'Delete' }).click();
+  const confirm = page.getByRole('dialog', { name: `Delete ${name}?` });
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(confirm).toBeHidden();
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText(`Couldn't move ${name} back to ${shortDay(today)}.`)).toBeVisible();
+  await expect(page.getByText(`Moved ${name} back to`)).toHaveCount(0);
+  await expect(day(today).getByRole('button', { name, exact: true })).toHaveCount(0);
 });
 
 test('switching the calendar view keeps the page where it is', async ({ page }) => {
