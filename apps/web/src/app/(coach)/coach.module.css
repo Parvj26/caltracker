@@ -107,7 +107,7 @@
   text-align: center;
 }
 
-.menuButton, .grabHandle { display: none; }
+.tabBar, .grabHandle { display: none; }
 
 .content {
   min-width: 0;
@@ -141,53 +141,72 @@
   .content { padding: var(--ct-space-4-5) var(--ct-space-4) 40px; }
 }
 
-/* iPhone (below the 600 px tablet breakpoint): no rail. A floating lime menu button opens the same items as a bottom
-   sheet of big tiles (docs: approved "Option B"). The sheet is the sidebar itself, restyled; CoachSidebar opens it. */
+/* iPhone (below the 600 px tablet breakpoint): no rail. A tab bar is fixed to the bottom (Home, Clients, Messages,
+   Programs, More), and More opens the rest of the menu as a bottom sheet of big tiles just above it (round 2 mockup
+   "Option B"). The sheet is the sidebar itself, restyled; CoachSidebar opens it. The bar stays put while scrolling. */
 @media (max-width: 599.98px) {
   .shell { grid-template-columns: minmax(0, 1fr); }
-  /* Room under the last thing on the page so the button never covers it. Toasts and bottom bars lift by
-     --coach-menu-room (calendar and program toasts use it). */
-  .shell { --coach-menu-room: 88px; }
+  /* The tab bar's height. The page keeps that much room (and a little more) under its last thing, so the bar never
+     covers it. Toasts and bottom bars lift by --coach-menu-room (calendar and program toasts use it). */
+  .shell { --coach-menu-room: calc(64px + env(safe-area-inset-bottom)); }
   .shell:has([data-no-menu-button]) { --coach-menu-room: 0px; }
-  .content { padding-bottom: 100px; }
+  .content { padding-bottom: calc(var(--coach-menu-room) + var(--ct-space-6)); }
 
-  .menuButton {
+  .tabBar {
     position: fixed;
-    z-index: 30;
-    left: var(--ct-space-4);
-    bottom: calc(var(--ct-space-4) + env(safe-area-inset-bottom));
+    z-index: 42;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: var(--coach-menu-room);
+    padding: 0 var(--ct-space-1) calc(var(--ct-space-1) + env(safe-area-inset-bottom));
+    border-top: var(--ct-border-width-card) solid var(--ct-border);
+    background: var(--ct-bg);
+  }
+  .tab {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 60px;
-    height: 60px;
+    gap: 3px;
+    min-width: 0;
     padding: 0;
-    border: var(--ct-border-width-card) solid var(--ct-ink);
-    border-radius: 50%;
-    background: var(--ct-lime);
-    color: var(--ct-ink);
-    box-shadow: 0 5px 0 var(--ct-ink);
+    border: 0;
+    background: transparent;
+    color: var(--ct-ink-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: var(--ct-weight-button);
+    text-decoration: none;
     cursor: pointer;
   }
-  .menuButton svg { width: 22px; height: 22px; }
-  .menuButton { transition: transform 0.2s ease, opacity 0.2s ease; }
-  /* Scrolling down tucks the button away below the screen edge; scrolling up brings it back (coach-sidebar.tsx). */
-  .menuButton[data-tucked] { transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none; }
-  /* Screens with their own bottom controls hide it (data-no-menu-button): a chat thread,
-     a live session and the meal form. Their Back link leaves the screen. */
-  .shell:has([data-no-menu-button]) .menuButton { display: none; }
-  .shell:has([data-no-menu-button]) .content { padding-bottom: var(--ct-space-4); }
-  @media (prefers-reduced-motion: reduce) { .menuButton { transition: none; } }
-  .menuDot {
+  .tabIcon { display: flex; align-items: center; justify-content: center; width: 48px; height: 28px; border-radius: var(--ct-radius-pill); }
+  .tabIcon svg { width: 24px; height: 24px; }
+  .tabOn { color: var(--ct-ink); }
+  .tabOn .tabIcon { background: var(--ct-lime); }
+  .tab:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -4px; border-radius: 12px; }
+  .tabBadge {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--ct-bg);
-    border-radius: 50%;
+    top: 4px;
+    left: calc(50% + 8px);
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--ct-radius-pill);
     background: var(--ct-danger);
+    color: var(--ct-bg);
+    font-size: 13px;
+    font-weight: var(--ct-weight-button);
+    line-height: 20px;
+    text-align: center;
   }
+  /* Screens with their own bottom controls hide it (data-no-menu-button): a chat thread, a live session and the meal
+     form. Their Back link leaves the screen. */
+  .shell:has([data-no-menu-button]) .tabBar { display: none; }
+  .shell:has([data-no-menu-button]) .content { padding-bottom: var(--ct-space-4); }
 
   .backdrop {
     position: fixed;
@@ -203,21 +222,22 @@
     top: auto;
     left: 0;
     right: 0;
-    bottom: 0;
-    display: flex;
+    bottom: var(--coach-menu-room);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
     height: auto;
-    max-height: calc(100dvh - 40px);
-    gap: var(--ct-space-3);
-    align-items: stretch;
-    padding: var(--ct-space-3-5) var(--ct-space-4) calc(26px + env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 40px - var(--coach-menu-room));
+    gap: var(--ct-space-2-5);
+    padding: var(--ct-space-3-5) var(--ct-space-4) 18px;
     border-right: 0;
     border-radius: 26px 26px 0 0;
     background: var(--ct-bg);
   }
   .grabHandle {
     display: block;
-    flex: none;
-    align-self: center;
+    grid-column: 1 / -1;
+    justify-self: center;
     width: 40px;
     height: 5px;
     border-radius: 3px;
@@ -225,13 +245,9 @@
   }
   .brand { display: none; }
 
-  .nav, .bottom {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--ct-space-2-5);
-    margin-top: 0;
-  }
-  .bottom > form { display: flex; }
+  /* One grid of tiles across both groups; the tab bar's own pages are left out. */
+  .nav, .bottom { display: contents; }
+  .navItem.inTabBar { display: none; }
   .navItem {
     flex-direction: column;
     justify-content: center;
@@ -248,7 +264,7 @@
     text-align: center;
   }
   .navItem svg { width: 26px; height: 26px; }
-  /* A finger leaves a "hover" behind where it tapped the menu button; only a mouse gets the hover tint. */
+  /* A finger leaves a "hover" behind where it tapped More; only a mouse gets the hover tint. */
   @media (hover: none) { .navItem:hover { background: var(--ct-bg); } }
   .navItemCurrent,
   .navItemCurrent:hover { border-color: var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); }

@@ -8,25 +8,24 @@ import { requireCoach } from '@/lib/auth';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { SessionReplayGate } from '@/lib/analytics/session-replay-gate';
 import { CoachSidebar } from './coach-sidebar';
-import { HelpNavLink } from './help-nav-link';
-import { NAV_ICONS } from './nav-icons';
+import type { NavIconName } from './nav-icons';
 import { loadUnreadTotal } from './messages/data';
 import { MessagesNavLink } from './messages-nav-link';
 import { NavLink } from './nav-link';
 import { createServerSupabase } from '@/lib/supabase/server';
 import styles from './coach.module.css';
 
-// Programs arrives with the program builder (phase 2 Task 15); until then it 404s.
-const NAV = [
-  { href: '/home', label: 'Home', icon: 'home' },
-  { href: '/clients', label: 'Clients', icon: 'clients' },
+// `tab`: on an iPhone the tab bar has it, so the More sheet leaves it out.
+const NAV: { href: string; label: string; icon: NavIconName; tab?: boolean }[] = [
+  { href: '/home', label: 'Home', icon: 'home', tab: true },
+  { href: '/clients', label: 'Clients', icon: 'clients', tab: true },
   { href: '/workouts', label: 'Workouts', icon: 'workouts' },
-  { href: '/programs', label: 'Programs', icon: 'programs' },
+  { href: '/programs', label: 'Programs', icon: 'programs', tab: true },
   { href: '/exercises', label: 'Exercises', icon: 'exercises' },
   { href: '/meals', label: 'Meals', icon: 'meals' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/community', label: 'Community', icon: 'community' },
-] as const;
+];
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
   const coach = await requireCoach();
@@ -59,22 +58,15 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           <p className={styles.workspace}>{coach.workspaceName}</p>
         </div>
         <nav aria-label="Main" className={styles.nav}>
-          {NAV.map((item) => (
-            <NavLink key={item.href} {...item} />
+          {NAV.map(({ tab, ...item }) => (
+            <NavLink key={item.href} {...item} className={tab ? styles.inTabBar : undefined} />
           ))}
-          <MessagesNavLink />
+          <MessagesNavLink className={styles.inTabBar} />
         </nav>
         <div className={styles.bottom}>
+          {/* Sign out is on the Profile page (it asks first). */}
+          <NavLink href="/help" label="Help" icon="help" />
           <NavLink href="/profile" label="Profile" leading={<CoachAvatar url={avatarUrl} name={fullName} seed={coach.userId} />} />
-          <HelpNavLink />
-          <form action="/auth/sign-out" method="post">
-            <button type="submit" data-ph-capture-attribute-label="sign_out" aria-label="Sign out" title="Sign out" className={styles.navItem}>
-              {NAV_ICONS.signOut}
-              <span className={styles.navLabel} data-ph-safe="">
-                Sign out
-              </span>
-            </button>
-          </form>
           <LegalLinks className={styles.legal} />
         </div>
       </CoachSidebar>

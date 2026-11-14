@@ -69,14 +69,17 @@ export const NAV_ICONS = {
       <path d="M9.5 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2-2.3 3.5M12 17h.01" />
     </Icon>
   ),
-  signOut: (
+  more: (
     <Icon>
-      <path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16.5 14.5 12 10 7.5M14.5 12H4" />
-    </Icon>
-  ),
-  menu: (
-    <Icon>
-      <path d="M4 7h16M4 12h16M4 17h16" />
+      <circle cx="6" cy="6" r="1.6" />
+      <circle cx="12" cy="6" r="1.6" />
+      <circle cx="18" cy="6" r="1.6" />
+      <circle cx="6" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="18" cy="12" r="1.6" />
+      <circle cx="6" cy="18" r="1.6" />
+      <circle cx="12" cy="18" r="1.6" />
+      <circle cx="18" cy="18" r="1.6" />
     </Icon>
   ),
 } as const;

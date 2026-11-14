@@ -2,7 +2,7 @@ import { devices, expect, test, type Page } from '@playwright/test';
 import { demoWorkspace, seedLibraryWorkout, unique } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
-// Phone fixes, batch 1: the Add exercises window, the floating Menu button, the Workouts list and the message box.
+// Phone fixes, batch 1: the Add exercises window, the tab bar on a chat, the Workouts list and the message box.
 // Chromium with iPhone sizes and touch (the browser can't be chosen per spec). The tests save nothing; the workout
 // below exists only so the Workouts list is never empty (each CI shard starts from a fresh database).
 
@@ -21,7 +21,7 @@ const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
 const SE = { width: 375, height: 667 };
 const CLIENT_ID = '00000000-0000-4000-8000-0000000000c2';
 
-const menuButton = (page: Page) => page.getByRole('button', { name: 'Menu', exact: true });
+const tabBar = (page: Page) => page.getByRole('navigation', { name: 'Tabs' });
 
 async function expectNoSidewaysScroll(page: Page) {
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -29,14 +29,6 @@ async function expectNoSidewaysScroll(page: Page) {
     innerWidth: window.innerWidth,
   }));
   expect(scrollWidth, `page is ${scrollWidth}px wide on a ${innerWidth}px screen`).toBeLessThanOrEqual(innerWidth);
-}
-
-/** Scrolls the page in small steps, like a finger does (a touch phone has no mouse wheel). */
-async function scrollBy(page: Page, dy: number) {
-  for (let i = 0; i < 5; i++) {
-    await page.evaluate((d) => window.scrollBy(0, d), dy / 5);
-    await page.waitForTimeout(50);
-  }
 }
 
 async function openPicker(page: Page) {
@@ -105,36 +97,17 @@ test.describe('iPhone SE (375 x 667)', () => {
 test.describe('iPhone 13', () => {
   test.use({ ...iphone13 });
 
-  test('on a chat the Menu button is gone and the message box is full width', async ({ page }) => {
+  test('on a chat the tab bar is gone and the message box is full width', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto(`/messages/${CLIENT_ID}`);
     const box = page.getByRole('textbox', { name: 'Message' });
     await expect(box).toBeVisible();
-    await expect(menuButton(page)).toBeHidden();
+    await expect(tabBar(page)).toBeHidden();
     const photos = page.getByRole('button', { name: 'Add photos' });
     await expect(photos).toBeInViewport({ ratio: 1 });
     const width = (await box.boundingBox())!.width;
     expect(width).toBeGreaterThan(iphone13.viewport.width - 48);
     await expectNoSidewaysScroll(page);
-  });
-
-  test('the Menu button tucks away while scrolling down and comes back on scrolling up', async ({ page }) => {
-    await signInAsCoach(page);
-    await page.goto('/workouts');
-    await expect(page.getByRole('table', { name: 'Workouts' })).toBeVisible();
-    // Make the page long enough to scroll, however many workouts the run has made.
-    await page.locator('#main-content').evaluate((el) => {
-      const pad = document.createElement('div');
-      pad.style.height = '3000px';
-      el.append(pad);
-    });
-    await expect(menuButton(page)).toBeInViewport();
-    await scrollBy(page, 400);
-    await expect(menuButton(page)).toHaveAttribute('data-tucked', '');
-    await expect(menuButton(page)).not.toBeInViewport();
-    await scrollBy(page, -150);
-    await expect(menuButton(page)).not.toHaveAttribute('data-tucked', '');
-    await expect(menuButton(page)).toBeInViewport();
   });
 
   test('the Workouts list and the picker fit at 390', async ({ page }) => {

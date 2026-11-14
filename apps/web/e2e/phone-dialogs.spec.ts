@@ -23,7 +23,7 @@ test.afterAll(async () => {
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
 
-const menuButton = (page: Page) => page.getByRole('button', { name: 'Menu', exact: true });
+const tabBar = (page: Page) => page.getByRole('navigation', { name: 'Tabs' });
 
 /** The control's box is at least 44 px tall (and, with `wide`, 44 px wide). */
 async function expectTappable(control: Locator, { wide = false } = {}) {
@@ -146,12 +146,12 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expect(dialog.getByRole('button', { name: 'Program', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('the meal form has 48 px fields and its Save bar stays on screen, with the Menu button out of the way', async ({ page }) => {
+  test('the meal form has 48 px fields and its Save bar stays on screen, with the tab bar out of the way', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/meals/new');
     const form = page.getByRole('form', { name: 'New meal' });
     await form.getByLabel('Name').scrollIntoViewIfNeeded();
-    await expect(menuButton(page)).toBeHidden();
+    await expect(tabBar(page)).toBeHidden();
     for (const label of ['Name', 'kcal', 'Protein g', 'Carbs g', 'Fat g']) {
       expect((await form.getByLabel(label, { exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(48);
     }
