@@ -9,6 +9,7 @@ describe('shortDay', () => {
     expect(shortDay(TODAY, TODAY)).toBe('today');
     expect(shortDay('2026-11-04', TODAY)).toBe('yesterday');
     expect(shortDay('2026-11-03', TODAY)).toBe('Tue 3 Nov');
+    expect(shortDay('2026-09-07', TODAY)).toBe('Mon 7 Sep');
   });
 });
 

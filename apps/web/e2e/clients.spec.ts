@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { formatPlainDay } from '@caltracker/shared';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // The invite window (+ Invite client): one client with an optional plan, or many from a CSV. Invites show on the
@@ -9,8 +10,7 @@ const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 const MS_DAY = 86_400_000;
 const dayOffset = (n: number) => new Intl.DateTimeFormat('en-CA').format(new Date(Date.now() + n * MS_DAY));
-const shortDay = (iso: string) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${iso}T00:00:00Z`));
+const shortDay = formatPlainDay;
 
 const cleanup: Array<() => Promise<unknown>> = [];
 test.afterAll(async () => {

@@ -1,4 +1,4 @@
-import { addDays } from '@caltracker/shared';
+import { addDays, formatPlainDay } from '@caltracker/shared';
 import type { AttentionReason, ClientStatus, DailyCheckInput, HomeClient, IsoDate } from '@caltracker/shared';
 import type { ChipTone } from '@/components/ui';
 import type { HomeData } from './coach-home';
@@ -41,12 +41,11 @@ export function checkInput(data: HomeData, today: IsoDate, timeZone: string, loo
   };
 }
 
-const dayFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-/** "Wed 4 Nov", or "yesterday" / "today". */
+/** "Wed 4 Nov", or "yesterday" / "today". Built from the shared formatter so server and Safari agree ("Sep"). */
 export function shortDay(date: IsoDate, today: IsoDate): string {
   if (date === today) return 'today';
   if (date === addDays(today, -1)) return 'yesterday';
-  return dayFormat.format(new Date(`${date}T00:00:00Z`));
+  return formatPlainDay(date);
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

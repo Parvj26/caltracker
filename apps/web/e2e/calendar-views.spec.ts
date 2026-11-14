@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { formatPlainDayMonth, formatPlainDayMonthYear, formatPlainMonth } from '@caltracker/shared';
 import { COACH_EMAIL, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // The client calendar's 1, 2 and 4-week views (and the month view beside them), stepping, the remembered view,
@@ -36,9 +37,8 @@ const toMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const addDays = (d: string, n: number) => new Date(toMs(d) + n * MS_DAY).toISOString().slice(0, 10);
 const weekday = (d: string) => new Date(toMs(d)).getUTCDay() || 7; // Monday 1 ... Sunday 7
 const mondayOf = (d: string) => addDays(d, 1 - weekday(d));
-const dm = (d: string, year: boolean) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) }).format(new Date(toMs(d)));
-const monthName = (d: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(new Date(toMs(d)));
+const dm = (d: string, year: boolean) => (year ? formatPlainDayMonthYear(d) : formatPlainDayMonth(d));
+const monthName = (d: string) => formatPlainMonth(d.slice(0, 7));
 /** The range label the app shows: "26 Oct – 8 Nov 2026", or both years across a new year. */
 const rangeLabel = (start: string, end: string) => `${dm(start, start.slice(0, 4) !== end.slice(0, 4))} – ${dm(end, true)}`;
 

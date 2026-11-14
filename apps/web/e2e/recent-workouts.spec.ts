@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { formatPlainDay } from '@caltracker/shared';
 import { serviceClient } from './helpers';
 import {
   addDays,
@@ -95,7 +96,7 @@ test("a day's \"+\" picker and the program grid's \"+\" also open with Recent", 
   await signInAs(page, coach.email);
   await page.goto(`/clients/${coach.clientId}/training`);
   const today = await browserToday(page);
-  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${today}T00:00:00Z`));
+  const fmt = formatPlainDay(today);
   await page.locator(`[data-date="${today}"]`).getByRole('button', { name: `Add workout to ${fmt}`, exact: true }).click();
   const picker = page.getByRole('dialog', { name: `Add a workout to ${fmt}` });
   await expect(picker.getByRole('region', { name: 'Recent' }).getByRole('button').first()).toHaveText('Lib A');
