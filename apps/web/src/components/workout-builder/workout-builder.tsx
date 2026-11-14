@@ -442,8 +442,13 @@ export function WorkoutBuilder({
           label="Workout name"
           maxLength={100}
           value={doc.name}
-          // A workout's name, not a person's: no contact AutoFill, autocorrect or spell-check underlines.
+          // A workout's name, not a person's: no contact AutoFill, autocorrect or spell-check underlines. Safari ignores
+          // autocomplete="off" and guesses from cues, so there's no name attribute, and password managers are told to
+          // stay out.
           autoComplete="off"
+          data-1p-ignore=""
+          data-lpignore="true"
+          data-form-type="other"
           autoCorrect="off"
           autoCapitalize="sentences"
           spellCheck={false}
