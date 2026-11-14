@@ -1,5 +1,6 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { IsoDate } from '@caltracker/shared';
@@ -106,7 +107,7 @@ function UnassignDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
   }, []);
 
   async function confirm() {

@@ -1,5 +1,6 @@
 'use client';
 
+import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   IsoDateSchema,
@@ -119,7 +120,7 @@ export function AssignDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) showDialog(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };
