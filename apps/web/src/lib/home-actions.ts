@@ -18,8 +18,7 @@ export function todayAction(row: TodayRow, coachId: string, live?: ClientLiveLog
   const session = `/clients/${client}/log/${row.workout.id}`;
   switch (row.status.kind) {
     case 'not_started':
-      if (live?.loggedBy === coachId && live.workoutId) return { label: 'Continue', href: `/clients/${client}/log/${live.workoutId}`, style: 'filled' };
-      if (live) return { label: 'Watch live', href: `/clients/${client}/logs/${live.id}`, style: 'outlined' };
+      if (live) return liveAction(client, live, coachId);
       return { label: 'Log session', href: session, style: 'filled' };
     case 'training':
       if (row.status.loggedBy === coachId) return { label: 'Continue', href: session, style: 'filled' };
@@ -27,6 +26,15 @@ export function todayAction(row: TodayRow, coachId: string, live?: ClientLiveLog
     case 'done':
       return { label: 'View', href: `/clients/${client}/logs/${row.status.logId}`, style: 'light' };
   }
+}
+
+/**
+ * A client's workout in progress: Continue (the logger) when it is the coach's own session in person on a planned
+ * workout, else Watch live. Home's Today rows and the client Overview's Today card both use this.
+ */
+export function liveAction(clientId: string, live: ClientLiveLog, coachId: string): TodayAction {
+  if (live.loggedBy === coachId && live.workoutId) return { label: 'Continue', href: `/clients/${clientId}/log/${live.workoutId}`, style: 'filled' };
+  return { label: 'Watch live', href: `/clients/${clientId}/logs/${live.id}`, style: 'outlined' };
 }
 
 /** The status pill next to the button. */
