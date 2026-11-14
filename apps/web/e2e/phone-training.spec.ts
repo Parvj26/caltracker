@@ -167,9 +167,10 @@ test('the assign dialog lists programs with full names; the assigned row opens t
   await expect(dialog).toBeHidden();
 
   const panel = page.getByRole('region', { name: 'Assigned programs' });
+  await panel.getByRole('button', { name: / on the calendar/ }).click();
   const link = panel.getByRole('link', { name: new RegExp(`^${program}`) });
   await expect(link).toBeVisible();
-  await expect(panel.getByRole('button', { name: `Remove ${program} from calendar`, exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: `Options for ${program}`, exact: true })).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
 });

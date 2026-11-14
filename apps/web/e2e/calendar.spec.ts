@@ -138,7 +138,10 @@ test('assign a program from next Monday; a double click still copies it once', a
   await dialog.getByRole('button', { name: 'Assign', exact: true }).dblclick();
   await expect(dialog).toBeHidden();
 
-  await expect(page.getByRole('region', { name: 'Assigned programs' }).getByText(`${program} · ${fmt(monday, false)} – ${fmt(end, false)}`)).toBeVisible();
+  // Assigned programs is one line ("N programs on the calendar"); a tap shows each with its dates.
+  const programs = page.getByRole('region', { name: 'Assigned programs' });
+  await programs.getByRole('button', { name: / on the calendar/ }).click();
+  await expect(programs.getByText(`${program} · ${fmt(monday, false)} – ${fmt(end, false)}`)).toBeVisible();
 
   await page.goto(calendarUrl(monthOf(monday), me));
   await expect(item(page, monday, workout)).toHaveCount(1);
@@ -378,8 +381,11 @@ test('remove a program from the calendar from today on', async ({ page }) => {
   if (seeded.error) throw seeded.error;
   await page.reload();
 
+  // Remove from calendar is in the program's ⋯, under the folded "Assigned programs" line.
   const panel = page.getByRole('region', { name: 'Assigned programs' });
-  await panel.getByRole('button', { name: `Remove ${program} from calendar`, exact: true }).click();
+  await panel.getByRole('button', { name: /on the calendar/ }).click();
+  await panel.getByRole('button', { name: `Options for ${program}`, exact: true }).click();
+  await panel.getByRole('menuitem', { name: 'Remove from calendar' }).click();
   const confirm = page.getByRole('dialog', { name: `Remove ${program} from the calendar?` });
   await expect(confirm.getByText(`Removes 2 upcoming workouts from ${fmt(today, true)}. Past workouts stay.`)).toBeVisible();
   await confirm.getByRole('button', { name: 'Remove', exact: true }).click();
