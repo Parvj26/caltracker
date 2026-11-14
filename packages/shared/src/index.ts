@@ -107,6 +107,8 @@ export {
 } from './dates/calendar-range';
 export type { CalendarRange, CalendarView } from './dates/calendar-range';
 export { SWIPE_MIN_PX, calendarSwipeStep, phoneCalendarDay } from './dates/calendar-phone';
+export { busyLabel, plannedLabel, quickDays } from './dates/quick-days';
+export type { QuickDay, QuickDayOptions } from './dates/quick-days';
 export {
   BLOCK_KINDS,
   SET_TYPES,
@@ -243,7 +245,7 @@ export {
 } from './logs/schema';
 export type { LogStatus } from './logs/schema';
 export { emptyLog, startLogFromWorkout } from './logs/start';
-export { canStartSessionOn, coachSessionState, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
+export { canStartSessionOn, coachSessionState, completeAllOpenSets, completeAllSets, isLoggedByCoach, loggerKind } from './logs/coach-session';
 export { rebaseEdits } from './logs/rebase';
 export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
@@ -303,7 +305,9 @@ export {
   logVolumeKg,
   openSetCount,
   shouldAutoFinish,
+  untickedSets,
 } from './logs/summary';
+export type { UntickedRow } from './logs/summary';
 export {
   ENDING_WITHIN_DAYS,
   LAST_WORKOUT_LOOKBACK_DAYS,

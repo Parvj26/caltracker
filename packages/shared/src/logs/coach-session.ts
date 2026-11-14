@@ -99,3 +99,17 @@ export function completeAllSets(
   }
   return out;
 }
+
+/**
+ * "Mark all done and finish": Mark all on every page, so each open set takes last time's values (or the plan's).
+ * A pick-one group with no pick yet is left as it is. The same log back when nothing was open.
+ */
+export function completeAllOpenSets(
+  log: WorkoutLogDoc,
+  lastTimeFor: (blockId: string, exerciseId: string) => readonly ResultSet[],
+  nowIso: string,
+): WorkoutLogDoc {
+  let out = log;
+  for (const block of log.blocks) out = completeAllSets(out, block.id, (exerciseId) => lastTimeFor(block.id, exerciseId), nowIso);
+  return out;
+}
