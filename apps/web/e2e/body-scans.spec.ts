@@ -289,3 +289,77 @@ test('scans only outside the chosen range say so and Show all brings the chart b
   await chart.press('ArrowLeft');
   await expect(read).not.toHaveText(before);
 });
+
+test.describe('scan history on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('each scan is a card with its values in two columns and Edit / Delete behind ⋯', async ({ page }) => {
+    test.slow();
+    const c = await newClient();
+    await seedScan(c.id, 12, { weight_kg: 70, body_fat_pct: 27 }, { source: 'client' });
+    await seedScan(c.id, 5, { weight_kg: 69.4, body_fat_pct: 26.2, smm_kg: 27.9, visceral_fat: 6 });
+    await signInAsCoach(page);
+    await page.goto(`/clients/${c.id}/body`);
+
+    // No table on a phone: a list of cards, newest first.
+    expect(page.viewportSize()!.width).toBeLessThan(600);
+    await expect(history(page)).toBeHidden();
+    const cards = page.getByRole('list', { name: 'Scan history, newest first' }).getByRole('listitem');
+    await expect(cards).toHaveCount(2);
+    const newest = cards.nth(0);
+    await expect(newest).toContainText('Entered by you');
+    await expect(newest).toContainText('Weight');
+    await expect(newest).toContainText('69.4 kg');
+    // The change from the scan before: in full on the first value, short after it.
+    await expect(newest).toContainText('−0.6 since');
+    await expect(newest).toContainText('−0.8');
+    await expect(cards.nth(1)).toContainText(`Entered by Body ${c.last}`);
+
+    // Values sit in two columns: Weight and Body fat side by side.
+    const weight = (await newest.getByText('Weight', { exact: true }).boundingBox())!;
+    const fat = (await newest.getByText('Body fat', { exact: true }).boundingBox())!;
+    expect(Math.abs(weight.y - fat.y)).toBeLessThan(4);
+    expect(fat.x).toBeGreaterThan(weight.x + 100);
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+    expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+
+    // ⋯ holds Edit and Delete (no small links on the card).
+    await expect(newest.getByRole('button', { name: /^(Edit|Delete) scan of/ })).toHaveCount(0);
+    const more = newest.getByRole('button', { name: /^More for the .+ scan$/ });
+    const moreBox = (await more.boundingBox())!;
+    expect(moreBox.height).toBeGreaterThanOrEqual(44);
+    expect(moreBox.width).toBeGreaterThanOrEqual(44);
+    await more.tap();
+    await expect(newest.getByRole('menuitem')).toHaveText(['Edit scan', 'Delete scan…']);
+    await newest.getByRole('menuitem', { name: 'Edit scan' }).tap();
+    await expect(page.getByRole('dialog', { name: 'Edit scan' })).toBeVisible();
+    await page.getByRole('dialog', { name: 'Edit scan' }).getByRole('button', { name: 'Cancel' }).tap();
+
+    // The client's own entry offers a new scan instead of Edit.
+    await cards.nth(1).getByRole('button', { name: /^More for the .+ scan$/ }).tap();
+    await expect(cards.nth(1).getByRole('menuitem')).toHaveText(['Add a new scan instead', 'Delete scan…']);
+    await page.keyboard.press('Escape');
+
+    // Delete still asks first.
+    await more.tap();
+    await newest.getByRole('menuitem', { name: 'Delete scan…' }).tap();
+    const dialog = page.getByRole('dialog', { name: 'Delete this scan?' });
+    await dialog.getByRole('button', { name: 'Cancel' }).tap();
+    await expect(cards).toHaveCount(2);
+    await more.tap();
+    await newest.getByRole('menuitem', { name: 'Delete scan…' }).tap();
+    await dialog.getByRole('button', { name: 'Delete scan' }).tap();
+    await expect(page.getByText('Scan deleted.')).toBeVisible();
+    await expect(cards).toHaveCount(1);
+  });
+
+  test('a tablet keeps the table', async ({ page }) => {
+    const c = await newClient();
+    await seedScan(c.id, 3, { weight_kg: 71 });
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await signInAsCoach(page);
+    await page.goto(`/clients/${c.id}/body`);
+    await expect(history(page)).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Scan history, newest first' })).toBeHidden();
+  });
+});
