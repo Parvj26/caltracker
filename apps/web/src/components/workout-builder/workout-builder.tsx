@@ -207,12 +207,29 @@ export function WorkoutBuilder({
   }, [prefsVersion]);
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
-  // A newly added exercise (or group) opens, so the coach can fill it in straight away.
+  // A newly added exercise (or group) opens, so the coach can fill it in straight away, and scrolls into view.
+  const builderRef = useRef<HTMLDivElement>(null);
+  const scrollToId = useRef<string | null>(null);
   useEffect(() => {
     const added = doc.blocks.find((b) => !knownBlocks.current.has(b.id));
     knownBlocks.current = new Set(doc.blocks.map((b) => b.id));
-    if (added) setOpenId(added.id);
+    if (added) {
+      scrollToId.current = added.id;
+      setOpenId(added.id);
+    }
   }, [doc.blocks]);
+  useEffect(() => {
+    const id = scrollToId.current;
+    if (id === null || id !== openId) return;
+    scrollToId.current = null;
+    const el = builderRef.current?.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+    if (!el) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Phones and iPad portrait: the exercise's top just under the top Save bar (scroll-margin-top). Wider screens
+    // only scroll when it is out of sight.
+    const narrow = window.matchMedia('(max-width: 899.98px)').matches;
+    el.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: narrow ? 'start' : 'nearest' });
+  }, [openId]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -413,7 +430,7 @@ export function WorkoutBuilder({
                 : '';
 
   return (
-    <div className={styles.builder}>
+    <div ref={builderRef} className={styles.builder}>
       {mode !== 'library' ? (
         <p className={styles.modeBanner}>
           {mode.clientName}&apos;s workout for {formatDay(mode.date)}. Changes here don&apos;t touch your library.

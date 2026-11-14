@@ -522,6 +522,8 @@
 @media (max-width: 899.98px) {
   .block { gap: var(--ct-space-2); padding: var(--ct-space-2) var(--ct-space-3); }
   .block[data-open] { border-color: var(--ct-ink); }
+  /* A newly added exercise scrolls to just under the top Save bar, not behind it. */
+  .block { scroll-margin-top: calc(env(safe-area-inset-top) + 80px); }
   .fold { display: flex; align-items: center; gap: var(--ct-space-1); }
   .foldButton {
     display: flex;
