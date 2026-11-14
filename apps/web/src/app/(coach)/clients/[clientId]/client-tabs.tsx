@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSelectedLayoutSegment } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { cx } from '@/components/ui/cx';
+import { ChevronIcon } from '@/components/ui/chevron-icon';
 import styles from './client-page.module.css';
 
 export const CLIENT_TABS = [
@@ -94,12 +95,12 @@ export function ClientTabs({ clientId }: { clientId: string }) {
           keyboard and screen reader users reach every tab as a link anyway, so the arrows stay out of their way. */}
       {more.before ? (
         <button type="button" className={cx(styles.tabsArrow, styles.tabsArrowBefore)} onClick={() => page(-1)} aria-hidden="true" tabIndex={-1} data-testid="client-tabs-before">
-          ‹
+          <ChevronIcon direction="left" size={18} />
         </button>
       ) : null}
       {more.after ? (
         <button type="button" className={cx(styles.tabsArrow, styles.tabsArrowAfter)} onClick={() => page(1)} aria-hidden="true" tabIndex={-1} data-testid="client-tabs-after">
-          ›
+          <ChevronIcon direction="right" size={18} />
         </button>
       ) : null}
     </div>

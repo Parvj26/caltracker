@@ -87,7 +87,7 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   const today = await browserToday(page);
   const monday = mondayOf(today);
 
-  await expect(viewLink(page, '2 Week')).toHaveAttribute('aria-current', 'page');
+  await expect(viewLink(page, '2 weeks')).toHaveAttribute('aria-current', 'page');
   await expectWeeks(page, monday, 2);
   await expect(page.locator('[aria-current="date"]')).toHaveAttribute('data-date', today);
 
@@ -103,23 +103,23 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await expectWeeks(page, monday, 2);
 
   // 4 weeks: kept on reload, and remembered when the calendar is opened again without ?view=.
-  await viewLink(page, '4 Week').click();
+  await viewLink(page, '4 weeks').click();
   await expect(page).toHaveURL(new RegExp(`\\?view=4w&from=${today}$`));
-  await expect(viewLink(page, '4 Week')).toHaveAttribute('aria-current', 'page');
+  await expect(viewLink(page, '4 weeks')).toHaveAttribute('aria-current', 'page');
   await expectWeeks(page, monday, 4);
   await page.getByRole('link', { name: 'Next 4 weeks' }).click();
   await expectWeeks(page, addDays(monday, 28), 4);
   await page.reload();
   await expectWeeks(page, addDays(monday, 28), 4);
   await page.goto(`/clients/${clientId}/training`);
-  await expect(viewLink(page, '4 Week')).toHaveAttribute('aria-current', 'page');
+  await expect(viewLink(page, '4 weeks')).toHaveAttribute('aria-current', 'page');
   await expectWeeks(page, monday, 4);
   // The server already renders the remembered view (no flash of 2 weeks first): 4 weeks of days in the HTML.
   const html = await (await page.context().request.get(`/clients/${clientId}/training`)).text();
   expect(html.match(/data-date="/g)?.length).toBe(28);
 
   // 1 week.
-  await viewLink(page, '1 Week').click();
+  await viewLink(page, '1 week').click();
   await expectWeeks(page, monday, 1);
   await page.getByRole('link', { name: 'Previous week' }).click();
   await expectWeeks(page, addDays(monday, -7), 1);
