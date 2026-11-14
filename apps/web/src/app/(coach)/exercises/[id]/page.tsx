@@ -9,6 +9,8 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { ExerciseForm } from '../exercise-form';
 import { TRACKING_LABELS } from '../filters';
 import styles from '../exercises.module.css';
+import { BackToExercises } from './back-link';
+import { DetailStar } from './detail-star';
 import { OverrideForm } from './override-form';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -18,12 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ExercisePage({ params }: { params: Promise<{ id: string }> }) {
-  const { workspaceId } = await requireCoach();
+  const { workspaceId, userId } = await requireCoach();
   const { id } = await params;
   if (!UUID.test(id)) notFound();
 
   const supabase = await createServerSupabase();
-  const [exercise, override] = await Promise.all([
+  const [exercise, override, favourite] = await Promise.all([
     getExercise(id),
     supabase
       .from('exercise_overrides')
@@ -31,6 +33,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
       .eq('exercise_id', id)
       .eq('workspace_id', workspaceId)
       .maybeSingle(),
+    supabase.from('exercise_favorites').select('exercise_id').eq('exercise_id', id).eq('coach_id', userId).maybeSingle(),
   ]);
   if (override.error) throw new Error(`Could not load exercise notes: ${override.error.message}`);
   const ex = exercise;
@@ -41,44 +44,70 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
   const videoId = pinned ? parseYoutubeUrl(pinned)?.videoId : undefined;
   const imageUrl = (path: string) => supabase.storage.from('exercise-images').getPublicUrl(path).data.publicUrl;
 
+  const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const trackingLabel = TRACKING_LABELS[toTrackingType(ex.tracking_type)];
+  const secondary = ex.secondary_muscles.filter((m) => !ex.primary_muscles.includes(m));
+
+  // Approved phone mockup (row 5): a full-screen page with ‹ Exercises and the star in a top bar that sticks, then the
+  // name, "tracking · equipment", the photos, the muscles and the steps. Wider screens show the same, unstuck.
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
+      <div className={styles.detailBar}>
+        <BackToExercises />
+        <DetailStar id={ex.id} name={ex.name} initial={favourite.data !== null} />
+      </div>
+
+      <header className={styles.detailHead}>
         <h1 className={styles.title}>{ex.name}</h1>
-        <Chip tone="lime">{TRACKING_LABELS[toTrackingType(ex.tracking_type)]}</Chip>
+        <p className={styles.detailCaption}>
+          {trackingLabel}
+          {ex.equipment ? ` · ${capital(ex.equipment)}` : ''}
+          {isCustom ? ' · Custom' : ''}
+        </p>
       </header>
 
-      <Card>
-        <dl className={styles.meta}>
-          <dt>Tracking type</dt>
-          <dd>{TRACKING_LABELS[toTrackingType(ex.tracking_type)]}</dd>
-          <dt>Primary muscles</dt>
-          <dd>{ex.primary_muscles.join(', ') || 'None listed'}</dd>
-          <dt>Equipment</dt>
-          <dd>{ex.equipment ?? 'None'}</dd>
-        </dl>
+      {ex.image_paths.length > 0 ? (
+        <div className={styles.images}>
+          {ex.image_paths.map((p) => (
+            // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
+            <img key={p} src={imageUrl(p)} alt={`${ex.name} demonstration`} width={240} height={160} loading="lazy" />
+          ))}
+        </div>
+      ) : null}
 
-        {ex.image_paths.length > 0 ? (
-          <div className={styles.images}>
-            {ex.image_paths.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
-              <img key={p} src={imageUrl(p)} alt={`${ex.name} demonstration`} width={240} height={160} loading="lazy" />
+      <section className={styles.detailSection} aria-labelledby="muscles-heading">
+        <h2 id="muscles-heading" className={styles.detailHeading}>
+          Muscles
+        </h2>
+        {ex.primary_muscles.length + secondary.length > 0 ? (
+          <div className={styles.muscleChips}>
+            {ex.primary_muscles.map((m) => (
+              <Chip key={m} tone="blue">
+                {capital(m)}
+              </Chip>
+            ))}
+            {secondary.map((m) => (
+              <Chip key={m} tone="grey">
+                {capital(m)}
+              </Chip>
             ))}
           </div>
-        ) : null}
-      </Card>
+        ) : (
+          <p className={styles.notes}>None listed</p>
+        )}
+      </section>
 
       {ex.instructions.length > 0 ? (
-        <Card>
-          <section>
-            <h2 className={styles.sectionHeading}>Instructions</h2>
-            <ol className={styles.steps}>
-              {ex.instructions.map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ol>
-          </section>
-        </Card>
+        <section className={styles.detailSection} aria-labelledby="steps-heading">
+          <h2 id="steps-heading" className={styles.detailHeading}>
+            How to do it
+          </h2>
+          <ol className={styles.steps}>
+            {ex.instructions.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </section>
       ) : null}
 
       <Card>

@@ -1,6 +1,7 @@
 /**
  * The search engine behind every name search in the app (exercises, meals): typo-tolerant, partial words, any word
- * order, light stemming ("eggs" finds "Egg"), accents and case ignored. Ranked exact (1) -> starts-with (2) ->
+ * order, light stemming ("eggs" finds "Egg"), accents and case ignored. Typos: one in a 3-4 letter word that matches
+ * nothing as typed ("mya" finds "Maya"), one from 5 letters, two from 8. Ranked exact (1) -> starts-with (2) ->
  * contains (3) -> typo (4) -> matched only through extra words (5). Callers add their own boosts within a tier.
  */
 
@@ -165,7 +166,13 @@ function withinEdits(a: string, b: string, max: number): boolean {
   return (prev[m] ?? max + 1) <= max;
 }
 
-function typoBudget(len: number): number {
+/**
+ * Typos allowed for query word `q` against a word of length `len`: none under 3 letters, one for 3-4 letters (a
+ * missing, extra, wrong or swapped letter: "mya" finds "Maya"), and for 5+ one, or two from 8 letters.
+ */
+function typoBudget(q: string, len: number): number {
+  if (q.length < 3) return 0;
+  if (q.length < 5) return 1;
   return len >= 8 ? 2 : len >= 5 ? 1 : 0;
 }
 
@@ -177,7 +184,7 @@ export function buildQueryTable(vocab: readonly string[], q: string): QueryTable
   const qForms = formsOf(q);
   const name = new Int8Array(vocab.length).fill(NONE);
   const other = new Int8Array(vocab.length).fill(NONE);
-  const typoOk = q.length >= 5;
+  let matchesAsTyped = false;
   for (let v = 0; v < vocab.length; v++) {
     const f = vocab[v] as string;
     let kind = NONE;
@@ -190,10 +197,19 @@ export function buildQueryTable(vocab: readonly string[], q: string): QueryTable
       // A stem is a weak guess ("spring" -> "spr"): use it as a prefix only when it has 4+ letters.
       if (f.startsWith(qf) && (qf === q || qf.length >= 4)) kind = PREFIX;
     }
-    if (kind === NONE && typoOk && withinEdits(q, f, typoBudget(Math.max(q.length, f.length)))) kind = TYPO;
+    if (kind !== NONE) matchesAsTyped = true;
     name[v] = kind;
     if (kind === EXACT || (q.length >= 3 && kind === PREFIX)) other[v] = OTHER;
     else if (qForms.includes(f)) other[v] = OTHER;
+  }
+  // Short words: one letter off turns a real word into another ("dip" -> "hip", "pull" -> "full"), so a 3-4 letter
+  // word is only treated as a typo when it matches nothing as typed. From 5 letters, look-alikes are rare.
+  const typoOk = q.length >= 5 || (q.length >= 3 && !matchesAsTyped);
+  if (typoOk) {
+    for (let v = 0; v < vocab.length; v++) {
+      const f = vocab[v] as string;
+      if (name[v] === NONE && withinEdits(q, f, typoBudget(q, Math.max(q.length, f.length)))) name[v] = TYPO;
+    }
   }
   return { q, name, other };
 }

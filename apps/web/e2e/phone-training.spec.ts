@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page } from '@playwright/test';
+import { formatPlainDay, formatPlainLongDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, nextMonday, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
@@ -24,13 +25,9 @@ const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
 test.use({ ...iphone13, viewport: { width: 375, height: 667 } });
 
 /** "Thursday 12 November 2026", as the calendar says it. */
-const longDay = (d: string) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(
-    new Date(`${d}T00:00:00Z`),
-  );
+const longDay = formatPlainLongDay;
 /** "Thu 12 Nov", as the day's "+" says it. */
-const shortDay = (d: string) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${d}T00:00:00Z`));
+const shortDay = formatPlainDay;
 const mondayOf =(d: string) => addDays(d, 1 - (new Date(`${d}T00:00:00Z`).getUTCDay() || 7));
 
 async function expectNoSidewaysScroll(page: Page) {

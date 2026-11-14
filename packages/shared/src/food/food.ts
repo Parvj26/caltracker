@@ -111,6 +111,15 @@ export function macroProgress(total: number, target: number | null): MacroProgre
   };
 }
 
+/** "860 left", "140 over" or "on target" for calories ("12.5 g left" for grams); null without a target. */
+export function targetGap(key: MacroKey, total: number, target: number | null): string | null {
+  if (target === null || target <= 0) return null;
+  const diff = round1(target - total);
+  if (diff === 0) return 'on target';
+  const amount = key === 'calories' ? group(Math.round(Math.abs(diff))) : formatMacro(key, Math.abs(diff));
+  return `${amount} ${diff < 0 ? 'over' : 'left'}`;
+}
+
 /** Why a meal cannot be saved yet (empty when it can). */
 export function mealProblems(draft: { macros: MealMacros; hasPhoto: boolean; name: string; note: string }): string[] {
   const out: string[] = [];

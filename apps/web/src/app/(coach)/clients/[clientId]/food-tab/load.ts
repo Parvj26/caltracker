@@ -10,7 +10,12 @@ export type CoachMeal = {
   macros: MealMacros;
   photo: { full: string; thumb: string | undefined; width: number | undefined; height: number | undefined } | null;
 };
-export type FoodWeek = { targets: MacroTargets | null; meals: CoachMeal[] };
+export type FoodWeek = {
+  targets: MacroTargets | null;
+  meals: CoachMeal[];
+  /** Whether the client has logged any meal at all (in any week): without one the tab shows a single message. */
+  everLogged: boolean;
+};
 
 const SIGNED_FOR_S = 3600;
 const num = (v: number | null): number | null => (v === null ? null : Number(v));
@@ -39,6 +44,14 @@ export async function loadFoodWeek(supabase: SupabaseClient<Database>, workspace
   if (meals.error) throw new Error(`Could not load meals: ${meals.error.message}`);
   if (targets.error) throw new Error(`Could not load targets: ${targets.error.message}`);
 
+  // Only asked when this week is empty: one row id, no meal details.
+  let everLogged = meals.data.length > 0;
+  if (!everLogged) {
+    const any = await supabase.from('meals').select('id').eq('workspace_id', workspaceId).eq('client_id', clientId).limit(1);
+    if (any.error) throw new Error(`Could not load meals: ${any.error.message}`);
+    everLogged = any.data.length > 0;
+  }
+
   const paths = meals.data.flatMap((m) => [m.photo_path, m.photo_thumb_path].filter((p): p is string => p !== null));
   const urls: Record<string, string> = {};
   if (paths.length > 0) {
@@ -47,6 +60,7 @@ export async function loadFoodWeek(supabase: SupabaseClient<Database>, workspace
   }
 
   return {
+    everLogged,
     targets: targets.data
       ? { calories: num(targets.data.calories), protein: num(targets.data.protein_g), carbs: num(targets.data.carbs_g), fat: num(targets.data.fat_g) }
       : null,

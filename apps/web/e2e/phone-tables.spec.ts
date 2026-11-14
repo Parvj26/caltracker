@@ -2,10 +2,10 @@ import { devices, expect, test, type Locator, type Page } from '@playwright/test
 import { demoWorkspace, freshClient, unique } from './assign-helpers';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 
-// Phone fixes, batch 2: Activity as cards, the Food week as one row per day with four bars, the client tabs' arrow,
+// Phone fixes, batch 2: Activity as cards, the client tabs' arrow (the Food tab's phone layout is in phone-food.spec.ts),
 // and the live view (short "HERE NOW" and Up next under the current exercise on phones, Up next beside the workout
 // on a landscape iPad). Chromium with iPhone sizes and touch (the browser can't be chosen per spec). Each CI shard starts from an empty database, so every test seeds its own
-// client, log and meals in the demo workspace, and everything is removed afterwards.
+// client and log in the demo workspace, and everything is removed afterwards.
 
 const admin = serviceClient();
 let workspaceId: string;
@@ -27,7 +27,6 @@ test.afterAll(async () => {
 const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
 const SE = { width: 375, height: 667 };
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
-const today = () => new Intl.DateTimeFormat('en-CA').format(new Date());
 
 async function newClient(first: string): Promise<{ id: string; name: string }> {
   const last = `Phone${unique()}`;
@@ -68,36 +67,6 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expectOnScreen(row.locator('time'));
     const box = (await row.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(SE.width);
-    await expectNoSidewaysScroll(page);
-  });
-
-  test('the Food week is one row per day with calories, protein, carbs and fat against the targets', async ({ page }) => {
-    const client = await newClient('Fern');
-    const noon = new Date();
-    noon.setHours(12, 15, 0, 0);
-    const meal = await admin.from('meals').insert({
-      workspace_id: workspaceId, client_id: client.id, eaten_at: noon.toISOString(), eaten_on: today(), name: 'Lunch',
-      calories: 650, protein_g: 42, carbs_g: 80, fat_g: 20,
-    });
-    if (meal.error) throw meal.error;
-    const targets = await admin.from('nutrition_targets').insert({ workspace_id: workspaceId, client_id: client.id, calories: 2000, protein_g: 150, carbs_g: 250, fat_g: 70 });
-    if (targets.error) throw targets.error;
-    await signInAsCoach(page);
-    await page.goto(`/clients/${client.id}/food`);
-
-    await expect(page.getByTestId('food-week')).toBeHidden();
-    const day = page.getByTestId(`food-phone-day-${today()}`);
-    await expect(day).toBeVisible();
-    await expect(day).toContainText('Today');
-    await expect(day).toContainText('1 meal');
-    for (const [label, amount] of [['Calories', '650 / 2,000'], ['Protein', '42 / 150'], ['Carbs', '80 / 250'], ['Fat', '20 / 70']] as const) {
-      await expectOnScreen(day.getByText(label, { exact: true }));
-      await expectOnScreen(day.getByText(amount));
-    }
-    // Seven days, each with its name on one line.
-    await expect(page.getByTestId('food-week-phone').getByRole('listitem')).toHaveCount(7);
-    const head = (await day.locator('p').first().boundingBox())!;
-    expect(head.height).toBeLessThan(30);
     await expectNoSidewaysScroll(page);
   });
 

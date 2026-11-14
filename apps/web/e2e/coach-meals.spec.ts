@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { devices, expect, test } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // The coach website's Meals: meals shared with every client, with how often clients logged each one. Each test
@@ -71,8 +71,8 @@ test('the Meals page lists shared meals with how often they were logged', async 
 
   const loggedRow = page.getByTestId('coach-meal-row').filter({ hasText: logged });
   await expect(loggedRow).toContainText('450 kcal · 35 P · 52 C · 11 F');
-  await expect(loggedRow).toContainText('logged 1×');
-  await expect(page.getByTestId('coach-meal-row').filter({ hasText: fresh })).toContainText('not yet');
+  await expect(loggedRow).toContainText('Logged 1 time');
+  await expect(page.getByTestId('coach-meal-row').filter({ hasText: fresh })).toContainText('Not logged yet');
 });
 
 test('the coach adds a meal with a photo, edits it and removes it', async ({ page }) => {
@@ -86,10 +86,10 @@ test('the coach adds a meal with a photo, edits it and removes it', async ({ pag
   await form.getByLabel('Name').fill(name);
   await form.getByTestId('coach-meal-photo-input').setInputFiles('e2e/fixtures/meal.jpg');
   await expect(form.getByRole('img', { name: 'Meal photo' })).toBeVisible();
-  await form.getByLabel('kcal').fill('490');
-  await form.getByLabel('Protein g').fill('45');
-  await form.getByLabel('Carbs g').fill('38');
-  await form.getByLabel('Fat g').fill('14');
+  await form.getByLabel('Calories (kcal)').fill('490');
+  await form.getByLabel('Protein (g)').fill('45');
+  await form.getByLabel('Carbs (g)').fill('38');
+  await form.getByLabel('Fat (g)').fill('14');
   await form.getByLabel('Ingredients').fill('500 g turkey mince\n1 tin beans');
   await form.getByLabel('How to make it').fill('Brown the mince, add the rest, simmer 20 minutes.');
   await form.getByRole('button', { name: 'Save' }).click();
@@ -97,7 +97,7 @@ test('the coach adds a meal with a photo, edits it and removes it', async ({ pag
   await expect(page).toHaveURL(/\/meals\/[0-9a-f-]{36}$/);
   const row = page.getByTestId('coach-meal-row').filter({ hasText: name });
   await expect(row).toContainText('490 kcal · 45 P · 38 C · 14 F');
-  await expect(row).toContainText('not yet');
+  await expect(row).toContainText('Not logged yet');
   await expect(row.getByRole('img', { name: `${name} photo` })).toBeVisible();
   const saved = await admin.from('coach_meals').select('id, photo_path, photo_width').eq('name', name).single();
   expect(saved.data?.photo_path).toMatch(new RegExp(`^${workspaceId}/${saved.data?.id}-[0-9a-f-]{36}\\.(webp|jpg)$`));
@@ -105,7 +105,7 @@ test('the coach adds a meal with a photo, edits it and removes it', async ({ pag
 
   // Edit.
   const edit = page.getByRole('form', { name: 'Edit meal' });
-  await edit.getByLabel('kcal').fill('500');
+  await edit.getByLabel('Calories (kcal)').fill('500');
   await edit.getByRole('button', { name: 'Save' }).click();
   await expect(edit.getByRole('status')).toHaveText('Saved');
   await expect(row).toContainText('500 kcal · 45 P · 38 C · 14 F');
@@ -147,4 +147,109 @@ test('Cancel leaves the meal form, asking "Discard changes?" only after typing',
   await form.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Discard' }).click();
   await expect(page).toHaveURL(/\/meals$/);
+});
+
+test('the meals search finds a meal despite a typo and keeps the text in the address', async ({ page }) => {
+  const tag = unique();
+  const wanted = `E2E Lentil soup ${tag}`;
+  const other = `E2E Banana bread ${tag}`;
+  await seedCoachMeal(wanted, 320);
+  await seedCoachMeal(other, 410);
+  await signInAsCoach(page);
+  await page.goto('/meals');
+  const rows = page.getByTestId('coach-meal-row');
+  await expect(rows.filter({ hasText: other })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search meals' }).fill(`lentl ${tag}`);
+  await expect(rows.filter({ hasText: wanted })).toBeVisible();
+  await expect(rows.filter({ hasText: other })).toHaveCount(0);
+  await expect(page).toHaveURL(/[?&]q=lentl/);
+  // The text is kept when a meal opens beside the list.
+  await rows.filter({ hasText: wanted }).click();
+  await expect(page.getByRole('form', { name: 'Edit meal' }).getByLabel('Name')).toHaveValue(wanted);
+  await expect(page.getByRole('searchbox', { name: 'Search meals' })).toHaveValue(`lentl ${tag}`);
+  await expect(rows.filter({ hasText: other })).toHaveCount(0);
+});
+
+// Phones (approved redesign, row 4 option A): the list is its own screen and a meal opens full screen.
+test.describe('on an iPhone', () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { defaultBrowserType, ...iphone13 } = devices['iPhone 13'];
+  test.use({ ...iphone13 });
+
+  test('a tap on a meal opens the full-screen editor; Back returns to the list; ⋯ removes it', async ({ page }) => {
+    test.slow();
+    const name = `E2E Phone wrap ${unique()}`.slice(0, 40);
+    const id = await seedCoachMeal(name, 520);
+    await signInAsCoach(page);
+    await page.goto('/meals');
+    const row = page.getByTestId('coach-meal-row').filter({ hasText: name });
+    // No photo: the meal's first letter stands in, and the hint panel of the laptop layout is gone.
+    await expect(row).toContainText('Not logged yet');
+    await expect(page.getByText('Pick a meal to edit it, or add a new one.')).toBeHidden();
+    await row.click();
+
+    await expect(page).toHaveURL(new RegExp(`/meals/${id}$`));
+    const form = page.getByRole('form', { name: 'Edit meal' });
+    await expect(form.getByLabel('Name')).toHaveValue(name);
+    // Full screen: the list and the page title are gone, the editor's own bar is at the top.
+    await expect(page.getByRole('list', { name: 'Shared meals' })).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Meals', level: 1 })).toBeHidden();
+    await expect(form.getByRole('link', { name: 'Back to meals' })).toBeInViewport();
+    await expect(form.getByRole('button', { name: 'Save' })).toBeInViewport({ ratio: 1 });
+    await expect(form.getByRole('button', { name: 'Cancel' })).toBeInViewport({ ratio: 1 });
+    // Remove lives in the ⋯ menu on a phone.
+    await expect(form.getByRole('button', { name: 'Remove meal' })).toBeHidden();
+
+    // Saving keeps "Saved" on screen after the page refreshes with the saved meal.
+    await form.getByLabel('Calories (kcal)').fill('530');
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(form.getByRole('status')).toHaveText('Saved');
+    // In the Save bar stuck to the bottom, so it shows without scrolling.
+    await expect(form.getByRole('status')).toBeInViewport();
+    await expect.poll(async () => (await admin.from('coach_meals').select('calories').eq('id', id).single()).data?.calories).toBe(530);
+    await expect(form.getByRole('status')).toHaveText('Saved');
+
+    await form.getByRole('link', { name: 'Back to meals' }).click();
+    await expect(page).toHaveURL(/\/meals$/);
+    await expect(row).toContainText('530 kcal');
+    await expect(page.getByRole('heading', { name: 'Meals', level: 1 })).toBeVisible();
+
+    // The phone's Back gesture works too: open again, go back.
+    await row.click();
+    await expect(page).toHaveURL(new RegExp(`/meals/${id}$`));
+    await page.goBack();
+    await expect(page).toHaveURL(/\/meals$/);
+    await expect(row).toBeVisible();
+
+    await row.click();
+    await form.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('menu', { name: 'Meal actions' }).getByRole('menuitem', { name: 'Remove meal' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('Remove this meal?');
+    await dialog.getByRole('button', { name: 'Remove meal' }).click();
+    await expect(page).toHaveURL(/\/meals$/);
+    await expect(page.getByTestId('coach-meal-row').filter({ hasText: name })).toHaveCount(0);
+  });
+
+  test('+ New meal opens an empty full-screen form, and Back leaves it', async ({ page }) => {
+    await signInAsCoach(page);
+    await page.goto('/meals');
+    await page.getByRole('link', { name: '+ New meal' }).click();
+    await expect(page).toHaveURL(/\/meals\/new$/);
+    const form = page.getByRole('form', { name: 'New meal' });
+    await expect(form.getByLabel('Name')).toHaveValue('');
+    await expect(form.getByLabel('Name')).toBeInViewport();
+    await expect(form.getByRole('button', { name: 'Save meal' })).toBeInViewport({ ratio: 1 });
+    await expect(form.getByRole('button', { name: 'More' })).toHaveCount(0);
+    await expect(page.getByRole('list', { name: 'Shared meals' })).toBeHidden();
+
+    // Back with something typed asks first, like Cancel.
+    await form.getByLabel('Name').fill(`E2E Unsaved ${unique()}`);
+    await form.getByRole('link', { name: 'Back to meals' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('Discard changes?');
+    await dialog.getByRole('button', { name: 'Discard' }).click();
+    await expect(page).toHaveURL(/\/meals$/);
+    await expect(page.getByRole('heading', { name: 'Meals', level: 1 })).toBeVisible();
+  });
 });

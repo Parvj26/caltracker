@@ -78,7 +78,23 @@ export {
   startOfWeek,
 } from './dates/dates';
 export type { IsoDate } from './dates/dates';
-export { MONTHS_SHORT, WEEKDAYS_SHORT, formatDateTime, formatDayDate, formatPlainDay, formatTimeOfDay } from './dates/format';
+export {
+  MONTHS_SHORT,
+  WEEKDAYS_SHORT,
+  formatDateTime,
+  formatDayDate,
+  formatPlainDay,
+  formatTimeOfDay,
+  formatWeekRange,
+  formatWeekdayDay,
+  MONTHS_LONG,
+  WEEKDAYS_LONG,
+  formatPlainDayMonth,
+  formatPlainDayMonthYear,
+  formatPlainLongDay,
+  formatPlainMonth,
+  formatPlainWeekday,
+} from './dates/format';
 export {
   CALENDAR_VIEWS,
   DEFAULT_CALENDAR_VIEW,
@@ -586,6 +602,7 @@ export {
   mealsByDay,
   parseMacroInput,
   shortDayLabel,
+  targetGap,
   todayFoodSummary,
   weekDays,
 } from './food/food';
