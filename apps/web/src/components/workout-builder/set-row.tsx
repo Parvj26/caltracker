@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
   setKindOf,
   setKindPatch,
@@ -46,16 +46,42 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'o
   onCommit: (n: number | null) => void;
 };
 
+/** Selects the whole box, so the next key replaces the number (10 → 8, not 108). */
+function selectAll(el: HTMLInputElement) {
+  if (document.activeElement === el) el.setSelectionRange(0, el.value.length);
+}
+
 /**
  * A text box for a number. While the coach types, the box shows exactly what they typed (so "61." or "1:" are not
  * rewritten mid-entry); each readable value is saved to the doc at once. On blur it shows the doc's value again.
+ * Tapping or tabbing into a filled box selects its number, so typing replaces it instead of landing mid-number.
  */
-function NumberInput({ label, value, format, parse, onCommit, className, ...rest }: NumberInputProps) {
+function NumberInput({ label, value, format, parse, onCommit, className, onFocus, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  // True during a tap that focuses the box: Safari places the caret when that tap ends, undoing the selection.
+  const focusingTap = useRef(false);
   const invalid = draft !== null && Number.isNaN(parse(draft));
   return (
     <input
       {...rest}
+      onFocus={(e) => {
+        onFocus?.(e);
+        const el = e.currentTarget;
+        // iOS ignores a selection made inside the focus event, so select once it has settled.
+        setTimeout(() => selectAll(el), 0);
+      }}
+      onPointerDown={(e) => {
+        onPointerDown?.(e);
+        focusingTap.current = document.activeElement !== e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        onPointerUp?.(e);
+        if (!focusingTap.current) return;
+        // A second tap in a box that already has focus still places the caret, as usual.
+        focusingTap.current = false;
+        const el = e.currentTarget;
+        requestAnimationFrame(() => selectAll(el));
+      }}
       type="text"
       aria-label={label}
       aria-invalid={invalid || undefined}
