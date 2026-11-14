@@ -77,6 +77,7 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
       <div id={setsId} hidden={!expanded} className={styles.substituteBody}>
         <SetTable
           sets={sub.sets}
+          exerciseName={`${sub.exerciseName} (substitute)`}
           names={names.map((n) => `${sub.exerciseName} (substitute) ${n}`)}
           trackingType={sub.trackingType}
           units={units}
