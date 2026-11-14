@@ -54,7 +54,8 @@ export function CoachSidebar({
   useEffect(() => {
     if (!open) return;
     const sheet = sheetRef.current;
-    const tiles = () => Array.from(sheet?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+    // Only what is shown: the tab bar's own pages are in the sidebar too, hidden from the sheet.
+    const tiles = () => Array.from(sheet?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter((el) => el.getClientRects().length > 0);
     tiles()[0]?.focus();
     // Tab goes round the tiles and the More button (which closes the sheet), nothing behind them.
     const items = () => [...tiles(), ...(moreRef.current ? [moreRef.current] : [])];
