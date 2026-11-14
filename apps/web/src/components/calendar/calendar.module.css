@@ -206,7 +206,8 @@
 .menuButton:hover, .menuButton[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
 .menu {
   position: absolute;
-  z-index: 10;
+  /* Over the client page's stuck bar (20) and the toast (20), so an open menu is never partly hidden. */
+  z-index: 25;
   top: 100%;
   right: 0;
   display: flex;

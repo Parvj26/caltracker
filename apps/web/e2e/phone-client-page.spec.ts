@@ -1,5 +1,5 @@
 import { devices, expect, test, type Page } from '@playwright/test';
-import { browserToday, demoWorkspace, freshClient } from './assign-helpers';
+import { addDays, browserToday, demoWorkspace, freshClient, seedLibraryWorkout } from './assign-helpers';
 import { COACH_EMAIL, seedLog, serviceClient, signInAsCoach } from './helpers';
 
 // The client page on an iPhone (approved redesign, rows 2A and 3A): one small bar (back, initials, name, Message, ⋯)
@@ -9,6 +9,7 @@ import { COACH_EMAIL, seedLog, serviceClient, signInAsCoach } from './helpers';
 
 const admin = serviceClient();
 const created: string[] = [];
+const library: string[] = [];
 let workspaceId: string;
 let coachId: string;
 
@@ -26,6 +27,7 @@ test.afterAll(async () => {
   await admin.from('workout_logs').delete().in('client_id', created);
   await admin.from('workouts').delete().in('client_id', created);
   await admin.from('client_limitations').delete().in('client_id', created);
+  if (library.length) await admin.from('workouts').delete().in('name', library);
   for (const id of created) await admin.auth.admin.deleteUser(id);
 });
 
@@ -171,4 +173,77 @@ test('Overview Today card: nothing today offers + Add workout, which opens the A
   await today.getByRole('link', { name: '+ Add workout' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training`));
   await expect(page.getByRole('dialog', { name: 'Add a workout' })).toBeVisible();
+});
+
+/** The bottom of the bar stuck at the top. */
+const barBottom = async (page: Page) => {
+  const b = (await page.getByTestId('client-sticky').boundingBox())!;
+  return b.y + b.height;
+};
+
+/** Every item of the open menu is between `top` and `bottom` on screen. */
+async function expectMenuWithin(page: Page, name: string, top: number, bottom: number) {
+  const items = page.getByRole('menu', { name }).getByRole('menuitem');
+  await expect(items.first()).toBeVisible();
+  for (const item of await items.all()) {
+    const b = (await item.boundingBox())!;
+    expect(b.y, `${await item.textContent()} starts under the bar`).toBeGreaterThanOrEqual(top - 1);
+    expect(b.y + b.height, `${await item.textContent()} ends under the toast`).toBeLessThanOrEqual(bottom + 1);
+  }
+}
+
+test('a calendar card\'s ⋯ menu stays clear of the stuck bar and of the toast', async ({ page }) => {
+  test.slow();
+  const client = await newClient('Mena');
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const near = `Near top ${Date.now()}`;
+  await planToday(page, client.id, near);
+  const later = `Later ${Date.now()}`;
+  library.push(later);
+  await seedLibraryWorkout(admin, workspaceId, later);
+  await page.goto(`/clients/${client.id}/training?view=2w&from=${today}`);
+
+  // Today's card a little under the bar, with a bit less room below it than its menu needs and more above it if the
+  // bar were not there: the menu must not flip up under the bar.
+  const card = page.locator(`[data-date="${today}"]`).getByRole('listitem').filter({ hasText: near });
+  await expect(card).toBeVisible();
+  const box = (await card.boundingBox())!;
+  await page.evaluate((dy) => window.scrollBy(0, dy), box.y + box.height - 361);
+  await card.getByRole('button', { name: `Options for ${near}` }).click();
+  await expectMenuWithin(page, `Options for ${near}`, await barBottom(page), 667);
+  await page.keyboard.press('Escape');
+
+  // A workout added six days on shows the "Added …" toast; with its card just above the toast, the menu flips up.
+  const day = addDays(today, 6);
+  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${day}T00:00:00Z`));
+  await page.locator(`[data-date="${day}"]`).getByRole('button', { name: `Add workout to ${fmt}`, exact: true }).click();
+  const picker = page.getByRole('dialog', { name: `Add a workout to ${fmt}` });
+  await picker.getByLabel('Search workouts').fill(later);
+  await picker.getByRole('button', { name: later, exact: true }).click();
+  const toast = page.getByText(`Added ${later} to`);
+  await expect(toast).toBeVisible();
+  const lower = page.locator(`[data-date="${day}"]`).getByRole('listitem').filter({ hasText: later });
+  const toastTop = (await toast.boundingBox())!.y;
+  const c = (await lower.boundingBox())!;
+  await page.evaluate((dy) => window.scrollBy(0, dy), c.y + c.height - (toastTop - 12));
+  await lower.getByRole('button', { name: `Options for ${later}` }).click();
+  await expectMenuWithin(page, `Options for ${later}`, await barBottom(page), (await toast.boundingBox())!.y);
+  // And it is drawn over the toast, so nothing of it is covered.
+  const del = page.getByRole('menu', { name: `Options for ${later}` }).getByRole('menuitem', { name: 'Delete' });
+  const d = (await del.boundingBox())!;
+  const topAtDelete = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest('[role="menuitem"]')?.textContent ?? null, [d.x + d.width / 2, d.y + d.height / 2]);
+  expect(topAtDelete).toBe('Delete');
+});
+
+test('a #heading link from Overview lands below the stuck bar', async ({ page }) => {
+  test.slow();
+  const client = await newClient('Hash');
+  await signInAsCoach(page);
+  await page.goto(`/clients/${client.id}`);
+  await page.getByRole('link', { name: 'See bests and stickers' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training#bests-heading$`));
+  const heading = page.locator('#bests-heading');
+  await expect(heading).toBeInViewport({ ratio: 1 });
+  await expect.poll(async () => (await heading.boundingBox())!.y - (await barBottom(page))).toBeGreaterThanOrEqual(0);
 });

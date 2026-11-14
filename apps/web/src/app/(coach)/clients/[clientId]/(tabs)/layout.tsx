@@ -18,7 +18,8 @@ export default async function ClientTabsLayout({ children, params }: { children:
 
   return (
     <div className={styles.page}>
-      <div className={styles.sticky} data-testid="client-sticky">
+      {/* data-overlay-edge: while stuck on a phone, open ⋯ menus keep below it (menu-placement.ts). */}
+      <div className={styles.sticky} data-testid="client-sticky" data-overlay-edge="top">
         <ClientHeader client={{ id: client.id, name: client.name, firstName: client.firstName, removedAt: client.removedAt }} />
         <ClientTabs clientId={client.id} />
       </div>

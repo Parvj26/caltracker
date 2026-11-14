@@ -467,7 +467,8 @@ export function ClientCalendar({
         />
       ) : null}
 
-      <div className={styles.toastRegion} aria-live="assertive">
+      {/* data-overlay-edge: an open ⋯ menu keeps clear of the toast (menu-placement.ts). */}
+      <div className={styles.toastRegion} aria-live="assertive" data-overlay-edge="bottom">
         {toast ? (
           <div className={styles.toast}>
             <span>{toast}</span>

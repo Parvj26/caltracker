@@ -59,9 +59,9 @@ export function AssignmentsPanel({
             {assignments.map((a) => (
               <li key={a.id} className={pageStyles.programRow}>
                 {a.programId ? (
+                  // The row opens the program (no "›": the row's ⋯ sits at its end).
                   <Link href={`/programs/${a.programId}`} className={styles.assignmentLink}>
                     <span className={styles.assignmentName}>{assignmentText(a)}</span>
-                    <span aria-hidden="true" className={styles.assignmentChevron}>›</span>
                   </Link>
                 ) : (
                   // Its program has been deleted since: nothing to open.

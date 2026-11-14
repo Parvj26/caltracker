@@ -69,6 +69,14 @@ export function ClientTabs({ clientId }: { clientId: string }) {
     if (left < strip.scrollLeft) strip.scrollLeft = Math.max(0, left - 48);
     else if (left + tab.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left + tab.offsetWidth - strip.clientWidth + 48;
   }, [ref, segment]);
+  // Opening a tab at a #heading (Overview's "See bests and stickers"): scroll it into view once the tab is on screen,
+  // so its scroll margin keeps it below the bar stuck at the top on a phone (Mobile Safari's own jump can land under it).
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [segment]);
   const page = (direction: 1 | -1) => {
     const strip = ref.current;
     if (strip) strip.scrollBy({ left: direction * Math.round(strip.clientWidth * 0.7), behavior: 'smooth' });
