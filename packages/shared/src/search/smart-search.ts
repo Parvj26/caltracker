@@ -294,3 +294,16 @@ export function smartMatch<T>(index: SmartIndex<T>, query: string): SmartHit<T>[
   }
   return out;
 }
+
+/**
+ * A list filtered by a search box: every item whose name matches the query (typos, partial words, any word order),
+ * best match first, the given order within a tier. A blank query keeps every item in the given order.
+ */
+export function smartFilter<T>(items: readonly T[], query: string, nameOf: (item: T) => string): T[] {
+  if (normalizeSearchText(query) === '') return [...items];
+  const index = buildSmartIndex(items, (item) => ({ name: nameOf(item) }));
+  // smartMatch keeps the given order, and sort is stable, so ties stay in the caller's order.
+  return smartMatch(index, query)
+    .sort((a, b) => a.tier - b.tier)
+    .map((h) => h.item);
+}

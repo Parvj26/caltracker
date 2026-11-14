@@ -175,6 +175,7 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
         <Avatar name={invite.name} toneKey={invite.email} />
         <span className={styles.nameStack}>
           <span className={styles.rowName}>{invite.name}</span>
+          <span className={cx(styles.statusLine, styles.statusMuted, styles.inviteEmail)}>{invite.email}</span>
           <span className={cx(styles.statusLine, styles.statusMuted)}>
             {today ? invitedLabel(localDateOf(invite.sentAt), today) : 'Invited'}
             {expired ? ' · link expired' : null}
@@ -208,7 +209,7 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
             </span>
           </span>
         ) : (
-          <span className={styles.muted}>{invite.email}</span>
+          <span className={styles.muted}>Nothing planned</span>
         )}
       </span>
     </div>

@@ -11,6 +11,7 @@ import {
   displayValue,
   formatMetric,
   formatMetricChange,
+  formatPlainDay,
   formatShortDate,
   fromKg,
   latestUpdates,
@@ -31,9 +32,8 @@ import { LineChart } from '../progress/line-chart';
 import { useNowMinute } from './use-now';
 import styles from '../client-page.module.css';
 
-const plainDay = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-/** A plain calendar date as "Sat 31 Oct". */
-const dayText = (d: IsoDate) => plainDay.format(new Date(`${d}T00:00:00Z`));
+/** A plain calendar date as "Sat 31 Oct" (same text on the server and in Safari). */
+const dayText = (d: IsoDate) => formatPlainDay(d);
 
 function Tracked({ label, count }: { label: string; count: TrackedCount }) {
   return (

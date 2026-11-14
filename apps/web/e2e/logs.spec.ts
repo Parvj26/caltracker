@@ -35,7 +35,9 @@ test.afterAll(async () => {
 
 /** An ISO timestamp `minutesAgo` before now, so seeded logs are always the newest in the feed. */
 const ago = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
-const shortDay = (d: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(new Date(`${d}T00:00:00Z`));
+// "4 Nov", as formatDateTime (packages/shared) prints it on every engine: "Sep", never Node's en-GB "Sept".
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDay = (d: string) => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
 
 /* ---------- Plain YYYY-MM-DD maths (UTC only) ---------- */
 const MS_DAY = 86_400_000;

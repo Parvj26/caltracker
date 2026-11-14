@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSmartIndex, normalizeSearchText, smartMatch } from '../../src/search';
+import { buildSmartIndex, normalizeSearchText, smartFilter, smartMatch } from '../../src/search';
 
 type Item = { name: string };
 const names = ['Chicken & rice', 'Egg white wrap', 'Crème brûlée', 'Protein oats', 'Oat bowl', 'Greek yogurt bowl'];
@@ -61,5 +61,26 @@ describe('smart search', () => {
   it('matches extra words at the lowest tier', () => {
     const idx = buildSmartIndex([{ name: 'Overnight oats' }], (i) => ({ name: i.name, extraWords: ['breakfast'] }));
     expect(smartMatch(idx, 'breakfast')[0]?.tier).toBe(5);
+  });
+});
+
+describe('smartFilter', () => {
+  const workouts = ['Upper body A', 'Lower body B', 'Full body conditioning', 'Mobility flow'].map((name) => ({ name }));
+  const find = (q: string) => smartFilter(workouts, q, (w) => w.name).map((w) => w.name);
+
+  it('keeps everything, in the given order, for a blank query', () => {
+    expect(find('')).toEqual(['Upper body A', 'Lower body B', 'Full body conditioning', 'Mobility flow']);
+    expect(find('   ')).toEqual(['Upper body A', 'Lower body B', 'Full body conditioning', 'Mobility flow']);
+  });
+
+  it('forgives typos, partial words and word order', () => {
+    expect(find('mobilty')).toEqual(['Mobility flow']);
+    expect(find('cond')).toEqual(['Full body conditioning']);
+    expect(find('body lower')).toEqual(['Lower body B']);
+  });
+
+  it('puts better matches first and keeps the given order within a tier', () => {
+    expect(find('body')).toEqual(['Upper body A', 'Lower body B', 'Full body conditioning']);
+    expect(find('lower')).toEqual(['Lower body B']);
   });
 });

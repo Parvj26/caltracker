@@ -1,9 +1,8 @@
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
+import { MONTHS_SHORT as MONTHS, WEEKDAYS_SHORT as WEEKDAYS } from '../dates/format';
 import { parseYoutubeUrl } from '../exercises/youtube';
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 /** Numeric calendar parts of an instant in a time zone. Only numbers are taken from Intl (limited locale data on Hermes). */

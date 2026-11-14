@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TodayRow, WorkoutStatus } from '@caltracker/shared';
 import { todayAction, todayMenu, todayPill } from './home-actions';
-import { minutesSince, trainingNow, type LiveLog } from './home-live';
+import { liveLogByClient, minutesSince, trainingNow, type LiveLog } from './home-live';
 
 const COACH = 'coach';
 const row = (status: WorkoutStatus): TodayRow => ({
@@ -16,6 +16,25 @@ describe('todayAction', () => {
     expect(todayAction(row({ kind: 'training', logId: 'l1', loggedBy: 'c1' }), COACH)).toEqual({ label: 'Watch', href: '/clients/c1/logs/l1', style: 'outlined' });
     expect(todayAction(row({ kind: 'training', logId: 'l1', loggedBy: COACH }), COACH)).toEqual({ label: 'Continue', href: '/clients/c1/log/w1', style: 'filled' });
     expect(todayAction(row({ kind: 'done', logId: 'l1', durationS: 3000 }), COACH)).toEqual({ label: 'View', href: '/clients/c1/logs/l1', style: 'light' });
+  });
+
+  it('offers Watch live, not Log session, when the client already has another workout in progress', () => {
+    // Log session would open a page that refuses to start ("They need to finish it first").
+    const theirs = { id: 'l9', loggedBy: 'c1', workoutId: 'w9' };
+    expect(todayAction(row({ kind: 'not_started' }), COACH, theirs)).toEqual({ label: 'Watch live', href: '/clients/c1/logs/l9', style: 'outlined' });
+    // The row's own live or finished log still wins.
+    expect(todayAction(row({ kind: 'done', logId: 'l1', durationS: 60 }), COACH, theirs).label).toBe('View');
+  });
+
+  it('offers Continue (the logger) when that other workout is the coach\'s own session in progress', () => {
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: COACH, workoutId: 'w9' })).toEqual({
+      label: 'Continue',
+      href: '/clients/c1/log/w9',
+      style: 'filled',
+    });
+    // Another coach's session (or one with no workout to open the logger on) is watched instead.
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: 'coach2', workoutId: 'w9' }).label).toBe('Watch live');
+    expect(todayAction(row({ kind: 'not_started' }), COACH, { id: 'l9', loggedBy: COACH, workoutId: null }).label).toBe('Watch live');
   });
 
   it('treats a log with no logger (an old row) as the client training: Watch', () => {
@@ -42,6 +61,23 @@ describe('todayMenu', () => {
   });
 });
 
+describe('liveLogByClient', () => {
+  const log = (id: string, clientId: string, startedAt: string): LiveLog => ({
+    id, clientId, name: 'W', startedAt, lastActivityAt: startedAt, done: 0, total: 1, loggedBy: clientId, workoutId: `w-${id}`,
+  });
+
+  it('maps each client to their latest-started workout in progress, idle or not', () => {
+    const map = liveLogByClient([
+      log('a', 'c1', '2026-11-07T08:00:00Z'),
+      log('b', 'c1', '2026-11-07T09:00:00Z'),
+      log('c', 'c2', '2026-11-01T09:00:00Z'),
+    ]);
+    expect(map.get('c1')).toEqual({ id: 'b', loggedBy: 'c1', workoutId: 'w-b' });
+    expect(map.get('c2')?.id).toBe('c');
+    expect(map.get('c3')).toBeUndefined();
+  });
+});
+
 describe('trainingNow', () => {
   const NOW = Date.parse('2026-11-07T10:00:00Z');
   const log = (id: string, clientId: string, startedMinAgo: number, idleMinAgo = 0): LiveLog => ({
@@ -52,6 +88,8 @@ describe('trainingNow', () => {
     lastActivityAt: new Date(NOW - idleMinAgo * 60_000).toISOString(),
     done: 1,
     total: 4,
+    loggedBy: clientId,
+    workoutId: null,
   });
 
   it('keeps current clients, one card each (latest start), earliest first, and drops long-idle ones', () => {

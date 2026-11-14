@@ -28,7 +28,7 @@ import {
   type AttentionFilter,
 } from '@/lib/home-attention';
 import { todayAction, todayMenu, todayPill } from '@/lib/home-actions';
-import { minutesSince, trainingNow, type LiveLog } from '@/lib/home-live';
+import { liveLogByClient, minutesSince, trainingNow, type LiveLog } from '@/lib/home-live';
 import { useBrowserToday } from '@/lib/local-today';
 import { ClientSearch } from './client-search';
 import { RowMenu } from './row-menu';
@@ -148,6 +148,7 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
   if (!today || !view) return <Skeleton />;
   const { byId, rows, progress, newPrs, groups, scansDue } = view;
   const cards = trainingNow(live, new Set(byId.keys()), nowMs);
+  const liveByClient = liveLogByClient(live);
   const entries = attentionEntries(groups, scansDue, new Set(cards.map((c) => c.clientId)));
   const counts = attentionCounts(entries);
   // A chip whose count drops to 0 (after a live refresh) disappears: fall back to All.
@@ -196,7 +197,7 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
               <ul className={styles.todayList}>
                 {rows.map((r) => {
                   const name = fullName(r.client);
-                  const action = todayAction(r, coachId);
+                  const action = todayAction(r, coachId, liveByClient.get(r.client.id));
                   const pill = todayPill(r, coachId);
                   const sub = r.status.kind === 'done' ? `${r.workout.name} · ${formatLogDuration(r.status.durationS)}` : r.workout.name;
                   return (

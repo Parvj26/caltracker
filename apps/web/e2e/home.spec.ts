@@ -136,6 +136,34 @@ test('the coach\'s own session in progress offers Continue', async ({ page }) =>
   await expect(row.getByRole('link', { name: /^Watch: / })).toHaveCount(0);
 });
 
+test('a client already training another workout gets Watch live, not Log session (which would be refused)', async ({ page }) => {
+  const last = `Busy${unique()}`;
+  const clientId = await newClient(last);
+  const yesterday = await plan(clientId, 'Catch-up', dayOffset(-1));
+  await plan(clientId, 'Legs', dayOffset(0));
+  const logId = await seedLog(admin, { workspaceId, clientId, name: 'Catch-up', plannedWorkoutId: yesterday, status: 'in_progress', startedAt: new Date().toISOString(), loggedBy: clientId });
+  created.logs.push(logId);
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const row = rowFor(page, last).filter({ hasText: 'Legs' });
+  await expect(row.getByRole('link', { name: /^Watch live: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
+  await expect(row.getByRole('link', { name: /^Log session: / })).toHaveCount(0);
+});
+
+test('the coach logging another workout in person gets Continue to that session on today\'s row', async ({ page }) => {
+  const last = `Busyme${unique()}`;
+  const clientId = await newClient(last);
+  const yesterday = await plan(clientId, 'Catch-up', dayOffset(-1));
+  await plan(clientId, 'Legs', dayOffset(0));
+  const coach = (await admin.auth.admin.listUsers({ perPage: 1000 })).data.users.find((u) => u.email === COACH_EMAIL)!;
+  created.logs.push(await seedLog(admin, { workspaceId, clientId, name: 'Catch-up', plannedWorkoutId: yesterday, status: 'in_progress', startedAt: new Date().toISOString(), loggedBy: coach.id }));
+  await signInAsCoach(page);
+  await page.goto('/home');
+  const row = rowFor(page, last).filter({ hasText: 'Legs' });
+  await expect(row.getByRole('link', { name: /^Continue: / })).toHaveAttribute('href', `/clients/${clientId}/log/${yesterday}`);
+  await expect(row.getByRole('link', { name: /^(Log session|Watch live): / })).toHaveCount(0);
+});
+
 test('every Today row has exactly one primary button, and ⋯ holds Message, Assign and Open client', async ({ page }) => {
   const last = `One${unique()}`;
   const clientId = await newClient(last);
