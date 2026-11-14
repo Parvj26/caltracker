@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
 import { smartFilter } from '@caltracker/shared';
 import { AssignButton } from '@/components/assign/assign-to-clients';
@@ -17,8 +18,16 @@ export type WorkoutListRow = { id: string; name: string; updatedAt: string; exer
  * word order), like the Clients list. The query stays in the address (?q=) so Back from a workout keeps it.
  */
 export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: WorkoutListRow[]; initialQuery: string; limited: boolean; limit: number }) {
+  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
-  const shown = useMemo(() => smartFilter(rows, query, (w) => w.name), [rows, query]);
+  const shown = useMemo(() => {
+    const smart = smartFilter(rows, query, (w) => w.name);
+    if (!limited) return smart;
+    // Past the cap the server adds older workouts whose names contain the text (a plain match): keep those too.
+    const text = query.trim().toLowerCase();
+    const seen = new Set(smart.map((w) => w.id));
+    return [...smart, ...rows.filter((w) => !seen.has(w.id) && text !== '' && w.name.toLowerCase().includes(text))];
+  }, [rows, query, limited]);
   const searching = query.trim() !== '';
 
   const onChange = (value: string) => {
@@ -28,10 +37,12 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
     else url.searchParams.delete('q');
     window.history.replaceState(null, '', `${url.pathname}${url.search}`);
   };
-  // The list already shows the matches; Search (or Enter) just closes the phone keyboard.
+  // The list already shows the matches; Search (or Enter) closes the phone keyboard. A library past the cap also asks
+  // the server, which adds older workouts whose names contain the text.
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (limited) router.replace(query.trim() ? `/workouts?q=${encodeURIComponent(query.trim())}` : '/workouts');
   };
 
   return (
@@ -93,9 +104,7 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
             </tbody>
           </table>
           {limited ? (
-            <p className={styles.caption}>
-              Showing the {limit} most recently updated{searching ? ', and searching those' : ''}.
-            </p>
+            <p className={styles.caption}>Showing the {limit} most recently updated. Search to find others.</p>
           ) : null}
         </Card>
       )}
