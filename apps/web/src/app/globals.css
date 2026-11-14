@@ -50,3 +50,26 @@ summary:active,
   /* Buttons do not move when pressed (the UI kit only adds the press transform with no-preference). */
   button:active { transform: none !important; }
 }
+
+/* Date and time fields never grow past their container. iPhone and iPad Safari give a native date field a fixed
+   intrinsic width and ignore `width`, so it pokes out of narrow dialogs; dropping the native appearance there (the
+   feature query only matches iOS Safari) makes it obey the width again, and the value text stays left-aligned. */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+input[type='month'] {
+  min-width: 0;
+  max-width: 100%;
+}
+@supports (-webkit-touch-callout: none) {
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  input[type='month'] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+  }
+  ::-webkit-date-and-time-value { text-align: start; min-height: 1.45em; }
+}
