@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { cx } from '@/components/ui/cx';
-import { trapTabTarget } from './focus-trap';
+import { cycleTabTarget } from './focus-trap';
 import { LAST_PAGE_KEY } from './help/support-page';
 import { UnreadTotalContext, useUnreadTotal } from './messages-nav-link';
 import { PhoneTabBar } from './phone-tab-bar';
@@ -65,7 +65,8 @@ export function CoachSidebar({
         close();
       } else if (e.key === 'Tab') {
         const list = items();
-        const target = trapTabTarget(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+        const target = cycleTabTarget(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+        // Always handled here: the More button sits before the sheet in the page, so the browser's own order would leave.
         if (target !== null) {
           e.preventDefault();
           list[target]?.focus();

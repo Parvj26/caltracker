@@ -1,12 +1,10 @@
 /**
- * Keeps Tab inside an open dialog. Given how many focusable items it has, the index of the focused one (-1 when focus
- * is outside it) and whether Shift is held, returns the index to move focus to, or null to let the browser move it.
+ * Keeps Tab inside an open sheet whose items aren't all next to each other in the page (the More sheet and the tab
+ * bar's More button). Given how many focusable items there are, the index of the focused one (-1 when focus is outside)
+ * and whether Shift is held, returns the index to move focus to (wrapping round), or null when there is none.
  */
-export function trapTabTarget(count: number, current: number, backwards: boolean): number | null {
+export function cycleTabTarget(count: number, current: number, backwards: boolean): number | null {
   if (count === 0) return null;
-  const last = count - 1;
-  if (current === -1) return backwards ? last : 0;
-  if (!backwards && current === last) return 0;
-  if (backwards && current === 0) return last;
-  return null;
+  if (current === -1) return backwards ? count - 1 : 0;
+  return (current + (backwards ? count - 1 : 1)) % count;
 }
