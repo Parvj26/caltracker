@@ -24,13 +24,18 @@ type Props = {
   emptyOnPick?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   className?: string | undefined;
+  /**
+   * Looks and works like a dropdown ("Client: All ▾"): `prefix` is shown before the box, tapping the box lists every
+   * client (typing still narrows the list with the smart search), and a ▾ shows while nothing is picked.
+   */
+  dropdown?: { prefix: string };
 };
 
 /**
  * An ARIA combobox for picking one of the coach's clients with the shared smart search (typos forgiven): type, arrow to
  * a suggestion, Enter or click. Escape closes the list and puts back the committed text.
  */
-export function ClientCombobox({ clients, label, placeholder, onPick, committed = '', onClear, clearLabel = 'Clear', emptyOnPick = false, inputRef, className }: Props) {
+export function ClientCombobox({ clients, label, placeholder, onPick, committed = '', onClear, clearLabel = 'Clear', emptyOnPick = false, inputRef, className, dropdown }: Props) {
   const listId = useId();
   const fallbackRef = useRef<HTMLInputElement | null>(null);
   const ownRef = inputRef ?? fallbackRef;
@@ -45,8 +50,10 @@ export function ClientCombobox({ clients, label, placeholder, onPick, committed 
   }
 
   const typed = query.trim() !== '';
-  const results = searchClients(clients, query);
-  const expanded = open && typed && results.length > 0;
+  // A dropdown lists everyone until the coach types something new.
+  const browsing = dropdown !== undefined && (!typed || query === committed);
+  const results = browsing ? clients : searchClients(clients, query);
+  const expanded = open && (typed || browsing) && results.length > 0;
   const activeIndex = Math.min(active, Math.max(results.length - 1, 0));
   const optionId = (id: string) => `${listId}-${id}`;
 
@@ -80,7 +87,12 @@ export function ClientCombobox({ clients, label, placeholder, onPick, committed 
 
   return (
     <div className={cx(styles.wrap, className)}>
-      <div className={styles.box}>
+      <div className={cx(styles.box, dropdown && styles.dropdown)}>
+        {dropdown ? (
+          <span className={styles.prefix} aria-hidden="true">
+            {dropdown.prefix}
+          </span>
+        ) : null}
         <input
           ref={ownRef}
           type="text"
@@ -92,14 +104,18 @@ export function ClientCombobox({ clients, label, placeholder, onPick, committed 
           aria-activedescendant={activeClient ? optionId(activeClient.id) : undefined}
           autoComplete="off"
           placeholder={placeholder}
-          className={cx(styles.input, showClear && styles.withClear)}
+          className={cx(styles.input, (showClear || dropdown) && styles.withClear)}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={(e) => {
+            setOpen(true);
+            // A dropdown showing a name: typing replaces it.
+            if (dropdown) e.currentTarget.select();
+          }}
           onBlur={() => {
             setOpen(false);
             // A filter box never keeps text that isn't applied.
@@ -123,9 +139,13 @@ export function ClientCombobox({ clients, label, placeholder, onPick, committed 
           >
             ×
           </button>
+        ) : dropdown ? (
+          <svg className={styles.chevron} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         ) : null}
       </div>
-      <ul id={listId} role="listbox" aria-label="Clients" hidden={!expanded} className={styles.list}>
+      <ul id={listId} role="listbox" aria-label="Clients" hidden={!expanded} className={cx(styles.list, dropdown && styles.scrollList)}>
         {results.map((c, i) => (
           <li
             key={c.id}

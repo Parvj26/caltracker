@@ -117,7 +117,7 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
 
   // Activity and the calendar show who logged it.
   await page.goto(`/activity?client=${client}`);
-  await expect(page.getByRole('row', { name: new RegExp(name) }).getByText('Logged by coach')).toBeVisible();
+  await expect(page.getByRole('main').getByRole('listitem').filter({ hasText: name }).getByText('Logged by coach')).toBeVisible();
   await page.goto(`/clients/${client}/training?view=month&from=${today}`);
   const card = page.locator(`[data-date="${today}"]`).getByRole('listitem').filter({ hasText: name });
   await expect(card.getByRole('link', { name: `Done: view the ${name} log` })).toBeVisible();

@@ -13,6 +13,12 @@
   font: inherit;
 }
 .input:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+/* The dropdown look ("Client: All ▾"): an outlined pill with the prefix inside it. */
+.dropdown { border-radius: var(--ct-radius-pill); background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.dropdown .input { background: transparent; padding-left: var(--ct-space-1); font-weight: var(--ct-weight-section-heading); }
+.dropdown .input::placeholder { color: var(--ct-ink); opacity: 1; }
+.prefix { flex: none; padding-left: var(--ct-space-3); font-weight: var(--ct-weight-section-heading); white-space: nowrap; }
+.chevron { position: absolute; right: var(--ct-space-3); pointer-events: none; }
 /* Room on the right for the clear button. */
 .withClear { padding-right: var(--ct-tap-min); }
 .clear {
@@ -46,6 +52,8 @@
   box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
 }
 .list[hidden] { display: none; }
+/* The dropdown lists everyone: it scrolls past about eight names. */
+.scrollList { max-height: min(22rem, 60vh); overflow-y: auto; }
 .option { display: flex; align-items: center; min-height: var(--ct-tap-min); padding: 0 var(--ct-space-2-5); border-radius: var(--ct-radius-input); cursor: pointer; }
 .option[aria-selected='true'] { background: var(--ct-bg); font-weight: var(--ct-weight-section-heading); }
 .none:empty { display: none; }

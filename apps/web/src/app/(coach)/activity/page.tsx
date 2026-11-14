@@ -9,17 +9,18 @@ import {
   isLoggedByCoach,
   isPlannedLog,
   logDurationS,
+  logReviewByLog,
   logRowToDoc,
   logVolumeKg,
   type LogTreeRow,
 } from '@caltracker/shared';
-import { Card, Chip } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { renderTime } from '@/lib/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ClientFilter } from './client-filter';
-import { LocalDateTime } from './local-date-time';
+import { ActivityFeed, type FeedRow } from './activity-feed';
 import styles from './activity.module.css';
 
 export const metadata: Metadata = { title: 'Activity' };
@@ -66,6 +67,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   if (awards.error) throw new Error(`Could not load awards: ${awards.error.message}`);
   const prLogs = new Set(awards.data.filter((a) => awardHasPrs(a.result)).map((a) => a.log_id));
 
+  // Comment counts, and whether the coach has commented yet (nothing records the coach opening a log).
+  const comments = logIds.length
+    ? await supabase.from('workout_log_comments').select('log_id, author_id').in('log_id', logIds)
+    : { data: [], error: null };
+  if (comments.error) throw new Error(`Could not load comments: ${comments.error.message}`);
+
   // No direct foreign key links workspace_members to profiles, so load names separately.
   const memberIds = members.data.map((m) => m.user_id);
   const profiles = memberIds.length
@@ -78,20 +85,35 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const options = [...names].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ id, name }));
 
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
-  const rows = (logs.data as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[]).slice(0, PAGE_SIZE).map((row) => {
+  const logRows = (logs.data as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[]).slice(0, PAGE_SIZE);
+  const review = logReviewByLog(
+    logRows.map((r) => ({ id: r.id, clientId: r.client_id })),
+    comments.data.map((c) => ({ logId: c.log_id, authorId: c.author_id })),
+  );
+  const rows: FeedRow[] = logRows.flatMap((row) => {
+    if (!row.finished_at) return [];
     const log = logRowToDoc(row);
-    return {
-      row,
-      log,
-      clientName: names.get(row.client_id) ?? 'Client',
-      sets: completedSetCount(log),
-      volumeKg: logVolumeKg(log),
-      seconds: logDurationS(log),
-      planned: isPlannedLog(log),
-      hasPr: prLogs.has(row.id),
-      byCoach: isLoggedByCoach({ loggedBy: row.logged_by, clientId: row.client_id }),
-    };
+    const volumeKg = logVolumeKg(log);
+    const state = review.get(row.id) ?? { comments: 0, reviewed: false };
+    return [
+      {
+        id: row.id,
+        href: `/clients/${row.client_id}/logs/${row.id}`,
+        clientId: row.client_id,
+        clientName: names.get(row.client_id) ?? 'Client',
+        workoutName: row.name,
+        finishedAt: row.finished_at,
+        facts: [formatLogDuration(logDurationS(log)), count(completedSetCount(log), 'set', 'sets'), ...(volumeKg > 0 ? [formatLogVolume(volumeKg, units)] : [])].join(' · '),
+        hasPr: prLogs.has(row.id),
+        autoFinished: row.auto_finished,
+        byCoach: isLoggedByCoach({ loggedBy: row.logged_by, clientId: row.client_id }),
+        planned: isPlannedLog(log),
+        reviewed: state.reviewed,
+        comments: state.comments,
+      },
+    ];
   });
+  const toReview = rows.filter((r) => !r.reviewed).length;
   const hasNext = logs.data.length > PAGE_SIZE;
   const pageHref = (n: number) => {
     const params = new URLSearchParams();
@@ -104,9 +126,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   return (
     <div className={styles.page}>
       <header className={styles.titleRow}>
-        <div className={styles.titleBlock}>
+        <div className={styles.titleLine}>
           <h1 className={styles.title}>Activity</h1>
-          <p className={styles.caption}>Workouts your clients have finished, newest first.</p>
+          {toReview > 0 ? (
+            <p className={styles.toReview}>
+              <span className={styles.dot} aria-hidden="true" />
+              <b>{toReview}</b> to review
+            </p>
+          ) : null}
         </div>
         <ClientFilter clients={options} selectedId={clientFilter} />
       </header>
@@ -121,41 +148,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </p>
       ) : (
         <Card className={styles.listCard}>
-          {/* Explicit roles: on phones the table is restyled as cards (display: block), which would otherwise drop them. */}
-          <table className={styles.table} aria-label="Finished workouts" role="table">
-            <thead role="rowgroup">
-              <tr role="row">
-                <th scope="col" role="columnheader">Client</th>
-                <th scope="col" role="columnheader">Workout</th>
-                <th scope="col" role="columnheader">Finished</th>
-                <th scope="col" role="columnheader">Duration</th>
-                <th scope="col" role="columnheader">Sets</th>
-                <th scope="col" role="columnheader">Volume</th>
-              </tr>
-            </thead>
-            <tbody role="rowgroup">
-              {rows.map(({ row, clientName, sets, volumeKg, seconds, planned, hasPr, byCoach }) => (
-                <tr key={row.id} role="row">
-                  <td role="cell" className={styles.clientCell}>{clientName}</td>
-                  <td role="cell" className={styles.workoutTd}>
-                    <div className={styles.workoutCell}>
-                      <Link href={`/clients/${row.client_id}/logs/${row.id}`} className={styles.nameLink}>
-                        {row.name}
-                      </Link>
-                      {hasPr ? <Chip tone="lime">PR</Chip> : null}
-                      {row.auto_finished ? <Chip tone="amber">Auto-finished</Chip> : null}
-                      {byCoach ? <Chip tone="blue">Logged by coach</Chip> : null}
-                      {planned ? null : <Chip>Unplanned</Chip>}
-                    </div>
-                  </td>
-                  <td role="cell" className={styles.numeric}>{row.finished_at ? <LocalDateTime iso={row.finished_at} /> : null}</td>
-                  <td role="cell" className={styles.numeric}>{formatLogDuration(seconds)}</td>
-                  <td role="cell" className={styles.numeric}>{count(sets, 'set', 'sets')}</td>
-                  <td role="cell" className={styles.numeric}>{volumeKg > 0 ? formatLogVolume(volumeKg, units) : '–'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ActivityFeed rows={rows} now={new Date(renderTime()).toISOString()} />
         </Card>
       )}
 
@@ -174,7 +167,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           ) : null}
         </nav>
       ) : null}
-      <LiveRefresh on={[{ table: 'workout_logs', filter: `workspace_id=eq.${workspaceId}` }, { table: 'awards', filter: `workspace_id=eq.${workspaceId}` }]} renderedAt={renderTime()} maxWaitMs={8000} />
+      <LiveRefresh
+        on={[
+          { table: 'workout_logs', filter: `workspace_id=eq.${workspaceId}` },
+          { table: 'awards', filter: `workspace_id=eq.${workspaceId}` },
+        ]} renderedAt={renderTime()} maxWaitMs={8000} />
     </div>
   );
 }

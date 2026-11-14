@@ -1,8 +1,8 @@
 /* Activity feed. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall (--ct-tap-min). */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
 
-.titleRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2) var(--ct-space-3); }
-.titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.titleRow { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-2-5); }
+.titleLine { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); width: 100%; }
 .title {
   margin: 0;
   font-size: var(--ct-size-screen-title);
@@ -11,13 +11,12 @@
   line-height: 1.15;
 }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.toReview { display: inline-flex; align-items: center; gap: var(--ct-space-1); margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.toReview b { color: var(--ct-ink); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
 
-/* The client filter box: right of the title on wide screens, full width once the row wraps. */
-.filter { flex: 0 1 280px; min-width: 220px; margin-left: auto; }
-@media (max-width: 700px) {
-  .filter { flex: 1 1 100%; margin-left: 0; }
-}
+/* The client filter, drawn as a "Client: All ▾" pill. */
+.filter { width: min(100%, 300px); }
 
 .smallButton {
   display: inline-flex;
@@ -36,35 +35,48 @@
 }
 .smallButton:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 
-.listCard { padding: var(--ct-space-2) var(--ct-space-4-5); overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; }
-.table th {
-  padding: var(--ct-space-2-5) var(--ct-space-2);
-  text-align: left;
+.listCard { padding: var(--ct-space-2) var(--ct-space-4-5) var(--ct-space-3); }
+
+/* One heading per day, then one tappable row per workout: the whole row opens the log. */
+.feed { display: flex; flex-direction: column; }
+.day + .day { margin-top: var(--ct-space-2); }
+.dayHeading {
+  margin: 0;
+  padding: var(--ct-space-2-5) 0 var(--ct-space-1);
   font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
+  font-weight: var(--ct-weight-section-heading);
   color: var(--ct-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
-.table td:first-child, .table th:first-child { padding-left: 0; }
-.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.workoutCell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
-.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
+.list { margin: 0; padding: 0; list-style: none; }
+.list li + li { border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  min-height: 66px;
+  padding: var(--ct-space-2) 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--ct-radius-input);
+}
+.row:hover .workout { text-decoration: underline; }
+.row:focus-visible { outline: none; box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.rowText { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.client { font-weight: var(--ct-weight-section-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workoutLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); min-width: 0; }
+.workout { min-width: 0; overflow-wrap: anywhere; }
+.facts { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* Unreviewed: a small magenta dot; reviewed rows keep the space so the avatars line up. */
+.dot, .dotOff { flex: none; width: 8px; height: 8px; border-radius: var(--ct-radius-pill); }
+.dot { background: var(--ct-magenta); }
+.comments { display: inline-flex; align-items: center; gap: var(--ct-space-1); flex: none; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; }
+.chevron { display: inline-flex; flex: none; color: var(--ct-ink-muted); }
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .pager { display: flex; align-items: center; gap: var(--ct-space-3); }
 
-/* iPhone: one card per workout instead of a 629 px table squeezed into the screen. The client on top, the workout
-   (with its chips) under it, then the finish time, duration, sets and volume on one line that wraps between items.
-   Same markup as the table (it keeps explicit roles in page.tsx), so iPad and desktop are unchanged. */
 @media (max-width: 599.98px) {
-  .listCard { padding: var(--ct-space-1) var(--ct-space-4); overflow-x: visible; }
-  .table, .table tbody, .table tr { display: block; }
-  .table thead { display: none; }
-  .table tr { padding: var(--ct-space-2-5) 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
-  .table tbody tr:first-child { border-top: 0; }
-  .table td { display: inline; padding: 0; border-top: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-  .table td.clientCell, .table td.workoutTd { display: block; font-size: inherit; color: var(--ct-ink); }
-  .table td.clientCell { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
-  .table td.numeric:not(:last-child)::after { content: ' · '; white-space: normal; }
-  .nameLink { overflow-wrap: anywhere; }
+  .listCard { padding: var(--ct-space-1) var(--ct-space-4) var(--ct-space-2); }
 }

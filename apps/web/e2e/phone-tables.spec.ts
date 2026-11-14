@@ -2,7 +2,7 @@ import { devices, expect, test, type Locator, type Page } from '@playwright/test
 import { demoWorkspace, freshClient, unique } from './assign-helpers';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 
-// Phone fixes, batch 2: Activity as cards, the client tabs' arrow (the Food tab's phone layout is in phone-food.spec.ts),
+// Phone fixes, batch 2: Activity as day-grouped rows (round 2: unreviewed dot, comment count, whole row tappable), the client tabs' arrow (the Food tab's phone layout is in phone-food.spec.ts),
 // and the live view (short "HERE NOW" and Up next under the current exercise on phones, Up next beside the workout
 // on a landscape iPad). Chromium with iPhone sizes and touch (the browser can't be chosen per spec). Each CI shard starts from an empty database, so every test seeds its own
 // client and log in the demo workspace, and everything is removed afterwards.
@@ -52,22 +52,55 @@ async function expectOnScreen(locator: Locator) {
 test.describe('iPhone SE (375 x 667)', () => {
   test.use({ ...iphone13, viewport: SE });
 
-  test('Activity shows each workout as a card with every detail on screen', async ({ page }) => {
+  test('Activity groups workouts by day, marks unreviewed ones, counts comments and opens a log from anywhere on its row', async ({ page }) => {
+    test.slow();
     const client = await newClient('Cara');
-    const name = `Card ${unique()}`;
-    await seedLog(admin, { workspaceId, clientId: client.id, name, startedAt: ago(120), finishedAt: ago(67) });
+    const fresh = `Card ${unique()}`;
+    const older = `Older ${unique()}`;
+    const freshId = await seedLog(admin, { workspaceId, clientId: client.id, name: fresh, startedAt: ago(55), finishedAt: ago(2) });
+    const olderId = await seedLog(admin, { workspaceId, clientId: client.id, name: older, startedAt: ago(3 * 1440 + 60), finishedAt: ago(3 * 1440) });
+    // The coach has commented on the older one (reviewed); the client commented on both.
+    const owner = await admin.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'owner').limit(1).single();
+    if (owner.error) throw owner.error;
+    const comments = await admin.from('workout_log_comments').insert([
+      { log_id: freshId, workspace_id: workspaceId, client_id: client.id, author_id: client.id, body: 'Felt strong' },
+      { log_id: olderId, workspace_id: workspaceId, client_id: client.id, author_id: client.id, body: 'Tough one' },
+      { log_id: olderId, workspace_id: workspaceId, client_id: client.id, author_id: owner.data.user_id, body: 'Nice work' },
+    ]);
+    if (comments.error) throw comments.error;
+
     await signInAsCoach(page);
     await page.goto(`/activity?client=${client.id}`);
-    // Still a table for screen readers (and the other tests), drawn as cards.
-    const table = page.getByRole('table', { name: 'Finished workouts' });
-    const row = table.getByRole('row').filter({ hasText: name });
-    await expect(row).toHaveCount(1);
-    for (const text of [client.name, name, '53 min', '3 sets']) await expectOnScreen(row.getByText(text, { exact: true }));
-    await expectOnScreen(row.getByText(/lifted$/));
-    await expectOnScreen(row.locator('time'));
-    const box = (await row.boundingBox())!;
+    const main = page.getByRole('main');
+    // One heading per day: today first, then the older day as "Tue 10 Nov".
+    const days = main.getByRole('region');
+    await expect(days).toHaveCount(2);
+    await expect(days.nth(0).getByRole('heading', { level: 2 })).toHaveText('Today');
+    await expect(days.nth(1).getByRole('heading', { level: 2 })).toHaveText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}( \d{4})?$/);
+
+    const freshRow = days.nth(0).getByRole('listitem').filter({ hasText: fresh });
+    const olderRow = days.nth(1).getByRole('listitem').filter({ hasText: older });
+    // Only the client has commented on the new one: still unreviewed. The coach's comment marks the older one reviewed.
+    await expect(freshRow.getByRole('img', { name: 'Not reviewed' })).toBeVisible();
+    await expect(freshRow).toContainText('1 comment');
+    await expect(olderRow.getByRole('img', { name: 'Not reviewed' })).toHaveCount(0);
+    await expect(olderRow).toContainText('2 comments');
+    await expect(main.getByText(/^1 to review$/)).toBeVisible();
+
+    // Every detail fits on the screen.
+    for (const text of [client.name, fresh]) await expectOnScreen(freshRow.getByText(text, { exact: true }));
+    await expectOnScreen(freshRow.getByText(/53 min · 3 sets · .* lifted$/));
+    const box = (await freshRow.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(SE.width);
+    expect(box.height).toBeGreaterThanOrEqual(44);
     await expectNoSidewaysScroll(page);
+
+    // The filter looks like a dropdown.
+    await expect(main.getByText('Client:', { exact: true })).toBeVisible();
+
+    // Tapping the client's name (not just the workout name) opens the log.
+    await freshRow.getByText(client.name, { exact: true }).tap();
+    await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/logs/${freshId}$`));
   });
 
   test('the client tabs show an arrow while tabs are hidden, and the current tab is in view', async ({ page }) => {
