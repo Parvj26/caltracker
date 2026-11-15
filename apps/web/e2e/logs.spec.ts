@@ -118,6 +118,46 @@ test('a finished workout shows in the activity feed with its sets and volume in 
   await expect(page.getByText(/1 to review/)).toBeVisible();
 });
 
+test('"N to review" counts every waiting workout, not just the first page', async ({ page }) => {
+  // Its own coach and workspace, so other tests' logs never change the count.
+  const password = 'coach-password-123';
+  const email = `review-coach-${unique()}@example.com`;
+  const coach = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { first_name: 'Count', last_name: 'Coach' } });
+  if (coach.error) throw coach.error;
+  created.users.push(coach.data.user.id);
+  const ws = await admin.from('workspaces').insert({ name: `Review Gym ${unique()}` }).select('id').single();
+  if (ws.error) throw ws.error;
+  created.workspaces.push(ws.data.id);
+  const owner = await admin.from('workspace_members').insert({ workspace_id: ws.data.id, user_id: coach.data.user.id, role: 'owner' });
+  if (owner.error) throw owner.error;
+  const ana = await newClient('Ana', `Count${unique()}`, ws.data.id);
+  const ben = await newClient('Ben', `Count${unique()}`, ws.data.id);
+
+  // 27 of Ana's workouts wait (more than one 25-row page), plus 1 of Ben's. One coach comment and one workout the
+  // coach logged in person are reviewed and do not count.
+  for (let i = 0; i < 27; i++) await log({ workspaceId: ws.data.id, clientId: ana, name: `Wait ${i}`, sets: 1, startedAt: ago(300 + i * 5), finishedAt: ago(299 + i * 5) });
+  await log({ workspaceId: ws.data.id, clientId: ben, name: 'Ben waits', sets: 1, startedAt: ago(30), finishedAt: ago(29) });
+  const seen = await log({ workspaceId: ws.data.id, clientId: ben, name: 'Ben seen', sets: 1, startedAt: ago(20), finishedAt: ago(19) });
+  const comment = await admin.from('workout_log_comments').insert({ log_id: seen, workspace_id: ws.data.id, client_id: ben, author_id: coach.data.user.id, body: 'Great' });
+  if (comment.error) throw comment.error;
+  await log({ workspaceId: ws.data.id, clientId: ben, name: 'Ben in person', sets: 1, startedAt: ago(10), finishedAt: ago(9), loggedBy: coach.data.user.id });
+
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/home$/);
+  await page.goto('/activity');
+  const main = page.getByRole('main');
+  await expect(main.getByRole('listitem')).toHaveCount(25);
+  await expect(main.getByText(/^28 to review$/)).toBeVisible();
+  // The same total on the next page, and per client with the filter.
+  await page.goto('/activity?page=2');
+  await expect(main.getByText(/^28 to review$/)).toBeVisible();
+  await page.goto(`/activity?client=${ben}`);
+  await expect(main.getByText(/^1 to review$/)).toBeVisible();
+});
+
 test('the feed shows only completed logs, with the auto-finished chip', async ({ page }) => {
   const done = `Auto ${unique()}`;
   const gone = `Dropped ${unique()}`;
