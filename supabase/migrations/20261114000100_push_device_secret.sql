@@ -11,10 +11,14 @@
 -- Backward compatibility (test phones run old builds, no OTA updates):
 --   * Old builds send no secret. p_secret defaults to null, so their call (p_token, p_app_version) still resolves.
 --   * Rows with a null secret hash (every row today, and every row an old build writes) keep the old behaviour:
---     any signed-in caller can move them. That is no worse than before, and a phone that upgrades sets its hash
---     on its next register, closing the hole for that phone.
---   * An old build can never take a row that has a secret: it sends none. That only happens on the same phone
---     after an upgrade, and iOS cannot downgrade an installed app, so no real phone is locked out.
+--     any signed-in caller can move them. This is trust on first use: whoever first registers a token WITH a secret
+--     owns it. A signed-in user who knows a no-secret row's token can send their own secret, take the row and lock
+--     the real phone out (its later calls, with no secret or its own, are refused). We accept that: production
+--     starts empty, so every production row gets its secret from the real phone the first time it registers, and
+--     staging only has test phones.
+--   * An old build never sends a secret, so it cannot take a row that has one. TestFlight testers can install an
+--     older build over a newer one: that phone keeps working for the same user (their own row), but a different
+--     user signing in on it is refused (42501) and gets no pushes on it. Accepted.
 
 alter table public.push_devices add column secret_hash text check (secret_hash ~ '^[0-9a-f]{64}$');
 
@@ -42,18 +46,21 @@ begin
     v_hash := encode(pg_catalog.sha256(convert_to(p_secret, 'UTF8')), 'hex');
   end if;
 
-  -- Lock the token's row (if any) so two registers of the same token cannot race past the check.
-  select * into v_row from public.push_devices d where d.token = p_token for update;
-
-  if not found then
+  -- Lock the token's row (if any) so two registers of the same token cannot race past the check. If there is no
+  -- row, insert; if someone inserted it at the same moment, lock theirs and check against it. Two rounds cover a
+  -- row deleted between our insert and select; never return success with nothing saved.
+  for v_try in 1..2 loop
+    select * into v_row from public.push_devices d where d.token = p_token for update;
+    exit when found;
     insert into public.push_devices (token, user_id, app_version, secret_hash)
     values (p_token, v_uid, p_app_version, v_hash)
     on conflict (token) do nothing;
     if found then
       return;
     end if;
-    -- Someone inserted it between our select and insert: check against their row.
-    select * into v_row from public.push_devices d where d.token = p_token for update;
+  end loop;
+  if v_row.token is null then
+    raise exception 'could not register the push token, try again' using errcode = '40001';
   end if;
 
   if v_row.user_id = v_uid then

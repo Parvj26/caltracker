@@ -44,6 +44,16 @@ export async function requestPushPermission(): Promise<boolean> {
   }
 }
 
+/** The warning for a refused register, naming the likely cause when the server says the token is tied elsewhere. */
+export function registerErrorMessage(error: { code?: string; message: string }, sentSecret: boolean): string {
+  if (error.code === '42501' && /another device/.test(error.message)) {
+    return `${error.message}: this token is tied to another install's secret (${
+      sentSecret ? 'this install sent a different one' : 'this install sent none: Keychain unavailable'
+    }), so this phone gets no pushes for this account`;
+  }
+  return error.message;
+}
+
 async function register(token: string): Promise<void> {
   const clean = token.toLowerCase();
   // The install's secret lets the server tell this phone (signing in as someone else) from a stranger who knows
@@ -54,7 +64,7 @@ async function register(token: string): Promise<void> {
     p_app_version: (Application.nativeApplicationVersion ?? '').slice(0, 32),
     ...(secret ? { p_secret: secret } : {}),
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(registerErrorMessage(error, secret !== null));
   currentToken = clean;
 }
 

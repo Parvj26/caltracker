@@ -1,11 +1,13 @@
 -- activity_to_review_count (migration 20261114000200): the Activity heading's "N to review", over every log, not one page.
 begin;
-select plan(13);
+select plan(15);
 
 select tests.create_user('arc-coach@t.local', 'Coach') as coach \gset
 select tests.create_workspace('ARC Coaching', :'coach') as ws \gset
 select tests.create_user('arc-coach2@t.local', 'Other Coach') as coach2 \gset
 select tests.create_workspace('ARC Other', :'coach2') as ws2 \gset
+select tests.create_user('arc-staff@t.local', 'Staff Coach') as staff \gset
+insert into public.workspace_members (workspace_id, user_id, role) values (:'ws', :'staff', 'staff');
 select tests.create_user('arc-sam@t.local', 'Sam') as sam \gset
 select tests.add_client(:'ws', :'sam');
 select tests.create_user('arc-kim@t.local', 'Kim') as kim \gset
@@ -31,15 +33,22 @@ insert into public.workout_logs (workspace_id, client_id, name, status, started_
 -- A coach comment whose author is gone does not count.
 select tests.create_log(:'ws', :'kim') as kim_orphan \gset
 insert into public.workout_log_comments (log_id, body, author_id) values (:'kim_orphan', 'Old', null);
+-- Client-logged with logged_by set to the client explicitly: still waiting.
+insert into public.workout_logs (workspace_id, client_id, name, status, started_at, finished_at, logged_by)
+  values (:'ws', :'kim', 'Self', 'completed', now() - interval '1 hour', now(), :'kim');
+-- Reviewed: a second (staff) coach commented.
+select tests.create_log(:'ws', :'kim') as kim_staff \gset
+insert into public.workout_log_comments (log_id, body, author_id) values (:'kim_staff', 'Solid', :'staff');
 -- Not finished: never counted.
 select tests.create_log(:'ws', :'kim', null, 'in_progress');
 -- Another workspace's log.
 select tests.create_log(:'ws2', :'lee');
 
 select tests.act_as(:'coach');
-select is(public.activity_to_review_count(:'ws'), 32, 'all 32 waiting logs count, beyond the first page');
+select is(public.activity_to_review_count(:'ws'), 33, 'all 33 waiting logs count, beyond the first page');
 select is(public.activity_to_review_count(:'ws', :'sam'), 30, 'client filter: sam');
-select is(public.activity_to_review_count(:'ws', :'kim'), 2, 'client filter: kim (coach comment and coach-logged are reviewed)');
+select is(public.activity_to_review_count(:'ws', :'kim'), 3,
+  'client filter: kim (logged_by = client counts; coach comment, staff comment and coach-logged are reviewed)');
 select is(public.activity_to_review_count(:'ws2'), 0, 'not the coach of another workspace: 0');
 select is(public.activity_to_review_count(:'ws', :'lee'), 0, 'another workspace''s client: 0');
 reset role;
@@ -48,7 +57,11 @@ reset role;
 insert into public.workout_log_comments (log_id, body, author_id)
   values ((select id from public.workout_logs where client_id = :'sam' limit 1), 'Good', :'coach');
 select tests.act_as(:'coach');
-select is(public.activity_to_review_count(:'ws'), 31, 'a coach comment marks a log reviewed');
+select is(public.activity_to_review_count(:'ws'), 32, 'a coach comment marks a log reviewed');
+reset role;
+select tests.act_as(:'staff');
+select is(public.activity_to_review_count(:'ws'), 32, 'a staff coach sees the same total');
+select is(public.activity_to_review_count(:'ws', :'kim'), 3, 'staff: kim''s count');
 reset role;
 
 select tests.act_as(:'coach2');

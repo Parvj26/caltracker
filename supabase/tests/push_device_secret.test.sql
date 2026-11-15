@@ -1,7 +1,7 @@
 -- register_push_device's per-install secret (migration 20261114000100): a token that has a secret moves to another
 -- user only with that secret; old builds (no secret) keep working.
 begin;
-select plan(24);
+select plan(34);
 
 select tests.create_user('pds-coach@t.local', 'Coach') as coach \gset
 select tests.create_workspace('PDS Coaching', :'coach') as ws \gset
@@ -32,6 +32,9 @@ select lives_ok(format('select public.register_push_device(%L, %L, %L)', :tok_a,
   'sam re-registers the same device');
 select lives_ok(format('select public.register_push_device(%L, %L)', :tok_a, '2.0.1'),
   'sam re-registers without a secret (own row)');
+select is((select user_id from public.push_devices where token = :tok_a), :'sam'::uuid,
+  'the owner can still select token and user_id on their own row');
+select throws_ok('select secret_hash from public.push_devices', '42501', null, 'but not the hash');
 reset role;
 select is((select user_id from public.push_devices where token = :tok_a), :'sam'::uuid, 'still sam''s');
 select is((select secret_hash from public.push_devices where token = :tok_a),
@@ -88,6 +91,40 @@ select tests.act_as(:'eve');
 select throws_ok(format('select public.register_push_device(%L, %L)', :tok_b, '1.0.0'), '42501', null,
   'after the upgrade a secretless call cannot take it');
 reset role;
+
+-- Trust on first use (accepted): a no-secret row can be taken by anyone who knows the token and sends their own
+-- secret, and from then on the real phone is locked out.
+\set tok_c '''' `printf 'c%.0s' $(seq 64)` ''''
+\set eve_secret '''eve-secret-0123456789abcdefghijklmnopqrs'''
+select tests.act_as(:'kim');
+select public.register_push_device(:tok_c, '1.0.0');
+reset role;
+select tests.act_as(:'eve');
+select lives_ok(format('select public.register_push_device(%L, %L, %L)', :tok_c, '2.0.0', :eve_secret),
+  'TOFU: eve with her own secret takes kim''s no-secret row');
+reset role;
+select is((select user_id from public.push_devices where token = :tok_c), :'eve'::uuid, 'TOFU: the row is eve''s');
+select is((select secret_hash from public.push_devices where token = :tok_c),
+  encode(sha256(convert_to(:eve_secret, 'UTF8')), 'hex'), 'TOFU: with eve''s hash');
+select tests.act_as(:'kim');
+select throws_ok(format('select public.register_push_device(%L, %L)', :tok_c, '1.0.0'), '42501', null,
+  'TOFU: kim''s old build (no secret) is now refused');
+select throws_ok(format('select public.register_push_device(%L, %L, %L)', :tok_c, '2.0.0', :phone_secret), '42501', null,
+  'TOFU: kim with a different secret is refused');
+reset role;
+select is((select user_id from public.push_devices where token = :tok_c), :'eve'::uuid, 'TOFU: still eve''s');
+
+-- Never report success with nothing saved. A trigger that silently drops the insert stands in for the row being
+-- deleted between the insert's conflict and the second look: both rounds find no row, so the call must fail.
+create function pg_temp.drop_insert() returns trigger language plpgsql as $$ begin return null; end; $$;
+create trigger drop_insert before insert on public.push_devices for each row execute function pg_temp.drop_insert();
+\set tok_d '''' `printf 'd%.0s' $(seq 64)` ''''
+select tests.act_as(:'sam');
+select throws_ok(format('select public.register_push_device(%L, %L, %L)', :tok_d, '2.0.0', :phone_secret), '40001', null,
+  'no row could be saved: the call fails instead of returning success');
+reset role;
+drop trigger drop_insert on public.push_devices;
+select is((select count(*)::int from public.push_devices where token = :tok_d), 0, 'and nothing was saved');
 
 select * from finish();
 rollback;

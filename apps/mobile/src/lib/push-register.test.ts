@@ -14,7 +14,7 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 vi.mock('./supabase', () => ({ supabase: { rpc: h.rpc } }));
 vi.mock('./device-secret', () => ({ deviceSecret: () => Promise.resolve(h.secret) }));
 
-import { registerDevice } from './push';
+import { registerDevice, registerErrorMessage } from './push';
 
 beforeEach(() => h.rpc.mockClear());
 
@@ -29,5 +29,17 @@ describe('registerDevice', () => {
     h.secret = null;
     await registerDevice();
     expect(h.rpc).toHaveBeenCalledWith('register_push_device', { p_token: 'ab'.repeat(32), p_app_version: '2.1.0' });
+  });
+});
+
+describe('registerErrorMessage', () => {
+  it('names the likely cause when the token is tied to another install', () => {
+    const e = { code: '42501', message: 'this push token belongs to another device' };
+    expect(registerErrorMessage(e, true)).toMatch(/tied to another install's secret \(this install sent a different one\)/);
+    expect(registerErrorMessage(e, false)).toMatch(/sent none/);
+  });
+
+  it('passes other errors through', () => {
+    expect(registerErrorMessage({ code: '42501', message: 'not signed in' }, true)).toBe('not signed in');
   });
 });
