@@ -12,7 +12,15 @@ import {
   formatPlainLongDay,
   formatPlainMonth,
   formatPlainWeekday,
+  formatNearDay,
+  formatPlainDayInYear,
+  formatPlainDayMonthInYear,
+  formatPlainLongWeekday,
+  formatRelativeInstantDay,
+  formatWeekdayWord,
+  nearDayWord,
 } from '../../src/dates/format';
+import { zonedParts } from '../../src/dates/dates';
 
 // These strings are rendered on the server (Node ICU) and again in the browser (WebKit, Blink). They must match
 // exactly, or React reports a hydration error, so they're built from numbers plus our own month names.
@@ -110,5 +118,41 @@ describe('plain calendar date labels', () => {
   it('prints a YYYY-MM month as its long name and year', () => {
     expect(formatPlainMonth('2026-09')).toBe('September 2026');
     expect(formatPlainMonth('2027-01')).toBe('January 2027');
+  });
+});
+
+describe('day words', () => {
+  const today = '2026-11-14';
+  it('nearDayWord names only the days next to today', () => {
+    expect(nearDayWord('2026-11-13', today)).toBe('yesterday');
+    expect(nearDayWord(today, today)).toBe('today');
+    expect(nearDayWord('2026-11-15', today)).toBe('tomorrow');
+    expect(nearDayWord('2026-11-16', today)).toBeNull();
+  });
+  it('formatNearDay falls back to "Sun 15 Nov"-style dates', () => {
+    expect(formatNearDay('2026-11-15', today)).toBe('tomorrow');
+    expect(formatNearDay('2026-09-07', today)).toBe('Mon 7 Sep');
+  });
+  it('formatWeekdayWord says last/next a week or more away', () => {
+    expect(formatWeekdayWord('2026-11-12', today)).toBe('Thursday');
+    expect(formatWeekdayWord('2026-11-07', today)).toBe('last Saturday');
+    expect(formatWeekdayWord('2026-11-21', today)).toBe('next Saturday');
+  });
+  it('the year shows only when it is not today\'s', () => {
+    expect(formatPlainDayInYear('2026-11-03', today)).toBe('Tue 3 Nov');
+    expect(formatPlainDayInYear('2025-12-31', today)).toBe('Wed 31 Dec 2025');
+    expect(formatPlainDayMonthInYear('2025-12-31', today)).toBe('31 Dec 2025');
+    expect(formatPlainLongWeekday('2026-11-14')).toBe('Saturday');
+  });
+  it('formatRelativeInstantDay reads both instants in the given zone', () => {
+    expect(formatRelativeInstantDay('2026-11-04T23:30:00Z', '2026-11-05T10:00:00Z', 'Pacific/Auckland')).toBe('Today');
+    expect(formatRelativeInstantDay('2026-11-04T23:30:00Z', '2026-11-05T10:00:00Z', 'Europe/London')).toBe('Yesterday');
+  });
+});
+
+describe('zonedParts', () => {
+  it('gives the wall clock in a zone, with seconds and a 0–23 hour', () => {
+    expect(zonedParts('2026-11-14T00:05:09Z', 'UTC')).toEqual({ year: 2026, month: 11, day: 14, hour: 0, minute: 5, second: 9 });
+    expect(zonedParts(Date.parse('2026-11-14T00:05:09Z'), 'Pacific/Auckland')).toEqual({ year: 2026, month: 11, day: 14, hour: 13, minute: 5, second: 9 });
   });
 });

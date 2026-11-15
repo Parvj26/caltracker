@@ -34,6 +34,18 @@ describe('readAll', () => {
     expect(await readAll(() => Promise.resolve({ data: null, error: null }), 'rows')).toEqual([]);
   });
 
+  it('drops rows read again when a row is added between two page reads', async () => {
+    // Rows sorted by id; another client schedules "a0" after the first page is read, so the second page (offset 3)
+    // starts with "c", which the first page already had. Without the key, Home showed that workout twice.
+    const table = ['a', 'b', 'c'];
+    const page = (from: number, to: number) => {
+      const data = table.slice(from, to + 1).map((id) => ({ id }));
+      if (from === 0) table.splice(1, 0, 'a0');
+      return Promise.resolve({ data, error: null });
+    };
+    expect((await readAll(page, 'workouts', (r) => r.id)).map((r) => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
   it('throws with what it was loading', async () => {
     await expect(readAll(() => Promise.resolve({ data: null, error: { message: 'boom' } }), 'workouts')).rejects.toThrow('Could not load workouts: boom');
   });

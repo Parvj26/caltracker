@@ -34,17 +34,30 @@ const PAGE = 1000; // PostgREST's default max rows per response
  * Reads every row of a query, a page at a time, so a busy coach never silently loses rows past the server cap. It
  * stops only at an empty page: a short page is not proof of the end, because the server's row cap may be lower than
  * PAGE.
+ *
+ * Pages are offsets, so a row added between two page reads (a client scheduling or logging at that moment) shifts
+ * the rows after it, and the next page starts again with rows already read. With `keyOf`, a row whose key was already
+ * read is dropped, so the same workout never shows twice (it did: two identical Today rows on Home).
  */
 export async function readAll<T>(
   page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   what: string,
+  keyOf?: (row: T) => string,
 ): Promise<T[]> {
   const rows: T[] = [];
+  const seen = new Set<string>();
   for (let from = 0; ; ) {
     const { data, error } = await page(from, from + PAGE - 1);
     if (error) throw new Error(`Could not load ${what}: ${error.message}`);
     if (!data || data.length === 0) return rows;
-    rows.push(...data);
+    for (const row of data) {
+      if (keyOf) {
+        const key = keyOf(row);
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      rows.push(row);
+    }
     from += data.length;
   }
 }
@@ -96,12 +109,13 @@ export async function loadHomeData(
           .order('id')
           .range(from, to),
       'workouts',
+      (w) => w.id,
     ),
     readAll(
       (from, to) =>
         supabase
           .from('workout_logs')
-          .select('client_id, finished_at, name')
+          .select('id, client_id, finished_at, name')
           .eq('workspace_id', workspaceId)
           .eq('status', 'completed')
           .gte('finished_at', since)
@@ -109,6 +123,7 @@ export async function loadHomeData(
           .order('id')
           .range(from, to),
       'recent workouts',
+      (l) => l.id,
     ),
     supabase
       .from('program_assignments')
@@ -127,6 +142,7 @@ export async function loadHomeData(
           .order('log_id')
           .range(from, to),
       'personal records',
+      (a) => a.log_id,
     ),
     // One row per client: their latest coach-entered scan (never every scan).
     supabase.rpc('latest_coach_scans', { p_workspace_id: workspaceId }),

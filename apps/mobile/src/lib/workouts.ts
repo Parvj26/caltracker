@@ -2,7 +2,7 @@
 // the fetchers live in ./workouts-api.ts.
 import { demoUrl } from './demo-link';
 import { programDayOf, type ProgramDay } from './workouts-plan';
-import { addDays, countExercises, groupDropSets, isoWeekday, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
+import { addDays, countExercises, formatPlainDay, formatPlainDayMonth, formatPlainWeekday, groupDropSets, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
   id: string;
@@ -76,24 +76,14 @@ export function resolveVideoUrls(
   return urls;
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-
 /** Short weekday name of a calendar date, e.g. "Thu". */
-export function weekdayShort(d: IsoDate): string {
-  return WEEKDAYS[isoWeekday(d) - 1] ?? '';
-}
+export const weekdayShort = formatPlainWeekday;
 
 /** "12 Nov": day and short month, read straight from the YYYY-MM-DD string. */
-export function formatDayMonth(d: IsoDate): string {
-  const [, m, day] = d.split('-').map(Number) as [number, number, number];
-  return `${day} ${MONTHS[m - 1] ?? ''}`;
-}
+export const formatDayMonth = formatPlainDayMonth;
 
 /** "Thu 12 Nov". */
-export function formatDayLabel(d: IsoDate): string {
-  return `${weekdayShort(d)} ${formatDayMonth(d)}`;
-}
+export const formatDayLabel = formatPlainDay;
 
 /** Up to two initials for an avatar: first letters of the first and last words. */
 export function initials(name: string): string {

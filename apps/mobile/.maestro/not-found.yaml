@@ -1,0 +1,22 @@
+# A link to a page the app doesn't have shows a plain "not available" screen with a way back, never a blank screen.
+appId: app.caltracker.client
+---
+- launchApp:
+    clearState: true
+- openLink: caltracker://no-such-page
+# The "Open in CalTracker?" prompt can appear late, so keep looking for it a few times.
+- repeat:
+    times: 3
+    while:
+      notVisible: "This page isn't available"
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+- extendedWaitUntil:
+    visible: "This page isn't available"
+    timeout: 15000
+- tapOn:
+    id: not-found-home
+# Signed out, home is sign-in.
+- assertVisible: 'New here? Ask your coach for an invite.'

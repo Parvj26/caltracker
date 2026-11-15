@@ -1,6 +1,8 @@
 // Feed ordering, visibility and who may do what. The database decides (RLS); these only shape the screens, e.g. to
 // hide a blocked member at once, before the feed reloads, and to show only the buttons that will work.
 
+import { MONTHS_SHORT } from '../dates/format';
+
 export type Viewer = { userId: string; isCoach: boolean };
 
 export type FeedPostLike = { id: string; authorId: string; createdAt: string; pinnedAt: string | null };
@@ -58,5 +60,7 @@ export function postAge(iso: string, nowMs: number): string {
   if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
   const d = new Date(t);
   const sameYear = d.getFullYear() === new Date(nowMs).getFullYear();
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+  // Our own month words, not Intl's (engines differ, e.g. "Sept"), on the viewer's own calendar.
+  const label = `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+  return sameYear ? label : `${label}, ${d.getFullYear()}`;
 }

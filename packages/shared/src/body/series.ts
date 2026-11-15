@@ -1,6 +1,6 @@
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
-import { MONTHS_SHORT } from '../dates/format';
+import { formatPlainDayMonthInYear } from '../dates/format';
 import type { Units } from '../units/units';
 import { displayValue } from './metrics';
 
@@ -36,11 +36,7 @@ export function measurementSeries(
 
 
 /** "6 Oct", or "6 Oct 2025" when not in the current year. Same output as en-GB short month, without depending on ICU. */
-export function formatShortDate(d: IsoDate, today: IsoDate): string {
-  const [y, m, day] = d.split('-').map(Number) as [number, number, number];
-  const base = `${day} ${MONTHS_SHORT[m - 1]}`;
-  return d.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${y}`;
-}
+export const formatShortDate = formatPlainDayMonthInYear;
 
 /** Change from the previous point to the latest, e.g. "−1.4 since 6 Oct". Series values are stored values (kg); they are converted the way formatMetric shows them. Null with fewer than 2 points. */
 export function changeSince(

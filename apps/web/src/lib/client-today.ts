@@ -1,4 +1,4 @@
-import { diffDays, formatPlainDay, workoutStatus } from '@caltracker/shared';
+import { formatNearDay, workoutStatus } from '@caltracker/shared';
 import type { HomeWorkout, IsoDate, TodayRow, WorkoutStatus } from '@caltracker/shared';
 import { liveAction, todayAction, type TodayAction } from './home-actions';
 import { liveLogByClient, minutesSince, trainingNow, type LiveLog } from './home-live';
@@ -56,10 +56,4 @@ export function clientToday({ clientId, coachId, today, nowMs, workouts, live }:
 }
 
 /** "yesterday", "today", "tomorrow", else "Sun 15 Nov". */
-export function relativeDay(day: IsoDate, today: IsoDate): string {
-  const d = diffDays(today, day);
-  if (d === -1) return 'yesterday';
-  if (d === 0) return 'today';
-  if (d === 1) return 'tomorrow';
-  return formatPlainDay(day);
-}
+export const relativeDay = formatNearDay;

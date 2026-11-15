@@ -71,13 +71,14 @@ export {
   diffDays,
   isoWeekday,
   localDateOf,
+  zonedParts,
   localToday,
   monthGrid,
   programDayToDate,
   programEndDate,
   startOfWeek,
 } from './dates/dates';
-export type { IsoDate } from './dates/dates';
+export type { IsoDate, ZonedParts } from './dates/dates';
 export {
   MONTHS_SHORT,
   WEEKDAYS_SHORT,
@@ -95,6 +96,13 @@ export {
   formatPlainMonth,
   formatPlainWeekday,
   formatRelativeDay,
+  formatRelativeInstantDay,
+  formatPlainDayInYear,
+  formatPlainDayMonthInYear,
+  formatPlainLongWeekday,
+  formatNearDay,
+  formatWeekdayWord,
+  nearDayWord,
   groupByLocalDay,
 } from './dates/format';
 export type { DayGroup } from './dates/format';
