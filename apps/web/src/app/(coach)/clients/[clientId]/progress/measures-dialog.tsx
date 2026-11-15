@@ -2,7 +2,7 @@
 
 import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Button, ErrorText, TextField } from '@/components/ui';
+import { Button, ErrorText, NOT_A_CONTACT, TextField } from '@/components/ui';
 import type { ActionFailure } from '@/lib/action-result';
 import { failureCode } from '@/lib/action-errors';
 import { addCustomMeasure, archiveCustomMeasure } from './actions';
@@ -88,7 +88,7 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
           void add();
         }}
       >
-        <TextField label="Measure name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+        <TextField label="Measure name" {...NOT_A_CONTACT} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
         <TextField label="Unit label" hint="For example in, cm or kcal. Optional." value={unit} maxLength={10} onChange={(e) => setUnit(e.target.value)} />
         <div className={styles.fields}>
           <TextField label="Smallest value" inputMode="decimal" value={min} onChange={(e) => setMin(e.target.value)} />

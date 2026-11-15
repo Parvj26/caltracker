@@ -16,7 +16,7 @@ import {
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
-import { Button, ButtonLink, ErrorText, SelectField, TextField } from '@/components/ui';
+import { Button, ButtonLink, ErrorText, NOT_A_CONTACT, SelectField, TextField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
 import { useBrowserToday } from '@/lib/local-today';
@@ -28,9 +28,6 @@ import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
-
-/** Asks password managers not to offer a contact or login here (Safari's own AutoFill ignores everything but cues). */
-const NOT_A_CONTACT = { 'data-1p-ignore': '', 'data-lpignore': 'true', 'data-form-type': 'other' } as const;
 
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
@@ -314,7 +311,6 @@ function OneClientForm({
         <TextField
           label="First name"
           {...NOT_A_CONTACT}
-          autoComplete="off"
           autoCorrect="off"
           autoCapitalize="words"
           spellCheck={false}
@@ -325,7 +321,6 @@ function OneClientForm({
         <TextField
           label="Last name"
           {...NOT_A_CONTACT}
-          autoComplete="off"
           autoCorrect="off"
           autoCapitalize="words"
           spellCheck={false}
@@ -339,7 +334,6 @@ function OneClientForm({
         {...NOT_A_CONTACT}
         type="email"
         inputMode="email"
-        autoComplete="off"
         autoCorrect="off"
         autoCapitalize="none"
         spellCheck={false}
