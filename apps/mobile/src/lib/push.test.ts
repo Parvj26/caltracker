@@ -5,6 +5,7 @@ vi.mock('expo-notifications', () => ({ setBadgeCountAsync }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 vi.mock('./supabase', () => ({ supabase: {} }));
+vi.mock('./device-secret', () => ({ deviceSecret: () => Promise.resolve(null) }));
 
 import { setBadge } from './push';
 

@@ -19,7 +19,7 @@ select ok((select bool_and(c.relrowsecurity) from pg_class c
   'tables have RLS');
 select ok(not has_function_privilege('authenticated', 'private.push_enqueue(uuid, uuid, text, text, jsonb, interval, boolean)', 'execute'),
   'clients cannot call push_enqueue');
-select ok(not has_function_privilege('anon', 'public.register_push_device(text, text)', 'execute'), 'anon cannot register a device');
+select ok(not has_function_privilege('anon', 'public.register_push_device(text, text, text)', 'execute'), 'anon cannot register a device');
 select table_privs_are('public', 'push_outbox', 'authenticated', array[]::text[], 'authenticated has no privileges on push_outbox');
 select table_privs_are('public', 'push_outbox', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
   'service_role has exactly select/insert/update/delete on push_outbox');

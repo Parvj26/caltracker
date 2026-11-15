@@ -5,6 +5,7 @@
 import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { deviceSecret } from './device-secret';
 import { pushDataOf } from './push-logic';
 import { supabase } from './supabase';
 
@@ -45,15 +46,19 @@ export async function requestPushPermission(): Promise<boolean> {
 
 async function register(token: string): Promise<void> {
   const clean = token.toLowerCase();
+  // The install's secret lets the server tell this phone (signing in as someone else) from a stranger who knows
+  // the token. Without one (Keychain unavailable) the call is what an older build sends.
+  const secret = await deviceSecret();
   const { error } = await supabase.rpc('register_push_device', {
     p_token: clean,
     p_app_version: (Application.nativeApplicationVersion ?? '').slice(0, 32),
+    ...(secret ? { p_secret: secret } : {}),
   });
   if (error) throw new Error(error.message);
   currentToken = clean;
 }
 
-/** Registers this iPhone for the signed-in user (moving the token from any earlier account). Only when allowed. */
+/** Registers this iPhone for the signed-in user (moving the token from an earlier account on this phone). Only when allowed. */
 export async function registerDevice(): Promise<void> {
   if (Platform.OS !== 'ios') return;
   try {
