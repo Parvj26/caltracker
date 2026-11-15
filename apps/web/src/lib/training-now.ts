@@ -20,6 +20,8 @@ type PaneBase = {
   tone: 'blue' | 'lime' | 'pink';
   startedAt: string;
   log: WorkoutLogDoc;
+  /** The coach's "Limitations & injuries" note for the client, or '' (each person's screen shows its injury chip). */
+  injury: string;
 };
 
 /** Someone else logs it (the client on their phone, or another coach): the coach watches it live. */
@@ -70,13 +72,16 @@ export async function loadTrainingNow(
 
   const clientIds = [...new Set(rows.map((r) => r.client_id))];
   const otherLoggers = [...new Set(rows.flatMap((r) => (r.logged_by && r.logged_by !== r.client_id && r.logged_by !== coachId ? [r.logged_by] : [])))];
-  const [members, profiles] = await Promise.all([
+  const [members, profiles, limitations] = await Promise.all([
     // Current clients only (a removed client is no longer a member).
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client').in('user_id', clientIds),
     supabase.from('profiles').select('id, first_name, full_name').in('id', [...clientIds, ...otherLoggers]),
+    supabase.from('client_limitations').select('client_id, body').eq('workspace_id', workspaceId).in('client_id', clientIds),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (profiles.error) throw new Error(`Could not load names: ${profiles.error.message}`);
+  if (limitations.error) throw new Error(`Could not load limitations: ${limitations.error.message}`);
+  const injuryOf = new Map(limitations.data.map((l) => [l.client_id, l.body.trim()]));
   const current = new Set(members.data.map((m) => m.user_id));
   const profileOf = new Map(profiles.data.map((p) => [p.id, p]));
   const live = rows.filter((r) => current.has(r.client_id));
@@ -107,6 +112,7 @@ export async function loadTrainingNow(
         tone: avatarTone(r.client_id),
         startedAt: log.startedAt,
         log,
+        injury: injuryOf.get(r.client_id) ?? '',
       };
       if (r.logged_by === coachId && r.workout_id !== null) {
         const workout = await loadWorkoutDoc(supabase, r.workout_id);

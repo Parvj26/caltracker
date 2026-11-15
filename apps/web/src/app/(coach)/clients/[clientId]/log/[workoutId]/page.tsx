@@ -119,20 +119,10 @@ export default async function SessionPage({
     // The coach's own session, with everyone else training now one tab away (they may log two people at once).
     const now = await loadTrainingNow(supabase, { workspaceId, coachId: userId });
     const active = pickActivePane(now.panes, [typeof query.with === 'string' ? query.with : null, log.id]);
+    // Each person's screen in the host carries their own injury note, so it is right whoever the coach switches to.
     if (active) {
-      const host = (
+      return (
         <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
-      );
-      // With one person training the screen is only this client's, so their injury note goes on top. With several,
-      // the host switches between people, and the note would belong to only one of them.
-      const onlyThisClient = now.panes.length === 1 && now.panes[0]?.clientId === client.id;
-      return onlyThisClient ? (
-        <div className={styles.wide}>
-          {injury}
-          {host}
-        </div>
-      ) : (
-        host
       );
     }
   }

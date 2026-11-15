@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { completedSetCount, openSetCount, type Units } from '@caltracker/shared';
+import { InjuryChip } from '@/app/(coach)/clients/[clientId]/injury-chip';
 import { SessionLogger } from '@/app/(coach)/clients/[clientId]/log/[workoutId]/session-logger';
 import sessionStyles from '@/app/(coach)/clients/[clientId]/log/[workoutId]/session.module.css';
 import { LiveRefresh, type LiveSource } from '@/components/live-refresh';
@@ -27,6 +28,8 @@ function SessionPaneView({ pane, units, onProgress }: { pane: SessionPane; units
       <Link href={`/clients/${pane.clientId}/training`} className={sessionStyles.back}>
         ← {pane.name}&apos;s calendar
       </Link>
+      {/* This client's injury note, on their own screen: with several people training, each tab shows its own. */}
+      <InjuryChip text={pane.injury} />
       <SessionLogger
         // A take-over or a new session is a different log: start the screen afresh.
         key={pane.logId}

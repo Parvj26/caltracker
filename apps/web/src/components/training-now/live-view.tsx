@@ -23,6 +23,7 @@ import {
   type Units,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
+import { InjuryChip } from '@/app/(coach)/clients/[clientId]/injury-chip';
 import { takeOverSession } from '@/app/(coach)/clients/[clientId]/log/[workoutId]/actions';
 import { Photo } from '@/components/exercise-search/photo';
 import { ErrorText } from '@/components/ui';
@@ -268,6 +269,8 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
       </header>
 
       <div className={cx(styles.inner, styles.innerWide, styles.body)}>
+        {/* The client's injury note, as on their Overview and the session logger. */}
+        <InjuryChip text={pane.injury} />
         <div className={styles.timeline}>
           {runs.map((run) => {
             const blocks = run.blockIndexes.map((i) => ({ block: log.blocks[i]!, index: i }));

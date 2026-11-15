@@ -330,3 +330,47 @@ test('with two people training, tabs switch between watching one and logging the
     .poll(async () => (await admin.from('log_sets').select('completed_at').eq('log_id', session)).data?.filter((s) => s.completed_at !== null).length)
     .toBe(3);
 });
+
+test("with two people training, each person's screen shows their own injury note", async ({ page }) => {
+  test.slow();
+  const coach = await newCoach(page);
+  const anna = await newClient(coach.workspaceId, 'Anna', 'Injured');
+  const ben = await newClient(coach.workspaceId, 'Ben', 'Injured');
+  const note = async (clientId: string, body: string) => {
+    const r = await admin.from('client_limitations').insert({ workspace_id: coach.workspaceId, client_id: clientId, body });
+    if (r.error) throw r.error;
+  };
+  await note(anna.id, 'Left knee: no deep squats.\nNo jumping');
+  await note(ben.id, 'Right shoulder: no overhead pressing');
+
+  // The coach logs Anna's session; Ben trains on his phone at the same time.
+  const today = await page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
+  const annaWorkout = await seedSectionedWorkout(admin, { workspaceId: coach.workspaceId, clientId: anna.id, name: 'Anna legs', scheduledOn: today, sections: [], blocks: [{ exercises: ['Barbell Squat'] }] });
+  await seedLog(admin, {
+    workspaceId: coach.workspaceId, clientId: anna.id, name: 'Anna legs', plannedWorkoutId: annaWorkout, status: 'in_progress', startedAt: ago(10), sets: 3, notDone: 3, loggedBy: coach.id,
+  });
+  const benWorkout = await seedSectionedWorkout(admin, { workspaceId: coach.workspaceId, clientId: ben.id, name: 'Ben push', scheduledOn: today, sections: [], blocks: [{ exercises: ['Barbell Squat'] }] });
+  await seedLog(admin, {
+    workspaceId: coach.workspaceId, clientId: ben.id, name: 'Ben push', plannedWorkoutId: benWorkout, status: 'in_progress', startedAt: ago(15), sets: 3, notDone: 2, loggedBy: ben.id,
+  });
+
+  await page.goto(`/clients/${anna.id}/log/${annaWorkout}`);
+  const annaTab = page.getByRole('tab', { name: /^Anna/ });
+  const benTab = page.getByRole('tab', { name: /^Ben/ });
+  const knee = page.getByRole('button', { name: /^Injury: Left knee: no deep squats \+1 more/ });
+  const shoulder = page.getByRole('button', { name: /^Injury: Right shoulder: no overhead pressing/ });
+  await expect(annaTab).toHaveAttribute('aria-selected', 'true');
+  await expect(knee).toBeVisible();
+  await expect(shoulder).toBeHidden();
+
+  // Switching to Ben (watched live) shows his note, not Anna's; and back again.
+  await benTab.click();
+  await expect(page.getByText('LIVE · BEN INJURED')).toBeVisible();
+  await expect(shoulder).toBeVisible();
+  await expect(knee).toBeHidden();
+  await annaTab.click();
+  await expect(knee).toBeVisible();
+  await expect(shoulder).toBeHidden();
+  // Only one chip per person's screen: the page doesn't add a second one on top.
+  await expect(page.getByRole('button', { name: /^Injury: Left knee/ })).toHaveCount(1);
+});
