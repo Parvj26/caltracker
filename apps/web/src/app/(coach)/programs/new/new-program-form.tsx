@@ -3,11 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition, type FormEvent } from 'react';
 import { ProgramInput, codeForMessage, type ErrorCode } from '@caltracker/shared';
-import { Button, Card, errorFromText, ErrorText, NOT_A_CONTACT, TextAreaField, TextField } from '@/components/ui';
+import { Button, Card, errorFromText, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
 import { createProgram } from '../actions';
 import styles from '../programs.module.css';
 import { markCreated, setBuildingProgram, startBuildingProgram } from '@/lib/analytics/client';
 
+/** The program name field; the form reads it back by this name. */
+const PROGRAM_TITLE = notAContact('program-title');
 const text = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
 const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_format') => (message ? { error: errorFromText(message, fallback) } : {});
@@ -27,7 +29,7 @@ export function NewProgramForm() {
     const form = new FormData(e.currentTarget);
     const description = text(form.get('description')).trim();
     const parsed = ProgramInput.safeParse({
-      name: text(form.get('title')),
+      name: text(form.get(PROGRAM_TITLE.name)),
       description: description === '' ? null : description,
       weeks: Number(form.get('weeks')),
     });
@@ -58,7 +60,7 @@ export function NewProgramForm() {
     <Card className={styles.formCard}>
       <form className={styles.form} onSubmit={submit} noValidate>
         {/* A program's name, not a person's: its field is called "title" so iPhone Safari doesn't offer a contact. */}
-        <TextField label="Program name" name="title" {...NOT_A_CONTACT} autoCorrect="off" spellCheck={false} maxLength={100} required {...errorProp(errors.name, 'program_name_required')} />
+        <TextField label="Program name" {...PROGRAM_TITLE} autoCorrect="off" spellCheck={false} maxLength={100} required {...errorProp(errors.name, 'program_name_required')} />
         <TextAreaField label="Description" name="description" maxLength={2000} rows={3} hint="Optional." />
         {errors.description ? <ErrorText code={codeForMessage(errors.description, 'field_format')}>{errors.description}</ErrorText> : null}
         <TextField

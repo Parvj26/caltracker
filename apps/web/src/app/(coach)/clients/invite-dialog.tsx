@@ -16,7 +16,7 @@ import {
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
-import { Button, ButtonLink, ErrorText, NOT_A_CONTACT, SelectField, TextField } from '@/components/ui';
+import { Button, ButtonLink, ErrorText, notAContact, SelectField, TextField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
 import { useBrowserToday } from '@/lib/local-today';
@@ -305,12 +305,11 @@ function OneClientForm({
     <form onSubmit={onSubmit} className={styles.inviteForm} noValidate>
       <div className={styles.nameGrid}>
         {/* Someone else's details, not the coach's: no contact AutoFill, spell-check or autocorrect on names. Safari
-            ignores autocomplete="off" and guesses from the field's name attribute (a dash in it brings up the contact
-            card), so these fields have none: the form reads React state, not form data. The data- attributes tell
-            password managers (1Password, LastPass, Dashlane) to stay out too. */}
+            ignores autocomplete="off", so notAContact gives each field a name with "search" in it, which keeps the
+            contact card away; the form reads React state, not form data. */}
         <TextField
           label="First name"
-          {...NOT_A_CONTACT}
+          {...notAContact('invite-first')}
           autoCorrect="off"
           autoCapitalize="words"
           spellCheck={false}
@@ -320,7 +319,7 @@ function OneClientForm({
         />
         <TextField
           label="Last name"
-          {...NOT_A_CONTACT}
+          {...notAContact('invite-last')}
           autoCorrect="off"
           autoCapitalize="words"
           spellCheck={false}
@@ -331,7 +330,7 @@ function OneClientForm({
       </div>
       <TextField
         label="Email"
-        {...NOT_A_CONTACT}
+        {...notAContact('invite-email')}
         type="email"
         inputMode="email"
         autoCorrect="off"

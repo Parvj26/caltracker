@@ -14,7 +14,7 @@ import {
   type MacroKey,
   type MealMacros,
 } from '@caltracker/shared';
-import { Button, ErrorText, NOT_A_CONTACT, errorFromText, type FieldError } from '@/components/ui';
+import { Button, ErrorText, notAContact, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -238,14 +238,14 @@ function MealFormFields({
   const nameField = (
     <label className={styles.field}>
       <span className={styles.label}>Name</span>
-      {/* A meal's name, not a person's: no contact AutoFill (see NOT_A_CONTACT), autocorrect or spell-check. */}
+      {/* A meal's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check. */}
       <input
         className={styles.input}
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={COACH_MEAL_LIMITS.name + 10}
         required
-        {...NOT_A_CONTACT}
+        {...notAContact('meal-title')}
         autoCorrect="off"
         autoCapitalize="sentences"
         spellCheck={false}

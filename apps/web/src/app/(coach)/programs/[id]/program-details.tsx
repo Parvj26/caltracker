@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { PROGRAM_WEEKS_MAX, ProgramInput, codeForMessage, type ErrorCode } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { SaveStatus } from '@/components/save-status';
-import { Button, Card, errorFromText, ErrorText, NOT_A_CONTACT, TextAreaField, TextField } from '@/components/ui';
+import { Button, Card, errorFromText, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
 import { countSlotsBeyondWeek, updateProgram } from '../actions';
@@ -111,7 +111,7 @@ export function ProgramDetails({
       <form className={styles.detailsForm} onSubmit={(e) => void submit(e)} noValidate>
         <TextField
           label="Program name"
-          {...NOT_A_CONTACT}
+          {...notAContact('program-title')}
           autoCorrect="off"
           spellCheck={false}
           value={name}

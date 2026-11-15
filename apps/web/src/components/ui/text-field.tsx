@@ -54,7 +54,8 @@ export function ErrorText({ code, children, className, id, safe = true }: ErrorT
 
 export function TextField({ label, error, hint, hintSafe = true, labelSafe = true, className, id, ...rest }: TextFieldProps) {
   const autoId = useId();
-  const inputId = id ?? autoId;
+  // A named field's id starts with its name (a notAContact field's "-search" name keeps Safari's AutoFill Contact off).
+  const inputId = id ?? (rest.name ? `${rest.name}${autoId}` : autoId);
   const hintId = hint ? `${inputId}-hint` : undefined;
   const errorId = error ? `${inputId}-error` : undefined;
   const describedBy = [rest['aria-describedby'], hintId, errorId].filter(Boolean).join(' ') || undefined;
