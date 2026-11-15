@@ -19,8 +19,9 @@ export default async function EditMealPage({
   const meals = await listCoachMeals(workspaceId);
   const meal = meals.find((m) => m.id === id);
   if (!meal) notFound();
+  const query = queryFrom(sp);
   return (
-    <MealsShell meals={meals} selectedId={meal.id} query={queryFrom(sp)} editing>
+    <MealsShell meals={meals} selectedId={meal.id} query={query} editing>
       {/* Keyed by the meal only: after a save the form's fields reset to the saved meal (version), but its "Saved"
           message is kept, so it no longer flashes away when the page refreshes. */}
       <MealForm
@@ -29,6 +30,7 @@ export default async function EditMealPage({
         workspaceId={workspaceId}
         isNew={false}
         logged={meal.logged}
+        query={query}
         initial={{
           id: meal.id,
           name: meal.name,

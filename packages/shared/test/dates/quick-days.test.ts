@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busyLabel, plannedLabel, quickDays } from '../../src/dates/quick-days';
+import { busyLabel, planStatus, plannedLabel, quickDays } from '../../src/dates/quick-days';
 
 // 2026-11-13 is a Friday.
 const FRI = '2026-11-13';
@@ -80,5 +80,24 @@ describe('plannedLabel', () => {
     expect(plannedLabel(FRI, ['2026-11-14'])).toBe('Planned tomorrow');
     expect(plannedLabel(FRI, ['2026-11-19', '2026-11-16'])).toBe('Planned Mon');
     expect(plannedLabel(FRI, ['2026-11-20'])).toBe('Planned 20 Nov');
+  });
+});
+
+describe('planStatus', () => {
+  const day = (date: string, done = false) => ({ date, done });
+  it('is the next planned day when there is one, even after a missed workout', () => {
+    expect(planStatus(FRI, [day('2026-11-11'), day('2026-11-16')])).toEqual({ kind: 'planned', label: 'Planned Mon' });
+    expect(planStatus(FRI, [day(FRI)])).toEqual({ kind: 'planned', label: 'Planned today' });
+  });
+  it('says Missed for the latest workout of the last 7 days that was not done, with nothing ahead', () => {
+    expect(planStatus(FRI, [day('2026-11-12')])).toEqual({ kind: 'missed', label: 'Missed yesterday' });
+    expect(planStatus(FRI, [day('2026-11-09'), day('2026-11-11'), day('2026-11-12', true)])).toEqual({ kind: 'missed', label: 'Missed Wed' });
+    // A week back is the same weekday as today, so it gets its date.
+    expect(planStatus(FRI, [day('2026-11-06')])).toEqual({ kind: 'missed', label: 'Missed 6 Nov' });
+  });
+  it('is Nothing planned when every recent workout was done, or the miss is older than a week', () => {
+    expect(planStatus(FRI, [])).toEqual({ kind: 'nothing', label: 'Nothing planned' });
+    expect(planStatus(FRI, [day('2026-11-12', true), day('2026-11-10', true)])).toEqual({ kind: 'nothing', label: 'Nothing planned' });
+    expect(planStatus(FRI, [day('2026-11-05')])).toEqual({ kind: 'nothing', label: 'Nothing planned' });
   });
 });

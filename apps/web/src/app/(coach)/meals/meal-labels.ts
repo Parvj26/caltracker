@@ -9,3 +9,9 @@ export function mealInitial(name: string): string {
   const first = /[\p{L}\p{N}]/u.exec(name.normalize('NFC'))?.[0];
   return first ? first.toLocaleUpperCase() : '?';
 }
+
+/** The meals list, with the search text (?q=) the coach had typed, so leaving a meal keeps their search. */
+export function mealsListHref(query: string | null | undefined): string {
+  const q = (query ?? '').trim();
+  return q ? `/meals?q=${encodeURIComponent(q)}` : '/meals';
+}

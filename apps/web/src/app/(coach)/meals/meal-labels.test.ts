@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loggedLabel, mealInitial } from './meal-labels';
+import { loggedLabel, mealInitial, mealsListHref } from './meal-labels';
 
 describe('loggedLabel', () => {
   it('says "Not logged yet" before any client logs the meal', () => {
@@ -30,5 +30,17 @@ describe('mealInitial', () => {
   it('falls back to "?" when there is no letter', () => {
     expect(mealInitial('')).toBe('?');
     expect(mealInitial('🍳')).toBe('?');
+  });
+});
+
+describe('mealsListHref', () => {
+  it('keeps the search text', () => {
+    expect(mealsListHref('lentil soup')).toBe('/meals?q=lentil%20soup');
+    expect(mealsListHref('  oats & milk ')).toBe('/meals?q=oats%20%26%20milk');
+  });
+  it('is the plain list with no search', () => {
+    expect(mealsListHref('')).toBe('/meals');
+    expect(mealsListHref('   ')).toBe('/meals');
+    expect(mealsListHref(null)).toBe('/meals');
   });
 });

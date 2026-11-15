@@ -4,7 +4,7 @@ import type { ErrorCode } from '@caltracker/shared';
 import { useRef, useState, useTransition } from 'react';
 import { DOCUMENT_NAME_MAX_LENGTH, documentKind, errorMessage, formatFileSize } from '@caltracker/shared';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
-import { Button, Card, ErrorText, TextField, type FieldError } from '@/components/ui';
+import { Button, Card, ErrorText, NOT_A_CONTACT, TextField, type FieldError } from '@/components/ui';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { createDocument, deleteDocument, documentLink, renameDocument, setDocumentShared, type DocumentOutcome } from '../documents-actions';
@@ -105,7 +105,7 @@ function UploadCard({ workspaceId, clientId, firstName, onMessage }: { workspace
           <p className={styles.caption}>
             {file.prepared.ext === 'pdf' ? 'PDF' : 'Image'} · {formatFileSize(file.prepared.blob.size)}
           </p>
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={DOCUMENT_NAME_MAX_LENGTH} required />
+          <TextField label="Name" {...NOT_A_CONTACT} value={name} onChange={(e) => setName(e.target.value)} maxLength={DOCUMENT_NAME_MAX_LENGTH} required />
           <label className={styles.check}>
             <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
             <span>Share with {firstName} (they can open it in the app)</span>
@@ -190,7 +190,7 @@ function DocumentItem({ doc, firstName, readOnly, onMessage }: { doc: DocumentRo
               run(() => renameDocument(doc.id, name), 'Renamed.', () => setRenaming(false));
             }}
           >
-            <TextField label="Document name" value={name} onChange={(e) => setName(e.target.value)} maxLength={DOCUMENT_NAME_MAX_LENGTH} autoFocus required />
+            <TextField label="Document name" {...NOT_A_CONTACT} value={name} onChange={(e) => setName(e.target.value)} maxLength={DOCUMENT_NAME_MAX_LENGTH} autoFocus required />
             <div className={styles.actions}>
               <Button type="submit" pending={pending}>Save</Button>
               <Button variant="secondary" onClick={() => setRenaming(false)} disabled={pending}>Cancel</Button>

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CustomExerciseInput, LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
-import { Button, ErrorText, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { Button, errorFromText, ErrorText, NOT_A_CONTACT, SelectField, TextAreaField, TextField, type FieldError } from '@/components/ui';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { createCustomExercise, updateCustomExercise } from './actions';
 import { EQUIPMENT, TRACKING_LABELS } from './filters';
@@ -39,7 +39,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
     const form = new FormData(event.currentTarget);
     const text = (key: string) => formText(form, key);
     const parsed = CustomExerciseInput.safeParse({
-      name: text('name'),
+      name: text('title'),
       trackingType: text('trackingType'),
       primaryMuscles: text('primaryMuscles').split(',').map((s) => s.trim()).filter(Boolean),
       equipment: text('equipment'),
@@ -71,7 +71,8 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
-      <TextField label="Name" name="name" defaultValue={initial.name} maxLength={100} />
+      {/* An exercise's name, not a person's: its field is called "title" so iPhone Safari doesn't offer a contact. */}
+      <TextField label="Name" name="title" {...NOT_A_CONTACT} autoCorrect="off" spellCheck={false} defaultValue={initial.name} maxLength={100} />
       <SelectField label="Tracking type" name="trackingType" defaultValue={initial.trackingType}>
         {LIBRARY_TRACKING_TYPES.map((t) => (
           <option key={t} value={t}>

@@ -11,14 +11,16 @@ export default async function NewMealPage({ searchParams }: { searchParams: Prom
   const [meals, sp] = await Promise.all([listCoachMeals(workspaceId), searchParams]);
   // The id is made here so the browser can name the photo files before the meal is saved.
   const id = crypto.randomUUID();
+  const query = queryFrom(sp);
   return (
-    <MealsShell meals={meals} selectedId={null} query={queryFrom(sp)} editing>
+    <MealsShell meals={meals} selectedId={null} query={query} editing>
       <MealForm
         key={id}
         workspaceId={workspaceId}
         isNew
         version=""
         logged={0}
+        query={query}
         initial={{ id, name: '', macros: { calories: null, protein: null, carbs: null, fat: null }, ingredients: '', howTo: '', photo: null }}
       />
     </MealsShell>

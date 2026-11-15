@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { SECTION_PRESETS } from '@caltracker/shared';
-import { Button } from '@/components/ui';
+import { Button, NOT_A_CONTACT } from '@/components/ui';
 import styles from './builder.module.css';
 
 type Props = {
@@ -55,6 +55,7 @@ export function AddSectionMenu({ full, onAdd }: Props) {
               <input
                 type="text"
                 aria-label="Custom section name"
+                {...NOT_A_CONTACT}
                 maxLength={40}
                 autoFocus
                 className={styles.input}

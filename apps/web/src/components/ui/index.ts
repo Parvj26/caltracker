@@ -4,5 +4,6 @@ export { Card } from './card';
 export { Chip, type ChipProps, type ChipTone } from './chip';
 export { HandNote } from './hand-note';
 export { Logo } from './logo';
+export { NOT_A_CONTACT } from './not-a-contact';
 export { ErrorText, SelectField, TextAreaField, TextField, errorFromText, type ErrorTextProps, type FieldError, type TextFieldProps } from './text-field';
 export { Tile, type TileProps, type Tone } from './tile';

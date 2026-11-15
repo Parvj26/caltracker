@@ -176,6 +176,12 @@ test('the meals search finds a meal despite a typo and keeps the text in the add
   await expect(page.getByRole('form', { name: 'Edit meal' }).getByLabel('Name')).toHaveValue(wanted);
   await expect(page.getByRole('searchbox', { name: 'Search meals' })).toHaveValue(`lentl ${tag}`);
   await expect(rows.filter({ hasText: other })).toHaveCount(0);
+
+  // Cancel goes back to the list with the search still typed in.
+  await page.getByRole('form', { name: 'Edit meal' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page).toHaveURL(/\/meals\?q=lentl/);
+  await expect(page.getByRole('searchbox', { name: 'Search meals' })).toHaveValue(`lentl ${tag}`);
+  await expect(rows.filter({ hasText: other })).toHaveCount(0);
 });
 
 // Phones (approved redesign, row 4 option A): the list is its own screen and a meal opens full screen.
@@ -237,6 +243,26 @@ test.describe('on an iPhone', () => {
     await dialog.getByRole('button', { name: 'Remove meal' }).click();
     await expect(page).toHaveURL(/\/meals$/);
     await expect(page.getByTestId('coach-meal-row').filter({ hasText: name })).toHaveCount(0);
+  });
+
+  test('‹ Meals goes back to the search the coach had typed', async ({ page }) => {
+    const tag = unique();
+    const wanted = track(`E2E Phone oats ${tag}`);
+    const other = track(`E2E Phone toast ${tag}`);
+    await seedCoachMeal(wanted, 300);
+    await seedCoachMeal(other, 250);
+    await signInAsCoach(page);
+    await page.goto(`/meals?q=${encodeURIComponent(`oats ${tag}`)}`);
+    const rows = page.getByTestId('coach-meal-row');
+    await expect(rows.filter({ hasText: other })).toHaveCount(0);
+    await rows.filter({ hasText: wanted }).click();
+    const form = page.getByRole('form', { name: 'Edit meal' });
+    await expect(form.getByLabel('Name')).toHaveValue(wanted);
+    await form.getByRole('link', { name: 'Back to meals' }).click();
+    await expect(page).toHaveURL(/\/meals\?q=oats/);
+    await expect(page.getByRole('searchbox', { name: 'Search meals' })).toHaveValue(`oats ${tag}`);
+    await expect(rows.filter({ hasText: wanted })).toBeVisible();
+    await expect(rows.filter({ hasText: other })).toHaveCount(0);
   });
 
   test('+ New meal opens an empty full-screen form, and Back leaves it', async ({ page }) => {

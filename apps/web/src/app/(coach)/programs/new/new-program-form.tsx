@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition, type FormEvent } from 'react';
 import { ProgramInput, codeForMessage, type ErrorCode } from '@caltracker/shared';
-import { Button, Card, ErrorText, TextAreaField, TextField, errorFromText } from '@/components/ui';
+import { Button, Card, errorFromText, ErrorText, NOT_A_CONTACT, TextAreaField, TextField } from '@/components/ui';
 import { createProgram } from '../actions';
 import styles from '../programs.module.css';
 import { markCreated, setBuildingProgram, startBuildingProgram } from '@/lib/analytics/client';
@@ -27,7 +27,7 @@ export function NewProgramForm() {
     const form = new FormData(e.currentTarget);
     const description = text(form.get('description')).trim();
     const parsed = ProgramInput.safeParse({
-      name: text(form.get('name')),
+      name: text(form.get('title')),
       description: description === '' ? null : description,
       weeks: Number(form.get('weeks')),
     });
@@ -57,7 +57,8 @@ export function NewProgramForm() {
   return (
     <Card className={styles.formCard}>
       <form className={styles.form} onSubmit={submit} noValidate>
-        <TextField label="Program name" name="name" maxLength={100} required {...errorProp(errors.name, 'program_name_required')} />
+        {/* A program's name, not a person's: its field is called "title" so iPhone Safari doesn't offer a contact. */}
+        <TextField label="Program name" name="title" {...NOT_A_CONTACT} autoCorrect="off" spellCheck={false} maxLength={100} required {...errorProp(errors.name, 'program_name_required')} />
         <TextAreaField label="Description" name="description" maxLength={2000} rows={3} hint="Optional." />
         {errors.description ? <ErrorText code={codeForMessage(errors.description, 'field_format')}>{errors.description}</ErrorText> : null}
         <TextField

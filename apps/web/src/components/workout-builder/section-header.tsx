@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ErrorText } from '@/components/ui';
+import { ErrorText, NOT_A_CONTACT } from '@/components/ui';
 import styles from './builder.module.css';
 
 type Props = {
@@ -34,6 +34,7 @@ export function SectionHeader({ section, index, count, empty, errors, onRename, 
           // A fixed name: one built from the section's name would change on every keystroke. The group around it says
           // which section this is.
           aria-label="Section name"
+          {...NOT_A_CONTACT}
           aria-invalid={blank || undefined}
           maxLength={40}
           className={`${styles.input} ${styles.sectionName}`}

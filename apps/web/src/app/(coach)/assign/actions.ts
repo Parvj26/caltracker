@@ -19,7 +19,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PARALLEL = 4;
 
 export type AssignClient = { id: string; firstName: string; lastName: string };
-export type ScheduledDay = { clientId: string; date: IsoDate; name: string };
+/** `done`: it has a completed log (a past one without is missed, as on the calendar). */
+export type ScheduledDay = { clientId: string; date: IsoDate; name: string; done: boolean };
 export type AssignProgramShape = { id: string; name: string; weeks: number; slots: { week: number; day: number }[] };
 export type AssignTargets = {
   /** Current clients, by last name. */
@@ -44,9 +45,11 @@ export async function loadAssignTargets(input: { programId?: string | null } = {
       (from, to) =>
         supabase
           .from('workouts')
-          .select('client_id, name, scheduled_on')
+          // Completed logs only (a discarded or in-progress one doesn't make it done), as the calendar reads them.
+          .select('client_id, name, scheduled_on, done_logs:workout_logs(id)')
           .eq('workspace_id', workspaceId)
           .not('client_id', 'is', null)
+          .eq('done_logs.status', 'completed')
           // A program may start up to 7 days back, plus a day for the browser's time zone.
           .gte('scheduled_on', addDays(localToday('UTC'), -8))
           .order('scheduled_on')
@@ -77,7 +80,7 @@ export async function loadAssignTargets(input: { programId?: string | null } = {
       .map((id) => ({ id, firstName: nameOf.get(id)?.first_name ?? '', lastName: nameOf.get(id)?.last_name ?? '' }))
       .sort(compareByLastName),
     scheduled: scheduled.flatMap((w) =>
-      w.client_id && w.scheduled_on && current.has(w.client_id) ? [{ clientId: w.client_id, date: w.scheduled_on, name: w.name }] : [],
+      w.client_id && w.scheduled_on && current.has(w.client_id) ? [{ clientId: w.client_id, date: w.scheduled_on, name: w.name, done: w.done_logs.length > 0 }] : [],
     ),
     program: program.data
       ? {
