@@ -8,6 +8,7 @@ import {
   formatLastResult,
   formatSetTarget,
   formatSetsSummary,
+  MONTHS_SHORT,
   muscleChipsOf,
   MUSCLE_CHIPS,
   startOfWeek,
@@ -138,8 +139,7 @@ export function firstSelectedDay(
   return first ?? weekStart;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-const monthOf = (d: IsoDate) => MONTHS[Number(d.slice(5, 7)) - 1] ?? '';
+const monthOf = (d: IsoDate) => MONTHS_SHORT[Number(d.slice(5, 7)) - 1] ?? '';
 
 /** "This week · Nov 9–15", "Next week · Nov 30 – Dec 6", or just the range for other weeks. */
 export function weekTitle(weekStart: IsoDate, today: IsoDate): string {

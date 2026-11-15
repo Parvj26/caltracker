@@ -8,6 +8,7 @@ import {
   formatLogVolume,
   logDurationS,
   logVolumeKg,
+  MONTHS_SHORT,
   parseClock,
   shouldAutoFinish,
   startLogFromWorkout,
@@ -34,12 +35,10 @@ export function startOrResume(
   return { ...fresh, revision: 1 };
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /** "5 Nov · 10:40 AM" in the phone's own time zone, for a coach comment. */
 export function formatCommentTime(iso: string): string {
   const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS[d.getMonth()] ?? ''} · ${formatTimeOfDay(iso)}`;
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()] ?? ''} · ${formatTimeOfDay(iso)}`;
 }
 
 /** "10:40 AM" in the phone's own time zone. */

@@ -1,4 +1,4 @@
-import { addDays, diffDays, localDateOf, type IsoDate } from './dates';
+import { addDays, diffDays, localDateOf, zonedParts, type IsoDate, type ZonedParts } from './dates';
 
 /**
  * Date and time labels that come out the same on every JavaScript engine.
@@ -26,30 +26,6 @@ export const MONTHS_LONG = [
 ] as const;
 export const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
-interface ZonedParts {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-}
-
-/** Numeric wall-clock parts of an instant in a time zone (default: the viewer's own). */
-function zonedParts(instant: string | Date, timeZone?: string): ZonedParts {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hourCycle: 'h23',
-    numberingSystem: 'latn',
-  }).formatToParts(typeof instant === 'string' ? new Date(instant) : instant);
-  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') % 24, minute: get('minute') };
-}
-
 const clock = (p: ZonedParts) => `${p.hour % 12 === 0 ? 12 : p.hour % 12}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'am' : 'pm'}`;
 
 /** "12 Nov, 2:38 am" in the given time zone (default: the viewer's own). */
@@ -63,13 +39,53 @@ export function formatTimeOfDay(instant: string | Date, timeZone?: string): stri
   return clock(zonedParts(instant, timeZone));
 }
 
+/** "Mon 9 Nov", with the year when it isn't `today`'s year ("Wed 31 Dec 2025"). */
+export function formatPlainDayInYear(day: IsoDate, today: IsoDate): string {
+  return withOtherYear(formatPlainDay(day), day, today);
+}
+
+/** "9 Nov", with the year when it isn't `today`'s year ("31 Dec 2025"). */
+export function formatPlainDayMonthInYear(day: IsoDate, today: IsoDate): string {
+  return withOtherYear(formatPlainDayMonth(day), day, today);
+}
+
+function withOtherYear(label: string, day: IsoDate, today: IsoDate): string {
+  return day.slice(0, 4) === today.slice(0, 4) ? label : `${label} ${day.slice(0, 4)}`;
+}
+
 /** A day heading relative to `today`: "Today", "Yesterday", else "Mon 9 Nov" (with the year when it isn't this year). */
 export function formatRelativeDay(day: IsoDate, today: IsoDate): string {
   const ago = diffDays(day, today);
   if (ago === 0) return 'Today';
   if (ago === 1) return 'Yesterday';
-  const label = formatPlainDay(day);
-  return day.slice(0, 4) === today.slice(0, 4) ? label : `${label} ${day.slice(0, 4)}`;
+  return formatPlainDayInYear(day, today);
+}
+
+/** The day an instant falls on, relative to the day `now` falls on, both in `timeZone`: "Today", "Yesterday", "Mon 2 Nov". */
+export function formatRelativeInstantDay(instant: string | Date, now: string | Date, timeZone?: string): string {
+  return formatRelativeDay(localDateOf(instant, timeZone), localDateOf(now, timeZone));
+}
+
+/** "today", "yesterday" or "tomorrow" for a day next to `today`, else null. */
+export function nearDayWord(day: IsoDate, today: IsoDate): 'today' | 'yesterday' | 'tomorrow' | null {
+  const d = diffDays(today, day);
+  return d === 0 ? 'today' : d === -1 ? 'yesterday' : d === 1 ? 'tomorrow' : null;
+}
+
+/** "yesterday", "today", "tomorrow", else "Sun 15 Nov". */
+export function formatNearDay(day: IsoDate, today: IsoDate): string {
+  return nearDayWord(day, today) ?? formatPlainDay(day);
+}
+
+/** "today", "yesterday", "tomorrow", "Thursday", or "last/next Thursday" a week or more away. */
+export function formatWeekdayWord(day: IsoDate, today: IsoDate): string {
+  const near = nearDayWord(day, today);
+  if (near) return near;
+  const d = diffDays(today, day);
+  const name = formatPlainLongWeekday(day);
+  if (d <= -7) return `last ${name}`;
+  if (d >= 7) return `next ${name}`;
+  return name;
 }
 
 /** Items gathered under one heading per local day, as `groupByLocalDay` returns them. */
@@ -102,8 +118,7 @@ export function groupByLocalDay<T>(items: readonly T[], instantOf: (item: T) => 
 
 /** "12 Nov 2026" for the day an instant falls on in the given time zone (default: the viewer's own). */
 export function formatDayDate(instant: string | Date, timeZone?: string): string {
-  const p = zonedParts(instant, timeZone);
-  return `${p.day} ${MONTHS_SHORT[p.month - 1]} ${p.year}`;
+  return formatPlainDayMonthYear(localDateOf(instant, timeZone));
 }
 
 /** Numeric parts of a plain YYYY-MM-DD date, plus its weekday (0 = Sunday). No time zone is involved. */
@@ -135,6 +150,11 @@ export function formatPlainWeekday(d: IsoDate): string {
   return WEEKDAYS_SHORT[plainParts(d).weekday] ?? '';
 }
 
+/** A plain calendar date's long weekday, "Saturday". */
+export function formatPlainLongWeekday(d: IsoDate): string {
+  return WEEKDAYS_LONG[plainParts(d).weekday] ?? '';
+}
+
 /** A plain calendar date as "Saturday 31 October 2026". */
 export function formatPlainLongDay(d: IsoDate): string {
   const p = plainParts(d);
@@ -155,9 +175,7 @@ export function formatWeekdayDay(d: IsoDate): string {
 /** The seven days from `monday`: "9–15 Nov", "30 Nov – 6 Dec", or "28 Dec 2026 – 3 Jan 2027" across a new year. */
 export function formatWeekRange(monday: IsoDate): string {
   const sunday = addDays(monday, 6);
-  const [y1, m1, d1] = monday.split('-').map(Number) as [number, number, number];
-  const [y2, m2, d2] = sunday.split('-').map(Number) as [number, number, number];
-  if (y1 !== y2) return `${d1} ${MONTHS_SHORT[m1 - 1]} ${y1} – ${d2} ${MONTHS_SHORT[m2 - 1]} ${y2}`;
-  if (m1 !== m2) return `${d1} ${MONTHS_SHORT[m1 - 1]} – ${d2} ${MONTHS_SHORT[m2 - 1]}`;
-  return `${d1}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
+  if (monday.slice(0, 4) !== sunday.slice(0, 4)) return `${formatPlainDayMonthYear(monday)} – ${formatPlainDayMonthYear(sunday)}`;
+  if (monday.slice(5, 7) !== sunday.slice(5, 7)) return `${formatPlainDayMonth(monday)} – ${formatPlainDayMonth(sunday)}`;
+  return `${plainParts(monday).day}–${formatPlainDayMonth(sunday)}`;
 }

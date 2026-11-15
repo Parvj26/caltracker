@@ -1,4 +1,5 @@
-import { addDays, isoWeekday } from '../dates/dates';
+import { addDays } from '../dates/dates';
+import { formatPlainWeekday } from '../dates/format';
 import type { IsoDate } from '../dates/dates';
 import { MACRO_KEYS, MACRO_NAMES, dailyTotals, formatMacro, hasAnyTarget, macroProgress, mealsByDay, weekDays } from '../food/food';
 import type { MacroKey, MacroTargets, MealMacros } from '../food/food';
@@ -47,8 +48,6 @@ export type FoodPeriodSummary = {
   sentence: string;
 };
 
-const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 export function foodPeriodSummary(
   meals: readonly FoodMealLite[],
   targets: MacroTargets | null,
@@ -79,7 +78,7 @@ export function foodPeriodSummary(
     proteinTarget === null || proteinTarget <= 0
       ? null
       : totals.map((t) => {
-          const dow = DOW[isoWeekday(t.date) - 1]!;
+          const dow = formatPlainWeekday(t.date);
           const state: ProteinDayState =
             t.date > today ? 'future' : !t.totals.logged.protein ? 'none' : t.totals.protein >= proteinTarget ? 'hit' : 'under';
           const label =

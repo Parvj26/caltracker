@@ -1,4 +1,4 @@
-import { diffDays, lastWorkoutLabel } from '@caltracker/shared';
+import { diffDays, formatPlainLongWeekday, lastWorkoutLabel } from '@caltracker/shared';
 import type { DirectoryPlan, DirectoryRow, DirectoryStatus, IsoDate } from '@caltracker/shared';
 import { formatDayMonth, formatShortDay, formatWeekday } from '@/components/calendar/format';
 
@@ -8,14 +8,12 @@ import { formatDayMonth, formatShortDay, formatWeekday } from '@/components/cale
 /** Below this 4-week completion the bar turns magenta. */
 export const LOW_COMPLETION_PERCENT = 60;
 
-const longWeekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long' });
-
 /** "today", "tomorrow", a weekday within the week ("Fri" or "Friday"), else "29 Nov". */
 export function relativeDay(date: IsoDate, today: IsoDate, long = false): string {
   const days = diffDays(today, date);
   if (days === 0) return 'today';
   if (days === 1) return 'tomorrow';
-  if (days > 1 && days < 7) return long ? longWeekday.format(new Date(`${date}T00:00:00Z`)) : formatWeekday(date);
+  if (days > 1 && days < 7) return long ? formatPlainLongWeekday(date) : formatWeekday(date);
   return formatDayMonth(date);
 }
 

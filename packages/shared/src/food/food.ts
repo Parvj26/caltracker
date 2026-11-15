@@ -1,7 +1,8 @@
 // Food tab rules (docs/superpowers/specs/2026-11-07-food-design.md): macro limits and parsing, daily totals against
 // the coach's targets, the kcal-from-macros hint, and the labels both apps show. Pure, no time zone unless given.
 
-import { addDays, diffDays, isoWeekday, startOfWeek, type IsoDate } from '../dates/dates';
+import { addDays, startOfWeek, type IsoDate } from '../dates/dates';
+import { formatPlainDayInYear, formatPlainWeekday, formatRelativeDay, formatTimeOfDay } from '../dates/format';
 
 export const MACRO_KEYS = ['calories', 'protein', 'carbs', 'fat'] as const;
 export type MacroKey = (typeof MACRO_KEYS)[number];
@@ -144,23 +145,11 @@ export function mealPhotoPaths(
   return { path: `${base}.${ext}`, thumbPath: `${base}-thumb.${ext}` };
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 /** "Tue 3 Nov", with the year when it is not this year. */
-export function shortDayLabel(day: IsoDate, today: IsoDate): string {
-  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
-  const base = `${WEEKDAYS[isoWeekday(day) - 1]} ${d} ${MONTHS[m - 1]}`;
-  return day.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${y}`;
-}
+export const shortDayLabel = formatPlainDayInYear;
 
 /** The day switcher's label: Today, Yesterday, or "Tue 3 Nov". */
-export function foodDayLabel(day: IsoDate, today: IsoDate): string {
-  const back = diffDays(day, today);
-  if (back === 0) return 'Today';
-  if (back === 1) return 'Yesterday';
-  return shortDayLabel(day, today);
-}
+export const foodDayLabel = formatRelativeDay;
 
 /** Monday to Sunday of the week holding `day`. */
 export function weekDays(day: IsoDate): IsoDate[] {
@@ -179,13 +168,7 @@ export function mealsByDay<T extends { id: string; eatenOn: IsoDate; eatenAt: st
 }
 
 /** "8:10 am" in the given time zone (default: the viewer's). Built from parts, so it works without full ICU data. */
-export function formatMealTime(instant: string, timeZone?: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23', numberingSystem: 'latn' }).formatToParts(new Date(instant));
-  const hour = Number(parts.find((p) => p.type === 'hour')?.value) % 24;
-  const minute = Number(parts.find((p) => p.type === 'minute')?.value);
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'am' : 'pm'}`;
-}
+export const formatMealTime = formatTimeOfDay;
 
 /** The start of a coach's message about a meal: "About your Lunch on Tue 3 Nov (12:15 pm): ". */
 export function mealReference(meal: { name: string | null; eatenOn: IsoDate; eatenAt: string }, today: IsoDate, timeZone?: string): string {
@@ -267,7 +250,7 @@ export function dayStrip(today: IsoDate, mealDays: ReadonlySet<IsoDate>, weeksBa
     const day = addDays(end, i - 6);
     return {
       day,
-      dow: WEEKDAYS[isoWeekday(day) - 1] as string,
+      dow: formatPlainWeekday(day),
       num: Number(day.slice(8, 10)),
       hasMeals: mealDays.has(day),
       isToday: day === today,

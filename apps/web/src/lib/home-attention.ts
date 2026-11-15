@@ -1,4 +1,4 @@
-import { diffDays } from '@caltracker/shared';
+import { diffDays, formatWeekdayWord } from '@caltracker/shared';
 import type { AttentionGroup, AttentionReason, IsoDate } from '@caltracker/shared';
 
 /**
@@ -86,19 +86,8 @@ export function attentionRows(entries: readonly AttentionEntry[], filter: Attent
   });
 }
 
-const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' });
-
 /** "today", "yesterday", "tomorrow", "Thursday", or "last/next Thursday" a week away. */
-export function dayWord(date: IsoDate, today: IsoDate): string {
-  const d = diffDays(today, date);
-  if (d === 0) return 'today';
-  if (d === -1) return 'yesterday';
-  if (d === 1) return 'tomorrow';
-  const name = weekday.format(new Date(`${date}T00:00:00Z`));
-  if (d <= -7) return `last ${name}`;
-  if (d >= 7) return `next ${name}`;
-  return name;
-}
+export const dayWord = formatWeekdayWord;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

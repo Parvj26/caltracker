@@ -65,16 +65,50 @@ export function localToday(timeZone?: string): IsoDate {
  * own), e.g. which day of the coach's calendar a log finished at 11:30 pm belongs to.
  */
 export function localDateOf(instant: string | Date, timeZone?: string): IsoDate {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const { year, month, day } = zonedParts(instant, timeZone);
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Numeric wall-clock parts of an instant in a time zone. */
+export interface ZonedParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+// One formatter per named zone (building one is slow). The viewer's own zone is not cached: it can change while the
+// app runs (and tests change TZ).
+const zonedFormatters = new Map<string, Intl.DateTimeFormat>();
+function zonedFormatter(timeZone?: string): Intl.DateTimeFormat {
+  const cached = timeZone === undefined ? undefined : zonedFormatters.get(timeZone);
+  if (cached) return cached;
+  const f = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
     numberingSystem: 'latn',
-  }).formatToParts(typeof instant === 'string' ? new Date(instant) : instant);
-  const part = (type: 'year' | 'month' | 'day') => Number(parts.find((p) => p.type === type)?.value);
-  const [y, m, d] = [part('year'), part('month'), part('day')];
-  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  });
+  if (timeZone !== undefined) zonedFormatters.set(timeZone, f);
+  return f;
+}
+
+/**
+ * The numeric wall-clock parts of an instant (ISO timestamp, Date or epoch ms) in a time zone (default: the viewer's
+ * own). The one place the apps read a time zone: only numbers are taken from Intl, because engines ship different
+ * locale data (Hermes, React Native's engine, has little; Node and Safari spell months differently).
+ */
+export function zonedParts(instant: string | number | Date, timeZone?: string): ZonedParts {
+  const parts = zonedFormatter(timeZone).formatToParts(instant instanceof Date ? instant : new Date(instant));
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') % 24, minute: get('minute'), second: get('second') };
 }
 
 export function programDayToDate(start: IsoDate, week: number, day: number): IsoDate {

@@ -1,33 +1,13 @@
+import { zonedParts } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
 
-const formatters = new Map<string, Intl.DateTimeFormat>();
-function formatter(timeZone: string): Intl.DateTimeFormat {
-  let f = formatters.get(timeZone);
-  if (!f) {
-    f = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-      hourCycle: 'h23',
-      numberingSystem: 'latn',
-    });
-    formatters.set(timeZone, f);
-  }
-  return f;
-}
-
 /** The local wall clock of an instant, written as if it were UTC (ms). */
 function wallMs(instantMs: number, timeZone: string): number {
-  const parts = formatter(timeZone).formatToParts(new Date(instantMs));
-  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  return Date.UTC(part('year'), part('month') - 1, part('day'), part('hour') % 24, part('minute'), part('second'));
+  const p = zonedParts(instantMs, timeZone);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
 }
 
 /** The zone's offset from UTC at an instant, in ms (local = UTC + offset). */
