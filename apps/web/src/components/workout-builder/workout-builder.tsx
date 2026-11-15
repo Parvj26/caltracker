@@ -44,7 +44,7 @@ import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
-import { Button, ErrorText, NOT_A_CONTACT, TextAreaField, TextField } from '@/components/ui';
+import { Button, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { AddSectionMenu } from './add-section-menu';
 import { SectionHeader } from './section-header';
@@ -442,10 +442,8 @@ export function WorkoutBuilder({
           label="Workout name"
           maxLength={100}
           value={doc.name}
-          // A workout's name, not a person's: no contact AutoFill, autocorrect or spell-check underlines. Safari ignores
-          // autocomplete="off" and guesses from cues, so there's no name attribute, and password managers are told to
-          // stay out.
-          {...NOT_A_CONTACT}
+          // A workout's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check underlines.
+          {...notAContact('workout-title')}
           autoCorrect="off"
           autoCapitalize="sentences"
           spellCheck={false}
