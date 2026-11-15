@@ -2238,6 +2238,7 @@ export type Database = {
           app_version: string | null
           created_at: string
           platform: string
+          secret_hash: string | null
           token: string
           updated_at: string
           user_id: string
@@ -2246,6 +2247,7 @@ export type Database = {
           app_version?: string | null
           created_at?: string
           platform?: string
+          secret_hash?: string | null
           token: string
           updated_at?: string
           user_id: string
@@ -2254,6 +2256,7 @@ export type Database = {
           app_version?: string | null
           created_at?: string
           platform?: string
+          secret_hash?: string | null
           token?: string
           updated_at?: string
           user_id?: string
@@ -2884,6 +2887,10 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      activity_to_review_count: {
+        Args: { p_client?: string; p_workspace: string }
+        Returns: number
+      }
       admin_audit: {
         Args: { p_limit?: number }
         Returns: {
@@ -3394,7 +3401,7 @@ export type Database = {
       }
       reclaim_workout_log: { Args: { p_log_id: string }; Returns: Json }
       register_push_device: {
-        Args: { p_app_version: string; p_token: string }
+        Args: { p_app_version: string; p_secret?: string; p_token: string }
         Returns: undefined
       }
       remove_client: {

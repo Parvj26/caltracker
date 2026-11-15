@@ -50,10 +50,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
     .range(from, from + PAGE_SIZE);
   if (clientFilter) logsQuery = logsQuery.eq('client_id', clientFilter);
 
-  const [logs, members, past] = await Promise.all([
+  const [logs, members, past, waiting] = await Promise.all([
     logsQuery,
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client'),
     supabase.from('past_clients').select('user_id, email, full_name').eq('workspace_id', workspaceId),
+    // Every finished workout still waiting for the coach, not just this page's (same rule as logReviewByLog).
+    supabase.rpc('activity_to_review_count', { p_workspace: workspaceId, ...(clientFilter ? { p_client: clientFilter } : {}) }),
   ]);
   if (logs.error) throw new Error(`Could not load activity: ${logs.error.message}`);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
@@ -113,7 +115,9 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       },
     ];
   });
-  const toReview = rows.filter((r) => !r.reviewed).length;
+  // A failed count is not worth an error page: fall back to this page's own count.
+  if (waiting.error) console.warn(`[activity] could not count workouts to review: ${waiting.error.message}`);
+  const toReview = waiting.error ? rows.filter((r) => !r.reviewed).length : waiting.data;
   const hasNext = logs.data.length > PAGE_SIZE;
   const pageHref = (n: number) => {
     const params = new URLSearchParams();
