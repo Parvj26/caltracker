@@ -14,13 +14,13 @@ import {
   type MacroKey,
   type MealMacros,
 } from '@caltracker/shared';
-import { Button, ErrorText, errorFromText, type FieldError } from '@/components/ui';
+import { Button, ErrorText, NOT_A_CONTACT, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { removeCoachMeal, saveCoachMeal, type CoachMealInput } from './actions';
 import { mealFormDirty, type MealFormSnapshot } from './form-dirty';
-import { loggedLabel, mealInitial } from './meal-labels';
+import { loggedLabel, mealInitial, mealsListHref } from './meal-labels';
 import { tileColour } from './meal-list';
 import styles from './meals.module.css';
 
@@ -56,6 +56,8 @@ type MealFormProps = {
   version: string;
   /** How often clients logged it (shown under the photo when editing). */
   logged: number;
+  /** The meals search text (?q=) the form was opened with: ‹ Meals, Cancel and Remove go back to that search. */
+  query: string;
 };
 
 /**
@@ -75,10 +77,14 @@ function MealFormFields({
   initial,
   isNew,
   logged,
+  query,
   saved,
   setSaved,
 }: MealFormProps & { saved: boolean; setSaved: (saved: boolean) => void }) {
   const router = useRouter();
+  // Back to the list with the coach's search kept. The search box beside the form (from 768 px up) can change the
+  // address after the page loaded, so a tap reads it from there.
+  const listHref = () => mealsListHref(new URLSearchParams(window.location.search).get('q'));
   const [name, setName] = useState(initial.name);
   const [macroText, setMacroText] = useState<Record<MacroKey, string>>({
     calories: toText(initial.macros.calories),
@@ -212,7 +218,7 @@ function MealFormFields({
   /** Back to the list without saving; asks first if anything was typed. */
   function cancel() {
     if (dirty) discardRef.current?.showModal();
-    else router.push('/meals');
+    else router.push(listHref());
   }
 
   async function remove() {
@@ -225,14 +231,25 @@ function MealFormFields({
       return;
     }
     dialogRef.current?.close();
-    router.push('/meals');
+    router.push(listHref());
     router.refresh();
   }
 
   const nameField = (
     <label className={styles.field}>
       <span className={styles.label}>Name</span>
-      <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={COACH_MEAL_LIMITS.name + 10} required />
+      {/* A meal's name, not a person's: no contact AutoFill (see NOT_A_CONTACT), autocorrect or spell-check. */}
+      <input
+        className={styles.input}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={COACH_MEAL_LIMITS.name + 10}
+        required
+        {...NOT_A_CONTACT}
+        autoCorrect="off"
+        autoCapitalize="sentences"
+        spellCheck={false}
+      />
     </label>
   );
 
@@ -243,7 +260,7 @@ function MealFormFields({
           the title shows, as the panel's heading. */}
       <div className={styles.topBar}>
         <Link
-          href="/meals"
+          href={mealsListHref(query)}
           className={styles.back}
           aria-label="Back to meals"
           onClick={(e) => {
@@ -406,7 +423,7 @@ function MealFormFields({
           <Button
             onClick={() => {
               discardRef.current?.close();
-              router.push('/meals');
+              router.push(listHref());
             }}
           >
             Discard
