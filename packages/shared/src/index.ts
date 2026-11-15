@@ -110,7 +110,7 @@ export {
 } from './dates/calendar-range';
 export type { CalendarRange, CalendarView } from './dates/calendar-range';
 export { SWIPE_MIN_PX, calendarSwipeStep, phoneCalendarDay } from './dates/calendar-phone';
-export { busyLabel, plannedLabel, quickDays } from './dates/quick-days';
+export { busyLabel, planStatus, plannedLabel, quickDays, type PlanStatus } from './dates/quick-days';
 export type { QuickDay, QuickDayOptions } from './dates/quick-days';
 export {
   BLOCK_KINDS,

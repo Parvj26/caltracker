@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { serviceClient, signInAsCoach, dateField } from './helpers';
+import { seedLog, serviceClient, signInAsCoach, dateField } from './helpers';
 import {
   addDays,
   browserToday,
@@ -187,4 +187,37 @@ test('a client removed while the dialog is open is reported; the others are assi
   await expect(dialog.getByRole('checkbox', { name: names[0]!, exact: true })).toBeDisabled();
   const copies = await admin.from('workouts').select('client_id').eq('source_workout_id', workoutId);
   expect(copies.data!.map((c) => c.client_id)).toEqual([ids[0]]);
+});
+
+test("a client's status chip says Missed for a past workout with no log", async ({ page }) => {
+  const name = `Lib missed ${unique()}`;
+  created.workouts.push(name);
+  await seedLibraryWorkout(admin, workspaceId, name);
+  const { last, ids, names } = await clients(3, 'Miss');
+
+  await signInAsCoach(page);
+  const today = await browserToday(page);
+  const yesterday = addDays(today, -1);
+  const past = `Past ${unique()}`;
+  created.workouts.push(past);
+  const plan = async (clientId: string, day: string) => {
+    const r = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: clientId, scheduled_on: day, name: past }).select('id').single();
+    if (r.error) throw r.error;
+    return r.data.id;
+  };
+  // C1 missed yesterday's workout; C2 did theirs; C3 missed one but has tomorrow planned (the next plan comes first).
+  await plan(ids[0]!, yesterday);
+  const done = await plan(ids[1]!, yesterday);
+  await seedLog(admin, { workspaceId, clientId: ids[1]!, name: past, plannedWorkoutId: done, startedAt: new Date(Date.now() - 86_400_000).toISOString() });
+  await plan(ids[2]!, yesterday);
+  await plan(ids[2]!, addDays(today, 1));
+
+  await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
+  await page.getByRole('button', { name: `Assign ${name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Assign ${name}` });
+  await dialog.getByLabel('Search clients').fill(last);
+  const row = (n: string) => dialog.getByRole('listitem').filter({ hasText: n });
+  await expect(row(names[0]!)).toContainText('Missed yesterday');
+  await expect(row(names[1]!)).toContainText('Nothing planned');
+  await expect(row(names[2]!)).toContainText('Planned tomorrow');
 });

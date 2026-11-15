@@ -11,7 +11,8 @@ import {
   filterClients,
   nextFreeDay,
   nextMonday,
-  plannedLabel,
+  planStatus,
+  type PlanStatus,
   programClashes,
   programStartError,
   scheduleDateError,
@@ -28,7 +29,7 @@ import {
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
-import { Button, Chip, ErrorText, type FieldError } from '@/components/ui';
+import { Button, Chip, ErrorText, type ChipTone, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
@@ -42,6 +43,8 @@ export type AssignKind = 'workout' | 'program' | 'copy';
 /** For a copy (Copy to… on a calendar workout), `date` is the workout's own day. */
 type Source = { kind: AssignKind; id: string; name: string; date?: IsoDate };
 
+/** The client's status chip: free (lime), a missed workout (pink, as on the Clients list) or something planned. */
+const CHIP_TONE: Record<PlanStatus['kind'], ChipTone> = { nothing: 'lime', missed: 'pink', planned: 'grey' };
 const nameOf = (c: AssignClient) => `${c.firstName} ${c.lastName}`.trim() || 'Client';
 const MAYBE_SENT = 'Check the calendars before assigning again: the first try may have gone through.';
 
@@ -175,10 +178,10 @@ export function AssignToClientsDialog({
   }, [isWorkout, source.id]);
 
   const byClient = useMemo(() => {
-    const m = new Map<string, { date: IsoDate; name: string }[]>();
+    const m = new Map<string, { date: IsoDate; name: string; done: boolean }[]>();
     for (const s of targets?.scheduled ?? []) {
       const list = m.get(s.clientId) ?? [];
-      list.push({ date: s.date, name: s.name });
+      list.push({ date: s.date, name: s.name, done: s.done });
       m.set(s.clientId, list);
     }
     return m;
@@ -203,7 +206,8 @@ export function AssignToClientsDialog({
   };
 
   const clients = targets?.clients ?? [];
-  const planned = (clientId: string) => plannedLabel(today, (byClient.get(clientId) ?? []).map((w) => w.date));
+  // Next planned day, else a workout missed in the last week (pink, as the Clients list flags it), else Nothing planned.
+  const planned = (clientId: string) => planStatus(today, byClient.get(clientId) ?? []);
   const shown = filterClients(clients, query);
   const assigned = (id: string) => results.get(id)?.ok === true;
   const chosen = clients.filter((c) => selected.has(c.id) && !assigned(c.id));
@@ -348,8 +352,8 @@ export function AssignToClientsDialog({
                   ) : clashes.length > 0 ? (
                     <span className={styles.note}>{isWorkout ? 'Has a workout that day' : 'Has workouts on some days'}</span>
                   ) : (
-                    <Chip tone={planned(c.id) === 'Nothing planned' ? 'lime' : 'grey'} className={styles.statusChip}>
-                      {planned(c.id)}
+                    <Chip tone={CHIP_TONE[planned(c.id).kind]} className={styles.statusChip}>
+                      {planned(c.id).label}
                     </Chip>
                   )}
                 </li>

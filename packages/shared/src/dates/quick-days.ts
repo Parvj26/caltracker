@@ -73,3 +73,27 @@ export function plannedLabel(today: IsoDate, dates: readonly IsoDate[]): string 
   if (next < addDays(today, 7)) return `Planned ${formatPlainWeekday(next)}`;
   return `Planned ${formatPlainDayMonth(next)}`;
 }
+
+/** How far back a workout that wasn't done shows as missed (as the coach's daily check counts it). */
+const MISSED_DAYS = 7;
+
+export type PlanStatus = { kind: 'planned' | 'missed' | 'nothing'; label: string };
+
+/**
+ * A client's status chip in a picker, from their planned workouts (and whether each was done): the next planned day
+ * from today on (as plannedLabel); else, when a workout of the last 7 days wasn't done, the latest one ("Missed
+ * yesterday", "Missed Wed", "Missed 6 Nov" a week back); else "Nothing planned". Today's workout is never missed.
+ */
+export function planStatus(today: IsoDate, days: readonly { date: IsoDate; done: boolean }[]): PlanStatus {
+  const planned = plannedLabel(today, days.map((d) => d.date));
+  if (planned !== 'Nothing planned') return { kind: 'planned', label: planned };
+  const from = addDays(today, -MISSED_DAYS);
+  const missed = days
+    .filter((d) => !d.done && d.date < today && d.date >= from)
+    .map((d) => d.date)
+    .sort()
+    .at(-1);
+  if (!missed) return { kind: 'nothing', label: planned };
+  if (missed === addDays(today, -1)) return { kind: 'missed', label: 'Missed yesterday' };
+  return { kind: 'missed', label: `Missed ${missed > from ? formatPlainWeekday(missed) : formatPlainDayMonth(missed)}` };
+}
