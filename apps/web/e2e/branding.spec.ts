@@ -72,7 +72,7 @@ for (const p of PAGES) {
     if (p.signInAs) {
       await page.goto('/sign-in');
       await page.getByLabel('Email').fill(p.signInAs);
-      await page.getByLabel('Password').fill('demo-password-123');
+      await page.getByLabel('Password', { exact: true }).fill('demo-password-123');
       await page.getByRole('button', { name: 'Sign in' }).click();
       await expect(page).not.toHaveURL(/sign-in/);
     }
@@ -94,7 +94,7 @@ for (const p of PAGES) {
 async function signInAsDemoCoach(page: Page) {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill('coach@demo.local');
-  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByLabel('Password', { exact: true }).fill('demo-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
   await page.goto('/clients');

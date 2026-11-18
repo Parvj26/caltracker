@@ -48,7 +48,7 @@ async function newCoach(page: Page): Promise<{ id: string; workspaceId: string }
   if (units.error) throw units.error;
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(coach.email);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
   return { id: coach.id, workspaceId: ws.data.id };

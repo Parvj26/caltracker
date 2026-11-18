@@ -6,6 +6,7 @@ import { Button, ErrorText, errorFromText, type FieldError } from '@/components/
 import { processCommunityPhoto, type ProcessedPhoto } from '@/lib/community-photo';
 import { PhotoError } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { createPost } from './actions';
 import styles from './community.module.css';
 
@@ -94,6 +95,8 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
   };
 
   const empty = !body.trim() && photos.length === 0;
+  // Typed text or picked photos aren't lost to Back or a link without asking.
+  const guard = useUnsavedGuard(!empty, { title: 'Discard post?', message: 'Your post isn’t shared yet.' });
   const expanded = active || !empty || error !== null;
 
   return (
@@ -125,6 +128,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
         </ul>
       ) : null}
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
+      {guard.prompt}
       <div className={styles.composerActions} hidden={!expanded}>
         <label className={styles.photoButton} aria-disabled={photos.length >= MAX_POST_PHOTOS || preparing}>
           {preparing ? 'Preparing…' : 'Add photos'}

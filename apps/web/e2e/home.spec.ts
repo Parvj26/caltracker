@@ -71,7 +71,7 @@ async function attentionList(page: Page, chip?: 'Missed' | 'Plan ending' | 'Scan
 test('signing in lands on /home and Home is the current nav item', async ({ page }) => {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(COACH_EMAIL);
-  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByLabel('Password', { exact: true }).fill('demo-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');

@@ -25,7 +25,7 @@
 .input {
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-2) var(--ct-space-3);
-  border: 2px solid transparent;
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong); /* ≥ 3:1 input border (UI rules §2.8) */
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
   color: var(--ct-ink);

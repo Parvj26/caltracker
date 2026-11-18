@@ -6,6 +6,7 @@ import { MAX_PHOTOS, type ErrorCode } from '@caltracker/shared';
 import { canSendDraft } from './model';
 import styles from './messages.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { readMessageDraft, writeMessageDraft } from '@/lib/message-draft';
 
 export type Draft = { body: string; files: File[] };
 type Photo = { file: File; url: string };
@@ -15,8 +16,18 @@ const BODY_MAX = 4000;
 /**
  * The reply box: Enter sends, Shift+Enter adds a line, 📎 adds up to 4 photos shown as removable thumbnails.
  * `initialBody` starts the box with text (and focuses it at the end), e.g. "Reply about this meal" from the Food tab.
+ * `draftKey` names this conversation's unsent text in sessionStorage (lib/message-draft): it comes back after Back,
+ * switching conversations or a reload, and goes once sent (or on sign-out). Nothing is lost, so leaving never asks.
  */
-export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) => void; initialBody?: string | undefined }) {
+export function Composer({
+  onSend,
+  initialBody = '',
+  draftKey,
+}: {
+  onSend: (draft: Draft) => void;
+  initialBody?: string | undefined;
+  draftKey?: string | undefined;
+}) {
   const [body, setBody] = useState(initialBody.slice(0, BODY_MAX));
   // Starts when the coach begins typing, so just opening a thread is not counted as a reply given up.
   const completeReply = useAnalyticsTask('reply_message', body.trim().length > 0);
@@ -38,6 +49,23 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
+
+  // The kept draft comes back after the first render (the server can't see sessionStorage). A ?about= reply keeps
+  // the draft only when it was written from that same start.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !draftKey) return;
+    restored.current = true;
+    const kept = readMessageDraft(draftKey);
+    if (kept === null || (initialBody !== '' && !kept.startsWith(initialBody))) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after hydration
+    setBody(kept.slice(0, BODY_MAX));
+    requestAnimationFrame(grow);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
+  useEffect(() => {
+    if (draftKey && restored.current) writeMessageDraft(draftKey, body === initialBody ? '' : body);
+  }, [draftKey, body, initialBody]);
 
   const canSend = canSendDraft(body, photos.length, initialBody);
 
@@ -70,6 +98,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
   function submit() {
     if (!canSend) return;
     completeReply();
+    if (draftKey) writeMessageDraft(draftKey, '');
     onSend({ body, files: photos.map((p) => p.file) });
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);
