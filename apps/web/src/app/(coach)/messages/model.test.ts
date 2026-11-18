@@ -71,6 +71,22 @@ describe('filterInbox', () => {
   it('filters to unread', () => {
     expect(filterInbox(rows, { unreadOnly: true, query: '' }).map((r) => r.clientId)).toEqual(['a']);
   });
+  it('uses the shared smart search: typos, word order, accents', () => {
+    const more = buildInbox({
+      me: ME,
+      clients: [{ id: 'm', name: 'Maya Patel' }, { id: 'j', name: 'José Álvarez' }, { id: 'k', name: 'Kristopher Long' }],
+      conversations: [],
+      latest: new Map(),
+      recent: new Map(),
+      reads: new Map(),
+    });
+    const ids = (query: string) => filterInbox(more, { unreadOnly: false, query }).map((r) => r.clientId);
+    expect(ids('mya')).toEqual(['m']);
+    expect(ids('patel maya')).toEqual(['m']);
+    expect(ids('jose alv')).toEqual(['j']);
+    expect(ids('christopher')).toEqual(['k']);
+    expect(ids('zzz')).toEqual([]);
+  });
 });
 
 describe('badgeText', () => {
