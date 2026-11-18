@@ -35,7 +35,7 @@ export function LibraryPanel({
       ) : (
         <>
           <p className={styles.caption}>Tap a workout to add it to a day, or drag it onto one (on a touch screen, press and hold first).</p>
-          <SearchBox label="Search library" placeholder="Search workouts" value={query} onChange={setQuery} />
+          <SearchBox label="Search workouts" value={query} onChange={setQuery} />
           <ul className={styles.libraryList}>
             {results.length === 0 ? (
               <li>

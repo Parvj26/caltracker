@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition, type FormEvent } from 'react';
 import { ProgramInput, codeForMessage, type ErrorCode } from '@caltracker/shared';
-import { Button, Card, errorFromText, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
+import { Button, Card, errorFromText, ErrorText, notAContact, PhoneActionBar, TextAreaField, TextField } from '@/components/ui';
 import { createProgram } from '../actions';
 import styles from '../programs.module.css';
 import { markCreated, setBuildingProgram, startBuildingProgram } from '@/lib/analytics/client';
@@ -61,7 +61,7 @@ export function NewProgramForm() {
       <form className={styles.form} onSubmit={submit} noValidate>
         {/* A program's name, not a person's: its field is called "title" so iPhone Safari doesn't offer a contact. */}
         <TextField label="Program name" {...PROGRAM_TITLE} autoCorrect="off" spellCheck={false} maxLength={100} required {...errorProp(errors.name, 'program_name_required')} />
-        <TextAreaField label="Description" name="description" maxLength={2000} rows={3} hint="Optional." />
+        <TextAreaField label="Description (optional)" name="description" maxLength={2000} rows={3} />
         {errors.description ? <ErrorText code={codeForMessage(errors.description, 'field_format')}>{errors.description}</ErrorText> : null}
         <TextField
           label="Weeks"
@@ -75,11 +75,12 @@ export function NewProgramForm() {
           className={styles.weeksField}
         />
         {formError ? <ErrorText code={formError} /> : null}
-        <div>
-          <Button type="submit" pending={pending} data-ph-capture-attribute-label="program_name_save">
+        {/* An editing screen: on a phone Create sits in the bottom bar (no tab bar) in thumb reach. */}
+        <PhoneActionBar label="New program actions">
+          <Button type="submit" pending={pending} data-ph-capture-attribute-label="program_name_save" phSafe>
             {pending ? 'Creating…' : 'Create program'}
           </Button>
-        </div>
+        </PhoneActionBar>
       </form>
     </Card>
   );

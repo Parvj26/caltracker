@@ -75,7 +75,7 @@ export function ProgramMenu({ id, name }: { id: string; name: string }) {
       <button
         type="button"
         ref={buttonRef}
-        className={styles.smallButton}
+        className={`${styles.smallButton} ${styles.plainButton}`}
         aria-label="More program actions"
         aria-haspopup="menu"
         aria-expanded={open}

@@ -170,7 +170,8 @@ test('closing with unsaved changes asks first', async ({ page }) => {
   await openEditor(page, 4, workout);
   await sheet.getByLabel('Workout name').fill(`${workout} changed`);
   await sheet.getByRole('button', { name: 'Close', exact: true }).click();
-  const discard = page.getByRole('dialog', { name: 'Discard your changes?' });
+  // The inline "Discard changes?" step in the sheet (no second dialog over it).
+  const discard = sheet.getByRole('group', { name: /^Discard changes\?/ });
   await discard.getByRole('button', { name: 'Keep editing' }).click();
   await expect(discard).toBeHidden();
   await expect(sheet.getByLabel('Workout name')).toHaveValue(`${workout} changed`);

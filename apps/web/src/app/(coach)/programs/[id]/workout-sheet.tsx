@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent
 import { emptyWorkout, type ExercisePrefs, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
+import ad from '@/components/ui/adaptive-dialog.module.css';
+import { cx } from '@/components/ui/cx';
 import { saveWorkout, type SaveWorkoutOutcome } from '../../workouts/actions';
 import { saveSlotCopy, type SlotWorkout } from '../actions';
 import { cellLabel, copyDaySuffix } from './grid-ids';
@@ -63,6 +65,8 @@ export function WorkoutSheet({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const discardId = useId();
+  const discardRef = useRef<HTMLDivElement>(null);
   const [dirty, setDirty] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [asking, setAsking] = useState<((c: Choice) => void) | null>(null);
@@ -80,6 +84,11 @@ export function WorkoutSheet({
     if (dialog) openLayer(dialog);
   }, []);
 
+  // The question takes focus, so a keyboard or screen reader user meets it.
+  useEffect(() => {
+    if (discarding) discardRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  }, [discarding]);
+
   function close() {
     if (dirty) setDiscarding(true);
     else onClose();
@@ -89,7 +98,9 @@ export function WorkoutSheet({
     // Escape: ask before losing changes. (Only the sheet's own cancel, not one from a dialog opened inside it.)
     if (e.target !== e.currentTarget) return;
     e.preventDefault();
-    close();
+    // A second Escape while asking means "keep editing".
+    if (discarding) setDiscarding(false);
+    else close();
   }
 
   // The builder calls saveWith inside a transition, and React holds a transition's updates until it finishes, which
@@ -140,9 +151,6 @@ export function WorkoutSheet({
       }}
     >
       <header className={styles.sheetHeader}>
-        <button type="button" className={styles.closeButton} aria-label="Close" onClick={close}>
-          <span aria-hidden="true">✕</span>
-        </button>
         <div className={styles.sheetHeading}>
           <span className={styles.eyebrow}>
             {programName} · {where}
@@ -155,7 +163,27 @@ export function WorkoutSheet({
         <Button className={styles.sheetTopSave} onClick={saveFromTop} data-ph-capture-attribute-label="program_sheet_top_save">
           Save
         </Button>
+        {/* The one close style (rulebook §5.2): a 44 px grey circle with ×, top right. */}
+        <button type="button" className={ad.close} aria-label="Close" onClick={close}>
+          <span aria-hidden="true">×</span>
+        </button>
       </header>
+      {discarding ? (
+        // The standard inline "Discard changes?" step (as in AdaptiveDialog), not a second dialog over the sheet.
+        <div ref={discardRef} className={cx(ad.discard, styles.sheetDiscard)} role="group" aria-labelledby={discardId}>
+          <p id={discardId} className={ad.discardText} data-ph-safe="">
+            <strong>Discard changes?</strong> What you changed here isn’t saved yet.
+          </p>
+          <div className={ad.discardActions}>
+            <Button variant="secondary" size="compact" onClick={() => setDiscarding(false)} phSafe>
+              Keep editing
+            </Button>
+            <Button variant="danger" size="compact" onClick={onClose} phSafe>
+              Discard
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {target.kind === 'new' ? (
         <p className={styles.sheetNote}>Saving puts it on {where} and in your Workouts list, then brings you back to the program.</p>
       ) : null}
@@ -200,17 +228,6 @@ export function WorkoutSheet({
         </SmallDialog>
       ) : null}
 
-      {discarding ? (
-        <SmallDialog title="Discard your changes?" onCancel={() => setDiscarding(false)}>
-          <p className={styles.dialogBody}>What you changed here isn’t saved yet.</p>
-          <div className={styles.dialogActions}>
-            <Button variant="secondary" onClick={() => setDiscarding(false)}>
-              Keep editing
-            </Button>
-            <Button onClick={onClose}>Discard</Button>
-          </div>
-        </SmallDialog>
-      ) : null}
     </dialog>
   );
 }
