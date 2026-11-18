@@ -124,6 +124,7 @@ test.describe('iPhone', () => {
     await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
     await picker.getByLabel('Search exercises').fill('Barbell Deadlift');
     await picker.getByRole('option', { name: 'Barbell Deadlift', exact: true }).click();
+    await expect(picker.getByRole('button', { name: 'Add 1 exercise' })).toBeVisible();
     await page.goBack();
     const ask = picker.getByRole('group', { name: /Discard changes\?/ });
     await expect(ask).toBeVisible();
@@ -230,13 +231,13 @@ for (const [device, size] of [
       await signInAsCoach(page);
       await openFromList(page, w);
 
-      // The workout's ⋯ menu: Back closes it, the workout stays.
-      const more = page.getByRole('button', { name: /^More (for|actions)/ }).first();
+      // The workout's ⋯ (iPad portrait folds Duplicate and Delete behind it): Back folds it, the workout stays.
+      const more = page.getByRole('button', { name: `More for ${w.name}`, exact: true });
       if (await more.isVisible()) {
         await more.click();
-        await expect(page.getByRole('menu').first()).toBeVisible();
+        await expect(more).toHaveAttribute('aria-expanded', 'true');
         await page.goBack();
-        await expect(page.getByRole('menu')).toHaveCount(0);
+        await expect(more).toHaveAttribute('aria-expanded', 'false');
         expect(path(page)).toBe(`/workouts/${w.id}`);
       }
 

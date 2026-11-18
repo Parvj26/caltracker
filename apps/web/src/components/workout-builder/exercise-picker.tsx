@@ -42,9 +42,15 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
   const discardId = useId();
   // Picked but not added yet: closing (×, Cancel, Escape, a tap outside, Back) asks before dropping them.
   const [picked, setPicked] = useState(0);
+  // Also kept in a ref: Back can come before the re-render with the new count (a pick inside a slow transition).
+  const pickedNow = useRef(0);
+  const onSelectionChange = useCallback((n: number) => {
+    pickedNow.current = n;
+    setPicked(n);
+  }, []);
   const [asking, setAsking] = useState(false);
   const requestClose = () => {
-    if (picked > 0) setAsking(true);
+    if (pickedNow.current > 0) setAsking(true);
     else dialogRef.current?.close();
   };
   useEffect(() => {
@@ -109,7 +115,7 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
         {...(excludeKey ? { rowFilter } : {})}
         onPick={onPick}
         onCancel={requestClose}
-        onSelectionChange={setPicked}
+        onSelectionChange={onSelectionChange}
       />
     </dialog>
   );

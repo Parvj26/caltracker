@@ -123,6 +123,10 @@ function traverse(delta: number): Promise<void> {
 
 function rawPush(entry: Entry, url?: string) {
   entry.seq = nextSeq();
+  // It goes on top of history, so on top of the stack too (it may have waited behind later ones).
+  const at = stack.indexOf(entry);
+  if (at >= 0) stack.splice(at, 1);
+  stack.push(entry);
   entry.pushed = true;
   entry.href = url ? new URL(url, window.location.href).href : window.location.href;
   writing = true;
@@ -135,7 +139,14 @@ function rawPush(entry: Entry, url?: string) {
   currentSeq = entry.seq;
 }
 
+/** Run before every push: lets openLayer notice dialogs React already took out of the page. */
+const beforePush = new Set<() => void>();
+export function onBeforePush(fn: () => void) {
+  beforePush.add(fn);
+}
+
 function push(entry: Entry) {
+  for (const fn of beforePush) fn();
   // Closed layers still on top (a menu item that opens a dialog): step over them first, then push.
   settle();
   stack.push(entry);
@@ -228,10 +239,7 @@ async function handleGone(gone: Entry[]) {
       }
     }
     // Still open: back on, bottom first, under anything they opened meanwhile (that waited in `deferred`).
-    for (const entry of refused.reverse()) {
-      stack.push(entry);
-      rawPush(entry);
-    }
+    for (const entry of refused.reverse()) rawPush(entry);
   } finally {
     deciding--;
     flush();
@@ -357,6 +365,7 @@ export function installHistoryLayers() {
 
   h.pushState = function pushState(data: unknown, unused: string, url?: string | URL | null) {
     if (writing) return innerPush.call(h, data, unused, url);
+    for (const fn of beforePush) fn();
     settle();
     const run = () => {
       const base = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
@@ -439,7 +448,6 @@ async function rewriteUnder(entries: Entry[], write: () => void) {
         continue;
       }
     }
-    stack.push(e);
     rawPush(e);
   }
 }

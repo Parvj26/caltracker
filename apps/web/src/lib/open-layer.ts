@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { showDialog } from '@/components/calendar/show-dialog';
-import { DECIDE_MS, pushLayer, type LayerHandle } from './history-layers';
+import { DECIDE_MS, onBeforePush, pushLayer, type LayerHandle } from './history-layers';
 
 type OpenLayerOptions = {
   /** On touch screens start on the dialog itself (see showDialog). */
@@ -24,10 +24,17 @@ function focusBack(opener: HTMLElement | null) {
   if (lost && opener?.isConnected) opener.focus({ preventScroll: true });
 }
 
+/** Dialogs React has taken out of the page count as closed. */
+function sweep() {
+  for (const [dialog, o] of open) if (!dialog.isConnected) o.done();
+}
+// Before a new layer is pushed (a pop-up closing as the next one opens, in one render): so they stay in order.
+onBeforePush(sweep);
+
 function watch() {
   if (observer || typeof MutationObserver === 'undefined') return;
   observer = new MutationObserver(() => {
-    for (const [dialog, o] of open) if (!dialog.isConnected) o.done();
+    sweep();
     if (open.size === 0) {
       observer?.disconnect();
       observer = null;

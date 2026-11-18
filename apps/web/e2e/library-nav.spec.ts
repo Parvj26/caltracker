@@ -54,8 +54,9 @@ for (const [device, size] of [
     await expect(menu(page)).toBeHidden();
     await expect(library(page)).toBeFocused();
 
+    // A tap outside (on the page's title, not a link) closes it.
     await library(page).click();
-    await page.mouse.click(size.width - 20, size.height - 20);
+    await page.getByRole('heading', { level: 1 }).click();
     await expect(menu(page)).toBeHidden();
 
     // Back closes the menu and stays on the page.
