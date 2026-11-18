@@ -29,6 +29,7 @@ import calendar from '@/components/calendar/calendar.module.css';
 import { useUrlChoice } from '@/lib/url-state';
 import styles from './progress.module.css';
 import { openLayer } from '@/lib/open-layer';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 
 type Editing = { scan: ScanRow | null; presetDate?: IsoDate };
 
@@ -79,6 +80,18 @@ export function ProgressSection({
   }, [toast]);
 
   const { scans, customs } = data;
+  // A refresh or shared link with ?sheet=add-scan / edit-scan-<id> opens that form again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    if (readOnly) return false;
+    if (id === 'add-scan') {
+      setEditing({ scan: null });
+      return true;
+    }
+    const scan = id.startsWith('edit-scan-') ? scans.find((s) => `edit-scan-${s.id}` === id && s.source === 'coach') : undefined;
+    if (!scan) return false;
+    setEditing({ scan });
+    return true;
+  });
   const customByKey = new Map(customs.map((c) => [customKey(c.id), c]));
   const keys = [...BUILT_IN_METRIC_KEYS, ...customs.map((c) => customKey(c.id))];
   const nameOf = (key: string) => (Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey].label : (customByKey.get(key)?.name ?? 'Measure'));
@@ -172,7 +185,7 @@ export function ProgressSection({
               </li>
             ))}
           </ul>
-          {readOnly ? null : <Button onClick={() => setEditing({ scan: null })}>Add scan</Button>}
+          {readOnly ? null : <Button variant="create" onClick={() => setEditing({ scan: null })}>+ Add scan</Button>}
         </div>
       </div>
 

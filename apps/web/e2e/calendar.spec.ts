@@ -336,8 +336,8 @@ test('move one item with "Move to…", drag another, then delete one', async ({ 
   // Delete (asks first).
   await day(page, d(15)).getByRole('button', { name: `Options for ${first}`, exact: true }).click();
   await day(page, d(15)).getByRole('menuitem', { name: 'Delete' }).click();
-  const confirm = page.getByRole('dialog', { name: `Delete ${first}?` });
-  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirm = page.getByRole('alertdialog', { name: `Delete ${first}?` });
+  await confirm.getByRole('button', { name: 'Delete workout' }).click();
   await expect(confirm).toBeHidden();
   await expect(item(page, d(15), first)).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
@@ -670,8 +670,8 @@ test('a missed past workout can be edited, moved to another day or deleted, but 
   await expect(menu.getByRole('menuitem', { name: 'Log session' })).toBeFocused();
 
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
-  const confirm = page.getByRole('dialog', { name: `Delete ${workout}?` });
-  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirm = page.getByRole('alertdialog', { name: `Delete ${workout}?` });
+  await confirm.getByRole('button', { name: 'Delete workout' }).click();
   await expect(confirm).toBeHidden();
   await expect(cell.getByText(workout, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();

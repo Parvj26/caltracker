@@ -77,16 +77,18 @@
   .barMessageText { display: inline; }
   .avatar { width: 44px; height: 44px; font-size: var(--ct-size-body); }
 }
-/* iPhone: the bar is one small row (name at heading size, on one line), and it stays at the top with the tabs. */
+/* iPhone: the bar is one small row (name at heading size), and it stays at the top with the tabs. A long name wraps
+   onto a second line (between words first) instead of being cut off; the row stays the 44 px buttons' height. */
 @media (max-width: 599.98px) {
   .barBackText { display: none; }
+  .avatar { width: 32px; height: 32px; }
   .name {
     font-size: var(--ct-size-section-heading);
     font-weight: var(--ct-weight-section-heading);
     letter-spacing: normal;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.2;
+    overflow-wrap: break-word;
+    hyphens: manual;
   }
   .sticky {
     position: sticky;
@@ -271,7 +273,10 @@
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-2); margin: 0; }
 .stat { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; padding: var(--ct-space-2) var(--ct-space-2-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
 .stat dt { order: 1; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.stat dd { order: 2; margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat dd { order: 2; margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.stat dt { overflow-wrap: break-word; }
+/* A word instead of a number ("Not assigned yet"): body size, so it wraps between words in a narrow tile. */
+.statWords { font-size: var(--ct-size-body); }
 .statNote { display: block; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
 /* Body metrics: three pickable figures above one chart. */
@@ -309,7 +314,7 @@
   font-size: var(--ct-size-caption);
   cursor: pointer;
 }
-.periodSelect:focus-visible { outline: none; border-color: var(--ct-ink); }
+.periodSelect:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-color: var(--ct-ink); }
 
 /* Updates feed */
 .feed { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
@@ -396,3 +401,6 @@
   /* Empty until something saves; then "Saving…" takes one line. */
   .trainingStatus.trainingStatus { min-height: 0; }
 }
+
+/* A list inside an AdaptiveDialog: the dialog's body is the one scroll area (UI rules §5.2), so no box of its own. */
+.dialogList.dialogList { max-height: none; min-height: 0; overflow: visible; }
