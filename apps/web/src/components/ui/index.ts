@@ -1,5 +1,5 @@
 export { AuthShell, AUTH_TAGLINE } from './auth-shell';
-export { Button, ButtonLink, type ButtonLinkProps, type ButtonProps, type ButtonVariant } from './button';
+export { Button, ButtonLink, type ButtonLinkProps, type ButtonProps, type ButtonSize, type ButtonVariant } from './button';
 export { Card } from './card';
 export { Chip, type ChipProps, type ChipTone } from './chip';
 export { HandNote } from './hand-note';
@@ -7,3 +7,4 @@ export { Logo } from './logo';
 export { notAContact } from './not-a-contact';
 export { ErrorText, SelectField, TextAreaField, TextField, errorFromText, type ErrorTextProps, type FieldError, type TextFieldProps } from './text-field';
 export { Tile, type TileProps, type Tone } from './tile';
+export { AdaptiveDialog, SHEET_MEDIA, type AdaptiveDialogHandle, type AdaptiveDialogProps } from './adaptive-dialog';
