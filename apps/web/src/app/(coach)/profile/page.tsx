@@ -1,5 +1,5 @@
 import { CoachAvatar } from '@/components/coach-avatar';
-import { Card } from '@/components/ui';
+import { Card, PageHeader } from '@/components/ui';
 import { coachAvatarUrl } from '@/lib/avatar-url';
 import { requireCoach } from '@/lib/auth';
 import { AvatarPicker } from './avatar-picker';
@@ -17,10 +17,7 @@ export default async function ProfilePage() {
 
   return (
     <div className={styles.page}>
-      <header>
-        <h1 className={styles.title}>Profile</h1>
-        <p className={styles.caption}>Your clients see your photo, name, business and bio in the app.</p>
-      </header>
+      <PageHeader title="Profile" subtitle="Your clients see your photo, name, business and bio in the app." />
 
       <Card className={styles.card}>
         <h2 className={styles.sectionHeading}>Photo</h2>
