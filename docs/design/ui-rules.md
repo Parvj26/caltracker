@@ -128,7 +128,7 @@ Always kit `Button` / `ButtonLink`; no page-level button CSS.
 1. Every full-screen editor, sheet or pop-up that covers the page **pushes a history entry** (e.g. `?exercise=<id>`, `?sheet=assign`), so Back / iOS swipe-back closes that layer and returns to the page under it — never jumps to the previous page.
 2. Back from a layer with unsaved changes shows the "Discard changes?" prompt (same as ×/Esc).
 3. Opened layers are restorable from the URL (refresh/deep link reopens them); closing replaces history state so Forward doesn't reopen stale layers.
-4. Client-page tabs and calendar views are in the URL (`?tab=`, `?view=`), so Back returns to the previous tab/view.
+4. Client-page tabs and calendar views are kept in the URL (`?tab=`, `?view=`) with **replace** (no history step): one Back leaves the client page, and refresh/deep link still restores the selected tab/view.
 
 **Other long edit screens** (Profile, program details, meal editor) use the same "Save appears only when dirty" pattern, with the "All changes saved" / "Unsaved changes" status and the leave-page warning. Short forms inside dialogs keep a normal footer Save, disabled-with-reason until valid.
 
