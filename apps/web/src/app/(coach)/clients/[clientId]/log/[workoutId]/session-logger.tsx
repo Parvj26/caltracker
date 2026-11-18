@@ -61,7 +61,9 @@ import { Button, Card, ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
+import { backOrReplace } from '@/lib/history-back';
 import { useBrowserToday } from '@/lib/local-today';
+import { clearDraft, draftToRestore, readDraft, writeDraft } from '@/lib/session-draft';
 import { handBackSession, loadSession, saveSession } from './actions';
 import { DiscardSheet, UntickedSheet } from './finish-sheets';
 import styles from './session.module.css';
@@ -89,6 +91,16 @@ const FIELDS: Record<TrackingType, Field[]> = {
   reps_time: ['reps', 'time'],
   weight_reps_time: ['weight', 'reps', 'time'],
 };
+
+/**
+ * Keeps the page's copy on the device while it has edits the server doesn't (lib/session-draft), and drops it once
+ * saved. Every edit writes it straight away, so leaving the page at any moment loses nothing.
+ */
+function keepOnDevice(doc: WorkoutLogDoc | null, savedRevision: number) {
+  if (!doc) return;
+  if (doc.status === 'in_progress' && doc.revision > savedRevision) writeDraft(doc, savedRevision);
+  else clearDraft(doc.id);
+}
 
 /** A set's short label in the SET column: W for a warm-up, D for a drop, else the working set's number. */
 function setLabel(sets: readonly LogSetDoc[], index: number): string {
@@ -454,6 +466,7 @@ export function SessionLogger({
         if (!outcome.ok) {
           if (outcome.final) {
             stopped.current = true;
+            clearDraft(doc.id);
             setSave({ kind: 'final', code: outcome.code, message: errorMessage(outcome.code), safe: true });
           } else {
             setSave({ kind: 'error', message: errorMessage(outcome.code) });
@@ -464,11 +477,13 @@ export function SessionLogger({
         if (outcome.applied) {
           savedRevision.current = Math.max(savedRevision.current, doc.revision);
           unsaved.current = unsaved.current.filter((u) => u.revision > savedRevision.current);
+          keepOnDevice(logRef.current, savedRevision.current);
           setSave({ kind: 'saved' });
           continue;
         }
         if (outcome.loggedByOther) {
           stopped.current = true;
+          clearDraft(doc.id);
           setSave({ kind: 'final', code: 'session_client_logging', message: `${client.firstName || 'Your client'} is logging this on their phone now.`, safe: false });
           router.refresh();
           return false;
@@ -487,6 +502,7 @@ export function SessionLogger({
         unsaved.current = rebased.unsaved;
         logRef.current = rebased.doc;
         savedRevision.current = server.revision;
+        keepOnDevice(rebased.doc, savedRevision.current);
         setLog(rebased.doc);
         if (!typing) setNotes(rebased.doc.notes ?? '');
         setReloads((n) => n + 1);
@@ -517,14 +533,86 @@ export function SessionLogger({
     flushRef.current = flush;
   }, [flush]);
   // Leaving the screen (another page, or this one replaced after a take over) sends what is still waiting to be
-  // saved instead of dropping it.
-  useEffect(() => () => {
-    if (timer.current) {
+  // saved instead of dropping it. So does the page being hidden or closed (the app put away, the tab closed, a
+  // reload): the browser may stop the page any moment after, so the wait for more typing is cut short. Either way
+  // the edits are already kept on the device, and the session sends them when it opens again if this save is lost.
+  useEffect(() => {
+    const sendNow = () => {
+      if (!timer.current) return;
       clearTimeout(timer.current);
       timer.current = null;
       void flushRef.current();
-    }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') sendNow();
+    };
+    window.addEventListener('pagehide', sendNow);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', sendNow);
+      document.removeEventListener('visibilitychange', onVisibility);
+      sendNow();
+    };
   }, []);
+
+  // Opening the session (again), the server's copy is loaded once more, for two things the copy this page was given
+  // may not know:
+  // - The session was finished, discarded or handed back since: Back can show this page from the browser's memory
+  //   with the old copy. It locks at once and the page loads afresh (the server then shows the log or Start).
+  // - Edits kept on this device never reached the server (the page was left or closed mid-save): the page carries on
+  //   from them and sends them now. Offline, it checks them against the copy it was given instead.
+  const [opening] = useState(initialLog);
+  useEffect(() => {
+    if (!opening || opening.status !== 'in_progress') return;
+    let live = true;
+    const restore = (server: WorkoutLogDoc) => {
+      // Only while nothing was typed on this page yet (what is typed now is kept on the device in its place).
+      if (logRef.current !== opening) return;
+      const kept = draftToRestore(readDraft(server.id), server);
+      if (!kept) {
+        // Saved already, or overtaken by changes made elsewhere: the server's copy stands.
+        clearDraft(server.id);
+        return;
+      }
+      savedRevision.current = Math.max(savedRevision.current, server.revision);
+      logRef.current = kept;
+      setLog(kept);
+      setNotes(kept.notes ?? '');
+      setReloads((n) => n + 1);
+      void flushRef.current();
+    };
+    const recheck = (first: boolean) =>
+      loadSession(opening.id)
+        .then((server) => {
+          if (!live || !server) return;
+          if (server.status === 'in_progress') {
+            if (first) restore(server);
+            return;
+          }
+          if (logRef.current?.status !== 'in_progress') return;
+          stopped.current = true;
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = null;
+          clearDraft(server.id);
+          logRef.current = server;
+          setLog(server);
+          setNotice(server.status === 'discarded' ? 'This session was discarded.' : 'This session has ended.');
+          router.refresh();
+        })
+        .catch(() => {
+          if (live && first) restore(opening);
+        });
+    void recheck(true);
+    // Shown again from the browser's back-forward memory, without this page starting again.
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) void recheck(false);
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => {
+      live = false;
+      window.removeEventListener('pageshow', onShow);
+    };
+  }, [opening, router]);
 
   /** Applies one operation to this page's copy and remembers it until saved. False when it changed nothing. */
   const applyLocal = useCallback((fn: Op): boolean => {
@@ -534,6 +622,8 @@ export function SessionLogger({
     if (next === current) return false;
     logRef.current = next;
     unsaved.current.push({ edit: fn, revision: next.revision });
+    // On the device at once (synchronously), before the save's short wait.
+    if (next.status === 'in_progress') writeDraft(next, savedRevision.current);
     setLog(next);
     return true;
   }, []);
@@ -609,7 +699,8 @@ export function SessionLogger({
     }
     // Open the finished log at once; it asks for the client's stickers, PRs and streaks itself (?award=1), so a slow
     // award never holds the coach up.
-    router.push(`/clients/${client.id}/logs/${finished.id}?award=1`);
+    // In place of this page, so Back goes to where the session was opened from, not to a session that has ended.
+    router.replace(`/clients/${client.id}/logs/${finished.id}?award=1`);
   }
 
   /** Discard session, after "Discard this session?". */
@@ -618,7 +709,8 @@ export function SessionLogger({
     if (!logRef.current) return;
     const at = nowIso();
     applyLocal((l) => discardLog(l, at));
-    if (await flush()) router.push(`/clients/${client.id}/training`);
+    // Back to the calendar it was opened from (same week and view), else to the calendar, in place of this page.
+    if (await flush()) backOrReplace(router, (url) => url.pathname === `/clients/${client.id}/training`, `/clients/${client.id}/training`);
   }
 
   /** Gives the workout back to the client's phone; they carry on from what is saved, and the coach watches it live. */
@@ -651,7 +743,7 @@ export function SessionLogger({
     }
     stopped.current = true;
     // Straight to the live view of this workout, so the coach can watch the client carry on.
-    router.push(`/clients/${client.id}/logs/${current.id}`);
+    router.replace(`/clients/${client.id}/logs/${current.id}`);
   }
 
   const status =
