@@ -9,3 +9,6 @@ export { ErrorText, SelectField, TextAreaField, TextField, errorFromText, type E
 export { Tile, type TileProps, type Tone } from './tile';
 export { AdaptiveDialog, SHEET_MEDIA, type AdaptiveDialogHandle, type AdaptiveDialogProps } from './adaptive-dialog';
 export { SearchBox, SearchCount, SearchEmpty, useDebounced, useSearchQuery, type SearchBoxProps } from './search-box';
+export { CreateLink, PageHeader, ParentLink, type PageHeaderProps } from './page-header';
+export { ListRow, RowList, type ListRowProps } from './list-row';
+export { PhoneActionBar, keyboardCover } from './phone-action-bar';

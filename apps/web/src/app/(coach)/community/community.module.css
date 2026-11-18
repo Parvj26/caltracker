@@ -1,20 +1,10 @@
 /* Community feed and reports. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
-.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1100px; }
-.titleRow { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); }
-.titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
-.title {
-  margin: 0;
-  font-size: var(--ct-size-screen-title);
-  font-weight: var(--ct-weight-screen-title);
-  letter-spacing: var(--ct-tracking-screen-title);
-  line-height: 1.15;
-}
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4); max-width: 680px; }
 .sectionTitle { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 .subTitle { margin: var(--ct-space-3) 0 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--ct-space-4-5); align-items: start; }
-@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+/* The feed: one readable column (max ~680 px), members are behind the "Members (N)" button. */
 .feed { display: flex; flex-direction: column; gap: var(--ct-space-4); min-width: 0; }
 
 .visuallyHidden {
@@ -22,61 +12,57 @@
   clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
-.smallButton {
-  position: relative;
+/* "2 reports to review": shown only when something needs looking at. */
+.reportsLink {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  align-self: flex-start;
+  gap: var(--ct-space-2);
   min-height: var(--ct-tap-min);
-  min-width: var(--ct-tap-min);
-  padding: 0 var(--ct-space-3);
-  border: 0;
-  border-radius: var(--ct-radius-input);
-  background: transparent;
   color: var(--ct-ink);
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
-  font: inherit;
   font-weight: var(--ct-weight-section-heading);
-  text-decoration: none;
-  cursor: pointer;
 }
-.smallButton:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.smallButton[aria-pressed='true'] { background: var(--ct-pink); }
-.smallButton[aria-disabled='true'], .smallButton:disabled { opacity: 0.5; cursor: default; }
-.linkButton {
+.reviewLink {
+  display: inline-flex;
+  align-items: center;
   min-height: var(--ct-tap-min);
-  padding: 0;
-  border: 0;
-  background: none;
+  padding: 0 var(--ct-space-1);
+  margin-block: calc((var(--ct-tap-min) - 1.5em) / -2);
   color: var(--ct-ink);
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
+  font-weight: var(--ct-weight-section-heading);
 }
 
-/* Composer */
-.composer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ct-space-3);
-  padding: var(--ct-space-4);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-surface);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-}
+/* Composer: one surface (the text box), no card around it. */
+.composer { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .composerLabel { display: block; }
 .composerInput {
   width: 100%;
   min-height: 88px;
-  padding: var(--ct-space-3);
-  border: var(--ct-border-width-card) solid var(--ct-border);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: 2px solid transparent;
   border-radius: var(--ct-radius-input);
-  background: var(--ct-bg);
+  background: var(--ct-surface);
   color: var(--ct-ink);
   font: inherit;
   resize: vertical;
 }
 .composerActions { display: flex; justify-content: space-between; align-items: center; gap: var(--ct-space-3); }
+.composerActions[hidden], .thread[hidden] { display: none; }
+.composer:not([data-expanded]) .composerInput { min-height: var(--ct-button-min-height); resize: none; }
+.composerInput:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.composerInput:focus-visible, .commentInput:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.photoButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-4);
+  border-radius: var(--ct-radius-input);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.photoButton:has(:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.photoButton[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; }
 .previewRow { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 .preview { position: relative; }
 .preview img { width: 88px; height: 88px; object-fit: cover; border-radius: var(--ct-radius-input); display: block; }
@@ -113,27 +99,38 @@
 .pinned { display: inline-flex; align-items: center; gap: 3px; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
 /* React, Comment and the folded "3 comments" on one line; they wrap on a narrow phone. */
 .postActions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--ct-space-2); }
-.buttonText { margin-left: var(--ct-space-1); }
-.commentToggle {
+/* The one comment control: "💬 3" (or "Comment") opens the comments with the reply box under them. */
+.commentButton {
   display: inline-flex;
   align-items: center;
   gap: var(--ct-space-1);
   min-height: var(--ct-tap-min);
   margin-left: auto;
-  padding: 0 var(--ct-space-2);
+  padding: 0 var(--ct-space-3);
   border: 0;
   border-radius: var(--ct-radius-input);
   background: transparent;
   color: var(--ct-ink);
   font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.commentButton:hover, .commentButton[aria-expanded='true'] { background: var(--ct-bg); }
+.thread { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+/* "React" on a comment (or post) nobody reacted to yet: small text, a full 44 px target. */
+.reactQuiet {
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink-muted);
+  font: inherit;
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   cursor: pointer;
 }
-.commentToggle:hover { text-decoration: underline; }
-.commentToggle[aria-expanded='true'] .toggleChevron { transform: rotate(180deg); }
-/* Shown only when there are open reports: "2 reports to review", outlined in amber. */
-.reportsLink { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber); }
+.reactQuiet:hover { color: var(--ct-ink); text-decoration: underline; }
 .postBody { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reactions { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .reactionBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
@@ -155,8 +152,8 @@
   font: inherit;
   cursor: pointer;
 }
-.reactionToggle { font-size: var(--ct-size-body); padding: 0 var(--ct-space-1) 0 var(--ct-space-3); min-width: 0; }
-.reactionCount { font-weight: var(--ct-weight-section-heading); padding: 0 var(--ct-space-3) 0 var(--ct-space-1); min-width: 0; text-decoration: underline dotted; }
+.reactionToggle { font-size: var(--ct-size-body); padding: 0 var(--ct-space-1) 0 var(--ct-space-3); }
+.reactionCount { font-weight: var(--ct-weight-section-heading); padding: 0 var(--ct-space-3) 0 var(--ct-space-1); text-decoration: underline dotted; }
 .reactionAdd {
   border-radius: var(--ct-radius-pill);
   box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
@@ -217,19 +214,10 @@
   font: inherit;
 }
 
-/* Members */
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ct-space-2);
-  padding: var(--ct-space-4);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-surface);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-}
-.memberList { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
-.member { display: flex; align-items: center; gap: var(--ct-space-2); }
-.memberName { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Members (inside the Members pop-up) */
+.memberList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.member { display: flex; align-items: center; gap: var(--ct-space-3); min-height: 56px; border-bottom: 1px solid var(--ct-border); }
+.memberName { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: var(--ct-weight-section-heading); }
 
 /* Reports */
 .reportList { display: flex; flex-direction: column; gap: var(--ct-space-3); }

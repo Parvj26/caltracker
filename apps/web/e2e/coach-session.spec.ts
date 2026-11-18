@@ -119,8 +119,8 @@ test('the coach logs today\'s workout from the calendar, and it counts as the cl
   await page.goto(`/activity?client=${client}`);
   const feedRow = page.getByRole('main').getByRole('listitem').filter({ hasText: name });
   await expect(feedRow.getByText('Logged by coach')).toBeVisible();
-  // The coach logged it in person, so it counts as reviewed: no dot.
-  await expect(feedRow.getByRole('img', { name: 'Not reviewed' })).toHaveCount(0);
+  // The coach logged it in person, so it counts as reviewed: no "To review" chip.
+  await expect(feedRow.getByText('To review', { exact: true })).toHaveCount(0);
   await page.goto(`/clients/${client}/training?view=month&from=${today}`);
   const card = page.locator(`[data-date="${today}"]`).getByRole('listitem').filter({ hasText: name });
   await expect(card.getByRole('link', { name: `Done: view the ${name} log` })).toBeVisible();

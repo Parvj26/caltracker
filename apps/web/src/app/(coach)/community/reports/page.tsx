@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { REPORT_REASON_LABELS, memberName, postAge, type ReportReason } from '@caltracker/shared';
-import { Card } from '@/components/ui';
+import { Card, PageHeader } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
@@ -35,15 +35,11 @@ export default async function ReportsPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <div className={styles.titleBlock}>
-          <p className={styles.caption}>
-            <Link href="/community" className="tap-inline">← Community</Link>
-          </p>
-          <h1 className={styles.title}>Reports</h1>
-          <p className={styles.caption}>Posts and comments your clients reported. Remove them, or keep them if they’re fine.</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Reports"
+        back={{ href: '/community', label: 'Community' }}
+        subtitle="Posts and comments your clients reported. Remove them, or keep them if they’re fine."
+      />
 
       <section aria-labelledby="open-reports" className={styles.reportList}>
         <h2 id="open-reports" className={styles.sectionTitle}>

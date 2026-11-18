@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   COACH_MEAL_LIMITS,
   COACH_MEAL_PHOTO_BUCKET,
@@ -14,16 +13,15 @@ import {
   type MacroKey,
   type MealMacros,
 } from '@caltracker/shared';
-import { Button, ErrorText, notAContact, errorFromText, type FieldError } from '@/components/ui';
+import { Button, ButtonLink, ErrorText, PageHeader, PhoneActionBar, notAContact, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { removeCoachMeal, saveCoachMeal, type CoachMealInput } from './actions';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { saveCoachMeal, type CoachMealInput } from './actions';
 import { mealFormDirty, type MealFormSnapshot } from './form-dirty';
-import { loggedLabel, mealInitial, mealsListHref } from './meal-labels';
-import { tileColour } from './meal-list';
+import { mealHref, mealInitial, mealsListHref } from './meal-labels';
 import styles from './meals.module.css';
-import { openRef, useBackLayer } from '@/lib/open-layer';
 
 type StoredPhoto = { path: string; thumbPath: string; width: number; height: number; url: string | null };
 export type MealFormValue = {
@@ -37,8 +35,6 @@ export type MealFormValue = {
 
 const LABEL: Record<MacroKey, string> = { calories: 'Calories (kcal)', protein: 'Protein (g)', carbs: 'Carbs (g)', fat: 'Fat (g)' };
 const toText = (n: number | null) => (n === null ? '' : String(n));
-export const DISCARD_CONFIRM = 'Discard changes?';
-export const REMOVE_CONFIRM = "Remove this meal? Clients won't see it any more. Meals they already logged stay.";
 
 async function sizeOf(blob: Blob): Promise<{ width: number; height: number }> {
   const bitmap = await createImageBitmap(blob);
@@ -55,37 +51,37 @@ type MealFormProps = {
   isNew: boolean;
   /** The saved meal's version (its updatedAt): when it changes after a save, the fields reset to the saved values. */
   version: string;
-  /** How often clients logged it (shown under the photo when editing). */
+  /** How often clients logged it (shown on the meal's own page). */
   logged: number;
-  /** The meals search text (?q=) the form was opened with: ‹ Meals, Cancel and Remove go back to that search. */
+  /** The meals search text (?q=) the form was opened with: ‹ Back and Cancel keep that search. */
   query: string;
 };
 
 /**
- * New or edit form for a shared meal. A new photo is compressed in the browser (1600 px + 320 px thumbnail) and
+ * New or edit form for a shared meal (the same fields in the same order for both: name first). Save shows only when
+ * something changed (UI rules §8), with "All changes saved" / "Unsaved changes"; on a phone it sits in the bottom
+ * action bar. Removing a meal is on the meal's own page (⋯), never beside Save.
+ *
+ * A new photo is compressed in the browser (1600 px + 320 px thumbnail) and
  * uploaded to the meal's own files before saving; the files of a replaced or removed photo are deleted after.
  *
- * The "Saved" message lives here, above the fields: a save refreshes the page, which remounts the fields with the
- * saved meal (a new version), and the message has to survive that.
+ * Keyed by the saved version: a save refreshes the page, which remounts the fields with the saved meal.
  */
 export function MealForm(props: MealFormProps) {
-  const [saved, setSaved] = useState(false);
-  return <MealFormFields key={props.version} {...props} saved={saved} setSaved={setSaved} />;
+  return <MealFormFields key={props.version} {...props} />;
 }
 
 function MealFormFields({
   workspaceId,
   initial,
   isNew,
-  logged,
   query,
-  saved,
-  setSaved,
-}: MealFormProps & { saved: boolean; setSaved: (saved: boolean) => void }) {
+}: MealFormProps) {
   const router = useRouter();
-  // Back to the list with the coach's search kept. The search box beside the form (from 768 px up) can change the
-  // address after the page loaded, so a tap reads it from there.
-  const listHref = () => mealsListHref(new URLSearchParams(window.location.search).get('q'));
+  // Back to the meal (or, for a new one, the list) with the coach's search kept. The search box beside the form (on a
+  // wide page) can change the address after the page loaded, so a tap reads it from there.
+  const backTo = (q: string | null) => (isNew ? mealsListHref(q) : mealHref(initial.id, q));
+  const listHref = () => backTo(new URLSearchParams(window.location.search).get('q'));
   const [name, setName] = useState(initial.name);
   const [macroText, setMacroText] = useState<Record<MacroKey, string>>({
     calories: toText(initial.macros.calories),
@@ -99,9 +95,6 @@ function MealFormFields({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<FieldError | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  // Back (and iOS swipe-back) closes the menu, not the page.
-  useBackLayer(menuOpen, () => setMenuOpen(false));
   // What "unchanged" means for Cancel and ‹ Meals: the meal as opened, then as last saved. A save is on screen before
   // the page refresh brings the saved meal back, and leaving in between mustn't ask "Discard changes?".
   const [baseline, setBaseline] = useState<MealFormSnapshot>(() => ({
@@ -115,12 +108,6 @@ function MealFormFields({
   const [savedFile, setSavedFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const discardRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const menuId = useId();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const discardTitleId = useId();
 
   // The local preview's link is freed when it is replaced and when the form goes away.
   const previewRef = useRef<string | null>(null);
@@ -133,23 +120,6 @@ function MealFormFields({
   useEffect(() => () => {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
   }, []);
-
-  // The ⋯ menu closes on a tap outside it or Escape.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
 
   const shownPhoto = file ? preview : stored?.url ?? null;
   const hasPhoto = file !== null || stored !== null;
@@ -171,7 +141,6 @@ function MealFormFields({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSaved(false);
     const problems = coachMealProblems({ name, ingredients, howTo });
     for (const k of MACRO_KEYS) {
       const r = parseMacroInput(k, macroText[k]);
@@ -202,12 +171,14 @@ function MealFormFields({
         setError({ code: out.code });
         return;
       }
-      setSaved(true);
       setBaseline({ ...current, newFile: false });
       setSavedFile(file);
-      // Replace: Back from the saved meal goes to the list, not to an empty New meal form.
-      if (isNew) router.replace(`/meals/${initial.id}`);
-      else router.refresh();
+      // Replace: Back from the saved meal goes to the list, not to an empty New meal form. The search (?q=) is kept.
+      if (isNew) {
+        // Nothing left to lose: take the guard off before leaving the form.
+        await guard.release();
+        router.replace(mealHref(initial.id, new URLSearchParams(window.location.search).get('q')));
+      } else router.refresh();
     } catch (err) {
       setError(err instanceof PhotoError ? errorFromText(err.message, 'meal_photo_failed') : { code: 'meal_save_failed' });
     } finally {
@@ -218,24 +189,14 @@ function MealFormFields({
   const current: MealFormSnapshot = { name, macroText, ingredients, howTo, photoPath: stored?.path ?? null, newFile: file !== null && file !== savedFile };
   const dirty = mealFormDirty(baseline, current);
 
-  /** Back to the list without saving; asks first if anything was typed. */
-  function cancel() {
-    if (dirty) openRef(discardRef);
-    else router.push(listHref());
-  }
+  // Unsaved changes: ‹ Back, the menu's links, the browser's Back and closing the tab all ask "Discard changes?" once.
+  const guard = useUnsavedGuard(dirty, { parentHref: backTo(query) });
 
-  async function remove() {
-    setPending(true);
-    const out = await removeCoachMeal(initial.id);
-    setPending(false);
-    if (!out.ok) {
-      setError({ code: out.code });
-      dialogRef.current?.close();
-      return;
-    }
-    dialogRef.current?.close();
+  /** Back without saving; asks first if anything was typed. */
+  async function cancel() {
+    if (!(await guard.confirm())) return;
+    await guard.release();
     router.push(listHref());
-    router.refresh();
   }
 
   const nameField = (
@@ -256,67 +217,22 @@ function MealFormFields({
     </label>
   );
 
-  return (
-    // data-no-menu-button: on an iPhone the floating Menu button would sit on the sticky Save bar; Cancel leaves.
-    <form className={styles.panel} aria-label={isNew ? 'New meal' : 'Edit meal'} onSubmit={(e) => void save(e)} noValidate data-no-menu-button="">
-      {/* On a phone this is the full-screen editor's top bar: ‹ Meals, the title, and ⋯ (Remove). From 768 px up only
-          the title shows, as the panel's heading. */}
-      <div className={styles.topBar}>
-        <Link
-          href={mealsListHref(query)}
-          className={styles.back}
-          aria-label="Back to meals"
-          onClick={(e) => {
-            if (!dirty) return;
-            e.preventDefault();
-            openRef(discardRef);
-          }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-          Meals
-        </Link>
-        <h2 className={styles.panelTitle}>{isNew ? 'New meal' : 'Edit meal'}</h2>
-        {!isNew ? (
-          <div className={styles.more} ref={menuRef}>
-            <button
-              type="button"
-              className={styles.moreButton}
-              aria-label="More"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              aria-controls={menuOpen ? menuId : undefined}
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="5" cy="12" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="19" cy="12" r="2" />
-              </svg>
-            </button>
-            {menuOpen ? (
-              <div id={menuId} role="menu" aria-label="Meal actions" className={styles.menu}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.menuDanger}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    openRef(dialogRef);
-                  }}
-                >
-                  Remove meal
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <span className={styles.topBarSpacer} aria-hidden="true" />
-        )}
-      </div>
+  const named = name.trim() !== '';
+  const status = pending ? 'Saving…' : isNew ? null : dirty ? 'Unsaved changes' : 'All changes saved';
 
-      {isNew ? nameField : null}
+  return (
+    <form className={styles.panel} aria-labelledby="meal-form-title" onSubmit={(e) => void save(e)} noValidate>
+      <PageHeader
+        className={styles.panelHeader}
+        titleId="meal-form-title"
+        title={isNew ? 'New meal' : 'Edit meal'}
+        back={{
+          href: backTo(query),
+          label: isNew ? 'Meals' : initial.name,
+        }}
+      />
+
+      {nameField}
 
       <div className={styles.photoRow}>
         {shownPhoto ? (
@@ -330,7 +246,7 @@ function MealFormFields({
             </svg>
           </span>
         ) : (
-          <span className={cx(styles.photo, styles.photoInitial)} style={{ background: tileColour(initial.id) }} aria-hidden="true">
+          <span className={cx(styles.photo, styles.photoInitial)} aria-hidden="true">
             {mealInitial(name)}
           </span>
         )}
@@ -349,27 +265,26 @@ function MealFormFields({
                 e.target.value = '';
               }}
             />
-            <button type="button" className={styles.smallButton} onClick={() => fileRef.current?.click()}>
+            <Button variant="secondary" size="compact" onClick={() => fileRef.current?.click()} phSafe>
               {hasPhoto ? 'Change photo' : 'Add photo'}
-            </button>
+            </Button>
             {hasPhoto ? (
-              <button
-                type="button"
-                className={styles.smallButton}
+              <Button
+                variant="quiet"
+                size="compact"
+                phSafe
                 onClick={() => {
                   pickFile(null);
                   setStored(null);
                 }}
               >
                 Remove photo
-              </button>
+              </Button>
             ) : null}
           </div>
-          <span className={styles.caption}>{isNew ? 'Optional. Clients see it when they log.' : loggedLabel(logged)}</span>
+          <span className={styles.caption}>Optional. Clients see it when they log.</span>
         </div>
       </div>
-
-      {isNew ? null : nameField}
 
       <div className={styles.macros}>
         {MACRO_KEYS.map((k) => (
@@ -395,67 +310,28 @@ function MealFormFields({
       </label>
 
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
-      <div className={styles.actions}>
-        <button type="submit" className={styles.save} disabled={pending} aria-busy={pending || undefined}>
-          {pending ? 'Saving…' : isNew ? 'Save meal' : 'Save'}
-        </button>
-        <button type="button" className={styles.cancel} onClick={cancel} disabled={pending}>
-          Cancel
-        </button>
-        {!isNew ? (
-          <button type="button" className={cx(styles.remove, styles.wideOnly)} onClick={() => openRef(dialogRef)}>
-            Remove meal
-          </button>
-        ) : null}
-        {/* In the Save bar, so on a phone (where the bar sticks to the bottom) it shows where the coach just tapped. */}
-        {saved && !isNew && !dirty ? (
-          <p role="status" className={styles.status}>
-            Saved
-          </p>
-        ) : null}
-      </div>
-
-      <dialog ref={discardRef} className={styles.dialog} aria-labelledby={discardTitleId}>
-        <h2 id={discardTitleId} className={styles.dialogTitle}>
-          {DISCARD_CONFIRM}
-        </h2>
-        <div className={styles.dialogActions}>
-          <Button variant="secondary" onClick={() => discardRef.current?.close()}>
-            Keep editing
+      <PhoneActionBar status={status} label="Meal actions">
+        {isNew || dirty ? (
+          <Button variant="secondary" onClick={() => void cancel()} disabled={pending} phSafe>
+            Cancel
           </Button>
-          <Button
-            onClick={() => {
-              discardRef.current?.close();
-              router.push(listHref());
-            }}
-          >
-            Discard
+        ) : (
+          <ButtonLink href={backTo(query)} variant="secondary" phSafe>
+            Done
+          </ButtonLink>
+        )}
+        {isNew ? (
+          <Button type="submit" pending={pending} disabled={!named} disabledReason="Give the meal a name first" phSafe>
+            {pending ? 'Saving…' : 'Save meal'}
           </Button>
-        </div>
-      </dialog>
+        ) : dirty || pending ? (
+          <Button type="submit" pending={pending} phSafe>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        ) : null}
+      </PhoneActionBar>
 
-      {!isNew ? (
-        <dialog
-          ref={dialogRef}
-          className={styles.dialog}
-          aria-labelledby={titleId}
-          onCancel={(e) => {
-            if (pending) e.preventDefault();
-          }}
-        >
-          <h2 id={titleId} className={styles.dialogTitle}>
-            {REMOVE_CONFIRM}
-          </h2>
-          <div className={styles.dialogActions}>
-            <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-              Cancel
-            </Button>
-            <Button onClick={() => void remove()} pending={pending}>
-              Remove meal
-            </Button>
-          </div>
-        </dialog>
-      ) : null}
+      {guard.prompt}
     </form>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loggedLabel, mealInitial, mealsListHref } from './meal-labels';
+import { loggedLabel, loggedNote, mealEditHref, mealHref, mealInitial, mealsListHref } from './meal-labels';
 
 describe('loggedLabel', () => {
   it('says "Not logged yet" before any client logs the meal', () => {
@@ -42,5 +42,22 @@ describe('mealsListHref', () => {
     expect(mealsListHref('')).toBe('/meals');
     expect(mealsListHref('   ')).toBe('/meals');
     expect(mealsListHref(null)).toBe('/meals');
+  });
+});
+
+describe('loggedNote', () => {
+  it('leaves the line out before any client logs the meal', () => {
+    expect(loggedNote(0)).toBeNull();
+    expect(loggedNote(Number.NaN)).toBeNull();
+    expect(loggedNote(3)).toBe('Logged 3 times');
+  });
+});
+
+describe('mealHref / mealEditHref', () => {
+  it('keep the search', () => {
+    expect(mealHref('m1', '')).toBe('/meals/m1');
+    expect(mealHref('m1', ' oat bar ')).toBe('/meals/m1?q=oat%20bar');
+    expect(mealEditHref('m1', null)).toBe('/meals/m1/edit');
+    expect(mealEditHref('m1', 'oat')).toBe('/meals/m1/edit?q=oat');
   });
 });

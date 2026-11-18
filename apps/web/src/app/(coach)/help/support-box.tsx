@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { SUPPORT_EMAIL, supportMailto } from '@caltracker/shared';
+import { ButtonLink } from '@/components/ui';
 import { copyText } from './copy-text';
 import { LAST_PAGE_KEY, supportPage } from './support-page';
 import styles from './help.module.css';
@@ -17,8 +18,8 @@ const readLastPage = () => {
 };
 
 /**
- * The support address as text you can select, a Copy button, and "Open in my mail app": an email pre-filled with the
- * website's release, the browser and the page the coach was on before Help. The browser details exist only in the
+ * The support address as text you can select, a Copy button, and "Email support": an email pre-filled with the
+ * website's release, the browser and the page the coach was on before Help ("Email support", the main button). The browser details exist only in the
  * browser, so the server renders the link without them.
  */
 export function SupportBox() {
@@ -59,13 +60,13 @@ export function SupportBox() {
       <p className={styles.copyStatus} role="status" data-ph-safe="">
         {copied === 'yes' ? 'Email address copied.' : copied === 'no' ? 'Couldn’t copy. Press and hold the address to copy it.' : ''}
       </p>
-      <a href={href} className={styles.mailLink} data-ph-capture-attribute-label="help_feedback">
+      <ButtonLink href={href} className={styles.mailLink} data-ph-capture-attribute-label="help_feedback">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden="true" focusable="false">
           <rect x="3" y="5" width="18" height="14" rx="2" />
           <path d="M3 7l9 6 9-6" />
         </svg>
-        <span data-ph-safe="">Open in my mail app</span>
-      </a>
+        <span data-ph-safe="">Email support</span>
+      </ButtonLink>
     </section>
   );
 }

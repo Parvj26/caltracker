@@ -1,29 +1,21 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo } from 'react';
 import { compactMacroLine, smartFilter } from '@caltracker/shared';
-import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import type { ListedCoachMeal } from '@/lib/coach-meals';
-import { loggedLabel, mealInitial } from './meal-labels';
+import { loggedNote, mealHref, mealInitial } from './meal-labels';
 import styles from './meals.module.css';
 
-const TILES = ['var(--ct-drop)', 'var(--ct-lime)', 'var(--ct-blue)', 'var(--ct-celebrate-bg)'];
-/** The colour tile for a meal without a photo, fixed by its id. */
-export function tileColour(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return TILES[h % TILES.length] ?? 'var(--ct-surface)';
-}
-
-/** The photo, or the meal's first letter on its colour tile. */
-export function MealTile({ id, name, src, className }: { id: string; name: string; src: string | null; className?: string }) {
+/** The photo, or the meal's first letter on a calm grey tile (the old random colours meant nothing). */
+export function MealTile({ name, src, className }: { id?: string; name: string; src: string | null; className?: string | undefined }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link; next/image can't cache it
     <img src={src} alt={`${name} photo`} className={cx(styles.thumb, className)} />
   ) : (
-    <span className={cx(styles.thumb, styles.thumbInitial, className)} style={{ background: tileColour(id) }} aria-hidden="true">
+    <span className={cx(styles.thumb, styles.thumbInitial, className)} aria-hidden="true">
       {mealInitial(name)}
     </span>
   );
@@ -52,28 +44,24 @@ export function MealList({ meals, selectedId, initialQuery }: { meals: ListedCoa
       {shown.length === 0 ? (
         <SearchEmpty things="meals" query={q} onClear={() => setQuery('')} className={styles.empty} />
       ) : (
-        <ul className={styles.list} aria-label="Shared meals">
-          {shown.map((m) => (
-            <li key={m.id}>
-              <Link
-                href={q ? `/meals/${m.id}?q=${encodeURIComponent(q)}` : `/meals/${m.id}`}
-                className={cx(styles.row, m.id === selectedId && styles.rowSelected)}
-                aria-current={m.id === selectedId ? 'page' : undefined}
-                data-testid="coach-meal-row"
-              >
-                <MealTile id={m.id} name={m.name} src={m.thumbUrl} />
-                <span className={styles.rowText}>
-                  <span className={styles.rowName}>{m.name}</span>
-                  <span className={styles.rowMacros}>{compactMacroLine(m.macros)}</span>
-                  <span className={styles.rowLogged}>{loggedLabel(m.logged)}</span>
-                </span>
-                <svg className={styles.chevron} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <RowList aria-label="Shared meals">
+          {shown.map((m) => {
+            const macros = compactMacroLine(m.macros);
+            const logged = loggedNote(m.logged);
+            return (
+              <ListRow
+                key={m.id}
+                href={mealHref(m.id, q)}
+                current={m.id === selectedId}
+                leading={<MealTile id={m.id} name={m.name} src={m.thumbUrl} />}
+                title={m.name}
+                meta={macros || logged ? [macros, logged].filter(Boolean).join(' · ') : null}
+                end={<ChevronIcon direction="right" size={20} />}
+                linkProps={{ 'data-testid': 'coach-meal-row' }}
+              />
+            );
+          })}
+        </RowList>
       )}
     </div>
   );

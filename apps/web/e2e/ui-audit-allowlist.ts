@@ -40,12 +40,6 @@ export const AXE_ALLOW: AxeAllow[] = [
   },
   {
     rule: 'label-content-name-mismatch',
-    pages: ['Messages'],
-    selector: 'a[class*="_row"]',
-    reason: `Inbox rows are labelled with the client's name only; the visible text also has the last message. ${TODO}`,
-  },
-  {
-    rule: 'label-content-name-mismatch',
     pages: ['Exercises'],
     selector: '[role=option]',
     reason: `Exercise search results: the option's aria-label differs from its visible text. ${TODO}`,

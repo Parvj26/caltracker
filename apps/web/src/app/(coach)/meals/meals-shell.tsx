@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ButtonLink } from '@/components/ui';
+import { CreateLink, PageHeader } from '@/components/ui';
 import type { ListedCoachMeal } from '@/lib/coach-meals';
 import { MealList } from './meal-list';
 import styles from './meals.module.css';
@@ -12,37 +12,39 @@ export function queryFrom(sp: SearchParams): string {
 }
 
 /**
- * The Meals page frame: title, + New meal, the searchable list of shared meals, and the panel beside it (a form or a
- * hint). From 768 px up the list and the panel sit side by side. On a phone the list is its own screen and a meal
- * (or New meal) opens full screen (`editing`): the list and the title are hidden and the form brings its own top bar.
+ * The Meals page frame: the title with "+ New meal", the searchable list of shared meals, and the panel beside it (a
+ * meal, the form, or a hint). When the page is wide (iPad landscape, desktop) the list and the panel sit side by side.
+ * Narrower (phone, iPad portrait) the list is its own screen, and a meal or the form fills the screen with its own
+ * "‹ Meals" (`open`): the list and the title are hidden. On a meal's own pages the panel has the page's h1.
  */
 export function MealsShell({
   meals,
   selectedId,
   query,
-  editing,
+  open,
   children,
 }: {
   meals: ListedCoachMeal[];
   selectedId: string | null;
   query: string;
-  editing: boolean;
+  /** A meal or the form is open (the list's h1 steps aside for the panel's). */
+  open: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className={styles.page} data-editing={editing || undefined}>
-      <header className={styles.titleRow}>
-        <div className={styles.titleText}>
-          <h1 className={styles.title}>Meals</h1>
-          <p className={styles.subtitle}>Shared with all your clients. They can log any of these in one tap.</p>
+    <div className={styles.page} data-open={open || undefined}>
+      <div className={styles.inner}>
+        <PageHeader
+          className={styles.header}
+          title="Meals"
+          titleAs={open ? 'p' : 'h1'}
+          subtitle="Shared with all your clients. They can log any of these in one tap."
+          action={<CreateLink href="/meals/new" thing="meal" />}
+        />
+        <div className={styles.columns}>
+          <MealList meals={meals} selectedId={selectedId} initialQuery={query} />
+          {children}
         </div>
-        <ButtonLink href="/meals/new" className={styles.newButton}>
-          + New meal
-        </ButtonLink>
-      </header>
-      <div className={styles.columns}>
-        <MealList meals={meals} selectedId={selectedId} initialQuery={query} />
-        {children}
       </div>
     </div>
   );
