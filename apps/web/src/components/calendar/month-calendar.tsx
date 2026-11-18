@@ -18,11 +18,12 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type TouchEvent } from 'react';
 import { calendarSwipeStep, isLiveWorkout, phoneCalendarDay } from '@caltracker/shared';
 import type { IsoDate, WorkoutPreview } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
+import { replaceParam } from '@/lib/url-state';
 import { formatDayMonth, formatLongDay, formatShortDay, formatWeekday } from './format';
 import styles from './calendar.module.css';
 
@@ -120,6 +121,8 @@ const announcements: Announcements = {
   onDragCancel: ({ active }) => `Cancelled. ${dragName(active.data.current)} was put back.`,
 };
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Monday-first weeks of days: a month, or 1, 2 or 4 weeks. Each day cell carries data-date; today has an ink ring and
  * aria-current="date". Items can be dragged between days (mouse, touch, or keyboard: Space to pick up, arrows, Space
@@ -142,7 +145,11 @@ export function MonthCalendar({ weeks, month, label, layout, toolbar, days, toda
   const draggable = Boolean(onDropItem);
   const narrow = useNarrow(rootRef, COMPACT_MAX_PX);
   const compact = narrow && layout === 'month';
-  const [picked, setPicked] = useState<IsoDate | null>(null);
+  // The day picked on a phone's month grid is kept in the address (?day=), so Back from its workout or a reload
+  // shows the same day. phoneCalendarDay ignores a day outside the dates shown.
+  const dayParam = useSearchParams().get('day');
+  const picked = dayParam !== null && ISO_DAY.test(dayParam) ? dayParam : null;
+  const setPicked = (date: IsoDate) => replaceParam('day', date, '');
   const first = weeks[0]![0]!;
   const last = weeks.at(-1)!.at(-1)!;
   const shownDay = today ? phoneCalendarDay({ start: first, end: last, month }, today, picked) : (picked ?? first);

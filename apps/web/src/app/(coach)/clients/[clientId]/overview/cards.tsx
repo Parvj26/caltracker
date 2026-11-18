@@ -30,6 +30,7 @@ import type { ClientOverview, OverviewEvent } from '@/lib/client-overview';
 import { UPDATES_SHOWN } from '@/lib/client-overview';
 import { LineChart } from '../progress/line-chart';
 import { useNowMinute } from './use-now';
+import { useUrlChoice } from '@/lib/url-state';
 import styles from '../client-page.module.css';
 
 /** A plain calendar date as "Sat 31 Oct" (same text on the server and in Safari). */
@@ -103,7 +104,8 @@ export function HighlightsCard({ data, units }: { data: ClientOverview; units: U
 const SHORT_LABEL: Record<OverviewMetric, string> = { weight_kg: 'Weight', body_fat_pct: 'Body fat', smm_kg: 'Muscle mass' };
 
 export function BodyMetricsCard({ data, units, today, readOnly }: { data: ClientOverview; units: Units; today: IsoDate; readOnly: boolean }) {
-  const [period, setPeriod] = useState<OverviewPeriod>('4w');
+  // Kept in the address (?period=), so a reload or Back to Overview keeps it.
+  const [period, setPeriod] = useUrlChoice<OverviewPeriod>('period', OVERVIEW_PERIODS, '4w');
   const [chosen, setChosen] = useState<OverviewMetric>('weight_kg');
   const metrics = bodyOverview(data.scans, period, today);
   const shown = metrics.find((m) => m.key === chosen)!;

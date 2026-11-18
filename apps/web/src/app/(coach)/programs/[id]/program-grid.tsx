@@ -18,7 +18,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PROGRAM_WEEKS_MAX, copySlotTo, copyWeek, errorMessage, type PlanCell } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
@@ -49,6 +49,7 @@ import { SlotSummary } from './slot-summary';
 import { usePhone } from './use-phone';
 import { WorkoutSheet, type SheetSaved, type SheetTarget } from './workout-sheet';
 import styles from '../programs.module.css';
+import { replaceParam } from '@/lib/url-state';
 import { programWorkoutSaved } from '@/lib/analytics/client';
 
 export type Slot = { id: string; week: number; day: number; position: number; workoutId: string; workoutName: string };
@@ -62,6 +63,11 @@ type DropData = { week: number; day: number };
 const cellId = (week: number, day: number) => `cell-${week}-${day}`;
 /** DOM ids, so focus can land somewhere sensible after a chip moves or disappears. */
 const addButtonDomId = (week: number, day: number) => `program-add-${week}-${day}`;
+/** ?week= as a week number (1 when missing or not a number; a week past the end shows the last one). */
+const weekFromParam = (raw: string | null) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+};
 const weekTabDomId = (week: number) => `program-week-tab-${week}`;
 /** A click this soon after a drag ended belongs to the drag, not a tap. */
 const DRAG_CLICK_MS = 400;
@@ -141,8 +147,12 @@ export function ProgramGrid({
   const [copyingSlot, setCopyingSlot] = useState<Slot | null>(null);
   const [adding, setAdding] = useState<LibraryWorkout | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The week shown on a phone (week tabs).
-  const [tab, setTab] = useState(1);
+  // The week shown on a phone (week tabs), kept in the address (?week=) so Back from a workout or a reload keeps it.
+  const tab = weekFromParam(useSearchParams().get('week'));
+  const setTab = (next: number | ((current: number) => number)) => {
+    const value = typeof next === 'function' ? next(weekFromParam(new URLSearchParams(window.location.search).get('week'))) : next;
+    replaceParam('week', String(value), '1');
+  };
   const phone = usePhone();
   const lastDragEnd = useRef(0);
   const justDragged = () => now() - lastDragEnd.current < DRAG_CLICK_MS;

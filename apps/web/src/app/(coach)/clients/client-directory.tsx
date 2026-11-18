@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildSmartIndex,
   compareByLastName,
@@ -28,6 +28,7 @@ import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { homeClients, localDateOf } from '@/lib/daily-check';
 import { useBrowserToday } from '@/lib/local-today';
+import { useUrlChoice } from '@/lib/url-state';
 import { avatarTone, initials } from './avatar';
 import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from './directory-copy';
 import type { ConfirmHandle } from './confirm-button';
@@ -69,6 +70,7 @@ const SORT_LABEL: Record<DirectorySort, string> = {
   completion: '4-week completion',
   plan_end: 'Plan end',
 };
+const SORTS = Object.keys(SORT_LABEL) as DirectorySort[];
 const STATUS_CLASS: Record<DirectoryRow['status']['kind'], string | undefined> = {
   training: styles.statusAlert,
   missed: styles.statusAlert,
@@ -295,15 +297,16 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
 export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeData; invites: DirectoryInvite[]; lookbackDays: number }) {
   const today = useBrowserToday();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<DirectoryFilter>('active');
-  const [sort, setSort] = useState<DirectorySort>('last_workout');
+  // Filter and sort are kept in the address (?filter=&sort=), so Back from a client, a reload or a shared link keeps them.
+  const [filter, setFilter] = useUrlChoice<DirectoryFilter>('filter', FILTERS, 'active');
+  const [sort, setSort] = useUrlChoice<DirectorySort>('sort', SORTS, 'last_workout');
   // A new invite (just sent from the invite window) switches the list to Invited, so the coach sees it there.
-  const [knownInvites, setKnownInvites] = useState(invites);
-  if (knownInvites !== invites) {
-    const known = new Set(knownInvites.map((i) => i.id));
+  const knownInvites = useRef(invites);
+  useEffect(() => {
+    const known = new Set(knownInvites.current.map((i) => i.id));
+    knownInvites.current = invites;
     if (invites.some((i) => !known.has(i.id))) setFilter('invited');
-    setKnownInvites(invites);
-  }
+  }, [invites, setFilter]);
 
   const people = useMemo(() => {
     const names = new Map(data.clients.map((c) => [c.id, c.lastWorkoutName]));
