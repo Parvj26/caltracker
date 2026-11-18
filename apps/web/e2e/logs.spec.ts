@@ -384,8 +384,8 @@ test.describe('logged workout page', () => {
     const squat = page.getByRole('table', { name: 'Barbell Squat' });
     await expect(squat.getByRole('columnheader', { name: 'Planned' })).toBeVisible();
     await expect(squat.getByRole('columnheader', { name: 'Actual' })).toBeVisible();
-    await expect(squat.getByRole('row').nth(1)).toContainText('8 reps · 60 kg');
-    await expect(squat.getByRole('row').nth(1)).toContainText('60 kg × 8');
+    // Planned and actual in the same words, side by side.
+    await expect(squat.getByRole('row').nth(1).getByRole('cell')).toHaveText(['60 kg × 8', '60 kg × 8']);
     await expect(squat.getByRole('row').nth(3)).toContainText('Not done');
     await expect(page.getByText('Swapped from Barbell Deadlift')).toBeVisible();
     await expect(page.getByText('Added', { exact: true })).toBeVisible();

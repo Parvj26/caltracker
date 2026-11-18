@@ -128,11 +128,13 @@ test.describe('session logger', () => {
     const finish = page.getByRole('button', { name: 'Finish session' });
     const handBack = page.getByRole('button', { name: /^Hand back to/ });
     const cancel = page.getByRole('button', { name: 'Cancel session…' });
-    // Finish is the standard black primary button, and Cancel is red and well below Hand back.
-    expect(await finish.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(18, 18, 18)');
+    // Finish and Hand back sit in the bottom bar, always on screen; Cancel is red and apart from them, in the page.
+    await expectOnScreen(page, finish);
+    await expectOnScreen(page, handBack);
+    const bar = page.locator('[data-phone-action-bar]');
+    await expect(bar.getByRole('button', { name: 'Finish session' })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Cancel session…' })).toHaveCount(0);
     expect(await cancel.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(179, 38, 30)');
-    const below = (await cancel.boundingBox())!.y - ((await handBack.boundingBox())!.y + (await handBack.boundingBox())!.height);
-    expect(below).toBeGreaterThanOrEqual(24);
 
     await cancel.click();
     const sheet = page.getByRole('dialog', { name: 'Discard this session?' });

@@ -57,7 +57,7 @@ import {
   type WorkoutDoc,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
-import { Button, Card, ErrorText } from '@/components/ui';
+import { Button, Card, ErrorText, PhoneActionBar } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
@@ -197,7 +197,9 @@ function ExerciseTable({
   lastTime,
   progression,
   edit,
+  nameHidden = false,
 }: {
+  nameHidden?: boolean;
   exercise: LogExerciseDoc;
   letter: string | null;
   units: Units;
@@ -218,7 +220,7 @@ function ExerciseTable({
   return (
     <section className={styles.exercise} aria-label={exercise.exerciseName}>
       <header className={styles.exerciseHead}>
-        <h3 className={styles.exerciseName}>{name}</h3>
+        <h3 className={nameHidden ? styles.srOnly : styles.exerciseName}>{name}</h3>
         {plan ? <p className={styles.caption}>Coach: {plan}</p> : null}
         <p className={styles.caption}>{last ?? 'Last time: first time'}</p>
         {suggestion ? (
@@ -227,6 +229,7 @@ function ExerciseTable({
           </p>
         ) : null}
       </header>
+      <p className={styles.caption}>The numbers are filled in from the plan; ✓ saves them as they are.</p>
       <table className={styles.table}>
         <thead>
           <tr>
@@ -374,6 +377,8 @@ function BlockPage({
           lastTime={lastTimes[exercise.exerciseId] ?? []}
           progression={progression}
           edit={edit}
+          // One exercise on its own page: the page title already names it.
+          nameHidden={block.kind === 'straight' && block.exercises.length === 1}
         />
       ))}
     </div>
@@ -955,15 +960,7 @@ export function SessionLogger({
             onBlur={() => edit((l) => setLogNotes(l, notes, nowIso()))}
           />
         </label>
-        <div className={styles.footerActions}>
-          <Button className={styles.footerButton} onClick={requestFinish} pending={finishing}>
-            {finishing ? 'Finishing…' : 'Finish session'}
-          </Button>
-          <Button variant="secondary" className={cx(styles.footerButton, styles.ledgeButton)} onClick={() => void handBack()} pending={handingBack}>
-            Hand back to {client.firstName || 'client'}
-          </Button>
-        </div>
-        {/* Kept apart from Finish and Hand back, at the very bottom, so it is never tapped by mistake. */}
+        {/* Kept apart from Finish and Hand back (in the bar below), so it is never tapped by mistake. */}
         <div className={styles.cancelZone}>
           <button type="button" className={styles.cancelButton} onClick={() => setSheet('discard')}>
             Cancel session…
@@ -971,6 +968,32 @@ export function SessionLogger({
           <span className={styles.caption}>Deletes everything logged in this session</span>
         </div>
       </fieldset>
+      {/* Finish is always in reach: a bar at the bottom of the screen on a phone, a footer that sticks to the bottom
+          of the window on iPad and desktop (UI rules §8). */}
+      <PhoneActionBar label="Session actions" status={`${done} of ${total} ${total === 1 ? 'set' : 'sets'} done`} className={styles.sessionBar}>
+        <Button
+          variant="secondary"
+          className={styles.barButton}
+          onClick={() => void handBack()}
+          pending={handingBack}
+          disabled={locked || finishing}
+          // The full words for screen readers, also on a phone where only "Hand back" shows.
+          aria-label={handingBack ? undefined : `Hand back to ${client.firstName || 'client'}`}
+        >
+          Hand back<span className={styles.barWide}> to {client.firstName || 'client'}</span>
+        </Button>
+        <Button
+          variant="finish"
+          className={styles.barButton}
+          onClick={requestFinish}
+          pending={finishing}
+          disabled={locked || handingBack}
+          aria-label={finishing ? undefined : 'Finish session'}
+        >
+          {finishing ? 'Finishing…' : 'Finish'}
+          <span className={styles.barWide}>{finishing ? '' : ' session'}</span>
+        </Button>
+      </PhoneActionBar>
       {sheet === 'unticked' ? (
         <UntickedSheet
           {...untickedSets(log)}

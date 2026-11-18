@@ -63,29 +63,4 @@ export const AXE_ALLOW: AxeAllow[] = [
     selector: '[class*="_phoneRow"]',
     reason: `Builder exercise rows: the aria-label doesn't contain the visible sets summary. ${TODO}`,
   },
-  {
-    rule: 'label-content-name-mismatch',
-    pages: ['Client overview'],
-    selector: '[aria-label="Set a goal"]',
-    reason: `"Set goal" button is labelled "Set a goal". ${TODO}`,
-  },
-  {
-    rule: 'definition-list',
-    pages: ['Client overview'],
-    selector: 'dl[class*="_stats"]',
-    reason: `Overview stats <dl> holds elements other than dt/dd groups. ${TODO}`,
-  },
-  {
-    rule: 'label-content-name-mismatch',
-    pages: ['Client training'],
-    selector: '[class*="_choice"]',
-    reason: `Training tab "Assign" / "Add" choices: the label doesn't contain the visible text. ${TODO}`,
-  },
-  {
-    rule: 'scrollable-region-focusable',
-    pages: ['Client training'],
-    sizes: ['phone'],
-    selector: '[class*="_scroll"]',
-    reason: `Calendar's sideways-scrolling strip can't be reached with the keyboard. ${TODO}`,
-  },
 ];
