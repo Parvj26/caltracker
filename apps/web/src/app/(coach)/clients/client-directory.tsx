@@ -28,6 +28,7 @@ import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { homeClients, localDateOf } from '@/lib/daily-check';
 import { useBrowserToday } from '@/lib/local-today';
+import { useRememberUrl } from '@/lib/history-back';
 import { useUrlChoice } from '@/lib/url-state';
 import { avatarTone, initials } from './avatar';
 import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from './directory-copy';
@@ -310,6 +311,8 @@ export function ClientDirectory({
   // Filter and sort are kept in the address (?filter=&sort=), so Back from a client, a reload or a shared link keeps them.
   const [filter, setFilter] = useUrlChoice<DirectoryFilter>('filter', FILTERS, 'active');
   const [sort, setSort] = useUrlChoice<DirectorySort>('sort', SORTS, 'last_workout');
+  // So "‹ Clients" can reopen the list as it is now where the browser can't step back to it.
+  useRememberUrl();
   // A new invite (just sent from the invite window) switches the list to Invited, so the coach sees it there.
   const knownInvites = useRef(invites);
   useEffect(() => {

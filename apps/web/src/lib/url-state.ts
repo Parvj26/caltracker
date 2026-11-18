@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
+import { rememberUrl } from './history-back';
 
 // Screen choices (a filter chip, a sort, a picked day, a chart range) kept in the address, so Back, a reload or a
 // shared link comes back to the same view. Written with history.replaceState: a change of view is not a step of its
@@ -29,6 +30,7 @@ export function replaceParam(name: string, value: string, fallback: string): voi
   if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
     window.history.replaceState(null, '', next);
   }
+  rememberUrl();
 }
 
 /** One choice of a fixed set, read from and written to `?name=`. */

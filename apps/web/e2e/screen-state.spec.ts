@@ -186,3 +186,27 @@ test('the log page’s calendar link goes back to the week it came from', async 
   await page.getByRole('link', { name: /calendar$/ }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training\\?view=week&from=${day}$`));
 });
+
+test('without the Navigation API (iOS before 26), ‹ Clients and ← calendar still open the list and week as last seen', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'navigation', { value: undefined, configurable: true }));
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await signInAsCoach(page);
+  const client = await newClient('Oldios');
+  await page.goto('/clients');
+  await page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Nothing planned/ }).click();
+  await expect(page).toHaveURL(/\/clients\?filter=nothing_planned$/);
+  await page.getByRole('link', { name: client.name, exact: true }).click();
+  await page.getByRole('link', { name: 'Back to Clients' }).click();
+  await expect(page).toHaveURL(/\/clients\?filter=nothing_planned$/);
+
+  const today = await browserToday(page);
+  const day = addDays(today, -28);
+  const name = `Navb oldios ${unique()}`;
+  const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: client.id, scheduled_on: day, name }).select('id').single();
+  if (w.error) throw w.error;
+  created.workouts.push(w.data.id);
+  await page.goto(`/clients/${client.id}/training?view=week&from=${day}`);
+  await page.goto(`/clients/${client.id}/log/${w.data.id}`);
+  await page.getByRole('link', { name: /calendar$/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training\\?view=week&from=${day}$`));
+});
