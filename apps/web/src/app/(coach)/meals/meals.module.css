@@ -37,6 +37,8 @@
   font-size: 16px;
 }
 .searchInput:focus { outline: none; }
+/* The ring goes round the whole search box (UI rules §3), not the bare input inside it. */
+.search:has(.searchInput:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .searchInput::placeholder { color: var(--ct-ink-muted); }
 .row {
   display: flex;
@@ -130,7 +132,7 @@
   text-align: left;
   cursor: pointer;
 }
-.menuDanger:hover, .menuDanger:focus-visible { background: var(--ct-surface); outline: none; }
+.menuDanger:hover, .menuDanger:focus-visible { background: var(--ct-surface); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { font-size: 13px; font-weight: 800; }
@@ -240,7 +242,7 @@
   }
   .macroInput { min-height: var(--ct-button-min-height); padding-inline: var(--ct-space-3); border-radius: var(--ct-radius-input); }
   .input:focus, .textarea:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-  .input:focus-visible, .textarea:focus-visible { outline: none; }
+  .input:focus-visible, .textarea:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
   .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
   .input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 

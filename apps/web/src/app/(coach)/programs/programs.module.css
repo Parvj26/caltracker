@@ -96,7 +96,9 @@
   font: inherit;
   font-size: 16px;
 }
+/* The ring goes round the whole search box (UI rules §3), not the bare input inside it. */
 .searchInput:focus-visible { outline: none; }
+.searchField:has(.searchInput:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 /* The browser's own clear (×) is replaced by ours, which every phone shows. */
 .searchInput::-webkit-search-cancel-button { appearance: none; }
 .clearSearch {

@@ -235,7 +235,9 @@
   color: var(--ct-ink);
   font: inherit;
 }
+/* The ring goes round the whole search box (UI rules §3), not the bare input inside it. */
 .searchInput:focus-visible { outline: none; }
+.searchField:has(.searchInput:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 /* Takes the room between search and Sort and wraps its own chips, so Sort stays at the end of the row. */
 .filters { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); flex: 1 1 0; min-width: 0; }
 /* On a phone the search box takes its own row, so the chips are not squeezed past the screen edge. */
@@ -312,7 +314,8 @@
 .rowLink { padding-block: calc((var(--ct-tap-min) - 1em) / 2); margin-block: calc((1em - var(--ct-tap-min)) / 2); color: var(--ct-ink); font-weight: var(--ct-weight-button); text-decoration: none; overflow-wrap: anywhere; }
 .rowLink::after { content: ''; position: absolute; inset: 0; }
 .rowLink:focus-visible { outline: none; }
-.linkRow:has(.rowLink:focus-visible) { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+/* The whole row gets the standard ring (inset, so the table doesn't clip it). */
+.linkRow:has(.rowLink:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
 .rowName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
 
 .clientCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }

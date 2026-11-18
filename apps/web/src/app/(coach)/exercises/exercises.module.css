@@ -101,6 +101,8 @@
 .search:focus-within { border-color: var(--ct-ink); background: var(--ct-bg); color: var(--ct-ink); }
 .searchInput { flex: 1; min-width: 0; min-height: 44px; border: 0; padding: 0; background: transparent; color: var(--ct-ink); font: inherit; font-size: 16px; }
 .searchInput:focus { outline: none; }
+/* The ring goes round the whole search box (UI rules §3), not the bare input inside it. */
+.search:has(.searchInput:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .searchInput::placeholder { color: var(--ct-ink-muted); }
 
 .pill {
