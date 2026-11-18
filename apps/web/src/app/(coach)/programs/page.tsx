@@ -5,6 +5,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
 import { ProgramList } from './program-list';
 import styles from './programs.module.css';
+import { LibraryTabs } from '../library-tabs';
 
 export const metadata: Metadata = { title: 'Programs' };
 
@@ -58,6 +59,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
           </ButtonLink>
         </div>
       </header>
+      <LibraryTabs current="/programs" />
 
       <ProgramList rows={rows} total={counted.count ?? found.length} initialQuery={q} limited={limited} limit={LIMIT} />
     </div>

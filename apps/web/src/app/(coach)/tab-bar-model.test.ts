@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentTab } from './tab-bar-model';
+import { currentTab, isLibraryPath } from './tab-bar-model';
 
 describe('currentTab', () => {
   it('marks the tab whose page (or a page below it) is open', () => {
@@ -8,16 +8,23 @@ describe('currentTab', () => {
     expect(currentTab('/clients/abc/body')).toBe('clients');
     expect(currentTab('/messages')).toBe('messages');
     expect(currentTab('/messages/abc')).toBe('messages');
-    expect(currentTab('/programs/p1')).toBe('programs');
+  });
+  it('marks Library for workouts, exercises and programs, detail pages included', () => {
+    for (const path of ['/workouts', '/workouts/new', '/exercises', '/exercises/1', '/programs', '/programs/p1']) {
+      expect(currentTab(path)).toBe('library');
+      expect(isLibraryPath(path)).toBe(true);
+    }
   });
   it('marks More for the pages that live in the More sheet', () => {
-    for (const path of ['/workouts', '/workouts/new', '/exercises/1', '/meals', '/activity', '/community', '/profile', '/help']) {
+    for (const path of ['/meals', '/activity', '/community', '/profile', '/help']) {
       expect(currentTab(path)).toBe('more');
     }
   });
   it('marks nothing elsewhere, and does not match a prefix of another word', () => {
     expect(currentTab('/assign')).toBeNull();
     expect(currentTab('/homework')).toBeNull();
+    expect(currentTab('/programsx')).toBeNull();
+    expect(isLibraryPath('/clients')).toBe(false);
     expect(currentTab('/')).toBeNull();
   });
 });

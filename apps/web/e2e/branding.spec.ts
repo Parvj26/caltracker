@@ -103,14 +103,13 @@ async function signInAsDemoCoach(page: Page) {
 test('coach shell: sidebar nav marks Clients as the current page and the page uses token card borders', async ({ page }) => {
   await signInAsDemoCoach(page);
   const nav = page.getByRole('navigation', { name: 'Main' });
-  for (const name of ['Clients', 'Workouts', 'Programs', 'Exercises']) {
-    await expect(nav.getByRole('link', { name })).toBeVisible();
-  }
+  await expect(nav.getByRole('link', { name: 'Clients' })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Library' })).toBeVisible();
   const clients = nav.getByRole('link', { name: 'Clients' });
   await expect(clients).toHaveAttribute('aria-current', 'page');
   await expect(clients).toHaveCSS('background-color', 'rgb(18, 18, 18)');
   await expect(clients).toHaveCSS('color', 'rgb(255, 255, 255)');
-  await expect(nav.getByRole('link', { name: 'Exercises' })).not.toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('button', { name: 'Library' })).not.toHaveAttribute('aria-current');
   // Sign out lives on Profile now (it asks first), not in the sidebar.
   await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
 
@@ -136,8 +135,8 @@ test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait
   const nav = page.getByRole('navigation', { name: 'Main' });
   const sidebar = page.locator('[data-coach-sidebar]');
   expect((await sidebar.boundingBox())!.width).toBe(56);
-  for (const name of ['Clients', 'Workouts', 'Programs', 'Exercises']) {
-    const link = nav.getByRole('link', { name });
+  for (const name of ['Clients', 'Library', 'Meals']) {
+    const link = nav.getByRole(name === 'Library' ? 'button' : 'link', { name });
     await expect(link).toHaveAttribute('aria-label', name);
     const box = (await link.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
@@ -145,7 +144,7 @@ test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait
   }
   await expect(page.locator('[data-coach-sidebar]').getByRole('link', { name: 'Profile' })).toBeVisible();
   // Mouse users get the name as a tooltip.
-  await expect(nav.getByRole('link', { name: 'Workouts' })).toHaveAttribute('title', 'Workouts');
+  await expect(nav.getByRole('button', { name: 'Library' })).toHaveAttribute('title', 'Library');
 });
 
 test('on a short screen the icon rail scrolls, so Help and Profile stay reachable', async ({ page }) => {

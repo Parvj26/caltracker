@@ -2,12 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // iPhone-width coach menu (round 2, "Option B"): below the 600 px tablet breakpoint the side rail gives way to a tab
-// bar fixed to the bottom (Home, Clients, Messages, Programs, More). More opens the rest of the menu as a bottom sheet
-// of big tiles. iPad and desktop keep the side menu.
+// bar fixed to the bottom (Home, Clients, Library, Messages, More). Library opens a sheet of Workouts, Exercise library
+// and Programs; More opens the rest of the menu as a bottom sheet of big tiles. iPad and desktop keep the side menu.
 
 const IPHONE = { width: 390, height: 844 };
-const TABS = ['Home', 'Clients', 'Messages', 'Programs', 'More'];
-const TILES = ['Workouts', 'Exercises', 'Meals', 'Activity', 'Community', 'Help', 'Profile'];
+const TABS = ['Home', 'Clients', 'Library', 'Messages', 'More'];
+const TILES = ['Meals', 'Activity', 'Community', 'Help', 'Profile'];
 const LIME = 'rgb(200, 241, 105)';
 // A seeded demo client (supabase/seed.sql).
 const CLIENT_ID = '00000000-0000-4000-8000-0000000000c2';
@@ -15,6 +15,8 @@ const CLIENT_ID = '00000000-0000-4000-8000-0000000000c2';
 const tabBar = (page: Page) => page.getByRole('navigation', { name: 'Tabs' });
 const more = (page: Page) => tabBar(page).getByRole('button', { name: 'More' });
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'More' });
+const libraryTab = (page: Page) => tabBar(page).getByRole('button', { name: 'Library' });
+const librarySheet = (page: Page) => page.getByRole('dialog', { name: 'Library' });
 const tabNames = (page: Page) =>
   tabBar(page)
     .locator('a, button')
@@ -53,9 +55,9 @@ test.describe('on an iPhone', () => {
     await expect(clients).toHaveAttribute('aria-current', 'page');
     await expect(clients.locator('span').first()).toHaveCSS('background-color', LIME);
     await expect(tabBar(page).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current', 'page');
-    await tabBar(page).getByRole('link', { name: 'Programs' }).click();
-    await expect(page).toHaveURL(/\/programs$/);
-    await expect(tabBar(page).getByRole('link', { name: 'Programs' })).toHaveAttribute('aria-current', 'page');
+    await tabBar(page).getByRole('link', { name: 'Home' }).click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(tabBar(page).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     await expect(clients).not.toHaveAttribute('aria-current', 'page');
   });
 
@@ -71,13 +73,12 @@ test.describe('on an iPhone', () => {
     for (const tile of await tiles.all()) {
       expect(Math.round((await tile.boundingBox())!.height)).toBe(96);
     }
-    // Three tiles to a row, running on across both groups (Help sits beside Community).
-    const boxes = await Promise.all([0, 2, 3, 4, 5, 6].map(async (i) => (await tiles.nth(i).boundingBox())!));
-    const [first, third, fourth, fifth, help, profile] = boxes as [typeof boxes[0], typeof boxes[0], typeof boxes[0], typeof boxes[0], typeof boxes[0], typeof boxes[0]];
+    // Three tiles to a row, running on across both groups (Help and Profile on the second row).
+    const boxes = await Promise.all([0, 2, 3, 4].map(async (i) => (await tiles.nth(i).boundingBox())!));
+    const [first, third, help, profile] = boxes as [typeof boxes[0], typeof boxes[0], typeof boxes[0], typeof boxes[0]];
     expect(third.y).toBe(first.y);
-    expect(fourth.y).toBeGreaterThan(first.y);
-    expect(help.y).toBe(fifth.y);
-    expect(profile.y).toBeGreaterThan(help.y);
+    expect(help.y).toBeGreaterThan(first.y);
+    expect(profile.y).toBe(help.y);
     // The sheet ends where the tab bar starts, and the bar stays in front.
     const sheetBox = (await dialog.boundingBox())!;
     const bar = (await tabBar(page).boundingBox())!;
@@ -91,13 +92,63 @@ test.describe('on an iPhone', () => {
   test('a tile navigates and closes the sheet, and More is then the current tab', async ({ page }) => {
     await signInAsCoach(page);
     await more(page).click();
-    await sheet(page).getByRole('link', { name: 'Workouts' }).click();
-    await expect(page).toHaveURL(/\/workouts$/);
+    await sheet(page).getByRole('link', { name: 'Meals' }).click();
+    await expect(page).toHaveURL(/\/meals$/);
     await expect(sheet(page)).toBeHidden();
     await expect(more(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(more(page).locator('span').first()).toHaveCSS('background-color', LIME);
     await more(page).click();
-    await expect(sheet(page).getByRole('link', { name: 'Workouts' })).toHaveAttribute('aria-current', 'page');
+    await expect(sheet(page).getByRole('link', { name: 'Meals' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('Library opens a sheet of Workouts, Exercise library and Programs; a choice navigates and lights Library', async ({ page }) => {
+    await signInAsCoach(page);
+    await libraryTab(page).click();
+    await expect(libraryTab(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(libraryTab(page).locator('span').first()).toHaveCSS('background-color', LIME);
+    const dialog = librarySheet(page);
+    await expect(dialog).toBeVisible();
+    const choices = dialog.getByRole('link');
+    await expect(choices).toHaveCount(3);
+    await expect(choices.nth(0)).toHaveAccessibleName(/^Workouts/);
+    await expect(choices.nth(1)).toHaveAccessibleName(/^Exercise library/);
+    await expect(choices.nth(2)).toHaveAccessibleName(/^Programs/);
+    await expect(choices.nth(0)).toBeFocused();
+    for (const choice of await choices.all()) expect((await choice.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // The sheet ends where the tab bar starts, and nothing is wider than the screen.
+    const sheetBox = (await dialog.boundingBox())!;
+    expect(Math.round(sheetBox.y + sheetBox.height)).toBe(Math.round((await tabBar(page).boundingBox())!.y));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(IPHONE.width);
+
+    // Shift+Tab from the first choice stays in the sheet (its screen-reader Close button), and Tab goes round it.
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Close library' })).toBeFocused();
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('#library-sheet') || document.activeElement?.textContent === 'Library')).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(libraryTab(page)).toBeFocused();
+
+    await libraryTab(page).click();
+    await page.mouse.click(IPHONE.width / 2, 40);
+    await expect(dialog).toBeHidden();
+
+    await libraryTab(page).click();
+    await dialog.getByRole('link', { name: /^Programs/ }).click();
+    await expect(page).toHaveURL(/\/programs$/);
+    await expect(dialog).toBeHidden();
+    await expect(libraryTab(page)).toHaveAttribute('aria-current', 'true');
+    await expect(libraryTab(page).locator('span').first()).toHaveCSS('background-color', LIME);
+    // The row at the top switches between the three without the sheet.
+    const sections = page.getByRole('navigation', { name: 'Library sections' });
+    await expect(sections.getByRole('link', { name: 'Programs' })).toHaveAttribute('aria-current', 'page');
+    await sections.getByRole('link', { name: 'Exercises' }).click();
+    await expect(page).toHaveURL(/\/exercises$/);
+    await expect(sections.getByRole('link', { name: 'Exercises' })).toHaveAttribute('aria-current', 'page');
+    for (const link of await sections.getByRole('link').all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(IPHONE.width);
   });
 
   test('Escape, the backdrop and More itself close the sheet; focus returns to More', async ({ page }) => {
@@ -240,7 +291,7 @@ for (const [device, size] of [['iPad', { width: 820, height: 1180 }], ['desktop'
     await page.setViewportSize(size);
     await signInAsCoach(page);
     await expect(page.locator('[data-coach-sidebar]')).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Workouts' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Library' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /^Messages/ })).toBeVisible();
     await expect(tabBar(page)).toBeHidden();
     await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
