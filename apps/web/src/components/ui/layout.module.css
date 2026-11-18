@@ -105,15 +105,6 @@
 .actionBarStatus { flex: 1; min-width: 0; margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
 .actionBarButtons { display: flex; align-items: center; gap: var(--ct-space-2); }
 
-} /* end @layer ct-ui */
-
-/* ---------- Unlayered: states, container and media rules ---------- */
-.backLink:hover { text-decoration: underline; }
-@media (hover: hover) {
-  .listRow:hover { background: var(--ct-surface); }
-}
-.listRowLink:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
-
 /* Phone-sized header: the create button is compact and reads "+ New" (its aria-label keeps the full name). */
 @container (max-width: 559.98px) {
   .createThing { display: none; }
@@ -152,8 +143,18 @@
   }
   .actionBarButtons { flex: none; }
   /* A focused field or a #link scrolled into view lands above the bar, not under it. */
-  :global(html):has([data-phone-action-bar]) { scroll-padding-bottom: calc(var(--ct-action-bar-room, 80px) + var(--ct-space-3)); }
+  :global(html):has([data-phone-action-bar]) { scroll-padding-bottom: calc(var(--action-bar-room, 80px) + var(--ct-space-3)); }
 }
 @media (max-width: 599.98px) and (prefers-reduced-motion: no-preference) {
   .actionBar { transition: bottom 120ms ease-out; }
 }
+
+} /* end @layer ct-ui */
+
+/* ---------- Unlayered: hover and focus states ---------- */
+.backLink:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .listRow:hover { background: var(--ct-surface); }
+}
+.listRowLink:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
+

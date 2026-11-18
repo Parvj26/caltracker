@@ -49,7 +49,7 @@ export function PhoneActionBar({
     const size = new ResizeObserver(() => {
       const h = Math.round(el.getBoundingClientRect().height);
       setHeight(h);
-      root.style.setProperty('--ct-action-bar-room', `${h}px`);
+      root.style.setProperty('--action-bar-room', `${h}px`);
     });
     size.observe(el);
     return () => {
@@ -57,7 +57,7 @@ export function PhoneActionBar({
       viewport?.removeEventListener('scroll', schedule);
       if (frame !== 0) cancelAnimationFrame(frame);
       size.disconnect();
-      root.style.removeProperty('--ct-action-bar-room');
+      root.style.removeProperty('--action-bar-room');
     };
   }, []);
 

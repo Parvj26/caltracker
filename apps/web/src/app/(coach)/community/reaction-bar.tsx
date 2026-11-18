@@ -90,7 +90,7 @@ export function ReactionBar({
             <button
               type="button"
               className={styles.reactionCount}
-              aria-label={whoReactedLabel(s)}
+              aria-label={`${s.count}: ${whoReactedLabel(s)}`}
               aria-expanded={who === s.key}
               onClick={() => setWho(who === s.key ? null : s.key)}
             >

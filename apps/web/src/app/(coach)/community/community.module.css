@@ -128,6 +128,7 @@
 /* "React" on a comment (or post) nobody reacted to yet: small text, a full 44 px target. */
 .reactQuiet {
   min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
   padding: 0 var(--ct-space-1);
   border: 0;
   background: transparent;
@@ -159,8 +160,8 @@
   font: inherit;
   cursor: pointer;
 }
-.reactionToggle { font-size: var(--ct-size-body); padding: 0 var(--ct-space-1) 0 var(--ct-space-3); min-width: 0; }
-.reactionCount { font-weight: var(--ct-weight-section-heading); padding: 0 var(--ct-space-3) 0 var(--ct-space-1); min-width: 0; text-decoration: underline dotted; }
+.reactionToggle { font-size: var(--ct-size-body); padding: 0 var(--ct-space-1) 0 var(--ct-space-3); }
+.reactionCount { font-weight: var(--ct-weight-section-heading); padding: 0 var(--ct-space-3) 0 var(--ct-space-1); text-decoration: underline dotted; }
 .reactionAdd {
   border-radius: var(--ct-radius-pill);
   box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);

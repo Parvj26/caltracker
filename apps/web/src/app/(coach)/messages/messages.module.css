@@ -28,15 +28,15 @@
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
 }
-.filters { display: flex; align-items: center; gap: var(--ct-space-2); }
-.search { flex: 1; }
+.filters { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
 .toggle {
+  flex: none;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-2) var(--ct-space-3-5);
   border: 0;
   border-radius: var(--ct-radius-pill);
   background: transparent;
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border-strong);
   color: var(--ct-ink);
   font: inherit;
   font-size: var(--ct-size-caption);
@@ -242,6 +242,12 @@
 /* iPad: the inbox stays beside the conversation, a little narrower. */
 @media (max-width: 1199.98px) {
   .shell { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: var(--ct-space-3); }
+}
+
+/* Short windows (a phone on its side, iPad with the keyboard up): the panes fit the window, so the reply box stays on
+   screen. */
+@media (max-height: 499.98px) {
+  .shell { height: calc(100dvh - var(--ct-space-6) - var(--ct-space-4)); min-height: 260px; }
 }
 
 /* iPhone: one screen at a time. The inbox is a plain list (no box around it) and the thread fills the screen edge to

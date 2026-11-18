@@ -128,7 +128,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Activity" subtitle={toReview > 0 ? `${toReview} finished ${toReview === 1 ? 'workout' : 'workouts'} to review` : 'All caught up'} />
+      <PageHeader title="Activity" subtitle={toReview > 0 ? `${toReview} to review` : 'All caught up'} />
       <ClientFilter clients={options} selectedId={clientFilter} />
 
       {rows.length === 0 ? (

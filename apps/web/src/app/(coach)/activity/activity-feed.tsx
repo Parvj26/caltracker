@@ -53,8 +53,11 @@ export function ActivityFeed({ rows, now }: { rows: FeedRow[]; now: string }) {
                 leading={<CoachAvatar url={null} name={r.clientName} seed={r.clientId} />}
                 title={
                   <>
-                    {r.clientName}
-                    <span className={styles.workout}> · {r.workoutName}</span>
+                    <span>{r.clientName}</span>
+                    <span className={styles.workout}>
+                      {' · '}
+                      <span>{r.workoutName}</span>
+                    </span>
                   </>
                 }
                 meta={

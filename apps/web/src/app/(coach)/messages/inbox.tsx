@@ -82,13 +82,13 @@ export function MessagesShell({
     <div className={styles.shell} data-screen={segment ? 'thread' : 'list'}>
       <section className={cx(styles.pane, styles.inboxPane)} aria-labelledby="inbox-heading">
         <div className={styles.inboxHead}>
-          <h1 id="inbox-heading" className={styles.heading}>Messages</h1>
           <div className={styles.filters}>
-            <SearchBox label="Search clients" value={query} onChange={setQuery} className={styles.search} />
+            <h1 id="inbox-heading" className={styles.heading}>Messages</h1>
             <button type="button" className={styles.toggle} aria-pressed={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>
               Unread{unreadCount > 0 ? ` ${unreadCount}` : ''}
             </button>
           </div>
+          <SearchBox label="Search clients" value={query} onChange={setQuery} />
         </div>
         {shown.length === 0 ? (
           // With Unread on, say "Nothing unread" when the search alone would find someone.

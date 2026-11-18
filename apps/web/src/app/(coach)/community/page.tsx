@@ -40,7 +40,7 @@ export default async function CommunityPage() {
       {/* Only when something needs looking at; /community/reports itself stays reachable. */}
       {data.openReports > 0 ? (
         <Link href="/community/reports" className={styles.reportsLink}>
-          <Chip tone="amber">{data.openReports}</Chip>
+          <Chip tone="amber">{data.openReports}</Chip>{' '}
           {data.openReports === 1 ? 'report' : 'reports'} to review
         </Link>
       ) : null}
