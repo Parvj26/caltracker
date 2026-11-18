@@ -108,6 +108,9 @@ for (const size of [
       await page.getByRole('button', { name: 'Discard session' }).click();
       // Back on the calendar it was opened from, same week and view.
       await expect(page).toHaveURL(new RegExp(`/clients/${s.client}/training\\?view=week&from=${s.today}$`));
+      // The address changes the moment Back starts, but the calendar can take a moment to load (slow CI). Going
+      // Forward before it is on screen only returns to the session page that never left, which is not what this checks.
+      await expect(page.locator(`[data-date="${s.today}"]`).getByRole('button', { name: `Options for ${s.name}`, exact: true })).toBeVisible();
       await expect.poll(async () => (await admin.from('workout_logs').select('status').eq('id', s.logId).single()).data?.status).toBe('discarded');
       // Forward to the session page again (from the browser's memory): it is not live any more.
       await page.goForward();
