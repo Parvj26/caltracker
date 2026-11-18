@@ -114,6 +114,8 @@ type Props = {
   errors: string[];
   onChange: (patch: SetPatch) => void;
   onRemove: () => void;
+  /** The phone exercise editor: "Set N", its type and × on top, then one labelled line per box. */
+  stacked?: boolean;
 };
 
 /**
@@ -151,25 +153,54 @@ function Field({ caption, col, children }: { caption: string; col: string; child
  * as the exercise's tracking type needs) and rest. A drop is indented under the set above and has no rest of its own.
  * The × in the corner removes it.
  */
-export function SetRow({ set, number, name, trackingType, units, showRest, canRemove, canDrop, errors, onChange, onRemove }: Props) {
+export function SetRow({ set, number, name, trackingType, units, showRest, canRemove, canDrop, errors, onChange, onRemove, stacked = false }: Props) {
   const fields = targetFieldsFor(trackingType);
   const kind = setKindOf(set);
   const isDrop = set.setType === 'drop';
   const distanceUnit = distanceUnitFor(units);
+  const removeButton = (
+    <button
+      type="button"
+      className={styles.removeSet}
+      data-ph-capture-attribute-label="workout_remove_set"
+      aria-label={`Remove set ${number}`}
+      title={canRemove ? 'Remove set' : 'An exercise keeps at least one set'}
+      disabled={!canRemove}
+      onClick={onRemove}
+    >
+      <Icon name="close" size={18} />
+    </button>
+  );
+  const typeMenu = <SetTypeMenu kind={kind} setName={name} canDrop={canDrop} onPick={(k) => onChange(setKindPatch(k))} />;
 
   return (
-    // data-values: how many value boxes the row has, so a phone's two-line layout knows which boxes wrap to line 2.
-    <div role="group" aria-label={name} className={cx(styles.setRow, isDrop && styles.dropRow)} data-values={fields.length}>
-      <div className={styles.setCells}>
-        <span className={styles.setLabel} aria-hidden="true">
-          {number}
-        </span>
-        <div className={styles.field} data-col="type">
-          <span className={styles.fieldCaption} aria-hidden="true">
-            Type
-          </span>
-          <SetTypeMenu kind={kind} setName={name} canDrop={canDrop} onPick={(k) => onChange(setKindPatch(k))} />
+    <div
+      role="group"
+      aria-label={name}
+      className={cx(styles.setRow, isDrop && styles.dropRow)}
+      data-layout={stacked ? 'stacked' : undefined}
+    >
+      {stacked ? (
+        <div className={styles.setHead}>
+          <span className={styles.setHeadName} aria-hidden="true">Set {number}</span>
+          {typeMenu}
+          {removeButton}
         </div>
+      ) : null}
+      <div className={styles.setCells}>
+        {!stacked ? (
+          <>
+            <span className={styles.setLabel} aria-hidden="true">
+              {number}
+            </span>
+            <div className={styles.field} data-col="type">
+              <span className={styles.fieldCaption} aria-hidden="true">
+                Type
+              </span>
+              {typeMenu}
+            </div>
+          </>
+        ) : null}
 
         {fields.includes('reps') ? (
           <Field caption="Reps" col="reps">
@@ -196,7 +227,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         ) : null}
 
         {fields.includes('weight') ? (
-          <Field caption="Weight" col="weight">
+          <Field caption={stacked ? `Weight (${units})` : 'Weight'} col="weight">
             <Stepper
               less="Less weight"
               more="More weight"
@@ -233,7 +264,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         ) : null}
 
         {fields.includes('distance') ? (
-          <Field caption="Distance" col="distance">
+          <Field caption={stacked ? `Distance (${distanceUnit})` : 'Distance'} col="distance">
             <NumberInput
               label={`Distance (${distanceUnit})`}
               inputMode="decimal"
@@ -251,7 +282,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
         {/* A drop goes straight on from the set above, so it has no rest; nor does a superset exercise that runs
             straight into the next one. */}
         {showRest && !isDrop ? (
-          <Field caption="Rest" col="rest">
+          <Field caption={stacked ? 'Rest after' : 'Rest'} col="rest">
             <NumberInput
               label="Rest (m:ss)"
               inputMode="numeric"
@@ -265,17 +296,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
           </Field>
         ) : null}
       </div>
-      <button
-        type="button"
-        className={styles.removeSet}
-        data-ph-capture-attribute-label="workout_remove_set"
-        aria-label={`Remove set ${number}`}
-        title={canRemove ? 'Remove set' : 'An exercise keeps at least one set'}
-        disabled={!canRemove}
-        onClick={onRemove}
-      >
-        <Icon name="close" size={18} />
-      </button>
+      {!stacked ? removeButton : null}
       {errors.map((message) => (
         <ErrorText key={message} code="workout_fields_invalid" safe={false} className={styles.rowError}>
           {message}

@@ -7,26 +7,29 @@ import { cx } from '@/components/ui/cx';
 import { Icon } from './icons';
 import styles from './builder.module.css';
 
-/**
- * The measurements tab: a pill with what the exercise measures here ("Weight · Reps ⌄"). Tapping it opens the
- * "Measurements" popover with a checkbox for Weight, Reps and Time; the set columns follow. The last ticked one
- * can't be unticked. A distance exercise keeps its kind, so it shows a plain label instead.
- */
-export function MeasurementsMenu({
-  trackingType,
-  exerciseName,
-  onToggle,
-}: {
+type Props = {
   trackingType: TrackingType;
   exerciseName: string;
   onToggle: (m: Measurement) => void;
-}) {
+  /** The Rest checkbox: null when no set of the exercise has a rest (it goes straight on in a superset). */
+  rest: boolean | null;
+  onToggleRest: (on: boolean) => void;
+};
+
+const restHint = "Rest off: no rest column, and no rest on the client's phone after this exercise.";
+
+/**
+ * The measurements tab: a pill with what the exercise measures here ("Weight · Reps · Rest ⌄"). Tapping it opens
+ * the "Measurements" popover with a checkbox for Weight, Reps and Time (the set columns follow; the last ticked one
+ * can't be unticked) and, below them, Rest. A distance exercise keeps its kind, so it offers only Rest.
+ */
+export function MeasurementsMenu({ trackingType, exerciseName, onToggle, rest, onToggleRest }: Props) {
   const [open, setOpen] = useState(false);
   const popId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const firstRef = useRef<HTMLInputElement>(null);
-  const label = measurementsLabel(trackingType);
+  const label = `${measurementsLabel(trackingType)}${rest ? ' · Rest' : ''}`;
 
   useEffect(() => {
     if (!open) return;
@@ -38,7 +41,8 @@ export function MeasurementsMenu({
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
 
-  if (!canPickMeasurements(trackingType)) return <span className={styles.caption}>{label}</span>;
+  const pickable = canPickMeasurements(trackingType);
+  if (!pickable && rest === null) return <span className={styles.caption}>{label}</span>;
   const on = measurementsOf(trackingType) ?? [];
 
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
@@ -70,7 +74,7 @@ export function MeasurementsMenu({
           <span className={styles.measureTitle} aria-hidden="true">
             Measurements
           </span>
-          {MEASUREMENTS.map((m, i) => {
+          {(pickable ? MEASUREMENTS : []).map((m, i) => {
             const checked = on.includes(m);
             const last = checked && on.length === 1;
             return (
@@ -87,9 +91,57 @@ export function MeasurementsMenu({
               </label>
             );
           })}
-          <p className={styles.measureHint}>Pick at least one. The table shows a column for each.</p>
+          {pickable ? <p className={styles.measureHint}>Pick at least one. The table shows a column for each.</p> : null}
+          {rest !== null ? (
+            <>
+              <label className={cx(styles.measureItem, pickable && styles.measureRest)}>
+                <input
+                  ref={pickable ? undefined : firstRef}
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={rest}
+                  onChange={(e) => onToggleRest(e.target.checked)}
+                />
+                Rest
+              </label>
+              <p className={styles.measureHint}>{restHint}</p>
+            </>
+          ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The phone editor's measurements: one toggle chip each ("✓ Weight", "+ Time", "✓ Rest"), same rules as the menu.
+ */
+export function MeasurementChips({ trackingType, exerciseName, onToggle, rest, onToggleRest }: Props) {
+  const pickable = canPickMeasurements(trackingType);
+  const on = measurementsOf(trackingType) ?? [];
+  const chip = (key: string, name: string, pressed: boolean, disabled: boolean, onClick: () => void) => (
+    <button
+      key={key}
+      type="button"
+      className={styles.measureChip}
+      aria-pressed={pressed}
+      aria-label={`${name} for ${exerciseName}`}
+      title={disabled ? 'Pick at least one' : undefined}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span aria-hidden="true">{pressed ? '✓' : '+'}</span> {name}
+    </button>
+  );
+  return (
+    <div role="group" aria-label={`Measurements for ${exerciseName}`} className={styles.measureChips}>
+      {pickable
+        ? MEASUREMENTS.map((m) => {
+            const pressed = on.includes(m);
+            return chip(m, MEASUREMENT_NAMES[m], pressed, pressed && on.length === 1, () => onToggle(m));
+          })
+        : <span className={styles.caption}>{measurementsLabel(trackingType)}</span>}
+      {rest !== null ? chip('rest', 'Rest', rest, false, () => onToggleRest(!rest)) : null}
     </div>
   );
 }

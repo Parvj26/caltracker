@@ -32,13 +32,12 @@ test('tapping the exercise name swaps it; the header has icon buttons only', asy
   await createWorkout(page, name);
 
   const squat = page.getByRole('region', { name: 'Barbell Squat' });
-  for (const old of ['Swap exercise', '+ Substitute', 'Remove', '↑', '↓', 'Copy set 1 to all sets', 'Fill', '+ Drop']) {
+  // Moving lives in the Reorder window now, so the card has no ↑ / ↓.
+  for (const old of ['Swap exercise', '+ Substitute', 'Remove', '↑', '↓', 'Copy set 1 to all sets', 'Fill', '+ Drop', 'Move Barbell Squat up', 'Move Barbell Squat down']) {
     await expect(squat.getByRole('button', { name: old, exact: true })).toHaveCount(0);
   }
   for (const [label, tip] of [
     ['Add a substitute for Barbell Squat', 'Add substitute'],
-    ['Move Barbell Squat up', 'Move up'],
-    ['Move Barbell Squat down', 'Move down'],
     ['Remove Barbell Squat', 'Remove exercise'],
   ] as const) {
     const button = squat.getByRole('button', { name: label, exact: true });

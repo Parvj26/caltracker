@@ -27,6 +27,7 @@ test('add a substitute to an exercise and to a superset exercise, edit its sets,
 
   await pickExercise(page, '+ Exercise', 'Barbell Squat');
   await setRow(page, 'Barbell Squat', 'set 1').getByLabel('Weight (kg)').fill('60');
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Add a set to Barbell Squat' }).click();
   await page.getByRole('button', { name: 'Add a substitute for Barbell Squat' }).click();
   await expect(page.getByRole('dialog', { name: 'Add a substitute for Barbell Squat' })).toBeVisible();
   await pickInDialog(page, 'Barbell Deadlift');
@@ -58,13 +59,14 @@ test('add a substitute to an exercise and to a superset exercise, edit its sets,
   await expect(setRow(page, 'Barbell Squat', 'set 4')).toHaveCount(0);
 
   // Inside a superset too.
-  await page.getByRole('button', { name: '+ Superset / circuit' }).click();
-  const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
+  await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Add exercises' });
   for (const ex of ['Pushups', 'Pullups']) {
     await picker.getByLabel('Search exercises').fill(ex);
     await picker.getByRole('option', { name: ex, exact: true }).click();
   }
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
+  await page.getByRole('button', { name: 'Superset Pushups with Pullups' }).click();
   await page.getByRole('button', { name: 'Add a substitute for Pullups' }).click();
   await pickInDialog(page, 'Cable Crossover');
   await expect(page.getByRole('group', { name: 'Substitute: Cable Crossover' })).toBeVisible();

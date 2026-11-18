@@ -6,18 +6,15 @@ const PATHS = {
       <path d="M17 17H6l3 3" />
     </>
   ),
-  up: (
+  reorder: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
+  pickOne: (
     <>
-      <path d="M12 19V5" />
-      <path d="M6 11l6-6 6 6" />
+      <circle cx="12" cy="12" r="8" />
+      <path d="M8.5 12l2.5 2.5 4.5-5" />
     </>
   ),
-  down: (
-    <>
-      <path d="M12 5v14" />
-      <path d="M6 13l6 6 6-6" />
-    </>
-  ),
+  section: <path d="M4 6h16M4 12h10M4 18h16" />,
+  dots: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
   trash: (
     <>
       <path d="M4 7h16" />

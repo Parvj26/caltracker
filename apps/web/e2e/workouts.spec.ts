@@ -40,11 +40,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await expect(first.getByLabel('Weight (kg)')).toHaveAttribute('placeholder', 'kg');
   await expect(squat.getByRole('button', { name: /^(8–10|Single)$/ })).toHaveCount(0);
 
-  for (const n of [1, 2, 3]) {
-    const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await row.getByLabel('Reps', { exact: true }).fill('10');
-    await row.getByLabel('Weight (kg)').fill('60');
-  }
+  // A new exercise starts with one set; "+ Set" copies it.
+  await expect(setRow(page, 'Barbell Squat', 'set 2')).toHaveCount(0);
+  await first.getByLabel('Reps', { exact: true }).fill('10');
+  await first.getByLabel('Weight (kg)').fill('60');
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Add a set to Barbell Squat', exact: true }).click();
   // A kg coach keeps the precision they typed (not rounded to 61.3).
   const set3Weight = setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)');
   await set3Weight.fill('61.25');
@@ -59,18 +59,22 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await drop.getByLabel('Weight (kg)').fill('40');
   await expect(drop.getByLabel(/^Rest/)).toHaveCount(0);
 
-  // Superset of Pushups + Pullups, 3 rounds by default.
-  await page.getByRole('button', { name: '+ Superset / circuit' }).click();
-  const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
-  await expect(picker.getByText('A superset needs 2 or more exercises. Search and tap each one.')).toBeVisible();
-  await picker.getByLabel('Search exercises').fill('Pushups');
-  await picker.getByRole('option', { name: 'Pushups', exact: true }).click();
-  // One pick is not a superset yet.
-  await expect(picker.getByRole('button', { name: 'Pick at least 2 exercises', exact: true })).toBeDisabled();
-  await picker.getByLabel('Search exercises').fill('Pullups');
-  await picker.getByRole('option', { name: 'Pullups', exact: true }).click();
+  // Superset of Pushups + Pullups: add both, then turn on the Superset switch between them. 3 sets each.
+  await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Add exercises' });
+  for (const ex of ['Pushups', 'Pullups']) {
+    await picker.getByLabel('Search exercises').fill(ex);
+    await picker.getByRole('option', { name: ex, exact: true }).click();
+  }
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
-  await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
+  // No switch from Barbell Squat to Pushups is on yet.
+  await expect(page.getByRole('button', { name: 'Superset Barbell Squat with Pushups' })).toHaveAttribute('aria-pressed', 'false');
+  const link = page.getByRole('button', { name: 'Superset Pushups with Pullups' });
+  await link.click();
+  await expect(link).toHaveAttribute('aria-pressed', 'true');
+  for (const ex of ['Pushups', 'Pullups']) {
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: `Add a set to ${ex}`, exact: true }).click();
+  }
 
   // Unsaved edits are flagged next to the Save button; after saving it says so there too.
   const saveButton = page.getByRole('button', { name: 'Save workout' });
@@ -79,9 +83,9 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
   const savedChip = page.getByRole('status').filter({ hasText: '✓ Saved' });
   await expect(savedChip).toBeVisible();
+  // In the top bar, on the Save button's line.
   const chipBox = (await savedChip.boundingBox())!;
   const buttonBox = (await saveButton.boundingBox())!;
-  expect(Math.abs(buttonBox.x - (chipBox.x + chipBox.width))).toBeLessThan(48);
   expect(Math.abs(buttonBox.y + buttonBox.height / 2 - (chipBox.y + chipBox.height / 2))).toBeLessThan(24);
   // After a few seconds it settles to a quiet line.
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 8000 });
@@ -103,7 +107,7 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
     await expect(row.getByLabel('Weight (kg)')).toHaveValue(kg);
   }
   await expect(drop.getByRole('button', { name: 'Set type: Drop set' })).toBeVisible();
-  await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
+  await expect(link).toHaveAttribute('aria-pressed', 'true');
   for (const ex of ['Pushups', 'Pullups']) {
     for (const n of [1, 2, 3]) await expect(setRow(page, ex, `set ${n}`)).toBeVisible();
   }
@@ -252,15 +256,24 @@ test.describe('sections and pick-one groups', () => {
     if (weight !== undefined) await row.getByLabel('Weight (lb)').fill(String(weight));
   }
 
+  /** Adds the exercises, turns on the Superset switch between each two, and gives each 3 sets (+ Set copies). */
   async function addSuperset(page: Page, names: string[]) {
-    await page.getByRole('button', { name: '+ Superset / circuit' }).click();
-    const picker = page.getByRole('dialog', { name: 'Add a superset / circuit' });
+    await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: 'Add exercises' });
     for (const n of names) {
       await picker.getByLabel('Search exercises').fill(n);
       await picker.getByRole('option', { name: n, exact: true }).click();
     }
     await picker.getByRole('button', { name: `Add ${names.length} exercises` }).click();
     await expect(picker).toBeHidden();
+    for (const [i, n] of names.slice(0, -1).entries()) {
+      const link = page.getByRole('button', { name: `Superset ${n} with ${names[i + 1]}`, exact: true });
+      await link.click();
+      await expect(link).toHaveAttribute('aria-pressed', 'true');
+    }
+    for (const n of names) {
+      for (let i = 0; i < 2; i++) await page.getByRole('button', { name: `Add a set to ${n}`, exact: true }).click();
+    }
   }
 
   test('builds the Upper / Core workout with sections and a pick-one finisher', async ({ page }) => {
@@ -270,14 +283,12 @@ test.describe('sections and pick-one groups', () => {
     // Warm-Up: Arm Circles, 1 set of 10.
     await addSection(page, 'Warm-Up');
     await pickExercise(page, '+ Exercise', X('Arm Circles'));
-    for (const n of [3, 2]) await setRow(page, X('Arm Circles'), `set ${n}`).getByRole('button', { name: 'Remove set' }).click();
     await expect(setRow(page, X('Arm Circles'), 'set 2')).toHaveCount(0);
     await fillSet(page, X('Arm Circles'), 1, 10);
 
     // Core (Activation): one superset, 3 rounds.
     await addSection(page, 'Core (Activation)');
     await addSuperset(page, [X('Hanging Leg Raise'), X('Medicine Ball Sit Up & Overhead Throw')]);
-    await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
     for (const n of [1, 2, 3]) await fillSet(page, X('Hanging Leg Raise'), n, 10);
     for (const [n, w] of [[1, 10], [2, 12], [3, 14]] as const) await fillSet(page, X('Medicine Ball Sit Up & Overhead Throw'), n, 12, w);
 
@@ -289,7 +300,7 @@ test.describe('sections and pick-one groups', () => {
 
     await addSuperset(page, [X('Lateral Raise'), X('Seated DB Press')]);
     await setRow(page, X('Seated DB Press'), 'set 3').getByRole('button', { name: 'Remove set' }).click();
-    await expect(page.getByText('Superset / circuit · 3 + 2 sets')).toBeVisible();
+    await expect(setRow(page, X('Seated DB Press'), 'set 3')).toHaveCount(0);
     for (const [n, w] of [[1, 10], [2, 15], [3, 15]] as const) await fillSet(page, X('Lateral Raise'), n, 12, w);
     for (const [n, w] of [[1, 25], [2, 30]] as const) await fillSet(page, X('Seated DB Press'), n, 12, w);
 
@@ -310,7 +321,8 @@ test.describe('sections and pick-one groups', () => {
     await picker.getByRole('option', { name: X("Farmer's Walk"), exact: true }).click();
     await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
     await expect(page.getByRole('heading', { name: 'Pick one · 2 options' })).toBeVisible();
-    for (const n of [1, 2, 3]) await fillSet(page, X('Medicine Ball Slam'), n, 12, 15);
+    await fillSet(page, X('Medicine Ball Slam'), 1, 12, 15);
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: `Add a set to ${X('Medicine Ball Slam')}`, exact: true }).click();
 
     await page.getByRole('button', { name: 'Save workout' }).click();
     await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
@@ -325,7 +337,8 @@ test.describe('sections and pick-one groups', () => {
       'Resistance Training',
       'Finisher',
     ]);
-    // Headings come in order: sections are <h2> and their blocks <h3>, so the pick-one group sits under Finisher.
+    // Headings come in order: sections are <h2> and their cards <h3> (a superset's exercises each have a card), so
+    // the pick-one group sits under Finisher.
     const headings = (
       await page.getByRole('heading').evaluateAll((els) => els.map((e) => `${e.tagName} ${e.textContent ?? ''}`))
     ).filter((h) => h.startsWith('H2 ') || h.startsWith('H3 '));
@@ -333,11 +346,12 @@ test.describe('sections and pick-one groups', () => {
       'H2 Warm-Up',
       `H3 ${X('Arm Circles')}`,
       'H2 Core (Activation)',
-      'H3 Superset / circuit · 3 rounds',
+      `H3 ${X('Hanging Leg Raise')}`,
+      `H3 ${X('Medicine Ball Sit Up & Overhead Throw')}`,
       'H2 Resistance Training',
-      'H3 Superset / circuit · 3 rounds',
-      'H3 Superset / circuit · 3 + 2 sets',
-      'H3 Superset / circuit · 4 rounds',
+      `H3 ${X('DB Bench')}`,
+      `H3 ${X('Lateral Raise')}`,
+      `H3 ${X('Lat Pulldown')}`,
       'H2 Finisher',
       'H3 Pick one · 2 options',
     ];
@@ -354,10 +368,10 @@ test.describe('sections and pick-one groups', () => {
     await expect(setRow(page, X('Seated DB Press'), 'set 2').getByLabel('Weight (lb)')).toHaveValue('30');
     await expect(setRow(page, X('Tricep Pushdown'), 'set 4').getByLabel('Weight (lb)')).toHaveValue('70');
     await expect(setRow(page, X('Medicine Ball Slam'), 'set 3').getByLabel('Weight (lb)')).toHaveValue('15');
-    await expect(page.getByRole('button', { name: 'Remove the last round' }).first()).toBeEnabled();
+    await expect(page.getByRole('button', { name: `Superset ${X('Lat Pulldown')} with ${X('Tricep Pushdown')}` })).toHaveAttribute('aria-pressed', 'true');
 
-    // Moving the pick-one group (block 6) into Core empties Finisher, so that section goes away.
-    await page.getByLabel('Move pick-one group 6 to a section').selectOption({ label: 'Core (Activation)' });
+    // Moving the pick-one group (numbered 2: supersets are lettered) into Core empties Finisher, so that section goes away.
+    await page.getByLabel('Move pick-one group 2 to a section').selectOption({ label: 'Core (Activation)' });
     await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(3);
   });
 
