@@ -121,25 +121,39 @@ test('Delete… asks first, then removes an unused workout from the library', as
 test('Delete… refuses a workout a program still uses, and the program keeps its day', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const w = await seed('InUse');
-  const programId = await seedProgram(admin, workspaceId, `Uses ${unique()}`, 1, [{ week: 1, day: 1, workoutId: w.id }]);
+  const programName = `Uses ${unique()}`;
+  const programId = await seedProgram(admin, workspaceId, programName, 1, [{ week: 1, day: 1, workoutId: w.id }]);
   created.programs.push(programId);
   await signInAsCoach(page);
   await openList(page, w.name);
   await page.getByRole('button', { name: `More actions for ${w.name}` }).click();
   await page.getByRole('menuitem', { name: 'Delete…' }).click();
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
-  await expect(told).toContainText('Used in 1 program — remove it from that program first.');
+  // It names the program and links to it (rulebook §10.3).
+  await expect(told).toContainText(`Used in “${programName}” — remove it from that program first.`);
+  await expect(told.getByRole('link', { name: `Open “${programName}”` })).toHaveAttribute('href', `/programs/${programId}`);
   await expect(told.getByRole('button', { name: 'Delete workout' })).toHaveCount(0);
   await told.getByRole('button', { name: 'OK' }).click();
   await expect(told).toBeHidden();
   expect((await admin.from('workouts').select('id').eq('id', w.id)).data).toHaveLength(1);
   expect((await admin.from('program_workouts').select('id').eq('program_id', programId)).data).toHaveLength(1);
+
+  // The link opens the program; Back comes to the list, not to the question.
+  await page.getByRole('button', { name: `More actions for ${w.name}` }).click();
+  await page.getByRole('menuitem', { name: 'Delete…' }).click();
+  await told.getByRole('link', { name: `Open “${programName}”` }).click();
+  await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
+  await page.goBack();
+  await expect(page).toHaveURL(/\/workouts(\?|$)/);
+  await expect(page).not.toHaveURL(/sheet=/);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
 });
 
 test("the workout page's Delete workout refuses too while a program uses it, then deletes once it's free", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const w = await seed('PageInUse');
-  const programId = await seedProgram(admin, workspaceId, `Uses ${unique()}`, 1, [
+  const programName = `Uses ${unique()}`;
+  const programId = await seedProgram(admin, workspaceId, programName, 1, [
     { week: 1, day: 1, workoutId: w.id },
     { week: 1, day: 2, workoutId: w.id },
   ]);
@@ -148,7 +162,7 @@ test("the workout page's Delete workout refuses too while a program uses it, the
   await page.goto(`/workouts/${w.id}`);
   await page.getByRole('button', { name: 'Delete workout' }).click();
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
-  await expect(told).toContainText('Used in 1 program — remove it from that program first.');
+  await expect(told).toContainText(`Used in “${programName}” — remove it from that program first.`);
   await expect(told.getByRole('button', { name: 'Delete workout' })).toHaveCount(0);
   await told.getByRole('button', { name: 'OK' }).click();
   await expect(told).toBeHidden();

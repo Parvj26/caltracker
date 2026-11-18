@@ -1,6 +1,7 @@
 'use client';
 
 import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DialogHeader } from '@/components/assign/dialog-header';
@@ -313,7 +314,8 @@ function RenameDialog({ id, name, onClose }: { id: string; name: string; onClose
 }
 
 function usesText(uses: WorkoutUses): string {
-  const programs = `Used in ${count(uses.programs, 'program', 'programs')}`;
+  const one = uses.programList.length === 1 ? uses.programList[0] : undefined;
+  const programs = one ? `Used in “${one.name}”` : `Used in ${count(uses.programs, 'program', 'programs')}`;
   const invites = `in the starting plan of ${count(uses.invitePlans, "invited client who hasn't", "invited clients who haven't")} joined yet`;
   if (uses.programs > 0 && uses.invitePlans > 0) return `${programs} and ${invites} — remove it from those first.`;
   if (uses.programs > 0) return `${programs} — remove it from ${uses.programs === 1 ? 'that program' : 'them'} first.`;
@@ -326,6 +328,7 @@ function usesText(uses: WorkoutUses): string {
  */
 export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
   const ref = useRef<AdaptiveDialogHandle>(null);
+  const router = useRouter();
   const bodyId = useId();
   const [uses, setUses] = useState<WorkoutUses | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
@@ -408,6 +411,27 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
             ? usesText(uses)
             : "It's removed from your library. Workouts already on clients' calendars and their logged history stay."}
       </p>
+      {inUse && uses.programList.length > 0 ? (
+        // Each program that blocks the delete, as a link (rulebook §10.3). The pop-up steps off the history first, so
+        // Back from the program comes back to the list, not to this question.
+        <ul className={styles.blockers} aria-label="Programs that use it">
+          {uses.programList.map((p) => (
+            <li key={p.id}>
+              <ButtonLink
+                href={`/programs/${p.id}`}
+                variant="secondary"
+                size="compact"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void ref.current?.close().then(() => router.push(`/programs/${p.id}`));
+                }}
+              >
+                Open “{p.name}”
+              </ButtonLink>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {error ? <ErrorText code={error} /> : null}
       {checkFailed ? (
         <Button
