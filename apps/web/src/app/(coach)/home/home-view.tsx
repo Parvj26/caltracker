@@ -79,7 +79,6 @@ function LiveCard({ log, client, nowMs }: { log: LiveLog; client: HomeClient; no
       <Link
         href={`/clients/${client.id}/logs/${log.id}`}
         className={styles.liveCard}
-        aria-label={`Watch ${name} live: ${log.name}, ${log.done} of ${log.total} sets`}
       >
         <span className={styles.liveWho}>
           <Avatar name={name} toneKey={client.id} />
@@ -91,7 +90,9 @@ function LiveCard({ log, client, nowMs }: { log: LiveLog; client: HomeClient; no
         <span className={styles.liveTrack} aria-hidden="true">
           <span className={styles.liveFill} style={{ width: `${pct}%` }} />
         </span>
-        <span className={styles.liveFoot}>{log.done} of {log.total} sets · Watch live →</span>
+        <span className={styles.liveFoot}>
+          {log.done} of {log.total} sets · Watch live<span aria-hidden="true"> →</span>
+        </span>
       </Link>
     </li>
   );
@@ -185,7 +186,8 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
         </section>
       ) : null}
 
-      <div className={styles.columns}>
+      {/* Nothing today: Today is one line on top and Needs attention gets the full width (cards in a grid when wide). */}
+      <div className={cx(styles.columns, rows.length === 0 && styles.columnsQuiet)}>
         <section id="today" tabIndex={-1} aria-labelledby="today-heading" className={styles.section}>
           <h2 id="today-heading" className={styles.sectionHeading}>
             Today <span className={styles.count}>{plural(todayClients, 'client', 'clients')}</span>

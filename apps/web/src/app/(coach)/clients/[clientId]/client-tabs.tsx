@@ -12,7 +12,7 @@ export const CLIENT_TABS = [
   { segment: 'training', path: '/training', label: 'Training' },
   { segment: 'body', path: '/body', label: 'Body' },
   { segment: 'food', path: '/food', label: 'Food' },
-  { segment: 'documents', path: '/documents', label: 'Documents' },
+  { segment: 'documents', path: '/documents', label: 'Documents', short: 'Docs' },
 ] as const;
 
 type More = { before: boolean; after: boolean };
@@ -94,9 +94,12 @@ export function ClientTabs({ clientId }: { clientId: string }) {
                   href={`/clients/${clientId}${t.path}`}
                   replace
                   aria-current={current ? 'page' : undefined}
+                  data-short={'short' in t ? t.short : undefined}
                   className={cx(styles.tab, current && styles.tabCurrent)}
                 >
-                  {t.label}
+                  {/* A phone shows "Docs" (drawn by CSS from data-short) so all five tabs fit at 375 px; the link's
+                      text and name stay "Documents". */}
+                  {'short' in t ? <span className={styles.tabLong}>{t.label}</span> : t.label}
                 </Link>
               </li>
             );

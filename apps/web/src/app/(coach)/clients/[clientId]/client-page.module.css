@@ -155,7 +155,14 @@
   .tabsArrow { display: none; }
   .tabs { margin-right: calc(-1 * var(--ct-space-2)); scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { padding: 0 var(--ct-space-2-5); }
+  /* All five tabs fit at 375 px: tighter padding and "Docs" (its full name stays for screen readers). */
+  .tabs .tabList { gap: 0; }
+  .tabList .tab { justify-content: center; min-width: var(--ct-tap-min); padding: 0 var(--ct-space-2); }
+  .tabLong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (max-width: 599.98px) {
+  /* "Docs" on screen only: the empty alt text after "/" keeps it out of the link's name. */
+  .tab[data-short]::before { content: attr(data-short) / ''; }
 }
 .tabList { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .tab {
@@ -228,20 +235,23 @@
 .todayTitle { margin: 0; font-size: 20px; font-weight: var(--ct-weight-screen-title); letter-spacing: -0.01em; line-height: 1.2; overflow-wrap: anywhere; }
 .todayLines { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--ct-size-caption); font-variant-numeric: tabular-nums; }
 .todayAction { width: 100%; margin-top: var(--ct-space-1); }
-.todayLive { border-color: var(--ct-ink); background: var(--ct-ink); color: var(--ct-bg); box-shadow: 0 4px 0 var(--ct-lime); }
-.liveLabel { display: inline-flex; align-items: center; gap: var(--ct-space-2); color: var(--ct-lime); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-screen-title); letter-spacing: 0.08em; text-transform: uppercase; }
-.liveDot { width: 10px; height: 10px; border-radius: 50%; background: var(--ct-lime); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ct-lime) 25%, transparent); }
+.todayLive { border-color: var(--ct-ink); background: var(--ct-ink); color: var(--ct-bg); }
+.liveLabel { display: inline-flex; align-items: center; gap: var(--ct-space-2); color: var(--ct-bg); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-screen-title); letter-spacing: 0.08em; text-transform: uppercase; }
+.liveDot { width: 10px; height: 10px; border-radius: 50%; background: var(--ct-bg); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ct-bg) 25%, transparent); }
 .liveSince, .liveSets { margin: 0; color: color-mix(in srgb, var(--ct-bg) 75%, transparent); font-size: var(--ct-size-caption); font-variant-numeric: tabular-nums; }
 .liveTrack { height: 8px; border-radius: var(--ct-radius-pill); background: color-mix(in srgb, var(--ct-bg) 18%, transparent); overflow: hidden; }
-.liveFill { display: block; height: 100%; border-radius: inherit; background: var(--ct-lime); }
-.todayLive .todayActionLive { background: var(--ct-lime); color: var(--ct-ink); }
+.liveFill { display: block; height: 100%; border-radius: inherit; background: var(--ct-bg); }
+.todayLive .todayActionLive { background: var(--ct-bg); color: var(--ct-ink); box-shadow: none; }
 
 /* ---------- Overview ---------- */
 .grid { display: grid; gap: var(--ct-space-3); grid-template-columns: minmax(0, 1fr); align-items: start; }
 .column { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
-@media (min-width: 700px) {
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .side { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+/* Two columns (iPad portrait): the cards flow down one column and on into the next, like a newspaper, so a short
+   card never leaves a hole beside a tall one. */
+@media (min-width: 700px) and (max-width: 1023.98px) {
+  .grid { display: block; column-count: 2; column-gap: var(--ct-space-3); }
+  .grid .column, .grid .side { display: contents; }
+  .grid .column > *, .grid .side > * { break-inside: avoid; margin-bottom: var(--ct-space-3); }
 }
 @media (min-width: 1024px) {
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -252,6 +262,7 @@
 .card { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
 .heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.subheading { margin: var(--ct-space-2) 0 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-button); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .link { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
@@ -260,7 +271,7 @@
 .stat { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; padding: var(--ct-space-2) var(--ct-space-2-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
 .stat dt { order: 1; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .stat dd { order: 2; margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.statNote { order: 3; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.statNote { display: block; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
 /* Body metrics: three pickable figures above one chart. */
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
@@ -380,7 +391,7 @@
   .trainingHead.trainingHead { gap: 0; }
   .trainingTitle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .trainingActions.trainingActions { flex-wrap: nowrap; width: 100%; gap: var(--ct-space-2-5); margin-left: 0; }
-  .trainingActions.trainingActions > * { flex: 1 1 0; min-width: 0; padding-inline: var(--ct-space-2-5); }
+  .trainingActions.trainingActions > * { flex: 1 1 0; min-width: 0; min-height: var(--ct-button-compact-height); padding-inline: var(--ct-space-2-5); }
   /* Empty until something saves; then "Saving…" takes one line. */
   .trainingStatus.trainingStatus { min-height: 0; }
 }

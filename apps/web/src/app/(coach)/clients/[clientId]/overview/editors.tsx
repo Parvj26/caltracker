@@ -64,7 +64,7 @@ export function GoalCard({
       <div className={styles.cardHead}>
         <h2 id="goal-heading" className={styles.heading}>Goal &amp; countdown</h2>
         {readOnly || editing ? null : (
-          <button ref={editButton} type="button" className={styles.textButton} onClick={open} aria-label={goal ? 'Edit goal' : 'Set a goal'}>
+          <button ref={editButton} type="button" className={styles.textButton} onClick={open} aria-label={goal ? 'Edit goal' : undefined}>
             {goal ? 'Edit' : 'Set goal'}
           </button>
         )}
