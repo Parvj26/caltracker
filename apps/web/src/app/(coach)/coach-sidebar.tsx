@@ -8,6 +8,7 @@ import { startTabPresence } from '@/lib/tab-id';
 import { cycleTabTarget } from './focus-trap';
 import { LAST_PAGE_KEY } from './help/support-page';
 import { LibrarySheet } from './library-menu';
+import { useBackLayer } from '@/lib/open-layer';
 import { UnreadTotalContext, useUnreadTotal } from './messages-nav-link';
 import { PhoneTabBar } from './phone-tab-bar';
 import styles from './coach.module.css';
@@ -67,6 +68,8 @@ export function CoachSidebar({
     setOpen(false);
     moreRef.current?.focus();
   }, []);
+  // Back (and iOS swipe-back) closes the More sheet, not the page.
+  useBackLayer(open, close);
 
   useEffect(() => {
     if (!open) return;

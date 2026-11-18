@@ -9,6 +9,7 @@ import { saveSlotCopy, type SlotWorkout } from '../actions';
 import { cellLabel, copyDaySuffix } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 /** What the sheet is for: a new workout for one day, or editing the workout on a placed day. */
 export type SheetTarget = { kind: 'new'; week: number; day: number } | { kind: 'edit'; slot: Slot; workout: SlotWorkout };
@@ -76,7 +77,7 @@ export function WorkoutSheet({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
   }, []);
 
   function close() {
@@ -169,6 +170,7 @@ export function WorkoutSheet({
           saveLabel={target.kind === 'new' ? 'Save and add to day' : 'Save'}
           saveWith={saveWith}
           onDirtyChange={setDirty}
+          embedded
           onSaved={() => {
             if (saved.current) onSaved(saved.current);
           }}
@@ -219,7 +221,7 @@ function SmallDialog({ title, onCancel, children }: { title: string; onCancel: (
   const titleId = useId();
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d) openLayer(d);
   }, []);
   return (
     <dialog

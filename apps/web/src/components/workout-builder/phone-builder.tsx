@@ -23,6 +23,7 @@ import { MeasurementChips } from './measurements-menu';
 import { SupersetSwitch, type Link } from './superset-switch';
 import { useSheetKeyboardInset } from './use-keyboard-offset';
 import styles from './builder.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 /** One exercise in the list: a straight exercise, one exercise of a superset, or a whole pick-one group. */
 export type Card = {
@@ -81,7 +82,7 @@ function FullScreen({ label, onClose, children }: { label: string; onClose: () =
   useSheetKeyboardInset(ref);
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d) openLayer(d);
   }, []);
   return (
     <dialog
@@ -275,7 +276,7 @@ export function MoreSheet({
   useSheetKeyboardInset(ref);
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d) openLayer(d);
   }, []);
   return (
     <dialog

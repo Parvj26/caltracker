@@ -1,12 +1,12 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef } from 'react';
 import type { WorkoutHints } from '@caltracker/shared';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
 import { Button } from '@/components/ui';
 import type { LibraryWorkout } from './program-grid';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 type Props = {
   /** e.g. "Week 1, Day 4". */
@@ -34,7 +34,7 @@ export function WorkoutPicker({ cellLabel, library, hints, onPick, onClose, forP
     const dialog = dialogRef.current;
     // The picker unmounts when it closes, so hand focus back to the "+" button that opened it.
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

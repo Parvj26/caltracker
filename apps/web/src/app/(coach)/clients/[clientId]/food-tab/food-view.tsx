@@ -42,6 +42,7 @@ import type { CoachMeal } from './load';
 import { TIME_ZONE_COOKIE, weekRows } from './week';
 import styles from './food.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { openLayer } from '@/lib/open-layer';
 
 const noSubscribe = () => () => undefined;
 /** The coach's own time zone in the browser; UTC while rendering on the server. */
@@ -456,7 +457,7 @@ function useModal() {
   useEffect(() => {
     const dialog = ref.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

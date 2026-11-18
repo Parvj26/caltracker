@@ -6,6 +6,7 @@ import type { Measurement, TrackingType } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { Icon } from './icons';
 import styles from './builder.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 type Props = {
   trackingType: TrackingType;
@@ -25,6 +26,8 @@ const restHint = "Rest off: no rest column, and no rest on the client's phone af
  */
 export function MeasurementsMenu({ trackingType, exerciseName, onToggle, rest, onToggleRest }: Props) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const popId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

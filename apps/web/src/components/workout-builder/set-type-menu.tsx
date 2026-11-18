@@ -5,6 +5,7 @@ import { SET_KINDS, SET_KIND_NAMES } from '@caltracker/shared';
 import type { SetKind } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import styles from './builder.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 const LETTER_CLASS: Record<SetKind, string | undefined> = {
   W: styles.kindW,
@@ -31,6 +32,8 @@ export function SetTypeMenu({
   onPick: (kind: SetKind) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

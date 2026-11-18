@@ -23,6 +23,7 @@ import { mealFormDirty, type MealFormSnapshot } from './form-dirty';
 import { loggedLabel, mealInitial, mealsListHref } from './meal-labels';
 import { tileColour } from './meal-list';
 import styles from './meals.module.css';
+import { openRef, useBackLayer } from '@/lib/open-layer';
 
 type StoredPhoto = { path: string; thumbPath: string; width: number; height: number; url: string | null };
 export type MealFormValue = {
@@ -99,6 +100,8 @@ function MealFormFields({
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<FieldError | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(menuOpen, () => setMenuOpen(false));
   // What "unchanged" means for Cancel and ‹ Meals: the meal as opened, then as last saved. A save is on screen before
   // the page refresh brings the saved meal back, and leaving in between mustn't ask "Discard changes?".
   const [baseline, setBaseline] = useState<MealFormSnapshot>(() => ({
@@ -217,7 +220,7 @@ function MealFormFields({
 
   /** Back to the list without saving; asks first if anything was typed. */
   function cancel() {
-    if (dirty) discardRef.current?.showModal();
+    if (dirty) openRef(discardRef);
     else router.push(listHref());
   }
 
@@ -266,7 +269,7 @@ function MealFormFields({
           onClick={(e) => {
             if (!dirty) return;
             e.preventDefault();
-            discardRef.current?.showModal();
+            openRef(discardRef);
           }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -300,7 +303,7 @@ function MealFormFields({
                   className={styles.menuDanger}
                   onClick={() => {
                     setMenuOpen(false);
-                    dialogRef.current?.showModal();
+                    openRef(dialogRef);
                   }}
                 >
                   Remove meal
@@ -400,7 +403,7 @@ function MealFormFields({
           Cancel
         </button>
         {!isNew ? (
-          <button type="button" className={cx(styles.remove, styles.wideOnly)} onClick={() => dialogRef.current?.showModal()}>
+          <button type="button" className={cx(styles.remove, styles.wideOnly)} onClick={() => openRef(dialogRef)}>
             Remove meal
           </button>
         ) : null}

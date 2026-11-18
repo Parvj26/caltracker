@@ -28,6 +28,7 @@ import { customKey } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
 import { useUrlChoice } from '@/lib/url-state';
 import styles from './progress.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 type Editing = { scan: ScanRow | null; presetDate?: IsoDate };
 
@@ -388,7 +389,7 @@ function DeleteScanDialog({
   useEffect(() => {
     const dialog = ref.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

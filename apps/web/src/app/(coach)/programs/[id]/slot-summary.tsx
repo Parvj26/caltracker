@@ -6,6 +6,7 @@ import { Button } from '@/components/ui';
 import { loadSlotWorkout, type SlotWorkout } from '../actions';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -37,7 +38,7 @@ export function SlotSummary({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
   }, []);
 
   useEffect(() => {

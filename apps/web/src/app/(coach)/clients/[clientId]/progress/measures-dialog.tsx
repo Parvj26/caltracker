@@ -9,6 +9,7 @@ import { addCustomMeasure, archiveCustomMeasure } from './actions';
 import type { CustomMetric } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
 import styles from './progress.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 /** Custom measures: the workspace defines them once (name, unit label, allowed range) and they join every scan form. */
 export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; onClose: () => void }) {
@@ -24,7 +25,7 @@ export function MeasuresDialog({ customs, onClose }: { customs: CustomMetric[]; 
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui';
 import styles from './builder.module.css';
+import { openLayer, useBackLayer } from '@/lib/open-layer';
 
 export type MenuItem = { label: string; onSelect: () => void; disabled?: boolean; danger?: boolean };
 
@@ -13,6 +14,8 @@ export type MenuItem = { label: string; onSelect: () => void; disabled?: boolean
  */
 export function BlockMenu({ name, items }: { name: string; items: readonly MenuItem[] }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -107,7 +110,7 @@ export function MoveToDialog({
   const titleId = useId();
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d) openLayer(d);
   }, []);
   const pick = (t: MoveTarget) => {
     t.onSelect();

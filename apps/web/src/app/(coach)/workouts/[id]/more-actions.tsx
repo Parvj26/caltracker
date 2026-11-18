@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useBackLayer } from '@/lib/open-layer';
 import styles from './header.module.css';
 
 /**
@@ -12,6 +13,8 @@ export function MoreActions({ name, children }: { name: string; children: ReactN
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Back (and iOS swipe-back) folds the panel away, not the page.
+  useBackLayer(open, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;

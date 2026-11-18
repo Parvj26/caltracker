@@ -1,6 +1,5 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import { IsoDateSchema, scheduleDateError } from '@caltracker/shared';
 import type { IsoDate, WorkoutHints } from '@caltracker/shared';
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import styles from '@/components/calendar/calendar.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 type LibraryWorkout = { id: string; name: string };
 
@@ -44,7 +44,7 @@ export function AddWorkoutDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
+    if (dialog) openLayer(dialog, { noKeyboardOnTouch: true });
     return () => {
       if (opener?.isConnected) opener.focus();
     };

@@ -28,6 +28,7 @@ import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
+import { openLayer } from '@/lib/open-layer';
 
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
@@ -117,7 +118,7 @@ function InviteDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };
