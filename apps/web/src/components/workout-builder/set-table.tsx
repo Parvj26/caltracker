@@ -28,23 +28,30 @@ type Props = {
  */
 export function SetTable({ sets, names, trackingType, units, restShown, errors, onUpdate, onRemove, stacked = false }: Props) {
   const fields = targetFieldsFor(trackingType);
-  const captions = [
-    ...(fields.includes('reps') ? ['Reps'] : []),
-    ...(fields.includes('weight') ? [`Weight (${units})`] : []),
-    ...(fields.includes('duration') ? ['Time'] : []),
-    ...(fields.includes('distance') ? [`Distance (${distanceUnitFor(units)})`] : []),
+  // Reps and weight have − / + buttons on touch screens, so their columns never get narrower than 9.5rem (two 44 px buttons and a box that fits "102.5").
+  const STEPPED = 'minmax(9.5rem, 1.5fr)';
+  const PLAIN = 'minmax(5rem, 1fr)';
+  const columns: [caption: string, size: string][] = [
+    ...(fields.includes('reps') ? [['Reps', STEPPED] as [string, string]] : []),
+    ...(fields.includes('weight') ? [[`Weight (${units})`, STEPPED] as [string, string]] : []),
+    ...(fields.includes('duration') ? [['Time', PLAIN] as [string, string]] : []),
+    ...(fields.includes('distance') ? [[`Distance (${distanceUnitFor(units)})`, PLAIN] as [string, string]] : []),
     // Same rule as SetRow: a drop never has a rest box.
-    ...(sets.some((s, i) => restShown[i] && s.setType !== 'drop') ? ['Rest'] : []),
+    ...(sets.some((s, i) => restShown[i] && s.setType !== 'drop') ? [['Rest', PLAIN] as [string, string]] : []),
   ];
-  const columns = { '--set-cols': `40px 64px repeat(${captions.length}, minmax(0, 1fr)) var(--ct-tap-min)` } as CSSProperties;
+  // Four boxes (weight, reps, time and rest) don't fit a 700 px pane with the buttons, so the pane drops them there and
+  // every box shares the width (the boxes still take typing).
+  const many = columns.length > 3;
+  const sizes = columns.map(([, size]) => (many ? PLAIN : size));
+  const style = { '--set-cols': `40px 64px ${sizes.join(' ')} var(--ct-tap-min)` } as CSSProperties;
   return (
-    <div className={styles.sets} style={columns}>
+    <div className={styles.sets} style={style} data-many={many ? '' : undefined}>
       {stacked ? null : (
         <div className={styles.setColumns} aria-hidden="true">
           <span>Set</span>
           <span>Type</span>
-          {captions.map((c) => (
-            <span key={c}>{c}</span>
+          {columns.map(([caption]) => (
+            <span key={caption}>{caption}</span>
           ))}
         </div>
       )}
