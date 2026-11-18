@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo } from 'react';
 import { smartFilter } from '@caltracker/shared';
-import { Button, Card, TextField } from '@/components/ui';
+import { Card, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { LocalDate } from './local-date';
 import { WorkoutRowActions } from './workout-row-actions';
 import styles from './workouts.module.css';
@@ -17,53 +17,34 @@ export type WorkoutListRow = { id: string; name: string; updatedAt: string; exer
  */
 export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: WorkoutListRow[]; initialQuery: string; limited: boolean; limit: number }) {
   const router = useRouter();
-  const [query, setQuery] = useState(initialQuery);
+  const { query, setQuery, debounced, searching } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
   const shown = useMemo(() => {
-    const smart = smartFilter(rows, query, (w) => w.name);
+    const smart = smartFilter(rows, debounced, (w) => w.name);
     if (!limited) return smart;
     // Past the cap the server adds older workouts whose names contain the text (a plain match): keep those too.
-    const text = query.trim().toLowerCase();
+    const text = debounced.trim().toLowerCase();
     const seen = new Set(smart.map((w) => w.id));
     return [...smart, ...rows.filter((w) => !seen.has(w.id) && text !== '' && w.name.toLowerCase().includes(text))];
-  }, [rows, query, limited]);
-  const searching = query.trim() !== '';
+  }, [rows, debounced, limited]);
 
-  const onChange = (value: string) => {
-    setQuery(value);
-    const url = new URL(window.location.href);
-    if (value.trim()) url.searchParams.set('q', value);
-    else url.searchParams.delete('q');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-  };
-  // The list already shows the matches; Search (or Enter) closes the phone keyboard. A library past the cap also asks
-  // the server, which adds older workouts whose names contain the text.
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  // The list already shows the matches; Enter closes the phone keyboard. A library past the cap also asks the server,
+  // which adds older workouts whose names contain the text.
+  const onEnter = () => {
     if (limited) router.replace(query.trim() ? `/workouts?q=${encodeURIComponent(query.trim())}` : '/workouts');
   };
 
   return (
     <>
-      <Card>
-        <form method="get" action="/workouts" className={styles.searchRow} role="search" onSubmit={onSubmit}>
-          <TextField
-            label="Search"
-            type="search"
-            name="q"
-            value={query}
-            onChange={(e) => onChange(e.target.value)}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            className={styles.searchField}
-          />
-          <Button type="submit">Search</Button>
-        </form>
-      </Card>
+      <div role="search" aria-label="Find workouts" className={styles.search}>
+        <SearchBox label="Search workouts" value={query} onChange={setQuery} onEnter={onEnter} name="q" />
+      </div>
 
       {shown.length === 0 ? (
-        <p className={styles.empty}>{searching ? 'No workouts match.' : 'No workouts yet. Build your first one.'}</p>
+        searching ? (
+          <SearchEmpty things="workouts" query={debounced} onClear={() => setQuery('')} className={styles.empty} />
+        ) : (
+          <p className={styles.empty}>No workouts yet. Build your first one.</p>
+        )
       ) : (
         <Card>
           <table className={styles.table} aria-label="Workouts">

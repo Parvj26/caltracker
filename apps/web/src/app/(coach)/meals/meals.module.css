@@ -11,33 +11,6 @@
 .listColumn { flex: 1 1 340px; display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
 .list { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 
-/* The smart search box: a grey pill with a magnifier, 48 px tall and 16 px text (Safari doesn't zoom). */
-.search {
-  display: flex;
-  align-items: center;
-  gap: var(--ct-space-2);
-  min-height: var(--ct-button-min-height);
-  padding: 0 var(--ct-space-3-5);
-  border: 2px solid transparent;
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-surface);
-  color: var(--ct-ink-muted);
-  box-sizing: border-box;
-}
-.search:focus-within { border-color: var(--ct-ink); background: var(--ct-bg); color: var(--ct-ink); }
-.searchInput {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: 16px;
-}
-.searchInput:focus { outline: none; }
-.searchInput::placeholder { color: var(--ct-ink-muted); }
 .row {
   display: flex;
   align-items: center;

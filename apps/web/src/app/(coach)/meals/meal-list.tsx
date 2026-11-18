@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { compactMacroLine, smartFilter } from '@caltracker/shared';
+import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { ListedCoachMeal } from '@/lib/coach-meals';
 import { loggedLabel, mealInitial } from './meal-labels';
@@ -33,17 +34,9 @@ export function MealTile({ id, name, src, className }: { id: string; name: strin
  * order), like the Workouts list. The text stays in the address (?q=) and in the meal links, so Back keeps it.
  */
 export function MealList({ meals, selectedId, initialQuery }: { meals: ListedCoachMeal[]; selectedId: string | null; initialQuery: string }) {
-  const [query, setQuery] = useState(initialQuery);
-  const shown = useMemo(() => smartFilter(meals, query, (m) => m.name), [meals, query]);
-  const q = query.trim();
-
-  function onChange(value: string) {
-    setQuery(value);
-    const url = new URL(window.location.href);
-    if (value.trim()) url.searchParams.set('q', value);
-    else url.searchParams.delete('q');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-  }
+  const { query, setQuery, debounced } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
+  const shown = useMemo(() => smartFilter(meals, debounced, (m) => m.name), [meals, debounced]);
+  const q = debounced.trim();
 
   if (meals.length === 0) {
     return (
@@ -55,30 +48,9 @@ export function MealList({ meals, selectedId, initialQuery }: { meals: ListedCoa
 
   return (
     <div className={styles.listColumn}>
-      <label className={styles.search}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="M20 20l-4-4" />
-        </svg>
-        <input
-          type="search"
-          className={styles.searchInput}
-          aria-label="Search meals"
-          placeholder="Search meals"
-          value={query}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            // The list already shows the matches; Enter only closes the phone keyboard.
-            if (e.key === 'Enter') e.currentTarget.blur();
-          }}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="search"
-        />
-      </label>
+      <SearchBox label="Search meals" value={query} onChange={setQuery} />
       {shown.length === 0 ? (
-        <p className={styles.empty}>No meals match &quot;{q}&quot;.</p>
+        <SearchEmpty things="meals" query={q} onClear={() => setQuery('')} className={styles.empty} />
       ) : (
         <ul className={styles.list} aria-label="Shared meals">
           {shown.map((m) => (

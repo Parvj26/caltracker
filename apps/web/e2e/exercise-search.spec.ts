@@ -129,11 +129,11 @@ test('a search with no match shows the empty state and clears filters', async ({
   const dialog = await openPicker(page);
   await dialog.getByRole('button', { name: 'Chest', exact: true }).click();
   await dialog.getByLabel('Search exercises').fill('zzzz');
-  await expect(dialog.getByText('No exercises match "zzzz"')).toBeVisible();
+  await expect(dialog.getByText('No exercises match “zzzz”')).toBeVisible();
   await expect(dialog.getByRole('link', { name: 'Create a custom exercise' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Clear filters' }).click();
   await expect(dialog.getByRole('button', { name: 'Chest', exact: true })).toHaveAttribute('aria-pressed', 'false');
-  await expect(dialog.getByText('No exercises match "zzzz"')).toBeVisible();
+  await expect(dialog.getByText('No exercises match “zzzz”')).toBeVisible();
 });
 
 test('pick one: one pick keeps Add disabled, two add both', async ({ page }) => {

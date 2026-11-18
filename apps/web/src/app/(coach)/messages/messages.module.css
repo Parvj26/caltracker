@@ -28,20 +28,8 @@
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
 }
-.filters { display: flex; gap: var(--ct-space-2); }
-.search {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--ct-tap-min);
-  padding: var(--ct-space-2) var(--ct-space-3);
-  border: 2px solid transparent;
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-surface);
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: var(--ct-size-body);
-}
-.search:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.filters { display: flex; align-items: center; gap: var(--ct-space-2); }
+.search { flex: 1; }
 .toggle {
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-2) var(--ct-space-3-5);
