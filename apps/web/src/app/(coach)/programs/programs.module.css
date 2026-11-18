@@ -16,6 +16,8 @@
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 .sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .status { margin: 0; min-height: 1.5em; color: var(--ct-ink-muted); }
+/* The builder's save status takes no room until it has something to say, so the gap above the plan matches the rest. */
+.builder > .status:empty { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip-path: inset(50%); }
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -110,6 +112,8 @@
 
 /* ---------- Forms ---------- */
 .formCard { max-width: 1040px; }
+/* The program page's details card lines up with the settings cards beside it (full width). */
+.detailsCard { max-width: none; }
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
 .weeksField { max-width: 8rem; }
 .weeksGroup { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2); }
@@ -126,12 +130,13 @@
 .headerMenu { position: relative; display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--ct-space-1); }
 .headerMenu .menu { min-width: 12rem; }
 
-/* Program settings (Auto progression, Live Sync, name and weeks): open above the plan on wider screens; on a phone
-   they fold into one "Program settings" row below the plan. */
-.settings { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+/* Program settings (Auto progression, Live Sync, name and weeks) fold into one "Program settings" row below the plan
+   on every size, so the weekly plan is the first thing on the screen (B#1). */
+.settings { order: 2; display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.settings[data-open='false'] .settingsBody { display: none; }
 .settingsBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .settingsToggle {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
@@ -232,16 +237,20 @@
 .cellOver { box-shadow: inset 0 0 0 2px var(--ct-ink); background: var(--ct-blue); }
 .chips { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 
-/* Text on a pastel fill is always ink. */
+/* Text on a pastel fill is always ink. The name (drag handle, tap = summary) and ⋯ sit side by side, never on top of
+   each other. */
 .chip {
   position: relative;
+  display: flex;
+  align-items: stretch;
   border-radius: var(--ct-radius-input);
   background: var(--ct-lime);
   color: var(--ct-ink);
 }
 .chipHandle {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-2);
   border: 0;
@@ -258,12 +267,9 @@
 }
 /* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
    than the whole chip is cut with "…" (the full name is in the title). */
-.chipName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
-.menuSpace { float: right; width: calc(var(--ct-tap-min) - var(--ct-space-2)); height: calc(var(--ct-tap-min) - var(--ct-space-1)); }
+.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .chipMenuButton {
-  position: absolute;
-  top: 0;
-  right: 0;
+  flex: none;
   width: var(--ct-tap-min);
   min-height: var(--ct-tap-min);
   border: 0;
@@ -275,6 +281,14 @@
   cursor: pointer;
 }
 .chipMenuButton:hover, .chipMenuButton[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
+/* The weeks x days grid has narrow days. With a mouse, ⋯ is a slim 28 px column so the name keeps its room. On touch
+   it is left out there: a tap on the workout opens its summary, which has Copy to…, Move to… and Remove. */
+@media (hover: hover) and (pointer: fine) {
+  .grid .chipMenuButton { width: calc(var(--ct-space-6) + var(--ct-space-1)); }
+}
+@media (hover: none) and (pointer: coarse) {
+  .grid .chipMenuButton { display: none; }
+}
 .dragging { opacity: 0.4; }
 .overlayChip {
   display: inline-flex;
@@ -365,8 +379,7 @@
 }
 .dayRow .addButton { width: var(--ct-tap-min); }
 .dayRow .chips { margin-right: var(--ct-space-2); }
-.dayRow .chipHandle { display: flex; align-items: center; padding-right: var(--ct-tap-min); font-size: var(--ct-size-body); }
-.dayRow .menuSpace { display: none; }
+.dayRow .chipHandle { display: flex; align-items: center; font-size: var(--ct-size-body); }
 .rest { padding-bottom: var(--ct-space-1); font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 
 /* "Copy to…": the seven days of the picked week as checkboxes. */
@@ -453,7 +466,8 @@
   font-weight: var(--ct-weight-button);
   cursor: pointer;
 }
-.switch[aria-checked='true'] { background: var(--ct-lime); }
+/* On = ink track, white text (rulebook §2.4: lime is for create only). */
+.switch[aria-checked='true'] { background: var(--ct-ink); color: var(--ct-bg); }
 .switch:disabled { opacity: 0.6; cursor: progress; }
 
 /* ---------- Day "+" picker: New workout ---------- */
@@ -598,11 +612,8 @@
 .bigChoiceTitle { font-size: var(--ct-size-body); font-weight: var(--ct-weight-button); }
 .bigChoiceSub { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 
-/* ---------- Phone: the plan first, settings folded below it ---------- */
+/* ---------- Phone: week tabs instead of the grid ---------- */
 @media (max-width: 599.98px) {
-  .settings { order: 2; }
-  .settingsToggle { display: flex; }
-  .settings[data-open='false'] .settingsBody { display: none; }
   /* The phone shows week tabs instead (once the page has loaded), so the wide grid never flashes up first. */
   .gridScroll, .addWeekRow { display: none; }
 }

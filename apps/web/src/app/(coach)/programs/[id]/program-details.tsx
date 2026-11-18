@@ -111,7 +111,7 @@ export function ProgramDetails({
   }
 
   return (
-    <Card className={styles.formCard}>
+    <Card className={styles.detailsCard}>
       <form className={styles.detailsForm} onSubmit={(e) => void submit(e)} noValidate>
         <TextField
           label="Program name"

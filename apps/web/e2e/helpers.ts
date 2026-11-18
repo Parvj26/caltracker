@@ -132,6 +132,13 @@ export function programCell(page: Page, week: number, day: number): Locator {
  * Creates a program through the UI, then puts library workouts on it with each cell's "+" button (the keyboard and
  * touch path). Ends on the program page with every change saved.
  */
+/** The program page's settings (Auto progression, Live Sync, name, weeks) fold away below the plan: open them. */
+export async function openProgramSettings(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: /Program settings/ });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 export async function createProgram(
   page: Page,
   name: string,

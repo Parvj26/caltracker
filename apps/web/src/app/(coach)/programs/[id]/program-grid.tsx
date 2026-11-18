@@ -432,7 +432,7 @@ export function ProgramGrid({
 
   return (
     <div className={styles.builder}>
-      {/* On a phone the plan comes first and these fold away (CSS); wider screens show them open, above the plan. */}
+      {/* The plan comes first; these fold away below it on every size (CSS order). */}
       <section className={styles.settings} data-open={settingsOpen} aria-label="Program settings">
         <button
           type="button"
@@ -878,7 +878,6 @@ function SlotChip({
         title={slot.workoutName}
       >
         <span className={styles.chipName}>
-          <span className={styles.menuSpace} aria-hidden="true" />
           {slot.workoutName}
         </span>
       </button>

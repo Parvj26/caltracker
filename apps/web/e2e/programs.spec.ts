@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach, openProgramSettings } from './helpers';
 
 // Program builder (phase 2 Task 15): a weekly grid of library workouts.
 const admin = serviceClient();
@@ -51,6 +51,7 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
   await expect(programCell(page, 1, 1).getByRole('button', { name: workout, exact: true })).toHaveCount(0);
 
   // Shrinking to 1 week would remove the Week 2 workout: the coach is told first.
+  await openProgramSettings(page);
   await page.getByLabel('Weeks', { exact: true }).fill('1');
   await page.getByRole('button', { name: 'Save details' }).click();
   const confirm = page.getByRole('dialog', { name: 'Remove workouts?' });
@@ -60,6 +61,7 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
   await expect(programCell(page, 2, 3)).toHaveCount(0);
 
   await page.reload();
+  await openProgramSettings(page);
   await expect(page.getByLabel('Weeks', { exact: true })).toHaveValue('1');
   await expect(programCell(page, 2, 3)).toHaveCount(0);
   await expect(programCell(page, 1, 4).getByRole('button', { name: workout, exact: true })).toBeVisible();

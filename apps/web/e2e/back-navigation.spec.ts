@@ -1,6 +1,6 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { programCell, serviceClient, signInAsCoach } from './helpers';
+import { programCell, serviceClient, signInAsCoach, openProgramSettings } from './helpers';
 
 // Back and iOS swipe-back go exactly one step (ui-rules §8): every sheet, pop-up, menu and full-screen editor is one
 // step of history, so Back closes it and stays on the page under it; a page with unsaved changes asks "Discard
@@ -271,6 +271,7 @@ for (const [device, size] of [
       await signInAsCoach(page);
       await page.goto('/programs');
       await page.goto(`/programs/${pid}`);
+      await openProgramSettings(page);
       await page.getByLabel('Program name').fill(`${program} renamed`);
       await page.getByRole('link', { name: /Programs/ }).first().click();
       await expect(discard(page)).toBeVisible();
