@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './builder.module.css';
@@ -22,8 +22,25 @@ const move = <T,>(list: readonly T[], from: number, to: number): T[] => {
   return out;
 };
 
+/** How long neighbours take to slide into their new places, and the dropped row to settle (ms). */
+const SLIDE_MS = 180;
+const DROP_MS = 160;
+const LIFT = 'scale(1.03)';
+
+const stillMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** A light tap where the device has one (Android Chrome; iOS Safari has no vibrate and ignores it). */
+const tick = () => {
+  try {
+    navigator.vibrate?.(10);
+  } catch {
+    // Some browsers throw when vibration is blocked; it's only a nicety.
+  }
+};
+
 /**
- * "Reorder exercises": just the names, in order. Drag a row by its handle (mouse, finger or pen) or use ↑ and ↓. A
+ * "Reorder exercises": just the names, in order. Drag a row by its handle (mouse, finger or pen) or use ↑ and ↓. The
+ * lifted row grows a little and follows the finger, the others slide aside (FLIP), and it eases into place on drop;
+ * a light vibration marks pick-up and drop where supported. Reduced motion: no movement, rows just swap. A
  * superset moves as one block, and each block stays in its section. Cancel leaves the workout as it was; Done
  * applies the new order.
  */
@@ -33,26 +50,136 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
   const [order, setOrder] = useState(() => runs.map((r) => r.items));
   const [dragging, setDragging] = useState<string | null>(null);
   const lists = useRef<(HTMLOListElement | null)[]>([]);
+  // The drag in progress: which run, where the finger grabbed the row (px from its top) and the finger's last y.
+  const drag = useRef<{ run: number; id: string; grab: number; y: number } | null>(null);
+  // Each row's top on screen just before the order changed (mid-slide too), for the FLIP slide.
+  const before = useRef<Map<string, number> | null>(null);
 
   useEffect(() => {
     const d = ref.current;
     if (d) openLayer(d);
   }, []);
 
-  const shift = (run: number, from: number, to: number) => {
-    if (to < 0 || to >= order[run]!.length) return;
-    setOrder((o) => o.map((items, r) => (r === run ? move(items, from, to) : items)));
+  const rowEl = (run: number, id: string) =>
+    [...(lists.current[run]?.children ?? [])].find((el): el is HTMLLIElement => (el as HTMLElement).dataset.id === id);
+
+  /** Keeps the lifted row under the finger: its natural place plus whatever the finger moved past it. */
+  const follow = () => {
+    const d = drag.current;
+    if (!d) return;
+    const li = rowEl(d.run, d.id);
+    const list = lists.current[d.run];
+    if (!li || !list) return;
+    if (stillMotion()) return;
+    const natural = list.getBoundingClientRect().top + li.offsetTop;
+    li.style.transform = `translateY(${d.y - d.grab - natural}px) ${LIFT}`;
   };
 
-  const onDrag = (run: number, id: string) => (e: PointerEvent<HTMLSpanElement>) => {
-    if (dragging !== id) return;
-    const rows = [...(lists.current[run]?.children ?? [])];
-    const to = rows.findIndex((row) => {
-      const r = row.getBoundingClientRect();
-      return e.clientY >= r.top && e.clientY < r.bottom;
-    });
-    const from = order[run]!.findIndex((x) => x.id === id);
-    if (to >= 0 && to !== from) shift(run, from, to);
+  const remember = (run: number) => {
+    before.current = new Map([...(lists.current[run]?.children ?? [])].map((el) => [(el as HTMLElement).dataset.id ?? '', el.getBoundingClientRect().top]));
+  };
+
+  /** Moves a block to place `to` of its run (by id, so moves that come faster than renders still land right). */
+  const shift = (run: number, id: string, to: number) => {
+    if (to < 0 || to >= order[run]!.length) return;
+    remember(run);
+    setOrder((o) =>
+      o.map((items, r) => {
+        const from = items.findIndex((x) => x.id === id);
+        return r === run && from >= 0 && from !== to ? move(items, from, to) : items;
+      }),
+    );
+  };
+
+  // After a move: the rows that changed place slide from where they were (transform only, so nothing reflows), and
+  // the lifted row stays under the finger. With reduced motion everything just jumps.
+  useLayoutEffect(() => {
+    const old = before.current;
+    before.current = null;
+    if (!old) return;
+    follow();
+    if (stillMotion()) return;
+    for (const list of lists.current) {
+      for (const el of [...(list?.children ?? [])] as HTMLElement[]) {
+        const id = el.dataset.id ?? '';
+        const was = old.get(id);
+        if (was === undefined || id === drag.current?.id) continue;
+        el.style.transition = 'none';
+        el.style.transform = '';
+        const delta = was - el.getBoundingClientRect().top;
+        if (Math.abs(delta) < 0.5) continue;
+        el.style.transform = `translateY(${delta}px)`;
+        // Commit the start position before turning the transition on.
+        el.getBoundingClientRect();
+        el.style.transition = `transform ${SLIDE_MS}ms ease`;
+        el.style.transform = '';
+      }
+    }
+    // follow() only reads refs; the slide runs once per new order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order]);
+
+  // The drag follows the pointer on the whole window: the row (and its handle) moves in the list as it is dragged,
+  // which can drop a pointer capture on the handle.
+  const endDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => endDrag.current?.(), []);
+
+  const onDown = (run: number, id: string) => (e: PointerEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    endDrag.current?.();
+    const move = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId === e.pointerId) onDrag(run, id, ev.clientY);
+    };
+    const up = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      endDrag.current?.();
+      onUp(run, id);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    endDrag.current = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      endDrag.current = null;
+    };
+    const li = rowEl(run, id);
+    drag.current = { run, id, grab: li ? e.clientY - li.getBoundingClientRect().top : 0, y: e.clientY };
+    if (li && !stillMotion()) {
+      li.style.transition = `transform ${DROP_MS}ms ease-out, box-shadow ${DROP_MS}ms ease-out`;
+      li.style.transform = LIFT;
+    }
+    tick();
+    setDragging(id);
+  };
+
+  const onDrag = (run: number, id: string, y: number) => {
+    const d = drag.current;
+    if (!d || d.id !== id) return;
+    d.y = y;
+    const li = rowEl(run, id);
+    if (li) li.style.transition = 'box-shadow 120ms ease-out';
+    follow();
+    const rows = [...(lists.current[run]?.children ?? [])] as HTMLElement[];
+    const list = lists.current[run];
+    if (!li || !list) return;
+    const middle = y - d.grab - list.getBoundingClientRect().top + li.offsetHeight / 2;
+    // Its new place: how many of the other rows have their middle above the lifted row's middle.
+    const to = rows.filter((row) => row !== li && row.offsetTop + row.offsetHeight / 2 < middle).length;
+    if (to !== rows.indexOf(li)) shift(run, id, to);
+  };
+
+  const onUp = (run: number, id: string) => {
+    const li = rowEl(run, id);
+    drag.current = null;
+    if (li) {
+      // The row eases down into its slot.
+      li.style.transition = stillMotion() ? 'none' : `transform ${DROP_MS}ms ease-out, box-shadow ${DROP_MS}ms ease-out`;
+      li.style.transform = '';
+    }
+    tick();
+    setDragging(null);
   };
 
   return (
@@ -84,20 +211,14 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
                 return (
                   <li
                     key={item.id}
+                    data-id={item.id}
                     className={cx(styles.reorderItem, dragging === item.id && styles.reorderDragging)}
                     data-superset={item.tag?.startsWith('Superset') ? '' : undefined}
                   >
                     <span
                       className={styles.reorderHandle}
                       aria-hidden="true"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                        setDragging(item.id);
-                      }}
-                      onPointerMove={onDrag(ri, item.id)}
-                      onPointerUp={() => setDragging(null)}
-                      onPointerCancel={() => setDragging(null)}
+                      onPointerDown={onDown(ri, item.id)}
                     >
                       ⠿
                     </span>
@@ -107,7 +228,7 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
                         <span key={k} className={styles.reorderName}>{n}</span>
                       ))}
                     </span>
-                    <button type="button" className={styles.reorderArrow} aria-label={`Move ${name} up`} disabled={i === 0} onClick={() => shift(ri, i, i - 1)}>
+                    <button type="button" className={styles.reorderArrow} aria-label={`Move ${name} up`} disabled={i === 0} onClick={() => shift(ri, item.id, i - 1)}>
                       <span aria-hidden="true">↑</span>
                     </button>
                     <button
@@ -115,7 +236,7 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
                       className={styles.reorderArrow}
                       aria-label={`Move ${name} down`}
                       disabled={i === order[ri]!.length - 1}
-                      onClick={() => shift(ri, i, i + 1)}
+                      onClick={() => shift(ri, item.id, i + 1)}
                     >
                       <span aria-hidden="true">↓</span>
                     </button>
