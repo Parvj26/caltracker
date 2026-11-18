@@ -37,7 +37,13 @@ const SECTIONS = [
  * focus to the button that opened it, Tab goes round what the panel shows (and that button), and a press outside or a
  * change of page (back or forward) closes it.
  */
-function usePanel(open: boolean, close: (refocus: boolean) => void, trigger: RefObject<HTMLElement | null>, panel: RefObject<HTMLElement | null>) {
+function usePanel(
+  open: boolean,
+  close: (refocus: boolean) => void,
+  trigger: RefObject<HTMLElement | null>,
+  panel: RefObject<HTMLElement | null>,
+  { menu = false }: { menu?: boolean } = {},
+) {
   const pathname = usePathname();
   const openedOn = useRef<string | null>(null);
   useEffect(() => {
@@ -53,6 +59,9 @@ function usePanel(open: boolean, close: (refocus: boolean) => void, trigger: Ref
       if (e.key === 'Escape') {
         e.preventDefault();
         close(true);
+      } else if (e.key === 'Tab' && menu) {
+        // A menu (WAI-ARIA): Tab leaves it, closing it, and focus moves on as usual.
+        close(false);
       } else if (e.key === 'Tab') {
         const list = [...choices(), ...(trigger.current ? [trigger.current] : [])];
         const target = cycleTabTarget(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey);
@@ -72,7 +81,7 @@ function usePanel(open: boolean, close: (refocus: boolean) => void, trigger: Ref
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', outside);
     };
-  }, [open, close, trigger, panel]);
+  }, [open, close, trigger, panel, menu]);
 }
 
 /** The three choices. The rail menu is the compact list; the iPhone sheet has big buttons. Both use the short lines. */
@@ -156,7 +165,7 @@ export function LibraryNavItem({ className }: { className?: string | undefined }
     setOpen(false);
     if (refocus) buttonRef.current?.focus();
   }, []);
-  usePanel(open, close, buttonRef, panelRef);
+  usePanel(open, close, buttonRef, panelRef, { menu: true });
   // Back (and iOS swipe-back) closes the menu, not the page.
   useBackLayer(open, () => close(true));
 
@@ -186,13 +195,19 @@ export function LibraryNavItem({ className }: { className?: string | undefined }
     };
   }, [open]);
 
-  // Arrow keys move through the menu's choices.
+  // Arrow keys move through the menu's choices; Home and End go to the first and last.
   const onMenuKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const links = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('a[href]') ?? []);
     const at = links.indexOf(document.activeElement as HTMLElement);
+    const to =
+      e.key === 'ArrowDown' ? (at + 1) % links.length
+      : e.key === 'ArrowUp' ? (at - 1 + links.length) % links.length
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? links.length - 1
+      : null;
+    if (to === null) return;
     e.preventDefault();
-    links[(at + (e.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length]?.focus();
+    links[to]?.focus();
   };
 
   const showOpen = wide ? expanded : open;
