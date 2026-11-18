@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { WorkoutDoc, duplicateWorkoutDoc } from '@caltracker/shared';
-import type { ExercisePrefs } from '@caltracker/shared';
+import type { ExercisePrefs, Units } from '@caltracker/shared';
 import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -101,13 +101,25 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
   return { ok: true, id: data };
 }
 
-export async function deleteWorkout(id: string): Promise<{ ok: true } | ActionFailure> {
+/**
+ * Deletes a library workout. Program slots go with it (on delete cascade), and so do open invites' starting plans that
+ * hold it. Clients' calendar copies are separate rows and stay (their source_workout_id is set to null), and so do
+ * logs, except that Live Sync removes untouched upcoming copies from programs that have it on (the slots changed).
+ * Library workouts only: a client's calendar copy is edited and deleted from that client's calendar.
+ *
+ * `onlyIfUnused` (the Workouts list's ⋯ menu): refuse with workout_in_use while any program or open invite plan still
+ * uses it, so nothing but the library workout itself is removed. The workout page's Delete keeps the old behaviour (it
+ * says how many programs use it and deletes it from them).
+ */
+export async function deleteWorkout(id: string, options: { onlyIfUnused?: boolean } = {}): Promise<{ ok: true } | ActionFailure> {
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return fail('workout_not_found', 'action:workouts.deleteWorkout');
   const supabase = await createServerSupabase();
-  // Program slots go with it (on delete cascade). Clients' calendar copies are separate rows and stay, except that
-  // Live Sync removes untouched upcoming copies from programs that have it on (the slots changed).
-  // Library workouts only: a client's calendar copy is edited and deleted from that client's calendar.
+  if (options.onlyIfUnused) {
+    const uses = await workoutUses(supabase, workspaceId, id);
+    if (!uses) return fail('workout_delete_failed', 'action:workouts.deleteWorkout');
+    if (uses.programs > 0 || uses.invitePlans > 0) return fail('workout_in_use', 'action:workouts.deleteWorkout');
+  }
   const { data, error } = await supabase
     .from('workouts')
     .delete()
@@ -122,6 +134,93 @@ export async function deleteWorkout(id: string): Promise<{ ok: true } | ActionFa
   revalidatePath('/programs', 'layout');
   revalidatePath('/clients/[clientId]', 'layout');
   return { ok: true };
+}
+
+type Supabase = Awaited<ReturnType<typeof createServerSupabase>>;
+
+/** Programs (counted once each) and open invite plan items that use a workout, or null when the lookup fails. */
+async function workoutUses(supabase: Supabase, workspaceId: string, id: string): Promise<WorkoutUses | null> {
+  const [slots, invites] = await Promise.all([
+    supabase.from('program_workouts').select('program_id').eq('workout_id', id).eq('workspace_id', workspaceId),
+    supabase
+      .from('client_invite_plan_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('workout_id', id)
+      .eq('workspace_id', workspaceId),
+  ]);
+  if (slots.error || invites.error) return null;
+  return { programs: new Set(slots.data.map((r) => r.program_id)).size, invitePlans: invites.count ?? 0 };
+}
+
+export type WorkoutUses = { programs: number; invitePlans: number };
+
+/** What still uses a library workout, for the Workouts list's Delete… question. Throws when the lookup fails. */
+export async function libraryWorkoutUses(id: string): Promise<WorkoutUses> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(id)) return { programs: 0, invitePlans: 0 };
+  const uses = await workoutUses(await createServerSupabase(), workspaceId, id);
+  if (!uses) throw new Error('Could not check what uses the workout');
+  return uses;
+}
+
+/** A library workout as last saved, with the coach's units, for the Workouts list's read-only Preview. */
+export async function previewWorkout(id: string): Promise<{ doc: WorkoutDoc; units: Units } | null> {
+  const { workspaceId, units } = await requireCoach();
+  if (!UUID.test(id)) return null;
+  const supabase = await createServerSupabase();
+  const loaded = await loadWorkoutDoc(supabase, id);
+  if (!loaded || loaded.clientId !== null) return null;
+  // RLS limits what loads to workspaces this coach belongs to; this keeps it to the current one.
+  const { data: own, error } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .is('client_id', null)
+    .maybeSingle();
+  if (error || !own) return null;
+  return { doc: loaded.doc, units };
+}
+
+/**
+ * Renames a library workout through the same save as the builder (save_workout), with everything else as last saved.
+ * Like any save of a library workout, Live Sync carries it to untouched upcoming copies in programs that have it on.
+ */
+export async function renameWorkout(id: string, name: unknown): Promise<SaveWorkoutOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(id)) return fail('workout_not_in_library', 'action:workouts.renameWorkout');
+  const supabase = await createServerSupabase();
+  const { data: own, error: ownError } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .is('client_id', null)
+    .maybeSingle();
+  if (ownError) return fail('workout_rename_failed', 'action:workouts.renameWorkout');
+  if (!own) return fail('workout_not_in_library', 'action:workouts.renameWorkout');
+  const loaded = await loadWorkoutDoc(supabase, id);
+  if (!loaded) return fail('workout_not_in_library', 'action:workouts.renameWorkout');
+
+  const parsed = WorkoutDoc.safeParse({ ...loaded.doc, name });
+  if (!parsed.success) {
+    const nameIssue = parsed.error.issues.find((i) => i.path[0] === 'name');
+    return nameIssue
+      ? { ...fail('workout_fields_invalid', 'action:workouts.renameWorkout'), issues: [{ path: ['name'], message: nameIssue.message }] }
+      : fail('workout_invalid', 'action:workouts.renameWorkout');
+  }
+  // A rename is not the coach choosing measurements again, so it doesn't change what new exercises start with.
+  const { error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: { ...parsed.data, rememberChoices: false } });
+  if (error) {
+    if (error.code === '23514') return fail('workout_invalid', 'action:workouts.renameWorkout');
+    if (error.code === '42501') return fail('workout_edit_denied', 'action:workouts.renameWorkout');
+    return fail('workout_rename_failed', 'action:workouts.renameWorkout');
+  }
+  revalidatePath('/workouts');
+  revalidatePath(`/workouts/${id}`);
+  revalidatePath('/programs', 'layout');
+  revalidatePath('/clients/[clientId]', 'layout');
+  return { ok: true, id };
 }
 
 /** How many programs use this library workout (a program using it twice counts once). Client copies count 0. */

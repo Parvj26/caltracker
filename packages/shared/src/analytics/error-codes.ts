@@ -71,6 +71,8 @@ export const ERROR_CODES = {
   workout_not_found: "Couldn't find that workout.",
   workout_delete_failed: "Couldn't delete. Please try again.",
   workout_already_deleted: "Couldn't find that workout in your library. It may already be deleted.",
+  workout_in_use: "It's still used in a program or in an invited client's starting plan. Remove it from there first.",
+  workout_rename_failed: "Couldn't rename the workout. Please try again.",
   program_not_found: "Couldn't find that program.",
   program_details_invalid: 'Check the details.',
   program_deleted: "Couldn't find that program. It may have been deleted.",
