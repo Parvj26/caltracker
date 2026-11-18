@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { formatTimeOfDay, groupByLocalDay } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
-import { Chip } from '@/components/ui';
+import { Chip, ListRow, RowList } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import styles from './activity.module.css';
 
@@ -45,45 +44,54 @@ export function ActivityFeed({ rows, now }: { rows: FeedRow[]; now: string }) {
           <h2 id={`day-${g.day}`} className={styles.dayHeading}>
             {g.label}
           </h2>
-          <ul className={styles.list} aria-label={`Finished workouts, ${g.label}`}>
+          <RowList aria-label={`Finished workouts, ${g.label}`}>
             {g.items.map((r) => (
-              <li key={r.id}>
-                <Link href={r.href} className={styles.row}>
-                  {r.reviewed ? (
-                    <span className={styles.dotOff} aria-hidden="true" />
-                  ) : (
-                    <span className={styles.dot} role="img" aria-label="Not reviewed" title="No comment from you yet" />
-                  )}
-                  <CoachAvatar url={null} name={r.clientName} seed={r.clientId} />
-                  <span className={styles.rowText}>
-                    <span className={styles.client}>{r.clientName}</span>
-                    <span className={styles.workoutLine}>
-                      <span className={styles.workout}>{r.workoutName}</span>
-                      {r.hasPr ? <Chip tone="lime">PR</Chip> : null}
-                      {r.autoFinished ? <Chip tone="amber">Auto-finished</Chip> : null}
-                      {r.byCoach ? <Chip tone="blue">Logged by coach</Chip> : null}
-                      {r.planned ? null : <Chip>Unplanned</Chip>}
-                    </span>
+              <ListRow
+                key={r.id}
+                href={r.href}
+                emphasis={!r.reviewed}
+                leading={<CoachAvatar url={null} name={r.clientName} seed={r.clientId} />}
+                title={
+                  <>
+                    {r.clientName}
+                    <span className={styles.workout}> · {r.workoutName}</span>
+                  </>
+                }
+                meta={
+                  <>
+                    {r.reviewed ? null : <Chip tone="blue">To review</Chip>}
+                    {r.hasPr ? <Chip tone="lime">PR</Chip> : null}
+                    {r.autoFinished ? <Chip tone="amber">Auto-finished</Chip> : null}
+                    {r.byCoach ? <Chip>Logged by coach</Chip> : null}
+                    {r.planned ? null : <Chip>Unplanned</Chip>}
                     <span className={styles.facts}>
-                      <time dateTime={r.finishedAt}>{formatTimeOfDay(r.finishedAt, timeZone)}</time> · {r.facts}
+                      <time dateTime={r.finishedAt}>{formatTimeOfDay(r.finishedAt, timeZone)}</time>
+                      {r.facts.split(' · ').map((f) => (
+                        <span key={f} className={styles.fact}>
+                          {' · '}
+                          {f}
+                        </span>
+                      ))}
                     </span>
-                  </span>
-                  {r.comments > 0 ? (
-                    <span className={styles.comments}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                        <path d="M4 5h16v11H9l-5 4z" />
-                      </svg>
-                      {r.comments}
-                      <span className={styles.srOnly}>{r.comments === 1 ? ' comment' : ' comments'}</span>
-                    </span>
-                  ) : null}
-                  <span className={styles.chevron}>
+                  </>
+                }
+                end={
+                  <>
+                    {r.comments > 0 ? (
+                      <span className={styles.comments}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                          <path d="M4 5h16v11H9l-5 4z" />
+                        </svg>
+                        {r.comments}
+                        <span className={styles.srOnly}>{r.comments === 1 ? ' comment' : ' comments'}</span>
+                      </span>
+                    ) : null}
                     <ChevronIcon direction="right" size={18} />
-                  </span>
-                </Link>
-              </li>
+                  </>
+                }
+              />
             ))}
-          </ul>
+          </RowList>
         </section>
       ))}
     </div>
