@@ -1,6 +1,5 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { IsoDate } from '@caltracker/shared';
@@ -13,6 +12,7 @@ import { unassignProgram } from './actions';
 import type { AssignmentSummary } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 import pageStyles from './client-page.module.css';
+import { openLayer, useBackLayer } from '@/lib/open-layer';
 
 const workoutsText = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 const assignmentText = (a: AssignmentSummary) => `${a.programName} · ${formatDayMonth(a.startDate)} – ${formatDayMonth(a.endDate)}`;
@@ -37,6 +37,8 @@ export function AssignmentsPanel({
   const headingId = useId();
   const listId = useId();
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const [removing, setRemoving] = useState<AssignmentSummary | null>(null);
   const n = assignments.length;
   return (
@@ -96,6 +98,8 @@ export function AssignmentsPanel({
 /** A program row's "⋯": Remove from calendar, in red. Escape closes and returns focus; a tap outside closes. */
 function ProgramMenu({ name, onRemove }: { name: string; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -177,7 +181,7 @@ function UnassignDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
   }, []);
 
   async function confirm() {

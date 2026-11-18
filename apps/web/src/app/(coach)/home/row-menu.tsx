@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import menuStyles from '@/components/calendar/calendar.module.css';
 import styles from './home.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 /**
  * A row's "⋯" menu of links, keyboard-driven like the calendar's item menu (same look): arrows move, Escape closes and
@@ -11,6 +12,8 @@ import styles from './home.module.css';
  */
 export function RowMenu({ name, items }: { name: string; items: { label: string; href: string }[] }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
