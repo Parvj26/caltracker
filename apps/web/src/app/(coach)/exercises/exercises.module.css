@@ -86,6 +86,41 @@
 .saved { margin: 0; font-weight: var(--ct-weight-section-heading); }
 
 /* ---------- Phones (below 768 px): the approved row-5 mockups ---------- */
+
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3-5);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pill[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-lime); }
+.pill:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.pillFilters { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.pillCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-ink);
+  color: var(--ct-lime);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
 .phoneList { display: flex; flex-direction: column; }
 /* Search and chips stick to the top while the list scrolls under them (the whole page scrolls, not a box). */
 .phoneBar {

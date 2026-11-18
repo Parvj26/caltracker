@@ -88,7 +88,8 @@ export function MessagesShell({
           </div>
         </div>
         {shown.length === 0 ? (
-          rows.length > 0 && debounced.trim() !== '' ? (
+          // With Unread on, say "Nothing unread" when the search alone would find someone.
+          rows.length > 0 && debounced.trim() !== '' && (!unreadOnly || filterInbox(rows, { unreadOnly: false, query: debounced }).length === 0) ? (
             <SearchEmpty things="clients" query={debounced} onClear={() => setQuery('')} className={styles.empty} />
           ) : (
             <p className={styles.empty}>{rows.length === 0 ? 'No clients yet. Invite one from Clients.' : 'Nothing unread.'}</p>

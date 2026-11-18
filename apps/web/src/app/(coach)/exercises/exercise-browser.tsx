@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
 import type { ExerciseIndexRow } from '@caltracker/shared';
@@ -37,7 +38,10 @@ type Props = {
  * On a phone: a plain list that scrolls with the page, each exercise opening its own page (PhoneExerciseList).
  */
 export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, initialTracking }: Props) {
-  const [tracking, setTracking] = useState(initialTracking);
+  // From the address first: Back can restore the page from Next's client cache with props from before a chip was
+  // picked, while the address still holds ?tracking=.
+  const params = useSearchParams();
+  const [tracking, setTracking] = useState(params.get('tracking') ?? initialTracking);
   const phone = usePhone();
 
   const changeTracking = useCallback((next: string) => {

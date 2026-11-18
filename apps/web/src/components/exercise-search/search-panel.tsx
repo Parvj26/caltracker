@@ -83,7 +83,12 @@ export function SearchPanel({
 
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [error, setError] = useState(false);
-  const { query, setQuery, debounced } = useSearchQuery({ initial: initialQuery, ...(queryParam ? { urlParam: queryParam } : {}) });
+  const { query, setQuery, debounced } = useSearchQuery({
+    initial: initialQuery,
+    ...(queryParam ? { urlParam: queryParam } : {}),
+    // Enter and the arrow keys act on the list, so it must always match the typed text (it's a fast in-memory search).
+    delay: 0,
+  });
   const [filters, setFilters] = useState<SearchFilters>({ ...NO_FILTERS, ...initialFilters });
   const [shown, setShown] = useState(PAGE_SIZE);
   const [highlightId, setHighlightId] = useState<string | undefined>();

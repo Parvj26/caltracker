@@ -69,10 +69,50 @@ test('Clients: a typo finds the client, and Back from another page brings the se
   await expect(table.getByText(`Maya ${last}`)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`[?&]q=mya(\\+|%20)${last}`, 'i'));
 
-  await page.goto('/workouts');
+  // An in-app link and Back: Next may bring the page from its client cache, and the box must still show the search.
+  await table.getByText(`Maya ${last}`).click();
+  await page.waitForURL(/\/clients\/[0-9a-f-]{36}/);
   await page.goBack();
+  await expect(page).toHaveURL(/\/clients\?/);
   await expect(box).toHaveValue(`mya ${last}`);
   await expect(table.getByText(`Maya ${last}`)).toBeVisible();
+  await expect(table.getByRole('row')).toHaveCount(2);
+});
+
+test('Workouts: open a workout from a search, then Back keeps the search', async ({ page }) => {
+  const tag = unique();
+  const name = `Backcheck ${tag}`;
+  created.workouts.push(await seedLibraryWorkout(admin, await demoWorkspace(admin), name));
+  await signInAsCoach(page);
+  await page.goto('/workouts');
+  const box = page.getByRole('searchbox', { name: 'Search workouts' });
+  await box.fill(`bakcheck ${tag}`);
+  const list = page.getByRole('table', { name: 'Workouts' });
+  await list.getByRole('link', { name, exact: true }).click();
+  await page.waitForURL(/\/workouts\/[0-9a-f-]{36}/);
+  await page.goBack();
+  await expect(box).toHaveValue(`bakcheck ${tag}`);
+  await expect(list.locator('tbody tr')).toHaveCount(1);
+});
+
+test('Exercises on a phone: the Filters and Favourites pills keep their size and pressed look', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAsCoach(page);
+  await page.goto('/exercises');
+  const filters = page.getByRole('button', { name: /^Filters/ });
+  const favourites = page.getByRole('button', { name: /Favourites/ });
+  for (const pill of [filters, favourites]) {
+    const box = await pill.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+  const before = await favourites.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await favourites.click();
+  await expect(favourites).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => favourites.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
+  // One row of pills, side by side (not stacked).
+  const a = await filters.boundingBox();
+  const b = await favourites.boundingBox();
+  expect(Math.abs((a?.y ?? 0) - (b?.y ?? 1))).toBeLessThan(4);
 });
 
 test('Messages: the inbox search forgives a typo ("mya" finds Maya)', async ({ page }) => {

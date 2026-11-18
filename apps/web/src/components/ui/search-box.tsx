@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type InputHTMLAttributes, type RefObject } from 'react';
 import { cx } from './cx';
 import styles from './search-box.module.css';
@@ -104,16 +105,21 @@ export function useDebounced(value: string, delay = 120): string {
     const t = setTimeout(() => setSettled(value), delay);
     return () => clearTimeout(t);
   }, [value, delay]);
-  return value.trim() === '' ? value : settled;
+  return value.trim() === '' || delay <= 0 ? value : settled;
 }
 
 /**
  * Search text for a box: `query` is what's typed (give it to the SearchBox), `debounced` is what to filter with (it
  * settles 120 ms after typing stops, so a long list doesn't redo the search on every key). With `urlParam` the text is
- * kept in the address (replaced, not pushed), so Back to the page brings the same results.
+ * kept in the address (replaced, not pushed), so Back to the page brings the same results. `delay: 0` filters on every
+ * key (a combobox whose Enter and arrows act on the list must never see an older list).
  */
 export function useSearchQuery({ initial = '', urlParam, delay = 120 }: { initial?: string; urlParam?: string; delay?: number } = {}) {
-  const [query, setQuery] = useState(initial);
+  // Start from the address, not only the server's `initial`: Back can bring the page from Next's client cache, whose
+  // props are from before the text was typed, while the address (updated as you type) still holds ?q=.
+  const params = useSearchParams();
+  const fromUrl = urlParam ? params.get(urlParam) : null;
+  const [query, setQuery] = useState(fromUrl ?? initial);
   const debounced = useDebounced(query, delay);
   const first = useRef(true);
   useEffect(() => {
