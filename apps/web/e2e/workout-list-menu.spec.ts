@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { targetFieldsFor } from '@caltracker/shared';
 import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, listRow } from './helpers';
 
 // The Workouts list's ⋯: Preview, Rename and Delete… on iPad and desktop (beside Assign and Duplicate); on an iPhone,
 // Assign and ⋯, which opens a sheet from the bottom with Preview, Duplicate, Rename and Delete…. Delete asks first and
@@ -29,7 +29,7 @@ async function seed(prefix: string): Promise<{ id: string; name: string }> {
 
 async function openList(page: Page, name: string) {
   await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link', { name, exact: true })).toBeVisible();
+  await expect(listRow(page.getByRole('list', { name: 'Workouts' }), name)).toBeVisible();
 }
 
 const noSidewaysScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
@@ -39,21 +39,22 @@ for (const [device, size] of [
   ['iPad landscape', { width: 1180, height: 820 }],
   ['desktop', { width: 1440, height: 900 }],
 ] as const) {
-  test(`on ${device} ⋯ sits beside Assign and Duplicate and holds Preview, Rename and Delete…`, async ({ page }) => {
+  test(`on ${device} ⋯ sits beside Assign and holds Preview, Duplicate, Rename and Delete…`, async ({ page }) => {
     await page.setViewportSize(size);
     const w = await seed('Menu');
     await signInAsCoach(page);
     await openList(page, w.name);
-    const row = page.getByRole('row').filter({ hasText: w.name });
+    const row = listRow(page.getByRole('list', { name: 'Workouts' }), w.name);
     await expect(row.getByRole('button', { name: `Assign ${w.name}` })).toBeVisible();
-    await expect(row.getByRole('button', { name: `Duplicate ${w.name}` })).toBeVisible();
+    // One visible action per row (rulebook §7.3): Duplicate moved into ⋯.
+    await expect(row.getByRole('button', { name: `Duplicate ${w.name}` })).toHaveCount(0);
     const more = row.getByRole('button', { name: `More actions for ${w.name}` });
     const box = (await more.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeGreaterThanOrEqual(44);
     await more.click();
     const menu = page.getByRole('menu', { name: `More actions for ${w.name}` });
-    await expect(menu.getByRole('menuitem')).toHaveText(['Preview', 'Rename', 'Delete…']);
+    await expect(menu.getByRole('menuitem')).toHaveText(['Preview', 'Duplicate', 'Rename', 'Delete…']);
     expect(await noSidewaysScroll(page)).toBe(true);
 
     // Preview: read-only, its exercises with their sets.
@@ -87,7 +88,7 @@ test('Rename saves the new name and keeps the exercises', async ({ page }) => {
   await field.fill(renamed);
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link', { name: renamed, exact: true })).toBeVisible();
+  await expect(listRow(page.getByRole('list', { name: 'Workouts' }), renamed)).toBeVisible();
 
   const row = await admin.from('workouts').select('name, workout_blocks(workout_exercises(id))').eq('id', w.id).single();
   expect(row.data?.name).toBe(renamed);
@@ -114,7 +115,7 @@ test('Delete… asks first, then removes an unused workout from the library', as
   await page.getByRole('menuitem', { name: 'Delete…' }).click();
   await ask.getByRole('button', { name: 'Delete workout' }).click();
   await expect(ask).toBeHidden();
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link', { name: w.name, exact: true })).toHaveCount(0);
+  await expect(listRow(page.getByRole('list', { name: 'Workouts' }), w.name)).toHaveCount(0);
   expect((await admin.from('workouts').select('id').eq('id', w.id)).data).toHaveLength(0);
 });
 
@@ -305,7 +306,7 @@ test('after Rename saves, the address has no ?sheet=, and the next pop-up opens 
   await expect(dialog).toBeHidden();
   // The save's refresh must not write the closed pop-up back into the address.
   await expect.poll(() => new URL(page.url()).searchParams.get('sheet')).toBeNull();
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link', { name: `${w.name} renamed`, exact: true })).toBeVisible();
+  await expect(listRow(page.getByRole('list', { name: 'Workouts' }), `${w.name} renamed`)).toBeVisible();
   expect(new URL(page.url()).searchParams.get('sheet')).toBeNull();
 
   // The next pop-up: its own ?sheet= only, and nothing left after it closes.
@@ -361,9 +362,9 @@ test.describe('iPhone', () => {
       const w = await seed('Phone');
       await signInAsCoach(page);
       await openList(page, w.name);
-      const row = page.getByRole('table', { name: 'Workouts' }).locator('tbody tr').filter({ hasText: w.name });
+      const row = listRow(page.getByRole('list', { name: 'Workouts' }), w.name);
       await expect(row.getByRole('button', { name: `Assign ${w.name}` })).toBeVisible();
-      await expect(row.getByRole('button', { name: `Duplicate ${w.name}` })).toBeHidden();
+      await expect(row.getByRole('button', { name: `Duplicate ${w.name}` })).toHaveCount(0);
       const more = row.getByRole('button', { name: `More actions for ${w.name}` });
       await expect(more).toBeVisible();
       const box = (await more.boundingBox())!;

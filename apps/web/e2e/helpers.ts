@@ -132,6 +132,14 @@ export function programCell(page: Page, week: number, day: number): Locator {
  * Creates a program through the UI, then puts library workouts on it with each cell's "+" button (the keyboard and
  * touch path). Ends on the program page with every change saved.
  */
+/**
+ * A row of a Library list (Workouts, Programs, Exercises on a phone): the list item whose title is exactly `name`. The
+ * whole row is one link, named by everything on it (title and meta line), so look rows up by their title instead.
+ */
+export function listRow(list: Locator, name: string): Locator {
+  return list.getByRole('listitem').filter({ has: list.page().getByText(name, { exact: true }) });
+}
+
 /** The program page's settings (Auto progression, Live Sync, name, weeks) fold away below the plan: open them. */
 export async function openProgramSettings(page: Page): Promise<void> {
   const toggle = page.getByRole('button', { name: /Program settings/ });

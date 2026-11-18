@@ -2,9 +2,8 @@
 
 import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
-import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DialogHeader } from '@/components/assign/dialog-header';
-import { DuplicateButton, useDuplicate } from '@/components/duplicate-button';
+import { useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
 import { AdaptiveDialog, Button, ButtonLink, ErrorText, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
@@ -13,7 +12,6 @@ import { markUndone } from '@/lib/analytics/client';
 import { deleteWorkout, libraryWorkoutUses, previewWorkout, renameWorkout, type WorkoutUses } from './actions';
 import coach from '../coach.module.css';
 import styles from './workouts.module.css';
-import assignStyles from '@/components/assign/assign.module.css';
 import { openLayer } from '@/lib/open-layer';
 
 type Popup = 'preview' | 'rename' | 'delete';
@@ -39,26 +37,24 @@ const DotsIcon = (
 );
 
 /**
- * A Workouts list row's actions. iPad and desktop: Assign, Duplicate and ⋯ (Preview, Rename, Delete…). iPhone: Assign
- * and ⋯, which opens a sheet from the bottom with Preview, Duplicate, Rename and Delete….
+ * A Workouts list row's ⋯ (Assign is the row's one visible action, beside it). iPad and desktop: a menu with Preview,
+ * Duplicate, Rename and Delete…. iPhone: a sheet from the bottom with the same.
  */
-export function WorkoutRowActions({ id, name }: { id: string; name: string }) {
+export function WorkoutRowMore({ id, name }: { id: string; name: string }) {
   const [open, setOpen] = useState<Popup | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const duplicate = useDuplicate('workout', id);
   const label = `More actions for ${name}`;
 
   return (
-    <div className={cx(assignStyles.actions, styles.rowActions)}>
-      <AssignButton kind="workout" id={id} name={name} compact />
-      <span className={styles.wideOnly}>
-        <DuplicateButton kind="workout" id={id} name={name} compact />
-      </span>
+    <span className={styles.rowMore}>
       <MoreMenu
         label={label}
-        className={cx(styles.more, styles.wideOnly)}
+        className={styles.wideOnly}
+        busy={duplicate.pending}
         items={[
           { label: 'Preview', onSelect: () => setOpen('preview') },
+          { label: duplicate.pending ? 'Duplicating…' : 'Duplicate', onSelect: duplicate.run, disabled: duplicate.pending },
           { label: 'Rename', onSelect: () => setOpen('rename') },
           { label: 'Delete…', onSelect: () => setOpen('delete'), danger: true },
         ]}
@@ -94,7 +90,7 @@ export function WorkoutRowActions({ id, name }: { id: string; name: string }) {
       {open === 'preview' ? <PreviewDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
       {open === 'rename' ? <RenameDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
       {open === 'delete' ? <DeleteDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
-    </div>
+    </span>
   );
 }
 

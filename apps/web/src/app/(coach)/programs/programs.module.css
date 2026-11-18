@@ -56,58 +56,13 @@
 }
 
 /* ---------- List ---------- */
-.listCard { max-width: 1040px; }
-.table { width: 100%; border-collapse: collapse; }
-.table th {
-  padding: var(--ct-space-2-5) var(--ct-space-2);
-  text-align: left;
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
-  color: var(--ct-ink-muted);
-}
-.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
-.table td:first-child, .table th:first-child { padding-left: 0; }
-.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
-/* The name link's text (a phone card clamps it to 2 lines). */
-.nameText { overflow-wrap: anywhere; }
-.rowActions { flex-wrap: nowrap; }
-
+/* Room for Assign and ⋯ at the end of each row, so the column headings line up with the rows (RowList). */
+.rows { --row-actions-width: calc(var(--ct-space-12) * 3 + var(--ct-space-2)); }
 /* Search box above the list (the shared SearchBox). */
 .searchForm { max-width: 480px; }
-.phoneOnly { display: none; }
-
-/* iPhone: each program is a card like the Workouts list (name on up to 2 lines, "4 weeks · 20 workouts", then lime
-   Assign and ⋯), never wider than the screen; the whole card opens the program. iPad and desktop keep the table. */
+.rowMore { display: inline-flex; align-items: center; }
 @media (max-width: 599.98px) {
-  .phoneOnly { display: inline; }
-  .listIntro { display: none; }
-  .newWord { display: none; }
   .searchForm { max-width: none; }
-  .table, .table tbody { display: block; }
-  .table thead { display: none; }
-  .table tbody { display: flex; flex-direction: column; gap: var(--ct-space-2-5); }
-  .table tbody tr {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: 'name name name actions' 'weeks slots . actions';
-    align-items: center;
-    gap: 2px var(--ct-space-1);
-    padding: var(--ct-space-3) var(--ct-space-2) var(--ct-space-3) var(--ct-space-4);
-    border: var(--ct-border-width-card) solid var(--ct-border);
-    border-radius: var(--ct-radius-card);
-    background: var(--ct-bg);
-  }
-  .table td { display: block; padding: 0; border-top: 0; }
-  .table td:first-child { padding-left: 0; }
-  .nameCell { grid-area: name; min-width: 0; }
-  .weeksCell { grid-area: weeks; }
-  .slotsCell { grid-area: slots; }
-  .weeksCell, .slotsCell { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-  .actionsCell { grid-area: actions; padding-left: var(--ct-space-2); }
-  .nameLink { display: block; min-height: 0; font-size: 16px; font-weight: var(--ct-weight-button); line-height: 1.25; color: var(--ct-ink); text-decoration: none; }
-  .nameText { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .rowActions { gap: var(--ct-space-1); }
 }
 
 /* ---------- Forms ---------- */

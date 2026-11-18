@@ -25,67 +25,27 @@
 @media (max-width: 599.98px) { .search { max-width: none; } }
 
 /* ---------- List ---------- */
-.table { width: 100%; border-collapse: collapse; }
-.table th {
-  padding: var(--ct-space-2-5) var(--ct-space-2);
-  text-align: left;
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
-  color: var(--ct-ink-muted);
-}
-.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
-.table td:first-child, .table th:first-child { padding-left: 0; }
-.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
-
-/* Row actions: Assign, Duplicate and ⋯ on iPad and desktop; Assign and ⋯ (a sheet from the bottom) on an iPhone. */
-.rowActions { flex-wrap: nowrap; justify-content: flex-end; }
+/* Room for Assign and ⋯ at the end of each row, so the column headings line up with the rows (RowList). */
+.rows { --row-actions-width: calc(var(--ct-space-12) * 3 + var(--ct-space-2)); }
+/* The row's ⋯: a menu on iPad and desktop, a sheet from the bottom on an iPhone. */
+.rowMore { display: inline-flex; align-items: center; }
 .phoneOnlyFlex { display: none; }
-/* The ⋯ button: outlined like Duplicate beside it. */
-.more > button,
 .moreButton {
-  width: 48px;
-  height: var(--ct-tap-min);
-  border-radius: var(--ct-radius-input);
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
-}
-.more > button:hover,
-.more > button[aria-expanded='true'] { background: var(--ct-surface); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.moreButton {
+  display: none;
   align-items: center;
   justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
   padding: 0;
   border: 0;
-  background: var(--ct-bg);
+  border-radius: var(--ct-radius-input);
+  background: transparent;
   color: var(--ct-ink);
   cursor: pointer;
 }
-.moreButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
-
-/* iPhone: each workout is a card (name, then exercises and date, with Assign and ⋯ beside them), never wider than
-   the screen. iPad and desktop keep the table. */
-.phoneOnly { display: none; }
 @media (max-width: 599.98px) {
-  .phoneOnly { display: inline; }
   .wideOnly { display: none; }
   .phoneOnlyFlex { display: inline-flex; }
-  .table, .table tbody { display: block; }
-  .table thead { display: none; }
-  .table tr {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0 var(--ct-space-2);
-    padding: var(--ct-space-2-5) 0;
-    border-top: var(--ct-border-width-card) solid var(--ct-border);
-  }
-  .table tbody tr:first-child { border-top: 0; }
-  .table td { display: block; padding: 0; border-top: 0; }
-  .table td:first-child { grid-column: 1 / 3; grid-row: 1; }
-  .table td:nth-child(2), .table td:nth-child(3) { grid-row: 2; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-  .table td:nth-child(3)::before { content: '· '; }
-  .table td:last-child { grid-column: 3; grid-row: 1 / 3; }
-  .nameLink { min-height: 0; padding-bottom: 2px; overflow-wrap: anywhere; }
 }
 
 /* iPhone ⋯: the row's actions as big buttons in a sheet from the bottom. */

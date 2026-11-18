@@ -117,7 +117,7 @@ test.describe('on an iPhone', () => {
   test('the whole page scrolls, with the search box staying on top, and no row looks selected', async ({ page }) => {
     await page.goto('/exercises');
     await expect(list(page).getByRole('link').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveText('+ New', { useInnerText: true });
+    await expect(page.getByRole('link', { name: 'New exercise' })).toHaveText('+ New', { useInnerText: true });
     // No list box with its own scroll: the document is taller than the screen and scrolling it moves the list.
     const { scrollHeight, innerHeight } = await page.evaluate(() => ({ scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight }));
     expect(scrollHeight).toBeGreaterThan(innerHeight);

@@ -229,7 +229,7 @@ test('exercise library: list, detail and new-exercise form use the UI kit', asyn
   await group.getByRole('button', { name: 'Time', exact: true }).click();
   await expect(page).toHaveURL(/tracking=time/);
   await expect(page.getByRole('group', { name: 'Tracking type' }).getByRole('button', { name: 'Time', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveCSS('background-color', 'rgb(18, 18, 18)');
+  await expect(page.getByRole('link', { name: 'New exercise' })).toHaveCSS('background-color', 'rgb(200, 241, 105)'); // create = lime (rulebook §2.1)
   expect((await page.getByLabel('Search exercises').boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
   // Detail page, reached from the preview.

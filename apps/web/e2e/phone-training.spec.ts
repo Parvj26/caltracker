@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { formatPlainDay, formatPlainLongDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, nextMonday, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach, dateField } from './helpers';
+import { serviceClient, signInAsCoach, dateField, listRow } from './helpers';
 
 // Phone fixes, batch 2: the client Training tab (calendar swipes, arrows by the dates, the month as dots, assigned
 // program rows that open the program), the assign dialog's program rows and the Programs list's row links. Chromium
@@ -213,8 +213,8 @@ test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯
 
   await page.goto('/programs');
   const width = page.viewportSize()!.width;
-  const table = page.getByRole('table', { name: 'Programs' });
-  const card = (name: string) => table.getByRole('row').filter({ has: page.getByRole('link', { name, exact: true }) });
+  const table = page.getByRole('list', { name: 'Programs' });
+  const card = (name: string) => listRow(table, name);
 
   // A typo still finds it ("hypertrphy"), and the other program drops out.
   const search = page.getByRole('searchbox', { name: 'Search programs' });
@@ -228,7 +228,7 @@ test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯
   const row = card(long);
   await expect(row).toContainText('4 weeks');
   await expect(row).toContainText('· 2 workouts');
-  const name = row.getByRole('link', { name: long, exact: true });
+  const name = row.getByText(long, { exact: true });
   const lines = await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
   expect(lines).toBeLessThanOrEqual(2);
   for (const button of [row.getByRole('button', { name: `Assign ${long}` }), row.getByRole('button', { name: `More for ${long}` })]) {

@@ -1,7 +1,6 @@
 /* Exercise library. Colours, radii and sizes only via var(--ct-*). */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
 
-.titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
 .title {
   margin: 0;
   font-size: var(--ct-size-screen-title);
@@ -9,7 +8,6 @@
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
 }
-.newButton { margin-left: auto; }
 .sectionHeading { margin: 0 0 var(--ct-space-3); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 
 /* ---------- Filters ---------- */
@@ -49,19 +47,7 @@
 .detailPage { max-width: 760px; }
 .steps, .notes { max-width: 70ch; }
 .detailBar { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); margin-bottom: calc(-1 * var(--ct-space-2)); }
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-height: var(--ct-tap-min);
-  padding: 0 10px 0 4px;
-  margin-left: -4px;
-  color: var(--ct-ink);
-  font-weight: var(--ct-weight-button);
-  text-decoration: none;
-}
-.back:hover { text-decoration: underline; }
-.back:focus-visible, .topStar:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.topStar:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .topStar {
   display: inline-flex;
   align-items: center;
@@ -153,13 +139,7 @@
   mask-image: linear-gradient(to right, black 88%, transparent);
 }
 .pillRow::-webkit-scrollbar { display: none; }
-.phoneRows { margin: 0; padding: 0; list-style: none; }
-.phoneRow { display: flex; align-items: center; gap: var(--ct-space-2); min-height: 70px; border-bottom: 1px solid var(--ct-border); }
-.phoneRowLink { flex: 1; display: flex; align-items: center; gap: var(--ct-space-3); min-width: 0; padding: var(--ct-space-2) 0; color: var(--ct-ink); text-decoration: none; }
-.phoneRowLink:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .phoneThumb { width: 54px; height: 54px; flex: none; border-radius: 10px; object-fit: cover; }
-.phoneRowText { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
-.phoneRowName { font-size: 16px; font-weight: var(--ct-weight-button); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phoneTags { display: flex; gap: 6px; overflow: hidden; }
 .phoneTags > * { flex: none; }
 .phoneEmpty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-3); padding: var(--ct-space-4) 0; }
@@ -206,18 +186,8 @@
 .sheetDone { flex: 1; }
 
 @media (max-width: 767.98px) {
-  .titleRow { flex-wrap: nowrap; justify-content: space-between; }
   .wideOnly { display: none; }
   .phoneOnly { display: inline; }
-  /* A small lime "+ New" instead of the big black button. */
-  .titleRow .newButton {
-    min-height: var(--ct-tap-min);
-    padding: 0 var(--ct-space-4);
-    border: 2px solid var(--ct-ink);
-    background: var(--ct-lime);
-    color: var(--ct-ink);
-    box-shadow: none;
-  }
 
   .detailBar {
     position: sticky;
@@ -229,7 +199,6 @@
     border-bottom: var(--ct-border-width-card) solid var(--ct-border);
     background: var(--ct-bg);
   }
-  .back { margin-left: 0; }
   .images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-2); }
   .images img { width: 100%; height: 120px; object-fit: cover; border-radius: 14px; }
 }

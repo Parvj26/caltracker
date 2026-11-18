@@ -2,25 +2,22 @@
 
 import type { ErrorCode } from '@caltracker/shared';
 import { smartFilter } from '@caltracker/shared';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { AssignButton } from '@/components/assign/assign-to-clients';
-import { LinkRow } from '@/components/link-row';
 import { MoreMenu } from '@/components/more-menu';
-import { Card, ErrorText, SearchBox, SearchCount, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { ErrorText, ListRow, RowList, SearchBox, SearchCount, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { DeleteProgram, type DeleteProgramHandle } from './[id]/delete-program';
 import { duplicateProgram } from './actions';
 import styles from './programs.module.css';
-import assignStyles from '@/components/assign/assign.module.css';
 
 export type ProgramListRow = { id: string; name: string; weeks: number; slots: number };
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-/** Assign, then ⋯ with Duplicate (makes "<name> (copy)" and opens it) and Delete… (asks first). */
-function ProgramActions({ id, name }: { id: string; name: string }) {
+/** The row's ⋯ (Assign sits beside it): Duplicate (makes "<name> (copy)" and opens it) and Delete… (asks first). */
+function ProgramMore({ id, name }: { id: string; name: string }) {
   const router = useRouter();
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
@@ -43,8 +40,7 @@ function ProgramActions({ id, name }: { id: string; name: string }) {
   }
 
   return (
-    <div className={`${assignStyles.actions} ${styles.rowActions}`} data-row-actions>
-      <AssignButton kind="program" id={id} name={name} compact />
+    <span className={styles.rowMore}>
       <MoreMenu
         label={`More for ${name}`}
         busy={pending}
@@ -56,7 +52,7 @@ function ProgramActions({ id, name }: { id: string; name: string }) {
       {pending ? <span className={styles.visuallyHidden} role="status">Duplicating…</span> : null}
       {error ? <ErrorText code={error} /> : null}
       <DeleteProgram id={id} name={name} handle={deleteRef} />
-    </div>
+    </span>
   );
 }
 
@@ -64,7 +60,7 @@ function ProgramActions({ id, name }: { id: string; name: string }) {
  * The Programs list with its search box. Filters as you type with the shared smart search (typos, partial words, any
  * word order), like the Workouts list. The query stays in the address (?q=) so Back from a program keeps it; past the
  * list cap a submitted search also asks the server, which adds older programs whose names contain the text.
- * Laptops and iPads see a table; phones see one card per program.
+ * Plain rows on every size; wide screens add column headers.
  */
 export function ProgramList({ rows, total, initialQuery, limited, limit }: { rows: ProgramListRow[]; total: number; initialQuery: string; limited: boolean; limit: number }) {
   const router = useRouter();
@@ -106,45 +102,34 @@ export function ProgramList({ rows, total, initialQuery, limited, limit }: { row
           <p className={styles.empty}>No programs yet. Build your first one.</p>
         )
       ) : (
-        <Card className={styles.listCard}>
-          <table role="table" className={styles.table} aria-label="Programs">
-            <thead role="rowgroup">
-              <tr role="row">
-                <th role="columnheader" scope="col">Name</th>
-                <th role="columnheader" scope="col">Weeks</th>
-                <th role="columnheader" scope="col">Workouts</th>
-                <th role="columnheader" scope="col">
-                  <span className={styles.visuallyHidden}>Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody role="rowgroup">
-              {shown.map((p) => (
-                // The whole row (a card on a phone) opens the program; Assign and ⋯ stay their own buttons.
-                <LinkRow key={p.id} href={`/programs/${p.id}`} role="row">
-                  <td role="cell" className={styles.nameCell}>
-                    <Link href={`/programs/${p.id}`} className={styles.nameLink}>
-                      <span className={styles.nameText}>{p.name}</span>
-                    </Link>
-                  </td>
-                  <td role="cell" className={`${styles.numeric} ${styles.weeksCell}`}>
-                    {p.weeks}
-                    <span className={styles.phoneOnly}>{plural(p.weeks, ' week', ' weeks')}</span>
-                  </td>
-                  <td role="cell" className={`${styles.numeric} ${styles.slotsCell}`}>
-                    <span className={styles.phoneOnly} aria-hidden="true">·&nbsp;</span>
-                    {p.slots}
-                    <span className={styles.phoneOnly}>{plural(p.slots, ' workout', ' workouts')}</span>
-                  </td>
-                  <td role="cell" className={styles.actionsCell}>
-                    <ProgramActions id={p.id} name={p.name} />
-                  </td>
-                </LinkRow>
-              ))}
-            </tbody>
-          </table>
+        <>
+          {/* Plain rows, edge to edge (rulebook §7): the whole row opens the program; Assign (quiet) and ⋯ stay their own
+              buttons. Wide screens show weeks and workouts as columns with headers. */}
+          <RowList aria-label="Programs" className={styles.rows} columns={['Name', 'Weeks', 'Workouts']}>
+            {shown.map((p) => {
+              const weeks = `${p.weeks} ${plural(p.weeks, 'week', 'weeks')}`;
+              const workouts = `${p.slots} ${plural(p.slots, 'workout', 'workouts')}`;
+              return (
+                <ListRow
+                  key={p.id}
+                  href={`/programs/${p.id}`}
+                  title={p.name}
+                  meta={
+                    <>
+                      <span>{weeks}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{workouts}</span>
+                    </>
+                  }
+                  cells={[weeks, workouts]}
+                  action={<AssignButton kind="program" id={p.id} name={p.name} compact />}
+                  more={<ProgramMore id={p.id} name={p.name} />}
+                />
+              );
+            })}
+          </RowList>
           {limited ? <p className={styles.caption}>Showing the {limit} most recently updated. Search to find others.</p> : null}
-        </Card>
+        </>
       )}
     </>
   );

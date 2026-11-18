@@ -1,7 +1,7 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { formatPlainDay } from '@caltracker/shared';
 import { addDays, browserToday, demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach, dateField, moveButton } from './helpers';
+import { serviceClient, signInAsCoach, dateField, moveButton, listRow } from './helpers';
 
 // iPhone quick fixes B (2026-11-13 Safari review): the calendar, its dialogs, Programs and the live view. CI runs
 // Chromium with iPhone and iPad sizes, so iOS-only behaviour (a native picker popping open, Safari's wide date field,
@@ -124,7 +124,7 @@ test.describe('iPhone SE (375 x 667)', () => {
     created.programs.push(await seedProgram(admin, workspaceId, name, 12, []));
     await signInAsCoach(page);
     await page.goto('/programs');
-    const row = page.getByRole('table', { name: 'Programs' }).getByRole('row').filter({ hasText: name });
+    const row = listRow(page.getByRole('list', { name: 'Programs' }), name);
     for (const button of [row.getByRole('button', { name: `Assign ${name}` }), row.getByRole('button', { name: `More for ${name}` })]) {
       await button.scrollIntoViewIfNeeded();
       await expect(button).toBeInViewport({ ratio: 1 });

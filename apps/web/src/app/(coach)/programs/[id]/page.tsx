@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { programPageTitle } from '@/lib/page-titles';
 import { getProgram } from '@/lib/page-data';
-import Link from 'next/link';
+import { PageHeader } from '@/components/ui';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -72,14 +72,12 @@ export default async function ProgramPage({
 
   return (
     <div className={styles.page}>
-      <Link href="/programs" className={styles.back}>← Programs</Link>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>{program.name}</h1>
-        <div className={styles.titleActions}>
-          <AssignButton kind="program" id={program.id} name={program.name} />
-          <ProgramMenu id={program.id} name={program.name} />
-        </div>
-      </header>
+      <PageHeader
+        title={program.name}
+        back={{ href: '/programs', label: 'Programs' }}
+        action={<AssignButton kind="program" id={program.id} name={program.name} />}
+        more={<ProgramMenu id={program.id} name={program.name} />}
+      />
       {/* key: opening a different program starts a fresh grid. */}
       <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} autoProgression={program.auto_progression} hints={hints} units={units} workspaceId={workspaceId} exercisePrefs={prefs} />
     </div>

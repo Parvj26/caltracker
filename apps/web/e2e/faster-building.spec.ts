@@ -95,10 +95,11 @@ test('duplicate a workout from its page and from the list', async ({ page }) => 
   // From the list, the copy of the copy gets its own " (copy)".
   created.workouts.push(`${name} (copy) (copy)`);
   await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
-  await page.getByRole('button', { name: `Duplicate ${name} (copy)`, exact: true }).click();
+  await page.getByRole('button', { name: `More actions for ${name} (copy)`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Duplicate' }).click();
   await expect(page.getByRole('heading', { level: 1, name: `${name} (copy) (copy)` })).toBeVisible();
   await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link')).toHaveCount(3);
+  await expect(page.getByRole('list', { name: 'Workouts' }).getByRole('listitem')).toHaveCount(3);
 });
 
 test('duplicate a program, then copy and repeat a week', async ({ page }) => {

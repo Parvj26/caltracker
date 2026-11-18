@@ -21,13 +21,6 @@ export const UI_ALLOW: UiAllow[] = [
     sizes: ['phone'],
     reason: `The phone layout hides the sidebar and has no header, so coach pages show no logo. ${TODO}`,
   },
-  {
-    rule: 'target',
-    pages: ['Workouts', 'Programs'],
-    sizes: ['phone'],
-    selector: 'a[class*="_nameLink"]',
-    reason: `Library rows: only the name text is a link (20-40px tall); the whole row should open it (ListRow). ${TODO}`,
-  },
 ];
 
 // All of these are "serious" except aria-required-children ("critical").

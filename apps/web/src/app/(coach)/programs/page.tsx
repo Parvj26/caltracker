@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ButtonLink } from '@/components/ui';
+import { CreateLink, PageHeader } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
@@ -45,20 +45,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <div className={styles.titleBlock}>
-          <h1 className={styles.title}>Programs</h1>
-          <p className={`${styles.caption} ${styles.listIntro}`}>
-            A program arranges workouts into weeks. Assign it to a client and every workout lands on their calendar.
-          </p>
-        </div>
-        <div className={styles.titleActions}>
-          {/* Phones: a small outlined "+ New" (named "New program" for screen readers). */}
-          <ButtonLink href="/programs/new" aria-label="New program" data-ph-capture-attribute-label="program_new">
-            <span aria-hidden="true" className={styles.phoneOnly}>+</span>New<span className={styles.newWord}> program</span>
-          </ButtonLink>
-        </div>
-      </header>
+      <PageHeader title="Programs" action={<CreateLink href="/programs/new" thing="program" data-ph-capture-attribute-label="program_new" />} />
       <LibraryTabs current="/programs" />
 
       <ProgramList rows={rows} total={counted.count ?? found.length} initialQuery={q} limited={limited} limit={LIMIT} />
