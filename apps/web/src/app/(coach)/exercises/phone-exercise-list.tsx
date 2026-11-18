@@ -17,6 +17,7 @@ import { cx } from '@/components/ui/cx';
 import { exerciseImageUrl, loadExerciseIndex, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { TRACKING_LABELS } from './filters';
+import { writeExerciseFilters, type ExerciseUrlFilters } from './filter-url';
 import { matchesListFilter, sheetFilterCount } from './list-filter';
 import { clearListReturn, readListReturn, saveListReturn } from './list-return';
 import { useFavourites } from './use-favourites';
@@ -44,6 +45,8 @@ type Props = {
   workspaceId: string;
   initialQuery: string;
   initialSource: '' | 'builtin' | 'custom';
+  /** The chip filters read from the address (filter-url.ts). */
+  initialFilters?: ExerciseUrlFilters;
   tracking: string;
   onTrackingChange: (next: string) => void;
 };
@@ -53,13 +56,23 @@ type Props = {
  * Favourites, the muscles), and a plain list that scrolls with the page. Tracking type, equipment and Custom only sit
  * in the Filters sheet. A tap on an exercise opens its own page. Same shared smart search as the laptop list.
  */
-export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tracking, onTrackingChange }: Props) {
+export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, initialFilters, tracking, onTrackingChange }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const { query, setQuery, debounced } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
-  const [filters, setFilters] = useState<SearchFilters>({ ...NO_FILTERS, customOnly: initialSource === 'custom' });
-  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>({
+    ...NO_FILTERS,
+    ...(initialFilters ? { muscles: initialFilters.muscles, equipment: initialFilters.equipment, customOnly: initialFilters.customOnly } : {}),
+    ...(initialSource === 'custom' ? { customOnly: true } : {}),
+  });
+  const [favouritesOnly, setFavouritesOnlyState] = useState(initialFilters?.favourites ?? false);
+  // Kept in the address (with the chips below), so Back from an exercise brings the same list.
+  const setFavouritesOnly = (update: (on: boolean) => boolean) => {
+    const next = update(favouritesOnly);
+    setFavouritesOnlyState(next);
+    writeExerciseFilters({ favourites: next });
+  };
   const [shown, setShown] = useState(PAGE_SIZE);
   const { favourites, toggle: toggleStar, error: starError, reset: resetFavourites } = useFavourites([]);
   const sheetRef = useRef<HTMLDialogElement>(null);
@@ -113,6 +126,7 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   function changeFilters(next: SearchFilters) {
     setFilters(next);
     setShown(PAGE_SIZE);
+    writeExerciseFilters(next);
   }
   function clearAll() {
     changeFilters({ ...NO_FILTERS, muscles: filters.muscles });
@@ -120,7 +134,6 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   }
 
   const inSheet = sheetFilterCount(filters, tracking);
-  const total = data?.index.length;
   const imageUrl = (path: string) => exerciseImageUrl(supabase, path);
 
   return (
@@ -128,7 +141,6 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
       <div className={styles.phoneBar}>
         <SearchBox
           label="Search exercises"
-          placeholder={total ? `Search ${total} exercises` : 'Search exercises'}
           value={query}
           onChange={changeQuery}
         />
@@ -178,7 +190,7 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
               variant="secondary"
               onClick={() => {
                 changeFilters(NO_FILTERS);
-                setFavouritesOnly(false);
+                setFavouritesOnly(() => false);
                 onTrackingChange('');
               }}
             >

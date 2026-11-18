@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { demoWorkspace } from './assign-helpers';
 import { pickExercise, pickSetType, serviceClient, setRow, signInAsCoach, workoutPageMenu } from './helpers';
 
-// Measurements tab (Weight / Reps / Time per exercise), Each side and Tempo, remembering the coach's last choice,
+// Measurement chips (Weight / Reps / Time / Rest per exercise, the same on every size), Each side and Tempo, remembering the coach's last choice,
 // and the compact iPhone-width editor. Each test uses its own custom exercise, so the remembered choices it makes
 // (exercise_prefs) never reach the other specs, which use the fixture exercises.
 
@@ -51,8 +51,18 @@ async function save(page: Page) {
   await expect(page.getByText('Saved')).toBeVisible();
 }
 
-const measurements = (page: Page, exercise: string) =>
-  page.getByRole('region', { name: exercise }).getByRole('button', { name: /^Measurements: / });
+/** One measurement chip ("Weight", "Reps", "Time", "Rest") of an exercise's card: the same chips on every size. */
+const chip = (page: Page, exercise: string, name: string) =>
+  page.getByRole('region', { name: exercise }).getByRole('button', { name: `${name} for ${exercise}`, exact: true });
+/** Which chips are on, in order. */
+async function chipsOn(page: Page, exercise: string): Promise<string[]> {
+  const on: string[] = [];
+  for (const name of ['Weight', 'Reps', 'Time', 'Rest']) {
+    if ((await chip(page, exercise, name).getAttribute('aria-pressed')) === 'true') on.push(name);
+  }
+  return on;
+}
+const expectOn = (page: Page, exercise: string, names: string[]) => expect.poll(() => chipsOn(page, exercise)).toEqual(names);
 
 test('the measurements tab adds and removes set columns, and keeps at least one', async ({ page }) => {
   const ex = await customExercise('Lunge');
@@ -63,32 +73,26 @@ test('the measurements tab adds and removes set columns, and keeps at least one'
   await expect(set1.getByLabel(/^Weight/)).toBeVisible();
   await expect(set1.getByLabel('Duration (m:ss)')).toHaveCount(0);
 
-  // The old "weight and reps" label is gone: the pill says what is measured.
+  // The old "weight and reps" label is gone: the chips say what is measured.
   await expect(page.getByText('weight and reps', { exact: true })).toHaveCount(0);
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps · Rest');
-  await measurements(page, ex).click();
-  const menu = page.getByRole('dialog', { name: `Measurements for ${ex}` });
-  await expect(menu.getByText('Pick at least one. The table shows a column for each.')).toBeVisible();
-  await expect(menu.getByRole('checkbox')).toHaveCount(4);
+  await expectOn(page, ex, ['Weight', 'Reps', 'Rest']);
 
-  await menu.getByRole('checkbox', { name: 'Time' }).check();
+  await chip(page, ex, 'Time').click();
   await expect(set1.getByLabel('Duration (m:ss)')).toBeVisible();
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps · Time · Rest');
+  await expectOn(page, ex, ['Weight', 'Reps', 'Time', 'Rest']);
 
-  await menu.getByRole('checkbox', { name: 'Reps' }).uncheck();
+  await chip(page, ex, 'Reps').click();
   await expect(set1.getByLabel('Reps', { exact: true })).toHaveCount(0);
-  await expect(measurements(page, ex)).toHaveText('Weight · Time · Rest');
+  await expectOn(page, ex, ['Weight', 'Time', 'Rest']);
 
-  await menu.getByRole('checkbox', { name: 'Weight' }).uncheck();
-  // Time is the only one left: it can't be unticked.
-  const time = menu.getByRole('checkbox', { name: 'Time' });
-  await expect(time).toBeChecked();
+  await chip(page, ex, 'Weight').click();
+  // Time is the only one left: it can't be turned off.
+  const time = chip(page, ex, 'Time');
+  await expect(time).toHaveAttribute('aria-pressed', 'true');
   await expect(time).toBeDisabled();
   await expect(set1.getByLabel('Duration (m:ss)')).toBeVisible();
   await expect(set1.getByLabel(/^Weight/)).toHaveCount(0);
 
-  await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
   await set1.getByLabel('Duration (m:ss)').fill('0:45');
   await save(page);
   const id = page.url().split('/').pop()!;
@@ -128,16 +132,14 @@ test('the next time an exercise is added it starts with the last saved measureme
   const ex = await customExercise('Step Up');
   await signInAsCoach(page);
   await newWorkout(page, ex);
-  await measurements(page, ex).click();
-  await page.getByRole('dialog', { name: `Measurements for ${ex}` }).getByRole('checkbox', { name: 'Time' }).check();
-  await page.keyboard.press('Escape');
+  await chip(page, ex, 'Time').click();
   await page.getByRole('region', { name: ex }).getByRole('checkbox', { name: `Each side for ${ex}` }).check();
   await page.getByRole('region', { name: ex }).getByLabel(`Tempo for ${ex}`).fill('2-0-2-0');
   await save(page);
 
   await newWorkout(page, ex);
   const region = page.getByRole('region', { name: ex });
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps · Time · Rest');
+  await expectOn(page, ex, ['Weight', 'Reps', 'Time', 'Rest']);
   await expect(region.getByRole('checkbox', { name: `Each side for ${ex}` })).toBeChecked();
   await expect(setRow(page, ex, 'set 1').getByLabel('Duration (m:ss)')).toBeVisible();
   // Tempo is not remembered.
@@ -150,12 +152,9 @@ test('the Rest checkbox: off hides the rest boxes and saves no rest, and reads b
   await newWorkout(page, ex);
   await page.getByRole('button', { name: `Add a set to ${ex}` }).click();
   await expect(setRow(page, ex, 'set 2').getByLabel('Rest (m:ss)')).toHaveValue('1:30');
-  await measurements(page, ex).click();
-  const menu = page.getByRole('dialog', { name: `Measurements for ${ex}` });
-  await expect(menu.getByText("Rest off: no rest column, and no rest on the client's phone after this exercise.")).toBeVisible();
-  await menu.getByRole('checkbox', { name: 'Rest' }).uncheck();
-  await page.keyboard.press('Escape');
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps');
+  await expect(chip(page, ex, 'Rest')).toHaveAttribute('title', "Rest off: no rest column, and no rest on the client's phone after this exercise.");
+  await chip(page, ex, 'Rest').click();
+  await expectOn(page, ex, ['Weight', 'Reps']);
   await expect(page.getByRole('region', { name: ex }).getByLabel('Rest (m:ss)')).toHaveCount(0);
   // + Set copies the last set, with no rest.
   await page.getByRole('button', { name: `Add a set to ${ex}` }).click();
@@ -166,11 +165,8 @@ test('the Rest checkbox: off hides the rest boxes and saves no rest, and reads b
   expect(rests.data?.map((r) => r.rest_seconds)).toEqual([0, 0, 0]);
 
   await page.reload();
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps');
-  await measurements(page, ex).click();
-  await expect(menu.getByRole('checkbox', { name: 'Rest' })).not.toBeChecked();
-  await menu.getByRole('checkbox', { name: 'Rest' }).check();
-  await page.keyboard.press('Escape');
+  await expectOn(page, ex, ['Weight', 'Reps']);
+  await chip(page, ex, 'Rest').click();
   for (const n of [1, 2, 3]) await expect(setRow(page, ex, `set ${n}`).getByLabel('Rest (m:ss)')).toHaveValue('1:30');
 });
 
@@ -220,9 +216,7 @@ test('duplicating a workout copies its measurements but leaves the remembered ch
   await signInAsCoach(page);
   const name = await newWorkout(page, ex);
   workouts.push(`${name} (copy)`);
-  await measurements(page, ex).click();
-  await page.getByRole('dialog', { name: `Measurements for ${ex}` }).getByRole('checkbox', { name: 'Time' }).check();
-  await page.keyboard.press('Escape');
+  await chip(page, ex, 'Time').click();
   await save(page);
   const exId = exercises[exercises.length - 1]!;
   // Pretend the coach has since chosen otherwise for this exercise.
@@ -231,7 +225,7 @@ test('duplicating a workout copies its measurements but leaves the remembered ch
 
   await workoutPageMenu(page, name, 'Duplicate');
   await expect(page.getByRole('heading', { level: 1, name: `${name} (copy)` })).toBeVisible();
-  await expect(measurements(page, ex)).toHaveText('Weight · Reps · Time · Rest');
+  await expectOn(page, ex, ['Weight', 'Reps', 'Time', 'Rest']);
   const prefs = await admin.from('exercise_prefs').select('tracking_type, each_side').eq('exercise_id', exId).single();
   expect(prefs.data).toEqual({ tracking_type: null, each_side: true });
 });

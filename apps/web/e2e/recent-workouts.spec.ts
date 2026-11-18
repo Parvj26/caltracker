@@ -100,7 +100,7 @@ test("a day's \"+\" picker and the program grid's \"+\" also open with Recent", 
   await page.locator(`[data-date="${today}"]`).getByRole('button', { name: `Add workout to ${fmt}`, exact: true }).click();
   const picker = page.getByRole('dialog', { name: `Add a workout to ${fmt}` });
   await expect(picker.getByRole('region', { name: 'Recent' }).getByRole('button').first()).toHaveText('Lib A');
-  await picker.getByRole('button', { name: 'Cancel' }).click();
+  await picker.getByRole('button', { name: 'Close' }).click();
 
   await page.goto(`/programs/${programId}`);
   await page.getByRole('button', { name: 'Add a workout to week 1, day 1', exact: true }).click();

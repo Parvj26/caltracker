@@ -7,7 +7,7 @@
 .subItem {
   display: flex;
   align-items: center;
-  min-height: 40px;
+  min-height: var(--ct-tap-min);
   margin-left: 14px;
   padding: 0 var(--ct-space-3);
   border-radius: var(--ct-radius-input);
@@ -23,6 +23,11 @@
   .caret { display: inline; }
   .subnav { display: flex; }
   .libraryButton[aria-current] { font-weight: 800; }
+}
+/* iPad rail: while the Library menu is open, Library is the lit item (not the page you are on). */
+@media (min-width: 600px) and (max-width: 1199.98px) {
+  .libraryButton[aria-expanded='true'],
+  .libraryButton[aria-expanded='true']:hover { background: var(--ct-ink); color: var(--ct-bg); }
 }
 
 /* iPad (icon rail): a small menu beside the Library icon. No dimming: the page stays as it is. */
@@ -62,7 +67,7 @@
   height: 30px;
   border: var(--ct-border-width-secondary-button) solid var(--ct-ink);
   border-radius: 9px;
-  background: var(--ct-lime);
+  background: var(--ct-bg);
   font-size: 14px;
   font-weight: 800;
 }

@@ -264,11 +264,13 @@ test('from 1000 px wide, Messages opens the latest conversation when nothing is 
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto(`/messages/${quiet.id}`);
   const box = page.getByLabel('Message', { exact: true });
-  await box.fill('Latest from me');
+  // Its own text, so a copy of this test running alongside can't be counted.
+  const latest = `Latest from me ${quiet.id.slice(0, 8)}`;
+  await box.fill(latest);
   await box.press('Enter');
-  await expect(page.getByRole('log').getByText('Latest from me')).toBeVisible();
+  await expect(page.getByRole('log').getByText(latest)).toBeVisible();
   // Saved, not only shown (the bubble appears before the server has it).
-  await expect.poll(async () => (await admin.from('messages').select('id').eq('body', 'Latest from me')).data?.length ?? 0).toBe(1);
+  await expect.poll(async () => (await admin.from('messages').select('id').eq('body', latest)).data?.length ?? 0).toBe(1);
 
   // Nothing unread: the latest conversation opens in place of the empty pane.
   await page.goto('/messages');

@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
-import { Button } from '@/components/ui';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import { blockBadges, type BlockKind } from '@caltracker/shared';
+import { AdaptiveDialog, Button, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './builder.module.css';
-import { openLayer } from '@/lib/open-layer';
 
 export type ReorderItem = {
   id: string;
-  /** "Superset A" for a superset, "Pick one" for a pick-one group, else null. */
+  kind: BlockKind;
+  /** "Superset" for a superset, "Pick one" for a pick-one group, else null. */
   tag: string | null;
   names: string[];
 };
@@ -41,24 +42,23 @@ const tick = () => {
  * "Reorder exercises": just the names, in order. Drag a row by its handle (mouse, finger or pen) or use ↑ and ↓. The
  * lifted row grows a little and follows the finger, the others slide aside (FLIP), and it eases into place on drop;
  * a light vibration marks pick-up and drop where supported. Reduced motion: no movement, rows just swap. A
- * superset moves as one block, and each block stays in its section. Cancel leaves the workout as it was; Done
- * applies the new order.
+ * superset moves as one block, and each block stays in its section. Each row shows the builder's badge (1, A1, A2…).
+ * Cancel (or ×, Back) leaves the workout as it was, asking first once something moved; Done applies the new order.
  */
 export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly ReorderRun[]; onDone: (ids: string[]) => void; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const ref = useRef<AdaptiveDialogHandle>(null);
   const [order, setOrder] = useState(() => runs.map((r) => r.items));
+  const ids = order.flatMap((items) => items.map((x) => x.id));
+  const dirty = ids.join() !== runs.flatMap((r) => r.items.map((x) => x.id)).join();
+  // The builder's own badges (1, A1, A2, 3…) for the order as it stands, so they follow each move.
+  const flatBadges = blockBadges(order.flat().map((x) => ({ kind: x.kind, exercises: x.names })));
+  const badgeOf = new Map(order.flat().map((x, i) => [x.id, flatBadges[i]!]));
   const [dragging, setDragging] = useState<string | null>(null);
   const lists = useRef<(HTMLOListElement | null)[]>([]);
   // The drag in progress: which run, where the finger grabbed the row (px from its top) and the finger's last y.
   const drag = useRef<{ run: number; id: string; grab: number; y: number } | null>(null);
   // Each row's top on screen just before the order changed (mid-slide too), for the FLIP slide.
   const before = useRef<Map<string, number> | null>(null);
-
-  useEffect(() => {
-    const d = ref.current;
-    if (d) openLayer(d);
-  }, []);
 
   const rowEl = (run: number, id: string) =>
     [...(lists.current[run]?.children ?? [])].find((el): el is HTMLLIElement => (el as HTMLElement).dataset.id === id);
@@ -183,19 +183,34 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
   };
 
   return (
-    <dialog
+    <AdaptiveDialog
       ref={ref}
-      className={styles.reorderDialog}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
+      historyId="reorder"
+      title="Reorder exercises"
+      titleSafe
+      subtitle="Drag the handle, or use the arrows. Supersets move together."
+      onClose={onClose}
+      dirty={dirty}
+      noKeyboardOnTouch
+      fullScreenOnPhone
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => ref.current?.requestClose()} phSafe>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              onDone(ids);
+              void ref.current?.close();
+            }}
+            data-ph-capture-attribute-label="workout_reorder_done"
+            phSafe
+          >
+            Done
+          </Button>
+        </>
+      }
     >
-      <div className={styles.reorderHead}>
-        <h2 id={titleId} className={styles.dialogTitle}>Reorder exercises</h2>
-        <p className={styles.caption}>Drag the handle, or use the arrows. Supersets move together.</p>
-      </div>
       <div className={styles.reorderBody}>
         {runs.map((run, ri) => (
           <div key={run.key} className={styles.reorderRun}>
@@ -213,7 +228,7 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
                     key={item.id}
                     data-id={item.id}
                     className={cx(styles.reorderItem, dragging === item.id && styles.reorderDragging)}
-                    data-superset={item.tag?.startsWith('Superset') ? '' : undefined}
+                    data-superset={item.kind === 'superset' ? '' : undefined}
                   >
                     <span
                       className={styles.reorderHandle}
@@ -225,7 +240,12 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
                     <span className={styles.reorderNames}>
                       {item.tag ? <span className={styles.reorderTag}>{item.tag}</span> : null}
                       {item.names.map((n, k) => (
-                        <span key={k} className={styles.reorderName}>{n}</span>
+                        <span key={k} className={styles.reorderName}>
+                          <span className={styles.blockNumber} data-superset={item.kind === 'superset' ? '' : undefined} aria-hidden="true">
+                            {badgeOf.get(item.id)?.[k] ?? ''}
+                          </span>
+                          {n}
+                        </span>
                       ))}
                     </span>
                     <button type="button" className={styles.reorderArrow} aria-label={`Move ${name} up`} disabled={i === 0} onClick={() => shift(ri, item.id, i - 1)}>
@@ -247,20 +267,6 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
           </div>
         ))}
       </div>
-      <div className={styles.reorderActions}>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          onClick={() => {
-            onDone(order.flatMap((items) => items.map((x) => x.id)));
-            onClose();
-          }}
-          data-ph-capture-attribute-label="workout_reorder_done"
-        >
-          Done
-        </Button>
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

@@ -505,7 +505,8 @@ export function WorkoutBuilder({
           const b = doc.blocks[bi]!;
           return {
             id: b.id,
-            tag: b.kind === 'superset' ? `Superset ${badges.get(b.id)![0]!.replace(/\d+$/, '')}` : b.kind === 'choice' ? 'Pick one' : null,
+            kind: b.kind,
+            tag: b.kind === 'superset' ? 'Superset' : b.kind === 'choice' ? 'Pick one' : null,
             names: b.exercises.map((e) => e.exerciseName),
           };
         }),
@@ -546,6 +547,16 @@ export function WorkoutBuilder({
   const fullNote = `A workout holds at most ${MAX_BLOCKS} exercises and groups. Remove one to add another.`;
   const sectionsFull = doc.sections.length >= 10;
   const addSectionNamed = (name: string) => change((d) => addSection(d, name, makeId));
+
+  // An empty workout: one line and the create button, in the list itself (rulebook §11.2).
+  const emptyState = (
+    <div className={styles.emptyState}>
+      <p className={styles.caption}>No exercises yet.</p>
+      <Button variant="create" disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercises_empty" phSafe>
+        + Add exercises
+      </Button>
+    </div>
+  );
 
   const pickerTitle =
     picker?.kind === 'straight'
@@ -731,7 +742,7 @@ export function WorkoutBuilder({
             </Fragment>
           ),
         )}
-        {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
+        {doc.blocks.length === 0 ? emptyState : null}
         {blockErrors}
       </div>
 
@@ -753,7 +764,7 @@ export function WorkoutBuilder({
               </Fragment>
             ),
           )}
-          {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
+          {doc.blocks.length === 0 ? emptyState : null}
           {blockErrors}
         </section>
         <section ref={paneEditorRef} aria-label="Selected exercise" className={styles.paneEditor}>
@@ -786,7 +797,7 @@ export function WorkoutBuilder({
             {cards.length} {cards.length === 1 ? 'exercise' : 'exercises'} · tap the link icon to superset two
           </p>
         ) : (
-          <p className={styles.caption}>No exercises yet.</p>
+          emptyState
         )}
         {items.map((item) =>
           item.kind === 'section' ? (

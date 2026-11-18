@@ -188,18 +188,19 @@ test.describe('iPhone', () => {
     await expect(sheet).toBeVisible();
     expect(path(page)).toBe(`/programs/${pid}`);
 
-    // With an edit, Back from the sheet asks (the sheet's own question), and Keep editing keeps it open.
+    // With an edit, Back from the sheet asks (its inline "Discard changes?" step), and Keep editing keeps it open.
     await sheet.getByRole('button', { name: /^Barbell Squat: / }).click();
     await editor(page).getByLabel('Reps', { exact: true }).first().fill('66');
     await page.goBack();
     await expect(editor(page)).toBeHidden();
     await page.goBack();
-    const ask = page.getByRole('dialog', { name: 'Discard your changes?' });
+    const ask = sheet.getByRole('group', { name: /^Discard changes\?/ });
     await expect(ask).toBeVisible();
     await ask.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(ask).toBeHidden();
     await expect(sheet).toBeVisible();
     await page.goBack();
-    await page.getByRole('dialog', { name: 'Discard your changes?' }).getByRole('button', { name: 'Discard' }).click();
+    await ask.getByRole('button', { name: 'Discard', exact: true }).click();
     await expect(sheet).toBeHidden();
     expect(path(page)).toBe(`/programs/${pid}`);
   });

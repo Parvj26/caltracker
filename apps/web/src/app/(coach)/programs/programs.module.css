@@ -36,7 +36,7 @@
   color: var(--ct-ink);
   font: inherit;
 }
-.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus { border-color: var(--ct-ink); background: var(--ct-bg); }
 
 .smallButton {
   /* flex: none so the label never spills out: a min-width would replace the flex item's content-size minimum. */
@@ -49,11 +49,16 @@
   border-radius: var(--ct-radius-input);
   background: transparent;
   color: var(--ct-ink);
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  /* The same ink outline as the kit's secondary buttons ("+ Add week" beside it). */
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
   font: inherit;
   font-weight: var(--ct-weight-section-heading);
   cursor: pointer;
 }
+
+/* The header's ⋯: no outline, like the other ⋯ buttons. */
+.plainButton { box-shadow: none; border-radius: var(--ct-radius-pill); }
+.plainButton:hover, .plainButton[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 10%, transparent); }
 
 /* ---------- List ---------- */
 @media (max-width: 599.98px) { .intro { display: none; } }
@@ -68,6 +73,8 @@
 
 /* ---------- Forms ---------- */
 .formCard { max-width: 1040px; }
+/* Phone: the form is the page, not a card inside it. */
+@media (max-width: 599.98px) { .formCard { padding: 0; border: 0; border-radius: 0; background: none; } }
 /* The program page's details card lines up with the settings cards beside it (full width). */
 .detailsCard { max-width: none; }
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
@@ -179,6 +186,8 @@
 /* The week labels stay in view when the grid scrolls sideways. */
 .grid .weekHead { position: sticky; left: 0; z-index: 1; background: var(--ct-bg); }
 .addWeekRow { display: flex; }
+/* "Copy week" wraps onto two lines in the narrow week column, so the seven days keep their width. */
+.grid .weekHead .smallButton { white-space: normal; line-height: 1.15; padding: var(--ct-space-1) var(--ct-space-2); }
 
 .cell {
   display: flex;
@@ -200,7 +209,8 @@
   display: flex;
   align-items: stretch;
   border-radius: var(--ct-radius-input);
-  background: var(--ct-lime);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 1px var(--ct-border-strong);
   color: var(--ct-ink);
 }
 .chipHandle {
@@ -245,7 +255,7 @@
 @media (hover: hover) and (pointer: fine) {
   .grid .chip { flex-wrap: wrap; }
   .grid .chipHandle { flex-basis: 100%; }
-  .grid .chipMenuButton { width: calc(var(--ct-space-6) + var(--ct-space-1)); min-height: var(--ct-space-6); margin-left: auto; }
+  .grid .chipMenuButton { width: var(--ct-tap-min); min-height: var(--ct-space-8); margin-left: auto; }
 }
 @media (hover: none) and (pointer: coarse) {
   .grid .chipMenuButton { display: none; }
@@ -256,8 +266,9 @@
   align-items: center;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-3);
+  border: 1px solid var(--ct-border-strong);
   border-radius: var(--ct-radius-input);
-  background: var(--ct-lime);
+  background: var(--ct-bg);
   color: var(--ct-ink);
   font-weight: var(--ct-weight-section-heading);
   box-shadow: var(--ct-shadow-sticker);
@@ -298,28 +309,31 @@
 
 /* ---------- Phone plan: week tabs, then the seven days down the page ---------- */
 .weekBar { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+/* A segmented control (rulebook §2.3): tabs on a grey track, the selected one a white pill with an ink border. */
 .weekTabs {
   position: relative;
   display: flex;
   gap: var(--ct-space-1);
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: var(--ct-space-1);
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-surface);
   scrollbar-width: none;
 }
 .weekTab {
   flex: none;
   min-height: var(--ct-tap-min);
   padding: 0 var(--ct-space-3-5);
-  border: 0;
-  border-radius: 999px;
-  background: var(--ct-surface);
+  border: var(--ct-border-width-secondary-button) solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
   color: var(--ct-ink);
   font: inherit;
   font-weight: var(--ct-weight-section-heading);
   white-space: nowrap;
   cursor: pointer;
 }
-.weekTab[aria-selected='true'] { background: var(--ct-ink); color: var(--ct-bg); }
+.weekTab[aria-selected='true'] { border-color: var(--ct-ink); background: var(--ct-bg); font-weight: var(--ct-weight-button); }
 .weekActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
 .dayList { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .dayRow {
@@ -494,10 +508,7 @@
 }
 
 /* ---------- Summary card (tap a placed workout) ---------- */
-.dialog.summary { width: min(580px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 32px)); overflow-y: auto; }
-.summaryHead { display: flex; align-items: flex-start; gap: var(--ct-space-3); }
-.summaryTitle { margin: 0; font-size: var(--ct-size-screen-title); font-weight: var(--ct-weight-screen-title); overflow-wrap: anywhere; }
-.notesBox { margin: 0; padding: var(--ct-space-2-5) var(--ct-space-3-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); white-space: pre-wrap; }
+.notesBox { margin: 0 0 var(--ct-space-3); padding: var(--ct-space-2-5) var(--ct-space-3-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); white-space: pre-wrap; }
 .summaryList { margin: 0; padding: 0; list-style: none; }
 .summaryRow { display: flex; align-items: center; gap: var(--ct-space-3); padding: var(--ct-space-3) var(--ct-space-1); border-top: 1px solid var(--ct-border); }
 .summaryNumber {
@@ -508,19 +519,23 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--ct-lime);
+  background: var(--ct-surface);
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-button);
 }
 .summaryText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
-.summaryName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
-.summaryActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
-.summarySpacer { flex: 1; }
+.summaryName { font-weight: var(--ct-weight-button); overflow-wrap: break-word; }
+/* The summary's footer: Copy to…, Move to…, Remove, then the main Edit workout last (right). */
+.summaryActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ct-space-2); }
 .summaryActions .dangerText { color: var(--ct-danger); }
 @media (max-width: 599.98px) {
   .summaryActions > * { flex: 1 1 100%; }
-  .summarySpacer { display: none; }
+  /* Stacked on a phone: the main action on top. */
+  .summaryActions > :last-child { order: -1; }
 }
+
+/* The day's "+" picker: New workout, then the library. */
+.pickerBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 
 /* ---------- Editor sheet: the workout editor over the program (full screen on a phone) ---------- */
 .sheet {
@@ -540,6 +555,7 @@
 .sheetHeader { display: flex; align-items: center; gap: var(--ct-space-3); }
 /* The sheet's top-bar Save: phones only (below), where the keyboard covers the editor's own save bar. */
 .sheetHeader .sheetTopSave { display: none; flex: none; }
+.sheetDiscard { margin: 0; }
 .sheetNote { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .sheetBody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 599.98px) {
@@ -577,4 +593,6 @@
 @media (max-width: 599.98px) {
   /* The phone shows week tabs instead (once the page has loaded), so the wide grid never flashes up first. */
   .gridScroll, .addWeekRow { display: none; }
+  /* The drag-from-Library panel is a mouse aid: on a phone each day's "+" picks a workout instead. */
+  .workspace > .library { display: none; }
 }

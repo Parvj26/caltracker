@@ -77,6 +77,7 @@ export default async function ProgramPage({
         back={{ href: '/programs', label: 'Programs' }}
         action={<AssignButton kind="program" id={program.id} name={program.name} />}
         more={<ProgramMenu id={program.id} name={program.name} />}
+        stackOnPhone
       />
       {/* key: opening a different program starts a fresh grid. */}
       <ProgramGrid key={program.id} program={program} initialSlots={initialSlots} library={workouts} justCopied={justCopied} liveSync={live} autoProgression={program.auto_progression} hints={hints} units={units} workspaceId={workspaceId} exercisePrefs={prefs} />

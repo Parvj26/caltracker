@@ -76,6 +76,8 @@
 /* ---------- Forms ---------- */
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3-5); max-width: 520px; }
 .formCard { max-width: 600px; }
+/* Phone: the form is the page, not a card inside it. */
+@media (max-width: 599.98px) { .formCard { padding: 0; border: 0; border-radius: 0; background: none; } }
 .submit { align-self: flex-start; }
 .saved { margin: 0; font-weight: var(--ct-weight-section-heading); }
 

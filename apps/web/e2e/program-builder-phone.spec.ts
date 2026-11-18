@@ -143,11 +143,17 @@ test.describe('iPhone', () => {
     await saved(page);
   });
 
-  test('tap a Library workout to add it to a chosen day', async ({ page }) => {
+  test('no drag-from-Library panel on a phone: a day\'s + adds a library workout', async ({ page }) => {
     const { spare } = await seed(page);
-    await addFromLibrary(page, spare, 3, 5);
-    // It shows the week it went to.
-    await expect(tab(page, 3)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('region', { name: 'Library' })).toBeHidden();
+    await switchWeek(page)(3);
+    await page.getByRole('button', { name: 'Add a workout to week 3, day 5', exact: true }).tap();
+    // A bottom sheet (AdaptiveDialog): one tap on a workout puts it on the day.
+    const picker = page.getByRole('dialog', { name: 'Add a workout to Week 3, Day 5' });
+    await picker.getByRole('button', { name: spare, exact: true }).tap();
+    await expect(picker).toBeHidden();
+    await expect(programCell(page, 3, 5).getByRole('button', { name: spare, exact: true })).toBeVisible();
+    await saved(page);
   });
 
   test('Copy to… puts one workout on two days', async ({ page }) => {

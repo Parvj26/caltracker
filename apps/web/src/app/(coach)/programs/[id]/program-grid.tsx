@@ -521,16 +521,15 @@ export function ProgramGrid({
                   </div>
                   <div className={styles.weekActions}>
                     {addWeekButton}
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
                       id={copyWeekButtonDomId(shownWeek)}
-                      className={styles.smallButton}
                       aria-label={`Copy week ${shownWeek}`}
                       data-ph-capture-attribute-label="program_copy_week"
                       onClick={() => setCopying(shownWeek)}
                     >
                       Copy week
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <div role="tabpanel" id={`${dndId}-week`} aria-labelledby={weekTabDomId(shownWeek)} className={styles.dayList}>
@@ -567,7 +566,7 @@ export function ProgramGrid({
                                 data-ph-capture-attribute-label="program_copy_week"
                                 onClick={() => setCopying(w)}
                               >
-                                Copy…
+                                Copy week
                               </button>
                             </div>
                           </th>

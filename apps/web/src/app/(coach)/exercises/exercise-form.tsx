@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition, type FormEvent } from 'react';
 import { CustomExerciseInput, LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
-import { Button, errorFromText, ErrorText, notAContact, SelectField, TextAreaField, TextField, type FieldError } from '@/components/ui';
+import { Button, errorFromText, ErrorText, notAContact, PhoneActionBar, SelectField, TextAreaField, TextField, type FieldError } from '@/components/ui';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { createCustomExercise, updateCustomExercise } from './actions';
@@ -115,9 +115,18 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
       <TextField label="YouTube URL (optional)" name="youtubeUrl" defaultValue={initial.youtubeUrl ?? ''} />
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       {saved ? <p role="status" className={styles.saved}>Saved</p> : null}
-      <Button type="submit" pending={pending} className={styles.submit}>
-        {exerciseId ? 'Save changes' : 'Create exercise'}
-      </Button>
+      {exerciseId ? (
+        <Button type="submit" pending={pending} className={styles.submit}>
+          Save changes
+        </Button>
+      ) : (
+        // A new exercise is an editing screen: on a phone Create sits in the bottom bar (no tab bar) in thumb reach.
+        <PhoneActionBar label="New exercise actions">
+          <Button type="submit" pending={pending} className={styles.submit} phSafe>
+            {pending ? 'Creating…' : 'Create exercise'}
+          </Button>
+        </PhoneActionBar>
+      )}
       {guard.prompt}
     </form>
   );

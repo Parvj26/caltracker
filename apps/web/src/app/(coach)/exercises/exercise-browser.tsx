@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
 import type { ExerciseIndexRow } from '@caltracker/shared';
+import { readExerciseFilters, writeExerciseFilters } from './filter-url';
 import { PhoneExerciseList } from './phone-exercise-list';
 import { TrackingChips } from './tracking-chips';
 import styles from './exercises.module.css';
@@ -42,6 +43,8 @@ export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, init
   // picked, while the address still holds ?tracking=.
   const params = useSearchParams();
   const [tracking, setTracking] = useState(params.get('tracking') ?? initialTracking);
+  // The chip filters (muscles, equipment, Custom only, Favourites) live in the address too.
+  const [urlFilters] = useState(() => readExerciseFilters(params));
   const phone = usePhone();
 
   const changeTracking = useCallback((next: string) => {
@@ -65,6 +68,7 @@ export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, init
         workspaceId={workspaceId}
         initialQuery={initialQuery}
         initialSource={initialSource}
+        initialFilters={urlFilters}
         tracking={tracking}
         onTrackingChange={changeTracking}
       />
@@ -79,7 +83,8 @@ export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, init
           workspaceId={workspaceId}
           initialQuery={initialQuery}
           queryParam="q"
-          initialFilters={{ customOnly: initialSource === 'custom' }}
+          initialFilters={{ muscles: urlFilters.muscles, equipment: urlFilters.equipment, customOnly: urlFilters.customOnly || initialSource === 'custom' }}
+          onFiltersChange={writeExerciseFilters}
           rowFilter={rowFilter}
         />
       </div>

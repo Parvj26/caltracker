@@ -16,7 +16,9 @@
   font-weight: var(--ct-weight-screen-title);
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
-  overflow-wrap: anywhere;
+  /* Long names wrap between words (hyphenated where the language allows); only a word wider than the line breaks. */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 .pageCount { color: var(--ct-ink-muted); font-weight: var(--ct-weight-section-heading); }
 .pageSubtitle { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
@@ -107,6 +109,7 @@
 
 /* Phone-sized header: the create button is compact and reads "+ New" (its aria-label keeps the full name). */
 @container (max-width: 559.98px) {
+  .pageHeader[data-stack] .pageHeaderRow { flex-direction: column; align-items: flex-start; gap: var(--ct-space-2); }
   .createThing { display: none; }
   .createLink { min-height: var(--ct-button-compact-height); padding: var(--ct-space-2) var(--ct-space-4); border-radius: var(--ct-radius-input); }
 }

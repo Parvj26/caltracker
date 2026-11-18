@@ -84,7 +84,6 @@ export function ProgramList({ rows, total, initialQuery, limited, limit }: { row
       <div role="search" aria-label="Find programs" className={styles.searchForm}>
         <SearchBox
           label="Search programs"
-          placeholder={`Search ${total} ${plural(total, 'program', 'programs')}`}
           value={query}
           onChange={setQuery}
           onEnter={onEnter}

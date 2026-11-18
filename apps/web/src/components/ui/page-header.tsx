@@ -21,6 +21,8 @@ export type PageHeaderProps = {
   /** Render the title as a plain paragraph when another element on the page is the h1 (two-pane pages). */
   titleAs?: 'h1' | 'p';
   titleId?: string;
+  /** Phone-sized header: the action and ⋯ go on their own row under the title, so a long title keeps the full width. */
+  stackOnPhone?: boolean;
   className?: string | undefined;
 };
 
@@ -28,10 +30,10 @@ export type PageHeaderProps = {
  * The page title row (docs/design/ui-rules.md §8): an optional "‹ Parent" back link, the h1 with an optional count and
  * subtitle, and on the right at most one main/create button plus ⋯. On a phone the action shrinks to a compact button.
  */
-export function PageHeader({ title, back, count, subtitle, action, more, titleAs = 'h1', titleId, className }: PageHeaderProps) {
+export function PageHeader({ title, back, count, subtitle, action, more, titleAs = 'h1', titleId, stackOnPhone = false, className }: PageHeaderProps) {
   const Title = titleAs;
   return (
-    <header className={cx(styles.pageHeader, className)}>
+    <header className={cx(styles.pageHeader, className)} data-stack={stackOnPhone ? '' : undefined}>
       {back ? <ParentLink href={back.href} label={back.label} onClick={back.onClick} /> : null}
       <div className={styles.pageHeaderRow}>
         <div className={styles.pageHeaderText}>
