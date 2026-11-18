@@ -12,6 +12,7 @@ import { addComment, deleteComment, deletePost, setPinned, type CommunityOutcome
 import type { FeedPost } from './data';
 import { ReactionBar } from './reaction-bar';
 import { useConfirm } from './use-confirm';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import styles from './community.module.css';
 
 /** Post text with http(s) links made clickable (opened in a new tab, without passing the page along). */
@@ -117,6 +118,8 @@ export function PostCard({
       historyId: `delete-post-${post.id}`,
     });
   const count = post.comments.length;
+  // A typed comment isn't lost to Back or a link without asking.
+  const guard = useUnsavedGuard(comment.trim() !== '', { title: 'Discard comment?', message: 'Your comment isn’t posted yet.' });
 
   return (
     <article className={styles.post} id={`post-${post.id}`} aria-label={`Post by ${post.authorName}`} data-testid="community-post">
@@ -273,6 +276,7 @@ export function PostCard({
       </div>
       {error ? <ErrorText code={error} /> : null}
       {confirm.dialog}
+      {guard.prompt}
     </article>
   );
 }

@@ -1,6 +1,7 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { codeForMessage, errorMessage, type ErrorCode } from '@caltracker/shared';
 import { cx } from './cx';
+import { PasswordInput } from './password-input';
 import styles from './ui.module.css';
 
 export type TextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -63,13 +64,23 @@ export function TextField({ label, error, hint, hintSafe = true, labelSafe = tru
     <div className={cx(styles.field, className)}>
       <label className={styles.fieldLabel}>
         <span className={styles.fieldLabelText} {...(labelSafe ? { 'data-ph-safe': '' } : {})}>{label}</span>
-        <input
-          {...rest}
-          id={inputId}
-          aria-invalid={error ? true : rest['aria-invalid']}
-          aria-describedby={describedBy}
-          className={styles.input}
-        />
+        {rest.type === 'password' ? (
+          <PasswordInput
+            {...rest}
+            id={inputId}
+            aria-invalid={error ? true : rest['aria-invalid']}
+            aria-describedby={describedBy}
+            className={cx(styles.input, styles.revealInput)}
+          />
+        ) : (
+          <input
+            {...rest}
+            id={inputId}
+            aria-invalid={error ? true : rest['aria-invalid']}
+            aria-describedby={describedBy}
+            className={styles.input}
+          />
+        )}
       </label>
       {hint ? <p id={hintId} className={styles.hint} {...(hintSafe ? { 'data-ph-safe': '' } : {})}>{hint}</p> : null}
       {error ? (

@@ -118,7 +118,7 @@ test('client overview links, calendar controls and other small links are easy to
   await expectTappable(page.getByRole('link', { name: /^(Previous|Next) / }), { wide: true });
 
   await page.goto('/messages/00000000-0000-4000-8000-0000000000c2');
-  await expectTappable(page.getByRole('link', { name: /^(Calendar|Client page)$/ }));
+  await expectTappable(page.getByRole('link', { name: /’s (training calendar|client page)$/ }));
 
   await page.goto('/community/reports');
   await expectTappable(page.getByRole('link', { name: '← Community' }));

@@ -91,7 +91,7 @@ test('provisioned coach opens the invite link, sets a password, then signs in wi
     await expect(page).toHaveURL(/\/sign-in/);
 
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(NEW_PASSWORD);
+    await page.getByLabel('Password', { exact: true }).fill(NEW_PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/home$/);
   } finally {
