@@ -191,8 +191,8 @@ test('Undo after "Move to…" only says it moved back when it could: a workout d
   // Deleted while the move's toast (and its Undo) is still showing.
   await day(later).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await day(later).getByRole('menuitem', { name: 'Delete' }).click();
-  const confirm = page.getByRole('dialog', { name: `Delete ${name}?` });
-  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirm = page.getByRole('alertdialog', { name: `Delete ${name}?` });
+  await confirm.getByRole('button', { name: 'Delete workout' }).click();
   await expect(confirm).toBeHidden();
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();

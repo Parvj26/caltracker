@@ -11,6 +11,7 @@ import { cx } from '@/components/ui/cx';
 import { avatarTone, initials } from '../avatar';
 import { RemoveClientDialog } from '../row-actions';
 import styles from './client-page.module.css';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 
 export const CLIENT_NAME_ID = 'client-name';
 
@@ -31,6 +32,12 @@ export function ClientHeader({ client }: { client: { id: string; name: string; f
   const past = client.removedAt !== null;
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
+  // A refresh or shared link with ?sheet=remove-<id> asks again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    if (past || id !== `remove-${client.id}`) return false;
+    setRemoving(true);
+    return true;
+  });
 
   return (
     <header className={styles.bar}>

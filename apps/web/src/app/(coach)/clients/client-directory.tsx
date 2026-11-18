@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildSmartIndex,
   compareByLastName,
@@ -56,6 +56,8 @@ export type DirectoryInvite = {
 };
 
 // "Active" (every joined client) is the default; invites wait under their own chip.
+/** Invites shown at first, and added by each "Show more". */
+const INVITE_PAGE = 50;
 const FILTERS: readonly DirectoryFilter[] = ['active', 'missed', 'invited', 'nothing_planned', 'plan_ending'];
 const FILTER_LABEL: Record<DirectoryFilter, string> = {
   active: 'Active',
@@ -209,6 +211,19 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
   );
 }
 
+/** An email that wraps before the "@" (a word break there), not in the middle of a word. */
+function emailWithBreak(email: string) {
+  const at = email.indexOf('@');
+  if (at <= 0) return email;
+  return (
+    <>
+      {email.slice(0, at)}
+      <wbr />
+      {email.slice(at)}
+    </>
+  );
+}
+
 /** "Beginner 3-Day · starts Mon 16 Nov": what a pending invite will begin with, or null. */
 function invitePlanText(plan: InvitePlanSummary): string | null {
   if (!plan) return null;
@@ -230,7 +245,7 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
       className={styles.inviteRow}
       meta={
         <>
-          <span className={styles.inviteEmail}>{invite.email}</span>
+          <span className={styles.inviteEmail}>{emailWithBreak(invite.email)}</span>
           <span>{today ? invitedLabel(localDateOf(invite.sentAt), today) : 'Invited'}</span>
           {expired ? <Chip tone="amber">Link expired</Chip> : null}
           {planText ? <span>{planText}</span> : null}
@@ -359,6 +374,11 @@ export function ClientDirectory({
     return smartFilter(sorted, query, (c) => c.name);
   }, [people, rowById, filter, query, sort]);
   const shownInvites = useMemo(() => (scope.invites ? searchInvites(invites, query) : []), [scope.invites, invites, query]);
+  // Long invite lists show 50 at a time (UI rules §7.7); a new search or filter starts again at 50.
+  const listKey = `${filter}|${query}`;
+  const [inviteLimit, setInviteLimit] = useState({ key: listKey, count: INVITE_PAGE });
+  if (inviteLimit.key !== listKey) setInviteLimit({ key: listKey, count: INVITE_PAGE });
+  const inviteCount = inviteLimit.key === listKey ? inviteLimit.count : INVITE_PAGE;
 
   const shownTotal = shownClients.length + shownInvites.length;
   const filtering = query.trim() !== '' || filter !== 'active';
@@ -440,10 +460,20 @@ export function ClientDirectory({
             {`Invited · ${shownInvites.length}`}
           </h3>
           <RowList aria-label="Invites" className={styles.inviteList}>
-            {shownInvites.map((i) => (
+            {shownInvites.slice(0, inviteCount).map((i) => (
               <InviteRow key={i.id} invite={i} today={today} />
             ))}
           </RowList>
+          {shownInvites.length > inviteCount ? (
+            <Button
+              variant="quiet"
+              size="compact"
+              className={styles.showMore}
+              onClick={() => setInviteLimit({ key: listKey, count: inviteCount + INVITE_PAGE })}
+            >
+              {`Show more (${shownInvites.length - inviteCount} left)`}
+            </Button>
+          ) : null}
         </section>
       ) : null}
     </section>

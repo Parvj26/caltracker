@@ -32,12 +32,13 @@ import {
 import calendar from '@/components/calendar/calendar.module.css';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { useStableSrc } from '@/components/stable-img';
-import { Button, ButtonLink, Card, Chip, ErrorText, TextField, errorFromText } from '@/components/ui';
+import { AdaptiveDialog, Button, ButtonLink, Card, Chip, ErrorText, TextField, errorFromText, type AdaptiveDialogHandle } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import { failureCode } from '@/lib/action-errors';
 import { saveTargets } from './actions';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 import type { CoachMeal } from './load';
 import { TIME_ZONE_COOKIE, weekRows } from './week';
 import styles from './food.module.css';
@@ -477,6 +478,12 @@ function targetsLine(t: MacroTargets): string {
 /** The targets in one line, with Edit (or Set) opening the targets form. */
 function TargetsSummary({ clientId, firstName, targets, readOnly }: { clientId: string; firstName: string; targets: MacroTargets | null; readOnly: boolean }) {
   const [editing, setEditing] = useState(false);
+  // A refresh or shared link with ?sheet=daily-targets opens the form again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    if (readOnly || id !== 'daily-targets') return false;
+    setEditing(true);
+    return true;
+  });
   const [saved, setSaved] = useState(false);
   const any = hasAnyTarget(targets);
   return (
@@ -519,7 +526,7 @@ function TargetsSummary({ clientId, firstName, targets, readOnly }: { clientId: 
   );
 }
 
-/** The targets form, in a dialog (full screen on a phone). Any field can be left blank. */
+/** The targets form, in the one pop-up (a sheet on a phone). Any field can be left blank. */
 function TargetsDialog({
   clientId,
   firstName,
@@ -533,19 +540,21 @@ function TargetsDialog({
   onSaved: () => void;
   onClose: () => void;
 }) {
-  const ref = useModal();
-  const titleId = useId();
-  const [values, setValues] = useState<Record<MacroKey, string>>(() => ({
+  const ref = useRef<AdaptiveDialogHandle>(null);
+  const formId = useId();
+  const [initial] = useState<Record<MacroKey, string>>(() => ({
     calories: toText(targets?.calories),
     protein: toText(targets?.protein),
     carbs: toText(targets?.carbs),
     fat: toText(targets?.fat),
   }));
+  const [values, setValues] = useState<Record<MacroKey, string>>(initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<MacroKey, string>>>({});
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, start] = useTransition();
   const [touched, setTouched] = useState(false);
   const completeTargets = useAnalyticsTask('set_food_targets', touched);
+  const dirty = MACRO_KEYS.some((k) => values[k].trim() !== initial[k].trim());
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -557,8 +566,8 @@ function TargetsDialog({
           completeTargets();
           setTouched(false);
           setFieldErrors({});
+          await ref.current?.close();
           onSaved();
-          ref.current?.close();
         } else {
           setFieldErrors(outcome.fieldErrors ?? {});
           setError(outcome.code);
@@ -570,24 +579,27 @@ function TargetsDialog({
   }
 
   return (
-    <dialog
+    <AdaptiveDialog
       ref={ref}
-      className={cx(calendar.dialog, sheet.sheet)}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      historyId="daily-targets"
+      title="Daily targets"
+      titleSafe
       onClose={onClose}
+      dirty={dirty}
+      discardText="The targets you typed aren’t saved yet."
+      busy={pending}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => ref.current?.requestClose()} disabled={pending}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} pending={pending} data-testid="targets-save">
+            Save targets
+          </Button>
+        </>
+      }
     >
-      <div className={sheet.header}>
-        <h2 id={titleId} className={calendar.dialogTitle}>
-          Daily targets
-        </h2>
-        <button type="button" className={sheet.close} aria-label="Close" onClick={() => ref.current?.close()} disabled={pending}>
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-      <form onSubmit={submit} className={cx(styles.targetsForm, sheet.body)} noValidate>
+      <form id={formId} onSubmit={submit} className={styles.targetsForm} noValidate>
         <p className={styles.muted}>Any of these can be left blank. {firstName} sees them on the Food tab.</p>
         <div className={styles.targetFields}>
           {MACRO_KEYS.map((k) => (
@@ -608,15 +620,7 @@ function TargetsDialog({
           ))}
         </div>
         {error ? <ErrorText code={error} /> : null}
-        <div className={cx(calendar.dialogActions, sheet.actions)}>
-          <Button variant="secondary" onClick={() => ref.current?.close()} disabled={pending}>
-            Cancel
-          </Button>
-          <Button type="submit" pending={pending} data-testid="targets-save">
-            Save targets
-          </Button>
-        </div>
       </form>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

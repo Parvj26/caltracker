@@ -24,6 +24,7 @@ import { AssignmentsPanel } from './assignments-panel';
 import { CalendarEmptyState } from './calendar-empty-state';
 import type { ClientRef } from './client';
 import { DeleteDialog, ItemMenu, MoveDialog } from './item-menu';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 import { cx } from '@/components/ui/cx';
 import styles from '@/components/calendar/calendar.module.css';
 import pageStyles from './client-page.module.css';
@@ -147,6 +148,36 @@ export function ClientCalendar({
   );
   const [deleting, setDeleting] = useState<CalendarEntry | null>(null);
   const [copying, setCopying] = useState<CalendarEntry | null>(null);
+  // A refresh or shared link with ?sheet=<id> opens that pop-up again (UI rules §8.3), if what it was about is still
+  // on screen.
+  useSheetOnLoad((id) => {
+    if (readOnly || openOnLoad) return false;
+    if (id === 'assign-program') {
+      setAssigning(true);
+      return true;
+    }
+    if (id === 'add-workout') {
+      setAdding(true);
+      return true;
+    }
+    const find = (prefix: string) => (id.startsWith(prefix) ? items.find((i) => `${prefix}${i.id}` === id) : undefined);
+    const toMove = find('move-');
+    if (toMove && !toMove.logId) {
+      setMoving(toMove);
+      return true;
+    }
+    const toDelete = find('delete-workout-');
+    if (toDelete) {
+      setDeleting(toDelete);
+      return true;
+    }
+    const toCopy = find('assign-copy-');
+    if (toCopy) {
+      setCopying(toCopy);
+      return true;
+    }
+    return false;
+  });
   const [inFlight, setInFlight] = useState(0);
   const [savedOnce, setSavedOnce] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

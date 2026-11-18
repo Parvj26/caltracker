@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { IsoDateSchema, errorMessage, type ErrorCode } from '@caltracker/shared';
 import type { IsoDate, Units } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
-import { Button, ErrorText, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { AdaptiveDialog, Button, ErrorText, TextField, errorFromText, type AdaptiveDialogHandle, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { saveScan } from './actions';
@@ -15,7 +14,6 @@ import type { ScanRow } from './load';
 import { inputsFor, parseScanForm, scanFields, type CustomMetric } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
 import styles from './progress.module.css';
-import { openLayer } from '@/lib/open-layer';
 
 /**
  * The scan form: a date, the standard measures, the workspace's custom measures and one printout. `scan` is the
@@ -48,8 +46,9 @@ export function ScanDialog({
   onWarning: (message: string) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const titleId = useId();
+  const formId = useId();
   const [scanId] = useState(() => scan?.id ?? crypto.randomUUID());
   const [original] = useState(() => (scan ? { values: scan.values, inputs: inputsFor(scan.values, units) } : undefined));
   const [date, setDate] = useState<string>(scan?.measuredOn ?? presetDate ?? today);
@@ -62,14 +61,14 @@ export function ScanDialog({
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) openLayer(dialog);
-    return () => {
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
+  const startDate = scan?.measuredOn ?? presetDate ?? today;
+  // Anything typed or picked that isn't saved yet: closing asks "Discard changes?" first.
+  const dirty =
+    date !== startDate ||
+    printout !== null ||
+    removePrintout ||
+    Object.entries(inputs).some(([k, v]) => v.trim() !== (original?.inputs[k] ?? '').trim()) ||
+    Object.entries(original?.inputs ?? {}).some(([k, v]) => (inputs[k] ?? '').trim() !== v.trim());
 
   const fields = scanFields(customs, units, new Set(Object.keys(scan?.values ?? {})));
   const parsedDate = IsoDateSchema.safeParse(date);
@@ -123,6 +122,7 @@ export function ScanDialog({
       });
       if (outcome.ok) {
         uploaded = null; // saved: the file stays
+        await dialogRef.current?.close();
         onSaved(outcome.warning ?? (scan ? 'Scan updated.' : 'Scan added.'));
         return;
       }
@@ -142,25 +142,30 @@ export function ScanDialog({
     }
   }
 
+  const cancel = () => dialogRef.current?.requestClose();
   return (
-    <dialog
+    <AdaptiveDialog
       ref={dialogRef}
-      // On an iPhone it fills the screen with Cancel and Save stuck to the bottom; touch screens get a × too.
-      className={cx(calendar.dialog, sheet.sheet)}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      historyId={scan ? `edit-scan-${scan.id}` : 'add-scan'}
+      title={scan ? 'Edit scan' : 'Add a scan'}
+      titleSafe
       onClose={onClose}
+      dirty={dirty}
+      discardText="The numbers you typed aren’t saved yet."
+      busy={pending}
+      fullScreenOnPhone
+      // Cancel and Save stay pinned under the scrolling form on every size (Save was cut off on iPad).
+      footer={
+        <>
+          {formError?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
+          <Button variant="secondary" onClick={cancel} disabled={pending}>Cancel</Button>
+          <Button type="submit" form={formId} pending={pending}>{pending ? 'Saving…' : 'Save scan'}</Button>
+        </>
+      }
     >
-      <div className={sheet.header}>
-        <h2 id={titleId} className={calendar.dialogTitle}>{scan ? 'Edit scan' : 'Add a scan'}</h2>
-        <button type="button" className={sheet.close} aria-label="Close" onClick={() => dialogRef.current?.close()} disabled={pending}>
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
       <form
-        className={cx(styles.form, sheet.body)}
+        id={formId}
+        className={cx(styles.form, styles.scanForm)}
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
@@ -204,12 +209,7 @@ export function ScanDialog({
         </div>
 
         {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
-        <div className={cx(calendar.dialogActions, sheet.actions)}>
-          {formError?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
-          <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>Cancel</Button>
-          <Button type="submit" pending={pending}>{pending ? 'Saving…' : 'Save scan'}</Button>
-        </div>
       </form>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

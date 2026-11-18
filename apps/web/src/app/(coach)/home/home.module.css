@@ -30,7 +30,7 @@
 }
 .count { font-size: var(--ct-size-body); font-weight: var(--ct-weight-body); color: var(--ct-ink-muted); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
-.hint { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .name { font-weight: var(--ct-weight-button); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -88,9 +88,6 @@
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
 .columnsQuiet { grid-template-columns: minmax(0, 1fr); gap: var(--ct-space-4); }
-@container (min-width: 700px) {
-  .columnsQuiet .attentionList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 .todayList {
   list-style: none;
@@ -143,11 +140,21 @@
 }
 .moreButton:hover, .moreButton[aria-expanded='true'] { background: var(--ct-border); }
 
-/* Narrow rows: the pill drops under the name so the name keeps its room. */
-@media (max-width: 560px) {
-  .todayRow { flex-wrap: wrap; }
-  .todayRow .who { flex-basis: calc(100% - 52px); }
-  .todayRow .pill { margin-left: 48px; margin-right: auto; }
+/* Narrow rows: the pill and the main action drop under the name so the name keeps its room; ⋯ stays on the first line
+   at the row's end. */
+@media (max-width: 599.98px) {
+  .todayRow {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto auto;
+    grid-template-areas: 'avatar who who more' '. pill action action';
+    align-items: center;
+    gap: var(--ct-space-2) var(--ct-space-3);
+  }
+  .todayRow .avatar { grid-area: avatar; }
+  .todayRow .who { grid-area: who; }
+  .todayRow .pill { grid-area: pill; justify-self: start; }
+  .todayRow .action { grid-area: action; justify-self: end; }
+  .todayRow .menuWrap { grid-area: more; }
 }
 
 /* ---------- Needs attention ---------- */
@@ -158,8 +165,7 @@
 .filter[aria-pressed='true'] .filterPill { background: var(--ct-ink); color: var(--ct-bg); }
 .filter:hover .filterPill { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 
-.attentionList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ct-space-2); }
-.attentionRow { display: flex; align-items: center; gap: var(--ct-space-3); padding: var(--ct-space-2) var(--ct-space-3-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.attentionList { min-width: 0; }
 .reason { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
 .reasonUrgent { color: var(--ct-magenta-deep); }
 .more { color: var(--ct-ink-muted); font-weight: var(--ct-weight-body); }

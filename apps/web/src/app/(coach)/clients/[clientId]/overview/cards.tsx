@@ -64,7 +64,7 @@ export function TrainingCard({ data, today }: { data: ClientOverview; today: Iso
         <div className={styles.stat}>
           <dt>Next week</dt>
           <dd>
-            {s.nextWeek > 0 ? s.nextWeek : 'Not assigned yet'}
+            {s.nextWeek > 0 ? s.nextWeek : <span className={styles.statWords}>Not assigned yet</span>}
             {s.nextWeek > 0 ? <span className={styles.statNote}>planned</span> : null}
           </dd>
         </div>
