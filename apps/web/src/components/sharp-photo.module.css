@@ -1,6 +1,9 @@
 /* The frame takes the photo's shape (from its stored size, or the thumbnail) up to a max height; the photo is
    never cropped: anything too tall is fitted inside with `object-fit: contain`. */
-.frame { position: relative; display: block; overflow: hidden; width: 100%; line-height: 0; }
+/* The root class, which callers extend with their own className, sits in the `ct-shared` cascade layer so the caller's
+   class always wins over it whatever order the build loads stylesheets in. See ui/ui.module.css. */
+@layer ct-base, ct-ui, ct-shared;
+@layer ct-shared { .frame { position: relative; display: block; overflow: hidden; width: 100%; line-height: 0; } }
 .fit { display: block; width: 100%; height: auto; max-height: var(--photo-max-height, 80vh); object-fit: contain; }
 .placeholder { filter: blur(10px); }
 .hidden { visibility: hidden; }

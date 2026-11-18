@@ -1,6 +1,9 @@
 /* The client picker shared by Home ("Find a client") and Activity (filter). Colours, radii and type via var(--ct-*).
    Every control is at least 44 px tall (--ct-tap-min). */
-.wrap { position: relative; }
+/* The root class, which callers extend with their own className, sits in the `ct-shared` cascade layer so the caller's
+   class always wins over it whatever order the build loads stylesheets in. See ui/ui.module.css. */
+@layer ct-base, ct-ui, ct-shared;
+@layer ct-shared { .wrap { position: relative; } }
 .box { position: relative; display: flex; align-items: center; }
 .input {
   width: 100%;

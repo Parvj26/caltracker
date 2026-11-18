@@ -1,5 +1,8 @@
 /* The shared "⋯" menu (more-menu.tsx). Colours, radii and sizes only via var(--ct-*). Every control is 44 px or more. */
-.wrap { position: relative; flex: none; }
+/* The root class, which callers extend with their own className, sits in the `ct-shared` cascade layer so the caller's
+   class always wins over it whatever order the build loads stylesheets in. See ui/ui.module.css. */
+@layer ct-base, ct-ui, ct-shared;
+@layer ct-shared { .wrap { position: relative; flex: none; } }
 .button {
   display: inline-flex;
   align-items: center;

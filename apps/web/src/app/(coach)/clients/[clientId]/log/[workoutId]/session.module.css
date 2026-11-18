@@ -219,7 +219,8 @@
 .sheetActions .sheetButton { width: 100%; min-height: var(--ct-button-min-height); }
 .sheetActions .textButton { align-self: center; }
 .dangerButton { background: var(--ct-danger); color: var(--ct-bg); box-shadow: 0 var(--ct-base) 0 var(--ct-danger-deep); }
-.dangerButton:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-danger-deep); }
+/* Two classes, so the UI kit's .primary:active lime shadow can't win by load order. */
+.sheetButton.dangerButton:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-danger-deep); }
 
 @media (max-width: 599.98px) {
   .sheet[open] {

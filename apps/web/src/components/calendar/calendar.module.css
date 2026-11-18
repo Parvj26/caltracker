@@ -280,7 +280,7 @@
 .status { margin: 0; min-height: 1.5em; color: var(--ct-ink-muted); }
 .sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 
-.panel { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-4) var(--ct-space-4-5); }
+.panel { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .assignments { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .assignment {
   display: flex;

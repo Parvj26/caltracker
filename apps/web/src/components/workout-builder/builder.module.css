@@ -76,6 +76,10 @@
 }
 .blockTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .blockTools { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); margin-left: auto; }
+/* The header, any errors and the exercise sit apart, so the Swap and Delete buttons never touch the first set. */
+.blockBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+/* Delete (48 px) is centred over the sets' × (44 px, 4 px inside the set card's border) below it. */
+.blockHeader > .blockTools, .exerciseHeader > .blockTools { margin-right: calc(var(--ct-border-width-card) + 2px); }
 .exercise { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .exercise + .exercise { padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .exerciseName { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
@@ -131,6 +135,8 @@
 .removeSet:hover:not(:disabled) { background: var(--ct-surface); }
 .removeSet:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
 .rowError { padding-left: var(--ct-space-6); }
+/* The caption row above the sets: only the wide builder's right pane shows it (see the end of this file). */
+.setColumns { display: none; }
 
 /* Set type: one letter (W warm-up, N normal, F failure, D drop set), coloured from the design tokens. */
 .typeWrap { position: relative; }
@@ -923,7 +929,8 @@
   .paneList > .sectionHeader { padding-bottom: var(--ct-space-2); }
   .paneList > .sectionHeader:first-child { padding-top: 0; }
   .paneList > .phoneRow + .phoneRow { margin-top: var(--ct-space-2-5); }
-  .paneList > .switchRow { margin: 0; min-height: 44px; }
+  /* The Superset switch has room above and below, so it never touches the rows it joins. */
+  .paneList > .switchRow { margin: 0; padding: var(--ct-space-2-5) 0; }
   .paneRow { scroll-margin: var(--ct-space-3); }
   .paneRow .foldText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
   .paneRow .foldTitle { overflow: hidden; font-weight: var(--ct-weight-section-heading); text-overflow: ellipsis; white-space: nowrap; }
@@ -940,5 +947,39 @@
   .block[data-pane] .blockTitle { flex: 1; min-width: 0; font-size: 24px; font-weight: var(--ct-weight-button); }
   .block[data-pane] .blockTitle .swapName { font-size: inherit; font-weight: inherit; }
   .block[data-pane] .exerciseHeader .blockTools { margin-left: auto; }
+  .block[data-pane] .blockBody { gap: var(--ct-space-3-5); }
+  .block[data-pane] .blockHeader > .blockTools, .block[data-pane] .exerciseHeader > .blockTools { margin-right: 0; }
+
+  /* The sets as a table across the pane (approved mockup): one caption row on top instead of a caption over every box,
+     then each set on the same columns (number, type, one per box, ×), which SetTable sizes in --set-cols. */
+  .block[data-pane] .setColumns,
+  .block[data-pane] .setRow:not([data-layout='stacked']) {
+    display: grid;
+    grid-template-columns: var(--set-cols);
+    align-items: center;
+    column-gap: var(--ct-space-2-5);
+  }
+  .block[data-pane] .setColumns {
+    padding: 0 calc(var(--ct-space-3) + var(--ct-border-width-card));
+    font-size: var(--ct-size-caption);
+    font-weight: var(--ct-weight-caption);
+    color: var(--ct-ink-muted);
+  }
+  .block[data-pane] .setRow:not([data-layout='stacked']) { row-gap: var(--ct-space-1); padding: var(--ct-space-2) var(--ct-space-3); }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .setCells { display: contents; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldCaption,
+  .block[data-pane] .setRow:not([data-layout='stacked']) .unit { display: none; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .setLabel { margin-top: 0; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .field { min-width: 0; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox,
+  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox .stepper { display: flex; flex: 1; min-width: 0; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox .narrow { flex: 1; width: 0; min-width: 0; text-align: center; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .stepper .narrow { padding-inline: var(--ct-space-1); }
+  .block[data-pane] .sets[data-many] .setRow:not([data-layout='stacked']) .stepButton { display: none; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) .removeSet { position: static; grid-column: -2 / -1; justify-self: end; }
+  .block[data-pane] .setRow:not([data-layout='stacked']) > .rowError { grid-column: 1 / -1; padding-left: 0; }
+  /* A drop keeps the columns; its number is indented instead of the whole row. */
+  .block[data-pane] .dropRow:not([data-layout='stacked']) { margin-left: 0; }
+  .block[data-pane] .dropRow:not([data-layout='stacked']) .setLabel { padding-left: var(--ct-space-3); }
   .paneMenu { flex: none; }
 }

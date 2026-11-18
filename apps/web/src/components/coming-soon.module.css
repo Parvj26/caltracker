@@ -1,4 +1,8 @@
 /* A feature that has not shipped yet: muted ink and a dashed outline, never reduced opacity. */
+/* The root class, which callers extend with their own className, sits in the `ct-shared` cascade layer so the caller's
+   class always wins over it whatever order the build loads stylesheets in. See ui/ui.module.css. */
+@layer ct-base, ct-ui, ct-shared;
+@layer ct-shared {
 .soon {
   display: inline-flex;
   flex: none;
@@ -15,5 +19,6 @@
   font-weight: var(--ct-weight-caption);
   cursor: not-allowed;
   user-select: none;
+}
 }
 .note { font-style: italic; }

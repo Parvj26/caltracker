@@ -1,4 +1,14 @@
 /* CalTracker web UI kit. Colours, radii and sizes come only from var(--ct-*) (packages/design-tokens). */
+/*
+ * Cascade layers: the kit's plain one-class rules sit in the `ct-ui` layer, so a page or layout module that passes its
+ * own class (className) always wins over them, whatever order the production build loads the stylesheets in. Rules
+ * that are more specific than one class (states such as :focus or :active, nested rules) stay outside the layer below,
+ * so they still beat a page's plain class exactly as before. Every layered file repeats the layer order statement,
+ * because the first stylesheet the browser sees fixes the order. See app/globals.css.
+ */
+@layer ct-base, ct-ui, ct-shared;
+
+@layer ct-ui {
 
 /* ---------- Button ---------- */
 .button {
@@ -19,14 +29,12 @@
   cursor: pointer;
   transition: transform 80ms ease-out, box-shadow 80ms ease-out;
 }
-.button:disabled { cursor: not-allowed; opacity: 0.7; }
 
 .primary {
   background: var(--ct-ink);
   color: var(--ct-bg);
   box-shadow: 0 var(--ct-base) 0 var(--ct-lime);
 }
-.primary:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-lime); }
 
 .secondary {
   background: transparent;
@@ -42,13 +50,7 @@
   font-weight: var(--ct-weight-button);
   box-shadow: 0 var(--ct-base) 0 var(--ct-magenta-deep);
 }
-.finish:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-magenta-deep); }
 
-@media (prefers-reduced-motion: no-preference) {
-  .primary:active:not(:disabled),
-  .secondary:active:not(:disabled),
-  .finish:active:not(:disabled) { transform: translateY(var(--ct-press)); }
-}
 
 /* ---------- Text field ---------- */
 .field { display: flex; flex-direction: column; gap: var(--ct-space-1); }
@@ -65,11 +67,6 @@
   font: inherit;
   transition: border-color 80ms ease-out, background-color 80ms ease-out;
 }
-.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-.input:focus-visible { outline: none; }
-.input[aria-invalid='true'] { border-color: var(--ct-magenta); }
-/* The magenta error border hides the ink focus border, so a focused invalid field gets an ink outline instead. */
-.input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .select { cursor: pointer; }
 .textarea { resize: vertical; line-height: 1.4; }
 .hint { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
@@ -176,8 +173,6 @@
   background: var(--ct-lime);
   padding: 28px var(--ct-space-4) 64px;
 }
-.authPanel .logoMark { box-shadow: 0 0 0 3px var(--ct-bg), var(--ct-shadow-sticker); }
-.authTagline span { display: inline; }
 .authTagline {
   margin: var(--ct-space-4) 0 0;
   max-width: 22ch;
@@ -224,7 +219,6 @@
     line-height: 1.02;
     letter-spacing: -0.035em;
   }
-  .authTagline span { display: block; }
   /*
    * Decorative tile cluster, drawn on a 560 x 210 design grid. --u is one grid unit
    * (100cqi / 560 of the preview's own width), so the whole cluster scales evenly and
@@ -251,8 +245,6 @@
     padding: calc(14 * var(--u)) calc(16 * var(--u));
     box-shadow: var(--ct-shadow-sticker);
   }
-  .authPreview .tileLabel { font-size: calc(12 * var(--u)); }
-  .authPreview .tileValue { font-size: calc(26 * var(--u)); margin-top: calc(4 * var(--u)); }
   .authPreviewA { left: calc(12 * var(--u)); top: calc(34 * var(--u)); transform: rotate(-5deg); }
   .authPreviewB { left: calc(184 * var(--u)); top: calc(10 * var(--u)); transform: rotate(3deg); background: var(--ct-bg); z-index: 1; }
   .authPreviewC { left: calc(356 * var(--u)); top: calc(58 * var(--u)); transform: rotate(-2deg); }
@@ -264,7 +256,6 @@
     background: var(--ct-surface);
     overflow: hidden;
   }
-  .authBar i { display: block; width: 86%; height: 100%; background: var(--ct-ink); }
 
   .authMain {
     align-items: center;
@@ -272,4 +263,29 @@
     padding: 48px;
   }
   .authCard { padding: 40px; }
+}
+} /* end @layer ct-ui */
+
+/* ---------- Unlayered: states and nested rules (more specific than one class) ---------- */
+.button:disabled { cursor: not-allowed; opacity: 0.7; }
+.primary:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-lime); }
+.finish:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-magenta-deep); }
+@media (prefers-reduced-motion: no-preference) {
+  .primary:active:not(:disabled),
+  .secondary:active:not(:disabled),
+  .finish:active:not(:disabled) { transform: translateY(var(--ct-press)); }
+}
+.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus-visible { outline: none; }
+.input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+/* The magenta error border hides the ink focus border, so a focused invalid field gets an ink outline instead. */
+.input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.authPanel .logoMark { box-shadow: 0 0 0 3px var(--ct-bg), var(--ct-shadow-sticker); }
+.authTagline span { display: inline; }
+
+@media (min-width: 900px) {
+  .authTagline span { display: block; }
+  .authPreview .tileLabel { font-size: calc(12 * var(--u)); }
+  .authPreview .tileValue { font-size: calc(26 * var(--u)); margin-top: calc(4 * var(--u)); }
+  .authBar i { display: block; width: 86%; height: 100%; background: var(--ct-ink); }
 }

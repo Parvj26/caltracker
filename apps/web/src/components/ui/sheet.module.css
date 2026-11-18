@@ -11,6 +11,11 @@
  *   .actions  on the button row
  * A modal dialog sits above the floating Menu button, so the sticky row needs no --coach-menu-room.
  */
+/* Plain one-class rules sit in the `ct-ui` cascade layer so a dialog's own classes win over them; the state and
+   [open] rules are more specific and stay unlayered. See ui.module.css. */
+@layer ct-base, ct-ui, ct-shared;
+
+@layer ct-ui {
 .header { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-3); }
 .close { display: none; }
 
@@ -33,6 +38,10 @@
     font-weight: var(--ct-weight-button);
     cursor: pointer;
   }
+}
+} /* end @layer ct-ui */
+
+@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
   .close:disabled { opacity: 0.5; cursor: default; }
   .close:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 }
