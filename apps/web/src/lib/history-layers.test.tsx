@@ -375,4 +375,21 @@ describe('review fixes', () => {
     expect(seq()).toBe(base);
     d.remove();
   });
+
+  it('a pop-up in the address closing while the router queues a write: the write drops ?sheet=, and the router sees the step', async () => {
+    const layer = pushLayer(() => undefined, { address: { param: 'sheet', id: 'rename-w1' } });
+    expect(new URL(window.location.href).searchParams.get('sheet')).toBe('rename-w1');
+    const router = vi.fn();
+    window.addEventListener('popstate', router);
+    const closed = layer.release();
+    // A server action's refresh commits mid-close: the router writes its (stale) address with the pop-up in it.
+    window.history.replaceState({ refreshed: true }, '', '/workouts/w1?sheet=rename-w1');
+    await act(() => closed);
+    await settle();
+    window.removeEventListener('popstate', router);
+    expect(router).toHaveBeenCalled();
+    expect(window.location.pathname + window.location.search).toBe('/workouts/w1');
+    expect((window.history.state as { refreshed?: boolean }).refreshed).toBe(true);
+    expect(seq()).toBe(base);
+  });
 });

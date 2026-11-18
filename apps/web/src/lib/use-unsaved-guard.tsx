@@ -17,7 +17,15 @@ export type UnsavedGuard = {
 /**
  * Guards a page's unsaved changes (ui-rules §8): while `dirty`, Back and iOS swipe-back, in-app links (Next Link or a
  * plain <a>) and closing or reloading the tab all ask "Discard changes?" first, with Keep editing and Discard.
- * Navigations made in code: `await confirm()` first.
+ * Navigations made in code are not seen by the guard, so they must ask themselves:
+ *
+ *   const guard = useUnsavedGuard(dirty);
+ *   // A button that leaves the page:
+ *   onClick={async () => { if (await guard.confirm()) router.push('/workouts'); }}
+ *   // After a save, nothing to lose: take the guard off first, then navigate.
+ *   await guard.release(); router.replace(`/workouts/${id}`);
+ *
+ * Render `guard.prompt` somewhere in the page.
  */
 export function useUnsavedGuard(
   dirty: boolean,

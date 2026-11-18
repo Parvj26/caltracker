@@ -146,6 +146,29 @@ function withParam(href: string, param: string, id: string | null): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/**
+ * Pop-ups closed while they were in the address (`?sheet=<id>`). A write the router queued while one was open (a
+ * server action's refresh mid-close) still carries its param: it is taken off, so the address never shows a closed
+ * pop-up and the next one doesn't copy it.
+ */
+const closedAddresses = new Map<string, string>();
+function withoutClosed(url: string | URL | null | undefined): string | URL | null | undefined {
+  if (url == null || closedAddresses.size === 0) return url;
+  const u = new URL(String(url), window.location.href);
+  let changed = false;
+  for (const [param, id] of closedAddresses) {
+    const open = stack.some((e) => e.address?.param === param && e.address.id === id);
+    if (!open && u.searchParams.get(param) === id) {
+      u.searchParams.delete(param);
+      changed = true;
+    }
+  }
+  return changed ? `${u.pathname}${u.search}${u.hash}` : url;
+}
+
+/** The page a deferred push will land on: a write asked meanwhile belongs to that page. */
+let pendingPushPath: string | null = null;
+
 /** Writes history ourselves, through the (Next-patched) methods so the router's state and address stay in step. */
 function write(fn: () => void) {
   writing = true;
@@ -166,6 +189,7 @@ function rawPush(entry: Entry) {
   let url: string | undefined;
   if (entry.address) {
     const { param, id } = entry.address;
+    closedAddresses.delete(param);
     // A leftover ?sheet= (a shared link, a reload while open): off this entry first, so Back lands on the plain page.
     if (new URL(window.location.href).searchParams.has(param)) {
       const plain = withParam(window.location.href, param, null);
@@ -320,14 +344,17 @@ function onPopState(e: PopStateEvent) {
       stack.splice(i, 1);
     }
   }
+  for (const g of gone) if (g.address) closedAddresses.set(g.address.param, g.address.id);
   const t = traversals[0];
   // Same address under the layers that went: the router has nothing to do (and nothing waiting must be undone).
   const lowest = gone[gone.length - 1];
   const sameAddress = lowest !== undefined && window.location.href === lowest.href;
   if (t?.own) {
     // Never hidden when it left the page: the router must show where it landed.
+    // Nor when it closed a pop-up that was in the address (?sheet=): the router must drop it from its own state too.
     const samePage = window.location.pathname === t.fromPath;
-    if (samePage && (t.hide || sameAddress || deferred.length > 0)) e.stopImmediatePropagation();
+    const inAddress = gone.some((g) => g.address);
+    if (samePage && !inAddress && (t.hide || sameAddress || deferred.length > 0)) e.stopImmediatePropagation();
     t.done(true);
     return;
   }
@@ -433,6 +460,7 @@ export function installHistoryLayers() {
     settle();
     const target = url != null ? new URL(String(url), window.location.href) : new URL(window.location.href);
     const run = () => {
+      if (pendingPushPath === target.pathname) pendingPushPath = null;
       const base = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
       const ours = stack.filter((s) => s.pushed);
       if (ours.length > 0 && topIsCurrent()) {
@@ -454,17 +482,21 @@ export function installHistoryLayers() {
       stack.length = 0;
       for (const g of guards) g.entry = null;
     };
-    if (blocked()) deferred.push(run);
-    else run();
+    if (blocked()) {
+      pendingPushPath = target.pathname;
+      deferred.push(run);
+    } else run();
   } as History['pushState'];
 
   h.replaceState = function replaceState(data: unknown, unused: string, url?: string | URL | null) {
     if (writing) return innerReplace.call(h, data, unused, url);
     settle();
-    const fromPath = window.location.pathname;
+    // The page it was asked for: a push waiting its turn is where the router already is.
+    const fromPath = pendingPushPath ?? window.location.pathname;
     const run = () => {
       // Asked on a page the tab has since left (a Back raced it): it belongs to that page, not this one.
       if (window.location.pathname !== fromPath) return;
+      url = withoutClosed(url);
       const base = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
       const cur = h.state && typeof h.state === 'object' ? (h.state as Record<string, unknown>) : {};
       // Keep the entry's number whatever the caller passed (often null).
@@ -627,6 +659,8 @@ function dropGuardEntry(g: Guard): Promise<void> {
 /** For tests: forget everything (history itself is left as it is). */
 export function resetHistoryLayersForTests() {
   stack.length = 0;
+  closedAddresses.clear();
+  pendingPushPath = null;
   for (const t of traversals) clearTimeout(t.timer);
   traversals.length = 0;
   deferred = [];
