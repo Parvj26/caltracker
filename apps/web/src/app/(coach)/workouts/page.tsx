@@ -6,6 +6,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { escapeLike } from '../exercises/filters';
 import { WorkoutList } from './workout-list';
 import styles from './workouts.module.css';
+import { LibraryTabs } from '../library-tabs';
 
 export const metadata: Metadata = { title: 'Workouts' };
 
@@ -61,6 +62,7 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
           <ButtonLink href="/workouts/new">New workout</ButtonLink>
         </div>
       </header>
+      <LibraryTabs current="/workouts" />
 
       <WorkoutList rows={rows} initialQuery={q} limited={limited} limit={LIMIT} />
     </div>

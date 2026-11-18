@@ -9,6 +9,7 @@ import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { SessionReplayGate } from '@/lib/analytics/session-replay-gate';
 import { CoachSidebar } from './coach-sidebar';
 import type { NavIconName } from './nav-icons';
+import { LibraryNavItem } from './library-menu';
 import { loadUnreadTotal } from './messages/data';
 import { MessagesNavLink } from './messages-nav-link';
 import { NavLink } from './nav-link';
@@ -16,12 +17,12 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import styles from './coach.module.css';
 
 // `tab`: on an iPhone the tab bar has it, so the More sheet leaves it out.
-const NAV: { href: string; label: string; icon: NavIconName; tab?: boolean }[] = [
+type NavItem = { href: string; label: string; icon: NavIconName; tab?: boolean };
+const NAV_BEFORE_LIBRARY: NavItem[] = [
   { href: '/home', label: 'Home', icon: 'home', tab: true },
   { href: '/clients', label: 'Clients', icon: 'clients', tab: true },
-  { href: '/workouts', label: 'Workouts', icon: 'workouts' },
-  { href: '/programs', label: 'Programs', icon: 'programs', tab: true },
-  { href: '/exercises', label: 'Exercises', icon: 'exercises' },
+];
+const NAV_AFTER_LIBRARY: NavItem[] = [
   { href: '/meals', label: 'Meals', icon: 'meals' },
   { href: '/activity', label: 'Activity', icon: 'activity' },
   { href: '/community', label: 'Community', icon: 'community' },
@@ -58,7 +59,12 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           <p className={styles.workspace}>{coach.workspaceName}</p>
         </div>
         <nav aria-label="Main" className={styles.nav}>
-          {NAV.map(({ tab, ...item }) => (
+          {NAV_BEFORE_LIBRARY.map(({ tab, ...item }) => (
+            <NavLink key={item.href} {...item} className={tab ? styles.inTabBar : undefined} />
+          ))}
+          {/* Workouts, Exercises and Programs sit behind one Library item (an iPhone has it as a tab). */}
+          <LibraryNavItem className={styles.inTabBar} />
+          {NAV_AFTER_LIBRARY.map(({ tab, ...item }) => (
             <NavLink key={item.href} {...item} className={tab ? styles.inTabBar : undefined} />
           ))}
           <MessagesNavLink className={styles.inTabBar} />

@@ -1,0 +1,134 @@
+/* Library: the sidebar pop-up, the iPhone sheet and the Workouts | Exercises | Programs row. Colours only via var(--ct-*). */
+.backdrop {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  background: color-mix(in srgb, var(--ct-ink) 28%, transparent);
+}
+
+.popover {
+  position: fixed;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-3);
+  width: min(420px, calc(100vw - 100px));
+  box-sizing: border-box;
+  padding: var(--ct-space-4-5);
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: 24px;
+  background: var(--ct-bg);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ct-ink) 18%, transparent);
+  color: var(--ct-ink);
+}
+.heading {
+  margin: 0;
+  padding: 0 var(--ct-space-1) var(--ct-space-1);
+  font-size: 13px;
+  font-weight: var(--ct-weight-button);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ct-ink-muted);
+}
+
+.choices { display: flex; flex-direction: column; gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3-5);
+  min-height: 84px;
+  padding: var(--ct-space-2) var(--ct-space-4);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border);
+  border-radius: 18px;
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+.choice:hover { border-color: var(--ct-ink); }
+.choice:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.choice[aria-current='page'] { border-color: var(--ct-ink); }
+.choice svg { flex: none; }
+.letter {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: var(--ct-border-width-secondary-button) solid var(--ct-ink);
+  border-radius: 14px;
+  background: var(--ct-lime);
+  font-size: 20px;
+  font-weight: 800;
+}
+.choiceText { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.choiceName { font-size: 20px; font-weight: 800; }
+.choiceSub { font-size: 14px; color: var(--ct-ink-muted); }
+
+/* iPhone: the same choices as a bottom sheet just above the tab bar (like the More sheet). */
+.sheet {
+  position: fixed;
+  z-index: 41;
+  left: 0;
+  right: 0;
+  bottom: var(--coach-menu-room);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2-5);
+  max-height: calc(100dvh - 40px - var(--coach-menu-room));
+  overflow-y: auto;
+  padding: var(--ct-space-3) var(--ct-space-4) 18px;
+  border-top: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: 24px 24px 0 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.grab {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  margin-bottom: var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  background: color-mix(in srgb, var(--ct-ink) 20%, transparent);
+}
+.sheet .choices { gap: var(--ct-space-2-5); }
+.sheet .choice { gap: var(--ct-space-3-5); min-height: 76px; padding: var(--ct-space-2) var(--ct-space-4); }
+.sheet .letter { width: 44px; height: 44px; border-radius: var(--ct-radius-input); font-size: 18px; }
+.sheet .choiceName { font-size: 18px; }
+.sheet .choiceSub { font-size: 13px; }
+
+/* Workouts | Exercises | Programs at the top of each library page. */
+.tabs {
+  display: flex;
+  gap: 6px;
+  align-self: flex-start;
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-surface);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ct-tap-min);
+  padding: 0 18px;
+  border: var(--ct-border-width-secondary-button) solid transparent;
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-size: 15px;
+  font-weight: var(--ct-weight-button);
+  text-decoration: none;
+}
+.tab:hover { border-color: var(--ct-border); }
+.tab:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.tabOn,
+.tabOn:hover { border-color: var(--ct-ink); background: var(--ct-lime); }
+
+@media (max-width: 599.98px) {
+  .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-1); width: auto; align-self: stretch; padding: var(--ct-space-1); border-radius: 14px; }
+  .tabs li { display: contents; }
+  .tab { padding: 0 var(--ct-space-1); border-radius: 10px; font-size: 14px; }
+}
