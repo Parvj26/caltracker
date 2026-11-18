@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { MoreMenu } from '@/components/more-menu';
-import { ErrorText, ListRow, RowList, SearchBox, SearchCount, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { RowActionToast } from '@/components/row-toast';
+import { ListRow, RowList, SearchBox, SearchCount, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { DeleteProgram, type DeleteProgramHandle } from './[id]/delete-program';
 import { duplicateProgram } from './actions';
@@ -49,8 +50,7 @@ function ProgramMore({ id, name }: { id: string; name: string }) {
           { label: 'Delete…', onSelect: () => deleteRef.current?.open(), danger: true },
         ]}
       />
-      {pending ? <span className={styles.visuallyHidden} role="status">Duplicating…</span> : null}
-      {error ? <ErrorText code={error} /> : null}
+      <RowActionToast pending={pending} error={error} pendingText="Duplicating…" />
       <DeleteProgram id={id} name={name} handle={deleteRef} />
     </span>
   );

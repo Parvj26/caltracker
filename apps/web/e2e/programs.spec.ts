@@ -250,7 +250,7 @@ test('on an iPad in portrait all seven days fit and a long workout name wraps on
   const chip = programCell(page, 1, 5).getByRole('button', { name: workout, exact: true });
   await expect(chip).toHaveAttribute('title', workout);
   const lines = await chip.evaluate((el) => {
-    // The name's text node (the name span also holds the empty spacer the "⋯" button sits over).
+    // The name's text node.
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent!.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
     const text = walker.nextNode()!;
     const range = document.createRange();
@@ -266,10 +266,13 @@ test('on an iPad in portrait all seven days fit and a long workout name wraps on
   expect(lines.length).toBeGreaterThan(1);
   expect(lines.join(' ')).toBe(workout);
   for (const line of lines) expect(workout.split(' ')).toEqual(expect.arrayContaining(line.split(' ')));
-  // The "⋯" button sits in the chip's top-right corner, not on a row of its own under the name.
+  // With a mouse the "⋯" button sits in the chip, right-aligned on a slim row under the name: never on top of the name
+  // (the UI audit's overlap rule), and the name keeps the chip's full width so "Conditioning" stays whole.
   const chipBox = (await chip.locator('xpath=..').boundingBox())!;
+  const nameBox = (await chip.boundingBox())!;
   const menuBox = (await page.getByRole('button', { name: `Options for ${workout}` }).boundingBox())!;
-  expect(menuBox.y).toBeLessThanOrEqual(chipBox.y + 1);
+  expect(menuBox.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(chipBox.y + chipBox.height + 1);
   expect(Math.abs(menuBox.x + menuBox.width - (chipBox.x + chipBox.width))).toBeLessThanOrEqual(1);
 
   // A 1280 px laptop and an iPad in landscape also see all seven days without sideways scrolling.

@@ -180,6 +180,34 @@ test("the workout page's Delete workout refuses too while a program uses it, the
   expect((await admin.from('workouts').select('id').eq('id', w.id)).data).toHaveLength(0);
 });
 
+test('on the workout page with unsaved edits, Open “<program>” from the blocked delete asks before leaving', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const w = await seed('DirtyOpen');
+  const programName = `Uses ${unique()}`;
+  const programId = await seedProgram(admin, workspaceId, programName, 1, [{ week: 1, day: 1, workoutId: w.id }]);
+  created.programs.push(programId);
+  await signInAsCoach(page);
+  await page.goto(`/workouts/${w.id}`);
+  await page.getByLabel('Workout notes').fill('Half-written note');
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  const discard = page.getByRole('alertdialog', { name: 'Discard changes?' });
+
+  // Keep editing: the workout and its edits stay.
+  await page.getByRole('button', { name: 'Delete workout' }).click();
+  const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
+  await told.getByRole('button', { name: `Open “${programName}”` }).click();
+  await expect(discard).toBeVisible();
+  await discard.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page).toHaveURL(new RegExp(`/workouts/${w.id}$`));
+  await expect(page.getByLabel('Workout notes')).toHaveValue('Half-written note');
+
+  // Discard: on to the program.
+  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await told.getByRole('button', { name: `Open “${programName}”` }).click();
+  await discard.getByRole('button', { name: 'Discard' }).click();
+  await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
+});
+
 test("Delete… refuses a workout in the starting plan of an invited client who hasn't joined yet", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const w = await seed('InvitePlan');

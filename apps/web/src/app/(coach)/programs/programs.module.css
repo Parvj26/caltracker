@@ -223,7 +223,9 @@
 }
 /* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
    than the whole chip is cut with "…" (the full name is in the title). */
-.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+/* Up to 3 lines. Names wrap between words; a single word wider than the whole chip wraps inside itself rather than
+   being cut off (anywhere only breaks a word that can't fit on a line of its own). */
+.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .chipMenuButton {
   flex: none;
   width: var(--ct-tap-min);
@@ -237,10 +239,13 @@
   cursor: pointer;
 }
 .chipMenuButton:hover, .chipMenuButton[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
-/* The weeks x days grid has narrow days. With a mouse, ⋯ is a slim 28 px column so the name keeps its room. On touch
-   it is left out there: a tap on the workout opens its summary, which has Copy to…, Move to… and Remove. */
+/* The weeks x days grid has narrow days. With a mouse, ⋯ is a slim row under the name (right-aligned): beside the
+   name it would leave too little room, and "Conditioning" would break or be cut. On touch it is left out there: a tap
+   on the workout opens its summary, which has Copy to…, Move to… and Remove. */
 @media (hover: hover) and (pointer: fine) {
-  .grid .chipMenuButton { width: calc(var(--ct-space-6) + var(--ct-space-1)); }
+  .grid .chip { flex-wrap: wrap; }
+  .grid .chipHandle { flex-basis: 100%; }
+  .grid .chipMenuButton { width: calc(var(--ct-space-6) + var(--ct-space-1)); min-height: var(--ct-space-6); margin-left: auto; }
 }
 @media (hover: none) and (pointer: coarse) {
   .grid .chipMenuButton { display: none; }

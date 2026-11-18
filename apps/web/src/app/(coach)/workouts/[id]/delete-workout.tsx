@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui';
+import { confirmLeavePage } from '@/lib/history-layers';
 import { DeleteDialog } from '../workout-row-actions';
 
 /**
@@ -18,7 +19,7 @@ export function DeleteWorkout({ id, name }: { id: string; name: string }) {
       <Button variant="secondary" onClick={() => setOpen(true)}>
         Delete workout
       </Button>
-      {open ? <DeleteDialog id={id} name={name} onClose={() => setOpen(false)} onDeleted={() => router.replace('/workouts')} /> : null}
+      {open ? <DeleteDialog id={id} name={name} onClose={() => setOpen(false)} onDeleted={() => router.replace('/workouts')} confirmLeave={confirmLeavePage} /> : null}
     </>
   );
 }

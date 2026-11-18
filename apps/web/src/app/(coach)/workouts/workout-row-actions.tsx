@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, useTransition, type FormEvent } fro
 import { DialogHeader } from '@/components/assign/dialog-header';
 import { useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
+import { RowActionToast } from '@/components/row-toast';
 import { AdaptiveDialog, Button, ButtonLink, ErrorText, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
@@ -71,12 +72,7 @@ export function WorkoutRowMore({ id, name }: { id: string; name: string }) {
       >
         {DotsIcon}
       </button>
-      {duplicate.pending ? (
-        <span className={coach.srClose} role="status">
-          Duplicating…
-        </span>
-      ) : null}
-      {duplicate.error ? <ErrorText code={duplicate.error} /> : null}
+      <RowActionToast pending={duplicate.pending} error={duplicate.error} pendingText="Duplicating…" />
 
       {sheetOpen ? (
         <ActionSheet
@@ -322,7 +318,20 @@ function usesText(uses: WorkoutUses): string {
  * Delete…: asks first. A workout still used in a program or an open invite's starting plan can't be deleted (that
  * would empty those days); the window says where it is used instead. Used by the Workouts list and the workout page.
  */
-export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
+export function DeleteDialog({
+  id,
+  name,
+  onClose,
+  onDeleted,
+  confirmLeave,
+}: {
+  id: string;
+  name: string;
+  onClose: () => void;
+  onDeleted?: () => void;
+  /** Before "Open “<program>”" leaves the page: asks first when the page has unsaved changes (the workout page). */
+  confirmLeave?: () => Promise<boolean>;
+}) {
   const ref = useRef<AdaptiveDialogHandle>(null);
   const router = useRouter();
   const bodyId = useId();
@@ -419,6 +428,8 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
                 onClick={() => {
                   void (async () => {
                     await ref.current?.close();
+                    // Unsaved builder edits under it: "Discard changes?" first (code navigation isn't guarded).
+                    if (confirmLeave && !(await confirmLeave())) return;
                     router.push(`/programs/${p.id}`);
                   })();
                 }}
