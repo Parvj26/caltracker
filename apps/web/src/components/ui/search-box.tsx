@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type InputHTMLAttributes, type RefObject } from 'react';
+import { replaceParam } from '@/lib/url-state';
 import { cx } from './cx';
 import styles from './search-box.module.css';
 
@@ -137,6 +138,12 @@ export function useDebounced(value: string, delay = 120): string {
  * kept in the address (replaced, not pushed), so Back to the page brings the same results. `delay: 0` filters on every
  * key (a combobox whose Enter and arrows act on the list must never see an older list).
  */
+/** Puts the search text in the address (blank: no ?q=), when it differs. */
+function writeQuery(urlParam: string, text: string) {
+  const value = text.trim() ? text : '';
+  if ((new URLSearchParams(window.location.search).get(urlParam) ?? '') !== value) replaceParam(urlParam, value, '');
+}
+
 export function useSearchQuery({ initial = '', urlParam, delay = 120 }: { initial?: string; urlParam?: string; delay?: number } = {}) {
   // Start from the address, not only the server's `initial`: Back can bring the page from Next's client cache, whose
   // props are from before the text was typed, while the address (updated as you type) still holds ?q=.
@@ -152,13 +159,27 @@ export function useSearchQuery({ initial = '', urlParam, delay = 120 }: { initia
       first.current = false;
       return;
     }
-    const url = new URL(window.location.href);
-    if (debounced.trim()) url.searchParams.set(urlParam, debounced);
-    else url.searchParams.delete(urlParam);
-    const next = `${url.pathname}${url.search}${url.hash}`;
-    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-      window.history.replaceState(window.history.state, '', next);
-    }
+    // Through replaceParam (state null), so Next's router sees the address too: a refresh keeps ?q=.
+    writeQuery(urlParam, debounced);
   }, [debounced, urlParam]);
+  // A tap or Enter straight after typing (inside the 120 ms) writes the text first: written later, it would land in
+  // the middle of the navigation that tap started and cancel it.
+  const latest = useRef(query);
+  useEffect(() => {
+    latest.current = query;
+  }, [query]);
+  useEffect(() => {
+    if (!urlParam) return;
+    const now = () => writeQuery(urlParam, latest.current);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') now();
+    };
+    document.addEventListener('pointerdown', now, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', now, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [urlParam]);
   return { query, setQuery, debounced, searching: debounced.trim() !== '' };
 }

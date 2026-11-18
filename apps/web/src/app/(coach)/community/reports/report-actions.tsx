@@ -4,11 +4,13 @@ import type { ErrorCode } from '@caltracker/shared';
 import { useState, useTransition } from 'react';
 import { Button, ErrorText } from '@/components/ui';
 import { resolveReport } from '../actions';
+import { useConfirm } from '../use-confirm';
 import styles from '../community.module.css';
 
 export function ReportActions({ reportId, kind }: { reportId: string; kind: 'post' | 'comment' }) {
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
+  const confirm = useConfirm();
   const act = (resolution: 'removed' | 'kept') =>
     startTransition(async () => {
       setError(null);
@@ -20,7 +22,13 @@ export function ReportActions({ reportId, kind }: { reportId: string; kind: 'pos
       <Button
         pending={pending}
         onClick={() => {
-          if (window.confirm(`Delete this ${kind} for everyone?`)) act('removed');
+          confirm.ask({
+            title: `Delete this ${kind}?`,
+            body: `It goes for everyone in the community.`,
+            confirmLabel: `Delete ${kind}`,
+            onConfirm: () => resolveReport(reportId, 'removed'),
+            historyId: `remove-report-${reportId}`,
+          });
         }}
       >
         Remove {kind}
@@ -29,6 +37,7 @@ export function ReportActions({ reportId, kind }: { reportId: string; kind: 'pos
         Keep it
       </Button>
       {error ? <ErrorText code={error} /> : null}
+      {confirm.dialog}
     </div>
   );
 }

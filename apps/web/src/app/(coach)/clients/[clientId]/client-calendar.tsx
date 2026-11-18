@@ -11,6 +11,7 @@ import { storeCalendarView, useStoredCalendarView } from '@/components/calendar/
 import { ReloadButton } from '@/components/reload-button';
 import { Button } from '@/components/ui';
 import { ActionRefusedError, STALE_DEPLOY_MESSAGE, isStaleDeployError } from '@/lib/action-errors';
+import { useRememberUrl } from '@/lib/history-back';
 import { useLocalToday } from '@/lib/local-today';
 import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
@@ -104,6 +105,8 @@ export function ClientCalendar({
   const readOnly = client.removedAt !== null;
   const pathname = usePathname();
   const router = useRouter();
+  // So the log pages' "← calendar" can reopen this week and view where the browser can't step back to it.
+  useRememberUrl();
   const storedView = useStoredCalendarView(coachId);
   const view = viewParam ?? storedView ?? DEFAULT_CALENDAR_VIEW;
   const range = calendarRange(view, from ?? today);

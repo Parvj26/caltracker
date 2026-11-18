@@ -26,6 +26,7 @@ import { MeasuresDialog } from './measures-dialog';
 import { ScanDialog } from './scan-dialog';
 import { customKey } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
+import { useUrlChoice } from '@/lib/url-state';
 import styles from './progress.module.css';
 import { openLayer } from '@/lib/open-layer';
 
@@ -53,7 +54,8 @@ export function ProgressSection({
   openScan: boolean;
 }) {
   const today = useLocalToday();
-  const [range, setRange] = useState<ChartRange>('1y');
+  // Kept in the address (?range=), so a reload or Back to this tab keeps the chart's range.
+  const [range, setRange] = useUrlChoice<ChartRange>('range', CHART_RANGES, '1y');
   const [editing, setEditing] = useState<Editing | null>(openScan && !readOnly ? { scan: null } : null);
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState<ScanRow | null>(null);

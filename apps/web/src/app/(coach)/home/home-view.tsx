@@ -34,6 +34,7 @@ import { ClientSearch } from './client-search';
 import { RowMenu } from './row-menu';
 import { avatarTone, initials } from '../clients/avatar';
 import styles from './home.module.css';
+import { useUrlChoice } from '@/lib/url-state';
 
 /** Needs attention shows this many rows first, then "Show all". */
 const SHOWN = 6;
@@ -113,7 +114,8 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
   const greeting = useGreeting();
   const nowMs = useMinute();
   const router = useRouter();
-  const [filter, setFilter] = useState<AttentionFilter>('all');
+  // The picked chip is kept in the address (?needs=), so Back to Home or a reload keeps it.
+  const [filter, setFilter] = useUrlChoice<AttentionFilter>('needs', FILTERS, 'all');
   const [showAll, setShowAll] = useState(false);
   // The server data is from page load: when the browser's day changes, load it again.
   const lastToday = useRef(today);

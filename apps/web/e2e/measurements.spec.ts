@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { demoWorkspace } from './assign-helpers';
-import { pickExercise, pickSetType, serviceClient, setRow, signInAsCoach } from './helpers';
+import { pickExercise, pickSetType, serviceClient, setRow, signInAsCoach, workoutPageMenu } from './helpers';
 
 // Measurements tab (Weight / Reps / Time per exercise), Each side and Tempo, remembering the coach's last choice,
 // and the compact iPhone-width editor. Each test uses its own custom exercise, so the remembered choices it makes
@@ -229,7 +229,7 @@ test('duplicating a workout copies its measurements but leaves the remembered ch
   const { error } = await admin.from('exercise_prefs').update({ tracking_type: null, each_side: true }).eq('exercise_id', exId);
   if (error) throw error;
 
-  await page.getByRole('button', { name: 'Duplicate workout' }).click();
+  await workoutPageMenu(page, name, 'Duplicate');
   await expect(page.getByRole('heading', { level: 1, name: `${name} (copy)` })).toBeVisible();
   await expect(measurements(page, ex)).toHaveText('Weight · Reps · Time · Rest');
   const prefs = await admin.from('exercise_prefs').select('tracking_type, each_side').eq('exercise_id', exId).single();

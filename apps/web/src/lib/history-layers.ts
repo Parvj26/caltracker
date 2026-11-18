@@ -283,6 +283,17 @@ function cannotGoBackTwo(): boolean {
   return typeof index === 'number' && index < 2;
 }
 
+/**
+ * True when the entry `delta` steps away is another document (opened by a reload, a typed address or a link from
+ * outside): going there loads that page, and no popstate comes here meanwhile, however slow the server.
+ */
+function leavesDocument(delta: number): boolean {
+  const nav = (window as unknown as { navigation?: { currentEntry?: { index?: number } | null; entries?: () => { sameDocument?: boolean }[] } }).navigation;
+  const index = nav?.currentEntry?.index;
+  if (typeof index !== 'number' || !nav?.entries) return false;
+  return nav.entries()[index + delta]?.sameDocument === false;
+}
+
 function guardBack(g: Guard): false {
   void g.ask().then(async (discard) => {
     if (!discard || !g.entry) return;
@@ -292,6 +303,12 @@ function guardBack(g: Guard): false {
     if (!cannotGoBackTwo()) {
       const i = stack.indexOf(entry);
       if (i >= 0) stack.splice(i, 1);
+      // To another document: the browser loads it (no popstate will say so). Waiting for one would time out on a
+      // slow server, and the fallback below would then step a page too far.
+      if (leavesDocument(-2)) {
+        window.history.go(-2);
+        return;
+      }
       // From the guard entry (put back): over it and the page, to where Back was going.
       if (await traverse(-2)) return;
       // Nothing that far back after all: still on the guard entry.

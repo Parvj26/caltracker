@@ -141,14 +141,15 @@ test('invite with a program: it shows on the Invited row and goes on their calen
   await expect(row).toContainText(program.name);
   await expect(row).toContainText(`starts ${shortDay(start)}`);
 
-  // They join: the program is on their calendar from its start day, and the list (on Active again after a reload)
-  // shows them as a client with it.
+  // They join: the program is on their calendar from its start day, and the list (opened again on Active) shows
+  // them as a client with it.
   const clientId = await joinAs(email, 'Pat', `Program${tag}`);
   const copies = await admin.from('workouts').select('scheduled_on, assignment_id').eq('client_id', clientId).order('scheduled_on');
   expect(copies.error).toBeNull();
   expect(copies.data!.map((w) => w.scheduled_on)).toEqual([start, dayOffset(4), dayOffset(9)]);
   expect(copies.data!.every((w) => w.assignment_id !== null)).toBe(true);
-  await page.reload();
+  // A reload would stay on Invited (the chip is in the address); the plain list opens on Active.
+  await page.goto('/clients');
   const joined = table.locator(`[data-client-id="${clientId}"]`);
   await expect(joined).toContainText(program.name);
   await expect(joined).not.toContainText('Invited');
@@ -242,7 +243,8 @@ test('invites are listed newest first under Invited, apart from the clients', as
   const newer = `newer-${run}@example.com`;
   await add('Ada', 'Aardvark', older);
   await add('Zoe', 'Zulu', newer);
-  await page.reload();
+  // The plain list (a reload would stay on Invited: the chip is in the address).
+  await page.goto('/clients');
   // Active (the default) lists clients only; invites wait under Invited.
   const table = page.getByRole('table', { name: 'Clients', exact: true });
   await expect(table.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();

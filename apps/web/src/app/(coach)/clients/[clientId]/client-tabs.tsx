@@ -53,7 +53,8 @@ function useScrollHints<T extends HTMLElement>() {
 }
 
 /**
- * The client page's tabs. Each is a link to its own address, so back, reload and shared links all work. Settings is
+ * The client page's tabs. Each is a link to its own address, so reload and shared links work. A tab opens in place
+ * of the one before (no new history entry), so one Back leaves the client, whichever tabs were looked at. Settings is
  * not a tab: it opens from the bar's "⋯" (its page, /settings, has no current tab).
  */
 export function ClientTabs({ clientId }: { clientId: string }) {
@@ -91,6 +92,7 @@ export function ClientTabs({ clientId }: { clientId: string }) {
               <li key={t.label}>
                 <Link
                   href={`/clients/${clientId}${t.path}`}
+                  replace
                   aria-current={current ? 'page' : undefined}
                   className={cx(styles.tab, current && styles.tabCurrent)}
                 >

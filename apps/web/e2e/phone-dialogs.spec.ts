@@ -101,14 +101,18 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await expect(post.getByRole('menuitem', { name: 'Pin to top' })).toBeVisible();
     await expectTappable(post.getByRole('menuitem', { name: 'Pin to top' }));
 
-    // Saying no to the question keeps the post.
-    page.once('dialog', (d) => void d.dismiss());
+    // Delete asks first, in the app's own sheet; saying no keeps the post.
     await post.getByRole('menuitem', { name: 'Delete post…' }).click();
+    const ask = page.getByRole('alertdialog', { name: 'Delete this post?' });
+    await expect(ask).toBeVisible();
+    await expectTappable(ask.getByRole('button', { name: 'Delete post' }));
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    await expect(ask).toBeHidden();
     await expect(post).toHaveCount(1);
 
-    page.once('dialog', (d) => void d.accept());
     await more.click();
     await post.getByRole('menuitem', { name: 'Delete post…' }).click();
+    await page.getByRole('alertdialog', { name: 'Delete this post?' }).getByRole('button', { name: 'Delete post' }).click();
     await expect(post).toHaveCount(0);
   });
 

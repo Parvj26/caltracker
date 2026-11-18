@@ -118,7 +118,10 @@ test('build program: new, name, weeks, workouts and copy week are labelled', asy
 test('workout editor: add exercise, search, pick, sets and save are labelled', async ({ page }) => {
   await signInAsCoach(page);
   await page.goto('/workouts/new');
-  for (const n of ['workout_add_exercise', 'workout_save']) await expect(label(page, n)).toBeVisible();
+  await expect(label(page, 'workout_add_exercise')).toBeVisible();
+  // Save shows once there is something to save.
+  await page.getByLabel('Workout name').fill('Label check');
+  await expect(label(page, 'workout_save')).toBeVisible();
   await label(page, 'workout_add_exercise').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.locator('[data-ph-capture-attribute-label="workout_exercise_search"]')).toBeVisible();

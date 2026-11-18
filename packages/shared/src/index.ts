@@ -155,6 +155,7 @@ export {
 export { workoutPreview } from './workouts/preview';
 export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
 export type { WorkoutSummaryRow } from './workouts/summary';
+export { blockBadges, supersetLetter } from './workouts/badges';
 export { blockCollapsedSummary, exerciseCollapsedLine, stepReps, stepWeight, weightStep } from './workouts/collapsed';
 export type { CollapsedBlock } from './workouts/collapsed';
 export {
@@ -281,6 +282,7 @@ export { canStartSessionOn, coachSessionState, completeAllOpenSets, completeAllS
 export { logReviewByLog } from './logs/review';
 export type { LogReview } from './logs/review';
 export { rebaseEdits } from './logs/rebase';
+export { draftConflicts, draftEdits } from './logs/draft-edits';
 export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';

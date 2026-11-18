@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createWorkout, pickSetType, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createWorkout, pickSetType, serviceClient, setRow, signInAsCoach, workoutNotes } from './helpers';
 
 // The workout editor redesign (coach feedback, approved mockup): tap the name to swap, icon buttons in the header,
 // one-letter set types (W / N / F / D), one rep count, × to remove a set, "+ Set (copies last set)", no per-set notes.
@@ -142,6 +142,9 @@ test('a saved rep range shows and saves as its top number', async ({ page }) => 
   await expect(page.getByLabel('Min reps')).toHaveCount(0);
   // Showing a range as one number isn't an unsaved change by itself.
   await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save workout' })).toHaveCount(0);
+  // The next save (after any change) writes the single number.
+  await (await workoutNotes(page)).fill('Top of the range.');
   await page.getByRole('button', { name: 'Save workout' }).click();
   await expect(page.getByRole('status').filter({ hasText: '✓ Saved' })).toBeVisible();
   const sets = await savedSets(id);

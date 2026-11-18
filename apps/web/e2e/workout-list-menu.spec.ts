@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { targetFieldsFor } from '@caltracker/shared';
 import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach, listRow } from './helpers';
+import { serviceClient, signInAsCoach, listRow, workoutNotes, workoutPageMenu } from './helpers';
 
 // The Workouts list's ⋯: Preview, Rename and Delete… on iPad and desktop (beside Assign and Duplicate); on an iPhone,
 // Assign and ⋯, which opens a sheet from the bottom with Preview, Duplicate, Rename and Delete…. Delete asks first and
@@ -161,7 +161,7 @@ test("the workout page's Delete workout refuses too while a program uses it, the
   created.programs.push(programId);
   await signInAsCoach(page);
   await page.goto(`/workouts/${w.id}`);
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
   await expect(told).toContainText(`Used in “${programName}” — remove it from that program first.`);
   await expect(told.getByRole('button', { name: 'Delete workout' })).toHaveCount(0);
@@ -173,7 +173,7 @@ test("the workout page's Delete workout refuses too while a program uses it, the
 
   // Out of the program, it can go.
   await admin.from('program_workouts').delete().eq('program_id', programId);
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   const ask = page.getByRole('alertdialog', { name: `Delete “${w.name}”?` });
   await ask.getByRole('button', { name: 'Delete workout' }).click();
   await expect(page).toHaveURL(/\/workouts$/);
@@ -188,21 +188,21 @@ test('on the workout page with unsaved edits, Open “<program>” from the bloc
   created.programs.push(programId);
   await signInAsCoach(page);
   await page.goto(`/workouts/${w.id}`);
-  await page.getByLabel('Workout notes').fill('Half-written note');
+  await (await workoutNotes(page)).fill('Half-written note');
   await expect(page.getByText('Unsaved changes')).toBeVisible();
   const discard = page.getByRole('alertdialog', { name: 'Discard changes?' });
 
   // Keep editing: the workout and its edits stay.
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
   await told.getByRole('button', { name: `Open “${programName}”` }).click();
   await expect(discard).toBeVisible();
   await discard.getByRole('button', { name: 'Keep editing' }).click();
   await expect(page).toHaveURL(new RegExp(`/workouts/${w.id}$`));
-  await expect(page.getByLabel('Workout notes')).toHaveValue('Half-written note');
+  await expect(await workoutNotes(page)).toHaveValue('Half-written note');
 
   // Discard: on to the program.
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   await told.getByRole('button', { name: `Open “${programName}”` }).click();
   await discard.getByRole('button', { name: 'Discard' }).click();
   await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
