@@ -663,7 +663,15 @@ function focusLost(): boolean {
 function restoreFocus(openers: HTMLElement[]) {
   const run = () => {
     if (!focusLost()) return;
-    const target = openers.find((el) => el.isConnected && el.getClientRects().length > 0 && !el.closest('[inert], dialog:not([open])'));
+    // On a touch screen a text field would pop the keyboard back up (iOS swipe-back): skip those, as showDialog does.
+    const touch = typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    const target = openers.find(
+      (el) =>
+        el.isConnected &&
+        el.getClientRects().length > 0 &&
+        !el.closest('[inert], dialog:not([open])') &&
+        !(touch && el.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')),
+    );
     target?.focus({ preventScroll: true });
   };
   setTimeout(run, 0);

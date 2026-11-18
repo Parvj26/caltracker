@@ -28,7 +28,8 @@ export function WorkoutPicker({ cellLabel, library, hints, onPick, onClose, forP
   // A bottom sheet on a phone (full height: the list is long), a centred dialog wider up; Back closes it.
   return (
     <AdaptiveDialog
-      historyId="add-workout"
+      // Unique per day ("pick-workout-week-1-day-4"), and apart from the calendar's own "add-workout" pop-up.
+      historyId={`pick-workout-${cellLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}
       title={`Add a workout to ${cellLabel}`}
       titleSafe
       onClose={onClose}
