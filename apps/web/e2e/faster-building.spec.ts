@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach, workoutPageMenu } from './helpers';
 
 // Faster building (spec: docs/superpowers/specs/2026-11-06-coach-faster-building-design.md): several exercises at
 // once (each starts with 1 set), duplicate a workout or program, copy a program week. (Copy set 1 / fill down gave way to
@@ -87,7 +87,7 @@ test('duplicate a workout from its page and from the list', async ({ page }) => 
   await createWorkout(page, name);
   const original = page.url();
 
-  await page.getByRole('button', { name: 'Duplicate workout' }).click();
+  await workoutPageMenu(page, name, 'Duplicate');
   await expect(page.getByRole('heading', { level: 1, name: `${name} (copy)` })).toBeVisible();
   expect(page.url()).not.toBe(original);
   await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Reps', { exact: true })).toHaveValue('8');

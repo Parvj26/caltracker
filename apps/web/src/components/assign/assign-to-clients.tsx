@@ -50,7 +50,20 @@ const MAYBE_SENT = 'Check the calendars before assigning again: the first try ma
  * "Assign" on a library workout or program: opens the dialog, and after a full success closes it and says so in a
  * toast (a partial one keeps the dialog open with each client's answer).
  */
-export function AssignButton({ kind, id, name, compact = false }: { kind: 'workout' | 'program'; id: string; name: string; compact?: boolean }) {
+export function AssignButton({
+  kind,
+  id,
+  name,
+  compact = false,
+  secondary = false,
+}: {
+  kind: 'workout' | 'program';
+  id: string;
+  name: string;
+  compact?: boolean;
+  /** An outlined "Assign" for an editor's header, where Save is the one main button (UI rules §4). */
+  secondary?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -64,6 +77,10 @@ export function AssignButton({ kind, id, name, compact = false }: { kind: 'worko
     <>
       {compact ? (
         <Button variant="quiet" size="compact" aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open">
+          Assign
+        </Button>
+      ) : secondary ? (
+        <Button variant="secondary" aria-label={kind === 'workout' ? 'Assign workout' : 'Assign program'} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
           Assign
         </Button>
       ) : (

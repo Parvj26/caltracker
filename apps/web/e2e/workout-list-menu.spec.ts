@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { targetFieldsFor } from '@caltracker/shared';
 import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, workoutPageMenu } from './helpers';
 
 // The Workouts list's ⋯: Preview, Rename and Delete… on iPad and desktop (beside Assign and Duplicate); on an iPhone,
 // Assign and ⋯, which opens a sheet from the bottom with Preview, Duplicate, Rename and Delete…. Delete asks first and
@@ -146,7 +146,7 @@ test("the workout page's Delete workout refuses too while a program uses it, the
   created.programs.push(programId);
   await signInAsCoach(page);
   await page.goto(`/workouts/${w.id}`);
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
   await expect(told).toContainText('Used in 1 program — remove it from that program first.');
   await expect(told.getByRole('button', { name: 'Delete workout' })).toHaveCount(0);
@@ -158,7 +158,7 @@ test("the workout page's Delete workout refuses too while a program uses it, the
 
   // Out of the program, it can go.
   await admin.from('program_workouts').delete().eq('program_id', programId);
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  await workoutPageMenu(page, w.name, 'Delete…');
   const ask = page.getByRole('alertdialog', { name: `Delete “${w.name}”?` });
   await ask.getByRole('button', { name: 'Delete workout' }).click();
   await expect(page).toHaveURL(/\/workouts$/);
