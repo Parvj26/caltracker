@@ -59,6 +59,7 @@ import { AddSectionMenu } from './add-section-menu';
 import { SectionHeader } from './section-header';
 import { BlockEditor, restState, type BlockActions } from './block-editor';
 import { ExercisePicker } from './exercise-picker';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { Icon } from './icons';
 import { MoreSheet, PhoneExerciseEditor, PhoneLink, PhoneRow, phoneCardHasErrors, type Card } from './phone-builder';
 import { ReorderDialog, type ReorderRun } from './reorder-dialog';
@@ -83,6 +84,8 @@ type Props = {
   saveLabel?: string;
   /** Told when the workout gains or loses unsaved changes. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Inside a sheet that guards its own unsaved changes (a program day): no page-level leave guard. */
+  embedded?: boolean;
   /** Called after each successful save. Without it, a new library workout moves to /workouts/[id]. */
   onSaved?: (id: string) => void;
   /** True when `initial` has never been saved (it shows no "Saved" status yet). */
@@ -191,6 +194,7 @@ export function WorkoutBuilder({
   saveWith,
   saveLabel = 'Save workout',
   onDirtyChange,
+  embedded = false,
 }: Props) {
   const router = useRouter();
   // One rep count per set: an older range (10–12) shows, and saves, as its top number. Not an unsaved change by itself.
@@ -276,8 +280,11 @@ export function WorkoutBuilder({
     el.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: narrow ? 'start' : 'nearest' });
   }, [openId]);
 
+  // A page of its own: Back, links and closing the tab ask before losing unsaved changes. Inside a sheet (a program
+  // day) the sheet asks instead, so only closing the tab is guarded here.
+  const guard = useUnsavedGuard(dirty && !embedded);
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || !embedded) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       // Older browsers need returnValue set to show the prompt.
@@ -285,7 +292,7 @@ export function WorkoutBuilder({
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [dirty, embedded]);
 
   function save() {
     setFormError(null);
@@ -329,7 +336,8 @@ export function WorkoutBuilder({
       if (onSaved) onSaved(outcome.id);
       else if (mode === 'library' && isNew) {
         lastNewSave = { id: outcome.id, at };
-        router.replace(`/workouts/${outcome.id}`);
+        // Saved, so nothing to guard: take the guard's history entry off first, then swap the address.
+        void guard.release().then(() => router.replace(`/workouts/${outcome.id}`));
       }
     });
   }
@@ -916,6 +924,7 @@ export function WorkoutBuilder({
           onClose={() => setPicker(null)}
         />
       ) : null}
+      {guard.prompt}
     </div>
   );
 }

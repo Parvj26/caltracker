@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ExerciseIndexRow, ExercisePick } from '@caltracker/shared';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
+import { Button } from '@/components/ui/button';
 import styles from '@/components/exercise-search/exercise-search.module.css';
+import discardStyles from '@/components/ui/adaptive-dialog.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 type Props = {
   title: string;
@@ -36,12 +39,23 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const discardId = useId();
+  // Picked but not added yet: closing (×, Cancel, Escape, a tap outside, Back) asks before dropping them.
+  const [picked, setPicked] = useState(0);
+  const [asking, setAsking] = useState(false);
+  const requestClose = () => {
+    if (picked > 0) setAsking(true);
+    else dialogRef.current?.close();
+  };
+  useEffect(() => {
+    if (asking) dialogRef.current?.querySelector<HTMLButtonElement>('[data-discard-keep]')?.focus();
+  }, [asking]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     // The picker unmounts when it closes, so hand focus back to the button that opened it.
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       // Without scrolling: the builder scrolls to what was just added, and the opener was in sight when tapped.
       if (opener?.isConnected) opener.focus({ preventScroll: true });
@@ -49,13 +63,41 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
   }, []);
 
   return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
+    <dialog
+      ref={dialogRef}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      onClose={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onCancel={(e) => {
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        if (asking) setAsking(false);
+        else requestClose();
+      }}
+    >
       <div className={styles.dialogHead}>
         <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
-        <button type="button" className={styles.close} aria-label="Close picker" onClick={() => dialogRef.current?.close()}>
+        <button type="button" className={styles.close} aria-label="Close picker" onClick={requestClose}>
           <span aria-hidden="true">✕</span>
         </button>
       </div>
+      {asking ? (
+        <div className={discardStyles.discard} role="group" aria-labelledby={discardId}>
+          <p id={discardId} className={discardStyles.discardText} data-ph-safe="">
+            <strong>Discard changes?</strong> {picked === 1 ? '1 picked exercise isn’t added yet.' : `${picked} picked exercises aren’t added yet.`}
+          </p>
+          <div className={discardStyles.discardActions}>
+            <Button variant="secondary" size="compact" data-discard-keep="" onClick={() => setAsking(false)} phSafe>
+              Keep picking
+            </Button>
+            <Button variant="danger" size="compact" onClick={() => dialogRef.current?.close()} phSafe>
+              Discard
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <SearchPanel
         mode={multiple ? 'pick-many' : 'pick-one'}
         workspaceId={workspaceId}
@@ -66,7 +108,8 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
         {...(footerNote ? { footerExtra: <p className={styles.footerNote}>{footerNote}</p> } : {})}
         {...(excludeKey ? { rowFilter } : {})}
         onPick={onPick}
-        onCancel={() => dialogRef.current?.close()}
+        onCancel={requestClose}
+        onSelectionChange={setPicked}
       />
     </dialog>
   );

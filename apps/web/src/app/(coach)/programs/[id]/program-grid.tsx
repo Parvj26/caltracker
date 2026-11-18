@@ -50,6 +50,7 @@ import { usePhone } from './use-phone';
 import { WorkoutSheet, type SheetSaved, type SheetTarget } from './workout-sheet';
 import styles from '../programs.module.css';
 import { programWorkoutSaved } from '@/lib/analytics/client';
+import { useBackLayer } from '@/lib/open-layer';
 
 export type Slot = { id: string; week: number; day: number; position: number; workoutId: string; workoutName: string };
 export type LibraryWorkout = { id: string; name: string };
@@ -808,6 +809,8 @@ function SlotChip({
   const data: DragData = { kind: 'slot', slot };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `slot-${slot.id}`, data });
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLLIElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

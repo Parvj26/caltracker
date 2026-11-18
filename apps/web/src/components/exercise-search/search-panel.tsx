@@ -22,6 +22,7 @@ import { ResultList } from './result-list';
 import styles from './exercise-search.module.css';
 import { track } from '@/lib/analytics/client';
 import { useMediaQuery } from '@/lib/use-media-query';
+import { useBackLayer } from '@/lib/open-layer';
 
 /** Matches the CSS breakpoint below which the preview opens over the list instead of beside it. */
 const NARROW_QUERY = '(max-width: 900px)';
@@ -49,6 +50,8 @@ type Props = {
   initialFilters?: Partial<SearchFilters>;
   /** An extra yes/no test on each row, applied after the search (must be a stable function). */
   rowFilter?: (row: ExerciseIndexRow) => boolean;
+  /** Pick-many mode: how many are picked but not yet added (the picker asks before dropping them). */
+  onSelectionChange?: (count: number) => void;
 };
 
 const PAGE_SIZE = 50;
@@ -71,6 +74,7 @@ export function SearchPanel({
   initialQuery = '',
   initialFilters,
   rowFilter,
+  onSelectionChange,
 }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const listId = useId();
@@ -167,6 +171,12 @@ export function SearchPanel({
   const narrow = useMediaQuery(NARROW_QUERY);
   const tapOnlyPicks = narrow && mode !== 'browse';
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected]);
+  useEffect(() => onSelectionChange?.(selected.length), [selected.length, onSelectionChange]);
+  // Narrow screens: the preview covers the list, so Back (and iOS swipe-back) goes back to the list.
+  useBackLayer(previewOpen && narrow, () => {
+    setPreviewOpen(false);
+    searchRef.current?.focus();
+  });
   const imageUrl = (path: string) => exerciseImageUrl(supabase, path);
 
   function toggleSelected(row: ExerciseIndexRow) {

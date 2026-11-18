@@ -11,6 +11,8 @@ import { countSlotsBeyondWeek, updateProgram } from '../actions';
 import type { Program } from './program-grid';
 import { shrinkWarning } from './shrink-warning';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
 const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_format') => (message ? { error: errorFromText(message, fallback) } : {});
@@ -45,9 +47,11 @@ export function ProgramDetails({
     setWeeksText(String(weeks));
   }
   useEffect(() => {
-    if (confirm && !dialogRef.current?.open) dialogRef.current?.showModal();
+    if (confirm && dialogRef.current) openLayer(dialogRef.current);
   }, [confirm]);
   const dirty = name !== saved.name || description !== saved.description || weeksText !== String(weeks);
+  // Back, a link or closing the tab with unsaved details asks first.
+  const guard = useUnsavedGuard(dirty, { message: 'The program’s name, length or description isn’t saved yet.' });
 
   async function save(input: ProgramInput, expected: number) {
     setPending(true);
@@ -184,6 +188,7 @@ export function ProgramDetails({
           </Button>
         </div>
       </dialog>
+      {guard.prompt}
     </Card>
   );
 }

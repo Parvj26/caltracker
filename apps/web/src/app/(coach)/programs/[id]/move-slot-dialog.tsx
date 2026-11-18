@@ -1,11 +1,11 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { PlanCell } from '@caltracker/shared';
 import { Button, SelectField } from '@/components/ui';
 import { DAYS, cellLabel, cellsLabel, focusSoon } from './grid-ids';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 /**
  * Pick where a workout goes on the plan (the non-drag path):
@@ -48,7 +48,7 @@ export function MoveSlotDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
     return () => {
       if (returnFocusTo) focusSoon(returnFocusTo);
     };
