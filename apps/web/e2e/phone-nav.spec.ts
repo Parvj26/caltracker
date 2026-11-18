@@ -181,12 +181,13 @@ test.describe('on an iPhone', () => {
     await expect(tabBar(page)).toBeHidden();
   });
 
-  test('on the workout editor the save bar is at the top, clear of the tab bar', async ({ page }) => {
+  test('on the workout editor Save is in the top bar, and the editor bottom bar stands in for the tab bar', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts/new');
-    const save = (await page.getByRole('button', { name: 'Save workout' }).boundingBox())!;
-    const bar = (await tabBar(page).boundingBox())!;
-    expect(save.y + save.height).toBeLessThan(bar.y);
+    await expect(page.getByRole('button', { name: 'Save workout' })).toBeInViewport();
+    await expect(tabBar(page)).toBeHidden();
+    const add = (await page.getByRole('button', { name: '+ Exercise', exact: true }).boundingBox())!;
+    expect(add.y + add.height).toBeLessThanOrEqual(IPHONE.height);
   });
 });
 

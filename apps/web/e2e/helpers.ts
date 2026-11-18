@@ -112,11 +112,12 @@ export async function createWorkout(page: Page, name: string): Promise<void> {
   await page.goto('/workouts/new');
   await page.getByLabel('Workout name').fill(name);
   await pickExercise(page, '+ Exercise', 'Barbell Squat');
-  for (const n of [1, 2, 3]) {
-    const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await row.getByLabel('Reps', { exact: true }).fill('8');
-    await row.getByLabel(/^Weight/).fill('60');
-  }
+  // A new exercise starts with one set; "+ Set" copies it.
+  const row = setRow(page, 'Barbell Squat', 'set 1');
+  await row.getByLabel('Reps', { exact: true }).fill('8');
+  await row.getByLabel(/^Weight/).fill('60');
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Add a set to Barbell Squat' }).click();
+  await expect(setRow(page, 'Barbell Squat', 'set 3')).toBeVisible();
   await page.getByRole('button', { name: 'Save workout' }).click();
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
   await expect(page.getByText('Saved')).toBeVisible();
