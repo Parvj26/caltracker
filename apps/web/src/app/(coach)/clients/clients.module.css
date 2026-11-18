@@ -208,12 +208,13 @@
 /* ---------- Client and invite rows (ListRow) ---------- */
 .clientList, .inviteList { --row-leading-width: calc(36px + var(--ct-space-3)); }
 /* The wide list's action column (Assign, or an empty slot): the kit lines the header up with it. */
-.clientList { --row-actions-width: calc(88px + var(--ct-space-2)); }
+.clientList { --row-actions-width: calc(88px + var(--ct-space-1) + var(--ct-tap-min) + var(--ct-space-2)); }
 .clientList .avatar, .inviteList .avatar { width: 36px; height: 36px; }
 .clientRow, .inviteRow { min-width: 0; }
 .rowChip { flex: none; }
 .rowAction { flex: none; }
-.rowActionSlot { display: inline-block; width: 88px; }
+/* Keeps the action area there on every row; on a wide list the kit gives that area its fixed width. */
+.rowActionSlot { display: inline-block; width: 0; }
 .clientList .rowAction { width: 88px; }
 .statusCell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .statusLine { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }

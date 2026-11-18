@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   buildSmartIndex,
@@ -120,6 +121,7 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
   const pct = row?.fourWeeks.percent ?? null;
   const chip = row && today ? directoryChip(row) : null;
   const last = row && today ? lastWorkoutText(row, today, lookbackDays) : null;
+  const router = useRouter();
   const chipEl = chip ? (
     <Chip tone={CHIP_VIEW[chip.kind].tone} className={styles.rowChip}>
       {CHIP_VIEW[chip.kind].text(chip)}
@@ -140,6 +142,9 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
               <span className={cx(STATUS_CLASS[row.status.kind])}>{statusText(row.status, today)}</span>
             ) : null}
             {last ? <span>{last}</span> : null}
+            {row.week.planned > 0 ? (
+              <span className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned} this week`}</span>
+            ) : null}
           </>
         ) : undefined
       }
@@ -150,8 +155,15 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
             <span className={cx(styles.statusLine, STATUS_CLASS[row.status.kind])}>{statusText(row.status, today)}</span>
           ) : null}
         </span>,
-        // This week's count is left out: it was "—" for most clients; the status chip already says "Missed N".
-        last,
+        // "Last workout" also carries this week's count ("2 of 3 this week"): a column of its own was mostly "—".
+        last || (row && row.week.planned > 0) ? (
+          <span className={styles.planStack}>
+            {last ? <span>{last}</span> : null}
+            {row && row.week.planned > 0 ? (
+              <span className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned} this week`}</span>
+            ) : null}
+          </span>
+        ) : null,
         row ? (
           pct === null ? (
             <Dash />
@@ -183,6 +195,15 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
         ) : (
           <span aria-hidden="true" className={styles.rowActionSlot} />
         )
+      }
+      // Nothing planned: a single workout is the other way to start, in ⋯ (one visible action per row, UI rules §7.3).
+      more={
+        chip?.kind === 'nothing_planned' ? (
+          <MoreMenu
+            label={`More for ${name}`}
+            items={[{ label: 'Add a workout', onSelect: () => router.push(`/clients/${id}/training?add=workout`) }]}
+          />
+        ) : undefined
       }
     />
   );

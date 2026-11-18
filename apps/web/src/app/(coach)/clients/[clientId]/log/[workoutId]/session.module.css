@@ -239,6 +239,10 @@
 
 /* The Finish / Hand back bar (PhoneActionBar). On a phone the buttons say just "Finish" / "Hand back". */
 .sessionBar .barButton { min-height: var(--ct-button-min-height); white-space: nowrap; }
+.barNarrow { display: none; }
 @media (max-width: 599.98px) {
   .barWide { display: none; }
+  .barNarrow { display: inline; }
 }
+/* While typing (the on-screen keyboard is up), the bar steps away so Finish is never under the thumb. */
+.sessionBar[data-keyboard] { display: none; }

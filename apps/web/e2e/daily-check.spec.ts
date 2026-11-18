@@ -262,6 +262,7 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   await expect(rowOf('Rowan Run')).toContainText('0%');
   await expect(rowOf('Olive Once')).toContainText('50%');
   await expect(rowOf('Sami Steady')).toContainText('100%');
+  await expect(rowOf('Sami Steady')).toContainText(/\d of \d this week/);
   await expect(rowOf('Sami Steady').getByText('(1 of 1 done)')).toBeAttached();
 
   // Plan: the program and its end; "nothing after" when it ends this week; a quiet Assign when nothing is planned.
@@ -273,6 +274,12 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
     'href',
     `/clients/${ids.nothing}/training?add=program`,
   );
+  // A single workout is the other quick start, in the row's ⋯.
+  await rowOf('Nell Nothing').getByRole('button', { name: 'More for Nell Nothing' }).click();
+  await page.getByRole('menuitem', { name: 'Add a workout' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${ids.nothing}/training`));
+  await expect(page.getByRole('dialog', { name: 'Add a workout' })).toBeVisible();
+  await page.goto('/clients');
 
   // The pending invite has its own short row, under Invited (the list opens on Active).
   const inviteRow = (name: string) => page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: name });

@@ -229,7 +229,7 @@ function ExerciseTable({
           </p>
         ) : null}
       </header>
-      <p className={styles.caption}>The numbers are filled in from the plan; ✓ saves them as they are.</p>
+      <p className={styles.caption}>The numbers are pre-filled; ✓ saves them as they are.</p>
       <table className={styles.table}>
         <thead>
           <tr>
@@ -980,7 +980,8 @@ export function SessionLogger({
           // The full words for screen readers, also on a phone where only "Hand back" shows.
           aria-label={handingBack ? undefined : `Hand back to ${client.firstName || 'client'}`}
         >
-          Hand back<span className={styles.barWide}> to {client.firstName || 'client'}</span>
+          <span className={styles.barNarrow}>Hand back</span>
+          <span className={styles.barWide}>Hand back to {client.firstName || 'client'}</span>
         </Button>
         <Button
           variant="finish"
@@ -990,8 +991,14 @@ export function SessionLogger({
           disabled={locked || handingBack}
           aria-label={finishing ? undefined : 'Finish session'}
         >
-          {finishing ? 'Finishing…' : 'Finish'}
-          <span className={styles.barWide}>{finishing ? '' : ' session'}</span>
+          {finishing ? (
+            'Finishing…'
+          ) : (
+            <>
+              <span className={styles.barNarrow}>Finish</span>
+              <span className={styles.barWide}>Finish session</span>
+            </>
+          )}
         </Button>
       </PhoneActionBar>
       {sheet === 'unticked' ? (

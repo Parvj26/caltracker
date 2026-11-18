@@ -162,7 +162,8 @@
 }
 @media (max-width: 599.98px) {
   /* "Docs" on screen only: the empty alt text after "/" keeps it out of the link's name. */
-  .tab[data-short]::before { content: attr(data-short) / ''; }
+  /* The first line is for browsers without alt text in content (Safari before 17.4); the second wins where supported. */
+  .tab[data-short]::before { content: attr(data-short); content: attr(data-short) / ''; }
 }
 .tabList { display: flex; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 .tab {

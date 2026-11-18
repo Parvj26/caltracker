@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { COMPLETION_WINDOW_DAYS, formatFullName, localToday } from '@caltracker/shared';
-import { ListRow, PageHeader, RowList } from '@/components/ui';
+import { PageHeader, RowList } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
 import { loadHomeData } from '@/lib/coach-home';
@@ -10,8 +10,7 @@ import { avatarTone, initials } from './avatar';
 import { ClientDirectory, type DirectoryInvite, type InvitePlanSummary } from './client-directory';
 import { InviteClientButton } from './invite-dialog';
 import { newestInviteFirst } from './pending-order';
-import { PastClients } from './past-clients';
-import { ResendButton } from './resend-button';
+import { PastClientRow, PastClients } from './past-clients';
 import styles from './clients.module.css';
 
 export const metadata: Metadata = { title: 'Clients' };
@@ -124,26 +123,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         <PastClients count={past.data.length}>
           <RowList aria-label="Past clients" className={styles.clientList}>
             {past.data.map((p) => (
-              <ListRow
+              <PastClientRow
                 key={p.user_id}
-                href={`/clients/${p.user_id}`}
-                title={p.full_name || p.email || 'Client'}
+                id={p.user_id}
+                name={p.full_name || p.email || 'Client'}
+                email={p.email}
+                firstName={p.first_name || p.email.split('@')[0] || 'Client'}
+                lastName={p.last_name}
+                removed={`Removed ${dateFormat.format(new Date(p.removed_at))}`}
                 leading={<Avatar name={p.full_name || p.email} toneKey={p.user_id} />}
-                meta={
-                  <>
-                    <span className={styles.inviteEmail}>{p.email}</span>
-                    <span>{`Removed ${dateFormat.format(new Date(p.removed_at))}`}</span>
-                  </>
-                }
-                action={
-                  <ResendButton
-                    email={p.email}
-                    firstName={p.first_name || p.email.split('@')[0] || 'Client'}
-                    lastName={p.last_name}
-                    label="Re-invite"
-                    ariaLabel={`Re-invite ${p.full_name || p.email}`}
-                  />
-                }
               />
             ))}
           </RowList>
