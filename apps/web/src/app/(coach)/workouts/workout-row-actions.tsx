@@ -14,6 +14,7 @@ import { deleteWorkout, libraryWorkoutUses, previewWorkout, renameWorkout, type 
 import coach from '../coach.module.css';
 import styles from './workouts.module.css';
 import assignStyles from '@/components/assign/assign.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 type Popup = 'preview' | 'rename' | 'delete';
 
@@ -24,7 +25,7 @@ function useModal() {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
   }, []);
   return ref;
 }

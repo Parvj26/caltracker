@@ -128,7 +128,8 @@ describe('useHistoryLayer', () => {
     act(() => {
       root.render(createElement(Slow));
     });
-    const spy = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    // Steps back go through history.go().
+    const spy = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
     try {
       // Back never answers: release() gives up waiting after its timeout.
       await act(() => handle.release());

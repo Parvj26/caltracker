@@ -77,8 +77,9 @@ test.describe('iPhone SE (375 x 667)', () => {
     await dialog.getByRole('button', { name: '← Back to list' }).click();
     await expect(first).toHaveAttribute('aria-selected', 'true');
 
-    // The x closes the window.
+    // The x asks first (2 picks not added yet), then Discard closes the window.
     await dialog.getByRole('button', { name: 'Close picker' }).click();
+    await dialog.getByRole('group', { name: /Discard changes\?/ }).getByRole('button', { name: 'Discard' }).click();
     await expect(dialog).toBeHidden();
   });
 

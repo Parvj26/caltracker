@@ -1,12 +1,12 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import { followingWeeks, slotsInWeeks } from '@caltracker/shared';
 import { Button, SelectField } from '@/components/ui';
 import { assignedNote, copyWeekButtonDomId, focusSoon } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 const FOLLOWING = 'following';
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -49,7 +49,7 @@ export function CopyWeekDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
     return () => {
       focusSoon(copyWeekButtonDomId(week));
     };

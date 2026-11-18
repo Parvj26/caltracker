@@ -9,6 +9,7 @@ import { avatarTone, initials } from '../avatar';
 import { RemoveClientDialog } from '../row-actions';
 import menuStyles from '@/components/calendar/calendar.module.css';
 import styles from './client-page.module.css';
+import { openRef, useBackLayer } from '@/lib/open-layer';
 
 export const CLIENT_NAME_ID = 'client-name';
 
@@ -28,6 +29,8 @@ function MessageIcon() {
 export function ClientHeader({ client }: { client: { id: string; name: string; firstName: string; removedAt: string | null } }) {
   const past = client.removedAt !== null;
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -127,7 +130,7 @@ export function ClientHeader({ client }: { client: { id: string; name: string; f
                     className={cx(menuStyles.menuItem, styles.menuDanger)}
                     onClick={() => {
                       setOpen(false);
-                      removeRef.current?.showModal();
+                      openRef(removeRef);
                     }}
                   >
                     Remove client…

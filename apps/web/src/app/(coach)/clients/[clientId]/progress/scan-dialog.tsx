@@ -15,6 +15,7 @@ import type { ScanRow } from './load';
 import { inputsFor, parseScanForm, scanFields, type CustomMetric } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
 import styles from './progress.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 /**
  * The scan form: a date, the standard measures, the workspace's custom measures and one printout. `scan` is the
@@ -64,7 +65,7 @@ export function ScanDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

@@ -276,6 +276,38 @@ async function storedTree(id: string) {
   };
 }
 
+test('after Rename saves, the address has no ?sheet=, and the next pop-up opens and closes clean', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const w = await seed('Rename addr');
+  await signInAsCoach(page);
+  await openList(page, w.name);
+  const listUrl = page.url();
+  await page.getByRole('button', { name: `More actions for ${w.name}` }).click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Rename workout' });
+  await expect.poll(() => new URL(page.url()).searchParams.get('sheet')).toMatch(/^rename-/);
+  await dialog.getByRole('textbox', { name: 'Name' }).fill(`${w.name} renamed`);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+  // The save's refresh must not write the closed pop-up back into the address.
+  await expect.poll(() => new URL(page.url()).searchParams.get('sheet')).toBeNull();
+  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link', { name: `${w.name} renamed`, exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('sheet')).toBeNull();
+
+  // The next pop-up: its own ?sheet= only, and nothing left after it closes.
+  await page.getByRole('button', { name: `Assign ${w.name} renamed`, exact: true }).click();
+  const assign = page.getByRole('dialog', { name: `Assign ${w.name} renamed` });
+  await expect(assign).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('sheet')).toEqual([`assign-workout-${w.id}`]);
+  await assign.getByRole('button', { name: 'Close' }).click();
+  await expect(assign).toBeHidden();
+  await expect.poll(() => new URL(page.url()).searchParams.get('sheet')).toBeNull();
+  expect(page.url()).toBe(listUrl);
+  // And one Back leaves the list (no leftover steps from either pop-up).
+  await page.goBack();
+  await expect(page).not.toHaveURL(listUrl);
+});
+
 test('Rename keeps sections, the superset, the pick-one group, notes and sets exactly as they were', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const name = `Rich ${unique()}`;

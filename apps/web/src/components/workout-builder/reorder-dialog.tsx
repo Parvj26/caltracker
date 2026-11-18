@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './builder.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 export type ReorderItem = {
   id: string;
@@ -35,7 +36,7 @@ export function ReorderDialog({ runs, onDone, onClose }: { runs: readonly Reorde
 
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d) openLayer(d);
   }, []);
 
   const shift = (run: number, from: number, to: number) => {
