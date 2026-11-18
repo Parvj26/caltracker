@@ -20,11 +20,12 @@ export function SignInForm() {
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
+        enterKeyHint="next"
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <TextField label="Password" name="password" type="password" autoComplete="current-password" required />
+      <TextField label="Password" name="password" type="password" autoComplete="current-password" enterKeyHint="go" required />
       {state.code ? <ErrorText code={state.code} /> : null}
       <Button type="submit" pending={pending} className={styles.submit}>
         {pending ? 'Signing in…' : 'Sign in'}
