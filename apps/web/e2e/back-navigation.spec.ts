@@ -1,6 +1,6 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 import { demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
-import { programCell, serviceClient, signInAsCoach } from './helpers';
+import { listRow, programCell, serviceClient, signInAsCoach, openProgramSettings, workoutNotes } from './helpers';
 
 // Back and iOS swipe-back go exactly one step (ui-rules §8): every sheet, pop-up, menu and full-screen editor is one
 // step of history, so Back closes it and stays on the page under it; a page with unsaved changes asks "Discard
@@ -34,7 +34,7 @@ const path = (page: Page) => new URL(page.url()).pathname;
 /** Opens the workout from the Workouts list with a tap on its link (an in-app navigation, like a coach does). */
 async function openFromList(page: Page, w: { id: string; name: string }) {
   await page.goto(`/workouts?q=${encodeURIComponent(w.name)}`);
-  await page.getByRole('link', { name: w.name, exact: true }).first().click();
+  await listRow(page.getByRole('list', { name: 'Workouts' }), w.name).getByRole('link').click();
   await expect(page).toHaveURL(new RegExp(`/workouts/${w.id}$`));
 }
 
@@ -233,9 +233,9 @@ for (const [device, size] of [
       await signInAsCoach(page);
       await openFromList(page, w);
 
-      // The workout's ⋯ (iPad portrait folds Duplicate and Delete behind it): Back folds it, the workout stays.
+      // The workout's ⋯ (Duplicate, Delete…): Back folds it, the workout stays.
       const more = page.getByRole('button', { name: `More for ${w.name}`, exact: true });
-      if (await more.isVisible()) {
+      {
         await more.click();
         await expect(more).toHaveAttribute('aria-expanded', 'true');
         await page.goBack();
@@ -243,7 +243,7 @@ for (const [device, size] of [
         expect(path(page)).toBe(`/workouts/${w.id}`);
       }
 
-      await page.getByLabel('Workout notes').fill('Half-written note');
+      await (await workoutNotes(page)).fill('Half-written note');
       await expect(page.getByText('Unsaved changes')).toBeVisible();
       await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
       await expect(discard(page)).toBeVisible();
@@ -271,6 +271,7 @@ for (const [device, size] of [
       await signInAsCoach(page);
       await page.goto('/programs');
       await page.goto(`/programs/${pid}`);
+      await openProgramSettings(page);
       await page.getByLabel('Program name').fill(`${program} renamed`);
       await page.getByRole('link', { name: /Programs/ }).first().click();
       await expect(discard(page)).toBeVisible();
@@ -330,7 +331,7 @@ test.describe('pages that change their own address, and code that navigates, wit
       await signInAsCoach(page);
       await openFromList(page, w);
       await page.getByRole('button', { name: `More for ${w.name}`, exact: true }).click();
-      await page.getByRole('button', { name: /^Duplicate/ }).click();
+      await page.getByRole('menuitem', { name: /^Duplicate/ }).click();
       await expect.poll(() => path(page)).not.toBe(`/workouts/${w.id}`);
       await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
       await page.goBack();
@@ -344,7 +345,7 @@ test.describe('pages that change their own address, and code that navigates, wit
       await signInAsCoach(page);
       await openFromList(page, w);
       await page.getByRole('button', { name: `More for ${w.name}`, exact: true }).click();
-      await page.getByRole('button', { name: 'Delete workout', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Delete…', exact: true }).click();
       const confirm = page.getByRole('alertdialog').or(page.getByRole('dialog', { name: /Delete/ }));
       await confirm.getByRole('button', { name: /^Delete/ }).last().click();
       await expect(page).toHaveURL(/\/workouts$/);

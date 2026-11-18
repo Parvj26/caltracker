@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { demoWorkspace, freshClient, seedLibraryWorkout, unique } from './assign-helpers';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, listRow } from './helpers';
 
 // The one SearchBox (UI rules §6): results as you type with the shared smart search (typos forgiven), a clear ×,
 // the text kept in ?q= so a reload or Back brings the same results, and "No <things> match “x”" with Clear search.
@@ -27,15 +27,15 @@ test('Workouts: type with a typo, clear with ×, and the address keeps the searc
   await expect(page.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
 
   await box.fill(`mobilty ${tag}`);
-  const list = page.getByRole('table', { name: 'Workouts' });
-  await expect(list.getByRole('link', { name, exact: true })).toBeVisible();
-  await expect(list.locator('tbody tr')).toHaveCount(1);
+  const list = page.getByRole('list', { name: 'Workouts' });
+  await expect(listRow(list, name)).toBeVisible();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
   await expect(page).toHaveURL(new RegExp(`[?&]q=mobilty(\\+|%20)${tag}`));
 
   // A reload (or Back to the page) shows the same search and results.
   await page.reload();
   await expect(box).toHaveValue(`mobilty ${tag}`);
-  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await expect(list.getByRole('listitem')).toHaveCount(1);
 
   // Nothing found: one line naming the search, with Clear search.
   await box.fill(`zzzz ${tag}`);
@@ -46,7 +46,7 @@ test('Workouts: type with a typo, clear with ×, and the address keeps the searc
 
   // The × empties the box, keeps focus in it, and drops ?q=.
   await box.fill(name);
-  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await expect(list.getByRole('listitem')).toHaveCount(1);
   await expect(page).toHaveURL(/[?&]q=/);
   const clear = page.getByLabel('Clear search');
   const size = await clear.boundingBox();
@@ -87,12 +87,12 @@ test('Workouts: open a workout from a search, then Back keeps the search', async
   await page.goto('/workouts');
   const box = page.getByRole('searchbox', { name: 'Search workouts' });
   await box.fill(`bakcheck ${tag}`);
-  const list = page.getByRole('table', { name: 'Workouts' });
-  await list.getByRole('link', { name, exact: true }).click();
+  const list = page.getByRole('list', { name: 'Workouts' });
+  await listRow(list, name).getByRole('link').click();
   await page.waitForURL(/\/workouts\/[0-9a-f-]{36}/);
   await page.goBack();
   await expect(box).toHaveValue(`bakcheck ${tag}`);
-  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await expect(list.getByRole('listitem')).toHaveCount(1);
 });
 
 test('Exercises on a phone: the Filters and Favourites pills keep their size and pressed look', async ({ page }) => {

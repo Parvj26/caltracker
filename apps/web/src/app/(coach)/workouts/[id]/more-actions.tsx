@@ -1,53 +1,43 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { useBackLayer } from '@/lib/open-layer';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { AssignButton } from '@/components/assign/assign-to-clients';
+import { useDuplicate } from '@/components/duplicate-button';
+import { MoreMenu } from '@/components/more-menu';
+import { ErrorText } from '@/components/ui';
+import { confirmLeavePage } from '@/lib/history-layers';
+import { DeleteDialog } from '../workout-row-actions';
 import styles from './header.module.css';
 
 /**
- * The workout page's less common actions (Duplicate, Delete). On a wide screen they sit in the header as buttons, as
- * before. Below 900 px (phones, iPad portrait) they fold behind "⋯", so Assign is the one big button and Delete is no
- * longer as loud as it. The children stay mounted either way, so Delete's confirmation window keeps working.
+ * The workout page's actions beside "‹ Workouts" (UI rules §4, §8): an outlined Assign, so Save stays the one main
+ * button, and ⋯ with Duplicate and Delete…. Delete asks first, the same question as the Workouts list's Delete…, and
+ * refuses while a program or an open invite's starting plan uses the workout. Once deleted, the list takes its place
+ * in history (replace), so Back never shows the deleted workout.
  */
-export function MoreActions({ name, children }: { name: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const panelId = useId();
-  const wrapRef = useRef<HTMLDivElement>(null);
-  // Back (and iOS swipe-back) folds the panel away, not the page.
-  useBackLayer(open, () => setOpen(false));
-
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const escape = (e: KeyboardEvent) => {
-      // A window opened from the panel (Delete's question) handles its own Escape.
-      if (e.key === 'Escape' && !document.querySelector('dialog[open]')) setOpen(false);
-    };
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape);
-    };
-  }, [open]);
-
+export function WorkoutPageActions({ id, name }: { id: string; name: string }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const duplicate = useDuplicate('workout', id);
   return (
-    <div ref={wrapRef} className={styles.wrap}>
-      <button
-        type="button"
-        className={styles.moreButton}
-        aria-label={`More for ${name}`}
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span aria-hidden="true">⋯</span>
-      </button>
-      <div id={panelId} className={styles.panel} data-open={open ? '' : undefined}>
-        {children}
-      </div>
+    <div className={styles.actions}>
+      <AssignButton kind="workout" id={id} name={name} secondary />
+      <MoreMenu
+        label={`More for ${name}`}
+        busy={duplicate.pending}
+        items={[
+          { label: duplicate.pending ? 'Duplicating…' : 'Duplicate', onSelect: duplicate.run, disabled: duplicate.pending },
+          { label: 'Delete…', onSelect: () => setDeleting(true), danger: true },
+        ]}
+      />
+      {duplicate.pending ? (
+        <span className={styles.srOnly} role="status">
+          Duplicating…
+        </span>
+      ) : null}
+      {duplicate.error ? <ErrorText code={duplicate.error} className={styles.error} /> : null}
+      {deleting ? <DeleteDialog id={id} name={name} onClose={() => setDeleting(false)} onDeleted={() => router.replace('/workouts')} confirmLeave={confirmLeavePage} /> : null}
     </div>
   );
 }

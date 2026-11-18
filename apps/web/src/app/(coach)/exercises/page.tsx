@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LIBRARY_TRACKING_TYPES } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
-import { ButtonLink } from '@/components/ui';
+import { CreateLink, PageHeader } from '@/components/ui';
 import { ExerciseBrowser } from './exercise-browser';
 import styles from './exercises.module.css';
 import { LibraryTabs } from '../library-tabs';
@@ -19,16 +19,7 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>Exercises</h1>
-        {/* A phone shows a small lime "+ New"; the name stays "New custom exercise" for screen readers. */}
-        <ButtonLink href="/exercises/new" className={styles.newButton} aria-label="New custom exercise">
-          <span className={styles.wideOnly}>New custom exercise</span>
-          <span className={styles.phoneOnly} aria-hidden="true">
-            + New
-          </span>
-        </ButtonLink>
-      </header>
+      <PageHeader title="Exercises" action={<CreateLink href="/exercises/new" thing="exercise" data-ph-capture-attribute-label="exercise_new" />} />
       <LibraryTabs current="/exercises" />
       <ExerciseBrowser
         workspaceId={workspaceId}

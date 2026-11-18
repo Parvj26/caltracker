@@ -132,10 +132,10 @@ export async function deleteWorkout(id: string): Promise<{ ok: true } | ActionFa
 
 type Supabase = Awaited<ReturnType<typeof createServerSupabase>>;
 
-/** Programs (counted once each) and open invite plan items that use a workout, or null when the lookup fails. */
+/** Programs (each once, by name) and open invite plan items that use a workout, or null when the lookup fails. */
 async function workoutUses(supabase: Supabase, workspaceId: string, id: string): Promise<WorkoutUses | null> {
   const [slots, invites] = await Promise.all([
-    supabase.from('program_workouts').select('program_id').eq('workout_id', id).eq('workspace_id', workspaceId),
+    supabase.from('program_workouts').select('program_id, programs(name)').eq('workout_id', id).eq('workspace_id', workspaceId),
     supabase
       .from('client_invite_plan_items')
       .select('id', { count: 'exact', head: true })
@@ -143,15 +143,19 @@ async function workoutUses(supabase: Supabase, workspaceId: string, id: string):
       .eq('workspace_id', workspaceId),
   ]);
   if (slots.error || invites.error) return null;
-  return { programs: new Set(slots.data.map((r) => r.program_id)).size, invitePlans: invites.count ?? 0 };
+  const names = new Map<string, string>();
+  for (const r of slots.data) names.set(r.program_id, r.programs?.name ?? names.get(r.program_id) ?? '');
+  const programList = [...names].map(([programId, name]) => ({ id: programId, name })).sort((a, b) => a.name.localeCompare(b.name));
+  return { programs: names.size, programList, invitePlans: invites.count ?? 0 };
 }
 
-export type WorkoutUses = { programs: number; invitePlans: number };
+/** programList: the programs using it (id and name), so the Delete… question can name and link them (rulebook §10.3). */
+export type WorkoutUses = { programs: number; programList: { id: string; name: string }[]; invitePlans: number };
 
 /** What still uses a library workout, for the Delete… question (Workouts list and workout page). Throws when the lookup fails. */
 export async function libraryWorkoutUses(id: string): Promise<WorkoutUses> {
   const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return { programs: 0, invitePlans: 0 };
+  if (!UUID.test(id)) return { programs: 0, programList: [], invitePlans: 0 };
   const uses = await workoutUses(await createServerSupabase(), workspaceId, id);
   if (!uses) throw new Error('Could not check what uses the workout');
   return uses;

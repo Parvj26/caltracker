@@ -54,9 +54,20 @@ test('create a custom exercise and see it under My exercises', async ({ page }) 
     await page.goto('/exercises/new');
     await page.getByLabel('Name').fill(name);
     await page.getByLabel('Tracking type').selectOption('distance');
+    // Muscles and equipment are fixed choices as chips (no free text): muscles pick any, equipment picks one.
+    const muscles = page.getByRole('group', { name: 'Primary muscles' });
+    await muscles.getByRole('button', { name: 'Quadriceps' }).click();
+    await muscles.getByRole('button', { name: 'Glutes' }).click();
+    await expect(muscles.getByRole('button', { name: 'Quadriceps' })).toHaveAttribute('aria-pressed', 'true');
+    const equipment = page.getByRole('group', { name: 'Equipment (optional)' });
+    await equipment.getByRole('button', { name: 'Machine' }).click();
+    await equipment.getByRole('button', { name: 'Cable' }).click();
+    await expect(equipment.getByRole('button', { name: 'Machine' })).toHaveAttribute('aria-pressed', 'false');
     await page.getByRole('button', { name: 'Create exercise' }).click();
     await expect(page).toHaveURL(/\/exercises\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name })).toBeVisible();
+    const row = await admin().from('exercises').select('primary_muscles, equipment').eq('name', name).single();
+    expect(row.data).toEqual({ primary_muscles: ['quadriceps', 'glutes'], equipment: 'cable' });
 
     await page.goto('/exercises?source=custom');
     const option = page.getByRole('option', { name, exact: true });
@@ -106,7 +117,7 @@ test.describe('on an iPhone', () => {
   test('the whole page scrolls, with the search box staying on top, and no row looks selected', async ({ page }) => {
     await page.goto('/exercises');
     await expect(list(page).getByRole('link').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'New custom exercise' })).toHaveText('+ New', { useInnerText: true });
+    await expect(page.getByRole('link', { name: 'New exercise' })).toHaveText('+ New', { useInnerText: true });
     // No list box with its own scroll: the document is taller than the screen and scrolling it moves the list.
     const { scrollHeight, innerHeight } = await page.evaluate(() => ({ scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight }));
     expect(scrollHeight).toBeGreaterThan(innerHeight);

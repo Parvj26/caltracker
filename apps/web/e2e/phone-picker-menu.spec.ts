@@ -86,7 +86,7 @@ test.describe('iPhone SE (375 x 667)', () => {
   test('the Workouts list fits the screen, with Assign and ⋯ on every card', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts');
-    const table = page.getByRole('table', { name: 'Workouts' });
+    const table = page.getByRole('list', { name: 'Workouts' });
     await expect(table.getByRole('link').first()).toBeVisible();
     await expectNoSidewaysScroll(page);
     // Duplicate waits behind ⋯ on an iPhone (workout-list-menu.spec.ts).
@@ -126,7 +126,7 @@ test.describe('iPhone 13', () => {
   test('the Workouts list and the picker fit at 390', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts');
-    await expect(page.getByRole('table', { name: 'Workouts' })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Workouts' })).toBeVisible();
     await expectNoSidewaysScroll(page);
     const dialog = await openPicker(page);
     await expect(dialog.getByRole('button', { name: 'Pick at least 1 exercise' })).toBeInViewport({ ratio: 1 });

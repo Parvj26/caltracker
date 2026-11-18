@@ -7,7 +7,8 @@ import { Button, errorFromText, ErrorText, notAContact, SelectField, TextAreaFie
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { createCustomExercise, updateCustomExercise } from './actions';
-import { EQUIPMENT, TRACKING_LABELS } from './filters';
+import { ChoiceChips, EQUIPMENT_CHOICES, MUSCLE_CHOICES } from './choice-chips';
+import { TRACKING_LABELS } from './filters';
 import { formText } from './form-text';
 import styles from './exercises.module.css';
 
@@ -39,7 +40,12 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
   const [saved, setSaved] = useState(false);
   // What the form held when it opened (or was last saved): anything else is an unsaved change.
   const baseline = useRef<string | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const [textDirty, setDirty] = useState(false);
+  // The chip fields (muscles, equipment) and what they held when the form opened or was last saved.
+  const [muscles, setMuscles] = useState<string[]>(initial.primaryMuscles);
+  const [equipment, setEquipment] = useState<string[]>(initial.equipment ? [initial.equipment] : []);
+  const [savedChips, setSavedChips] = useState(() => JSON.stringify([initial.primaryMuscles, initial.equipment ? [initial.equipment] : []]));
+  const dirty = textDirty || JSON.stringify([muscles, equipment]) !== savedChips;
   const guard = useUnsavedGuard(dirty, { parentHref: '/exercises' });
   const snapshot = (form: HTMLFormElement) => JSON.stringify([...new FormData(form).entries()].map(([k, v]) => [k, typeof v === 'string' ? v : v.name]));
   function onInput(event: FormEvent<HTMLFormElement>) {
@@ -76,11 +82,13 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
           invalidateExerciseIndex();
           baseline.current = sent;
           setDirty(false);
+          setSavedChips(JSON.stringify([muscles, equipment]));
           setSaved(true);
         } else {
           const { id } = await createCustomExercise(parsed.data);
           invalidateExerciseIndex();
           setDirty(false);
+          setSavedChips(JSON.stringify([muscles, equipment]));
           await guard.release();
           router.push(`/exercises/${id}`);
         }
@@ -101,13 +109,8 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
           </option>
         ))}
       </SelectField>
-      <TextField label="Primary muscles (comma separated)" name="primaryMuscles" defaultValue={initial.primaryMuscles.join(', ')} />
-      <TextField label="Equipment" name="equipment" list="equipment-options" defaultValue={initial.equipment ?? ''} />
-      <datalist id="equipment-options">
-        {EQUIPMENT.map((e) => (
-          <option key={e} value={e} />
-        ))}
-      </datalist>
+      <ChoiceChips label="Primary muscles" name="primaryMuscles" choices={MUSCLE_CHOICES} value={muscles} multiple onChange={setMuscles} />
+      <ChoiceChips label="Equipment (optional)" name="equipment" choices={EQUIPMENT_CHOICES} value={equipment} multiple={false} onChange={setEquipment} />
       <TextAreaField label="Instructions (one step per line)" name="instructions" rows={5} defaultValue={initial.instructions.join('\n')} />
       <TextField label="YouTube URL (optional)" name="youtubeUrl" defaultValue={initial.youtubeUrl ?? ''} />
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}

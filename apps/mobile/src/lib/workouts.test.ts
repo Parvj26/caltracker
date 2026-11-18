@@ -181,6 +181,11 @@ describe('supersetLetters', () => {
   it('is empty for a workout with no blocks', () => {
     expect(supersetLetters([])).toEqual([]);
   });
+
+  it('goes on past Z as AA, AB (the same letters as the coach builder)', () => {
+    const letters = supersetLetters(Array.from({ length: 28 }, () => ({ kind: 'superset' as const })));
+    expect(letters.slice(24)).toEqual(['Y', 'Z', 'AA', 'AB']);
+  });
 });
 
 describe('blockRounds', () => {

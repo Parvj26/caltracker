@@ -49,9 +49,11 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
   const secondary = ex.secondary_muscles.filter((m) => !ex.primary_muscles.includes(m));
 
   // Approved phone mockup (row 5): a full-screen page with ‹ Exercises and the star in a top bar that sticks, then the
-  // name, "tracking · equipment", the photos, the muscles and the steps. Wider screens show the same, unstuck.
+  // name and "tracking · equipment". The coach's own video and notes come next (high on the page), then the photos,
+  // the muscles and the steps; a custom exercise's edit form is last. Wider screens show the same, unstuck, in a
+  // readable column (about 70 characters a line).
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${styles.detailPage}`}>
       <div className={styles.detailBar}>
         <BackToExercises />
         <DetailStar id={ex.id} name={ex.name} initial={favourite.data !== null} />
@@ -65,6 +67,54 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
           {isCustom ? ' · Custom' : ''}
         </p>
       </header>
+
+      {/* The coach's own content (video, notes) comes first, above the long library text (B review). */}
+      <Card>
+        <section>
+          <h2 className={styles.sectionHeading}>Video</h2>
+          {videoId ? (
+            <iframe
+              className={styles.video}
+              src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+              title={`${ex.name} form video`}
+              allow="encrypted-media; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+            />
+          ) : (
+            <ButtonLink
+              variant="secondary"
+              href={youtubeFormSearchUrl(ex.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Watch form on YouTube
+            </ButtonLink>
+          )}
+        </section>
+      </Card>
+
+      {!isCustom && override.data?.coach_notes ? (
+        <Card>
+          <section>
+            <h2 className={styles.sectionHeading}>Your notes</h2>
+            <p className={styles.notes}>{override.data.coach_notes}</p>
+          </section>
+        </Card>
+      ) : null}
+
+      {isCustom ? null : (
+        <Card>
+          <section>
+            <h2 className={styles.sectionHeading}>Your video and notes</h2>
+            <OverrideForm
+              exerciseId={ex.id}
+              youtubeUrl={override.data?.youtube_url ?? null}
+              coachNotes={override.data?.coach_notes ?? null}
+            />
+          </section>
+        </Card>
+      )}
 
       {ex.image_paths.length > 0 ? (
         <div className={styles.images}>
@@ -110,44 +160,10 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
         </section>
       ) : null}
 
-      <Card>
-        <section>
-          <h2 className={styles.sectionHeading}>Video</h2>
-          {videoId ? (
-            <iframe
-              className={styles.video}
-              src={`https://www.youtube-nocookie.com/embed/${videoId}`}
-              title={`${ex.name} form video`}
-              allow="encrypted-media; picture-in-picture"
-              allowFullScreen
-              loading="lazy"
-            />
-          ) : (
-            <ButtonLink
-              variant="secondary"
-              href={youtubeFormSearchUrl(ex.name)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Watch form on YouTube
-            </ButtonLink>
-          )}
-        </section>
-      </Card>
-
-      {!isCustom && override.data?.coach_notes ? (
+      {isCustom ? (
         <Card>
           <section>
-            <h2 className={styles.sectionHeading}>Your notes</h2>
-            <p className={styles.notes}>{override.data.coach_notes}</p>
-          </section>
-        </Card>
-      ) : null}
-
-      <Card>
-        <section>
-          <h2 className={styles.sectionHeading}>{isCustom ? 'Edit exercise' : 'Your video and notes'}</h2>
-          {isCustom ? (
+            <h2 className={styles.sectionHeading}>Edit exercise</h2>
             <ExerciseForm
               exerciseId={ex.id}
               initial={{
@@ -159,15 +175,9 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
                 youtubeUrl: ex.youtube_url,
               }}
             />
-          ) : (
-            <OverrideForm
-              exerciseId={ex.id}
-              youtubeUrl={override.data?.youtube_url ?? null}
-              coachNotes={override.data?.coach_notes ?? null}
-            />
-          )}
-        </section>
-      </Card>
+          </section>
+        </Card>
+      ) : null}
     </div>
   );
 }

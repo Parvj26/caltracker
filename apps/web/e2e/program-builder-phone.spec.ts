@@ -65,9 +65,15 @@ async function addFromLibrary(page: Page, workout: string, week: number, day: nu
 }
 
 /** "Copy to…" from a chip's ⋯ menu onto two days (one in another week), then checks both have it. */
-async function copyToTwoDays(page: Page, workout: string, switchWeek: (week: number) => Promise<void>) {
-  await programCell(page, 1, 1).getByRole('button', { name: `Options for ${workout}`, exact: true }).tap();
-  await programCell(page, 1, 1).getByRole('menuitem', { name: 'Copy to…' }).tap();
+async function copyToTwoDays(page: Page, workout: string, switchWeek: (week: number) => Promise<void>, via: 'menu' | 'summary' = 'menu') {
+  if (via === 'menu') {
+    await programCell(page, 1, 1).getByRole('button', { name: `Options for ${workout}`, exact: true }).tap();
+    await programCell(page, 1, 1).getByRole('menuitem', { name: 'Copy to…' }).tap();
+  } else {
+    // The iPad grid has no ⋯ on touch (days are narrow): a tap on the workout opens its summary, which has Copy to….
+    await programCell(page, 1, 1).getByRole('button', { name: workout, exact: true }).tap();
+    await page.getByRole('dialog', { name: workout }).getByRole('button', { name: 'Copy to…' }).tap();
+  }
   const dialog = page.getByRole('dialog', { name: `Copy ${workout}` });
   // The day it's on can't be picked.
   await expect(dialog.getByRole('checkbox', { name: /Day 1/ })).toBeDisabled();
@@ -204,7 +210,8 @@ test.describe('iPad portrait', () => {
   test('tap a Library workout to add it, and Copy to… two days', async ({ page }) => {
     const { placed, spare } = await seed(page);
     await addFromLibrary(page, spare, 2, 6);
-    await copyToTwoDays(page, placed, noSwitch);
+    await expect(programCell(page, 1, 1).getByRole('button', { name: `Options for ${placed}`, exact: true })).toBeHidden();
+    await copyToTwoDays(page, placed, noSwitch, 'summary');
   });
 });
 

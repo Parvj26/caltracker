@@ -107,6 +107,19 @@ export async function addSection(page: Page, name: string) {
   await expect(page.getByRole('group', { name: `Section ${name}`, exact: true })).toBeVisible();
 }
 
+/** The workout page's ⋯ (beside Assign): opens it and picks Duplicate or Delete…. */
+export async function workoutPageMenu(page: Page, name: string, item: 'Duplicate' | 'Delete…'): Promise<void> {
+  await page.getByRole('button', { name: `More for ${name}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
+/** The workout's notes box: empty notes fold to "+ Add notes", which opens it. */
+export async function workoutNotes(page: Page): Promise<Locator> {
+  const add = page.getByRole('button', { name: '+ Add notes', exact: true });
+  if (await add.isVisible()) await add.click();
+  return page.getByLabel('Workout notes (optional)');
+}
+
 /** Builds and saves a 1-block workout through the UI: Barbell Squat, 3 sets of 8 at 60 (coach's units, kg by default). */
 export async function createWorkout(page: Page, name: string): Promise<void> {
   await page.goto('/workouts/new');
@@ -132,6 +145,21 @@ export function programCell(page: Page, week: number, day: number): Locator {
  * Creates a program through the UI, then puts library workouts on it with each cell's "+" button (the keyboard and
  * touch path). Ends on the program page with every change saved.
  */
+/**
+ * A row of a Library list (Workouts, Programs, Exercises on a phone): the list item whose title is exactly `name`. The
+ * whole row is one link, named by everything on it (title and meta line), so look rows up by their title instead.
+ */
+export function listRow(list: Locator, name: string): Locator {
+  return list.getByRole('listitem').filter({ has: list.page().getByText(name, { exact: true }) });
+}
+
+/** The program page's settings (Auto progression, Live Sync, name, weeks) fold away below the plan: open them. */
+export async function openProgramSettings(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: /Program settings/ });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 export async function createProgram(
   page: Page,
   name: string,

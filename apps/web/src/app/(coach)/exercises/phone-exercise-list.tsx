@@ -12,7 +12,7 @@ import {
 } from '@caltracker/shared';
 import { FavouriteButton } from '@/components/exercise-search/favourite-button';
 import { Photo } from '@/components/exercise-search/photo';
-import { Button, Chip, ErrorText, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { Button, Chip, ErrorText, ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { exerciseImageUrl, loadExerciseIndex, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -22,6 +22,14 @@ import { clearListReturn, readListReturn, saveListReturn } from './list-return';
 import { useFavourites } from './use-favourites';
 import styles from './exercises.module.css';
 import { openRef } from '@/lib/open-layer';
+
+/** The list's address with the search as typed (the address itself catches up a moment later, debounced). */
+function returnUrl(query: string): string {
+  const url = new URL(window.location.href);
+  if (query.trim()) url.searchParams.set('q', query.trim());
+  else url.searchParams.delete('q');
+  return `${url.pathname}${url.search}`;
+}
 
 const PAGE_SIZE = 50;
 /** "body only" -> "Body only" (the library stores them in lower case). */
@@ -182,28 +190,27 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
           </Link>
         </div>
       ) : (
-        <ul className={styles.phoneRows} aria-label="Exercises" aria-busy={!data && !loadFailed}>
+        <RowList aria-label="Exercises" aria-busy={!data && !loadFailed}>
           {hits.slice(0, shown).map(({ row }) => (
-            <li key={row.id} className={styles.phoneRow}>
-              <Link
-                href={`/exercises/${row.id}`}
-                className={styles.phoneRowLink}
-                onClick={() => saveListReturn({ url: `${window.location.pathname}${window.location.search}`, y: window.scrollY, shown })}
-              >
-                <Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={54} height={54} className={styles.phoneThumb ?? ''} />
-                <span className={styles.phoneRowText}>
-                  <span className={styles.phoneRowName}>{row.name}</span>
+            <ListRow
+              key={row.id}
+              href={`/exercises/${row.id}`}
+              linkProps={{ onClick: () => saveListReturn({ url: returnUrl(query), y: window.scrollY, shown }) }}
+              leading={<Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={54} height={54} className={styles.phoneThumb ?? ''} />}
+              title={row.name}
+              meta={
+                row.primaryMuscles[0] || row.equipment || row.source === 'custom' ? (
                   <span className={styles.phoneTags} aria-hidden="true">
                     {row.primaryMuscles[0] ? <Chip tone="blue">{capital(row.primaryMuscles[0])}</Chip> : null}
                     {row.equipment ? <Chip tone="grey">{capital(row.equipment)}</Chip> : null}
                     {row.source === 'custom' ? <Chip tone="lime">Custom</Chip> : null}
                   </span>
-                </span>
-              </Link>
-              <FavouriteButton name={row.name} favourite={favourites.has(row.id)} onToggle={() => void toggleStar(row.id, !favourites.has(row.id))} />
-            </li>
+                ) : null
+              }
+              action={<FavouriteButton name={row.name} favourite={favourites.has(row.id)} onToggle={() => void toggleStar(row.id, !favourites.has(row.id))} />}
+            />
           ))}
-        </ul>
+        </RowList>
       )}
       {hits.length > shown ? (
         <Button variant="secondary" className={styles.showMore} onClick={() => setShown((n) => n + PAGE_SIZE)}>

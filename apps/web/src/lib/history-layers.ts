@@ -420,13 +420,27 @@ function onClick(e: MouseEvent) {
       for (const g of guards) if (g.active) g.bypassed = true;
     }
     await unwindAll();
-    if (a.isConnected) {
-      BYPASS.add(a);
-      a.click();
-    } else {
-      window.location.assign(url.href);
-    }
+    // The step back resolves inside our own popstate listener, before the router's: a navigation started now would
+    // be thrown away by the router's "restore" for that step (it replaces any navigation still loading). Wait until
+    // every listener has had it.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    follow(a, url);
   })();
+}
+
+/**
+ * Follows the link once our entries are off: tapped again, so its own handlers run (a Link's push, a BackLink's
+ * step back, a sheet closing itself). Taken out of the page meanwhile: the router opens its address, else the browser.
+ */
+function follow(a: HTMLAnchorElement, url: URL) {
+  if (a.isConnected) {
+    BYPASS.add(a);
+    a.click();
+    return;
+  }
+  const router = (window as unknown as { next?: { router?: { push?: (href: string) => void } } }).next?.router;
+  if (router?.push) router.push(`${url.pathname}${url.search}${url.hash}`);
+  else window.location.assign(url.href);
 }
 
 /** Steps back over every entry of ours on top of the page (layers and guard), without closing anything. */
@@ -662,6 +676,20 @@ export function addLeaveGuard(ask: () => Promise<boolean>, onNoHistory?: () => v
       guards.delete(g);
     },
   };
+}
+
+/**
+ * For code that leaves the page (router.push) from a component that doesn't own the page's unsaved guard, such as a
+ * pop-up in the page header while the builder below has unsaved edits: asks "Discard changes?" when a guard is active
+ * and, on Discard, takes the guard off (like UnsavedGuard.confirm() then release()). True when it is fine to leave.
+ */
+export async function confirmLeavePage(): Promise<boolean> {
+  const active = [...guards].filter((g) => g.active && !g.bypassed);
+  if (active.length === 0) return true;
+  if (!(await active[0]!.ask())) return false;
+  for (const g of active) g.bypassed = true;
+  await Promise.all(active.map((g) => dropGuardEntry(g)));
+  return true;
 }
 
 function dropGuardEntry(g: Guard): Promise<void> {

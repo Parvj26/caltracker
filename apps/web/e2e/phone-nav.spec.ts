@@ -232,10 +232,16 @@ test.describe('on an iPhone', () => {
     await expect(tabBar(page)).toBeHidden();
   });
 
-  test('on the workout editor Save is in the top bar, and the editor bottom bar stands in for the tab bar', async ({ page }) => {
+  test('on the workout editor Save shows in the bottom bar once something changed, and that bar stands in for the tab bar', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts/new');
-    await expect(page.getByRole('button', { name: 'Save workout' })).toBeInViewport();
+    // Nothing to save yet: no Save button.
+    await expect(page.getByRole('button', { name: 'Save workout' })).toHaveCount(0);
+    await page.getByLabel('Workout name').fill('Phone nav check');
+    const save = page.getByRole('button', { name: 'Save workout' });
+    await expect(save).toBeInViewport();
+    const box = (await save.boundingBox())!;
+    expect(box.y).toBeGreaterThan(IPHONE.height / 2);
     await expect(tabBar(page)).toBeHidden();
     const add = (await page.getByRole('button', { name: '+ Exercise', exact: true }).boundingBox())!;
     expect(add.y + add.height).toBeLessThanOrEqual(IPHONE.height);

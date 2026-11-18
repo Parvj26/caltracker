@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { workoutPageTitle } from '@/lib/page-titles';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
+import { ParentLink } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { getWorkoutDoc } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadExercisePrefs } from '@/lib/workouts';
-import { AssignButton } from '@/components/assign/assign-to-clients';
-import { DuplicateButton } from '@/components/duplicate-button';
-import { DeleteWorkout } from './delete-workout';
-import { MoreActions } from './more-actions';
+import { WorkoutPageActions } from './more-actions';
+import header from './header.module.css';
 import styles from '../workouts.module.css';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -29,19 +27,13 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className={styles.page}>
-      <Link href="/workouts" className={styles.back}>← Workouts</Link>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>{loaded.doc.name}</h1>
-        <div className={styles.titleActions}>
-          <AssignButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
-          <MoreActions name={loaded.doc.name}>
-            <DuplicateButton kind="workout" id={loaded.doc.id} name={loaded.doc.name} />
-            <DeleteWorkout id={loaded.doc.id} name={loaded.doc.name} />
-          </MoreActions>
-        </div>
-      </header>
+      {/* The name shows once: the builder's editable title (with the page's h1). Assign and ⋯ sit by the back link. */}
+      <div className={header.topRow}>
+        <ParentLink href="/workouts" label="Workouts" />
+        <WorkoutPageActions id={loaded.doc.id} name={loaded.doc.name} />
+      </div>
       {/* key: opening a different workout starts a fresh builder. */}
-      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} workspaceId={workspaceId} mode="library" initialPrefs={prefs} />
+      <WorkoutBuilder key={loaded.doc.id} initial={loaded.doc} units={units} workspaceId={workspaceId} mode="library" initialPrefs={prefs} pageTitle />
     </div>
   );
 }

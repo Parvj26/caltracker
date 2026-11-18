@@ -1,41 +1,6 @@
-/* The workout page header's ⋯ (Duplicate, Delete). Colours, radii and sizes only via var(--ct-*). */
-.wrap { display: contents; }
-.moreButton { display: none; }
-.panel { display: contents; }
-
-@media (max-width: 899.98px) {
-  .wrap { position: relative; display: block; }
-  .moreButton {
-    display: grid;
-    place-items: center;
-    width: var(--ct-tap-min);
-    height: var(--ct-tap-min);
-    border: 0;
-    border-radius: var(--ct-radius-pill);
-    background: var(--ct-surface);
-    color: var(--ct-ink);
-    font: inherit;
-    font-size: var(--ct-size-section-heading);
-    font-weight: var(--ct-weight-button);
-    cursor: pointer;
-  }
-  .moreButton[aria-expanded='true'] { background: var(--ct-border); }
-  .panel { display: none; }
-  .panel[data-open] {
-    position: absolute;
-    z-index: 12;
-    top: calc(100% + var(--ct-space-1));
-    right: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--ct-space-2);
-    min-width: 13rem;
-    padding: var(--ct-space-2);
-    border: var(--ct-border-width-card) solid var(--ct-border);
-    border-radius: var(--ct-radius-input);
-    background: var(--ct-bg);
-    box-shadow: var(--ct-shadow-sticker);
-  }
-  .panel[data-open] > * { width: 100%; }
-  .panel[data-open] button { width: 100%; }
-}
+/* The workout page's top row: "← Workouts" on the left, Assign and ⋯ on the right. Colours, radii and sizes only via
+   var(--ct-*). Above the builder's sticky top bar, so the ⋯ menu opens over it. */
+.topRow { position: relative; z-index: 12; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ct-space-2); }
+.error { flex-basis: 100%; text-align: right; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

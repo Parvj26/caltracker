@@ -16,6 +16,8 @@
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 .sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .status { margin: 0; min-height: 1.5em; color: var(--ct-ink-muted); }
+/* The builder's save status takes no room until it has something to say, so the gap above the plan matches the rest. */
+.builder > .status:empty { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip-path: inset(50%); }
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -54,62 +56,20 @@
 }
 
 /* ---------- List ---------- */
-.listCard { max-width: 1040px; }
-.table { width: 100%; border-collapse: collapse; }
-.table th {
-  padding: var(--ct-space-2-5) var(--ct-space-2);
-  text-align: left;
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
-  color: var(--ct-ink-muted);
-}
-.table td { padding: var(--ct-space-1) var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
-.table td:first-child, .table th:first-child { padding-left: 0; }
-.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
-/* The name link's text (a phone card clamps it to 2 lines). */
-.nameText { overflow-wrap: anywhere; }
-.rowActions { flex-wrap: nowrap; }
-
+@media (max-width: 599.98px) { .intro { display: none; } }
+/* Room for Assign and ⋯ at the end of each row, so the column headings line up with the rows (RowList). */
+.rows { --row-actions-width: calc(var(--ct-space-12) * 3 + var(--ct-space-2)); }
 /* Search box above the list (the shared SearchBox). */
 .searchForm { max-width: 480px; }
-.phoneOnly { display: none; }
-
-/* iPhone: each program is a card like the Workouts list (name on up to 2 lines, "4 weeks · 20 workouts", then lime
-   Assign and ⋯), never wider than the screen; the whole card opens the program. iPad and desktop keep the table. */
+.rowMore { display: inline-flex; align-items: center; }
 @media (max-width: 599.98px) {
-  .phoneOnly { display: inline; }
-  .listIntro { display: none; }
-  .newWord { display: none; }
   .searchForm { max-width: none; }
-  .table, .table tbody { display: block; }
-  .table thead { display: none; }
-  .table tbody { display: flex; flex-direction: column; gap: var(--ct-space-2-5); }
-  .table tbody tr {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: 'name name name actions' 'weeks slots . actions';
-    align-items: center;
-    gap: 2px var(--ct-space-1);
-    padding: var(--ct-space-3) var(--ct-space-2) var(--ct-space-3) var(--ct-space-4);
-    border: var(--ct-border-width-card) solid var(--ct-border);
-    border-radius: var(--ct-radius-card);
-    background: var(--ct-bg);
-  }
-  .table td { display: block; padding: 0; border-top: 0; }
-  .table td:first-child { padding-left: 0; }
-  .nameCell { grid-area: name; min-width: 0; }
-  .weeksCell { grid-area: weeks; }
-  .slotsCell { grid-area: slots; }
-  .weeksCell, .slotsCell { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-  .actionsCell { grid-area: actions; padding-left: var(--ct-space-2); }
-  .nameLink { display: block; min-height: 0; font-size: 16px; font-weight: var(--ct-weight-button); line-height: 1.25; color: var(--ct-ink); text-decoration: none; }
-  .nameText { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .rowActions { gap: var(--ct-space-1); }
 }
 
 /* ---------- Forms ---------- */
 .formCard { max-width: 1040px; }
+/* The program page's details card lines up with the settings cards beside it (full width). */
+.detailsCard { max-width: none; }
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
 .weeksField { max-width: 8rem; }
 .weeksGroup { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2); }
@@ -126,12 +86,13 @@
 .headerMenu { position: relative; display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--ct-space-1); }
 .headerMenu .menu { min-width: 12rem; }
 
-/* Program settings (Auto progression, Live Sync, name and weeks): open above the plan on wider screens; on a phone
-   they fold into one "Program settings" row below the plan. */
-.settings { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+/* Program settings (Auto progression, Live Sync, name and weeks) fold into one "Program settings" row below the plan
+   on every size, so the weekly plan is the first thing on the screen (B#1). */
+.settings { order: 2; display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.settings[data-open='false'] .settingsBody { display: none; }
 .settingsBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .settingsToggle {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
@@ -232,16 +193,20 @@
 .cellOver { box-shadow: inset 0 0 0 2px var(--ct-ink); background: var(--ct-blue); }
 .chips { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 
-/* Text on a pastel fill is always ink. */
+/* Text on a pastel fill is always ink. The name (drag handle, tap = summary) and ⋯ sit side by side, never on top of
+   each other. */
 .chip {
   position: relative;
+  display: flex;
+  align-items: stretch;
   border-radius: var(--ct-radius-input);
   background: var(--ct-lime);
   color: var(--ct-ink);
 }
 .chipHandle {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-2);
   border: 0;
@@ -258,12 +223,11 @@
 }
 /* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
    than the whole chip is cut with "…" (the full name is in the title). */
-.chipName { display: block; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; }
-.menuSpace { float: right; width: calc(var(--ct-tap-min) - var(--ct-space-2)); height: calc(var(--ct-tap-min) - var(--ct-space-1)); }
+/* Up to 3 lines. Names wrap between words; a single word wider than the whole chip wraps inside itself rather than
+   being cut off (anywhere only breaks a word that can't fit on a line of its own). */
+.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .chipMenuButton {
-  position: absolute;
-  top: 0;
-  right: 0;
+  flex: none;
   width: var(--ct-tap-min);
   min-height: var(--ct-tap-min);
   border: 0;
@@ -275,6 +239,17 @@
   cursor: pointer;
 }
 .chipMenuButton:hover, .chipMenuButton[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
+/* The weeks x days grid has narrow days. With a mouse, ⋯ is a slim row under the name (right-aligned): beside the
+   name it would leave too little room, and "Conditioning" would break or be cut. On touch it is left out there: a tap
+   on the workout opens its summary, which has Copy to…, Move to… and Remove. */
+@media (hover: hover) and (pointer: fine) {
+  .grid .chip { flex-wrap: wrap; }
+  .grid .chipHandle { flex-basis: 100%; }
+  .grid .chipMenuButton { width: calc(var(--ct-space-6) + var(--ct-space-1)); min-height: var(--ct-space-6); margin-left: auto; }
+}
+@media (hover: none) and (pointer: coarse) {
+  .grid .chipMenuButton { display: none; }
+}
 .dragging { opacity: 0.4; }
 .overlayChip {
   display: inline-flex;
@@ -365,8 +340,7 @@
 }
 .dayRow .addButton { width: var(--ct-tap-min); }
 .dayRow .chips { margin-right: var(--ct-space-2); }
-.dayRow .chipHandle { display: flex; align-items: center; padding-right: var(--ct-tap-min); font-size: var(--ct-size-body); }
-.dayRow .menuSpace { display: none; }
+.dayRow .chipHandle { display: flex; align-items: center; font-size: var(--ct-size-body); }
 .rest { padding-bottom: var(--ct-space-1); font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 
 /* "Copy to…": the seven days of the picked week as checkboxes. */
@@ -453,7 +427,8 @@
   font-weight: var(--ct-weight-button);
   cursor: pointer;
 }
-.switch[aria-checked='true'] { background: var(--ct-lime); }
+/* On = ink track, white text (rulebook §2.4: lime is for create only). */
+.switch[aria-checked='true'] { background: var(--ct-ink); color: var(--ct-bg); }
 .switch:disabled { opacity: 0.6; cursor: progress; }
 
 /* ---------- Day "+" picker: New workout ---------- */
@@ -598,11 +573,8 @@
 .bigChoiceTitle { font-size: var(--ct-size-body); font-weight: var(--ct-weight-button); }
 .bigChoiceSub { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 
-/* ---------- Phone: the plan first, settings folded below it ---------- */
+/* ---------- Phone: week tabs instead of the grid ---------- */
 @media (max-width: 599.98px) {
-  .settings { order: 2; }
-  .settingsToggle { display: flex; }
-  .settings[data-open='false'] .settingsBody { display: none; }
   /* The phone shows week tabs instead (once the page has loaded), so the wide grid never flashes up first. */
   .gridScroll, .addWeekRow { display: none; }
 }
