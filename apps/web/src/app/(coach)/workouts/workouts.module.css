@@ -21,12 +21,10 @@
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
 /* ---------- Search ---------- */
-.searchCard { padding: var(--ct-space-4) var(--ct-space-4-5); }
 .searchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
 .searchField { flex: 1 1 220px; }
 
 /* ---------- List ---------- */
-.listCard { padding: var(--ct-space-2) var(--ct-space-4-5); }
 .table { width: 100%; border-collapse: collapse; }
 .table th {
   padding: var(--ct-space-2-5) var(--ct-space-2);
@@ -71,7 +69,6 @@
   .phoneOnly { display: inline; }
   .wideOnly { display: none; }
   .phoneOnlyFlex { display: inline-flex; }
-  .listCard { padding: var(--ct-space-1) var(--ct-space-4); }
   .table, .table tbody { display: block; }
   .table thead { display: none; }
   .table tr {

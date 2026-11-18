@@ -1,6 +1,6 @@
 /* Streak, stickers and personal bests on the client page. Colours, radii and sizes only via var(--ct-*). */
 .wrap { display: grid; gap: var(--ct-space-3); grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
-.card { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3) var(--ct-space-4-5); min-width: 0; }
+.card { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .streak { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }

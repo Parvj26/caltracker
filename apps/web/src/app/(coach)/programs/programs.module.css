@@ -54,7 +54,7 @@
 }
 
 /* ---------- List ---------- */
-.listCard { max-width: 1040px; padding: var(--ct-space-2) var(--ct-space-4-5); }
+.listCard { max-width: 1040px; }
 .table { width: 100%; border-collapse: collapse; }
 .table th {
   padding: var(--ct-space-2-5) var(--ct-space-2);
@@ -122,17 +122,7 @@
   .phoneOnly { display: inline; }
   .listIntro { display: none; }
   .newWord { display: none; }
-  .newButton {
-    gap: var(--ct-space-1);
-    min-height: var(--ct-tap-min);
-    padding: var(--ct-space-2) var(--ct-space-4);
-    background: transparent;
-    color: var(--ct-ink);
-    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
-    font-size: 15px;
-  }
   .searchForm { max-width: none; }
-  .listCard { padding: 0; border: 0; background: transparent; }
   .table, .table tbody { display: block; }
   .table thead { display: none; }
   .table tbody { display: flex; flex-direction: column; gap: var(--ct-space-2-5); }
@@ -160,7 +150,7 @@
 }
 
 /* ---------- Forms ---------- */
-.formCard { max-width: 1040px; padding: var(--ct-space-4) var(--ct-space-4-5); }
+.formCard { max-width: 1040px; }
 .form { display: flex; flex-direction: column; gap: var(--ct-space-3); max-width: 640px; }
 .weeksField { max-width: 8rem; }
 .weeksGroup { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-2); }

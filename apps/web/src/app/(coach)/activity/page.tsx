@@ -151,7 +151,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               : 'No finished workouts yet. They show up here as soon as a client finishes one.'}
         </p>
       ) : (
-        <Card className={styles.listCard}>
+        <Card>
           <ActivityFeed rows={rows} now={new Date(renderTime()).toISOString()} />
         </Card>
       )}

@@ -45,7 +45,7 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
 
   return (
     <>
-      <Card className={styles.searchCard}>
+      <Card>
         <form method="get" action="/workouts" className={styles.searchRow} role="search" onSubmit={onSubmit}>
           <TextField
             label="Search"
@@ -65,7 +65,7 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
       {shown.length === 0 ? (
         <p className={styles.empty}>{searching ? 'No workouts match.' : 'No workouts yet. Build your first one.'}</p>
       ) : (
-        <Card className={styles.listCard}>
+        <Card>
           <table className={styles.table} aria-label="Workouts">
             <thead>
               <tr>
