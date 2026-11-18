@@ -15,3 +15,20 @@ export function mealsListHref(query: string | null | undefined): string {
   const q = (query ?? '').trim();
   return q ? `/meals?q=${encodeURIComponent(q)}` : '/meals';
 }
+
+/** The logged count for a list row or the meal's page, or nothing before any client logs it (UI rules §7.4). */
+export function loggedNote(count: number): string | null {
+  return Number.isFinite(count) && count >= 1 ? loggedLabel(count) : null;
+}
+
+/** A meal's own page (read-only), keeping the list's search (?q=). */
+export function mealHref(id: string, query: string | null | undefined): string {
+  const q = (query ?? '').trim();
+  return q ? `/meals/${id}?q=${encodeURIComponent(q)}` : `/meals/${id}`;
+}
+
+/** The meal's edit form, keeping the list's search (?q=). */
+export function mealEditHref(id: string, query: string | null | undefined): string {
+  const q = (query ?? '').trim();
+  return q ? `/meals/${id}/edit?q=${encodeURIComponent(q)}` : `/meals/${id}/edit`;
+}

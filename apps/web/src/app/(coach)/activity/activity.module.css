@@ -1,80 +1,32 @@
-/* Activity feed. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall (--ct-tap-min). */
-.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
-
-.titleRow { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-2-5); }
-.titleLine { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ct-space-2) var(--ct-space-3); width: 100%; }
-.title {
-  margin: 0;
-  font-size: var(--ct-size-screen-title);
-  font-weight: var(--ct-weight-screen-title);
-  letter-spacing: var(--ct-tracking-screen-title);
-  line-height: 1.15;
-}
+/* Activity feed. Colours, radii and sizes only via var(--ct-*). Every control is at least 44 px tall. The list is
+   capped so a row stays readable on a wide screen. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4); max-width: 760px; }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-.toReview { display: inline-flex; align-items: center; gap: var(--ct-space-1); margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.toReview b { color: var(--ct-ink); }
 .empty { margin: 0; color: var(--ct-ink-muted); }
 
-/* The client filter, drawn as a "Client: All ▾" pill. */
-.filter { width: min(100%, 300px); }
+/* The client filter, drawn as a "Client: All ▾" pill; full width on a phone. */
+.filter { width: min(100%, 320px); }
 
-.smallButton {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--ct-tap-min);
-  min-width: var(--ct-tap-min);
-  padding: 0 var(--ct-space-3);
-  border: 0;
-  border-radius: var(--ct-radius-input);
-  background: transparent;
-  color: var(--ct-ink);
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
-  font: inherit;
-  font-weight: var(--ct-weight-section-heading);
-  cursor: pointer;
-}
-.smallButton:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-
-
-/* One heading per day, then one tappable row per workout: the whole row opens the log. */
-.feed { display: flex; flex-direction: column; }
-.day + .day { margin-top: var(--ct-space-2); }
+/* One heading per day, then one row per workout: the whole row opens the log. */
+.feed { display: flex; flex-direction: column; gap: var(--ct-space-6); }
 .dayHeading {
   margin: 0;
-  padding: var(--ct-space-2-5) 0 var(--ct-space-1);
+  padding-bottom: var(--ct-space-1);
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   color: var(--ct-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.list { margin: 0; padding: 0; list-style: none; }
-.list li + li { border-top: var(--ct-border-width-card) solid var(--ct-border); }
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--ct-space-2-5);
-  min-height: 66px;
-  padding: var(--ct-space-2) 0;
-  color: inherit;
-  text-decoration: none;
-  border-radius: var(--ct-radius-input);
-}
-.row:hover .workout { text-decoration: underline; }
-.row:focus-visible { outline: none; box-shadow: 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.rowText { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.client { font-weight: var(--ct-weight-section-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workoutLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); min-width: 0; }
-.workout { min-width: 0; overflow-wrap: anywhere; }
-.facts { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-/* Unreviewed: a small magenta dot; reviewed rows keep the space so the avatars line up. */
-.dot, .dotOff { flex: none; width: 8px; height: 8px; border-radius: var(--ct-radius-pill); }
-.dot { background: var(--ct-magenta); }
-.comments { display: inline-flex; align-items: center; gap: var(--ct-space-1); flex: none; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; }
-.chevron { display: inline-flex; flex: none; color: var(--ct-ink-muted); }
+.workout { font-weight: var(--ct-weight-body); }
+/* "52 min · 18 sets · 1,080 kg lifted": each fact stays on one line, so "lifted" never sits alone. */
+.facts { display: inline; font-variant-numeric: tabular-nums; }
+.fact { white-space: nowrap; }
+.comments { display: inline-flex; align-items: center; gap: var(--ct-space-1); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; color: var(--ct-ink); }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .pager { display: flex; align-items: center; gap: var(--ct-space-3); }
 
 @media (max-width: 599.98px) {
+  .filter { width: 100%; }
 }
