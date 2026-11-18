@@ -1,5 +1,6 @@
 /** The Help page's how-tos. Keep each step in the words the app's own buttons use. */
-export type HowTo = { title: string; steps: string[]; link: { href: string; label: string } };
+/** `icon` overrides the icon of the linked page, when two how-tos would otherwise share one ("scan": a body scan). */
+export type HowTo = { title: string; steps: string[]; link: { href: string; label: string }; icon?: 'scan' };
 
 export const HOW_TOS: HowTo[] = [
   {
@@ -40,6 +41,7 @@ export const HOW_TOS: HowTo[] = [
   },
   {
     title: 'Add a body scan',
+    icon: 'scan',
     steps: [
       'Open the client and go to their Body tab.',
       'Tap Add scan and type in the numbers from the InBody printout. You can attach the printout too.',

@@ -291,3 +291,21 @@ test('the coach removes a client from the community only, then adds them back', 
   await expect(page).toHaveURL(/\/community$/);
   expect((await max.phone.from('communities').select('id')).data).toEqual([{ id: communityId }]);
 });
+
+test('text typed in the composer is not lost to Back without asking', async ({ page }) => {
+  const c = await newCoachWithClient(admin, 'Guarded');
+  try {
+    await signInAs(page, c.email);
+    await page.goto('/home');
+    await page.goto('/community');
+    await page.getByLabel('Write a post').fill('Half a post');
+    await page.goBack();
+    const ask = page.getByRole('alertdialog', { name: 'Discard post?' });
+    await expect(ask).toBeVisible();
+    await ask.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(page).toHaveURL(/\/community$/);
+    await expect(page.getByLabel('Write a post')).toHaveValue('Half a post');
+  } finally {
+    await deleteCoach(admin, c);
+  }
+});
