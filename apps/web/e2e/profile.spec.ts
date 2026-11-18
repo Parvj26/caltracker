@@ -37,7 +37,7 @@ function provision(email: string): { userId: string; workspaceId: string } {
 async function signIn(page: Page, email: string, password: string) {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 }
@@ -78,10 +78,10 @@ test.describe('coach profile', () => {
   test('with no changes there is no Save button, just "All changes saved"', async () => {
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
     await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
-    // A change brings Save (with Undo); Undo puts the saved values back.
+    // A change brings Save (with Cancel); Cancel puts the saved values back.
     await page.getByLabel('Bio').fill('Something new');
     await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
-    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
     await expect(page.locator('main').getByRole('alert')).toHaveCount(0);
   });

@@ -90,9 +90,22 @@
 /* "‹ Messages": phones only (on iPad and desktop the inbox is right there). Never squeezed by a long name. */
 .back { display: none; flex: none; }
 .threadWho { flex: 1; min-width: 0; }
-.threadTitle { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+/* A long name wraps to a second line instead of being cut off; only a third line would be clipped. */
+.threadTitle {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  font-size: var(--ct-size-section-heading);
+  font-weight: var(--ct-weight-section-heading);
+}
 .threadSub { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.threadLink { flex: none; font-size: var(--ct-size-caption); }
+/* The calendar (or client page) icon: a 44 x 44 target. */
+.threadLink { flex: none; width: var(--ct-tap-min); min-width: var(--ct-tap-min); padding: 0; }
 
 .messages { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-4); overflow-y: auto; }
 .messages > * { flex-shrink: 0; }
@@ -196,7 +209,7 @@
   min-height: var(--ct-tap-min);
   max-height: 9.5em;
   padding: var(--ct-space-3) var(--ct-space-3-5);
-  border: 2px solid transparent;
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong); /* ≥ 3:1 input border (UI rules §2.8) */
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
   color: var(--ct-ink);

@@ -18,7 +18,7 @@ const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_for
 
 /**
  * Photo is handled by AvatarPicker; this form is the names, business, bio and units. Save shows only when something
- * changed (UI rules §8): "Unsaved changes" with Save (and Undo) in a bar at the bottom (the phone's action bar, a
+ * changed (UI rules §8): "Unsaved changes" with Save (and Cancel) in a bar at the bottom (the phone's action bar, a
  * sticky footer on larger screens); otherwise a quiet "All changes saved". The email is shown as text: it can't be
  * changed here.
  */
@@ -145,7 +145,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
             }}
             phSafe
           >
-            Undo
+            Cancel
           </Button>
           <Button type="submit" pending={pending} phSafe>
             {pending ? 'Saving…' : 'Save'}

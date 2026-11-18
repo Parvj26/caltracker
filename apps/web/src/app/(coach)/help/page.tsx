@@ -13,6 +13,15 @@ const Chevron = () => (
   </svg>
 );
 
+/** A body inside scan corners: "Add a body scan" links to Clients too, so it would otherwise repeat Invite's icon. */
+const ScanIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+    <circle cx="12" cy="8" r="2" />
+    <path d="M8.5 17c.4-2.8 1.7-4.5 3.5-4.5s3.1 1.7 3.5 4.5" />
+  </svg>
+);
+
 /** Each how-to is independent, so it gets the icon of the page it's about (numbers suggested a sequence). */
 function topicIcon(href: string): NavIconName {
   const name = href.replace(/^\//, '');
@@ -30,7 +39,7 @@ export default function HelpPage() {
             <details className={styles.howTo}>
               <summary className={styles.summary} data-ph-capture-attribute-label={`help_howto_${i + 1}`}>
                 <span className={styles.topicIcon} aria-hidden="true">
-                  {NAV_ICONS[topicIcon(h.link.href)]}
+                  {h.icon === 'scan' ? ScanIcon : NAV_ICONS[topicIcon(h.link.href)]}
                 </span>
                 <span className={styles.howToTitle} data-ph-safe="">{h.title}</span>
                 <Chevron />

@@ -37,7 +37,7 @@
   min-width: 0;
   min-height: var(--ct-button-min-height);
   padding: var(--ct-space-3) var(--ct-space-3-5);
-  border: 2px solid transparent;
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong); /* ≥ 3:1 input border (UI rules §2.8) */
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
   color: var(--ct-ink);

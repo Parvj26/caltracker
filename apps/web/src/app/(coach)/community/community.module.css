@@ -1,10 +1,11 @@
 /* Community feed and reports. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
-.page { display: flex; flex-direction: column; gap: var(--ct-space-4); max-width: 680px; }
+/* One readable column (at most 720 px), centred in the space beside the sidebar on a wide screen. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4); width: 100%; max-width: 720px; margin-inline: auto; }
 .sectionTitle { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 .subTitle { margin: var(--ct-space-3) 0 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
-/* The feed: one readable column (max ~680 px), members are behind the "Members (N)" button. */
+/* The feed: one readable column (max 720 px), members are behind the "Members (N)" button. */
 .feed { display: flex; flex-direction: column; gap: var(--ct-space-4); min-width: 0; }
 
 .visuallyHidden {
@@ -39,7 +40,8 @@
   width: 100%;
   min-height: 88px;
   padding: var(--ct-space-3) var(--ct-space-3-5);
-  border: 2px solid transparent;
+  /* The stronger input border, ≥ 3:1 (UI rules §2.8), like every other field. */
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong);
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
   color: var(--ct-ink);
@@ -196,8 +198,9 @@
 .shareTitle { margin: 0 0 2px; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); line-height: 1.3; overflow-wrap: anywhere; }
 .shiny { filter: saturate(1.4) drop-shadow(0 0 6px var(--ct-amber)); }
 
-.comments { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
-.comment { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-2) var(--ct-space-1) var(--ct-space-2) var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-bg); }
+/* Comments are plain rows split by a thin line, not boxes inside the post's card. */
+.comments { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.comment { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-2) 0; border-top: 1px solid var(--ct-border); }
 .commentTop { display: flex; align-items: flex-start; gap: var(--ct-space-2); }
 .commentText { flex: 1; min-width: 0; }
 .commentBody { margin: 0; overflow-wrap: anywhere; }
@@ -207,7 +210,7 @@
   width: 100%;
   min-height: var(--ct-tap-min);
   padding: 0 var(--ct-space-3);
-  border: var(--ct-border-width-card) solid var(--ct-border);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong);
   border-radius: var(--ct-radius-input);
   background: var(--ct-bg);
   color: var(--ct-ink);

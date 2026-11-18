@@ -93,7 +93,10 @@
 .legal a {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: var(--ct-tap-min);
+  /* A short word like "Terms" still gets a 44 px wide target. */
+  min-width: var(--ct-tap-min);
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-section-heading);
   color: var(--ct-ink-muted);

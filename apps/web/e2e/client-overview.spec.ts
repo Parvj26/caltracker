@@ -99,7 +99,7 @@ async function scan(s: Setup, daysAgo: number, values: Record<string, number>) {
 async function signIn(page: Page, s: Setup) {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(s.coachEmail);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 }

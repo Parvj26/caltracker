@@ -6,7 +6,7 @@ const PASSWORD = 'demo-password-123';
 async function signIn(page: Page, email: string, password: string) {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
@@ -22,7 +22,7 @@ test('wrong password shows a generic error', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/);
   // Only the password clears, so the coach can just retype it.
   await expect(page.getByLabel('Email')).toHaveValue('coach@demo.local');
-  await expect(page.getByLabel('Password')).toHaveValue('');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
 });
 
 test('unknown email shows the same error', async ({ page }) => {
@@ -63,4 +63,21 @@ test('sign-out redirects with a relative address, so it never points at the serv
   const res = await page.request.post('/auth/sign-out', { maxRedirects: 0 });
   expect(res.status()).toBe(303);
   expect(res.headers()['location']).toBe('/sign-in');
+});
+
+test('the eye button shows and hides the password', async ({ page }) => {
+  await page.goto('/sign-in');
+  const field = page.getByLabel('Password', { exact: true });
+  await field.fill('secret-123');
+  await expect(field).toHaveAttribute('type', 'password');
+  const eye = page.getByRole('button', { name: 'Show password' });
+  await expect(eye).toHaveAttribute('aria-pressed', 'false');
+  const box = await eye.boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  await eye.click();
+  await expect(field).toHaveAttribute('type', 'text');
+  await expect(eye).toHaveAttribute('aria-pressed', 'true');
+  await eye.click();
+  await expect(field).toHaveAttribute('type', 'password');
 });

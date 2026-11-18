@@ -99,7 +99,7 @@ async function invite(coach: Coach) {
 async function signIn(page: Page, coach: Coach) {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(coach.email);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 }
