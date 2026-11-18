@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import { COACH_EMAIL, seedSectionedWorkout, serviceClient, signInAsCoach, signInThroughForm, signOutFromProfile } from './helpers';
 
 // Leaving a live session never loses what was typed, and Back after Finish / Discard / Hand back never shows the
@@ -63,6 +63,23 @@ async function startedSession(page: Page, firstName: string, signIn: (p: Page) =
   return { client, workoutId, logId: log.data.id, name, today };
 }
 
+/**
+ * From now on every save (POST) from `page` is lost on the way. `sent()` waits until one was sent and lost: the save
+ * leaving the page goes out when the page is swapped or the save's short wait ends, which on a slow machine can be
+ * after Back has returned, so stopping before then would let it through and the test would prove nothing.
+ */
+async function loseSaves(page: Page) {
+  let lostOne: () => void;
+  const lost = new Promise<void>((resolve) => (lostOne = resolve));
+  const handler = async (route: Route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await route.abort();
+    lostOne();
+  };
+  await page.route('**/*', handler);
+  return { sent: () => lost, stop: () => page.unroute('**/*', handler) };
+}
+
 const firstWeight = async (logId: string) =>
   (await admin.from('log_sets').select('actual_weight_kg, position').eq('log_id', logId).order('position').limit(1).single()).data?.actual_weight_kg;
 
@@ -90,11 +107,12 @@ for (const size of [
       const s = await startedSession(page, 'Lost');
       await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('52');
       // The save sent while leaving never arrives (the network dropped, the app was put away).
-      await page.route('**/*', (route) => (route.request().method() === 'POST' ? route.abort() : route.continue()));
+      const lost = await loseSaves(page);
       await page.goBack();
       await expect(page).toHaveURL(new RegExp(`/clients/${s.client}/training`));
+      await lost.sent();
       expect(await firstWeight(s.logId)).toBeNull();
-      await page.unroute('**/*');
+      await lost.stop();
       // Opening the session again (a full reload) brings the typed weight back and saves it.
       await page.goto(`/clients/${s.client}/log/${s.workoutId}`);
       await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('52');
@@ -179,14 +197,43 @@ test.describe('kept copies on the device', () => {
     await expect.poll(() => firstWeight(log.data!.id), { timeout: 10_000 }).toBe(61);
   });
 
+  test('a save that reached the server but whose reply never came shows the saved weight when the session opens again', async ({ page }) => {
+    const s = await startedSession(page, 'Arrived');
+    const url = `/clients/${s.client}/log/${s.workoutId}`;
+    // From here every save is held: none gets an answer on this page, so the typed weight stays kept on the device.
+    const held: Route[] = [];
+    let reopened = false;
+    await page.route('**/*', (route) => (reopened || route.request().method() !== 'POST' ? route.continue() : void held.push(route)));
+    await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('52');
+    await expect.poll(() => held.length).toBeGreaterThan(0);
+    // The session opens again (a reload). The server renders its copy before the held save arrives there; the save
+    // lands just after (its reply still never reaches the page). So the page opens with an older copy than the
+    // server's, and a kept copy whose change the server already has.
+    await page.route(url, async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback();
+      const response = await route.fetch();
+      await held[0]!.fetch();
+      await expect.poll(() => firstWeight(s.logId), { timeout: 10_000 }).toBe(52);
+      reopened = true;
+      await route.fulfill({ response });
+    });
+    await page.goto(url);
+    // The page shows the server's newer copy: the saved weight, not an empty box.
+    await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('52');
+    expect(await firstWeight(s.logId)).toBe(52);
+    // The kept copy is done with (the server has it), so nothing is left behind to merge next time.
+    await expect.poll(() => draftKeys(page)).toEqual([]);
+  });
+
   test('two tabs: a lost save from one tab and newer sets saved from another are both kept', async ({ page, context }) => {
     const s = await startedSession(page, 'Twotabs');
     const url = `/clients/${s.client}/log/${s.workoutId}`;
     // Tab A types 47 kg on set 1, and its save never arrives.
     await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('47');
-    await page.route('**/*', (route) => (route.request().method() === 'POST' ? route.abort() : route.continue()));
+    const lost = await loseSaves(page);
     await page.goBack();
-    await page.unroute('**/*');
+    await lost.sent();
+    await lost.stop();
     // Set A's kept copy aside while tab B works, so B saves without it (as when A's copy is written after B opened).
     const keptA = await page.evaluate((prefix) => {
       const out: [string, string][] = Object.keys(localStorage).filter((k) => k.startsWith(prefix)).map((k) => [k, localStorage.getItem(k)!]);
