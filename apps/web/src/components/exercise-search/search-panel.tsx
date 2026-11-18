@@ -42,7 +42,7 @@ type Props = {
   onOpen?: (id: string) => void;
   /** Shows a Cancel button in the footer. */
   onCancel?: () => void;
-  /** Pick-many mode: an extra control in the footer, before the buttons (the builder's set count). */
+  /** Pick-many mode: something extra in the footer, before the buttons (the builder's "1 set" note). */
   footerExtra?: ReactNode;
   /** Starting search text and chips (the Exercises page fills these from its address). */
   initialQuery?: string;

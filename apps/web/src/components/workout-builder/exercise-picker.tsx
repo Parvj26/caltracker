@@ -1,11 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { DEFAULT_SETS } from '@caltracker/shared';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import type { ExerciseIndexRow, ExercisePick } from '@caltracker/shared';
 import { SearchPanel } from '@/components/exercise-search/search-panel';
 import styles from '@/components/exercise-search/exercise-search.module.css';
-import { SetCountStepper } from './set-count-stepper';
 
 type Props = {
   title: string;
@@ -20,17 +18,16 @@ type Props = {
   hint?: string;
   /** With `multiple`: what the picks become, e.g. 'superset' or 'pick-one group'. */
   groupLabel?: string;
-  /** With `multiple`: shows a "Sets each: − 3 +" control (or "Rounds" for a superset) beside the Add button. */
-  setCount?: { label: string; noun: string };
-  /** `sets` is the stepper's value (3 when there is no stepper). */
-  onPick: (exercises: ExercisePick[], sets: number) => void;
+  /** With `multiple`: a line above the Add button. */
+  footerNote?: string;
+  onPick: (exercises: ExercisePick[]) => void;
   onClose: () => void;
   /** Exercise ids not to offer (a substitute's picker leaves out the planned exercise and its other substitutes). */
   exclude?: readonly string[];
 };
 
 /** Search built-in and custom exercises in a native modal dialog (focus is trapped and Escape closes it). */
-export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, setCount, onPick, onClose, exclude }: Props) {
+export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, groupLabel, footerNote, onPick, onClose, exclude }: Props) {
   // SearchPanel needs a stable row filter: it only changes when the excluded ids do.
   const excludeKey = (exclude ?? []).join(',');
   const rowFilter = useCallback(
@@ -39,7 +36,6 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [sets, setSets] = useState(DEFAULT_SETS);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -67,9 +63,9 @@ export function ExercisePicker({ title, workspaceId, multiple, min, max, hint, g
         {...(max !== undefined ? { max } : {})}
         {...(hint !== undefined ? { hint } : {})}
         {...(groupLabel !== undefined ? { groupLabel } : {})}
-        {...(setCount ? { footerExtra: <SetCountStepper label={setCount.label} noun={setCount.noun} value={sets} onChange={setSets} /> } : {})}
+        {...(footerNote ? { footerExtra: <p className={styles.footerNote}>{footerNote}</p> } : {})}
         {...(excludeKey ? { rowFilter } : {})}
-        onPick={(exs) => onPick(exs, setCount ? sets : DEFAULT_SETS)}
+        onPick={onPick}
         onCancel={() => dialogRef.current?.close()}
       />
     </dialog>

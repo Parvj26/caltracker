@@ -180,7 +180,16 @@ export {
   addChoice,
   addChoiceOption,
   addSection,
-  DEFAULT_SETS,
+  BUILDER_SETS,
+  canJoinWithNext,
+  exerciseRestOff,
+  joinWithNext,
+  keepRestOff,
+  reorderBlocks,
+  rememberRests,
+  restoreRests,
+  setExerciseRest,
+  splitSuperset,
   MAX_SETS,
   emptyWorkout,
   MAX_BLOCKS,
@@ -207,6 +216,7 @@ export {
   toggleExerciseMeasurement,
   updateExerciseOptions,
 } from './workouts/doc-ops';
+export type { RestMemory } from './workouts/doc-ops';
 export {
   MEASUREMENTS,
   MEASUREMENT_NAMES,

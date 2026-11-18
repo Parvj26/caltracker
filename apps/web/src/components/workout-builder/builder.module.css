@@ -236,20 +236,83 @@
 }
 .addSetHint { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
-.addRow { display: flex; flex-wrap: wrap; gap: var(--ct-space-3); }
-
+/* ---------- Top bar: tools, "+ Exercise" and Save (approved builder mockup) ---------- */
+/* Stuck to the top on every screen. --keyboard-offset (useKeyboardOffset): how far iOS has panned the screen down
+   while the keyboard is open, so Save stays in sight instead of scrolling off with the page. */
 .saveBar {
+  order: -1;
   position: sticky;
-  bottom: 0;
+  z-index: 11;
+  top: calc(env(safe-area-inset-top) + var(--keyboard-offset, 0px));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--ct-space-3);
+  gap: var(--ct-space-2);
   padding: var(--ct-space-3) 0;
   background: var(--ct-bg);
-  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  border-bottom: var(--ct-border-width-card) solid var(--ct-border);
 }
+/* In a window (the program's day sheet) the window already sits below the notch. */
+:global(dialog) .builder > .saveBar { top: 0; }
+/* An error from the last save gets its own line. */
+.saveBar > :not([role='status']):not(button):not(.barTools):not(.barName) { flex-basis: 100%; }
+.barName { display: none; }
+.barTools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.toolButton { display: inline-flex; align-items: center; gap: var(--ct-space-2); }
+.barAdd { margin-left: auto; }
+.addExercise, .saveButton { min-height: 54px; padding-left: var(--ct-space-4-5); padding-right: var(--ct-space-4-5); font-size: 18px; }
+.addExercise { border: 2px solid var(--ct-ink); background: var(--ct-lime); font-weight: var(--ct-weight-button); }
+.addExercise:hover:not(:disabled) { background: var(--ct-lime); }
+.sectionPopover { position: relative; }
+.sectionPopover .sectionChoices {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + var(--ct-space-1));
+  left: 0;
+  width: min(320px, calc(100vw - 32px));
+  padding: var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  box-shadow: var(--ct-shadow-sticker);
+}
+
+/* ---------- The Superset switch between two exercises ---------- */
+.switchRow, .linkRow { display: flex; align-items: center; justify-content: center; gap: var(--ct-space-2-5); }
+.switchRow { margin: calc(-1 * var(--ct-space-2)) 0; }
+.switchLine { width: 44px; height: 1px; background: var(--ct-border); }
+.switchRow[data-on] .switchLine { height: 3px; background: var(--ct-magenta); }
+.switchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.switchButton[aria-pressed='true'] { border-color: var(--ct-magenta-deep); background: var(--ct-blue); }
+.switchButton:disabled { cursor: not-allowed; opacity: 0.6; }
+.switchTrack {
+  display: flex;
+  width: 30px;
+  height: 18px;
+  padding: 2px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-ink-muted);
+}
+.switchThumb { width: 14px; height: 14px; border-radius: var(--ct-radius-pill); background: var(--ct-bg); }
+.switchButton[aria-pressed='true'] .switchTrack { justify-content: flex-end; background: var(--ct-magenta-deep); }
+/* Superset exercises: blue outline and blue A1 / A2 badges. */
+.block[data-superset] { border-color: var(--ct-magenta); }
+.block[data-superset] .blockNumber, .phoneRow[data-superset] .blockNumber { background: var(--ct-blue); }
+.blockNumber { min-width: 28px; width: auto; padding: 0 6px; }
 
 /* ---------- Sections and pick-one groups ---------- */
 .sectionHeader { display: flex; flex-direction: column; gap: var(--ct-space-2); padding-top: var(--ct-space-3); }
@@ -329,28 +392,10 @@
 .tempoInput { width: 8rem; text-align: center; font-variant-numeric: tabular-nums; }
 .optionsError { flex-basis: 100%; }
 
-/* ---------- iPhone width: one line per set, edited in a bottom sheet (round 2 mockup #3, option A) ---------- */
-/* Below 600 px each set is one tappable line ("1  12 × 10 kg   rest 1:30  ›", a W / F / D chip when it isn't a
-   normal set, "Not filled yet" when blank); the inline rows are hidden. Wider screens keep the rows. */
-.setLines { display: none; }
-@media (max-width: 599px) {
-  .block { padding: var(--ct-space-2); }
-  .blockHeader { gap: var(--ct-space-2); }
-  .blockHeader .blockTitle { flex: 1 1 calc(100% - 40px); min-width: 0; }
-  .blockTools { flex-wrap: nowrap; gap: var(--ct-space-1); }
-  .iconButton { width: 44px; height: 44px; }
-
-  .sets { display: none; }
-  .setLines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-  .exerciseFooter .addSet { align-self: stretch; }
-  .substitute { margin-left: 0; }
-}
 
 /* ---------- Phones, iPads and other touch screens ---------- */
-/* Desktop with a mouse: nothing below changes it. The fold line, the ⋯ menu, the steppers and the top "+ Exercise"
-   are hidden there; the bottom "+ Exercise" and the icon buttons stay. */
-.fold, .narrowOnly, .stepButton { display: none; }
-.saveBar .narrowOnly { display: none; }
+/* Desktop with a mouse: nothing below changes it. The fold line, the ⋯ menu and the steppers are hidden there. */
+.fold, .stepButton { display: none; }
 .stepper { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
 
 /* The ⋯ menu (same look as the calendar's item menu). */
@@ -458,11 +503,12 @@
   .stepper .narrow { width: 4.5rem; }
 }
 
-/* Phones and iPad portrait: each block folds to one line ("Bench Press" / "4 × 8 @ 60 kg · rest 1:30"); one is open
-   at a time. The ⋯ menu stands in for the header's icon buttons; the save bar moves to the top with "+ Exercise". */
+/* iPad portrait: each card folds to one line ("Bench Press" / "4 × 8 @ 60 kg · rest 1:30"); one is open at a time.
+   The ⋯ menu stands in for the header's icon buttons. */
 @media (max-width: 899.98px) {
   .block { gap: var(--ct-space-2); padding: var(--ct-space-2) var(--ct-space-3); }
   .block[data-open] { border-color: var(--ct-ink); }
+  .block[data-open][data-superset] { border-color: var(--ct-magenta-deep); }
   /* A newly added exercise scrolls to just under the top Save bar, not behind it. */
   .block { scroll-margin-top: calc(env(safe-area-inset-top) + 80px); }
   .fold { display: flex; align-items: center; gap: var(--ct-space-1); }
@@ -494,87 +540,11 @@
   .blockHeader .blockNumber, .blockHeader .blockTitle, .blockHeader > .blockTools { display: none; }
   .blockHeader:not(:has(.measureWrap)) { display: none; }
 
-  .builder > .saveBar {
-    order: -1;
-    position: sticky;
-    z-index: 11;
-    /* --keyboard-offset (useKeyboardOffset): how far iOS has panned the screen down while the keyboard is open, so
-       Save stays at the top of what the coach can see instead of scrolling off with the page. */
-    top: calc(env(safe-area-inset-top) + var(--keyboard-offset, 0px));
-    bottom: auto;
-    padding: var(--ct-space-2) 0;
-    border-top: 0;
-    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
-  }
-  /* In a window (the program's day sheet) the window already sits below the notch. */
-  :global(dialog) .builder > .saveBar { top: 0; }
-  .saveBar .narrowOnly { display: inline-flex; }
-  /* One line: a short status, "+ Exercise" and "Save". */
-  .builder > .saveBar { gap: var(--ct-space-2); }
-  .builder > .saveBar > [role='status'] { flex: 1 1 auto; min-width: 0; text-align: right; }
-  /* An error from the last save gets its own line above the buttons. */
-  .builder > .saveBar > :not([role='status']):not(button) { flex-basis: 100%; }
-  .saveBar button { padding-left: var(--ct-space-3-5); padding-right: var(--ct-space-3-5); }
-  .wideWord { display: none; }
-  .addRow .wideOnly { display: none; }
+  /* The status gets its own line above the buttons. */
+  .saveBar > [role='status'] { flex-basis: 100%; }
 }
 
-/* iPhone: a slimmer card edge than iPad portrait, so the set boxes get the width (see the stepper above). After the
-   rule above so it wins. */
-@media (max-width: 599px) {
-  .block { padding-left: var(--ct-space-2); padding-right: var(--ct-space-2); }
-  .substitute { padding-left: 6px; padding-right: 0; }
-}
-
-.setLineItem { display: flex; flex-direction: column; gap: var(--ct-space-1); }
-/* A drop set is indented under the set it follows. */
-.setLineDrop { padding-left: var(--ct-space-4); }
-.setLine {
-  display: flex;
-  align-items: center;
-  gap: var(--ct-space-2-5);
-  width: 100%;
-  min-height: 52px;
-  padding: 0 var(--ct-space-2) 0 var(--ct-space-2-5);
-  border: 0;
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-surface);
-  color: var(--ct-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.setLine:active { background: var(--ct-border); }
-.setLineNumber {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--ct-radius-pill);
-  background: var(--ct-bg);
-  font-size: 14px;
-  font-weight: var(--ct-weight-button);
-}
-.setLineChip {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: var(--ct-radius-pill);
-  font-size: 14px;
-  font-weight: var(--ct-weight-button);
-}
-.setLineValues, .setLineBlank { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.setLineValues { font-size: 17px; font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
-.setLineBlank { color: var(--ct-ink-muted); font-style: italic; }
-.setLineRest { flex: none; font-size: 14px; color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; }
-.setLineChevron { flex: none; width: 18px; font-size: 22px; line-height: 1; color: var(--ct-ink-muted); text-align: center; }
-
-/* The set editor: a sheet docked to the bottom, lifted above the iOS keyboard by --sheet-keyboard and capped to the
+/* The phone's More sheet: docked to the bottom, lifted above the iOS keyboard by --sheet-keyboard and capped to the
    visible height (--sheet-viewport), both from useSheetKeyboardInset. */
 .sheet {
   position: fixed;
@@ -600,11 +570,6 @@
   padding: var(--ct-space-2-5) var(--ct-space-4) calc(var(--ct-space-4) + env(safe-area-inset-bottom));
 }
 .sheetGrab { align-self: center; width: 40px; height: 5px; border-radius: var(--ct-radius-pill); background: var(--ct-border); }
-.sheetNav { display: flex; align-items: center; gap: var(--ct-space-1); }
-.sheetTitle { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; text-align: center; }
-.sheetTitle .caption { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sheetHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
-.sheetHeading:focus { outline: none; }
 .sheetArrow {
   display: grid;
   flex: none;
@@ -619,108 +584,312 @@
   cursor: pointer;
 }
 .sheetArrow:disabled { cursor: not-allowed; color: var(--ct-ink-muted); opacity: 0.5; }
-.sheetBoxes { display: flex; gap: var(--ct-space-2-5); }
-.sheetBox { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
-.sheetLabel { font-size: 14px; font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
-.sheetInput {
-  width: 100%;
-  min-width: 0;
-  min-height: 60px;
-  padding: 0 var(--ct-space-2);
-  font-size: 28px;
-  font-weight: var(--ct-weight-button);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-.sheetSteps { display: flex; gap: 6px; }
-.sheetStep {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  height: var(--ct-tap-min);
-  padding: 0;
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-bg);
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: var(--ct-size-section-heading);
-  font-weight: var(--ct-weight-button);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.sheetStep:active { background: var(--ct-surface); }
-.sheetRow { display: flex; align-items: center; gap: var(--ct-space-2); }
-.sheetRowLabel { width: 44px; font-size: 14px; color: var(--ct-ink-muted); }
-.sheetChip {
-  flex: 1;
+
+/* The Rest checkbox sits below Weight / Reps / Time, apart from them. */
+.measureRest { margin-top: var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); border-radius: 0; }
+.measureChips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.measureChip {
   min-height: var(--ct-tap-min);
-  border: var(--ct-border-width-card) solid var(--ct-border);
+  padding: 0 var(--ct-space-3);
+  border: 1px dashed var(--ct-ink-muted);
   border-radius: var(--ct-radius-pill);
   background: var(--ct-bg);
-  color: var(--ct-ink);
+  color: var(--ct-ink-muted);
   font: inherit;
+  font-size: 14px;
   font-weight: var(--ct-weight-button);
   cursor: pointer;
   touch-action: manipulation;
 }
-.sheetChip[aria-pressed='true'] { border-color: var(--ct-ink); background: var(--ct-lime); }
-.sheetField { display: flex; flex-direction: column; gap: 6px; }
-.sheetSeg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: var(--ct-radius-input); background: var(--ct-surface); }
-.sheetSegItem {
-  flex: 1 0 auto;
-  min-height: 40px;
-  padding: 0 var(--ct-space-2);
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
+.measureChip[aria-pressed='true'] { border: var(--ct-border-width-card) solid var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); }
+.measureChip:disabled { cursor: not-allowed; }
+
+/* ---------- Reorder window ---------- */
+.reorderDialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
   color: var(--ct-ink);
-  font: inherit;
-  font-size: 15px;
-  font-weight: var(--ct-weight-section-heading);
-  cursor: pointer;
-  touch-action: manipulation;
 }
-.sheetSegItem[aria-pressed='true'] { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-ink); }
-.sheetSegItem:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
-.sheetRestInput { flex: 0 0 4.5rem; width: 4.5rem; min-height: 40px; padding: 0 var(--ct-space-1); background: var(--ct-bg); text-align: center; }
-.sheetApply { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); min-height: var(--ct-tap-min); }
-.sheetApplied { font-size: 14px; font-weight: var(--ct-weight-section-heading); }
-.sheetApplied:empty { display: none; }
-.sheetUndo {
-  min-height: var(--ct-tap-min);
-  padding: 0 var(--ct-space-2);
-  border: 0;
-  background: transparent;
-  color: var(--ct-ink);
-  font: inherit;
-  font-weight: var(--ct-weight-button);
-  text-decoration: underline;
-  cursor: pointer;
-}
-/* Pinned to the sheet's bottom edge, so Done stays in reach when the keyboard shrinks the sheet and the rest scrolls. */
-.sheetActions {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
+.reorderDialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+.reorderDialog[open] { display: flex; flex-direction: column; }
+.reorderHead { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-6) var(--ct-space-6) var(--ct-space-2); }
+.dialogTitle { margin: 0; font-size: 24px; font-weight: var(--ct-weight-button); }
+.reorderBody { display: flex; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3) var(--ct-space-6) var(--ct-space-4-5); overflow-y: auto; }
+.reorderRun { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.reorderSection { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); text-transform: uppercase; }
+.reorderList { display: flex; flex-direction: column; gap: var(--ct-space-2-5); margin: 0; padding: 0; list-style: none; }
+.reorderItem {
   display: flex;
   align-items: center;
-  gap: var(--ct-space-2);
-  /* Over the sheet's side and bottom padding, so it meets the sheet's edges. */
-  margin: 0 calc(-1 * var(--ct-space-4)) calc(-1 * (var(--ct-space-4) + env(safe-area-inset-bottom)));
-  padding: var(--ct-space-2) var(--ct-space-4) calc(var(--ct-space-4) + env(safe-area-inset-bottom));
+  gap: var(--ct-space-3);
+  min-height: 72px;
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-button);
   background: var(--ct-bg);
+}
+.reorderItem[data-superset] { border-color: var(--ct-magenta); }
+.reorderDragging { opacity: 0.6; box-shadow: var(--ct-shadow-sticker); }
+.reorderHandle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  font-size: 24px;
+  color: var(--ct-ink-muted);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.reorderNames { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
+.reorderName { overflow-wrap: anywhere; font-size: 17px; font-weight: var(--ct-weight-section-heading); }
+.reorderTag {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border: 1px solid var(--ct-magenta-deep);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-blue);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.reorderArrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+.reorderArrow:disabled { cursor: not-allowed; color: var(--ct-ink-muted); opacity: 0.5; }
+.reorderActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ct-space-2-5);
+  padding: var(--ct-space-4) var(--ct-space-6) calc(var(--ct-space-4-5) + env(safe-area-inset-bottom));
   border-top: var(--ct-border-width-card) solid var(--ct-border);
 }
-.sheetRemove { color: var(--ct-danger); }
-.sheetDone {
-  flex: 1;
-  min-height: 48px;
-  border: 0;
+
+/* ---------- iPhone (below 600 px): a list of rows, each exercise edited on its own screen (approved mockups) ---------- */
+.phoneList, .phoneBar { display: none; }
+.phoneRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  width: 100%;
+  min-height: 66px;
+  padding: var(--ct-space-2-5) var(--ct-space-3-5);
+  border: var(--ct-border-width-card) solid var(--ct-border);
   border-radius: var(--ct-radius-button);
-  background: var(--ct-ink);
-  color: var(--ct-bg);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
   font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.phoneRow[data-superset] { border-color: var(--ct-magenta); }
+.phoneRow .blockNumber { flex: none; min-width: 32px; height: 32px; }
+.phoneRowChevron { display: grid; flex: none; color: var(--ct-ink-muted); transform: rotate(-90deg); }
+.linkRow { position: relative; height: 44px; }
+.linkRow .switchLine { display: none; }
+.linkRow[data-on]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--ct-magenta);
+}
+.linkButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* The visible pill is smaller than the 44 px tap area. */
+.linkButton::before {
+  content: '';
+  position: absolute;
+  inset: 7px 4px;
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-bg);
+}
+.linkButton svg { position: relative; }
+.linkButton[aria-pressed='true'] { color: var(--ct-magenta-deep); }
+.linkButton[aria-pressed='true']::before { border: var(--ct-border-width-card) solid var(--ct-magenta-deep); background: var(--ct-blue); }
+.linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.moreButtonBig {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 64px;
+  min-height: 56px;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 12px;
   font-weight: var(--ct-weight-button);
   cursor: pointer;
 }
+.moreRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3-5);
+  width: 100%;
+  min-height: 68px;
+  padding: 0 var(--ct-space-4);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.moreRow:disabled { cursor: not-allowed; opacity: 0.6; }
+.moreText { display: flex; flex-direction: column; gap: 2px; font-size: 17px; }
+
+@media (max-width: 599.98px) {
+  .wideList { display: none; }
+  .phoneList { display: flex; flex-direction: column; }
+  .phoneList > .caption { padding-bottom: var(--ct-space-2-5); }
+  .phoneList > .sectionHeader { padding-bottom: var(--ct-space-2); }
+  .phoneRow { scroll-margin-top: calc(env(safe-area-inset-top) + 80px); scroll-margin-bottom: 100px; }
+
+  /* The top bar: the workout's name over its status, and Save. */
+  .saveBar { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--ct-space-2); row-gap: 0; padding: var(--ct-space-2) 0; }
+  .barName { display: block; overflow: hidden; font-size: 19px; font-weight: var(--ct-weight-button); text-overflow: ellipsis; white-space: nowrap; }
+  .saveBar > [role='status'] { grid-column: 1; justify-self: start; }
+  .saveBar > .saveButton { grid-column: 2; grid-row: 1 / span 2; min-height: var(--ct-tap-min); font-size: 15px; }
+  .saveBar > :not([role='status']):not(button):not(.barName) { grid-column: 1 / -1; }
+  .barTools, .saveBar > .barAdd { display: none; }
+
+  /* The bottom bar: More and a wide "+ Exercise". */
+  .phoneBar {
+    position: sticky;
+    z-index: 11;
+    bottom: 0;
+    display: flex;
+    gap: var(--ct-space-2-5);
+    padding: var(--ct-space-3) 0 calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+    background: var(--ct-bg);
+    border-top: var(--ct-border-width-card) solid var(--ct-border);
+  }
+  .phoneBar .addExercise { flex: 1; min-height: 56px; }
+}
+
+/* The phone exercise editor: the whole screen, above the keyboard (--sheet-keyboard, useSheetKeyboardInset). */
+.phoneEditor {
+  position: fixed;
+  inset: 0 0 var(--sheet-keyboard, 0px) 0;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  overscroll-behavior: contain;
+}
+.phoneEditor[open] { display: flex; flex-direction: column; }
+.phoneEditorHead {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--ct-space-2-5);
+  padding: calc(env(safe-area-inset-top) + var(--ct-space-2)) var(--ct-space-3) var(--ct-space-3);
+  border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+}
+.phoneEditorNav { display: flex; align-items: center; gap: var(--ct-space-1); }
+.phoneBack {
+  display: grid;
+  place-items: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.phoneBack svg { transform: rotate(90deg); }
+.phoneEditorCount { flex: 1; font-size: 13px; color: var(--ct-ink-muted); text-align: center; }
+.phoneEditorTitle { display: flex; align-items: center; gap: var(--ct-space-3); padding: 0 var(--ct-space-1); }
+.phoneEditorTitle .blockNumber { flex: none; min-width: 34px; height: 34px; }
+.phoneEditorName { flex: 1; min-width: 0; margin: 0; font-size: 22px; font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
+.phoneEditorName .swapName { font-size: inherit; font-weight: inherit; }
+.phoneEditorBody { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3-5) var(--ct-space-4) var(--ct-space-6); overflow-y: auto; }
+.phoneExercise { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.phoneExercise + .phoneExercise { padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.phoneDetails { padding: 0 var(--ct-space-3-5); border: var(--ct-border-width-card) solid var(--ct-border); border-radius: var(--ct-radius-button); }
+.phoneDetailsSummary { display: flex; align-items: center; min-height: 48px; font-weight: var(--ct-weight-button); cursor: pointer; }
+.phoneDetailsBody { display: flex; flex-direction: column; gap: var(--ct-space-2-5); padding-bottom: var(--ct-space-3-5); }
+.phoneEditorBar {
+  display: flex;
+  flex: none;
+  gap: var(--ct-space-2-5);
+  padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  background: var(--ct-bg);
+}
+.phoneAddSet, .phoneDone {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-button);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.phoneDone { border-width: 2px; background: var(--ct-lime); font-size: 18px; }
+
+/* A set as a card in the phone editor: "Set 1", its type and ×, then one labelled line per box with − / +. */
+.setRow[data-layout='stacked'] { gap: var(--ct-space-2-5); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); }
+.setRow[data-layout='stacked'].dropRow { margin-left: var(--ct-space-4); }
+.setHead { display: flex; align-items: center; gap: var(--ct-space-2); }
+.setHeadName { font-weight: var(--ct-weight-button); }
+.setHead .typeWrap { margin-right: auto; }
+.setHead .removeSet { position: static; color: var(--ct-ink-muted); }
+.setRow[data-layout='stacked'] .setCells { flex-direction: column; align-items: stretch; gap: var(--ct-space-2); }
+.setRow[data-layout='stacked'] .field { flex-direction: row; align-items: center; gap: var(--ct-space-2); min-width: 0; }
+.setRow[data-layout='stacked'] .fieldCaption { flex: none; width: 84px; font-size: 14px; }
+.setRow[data-layout='stacked'] .fieldBox, .setRow[data-layout='stacked'] .stepper { display: flex; flex: 1; min-width: 0; }
+.setRow[data-layout='stacked'] .fieldBox .narrow { flex: 1; width: 0; min-width: 0; text-align: center; font-size: 18px; font-weight: var(--ct-weight-button); }
+.setRow[data-layout='stacked'] .unit { display: none; }

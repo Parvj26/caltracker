@@ -196,6 +196,7 @@
 .addButton { align-self: stretch; }
 
 .footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); }
+.footerNote { flex-basis: 100%; margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 
 /* Below about 900 px the preview opens over the list, with a Back button. */
 @media (max-width: 900px) {

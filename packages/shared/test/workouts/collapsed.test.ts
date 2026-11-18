@@ -171,7 +171,7 @@ describe('blockCollapsedSummary', () => {
     const c = exercise('Row', times(3, { targetRepsMin: 10, targetRepsMax: 10, targetWeightKg: 40, restSeconds: 90 }));
     const b = block('superset', [a, c]);
     expect(blockCollapsedSummary(b, 'kg')).toEqual({
-      title: 'Superset / circuit',
+      title: 'Superset',
       line: '3 rounds · rest 1:30',
       parts: [
         { key: a.id, name: 'Bench Press', line: '3 × 8 @ 60 kg' },

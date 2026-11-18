@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // Faster building (spec: docs/superpowers/specs/2026-11-06-coach-faster-building-design.md): several exercises at
-// once with a set count, duplicate a workout or program, copy a program week. (Copy set 1 / fill down gave way to
+// once (each starts with 1 set), duplicate a workout or program, copy a program week. (Copy set 1 / fill down gave way to
 // "+ Set (copies last set)" in the editor redesign: see workout-editor.spec.ts.)
 // Uses only exercises in the CI fixture.
 
@@ -17,14 +17,14 @@ test.afterAll(async () => {
 
 const saved = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
 
-test('add three exercises at once with 4 sets each, and save', async ({ page }) => {
+test('add three exercises at once, each with 1 set; + Set copies it, and save', async ({ page }) => {
   const name = `Fast build ${unique()}`;
   created.workouts.push(name);
   await signInAsCoach(page);
   await page.goto('/workouts/new');
   await page.getByLabel('Workout name').fill(name);
 
-  // One picker, three picks, in this order, with "Sets each" raised to 4.
+  // One picker, three picks, in this order. No sets control: each exercise starts with one set.
   await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Add exercises' });
   const search = picker.getByLabel('Search exercises');
@@ -32,23 +32,22 @@ test('add three exercises at once with 4 sets each, and save', async ({ page }) 
     await search.fill(exercise);
     await picker.getByRole('option', { name: exercise, exact: true }).click();
   }
-  const sets = picker.getByRole('group', { name: 'Sets each' });
-  await expect(sets.getByRole('status')).toHaveText('3');
-  await sets.getByRole('button', { name: 'More sets' }).click();
-  await expect(sets.getByRole('status')).toHaveText('4');
+  await expect(picker.getByRole('group', { name: 'Sets each' })).toHaveCount(0);
+  await expect(picker.getByText('Each exercise is added with 1 set.', { exact: false })).toBeVisible();
   await picker.getByRole('button', { name: 'Add 3 exercises', exact: true }).click();
   await expect(picker).toBeHidden();
 
   // Block titles, top to bottom (each block is a <section> whose <header> holds its title).
   await expect(page.locator('section header h2')).toHaveText(['Pushups', 'Barbell Squat', 'Pullups']);
-  for (const n of [1, 2, 3, 4]) await expect(setRow(page, 'Barbell Squat', `set ${n}`)).toBeVisible();
-  await expect(setRow(page, 'Barbell Squat', 'set 5')).toHaveCount(0);
+  await expect(setRow(page, 'Barbell Squat', 'set 1')).toBeVisible();
+  await expect(setRow(page, 'Barbell Squat', 'set 2')).toHaveCount(0);
 
-  for (const n of [1, 2, 3, 4]) {
-    const row = setRow(page, 'Barbell Squat', `set ${n}`);
-    await row.getByLabel('Reps', { exact: true }).fill('5');
-    await row.getByLabel('Weight (kg)').fill(n === 3 ? '110' : '100');
-  }
+  const first = setRow(page, 'Barbell Squat', 'set 1');
+  await first.getByLabel('Reps', { exact: true }).fill('5');
+  await first.getByLabel('Weight (kg)').fill('100');
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Add a set to Barbell Squat' }).click();
+  await expect(setRow(page, 'Barbell Squat', 'set 4').getByLabel('Weight (kg)')).toHaveValue('100');
+  await setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)').fill('110');
 
   await page.getByRole('button', { name: 'Save workout' }).click();
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
@@ -56,22 +55,29 @@ test('add three exercises at once with 4 sets each, and save', async ({ page }) 
   await page.reload();
   await expect(setRow(page, 'Barbell Squat', 'set 3').getByLabel('Weight (kg)')).toHaveValue('110');
   await expect(setRow(page, 'Barbell Squat', 'set 2').getByLabel('Reps', { exact: true })).toHaveValue('5');
-  await expect(setRow(page, 'Pushups', 'set 4')).toBeVisible();
+  await expect(setRow(page, 'Pushups', 'set 1')).toBeVisible();
+  await expect(setRow(page, 'Pushups', 'set 2')).toHaveCount(0);
 });
 
-test('a superset can start with 4 rounds', async ({ page }) => {
+test('the Superset switch joins two exercises, and the old superset button is gone', async ({ page }) => {
   await signInAsCoach(page);
   await page.goto('/workouts/new');
-  await page.getByRole('button', { name: '+ Superset / circuit', exact: true }).click();
+  await expect(page.getByRole('button', { name: /circuit/i })).toHaveCount(0);
+  await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
   const picker = page.getByRole('dialog');
   const search = picker.getByLabel('Search exercises');
   for (const exercise of ['Pushups', 'Pullups']) {
     await search.fill(exercise);
     await picker.getByRole('option', { name: exercise, exact: true }).click();
   }
-  await picker.getByRole('group', { name: 'Rounds' }).getByRole('button', { name: 'More rounds' }).click();
   await picker.getByRole('button', { name: 'Add 2 exercises' }).click();
-  await expect(page.getByText('Superset / circuit · 4 rounds')).toBeVisible();
+  const link = page.getByRole('button', { name: 'Superset Pushups with Pullups' });
+  await expect(link).toHaveAttribute('aria-pressed', 'false');
+  await link.click();
+  await expect(link).toHaveAttribute('aria-pressed', 'true');
+  // A1 / A2: the first goes straight on to the second, so only the second has a rest box.
+  await expect(setRow(page, 'Pushups', 'set 1').getByLabel('Rest (m:ss)')).toHaveCount(0);
+  await expect(setRow(page, 'Pullups', 'set 1').getByLabel('Rest (m:ss)')).toHaveValue('1:30');
 });
 
 test('duplicate a workout from its page and from the list', async ({ page }) => {

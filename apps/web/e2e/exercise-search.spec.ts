@@ -136,8 +136,8 @@ test('a search with no match shows the empty state and clears filters', async ({
   await expect(dialog.getByText('No exercises match "zzzz"')).toBeVisible();
 });
 
-test('superset: one pick keeps Add disabled, two add both', async ({ page }) => {
-  const dialog = await openPicker(page, '+ Superset / circuit');
+test('pick one: one pick keeps Add disabled, two add both', async ({ page }) => {
+  const dialog = await openPicker(page, '+ Pick one');
   const search = dialog.getByLabel('Search exercises');
   await search.fill('Pushups');
   await dialog.getByRole('option', { name: 'Pushups', exact: true }).click();
@@ -146,7 +146,7 @@ test('superset: one pick keeps Add disabled, two add both', async ({ page }) => 
   await dialog.getByRole('option', { name: 'Pullups', exact: true }).click();
   await dialog.getByRole('button', { name: 'Add 2 exercises' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText('Superset / circuit · 3 rounds')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pick one · 2 options' })).toBeVisible();
 });
 
 test('open picker with a query, a filter and the preview (screenshot)', async ({ page }) => {

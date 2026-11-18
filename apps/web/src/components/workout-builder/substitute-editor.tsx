@@ -24,20 +24,23 @@ type Props = {
   units: Units;
   errors: ReadonlyMap<string, string[]>;
   actions: SubstituteActions;
+  /** The exercise's Rest checkbox is off: no rest boxes. */
+  restOff?: boolean;
+  stacked?: boolean;
 };
 
 /**
  * One coach-added substitute under its exercise: "or: Machine Assisted Pull Up" with its own sets. The sets start
  * collapsed (a copy of the exercise's sets is usually right) and open by themselves when one has an error.
  */
-export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units, errors, actions }: Props) {
+export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units, errors, actions, restOff = false, stacked = false }: Props) {
   const setsId = useId();
   const [open, setOpen] = useState(false);
   const hasErrors =
     errors.has(`substitute:${sub.id}`) || sub.sets.some((s) => errors.has(`set:${s.id}`));
   const expanded = open || hasErrors;
   const names = rowNames(sub.sets);
-  const restShown = sub.sets.map((_, si) => substituteSetShowsRest(block, exerciseIndex, sub, si));
+  const restShown = sub.sets.map((_, si) => !restOff && substituteSetShowsRest(block, exerciseIndex, sub, si));
 
   return (
     <div className={styles.substitute} aria-label={`Substitute: ${sub.exerciseName}`} role="group">
@@ -77,7 +80,6 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
       <div id={setsId} hidden={!expanded} className={styles.substituteBody}>
         <SetTable
           sets={sub.sets}
-          exerciseName={`${sub.exerciseName} (substitute)`}
           names={names.map((n) => `${sub.exerciseName} (substitute) ${n}`)}
           trackingType={sub.trackingType}
           units={units}
@@ -85,6 +87,7 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
           errors={errors}
           onUpdate={actions.onUpdateSet}
           onRemove={actions.onRemoveSet}
+          stacked={stacked}
         />
         <div className={styles.exerciseFooter}>
           <AddSetButton label={`Add a set to substitute ${sub.exerciseName}`} onClick={actions.onAddSet} />

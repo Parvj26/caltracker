@@ -6,6 +6,7 @@ import {
   MAX_SUBSTITUTES,
   TEMPO_PLACEHOLDER,
   blockCollapsedSummary,
+  exerciseCollapsedLine,
   parseTempo,
   setShowsRest,
 } from '@caltracker/shared';
@@ -28,7 +29,7 @@ export function rowNames(sets: readonly WorkoutSetDoc[]): string[] {
 }
 
 /** A 48 px icon-only button; `label` is its name for screen readers and its tooltip. */
-function IconButton({
+export function IconButton({
   icon,
   label,
   title = label,
@@ -49,7 +50,7 @@ function IconButton({
 }
 
 /** The exercise's name as a button that opens the swap picker: dashed underline and a small chevron. */
-function SwapName({ name, nameId, onSwap }: { name: string; nameId?: string; onSwap: () => void }) {
+export function SwapName({ name, nameId, onSwap }: { name: string; nameId?: string; onSwap: () => void }) {
   return (
     <button type="button" className={styles.swapName} aria-label={`Swap exercise: ${name}`} title="Tap to swap exercise" onClick={onSwap}>
       <span id={nameId}>{name}</span>
@@ -59,11 +60,7 @@ function SwapName({ name, nameId, onSwap }: { name: string; nameId?: string; onS
 }
 
 export type BlockActions = {
-  onMove: (delta: -1 | 1) => void;
   onRemoveBlock: () => void;
-  onAddRound: () => void;
-  onRemoveRound: () => void;
-  onAddExercise: () => void;
   onAddOption: () => void;
   onMoveToSection: (sectionId: string | null) => void;
   onSwap: (exId: string) => void;
@@ -75,6 +72,8 @@ export type BlockActions = {
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
   /** The measurements tab: one of Weight / Reps / Time on or off (see toggleExerciseMeasurement). */
   onToggleMeasurement: (exId: string, m: Measurement) => void;
+  /** The Rest checkbox (see setExerciseRest). */
+  onToggleRest: (exId: string, on: boolean) => void;
   /** Each side and Tempo, above "+ Set". */
   onExerciseOptions: (exId: string, patch: { eachSide?: boolean; tempo?: string | null }) => void;
   onAddSubstitute: (exId: string) => void;
@@ -83,19 +82,24 @@ export type BlockActions = {
 
 type Props = {
   block: WorkoutBlockDoc;
-  /** 0-based position among all blocks (the number shown), and whether it can move up / down inside its section. */
-  index: number;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
+  /**
+   * A superset shows each exercise as a card of its own, joined by the Superset switches: the exercise this card
+   * is. Omitted for a straight exercise or a pick-one group (one card).
+   */
+  member?: number;
+  /** The badge: "3" for an exercise or pick-one group, "A1" for a superset's first exercise. */
+  badge: string;
   /** The workout's sections, to offer "Move to section…" (omitted or empty: no menu). */
   sections: ReadonlyArray<{ id: string; name: string }>;
   units: Units;
   /** Inline errors keyed by `block:<id>`, `exercise:<id>`, `tempo:<exercise id>` and `set:<id>`. */
   errors: ReadonlyMap<string, string[]>;
   actions: BlockActions;
+  /** Exercises whose Rest checkbox is off (no rest boxes). */
+  restOff: ReadonlySet<string>;
   /**
-   * Phones and iPad portrait (below 900 px) fold each block to one line; `open` unfolds it (one at a time, see
-   * WorkoutBuilder) and `onToggle` is a tap on the folded line. Wider screens always show every block in full.
+   * iPad portrait (600 to 900 px) folds each card to one line; `open` unfolds it (one at a time, see
+   * WorkoutBuilder) and `onToggle` is a tap on the folded line. Wider screens always show every card in full.
    */
   open?: boolean;
   onToggle?: () => void;
@@ -105,35 +109,36 @@ type Props = {
   onMoveTo?: (index: number) => void;
 };
 
-const rounds = (e: WorkoutExerciseDoc) => e.sets.filter((s) => s.setType !== 'drop').length;
-
-/** "3 rounds" when every exercise has the same number of sets, otherwise "3 + 2 sets" (supersets may be uneven). */
-export function supersetTitle(block: WorkoutBlockDoc): string {
-  const counts = block.exercises.map(rounds);
-  const even = counts.every((c) => c === counts[0]);
-  return `Superset / circuit · ${even ? `${counts[0]} rounds` : `${counts.join(' + ')} sets`}`;
-}
-
-/** True when any message from the last save sits on this block, one of its exercises, substitutes or sets. */
-function blockHasErrors(block: WorkoutBlockDoc, errors: ReadonlyMap<string, string[]>): boolean {
+/** The messages from the last save on these exercises (their substitutes and sets), and on the block itself. */
+export function cardHasErrors(block: WorkoutBlockDoc, exercises: readonly WorkoutExerciseDoc[], errors: ReadonlyMap<string, string[]>, withBlock: boolean): boolean {
   if (errors.size === 0) return false;
-  const keys = [`block:${block.id}`];
-  for (const ex of block.exercises) {
+  const keys = withBlock ? [`block:${block.id}`] : [];
+  for (const ex of exercises) {
     keys.push(`exercise:${ex.id}`, `tempo:${ex.id}`, ...ex.sets.map((s) => `set:${s.id}`));
     for (const sub of ex.substitutes) keys.push(`substitute:${sub.id}`, ...sub.sets.map((s) => `set:${s.id}`));
   }
   return keys.some((k) => (errors.get(k)?.length ?? 0) > 0);
 }
 
+/** Per set: whether its rest box shows (the superset rule, and not when the exercise's Rest is off). */
+export const restShownFor = (block: WorkoutBlockDoc, ei: number, restOff: ReadonlySet<string>): boolean[] => {
+  const ex = block.exercises[ei]!;
+  return ex.sets.map((_, si) => !restOff.has(ex.id) && setShowsRest(block, ei, si));
+};
+
+/** The Rest checkbox's state: null when no set of the exercise shows a rest (see exerciseRestOff). */
+export const restState = (block: WorkoutBlockDoc, ei: number, restOff: ReadonlySet<string>): boolean | null =>
+  block.exercises[ei]!.sets.some((s, si) => s.setType !== 'drop' && setShowsRest(block, ei, si)) ? !restOff.has(block.exercises[ei]!.id) : null;
+
 export function BlockEditor({
   block,
-  index,
-  canMoveUp,
-  canMoveDown,
+  member,
+  badge,
   sections,
   units,
   errors,
   actions,
+  restOff,
   open = false,
   onToggle,
   siblings = [],
@@ -143,19 +148,13 @@ export function BlockEditor({
   const bodyId = useId();
   const noteId = useId();
   const [moving, setMoving] = useState(false);
-  const superset = block.kind === 'superset';
-  const first = block.exercises[0]!;
-  const choice = block.kind === 'choice';
-  const multi = superset || choice;
-  const title = superset
-    ? supersetTitle(block)
-    : choice
-      ? `Pick one · ${block.exercises.length} options`
-      : first.exerciseName;
-  const shortTitle = superset ? `superset ${index + 1}` : choice ? `pick-one group ${index + 1}` : first.exerciseName;
-  const minRounds = Math.min(...block.exercises.map(rounds));
-  // Under a section's (hidden) <h2>, a block's title is an <h3> and its exercises <h4>, so heading navigation shows
-  // which blocks belong to which section. Blocks outside any section keep <h2> / <h3>.
+  const inSuperset = member !== undefined;
+  const choice = block.kind === 'choice' && !inSuperset;
+  const shown = inSuperset ? [{ ex: block.exercises[member]!, ei: member }] : block.exercises.map((ex, ei) => ({ ex, ei }));
+  const first = shown[0]!.ex;
+  const shortTitle = choice ? `pick-one group ${badge}` : first.exerciseName;
+  // Under a section's (hidden) <h2>, a card's title is an <h3> and a pick-one group's exercises <h4>, so heading
+  // navigation shows which cards belong to which section. Cards outside any section keep <h2> / <h3>.
   const inSection = block.sectionId !== null && sections.some((sec) => sec.id === block.sectionId);
   const TitleTag = inSection ? 'h3' : 'h2';
   const ExerciseTag = inSection ? 'h4' : 'h3';
@@ -163,22 +162,24 @@ export function BlockEditor({
     ...(block.sectionId !== null ? [{ id: 'none', name: 'No section' }] : []),
     ...sections.filter((sec) => sec.id !== block.sectionId),
   ];
-  const summary = blockCollapsedSummary(block, units);
-  const hasErrors = blockHasErrors(block, errors);
-  // A block with a message from the last save stays open, so the coach can see what to fix.
-  const shown = open || hasErrors;
+  const summary = inSuperset
+    ? { title: first.exerciseName, line: exerciseCollapsedLine(first, units, { rest: restState(block, member, restOff) === true }), parts: [] }
+    : blockCollapsedSummary(block, units);
+  const hasErrors = cardHasErrors(block, shown.map((x) => x.ex), errors, !inSuperset || member === 0);
+  // A card with a message from the last save stays open, so the coach can see what to fix.
+  const unfolded = open || hasErrors;
   const place = siblings.findIndex((s) => s.id === block.id);
-  const noun = superset ? 'superset' : choice ? 'pick-one group' : 'exercise';
   const focusNote = () => {
-    if (!shown) onToggle?.();
-    // After the block has unfolded.
+    if (!unfolded) onToggle?.();
+    // After the card has unfolded.
     requestAnimationFrame(() => setTimeout(() => document.getElementById(noteId)?.focus(), 0));
   };
+  const remove = inSuperset ? () => actions.onRemoveExercise(first.id) : actions.onRemoveBlock;
   const menuItems: MenuItem[] = [
-    { label: 'Move to top', disabled: place <= 0, onSelect: () => onMoveTo?.(siblings[0]!.index) },
-    { label: 'Move to…', disabled: siblings.length < 2 && targets.length === 0, onSelect: () => setMoving(true) },
-    ...(!multi ? [{ label: 'Swap exercise', onSelect: () => actions.onSwap(first.id) }] : []),
-    ...(!multi
+    ...(!inSuperset ? [{ label: 'Move to top', disabled: place <= 0, onSelect: () => onMoveTo?.(siblings[0]!.index) }] : []),
+    { label: inSuperset ? 'Move superset to…' : 'Move to…', disabled: siblings.length < 2 && targets.length === 0, onSelect: () => setMoving(true) },
+    ...(!choice ? [{ label: 'Swap exercise', onSelect: () => actions.onSwap(first.id) }] : []),
+    ...(!choice
       ? [
           {
             label: 'Add substitute',
@@ -188,27 +189,34 @@ export function BlockEditor({
         ]
       : []),
     { label: 'Notes', onSelect: focusNote },
-    { label: `Delete ${noun}`, danger: true, onSelect: actions.onRemoveBlock },
+    { label: choice ? 'Delete pick-one group' : 'Delete exercise', danger: true, onSelect: remove },
   ];
 
   return (
-    <section aria-labelledby={headingId} className={styles.block} data-open={shown ? '' : undefined} data-block-id={block.id}>
-      {/* Phones and iPad portrait: one tappable line (name, then "4 × 8 @ 60 kg · rest 1:30") and the ⋯ menu. */}
+    <section
+      aria-labelledby={headingId}
+      className={styles.block}
+      data-open={unfolded ? '' : undefined}
+      data-superset={inSuperset ? '' : undefined}
+      data-block-id={block.id}
+      data-card-id={inSuperset ? first.id : block.id}
+    >
+      {/* iPad portrait: one tappable line (name, then "4 × 8 @ 60 kg · rest 1:30") and the ⋯ menu. */}
       <div className={styles.fold}>
         <button
           type="button"
           className={styles.foldButton}
-          aria-expanded={shown}
+          aria-expanded={unfolded}
           aria-controls={bodyId}
           aria-label={`${summary.title}: ${summary.line}`}
           onClick={onToggle}
           data-ph-capture-attribute-label="workout_block_fold"
         >
-          <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
+          <span className={styles.blockNumber} aria-hidden="true">{badge}</span>
           <span className={styles.foldText}>
             <span className={styles.foldTitle}>{summary.title}</span>
             <span className={styles.foldLine}>{summary.line}</span>
-            {!shown
+            {!unfolded
               ? summary.parts.map((p) => (
                   <span key={p.key} className={styles.foldLine}>
                     {p.name} · {p.line}
@@ -225,7 +233,7 @@ export function BlockEditor({
       </div>
       {moving ? (
         <MoveToDialog
-          name={summary.title}
+          name={inSuperset ? 'the superset' : summary.title}
           places={siblings.map((s) => ({
             key: s.id,
             label: s.title,
@@ -242,27 +250,29 @@ export function BlockEditor({
       ) : null}
       <div id={bodyId} className={styles.blockBody}>
       <header className={styles.blockHeader}>
-        <span className={styles.blockNumber} aria-hidden="true">{index + 1}</span>
-        {multi ? (
-          <TitleTag id={headingId} className={styles.blockTitle}>{title}</TitleTag>
+        <span className={styles.blockNumber} aria-hidden="true">{badge}</span>
+        {choice ? (
+          <TitleTag id={headingId} className={styles.blockTitle}>{`Pick one · ${block.exercises.length} options`}</TitleTag>
         ) : (
           // The section is named by the exercise name alone (headingId sits on the name inside the button).
           <TitleTag className={styles.blockTitle}>
             <SwapName name={first.exerciseName} nameId={headingId} onSwap={() => actions.onSwap(first.id)} />
           </TitleTag>
         )}
-        {!multi ? (
+        {!choice ? (
           <MeasurementsMenu
             trackingType={first.trackingType}
             exerciseName={first.exerciseName}
             onToggle={(m) => actions.onToggleMeasurement(first.id, m)}
+            rest={restState(block, shown[0]!.ei, restOff)}
+            onToggleRest={(on) => actions.onToggleRest(first.id, on)}
           />
         ) : null}
         <div className={styles.blockTools}>
-          {targets.length > 0 ? (
+          {targets.length > 0 && (!inSuperset || member === 0) ? (
             <select
               className={`${styles.input} ${styles.moveSelect}`}
-              aria-label={`Move ${shortTitle} to a section`}
+              aria-label={`Move ${inSuperset ? 'the superset' : shortTitle} to a section`}
               value=""
               onChange={(e) => {
                 if (e.target.value) actions.onMoveToSection(e.target.value === 'none' ? null : e.target.value);
@@ -276,127 +286,58 @@ export function BlockEditor({
               ))}
             </select>
           ) : null}
-          {!multi ? <SubstituteButton exercise={first} onAdd={() => actions.onAddSubstitute(first.id)} /> : null}
-          <IconButton icon="up" label={`Move ${shortTitle} up`} title="Move up" disabled={!canMoveUp} onClick={() => actions.onMove(-1)} />
-          <IconButton icon="down" label={`Move ${shortTitle} down`} title="Move down" disabled={!canMoveDown} onClick={() => actions.onMove(1)} />
+          {!choice ? <SubstituteButton exercise={first} onAdd={() => actions.onAddSubstitute(first.id)} /> : null}
           <IconButton
             icon="trash"
             label={`Remove ${shortTitle}`}
-            title={multi ? (superset ? 'Remove superset' : 'Remove pick-one group') : 'Remove exercise'}
-            onClick={actions.onRemoveBlock}
+            title={choice ? 'Remove pick-one group' : 'Remove exercise'}
+            onClick={remove}
           />
         </div>
       </header>
-      {(errors.get(`block:${block.id}`) ?? []).map((m) => (
+      {(!inSuperset || member === 0) && (errors.get(`block:${block.id}`) ?? []).map((m) => (
         <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}
         </ErrorText>
       ))}
 
-      {block.exercises.map((ex, ei) => {
-        const names = rowNames(ex.sets);
-        // In a superset the rest after a round sits on the round's last exercise; the others go straight on.
-        const restShown = ex.sets.map((_, si) => setShowsRest(block, ei, si));
-        return (
-          <div key={ex.id} className={styles.exercise}>
-            {multi ? (
-              <div className={styles.exerciseHeader}>
-                <ExerciseTag className={styles.exerciseName}>
-                  <SwapName name={ex.exerciseName} onSwap={() => actions.onSwap(ex.id)} />
-                </ExerciseTag>
-                <MeasurementsMenu
-                  trackingType={ex.trackingType}
-                  exerciseName={ex.exerciseName}
-                  onToggle={(m) => actions.onToggleMeasurement(ex.id, m)}
-                />
-                <div className={styles.blockTools}>
-                  {/* Pick-one options are already alternatives to each other, so they get no substitutes. */}
-                  {!choice ? <SubstituteButton exercise={ex} onAdd={() => actions.onAddSubstitute(ex.id)} /> : null}
-                  <IconButton
-                    icon="trash"
-                    label={`Remove ${ex.exerciseName}`}
-                    title="Remove exercise"
-                    onClick={() => actions.onRemoveExercise(ex.id)}
-                  />
-                </div>
-              </div>
-            ) : null}
-            {(errors.get(`exercise:${ex.id}`) ?? []).map((m) => (
-              <ErrorText key={m} code="workout_fields_invalid" safe={false}>
-          {m}
-        </ErrorText>
-            ))}
-            <SetTable
-              sets={ex.sets}
-              exerciseName={ex.exerciseName}
-              names={names.map((n) => `${ex.exerciseName} ${n}`)}
-              trackingType={ex.trackingType}
-              units={units}
-              restShown={restShown}
-              errors={errors}
-              onUpdate={(setId, patch) => actions.onUpdateSet(ex.id, setId, patch)}
-              onRemove={(setId) => actions.onRemoveSet(ex.id, setId)}
-            />
-            <ExerciseOptions
-              exercise={ex}
-              errors={errors.get(`tempo:${ex.id}`) ?? []}
-              onChange={(patch) => actions.onExerciseOptions(ex.id, patch)}
-            />
-            <div className={styles.exerciseFooter}>
-              <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
-              <label className={styles.exerciseNote}>
-                <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
-                <input
-                  id={ei === 0 ? noteId : undefined}
-                  type="text"
-                  placeholder="Exercise note (optional)"
-                  maxLength={500}
-                  className={styles.input}
-                  value={ex.note ?? ''}
-                  onChange={(e) => actions.onExerciseNote(ex.id, e.target.value === '' ? null : e.target.value)}
-                />
-              </label>
-            </div>
-            {ex.substitutes.map((sub) => (
-              <SubstituteEditor
-                key={sub.id}
-                block={block}
-                exerciseIndex={ei}
-                substitute={sub}
-                units={units}
-                errors={errors}
-                actions={actions.substitute(ex.id, sub.id)}
+      {shown.map(({ ex, ei }, k) => (
+        <div key={ex.id} className={styles.exercise}>
+          {choice ? (
+            <div className={styles.exerciseHeader}>
+              <ExerciseTag className={styles.exerciseName}>
+                <SwapName name={ex.exerciseName} onSwap={() => actions.onSwap(ex.id)} />
+              </ExerciseTag>
+              <MeasurementsMenu
+                trackingType={ex.trackingType}
+                exerciseName={ex.exerciseName}
+                onToggle={(m) => actions.onToggleMeasurement(ex.id, m)}
+                rest={restState(block, ei, restOff)}
+                onToggleRest={(on) => actions.onToggleRest(ex.id, on)}
               />
-            ))}
-          </div>
-        );
-      })}
-
-      {superset ? (
-        <div className={styles.blockFooter}>
-          <button type="button" className={styles.smallButton} onClick={actions.onAddRound}>
-            + Round
-          </button>
-          <button
-            type="button"
-            className={styles.smallButton}
-            aria-label="Remove the last round"
-            disabled={minRounds <= 1}
-            aria-describedby={minRounds <= 1 ? `${headingId}-round-help` : undefined}
-            onClick={actions.onRemoveRound}
-          >
-            − Round
-          </button>
-          <button type="button" className={styles.smallButton} onClick={actions.onAddExercise}>
-            + Exercise to superset
-          </button>
-          {minRounds <= 1 ? (
-            <p id={`${headingId}-round-help`} className={`${styles.caption} ${styles.blockHelp}`}>
-              Can&apos;t remove a round: an exercise here has only one set.
-            </p>
+              <div className={styles.blockTools}>
+                <IconButton
+                  icon="trash"
+                  label={`Remove ${ex.exerciseName}`}
+                  title="Remove exercise"
+                  onClick={() => actions.onRemoveExercise(ex.id)}
+                />
+              </div>
+            </div>
           ) : null}
+          <ExerciseSets block={block} ei={ei} units={units} errors={errors} actions={actions} restOff={restOff} />
+          <ExerciseOptions
+            exercise={ex}
+            errors={errors.get(`tempo:${ex.id}`) ?? []}
+            onChange={(patch) => actions.onExerciseOptions(ex.id, patch)}
+          />
+          <div className={styles.exerciseFooter}>
+            <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
+            <ExerciseNote exercise={ex} id={k === 0 ? noteId : undefined} onChange={(note) => actions.onExerciseNote(ex.id, note)} />
+          </div>
+          <Substitutes block={block} ei={ei} units={units} errors={errors} actions={actions} restOff={restOff} />
         </div>
-      ) : null}
+      ))}
 
       {choice ? (
         <div className={styles.blockFooter}>
@@ -415,6 +356,76 @@ export function BlockEditor({
       ) : null}
       </div>
     </section>
+  );
+}
+
+type ExerciseProps = {
+  block: WorkoutBlockDoc;
+  ei: number;
+  units: Units;
+  errors: ReadonlyMap<string, string[]>;
+  actions: BlockActions;
+  restOff: ReadonlySet<string>;
+  stacked?: boolean;
+};
+
+/** One exercise's error messages and set rows (shared with the phone exercise editor). */
+export function ExerciseSets({ block, ei, units, errors, actions, restOff, stacked = false }: ExerciseProps) {
+  const ex = block.exercises[ei]!;
+  return (
+    <>
+      {(errors.get(`exercise:${ex.id}`) ?? []).map((m) => (
+        <ErrorText key={m} code="workout_fields_invalid" safe={false}>
+          {m}
+        </ErrorText>
+      ))}
+      <SetTable
+        sets={ex.sets}
+        names={rowNames(ex.sets).map((n) => `${ex.exerciseName} ${n}`)}
+        trackingType={ex.trackingType}
+        units={units}
+        restShown={restShownFor(block, ei, restOff)}
+        errors={errors}
+        onUpdate={(setId, patch) => actions.onUpdateSet(ex.id, setId, patch)}
+        onRemove={(setId) => actions.onRemoveSet(ex.id, setId)}
+        stacked={stacked}
+      />
+    </>
+  );
+}
+
+/** The exercise's coach-added substitutes, each with its own sets. */
+export function Substitutes({ block, ei, units, errors, actions, restOff, stacked = false }: ExerciseProps) {
+  const ex = block.exercises[ei]!;
+  return ex.substitutes.map((sub) => (
+    <SubstituteEditor
+      key={sub.id}
+      block={block}
+      exerciseIndex={ei}
+      substitute={sub}
+      units={units}
+      errors={errors}
+      actions={actions.substitute(ex.id, sub.id)}
+      restOff={restOff.has(ex.id)}
+      stacked={stacked}
+    />
+  ));
+}
+
+export function ExerciseNote({ exercise: ex, id, onChange }: { exercise: WorkoutExerciseDoc; id?: string | undefined; onChange: (note: string | null) => void }) {
+  return (
+    <label className={styles.exerciseNote}>
+      <span className={styles.visuallyHidden}>Note for {ex.exerciseName}</span>
+      <input
+        id={id}
+        type="text"
+        placeholder="Exercise note (optional)"
+        maxLength={500}
+        className={styles.input}
+        value={ex.note ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+      />
+    </label>
   );
 }
 
@@ -445,7 +456,7 @@ export function AddSetButton({ label, onClick }: { label: string; onClick: () =>
  * Each side (a checkbox) and Tempo (optional, "0-0-0-0"), above "+ Set". The tempo is kept as typed; a bad one is
  * marked when the box is left (and refused on save), with the rule as the message.
  */
-function ExerciseOptions({
+export function ExerciseOptions({
   exercise: ex,
   errors,
   onChange,
