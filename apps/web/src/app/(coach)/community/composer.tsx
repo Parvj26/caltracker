@@ -27,6 +27,8 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
   const [photos, setPhotos] = useState<Picked[]>([]);
   const [error, setError] = useState<FieldError | null>(null);
   const [preparing, setPreparing] = useState(false);
+  // One line ("Share an update…") until the coach starts writing, so the feed starts high on a phone (UX review C).
+  const [active, setActive] = useState(false);
   const [pending, startTransition] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
   // One id per post being written, so a retry after a failure re-uses the uploaded photos and never posts twice.
@@ -87,11 +89,15 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
       setBody('');
       setPhotos([]);
       setPostId(crypto.randomUUID());
+      setActive(false);
     });
   };
 
+  const empty = !body.trim() && photos.length === 0;
+  const expanded = active || !empty || error !== null;
+
   return (
-    <section className={styles.composer} aria-label="New post">
+    <section className={styles.composer} aria-label="New post" data-expanded={expanded || undefined}>
       <label className={styles.composerLabel}>
         <span className={styles.visuallyHidden}>Write a post</span>
         <textarea
@@ -99,7 +105,8 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
           placeholder="Share an update with your clients…"
           value={body}
           maxLength={POST_BODY_MAX}
-          rows={3}
+          rows={expanded ? 3 : 1}
+          onFocus={() => setActive(true)}
           onChange={(e) => setBody(e.target.value)}
         />
       </label>
@@ -118,8 +125,8 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
         </ul>
       ) : null}
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
-      <div className={styles.composerActions}>
-        <label className={styles.smallButton} aria-disabled={photos.length >= MAX_POST_PHOTOS || preparing}>
+      <div className={styles.composerActions} hidden={!expanded}>
+        <label className={styles.photoButton} aria-disabled={photos.length >= MAX_POST_PHOTOS || preparing}>
           {preparing ? 'Preparing…' : 'Add photos'}
           <input
             ref={fileInput}
@@ -132,7 +139,7 @@ export function Composer({ communityId, workspaceId, userId }: { communityId: st
             aria-label="Add photos"
           />
         </label>
-        <Button onClick={submit} pending={pending || preparing}>
+        <Button onClick={submit} pending={pending || preparing} disabled={empty} disabledReason="Write something or add a photo first" phSafe>
           Post
         </Button>
       </div>

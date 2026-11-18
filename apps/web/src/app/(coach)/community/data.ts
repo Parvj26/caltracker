@@ -20,6 +20,8 @@ export type FeedPost = {
   createdAt: string;
   pinnedAt: string | null;
   images: FeedImage[];
+  /** Someone reported this post and the coach hasn't dealt with it yet (Reports page). */
+  reported: boolean;
   /** Reactions to the post itself (not its comments). */
   reactions: ReactionRow[];
   comments: FeedComment[];
@@ -69,10 +71,13 @@ export async function loadCommunity(supabase: Db, workspaceId: string) {
   const [posts, members, openReports] = await Promise.all([
     supabase.from('community_posts').select(POST_SELECT).eq('community_id', communityId).order('created_at', { ascending: false }).limit(FEED_SIZE),
     supabase.from('community_members').select('user_id, role, removed_at').eq('community_id', communityId),
-    supabase.from('community_reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('resolved_at', null),
+    supabase.from('community_reports').select('id, post_id, comment_id').eq('workspace_id', workspaceId).is('resolved_at', null),
   ]);
   if (posts.error) throw new Error(`Could not load posts: ${posts.error.message}`);
   if (members.error) throw new Error(`Could not load members: ${members.error.message}`);
+  // A failed reports read only hides the "Reported" marks and the Reports link.
+  const reports = openReports.data ?? [];
+  const reportedPosts = new Set(reports.filter((r) => r.comment_id === null && r.post_id !== null).map((r) => r.post_id));
   // Pinned posts older than the newest 50 still show at the top.
   const pinned = await supabase.from('community_posts').select(POST_SELECT).eq('community_id', communityId).not('pinned_at', 'is', null);
   if (pinned.error) throw new Error(`Could not load pinned posts: ${pinned.error.message}`);
@@ -102,6 +107,7 @@ export async function loadCommunity(supabase: Db, workspaceId: string) {
       card: parseCard(p.card),
       createdAt: p.created_at,
       pinnedAt: p.pinned_at,
+      reported: reportedPosts.has(p.id),
       images: [...p.images]
         .sort((a, b) => a.position - b.position)
         .map((i) => ({ id: i.id, thumbUrl: images.get(i.thumb_path) ?? null, fullUrl: images.get(i.path) ?? null, width: i.width, height: i.height })),
@@ -133,7 +139,7 @@ export async function loadCommunity(supabase: Db, workspaceId: string) {
     })
     .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'coach' ? -1 : 1));
 
-  return { communityId, name: community.data.name, posts: feed, members: memberList, openReports: openReports.count ?? 0 };
+  return { communityId, name: community.data.name, posts: feed, members: memberList, openReports: reports.length };
 }
 
 export type CommunityData = NonNullable<Awaited<ReturnType<typeof loadCommunity>>>;

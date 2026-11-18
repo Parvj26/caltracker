@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { memberName } from '@caltracker/shared';
 import Link from 'next/link';
-import { Card } from '@/components/ui';
+import { Card, Chip, PageHeader } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
@@ -24,7 +24,7 @@ export default async function CommunityPage() {
   if (!data) {
     return (
       <div className={styles.page}>
-        <h1 className={styles.title}>Community</h1>
+        <PageHeader title="Community" />
         <p className={styles.caption}>Your community isn’t set up yet. Please contact support.</p>
       </div>
     );
@@ -32,21 +32,20 @@ export default async function CommunityPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <div className={styles.titleBlock}>
-          <h1 className={styles.title}>Community</h1>
-          <p className={styles.caption}>A private space for you and your clients. Members only see each other’s name and photo.</p>
-        </div>
-        {/* Only when something needs looking at; /community/reports itself stays reachable. */}
-        {data.openReports > 0 ? (
-          <Link href="/community/reports" className={`${styles.smallButton} ${styles.reportsLink}`}>
-            {data.openReports} {data.openReports === 1 ? 'report' : 'reports'} to review
-          </Link>
-        ) : null}
-      </header>
+      <PageHeader
+        title="Community"
+        subtitle="A private space for you and your clients. Members only see each other’s name and photo."
+        action={<Members communityId={data.communityId} members={data.members} />}
+      />
+      {/* Only when something needs looking at; /community/reports itself stays reachable. */}
+      {data.openReports > 0 ? (
+        <Link href="/community/reports" className={styles.reportsLink}>
+          <Chip tone="amber">{data.openReports}</Chip>
+          {data.openReports === 1 ? 'report' : 'reports'} to review
+        </Link>
+      ) : null}
 
-      <div className={styles.layout}>
-        <div className={styles.feed}>
+      <div className={styles.feed}>
           <Composer communityId={data.communityId} workspaceId={coach.workspaceId} userId={coach.userId} />
           {data.posts.length === 0 ? (
             <Card>
@@ -55,8 +54,6 @@ export default async function CommunityPage() {
           ) : (
             data.posts.map((p) => <PostCard key={p.id} post={p} viewer={viewer} units={coach.units} now={now} />)
           )}
-        </div>
-        <Members communityId={data.communityId} members={data.members} />
       </div>
 
       <LiveRefresh
