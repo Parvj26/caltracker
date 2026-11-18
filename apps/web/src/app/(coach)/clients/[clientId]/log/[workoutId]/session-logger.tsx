@@ -88,6 +88,8 @@ type Op = LogEdit;
 
 const SAVE_DELAY_MS = 400;
 const RETRY_MS = 3000;
+const PARTIAL_NOTICE =
+  'Some changes kept on this device could not be added back, because the session changed somewhere else meanwhile (the newer values stay, and sets added or removed here are left out). Check the sets below.';
 const nowIso = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
@@ -606,7 +608,8 @@ export function SessionLogger({
   // - Copies kept on this device have changes the server never got (a page left or closed mid-save, in this tab or
   //   another): they are merged onto the server's copy (lib/session-draft) and sent now, with anything typed here
   //   meanwhile on top. Offline, they are merged onto the copy this page was given.
-  // - Nothing kept and nothing typed, but the server is ahead (Back to a page from the browser's memory): show it.
+  // - Nothing typed here and nothing kept that the server lacks, but the server is ahead (Back to a page from the
+  //   browser's memory, or a kept copy whose save arrived after this page's copy was made): show the server's.
   const [opening] = useState(initialLog);
   useEffect(() => {
     if (!opening || opening.status !== 'in_progress') return;
@@ -615,15 +618,18 @@ export function SessionLogger({
       const current = logRef.current;
       if (!current || current.status !== 'in_progress' || stopped.current) return;
       const local = unsaved.current.map((u) => u.edit);
+      // Nothing to add on this page, but the server is ahead of the copy it opened with: show the server's.
+      const showServer = () => {
+        if (local.length > 0 || server.revision <= current.revision) return;
+        logRef.current = server;
+        savedRevision.current = server.revision;
+        savedDoc.current = server;
+        setLog(server);
+        setNotes(server.notes ?? '');
+        setReloads((n) => n + 1);
+      };
       if (keptAtOpen.length === 0) {
-        if (local.length === 0 && server.revision > current.revision) {
-          logRef.current = server;
-          savedRevision.current = server.revision;
-          savedDoc.current = server;
-          setLog(server);
-          setNotes(server.notes ?? '');
-          setReloads((n) => n + 1);
-        }
+        showServer();
         return;
       }
       const m = mergeDrafts(server, keptAtOpen, local);
@@ -635,7 +641,13 @@ export function SessionLogger({
           if (k.tabId === mine || (open && !open.has(k.tabId))) removeDraftIfUnchanged(k.key, k.raw);
         }
       });
-      if (!m.restored && local.length === 0) return;
+      if (!m.restored && local.length === 0) {
+        // The kept copies brought nothing the server lacks: their save arrived after this page's copy was made (the
+        // reply was lost as the page closed). The server's copy has the typed sets, so it is the one to show.
+        showServer();
+        if (m.partial) setNotice(PARTIAL_NOTICE);
+        return;
+      }
       shapeUnsaved.current = m.shapeChanged;
       const typing = notesRef.current !== (current.notes ?? '');
       savedRevision.current = server.revision;
@@ -646,11 +658,7 @@ export function SessionLogger({
       setLog(m.doc);
       if (!typing) setNotes(m.doc.notes ?? '');
       setReloads((n) => n + 1);
-      if (m.partial) {
-        setNotice(
-          'Some changes kept on this device could not be added back, because the session changed somewhere else meanwhile (the newer values stay, and sets added or removed here are left out). Check the sets below.',
-        );
-      }
+      if (m.partial) setNotice(PARTIAL_NOTICE);
       void flushRef.current();
     };
     const end = (server: WorkoutLogDoc) => {
