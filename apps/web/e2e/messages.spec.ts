@@ -131,7 +131,7 @@ test('a message from the client appears live, raises the badge, and opening the 
   const client = await makeClient('Livia');
   await signInAsCoach(page);
   await page.goto('/messages');
-  await expect(page.getByText('Pick a client to see your conversation.')).toBeVisible();
+  await expect(page.getByText(/Pick a client on the left/)).toBeVisible();
   const before = await unreadTotal(page);
 
   const conversationId = await clientSays(client.id, 'Hi coach, quick question');
@@ -183,7 +183,7 @@ test('the Message button in the client header, on every tab, opens that conversa
   await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
   await expect(page.getByRole('heading', { name: client.name })).toBeVisible();
   // The thread's Calendar link goes back to the client's Training tab, where the calendar lives.
-  await expect(page.getByRole('link', { name: 'Calendar', exact: true })).toHaveAttribute('href', `/clients/${client.id}/training`);
+  await expect(page.getByRole('link', { name: `${client.name}’s training calendar` })).toHaveAttribute('href', `/clients/${client.id}/training`);
 });
 
 test('a message sent while Realtime was not delivering shows up when the window is focused again', async ({ page }) => {

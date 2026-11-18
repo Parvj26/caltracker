@@ -145,9 +145,14 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
   await expect(postBar.getByRole('button', { name: 'Remove your fire reaction, 2 people' })).toBeVisible();
 
   // Comments get reactions too; the client hears about it. The reload folded the comments again: open them.
+  // One comment button opens the comments with the reply box under them (focused).
   await mine.getByRole('button', { name: '1 comment', exact: true }).click();
+  const box = mine.getByRole('textbox', { name: /^Comment on / });
+  await expect(box).toBeFocused();
+  // A comment nobody reacted to has a small "React" button, not an empty reaction pill.
   const commentBar = mine.getByRole('group', { name: 'Reactions to Sam Tester’s comment' });
-  await commentBar.getByRole('button', { name: 'Add a reaction' }).click();
+  await expect(commentBar.getByRole('button', { name: 'Add a reaction' })).toHaveCount(0);
+  await commentBar.getByRole('button', { name: 'React', exact: true }).click();
   await mine.getByRole('group', { name: 'Choose a reaction' }).getByRole('button', { name: 'React with clap' }).click();
   await expect(commentBar.getByRole('button', { name: 'Remove your clap reaction, 1 person' })).toBeVisible();
   await expect
@@ -157,10 +162,8 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
     })
     .toBe(1);
 
-  // The coach answers with the Comment button, which opens the box.
-  await mine.getByRole('button', { name: 'Comment', exact: true }).click();
-  const box = mine.getByRole('textbox', { name: /^Comment on / });
-  await expect(box).toBeFocused();
+  // The coach answers in the reply box under the comments.
+  await expect(mine.getByRole('button', { name: 'Comment', exact: true })).toHaveCount(0);
   await box.fill('Welcome, Sam!');
   await mine.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(mine.getByText('Welcome, Sam!')).toBeVisible();
@@ -243,16 +246,28 @@ test('with nothing to review there is no Reports button, but the Reports page st
 test('the coach removes a client from the community only, then adds them back', async ({ page }) => {
   const max = await newClient('Max');
   await openCommunity(page);
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: 'Remove Max Tester from the community' }).click();
-  await expect(page.getByRole('button', { name: 'Add Max Tester back to the community' })).toBeVisible();
+  // Members are in a pop-up; Remove is in each client's ⋯ and asks first, inside the same pop-up.
+  await page.getByRole('button', { name: /^Members \(\d+\)$/ }).click();
+  const members = page.getByRole('dialog', { name: /^Members/ });
+  await expect(members.getByRole('button', { name: /Remove/ })).toHaveCount(0);
+  await members.getByRole('button', { name: 'More for Max Tester' }).click();
+  await page.getByRole('menuitem', { name: 'Remove from the community…' }).click();
+  const ask = page.getByRole('dialog', { name: 'Remove Max Tester from the community?' });
+  await expect(ask).toContainText('They stay your client');
+  await ask.getByRole('button', { name: 'Remove', exact: true }).click();
+  const list = page.getByRole('dialog', { name: /^Members/ });
+  await expect(list.getByRole('button', { name: 'Add Max Tester back to the community' })).toBeVisible();
 
   // Out of the community, still a client.
   expect((await max.phone.from('communities').select('id')).data).toEqual([]);
   expect((await max.phone.rpc('create_community_post', { p_id: crypto.randomUUID(), p_community_id: communityId, p_body: 'hi' })).error?.code).toBe('42501');
   expect((await max.phone.from('workspace_members').select('workspace_id')).data).toEqual([{ workspace_id: workspaceId }]);
 
-  await page.getByRole('button', { name: 'Add Max Tester back to the community' }).click();
-  await expect(page.getByRole('button', { name: 'Remove Max Tester from the community' })).toBeVisible();
+  await list.getByRole('button', { name: 'Add Max Tester back to the community' }).click();
+  await expect(list.getByRole('button', { name: 'More for Max Tester' })).toBeVisible();
+  // Back closes the pop-up and stays on the page.
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/community$/);
   expect((await max.phone.from('communities').select('id')).data).toEqual([{ id: communityId }]);
 });

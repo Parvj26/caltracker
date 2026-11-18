@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
+import type { Database } from '@caltracker/shared';
 import { serviceClient, signInAsCoach } from './helpers';
 import { AXE_ALLOW, UI_ALLOW, type AxeAllow, type Size, type UiAllow } from './ui-audit-allowlist';
 
@@ -19,11 +20,14 @@ import { AXE_ALLOW, UI_ALLOW, type AxeAllow, type Size, type UiAllow } from './u
 const CLIENT = '/clients/00000000-0000-4000-8000-0000000000c2';
 
 type AuditPage = { name: string; path: string };
-type Group = { name: string; pages: AuditPage[]; seed?: true; signedOut?: AuditPage[] };
+// `communityPost`: a coach post with a comment and a reaction, so Community's reaction chips and comment controls are
+// checked too (an empty feed would hide them).
+type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; signedOut?: AuditPage[] };
 
 const GROUPS: Group[] = [
   {
     name: 'main pages',
+    communityPost: true,
     pages: [
       { name: 'Home', path: '/home' },
       { name: 'Clients', path: '/clients' },
@@ -278,6 +282,26 @@ for (const { size, use } of SIZES) {
           if (ex.error) throw ex.error;
           ids.exercise = ex.data.id;
           cleanup.push(() => admin.from('programs').delete().eq('id', ids.program!), () => admin.from('workouts').delete().eq('id', ids.workout!));
+        }
+        if (group.communityPost) {
+          const ws = await demoWorkspace(admin);
+          const community = await admin.from('communities').select('id').eq('workspace_id', ws).eq('is_default', true).single();
+          if (community.error) throw community.error;
+          const owner = await admin.from('workspace_members').select('user_id').eq('workspace_id', ws).eq('role', 'owner').limit(1).single();
+          if (owner.error) throw owner.error;
+          const posted = await admin
+            .from('community_posts')
+            .insert({ community_id: community.data.id, workspace_id: ws, author_id: owner.data.user_id, body: `UI audit post ${unique()}` })
+            .select('id')
+            .single();
+          if (posted.error) throw posted.error;
+          const postId = posted.data.id;
+          cleanup.push(() => admin.from('community_posts').delete().eq('id', postId));
+          // The trigger fills in the community and workspace from the post.
+          const reacted = await admin
+            .from('community_reactions')
+            .insert({ post_id: postId, user_id: owner.data.user_id, reaction: 'fire' } as Database['public']['Tables']['community_reactions']['Insert']);
+          if (reacted.error) throw reacted.error;
         }
         const fill = (p: AuditPage) => ({ ...p, path: p.path.replace(/:(\w+)/g, (_, k: string) => ids[k]!) });
         const report: string[] = [];
