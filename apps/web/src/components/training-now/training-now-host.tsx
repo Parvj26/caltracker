@@ -1,6 +1,6 @@
 'use client';
 
-import { BackLink } from '@/components/back-link';
+import { ParentBackLink } from '@/components/back-link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { completedSetCount, openSetCount, type Units } from '@caltracker/shared';
@@ -25,9 +25,7 @@ function SessionPaneView({ pane, units, coachId, onProgress }: { pane: SessionPa
   const report = useCallback((done: number, total: number) => onProgress(pane.logId, done, total), [onProgress, pane.logId]);
   return (
     <div className={sessionStyles.wide}>
-      <BackLink href={`/clients/${pane.clientId}/training`} className={sessionStyles.back}>
-        ← {pane.name}&apos;s calendar
-      </BackLink>
+      <ParentBackLink href={`/clients/${pane.clientId}/training`} label={pane.name} />
       {/* This client's injury note, on their own screen: with several people training, each tab shows its own. */}
       <InjuryChip text={pane.injury} />
       <SessionLogger

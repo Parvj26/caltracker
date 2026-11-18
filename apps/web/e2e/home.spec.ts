@@ -176,7 +176,8 @@ test('every Today row has exactly one primary button, and ⋯ holds Message, Ass
   const perRow = await rows.evaluateAll((els) => els.map((el) => el.querySelectorAll('[data-primary]').length));
   expect(perRow.length).toBeGreaterThan(0);
   expect(perRow.every((n) => n === 1), `primary buttons per row: ${perRow.join(', ')}`).toBe(true);
-  await expect(page.getByText('⋯ has Message, Assign and Open client.')).toBeVisible();
+  // The hint is for screen readers only.
+  await expect(page.getByText("Each row's ⋯ has Message, Assign and Open client.")).toBeAttached();
 
   const more = rowFor(page, last).getByRole('button', { name: `More for Home ${last}` });
   await expect(more).toHaveAttribute('aria-expanded', 'false');
@@ -207,8 +208,8 @@ test('two undone workouts in the last 2 days list the client under Missed, with 
   const list = await attentionList(page, 'Missed');
   const row = list.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Missed 2 workouts in a row');
-  // One fix button per row.
-  await expect(row.getByRole('link')).toHaveCount(1);
+  // One fix button per row (the row itself opens the client).
+  await expect(row.getByRole('link', { name: /^(Message|Assign to|Add a scan for) / })).toHaveCount(1);
   await expect(row.getByRole('link', { name: `Message Home ${last}` })).toHaveAttribute('href', `/messages/${clientId}`);
 });
 
@@ -232,7 +233,7 @@ test('a client with nothing planned is listed with Assign', async ({ page }) => 
   const list = await attentionList(page);
   const row = list.locator('li').filter({ hasText: last });
   await expect(row).toContainText('Nothing planned in the next 7 days');
-  await expect(row.getByRole('link')).toHaveCount(1);
+  await expect(row.getByRole('link', { name: /^(Message|Assign to|Add a scan for) / })).toHaveCount(1);
   await expect(row.getByRole('link', { name: /^Assign to / })).toHaveAttribute('href', `/clients/${clientId}/training`);
 });
 

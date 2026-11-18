@@ -27,6 +27,7 @@ import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
@@ -70,6 +71,13 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
   const [open, setOpen] = useState(false);
   // A fresh window (empty form) each time it opens.
   const [round, setRound] = useState(0);
+  // A refresh or shared link with ?sheet=invite opens the window again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    if (id !== 'invite') return false;
+    setRound((r) => r + 1);
+    setOpen(true);
+    return true;
+  });
   return (
     <>
       {/* The page's create button (lime, UI rules §4). On a phone it reads "+ Invite". */}

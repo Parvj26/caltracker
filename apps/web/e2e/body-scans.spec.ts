@@ -238,7 +238,10 @@ test('coach home lists an overdue client, and Add scan opens the form', async ({
   const group = page.getByRole('region', { name: 'Needs attention' });
   await expect(group).toBeVisible();
   // "Scan due" narrows the list to clients due a scan, with that as the reason (other reasons count as "+n more").
-  await group.getByRole('button', { name: /^Scan due \d+$/ }).click();
+  const scanDue = group.getByRole('button', { name: /^Scan due \d+$/ });
+  await scanDue.click();
+  // The list has narrowed before "Show all" is looked for (the unfiltered list may have one that then goes).
+  await expect(scanDue).toHaveAttribute('aria-pressed', 'true');
   const showAll = group.getByRole('button', { name: /^Show all \d+$/ });
   if (await showAll.count()) await showAll.click();
   await expect(group.locator('li').filter({ hasText: due.last })).toContainText('No body scan yet');

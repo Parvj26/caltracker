@@ -7,14 +7,11 @@ import type { IsoDate } from '@caltracker/shared';
 import { calendarAddDomId, calendarItemDomId, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatShortDay } from '@/components/calendar/format';
 import { shouldOpenUp } from '@/components/calendar/menu-placement';
-import { DialogHeader } from '@/components/assign/dialog-header';
 import { QuickDayPicker } from '@/components/assign/quick-day-picker';
-import { Button } from '@/components/ui';
-import { cx } from '@/components/ui/cx';
-import sheet from '@/components/ui/sheet.module.css';
+import { AdaptiveDialog, Button, type AdaptiveDialogHandle } from '@/components/ui';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
-import { openLayer, useBackLayer } from '@/lib/open-layer';
+import { useBackLayer } from '@/lib/open-layer';
 
 const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 
@@ -247,35 +244,53 @@ export function MoveDialog({
   onMove: (date: IsoDate) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
+  const done = useRef(false);
   // The others on each day (not this workout itself).
   const others = dayWorkouts.filter((w) => w.id !== entry.id);
   const workoutsOn = (d: IsoDate) => others.filter((w) => w.date === d).length;
   // Quick days leave out the workout's own day; the first one is picked to start with.
   const [date, setDate] = useState<string>(() => quickDays(today, { exclude: [entry.date] })[0]?.date ?? today);
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog) openLayer(dialog, { noKeyboardOnTouch: true });
-    // The item remounts on its new day: put focus back on it there.
-    return () => {
+  // The item remounts on its new day: put focus back on it there.
+  useEffect(
+    () => () => {
       focusSoon(calendarItemDomId(entry.id));
-    };
-  }, [entry.id]);
+    },
+    [entry.id],
+  );
 
   const parsed = IsoDateSchema.safeParse(date);
   const error = !parsed.success ? 'Pick a date.' : date === entry.date ? 'It is already on this day.' : scheduleDateError(parsed.data, today);
   const already = parsed.success && error === null ? others.filter((w) => w.date === parsed.data).map((w) => w.name) : [];
 
   return (
-    <dialog ref={dialogRef} className={cx(styles.dialog, sheet.sheet)} aria-labelledby={titleId} onClose={onClose}>
-      <DialogHeader
-        titleId={titleId}
-        title={`Move ${entry.name}`}
-        subtitle={`${clientName ? `${clientName} · ` : ''}now on ${formatShortDay(entry.date)}`}
-        onClose={() => dialogRef.current?.close()}
-      />
+    <AdaptiveDialog
+      ref={dialogRef}
+      historyId={`move-${entry.id}`}
+      title={`Move ${entry.name}`}
+      subtitle={`${clientName ? `${clientName} · ` : ''}now on ${formatShortDay(entry.date)}`}
+      onClose={onClose}
+      noKeyboardOnTouch
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()}>
+            Cancel
+          </Button>
+          <Button
+            disabled={error !== null}
+            onClick={() => {
+              if (!parsed.success || error !== null || done.current) return;
+              done.current = true;
+              const to = parsed.data;
+              void dialogRef.current?.close().then(() => onMove(to));
+            }}
+          >
+            {parsed.success && error === null ? `Move to ${formatShortDay(parsed.data)}` : 'Move'}
+          </Button>
+        </>
+      }
+    >
       <QuickDayPicker
         legend="Move to"
         today={today}
@@ -291,15 +306,7 @@ export function MoveDialog({
           {formatShortDay(parsed.data!)} already has {already.join(', ')}. Moving there adds this alongside it.
         </p>
       ) : null}
-      <div className={cx(styles.dialogActions, sheet.actions)}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
-          Cancel
-        </Button>
-        <Button disabled={error !== null} onClick={() => parsed.success && error === null && onMove(parsed.data)}>
-          {parsed.success && error === null ? `Move to ${formatShortDay(parsed.data)}` : 'Move'}
-        </Button>
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }
 
@@ -314,32 +321,49 @@ export function DeleteDialog({
   onDelete: () => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const bodyId = useId();
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog) openLayer(dialog);
-    // The menu that opened this is gone: back to the item if it is still there, else to its day's "+".
-    return () => {
+  const done = useRef(false);
+  // The menu that opened this is gone: back to the item if it is still there, else to its day's "+".
+  useEffect(
+    () => () => {
       requestAnimationFrame(() =>
         (document.getElementById(calendarItemDomId(entry.id)) ?? document.getElementById(calendarAddDomId(entry.date)))?.focus(),
       );
-    };
-  }, [entry.id, entry.date]);
+    },
+    [entry.id, entry.date],
+  );
   return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId} aria-describedby={bodyId} onClose={onClose}>
-      <h2 id={titleId} className={styles.dialogTitle}>Delete {entry.name}?</h2>
+    <AdaptiveDialog
+      ref={dialogRef}
+      historyId={`delete-workout-${entry.id}`}
+      role="alertdialog"
+      describedBy={bodyId}
+      title={`Delete ${entry.name}?`}
+      onClose={onClose}
+      stackFooterOnPhone
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (done.current) return;
+              done.current = true;
+              void dialogRef.current?.close().then(onDelete);
+            }}
+          >
+            Delete workout
+          </Button>
+        </>
+      }
+    >
       <p id={bodyId} className={styles.dialogBody}>
         Removes it from {clientName}&apos;s calendar on {formatShortDay(entry.date)}. Your library isn&apos;t changed.
-        {entry.logId ? " The workout they logged stays in Activity." : ''}
+        {entry.logId ? ' The workout they logged stays in Activity.' : ''}
       </p>
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()}>
-          Cancel
-        </Button>
-        <Button onClick={onDelete}>Delete</Button>
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

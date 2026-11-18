@@ -29,6 +29,7 @@ import calendar from '@/components/calendar/calendar.module.css';
 import { useUrlChoice } from '@/lib/url-state';
 import styles from './progress.module.css';
 import { openLayer } from '@/lib/open-layer';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 
 type Editing = { scan: ScanRow | null; presetDate?: IsoDate };
 
@@ -56,21 +57,27 @@ export function ProgressSection({
   const today = useLocalToday();
   // Kept in the address (?range=), so a reload or Back to this tab keeps the chart's range.
   const [range, setRange] = useUrlChoice<ChartRange>('range', CHART_RANGES, '1y');
-  const [editing, setEditing] = useState<Editing | null>(openScan && !readOnly ? { scan: null } : null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState<ScanRow | null>(null);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<ErrorCode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Drop ?scan=1 once it has opened the form, so a reload doesn't open it again.
+  // Drop ?scan=1 from the address first, then open the form (it adds its own ?sheet= step on top of the clean
+  // address), so a reload or Back doesn't open it again.
   useEffect(() => {
     if (!openScan) return;
     const url = new URL(window.location.href);
-    if (!url.searchParams.has('scan')) return;
-    url.searchParams.delete('scan');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-  }, [openScan]);
+    if (url.searchParams.has('scan')) {
+      url.searchParams.delete('scan');
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    }
+    if (readOnly) return;
+    // Opening only after the address is clean is the point here (the form's own history step copies the address).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditing({ scan: null });
+  }, [openScan, readOnly]);
 
   useEffect(() => {
     if (!toast || toast === STALE_DEPLOY_MESSAGE) return;
@@ -79,6 +86,18 @@ export function ProgressSection({
   }, [toast]);
 
   const { scans, customs } = data;
+  // A refresh or shared link with ?sheet=add-scan / edit-scan-<id> opens that form again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    if (readOnly) return false;
+    if (id === 'add-scan') {
+      setEditing({ scan: null });
+      return true;
+    }
+    const scan = id.startsWith('edit-scan-') ? scans.find((s) => `edit-scan-${s.id}` === id && s.source === 'coach') : undefined;
+    if (!scan) return false;
+    setEditing({ scan });
+    return true;
+  });
   const customByKey = new Map(customs.map((c) => [customKey(c.id), c]));
   const keys = [...BUILT_IN_METRIC_KEYS, ...customs.map((c) => customKey(c.id))];
   const nameOf = (key: string) => (Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey].label : (customByKey.get(key)?.name ?? 'Measure'));
@@ -172,7 +191,7 @@ export function ProgressSection({
               </li>
             ))}
           </ul>
-          {readOnly ? null : <Button onClick={() => setEditing({ scan: null })}>Add scan</Button>}
+          {readOnly ? null : <Button variant="create" onClick={() => setEditing({ scan: null })}>+ Add scan</Button>}
         </div>
       </div>
 

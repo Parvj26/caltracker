@@ -9,6 +9,7 @@ import { failureCode } from '@/lib/action-errors';
 import type { OverviewNote } from '@/lib/client-overview';
 import { addNote, clearGoal, deleteNote, saveGoal, saveLimitations, updateNote, type RecordOutcome } from '../overview-actions';
 import styles from '../client-page.module.css';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 /** Runs a save, keeps the button busy meanwhile, and turns a failure (or a dropped connection) into a message. */
 function useSave() {
@@ -47,6 +48,10 @@ export function GoalCard({
   const [date, setDate] = useState(goal?.targetDate ?? '');
   const save = useSave();
   const editButton = useRef<HTMLButtonElement>(null);
+  // An unsaved goal: Back, links and closing the tab ask "Discard changes?" first (UI rules §8).
+  const guard = useUnsavedGuard(editing && (text.trim() !== (goal?.goal ?? '').trim() || date !== (goal?.targetDate ?? '')), {
+    message: 'The goal you typed isn’t saved yet.',
+  });
 
   function open() {
     setText(goal?.goal ?? '');
@@ -61,6 +66,7 @@ export function GoalCard({
 
   return (
     <Card className={styles.card} aria-labelledby="goal-heading">
+      {guard.prompt}
       <div className={styles.cardHead}>
         <h2 id="goal-heading" className={styles.heading}>Goal &amp; countdown</h2>
         {readOnly || editing ? null : (
@@ -113,12 +119,15 @@ export function LimitationsCard({ clientId, body, readOnly }: { clientId: string
   const [text, setText] = useState(body);
   const save = useSave();
   const editButton = useRef<HTMLButtonElement>(null);
+  // Unsaved limitations: Back, links and closing the tab ask "Discard changes?" first (UI rules §8).
+  const guard = useUnsavedGuard(editing && text.trim() !== body.trim(), { message: 'The limitations you typed aren’t saved yet.' });
   const close = () => {
     setEditing(false);
     requestAnimationFrame(() => editButton.current?.focus());
   };
   return (
     <Card id="limitations" tabIndex={-1} className={styles.card} aria-labelledby="limitations-heading">
+      {guard.prompt}
       <div className={styles.cardHead}>
         <h2 id="limitations-heading" className={styles.heading}>Limitations &amp; injuries</h2>
         {readOnly || editing ? null : (

@@ -16,7 +16,7 @@
   cursor: pointer;
 }
 .button:hover, .button[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 10%, transparent); }
-.button:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.button:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .button:disabled { opacity: 0.5; cursor: default; }
 .menu {
   position: absolute;

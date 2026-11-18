@@ -42,6 +42,8 @@ export type CalendarItem = {
   preview?: WorkoutPreview;
   /** Its finished log was logged by the coach (an in-person session), not by the client. */
   loggedByCoach?: boolean;
+  /** Has an unfinished log. Today (or later) it shows "In progress"; a past day stays Missed (the existing rule). */
+  inProgress?: boolean;
   /** From a program assignment: whether its program has Live Sync on, and this copy was edited or started. */
   liveSync?: { programLive: boolean; customised: boolean; started: boolean };
 };
@@ -735,6 +737,12 @@ function DayItem({
         </Link>
       ) : null}
       {item.logId && item.loggedByCoach ? <span className={styles.coachNote}>Logged by coach</span> : null}
+      {!item.logId && item.inProgress && !missed ? (
+        <span className={styles.inProgressNote}>
+          <span aria-hidden="true" className={styles.inProgressDot} />
+          <span>In progress</span>
+        </span>
+      ) : null}
       {missed ? (
         <span className={styles.missedNote}>
           <span aria-hidden="true">!</span>

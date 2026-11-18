@@ -11,6 +11,7 @@ import { CLIENT_UPDATED_MESSAGE, buildCorrections, logVersion } from './correcti
 import { PlannedVsActual, draftFor, type Drafts } from './planned-vs-actual';
 import styles from './log.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 const initialDrafts = (log: WorkoutLogDoc, units: Units): Drafts =>
   Object.fromEntries(log.blocks.flatMap((b) => liveExercises(b).flatMap(({ exercise: e }) => e.sets.filter((s) => s.completedAt !== null).map((s) => [s.id, draftFor(s, e.trackingType, units)]))));
@@ -50,6 +51,9 @@ export function CorrectForm({
   const [error, setError] = useState<FieldError | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
+  // Corrections typed but not saved: Back, links and closing the tab ask "Discard changes?" first (UI rules §8).
+  const dirty = editing && JSON.stringify(drafts) !== JSON.stringify(startDrafts);
+  const guard = useUnsavedGuard(dirty, { message: 'The corrections you typed aren’t saved yet.' });
 
   function start() {
     const fresh = initialDrafts(log, units);
@@ -88,6 +92,7 @@ export function CorrectForm({
 
   return (
     <section className={styles.section} aria-label="Planned and actual">
+      {guard.prompt}
       <div className={styles.sectionHead}>
         <h2 className={styles.sectionHeading}>Planned vs. actual</h2>
         <div className={styles.sectionActions}>

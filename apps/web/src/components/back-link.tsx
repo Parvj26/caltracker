@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ComponentProps, MouseEvent } from 'react';
 import { previousEntryIs, rememberedUrl } from '@/lib/history-back';
+import { ChevronIcon } from './ui/chevron-icon';
+import { cx } from './ui/cx';
+import layout from './ui/layout.module.css';
 
 /**
  * A "Back to …" link that steps back in history when the page it leads to is the one just behind (so that page comes
@@ -23,4 +26,18 @@ export function BackLink({ href, backTo, onClick, ...rest }: ComponentProps<type
     else router.push(rememberedUrl(path, href));
   }
   return <Link href={href} onClick={go} {...rest} />;
+}
+
+/**
+ * "‹ Maya Thompson": the one back-link look (ParentLink, UI rules §8) with BackLink's behaviour (steps back when that
+ * page is just behind, else opens it as last seen in this tab). Screen readers hear "Back to …".
+ */
+export function ParentBackLink({ href, label, backTo, className }: { href: string; label: string; backTo?: string; className?: string | undefined }) {
+  return (
+    <BackLink href={href} {...(backTo ? { backTo } : {})} className={cx(layout.backLink, className)} data-back-link="">
+      <ChevronIcon direction="left" size={20} />
+      <span className={layout.srOnly}>Back to </span>
+      {label}
+    </BackLink>
+  );
 }
