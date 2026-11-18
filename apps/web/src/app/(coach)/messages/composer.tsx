@@ -6,17 +6,45 @@ import { MAX_PHOTOS, type ErrorCode } from '@caltracker/shared';
 import { canSendDraft } from './model';
 import styles from './messages.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
 export type Draft = { body: string; files: File[] };
 type Photo = { file: File; url: string };
 
 const BODY_MAX = 4000;
 
+/** The unsent text of one conversation, kept for this tab only (sessionStorage), so Back or a reload doesn't lose it. */
+function readDraft(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeDraft(key: string, text: string) {
+  try {
+    if (text.trim() === '') window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, text);
+  } catch {
+    // Storage blocked (a private window): the draft just isn't kept.
+  }
+}
+
 /**
  * The reply box: Enter sends, Shift+Enter adds a line, 📎 adds up to 4 photos shown as removable thumbnails.
  * `initialBody` starts the box with text (and focuses it at the end), e.g. "Reply about this meal" from the Food tab.
+ * `draftKey` names this conversation's unsent text in sessionStorage: it comes back after Back or a reload, and goes
+ * once sent or discarded. While there is something unsent, leaving asks "Discard draft?".
  */
-export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) => void; initialBody?: string | undefined }) {
+export function Composer({
+  onSend,
+  initialBody = '',
+  draftKey,
+}: {
+  onSend: (draft: Draft) => void;
+  initialBody?: string | undefined;
+  draftKey?: string | undefined;
+}) {
   const [body, setBody] = useState(initialBody.slice(0, BODY_MAX));
   // Starts when the coach begins typing, so just opening a thread is not counted as a reply given up.
   const completeReply = useAnalyticsTask('reply_message', body.trim().length > 0);
@@ -39,7 +67,31 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
 
+  // The kept draft comes back after the first render (the server can't see sessionStorage). A ?about= reply keeps
+  // the draft only when it was written from that same start.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !draftKey) return;
+    restored.current = true;
+    const kept = readDraft(draftKey);
+    if (kept === null || (initialBody !== '' && !kept.startsWith(initialBody))) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after hydration
+    setBody(kept.slice(0, BODY_MAX));
+    requestAnimationFrame(grow);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
+  useEffect(() => {
+    if (draftKey && restored.current) writeDraft(draftKey, body === initialBody ? '' : body);
+  }, [draftKey, body, initialBody]);
+
   const canSend = canSendDraft(body, photos.length, initialBody);
+  const guard = useUnsavedGuard(canSend, {
+    title: 'Discard draft?',
+    message: 'Your message isn’t sent yet.',
+    onDiscard: () => {
+      if (draftKey) writeDraft(draftKey, '');
+    },
+  });
 
   function grow() {
     const el = area.current;
@@ -70,6 +122,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
   function submit() {
     if (!canSend) return;
     completeReply();
+    if (draftKey) writeDraft(draftKey, '');
     onSend({ body, files: photos.map((p) => p.file) });
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);
@@ -82,6 +135,8 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
   }
 
   return (
+    <>
+    {guard.prompt}
     <form
       className={styles.composer}
       // On an iPhone the floating Menu button would sit on Add photos; the thread's Back leaves the screen.
@@ -140,5 +195,6 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
         </Button>
       </div>
     </form>
+    </>
   );
 }

@@ -21,6 +21,9 @@ function RowTime({ iso, now }: { iso: string; now: string }) {
 /** How many conversations have unread messages, for the empty pane beside the inbox. */
 export const UnreadPeopleContext = createContext(0);
 
+/** The conversation a wide screen opens instead of an empty pane: the first with unread messages, else the latest. */
+export const FirstConversationContext = createContext<string | null>(null);
+
 /**
  * The two panes: the inbox (current clients, latest message first) and, beside it, the open conversation (the
  * route's page). On a phone only one shows at a time. The server sends the rows; Realtime events and focus ask the
@@ -41,7 +44,8 @@ export function MessagesShell({
   const segment = useSelectedLayoutSegment();
   const supabase = useBrowserSupabase();
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const { query, setQuery, debounced } = useSearchQuery();
+  // In the address (?q=), like the other searches: Back and a reload keep it.
+  const { query, setQuery, debounced } = useSearchQuery({ urlParam: 'q' });
   const [now, refreshNow] = useNow();
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -76,6 +80,7 @@ export function MessagesShell({
   useOnWake(refresh);
 
   const unreadCount = rows.filter((r) => r.unread > 0).length;
+  const firstConversation = (rows.find((r) => r.unread > 0) ?? rows.find((r) => r.lastMessageAt !== null))?.clientId ?? null;
   const shown = useMemo(() => filterInbox(rows, { unreadOnly, query: debounced }), [rows, unreadOnly, debounced]);
 
   return (
@@ -131,7 +136,9 @@ export function MessagesShell({
         )}
       </section>
       <section className={cx(styles.pane, styles.threadPane)} aria-label="Conversation">
-        <UnreadPeopleContext.Provider value={unreadCount}>{children}</UnreadPeopleContext.Provider>
+        <UnreadPeopleContext.Provider value={unreadCount}>
+          <FirstConversationContext.Provider value={firstConversation}>{children}</FirstConversationContext.Provider>
+        </UnreadPeopleContext.Provider>
       </section>
     </div>
   );

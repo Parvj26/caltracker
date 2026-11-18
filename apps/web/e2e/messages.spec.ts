@@ -130,6 +130,8 @@ test('the coach sends text and a photo and both appear', async ({ page }) => {
 test('a message from the client appears live, raises the badge, and opening the conversation clears it', async ({ page }) => {
   const client = await makeClient('Livia');
   await signInAsCoach(page);
+  // iPad portrait: the empty pane stays beside the inbox (from 1000 px the first conversation opens by itself).
+  await page.setViewportSize({ width: 900, height: 900 });
   await page.goto('/messages');
   await expect(page.getByText(/Pick a client on the left/)).toBeVisible();
   const before = await unreadTotal(page);
@@ -254,4 +256,40 @@ test('a past client\'s Training tab shows their history read-only', async ({ pag
   const as = await signedInAs('coach@demo.local', 'demo-password-123');
   const blocked = await as.from('messages').insert({ conversation_id: conv.data!.id, body: 'hello?', workspace_id: workspaceId });
   expect(blocked.error).not.toBeNull();
+});
+
+test('from 1000 px wide, Messages opens the first unread (else the latest) conversation instead of an empty pane', async ({ page }) => {
+  const client = await makeClient('Opal');
+  await clientSays(client.id, 'Opening by itself');
+  await signInAsCoach(page);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto('/messages');
+  await expect(page).toHaveURL(/\/messages\/[0-9a-f-]{36}$/);
+  await expect(page.getByText(/Pick a client on the left/)).toHaveCount(0);
+  await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
+});
+
+test('an unsent message is kept for a reload, Back asks "Discard draft?", and sending clears it', async ({ page }) => {
+  const client = await makeClient('Drafty');
+  await signInAsCoach(page);
+  await page.goto(`/clients/${client.id}`);
+  await page.getByRole('link', { name: 'Message', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
+  const box = page.getByLabel('Message', { exact: true });
+  await box.fill('Half a thought');
+  await page.reload();
+  await expect(box).toHaveValue('Half a thought');
+
+  await page.goBack();
+  const ask = page.getByRole('alertdialog', { name: 'Discard draft?' });
+  await expect(ask).toBeVisible();
+  await ask.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
+  await expect(box).toHaveValue('Half a thought');
+
+  await box.press('Enter');
+  await expect(page.getByRole('log').getByText('Half a thought')).toBeVisible();
+  await expect(box).toHaveValue('');
+  await page.reload();
+  await expect(box).toHaveValue('');
 });

@@ -31,9 +31,15 @@ export function useUnsavedGuard(
   dirty: boolean,
   {
     message = 'What you changed here isn’t saved yet.',
+    title = 'Discard changes?',
+    onDiscard,
     parentHref,
   }: {
     message?: string;
+    /** The question's title: "Discard changes?" unless something else fits better ("Discard draft?"). */
+    title?: string;
+    /** Runs when Discard is picked, before the page is left (e.g. forget a draft kept for a reload). */
+    onDiscard?: (() => void) | undefined;
     /** Where Discard on Back goes when the page was opened directly (nothing behind it in this tab): its list. */
     parentHref?: string | undefined;
   } = {},
@@ -55,9 +61,11 @@ export function useUnsavedGuard(
   );
 
   const parent = useRef(parentHref);
+  const discarded = useRef(onDiscard);
   useEffect(() => {
     parent.current = parentHref;
-  }, [parentHref]);
+    discarded.current = onDiscard;
+  }, [parentHref, onDiscard]);
 
   useEffect(() => {
     const g = addLeaveGuard(ask, () => {
@@ -81,17 +89,26 @@ export function useUnsavedGuard(
 
   const answer = useCallback(
     (discard: boolean) => {
+      if (discard) discarded.current?.();
       asking?.(discard);
       setAsking(null);
     },
     [asking],
   );
 
-  return { prompt: asking ? <DiscardPrompt message={message} onAnswer={answer} /> : null, confirm, release };
+  return { prompt: asking ? <DiscardPrompt title={title} message={message} onAnswer={answer} /> : null, confirm, release };
 }
 
 /** "Discard changes?" with Keep editing and Discard. Escape, ×, a tap outside and Back all mean Keep editing. */
-export function DiscardPrompt({ message, onAnswer }: { message: string; onAnswer: (discard: boolean) => void }) {
+export function DiscardPrompt({
+  title = 'Discard changes?',
+  message,
+  onAnswer,
+}: {
+  title?: string;
+  message: string;
+  onAnswer: (discard: boolean) => void;
+}) {
   const ref = useRef<AdaptiveDialogHandle>(null);
   const answered = useRef(false);
   const textId = useId();
@@ -105,7 +122,7 @@ export function DiscardPrompt({ message, onAnswer }: { message: string; onAnswer
       ref={ref}
       historyId="discard-changes"
       role="alertdialog"
-      title="Discard changes?"
+      title={title}
       titleSafe
       describedBy={textId}
       stackFooterOnPhone
