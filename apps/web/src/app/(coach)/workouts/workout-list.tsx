@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { smartFilter } from '@caltracker/shared';
-import { Card, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { AssignButton } from '@/components/assign/assign-to-clients';
+import { ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { LocalDate } from './local-date';
-import { WorkoutRowActions } from './workout-row-actions';
+import { WorkoutRowMore } from './workout-row-actions';
 import styles from './workouts.module.css';
 
 export type WorkoutListRow = { id: string; name: string; updatedAt: string; exercises: number };
@@ -46,43 +46,33 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
           <p className={styles.empty}>No workouts yet. Build your first one.</p>
         )
       ) : (
-        <Card>
-          <table className={styles.table} aria-label="Workouts">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Exercises</th>
-                <th scope="col">Updated</th>
-                <th scope="col" aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((w) => (
-                <tr key={w.id}>
-                  <td>
-                    <Link href={`/workouts/${w.id}`} className={styles.nameLink}>
-                      {w.name}
-                    </Link>
-                  </td>
-                  <td className={styles.numeric}>
-                    {w.exercises}
-                    <span className={styles.phoneOnly}>{w.exercises === 1 ? ' exercise' : ' exercises'}</span>
-                  </td>
-                  <td className={styles.numeric}>
-                    <span className={styles.phoneOnly}>Updated </span>
-                    <LocalDate iso={w.updatedAt} />
-                  </td>
-                  <td>
-                    <WorkoutRowActions id={w.id} name={w.name} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {limited ? (
-            <p className={styles.caption}>Showing the {limit} most recently updated. Search to find others.</p>
-          ) : null}
-        </Card>
+        <>
+          {/* Plain rows, edge to edge (rulebook §7): the whole row opens the workout; Assign (quiet) and ⋯ stay their own
+              buttons. Wide screens show the exercises and date as columns with headers. */}
+          <RowList aria-label="Workouts" className={styles.rows} columns={['Name', 'Exercises', 'Updated']}>
+            {shown.map((w) => {
+              const exercises = `${w.exercises} ${w.exercises === 1 ? 'exercise' : 'exercises'}`;
+              return (
+                <ListRow
+                  key={w.id}
+                  href={`/workouts/${w.id}`}
+                  title={w.name}
+                  meta={
+                    <>
+                      <span>{exercises}</span>
+                      <span aria-hidden="true">·</span>
+                      <LocalDate iso={w.updatedAt} short />
+                    </>
+                  }
+                  cells={[exercises, <LocalDate key="d" iso={w.updatedAt} />]}
+                  action={<AssignButton kind="workout" id={w.id} name={w.name} compact />}
+                  more={<WorkoutRowMore id={w.id} name={w.name} />}
+                />
+              );
+            })}
+          </RowList>
+          {limited ? <p className={styles.caption}>Showing the {limit} most recently updated. Search to find others.</p> : null}
+        </>
       )}
     </>
   );

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { isErrorCode } from '@caltracker/shared';
-import { createProgram, serviceClient, setRow, signInAsCoach } from './helpers';
+import { createProgram, openProgramSettings, serviceClient, setRow, signInAsCoach } from './helpers';
 import { demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 
 // Clear button names and error codes for PostHog: every key control on the four coach tasks carries its fixed
@@ -110,7 +110,10 @@ test('build program: new, name, weeks, workouts and copy week are labelled', asy
   await page.goto('/programs/new');
   await expect(label(page, 'program_name_save')).toBeVisible();
   await createProgram(page, name, 2, []);
-  for (const n of ['program_add_week', 'program_save']) await expect(label(page, n)).toBeVisible();
+  await expect(label(page, 'program_add_week')).toBeVisible();
+  // The details' Save sits in "Program settings", folded below the plan.
+  await openProgramSettings(page);
+  await expect(label(page, 'program_save')).toBeVisible();
   await expect(label(page, 'program_add_workout').first()).toBeVisible();
   await expect(label(page, 'program_copy_week').first()).toBeVisible();
 });

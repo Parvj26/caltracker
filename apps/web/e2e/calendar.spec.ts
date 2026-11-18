@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { formatPlainDay, formatPlainDayMonth } from '@caltracker/shared';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach, dateField, moveButton } from './helpers';
+import { createProgram, createWorkout, seedLog, seedSectionedWorkout, serviceClient, setRow, signInAsCoach, dateField, moveButton, openProgramSettings } from './helpers';
 
 // Client calendar and assignment (phase 2 Task 16). Every test builds its own workouts and programs with unique
 // names, so tests can share the demo client and still run side by side.
@@ -212,6 +212,7 @@ test("editing the library workout leaves the client's copy alone, and the other 
   await createWorkout(page, workout);
   await createProgram(page, program, 1, [{ week: 1, day: 1, workoutName: workout }]);
   // New programs have Live Sync on (live-sync.spec covers that); with it off, copies are independent of the library.
+  await openProgramSettings(page);
   await page.getByRole('switch', { name: 'Live Sync' }).click();
   await expect(page.getByRole('switch', { name: 'Live Sync' })).toHaveAttribute('aria-checked', 'false');
   const monday = await assignFromNextMonday(page, program, me);

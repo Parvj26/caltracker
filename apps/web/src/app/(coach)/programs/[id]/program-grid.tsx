@@ -442,14 +442,20 @@ export function ProgramGrid({
 
   return (
     <div className={styles.builder}>
-      {/* On a phone the plan comes first and these fold away (CSS); wider screens show them open, above the plan. */}
+      {/* The plan comes first; these fold away below it on every size (CSS order). */}
       <section className={styles.settings} data-open={settingsOpen} aria-label="Program settings">
         <button
           type="button"
           className={styles.settingsToggle}
           aria-expanded={settingsOpen}
           aria-controls={settingsId}
-          onClick={() => setSettingsOpen((o) => !o)}
+          onClick={(e) => {
+            const toggle = e.currentTarget;
+            const opening = !settingsOpen;
+            setSettingsOpen(opening);
+            // They open below the plan, often at the bottom of the screen: bring them into view.
+            if (opening) requestAnimationFrame(() => toggle.scrollIntoView({ block: 'start' }));
+          }}
         >
           Program settings <span aria-hidden="true">{settingsOpen ? '▴' : '▾'}</span>
         </button>
@@ -888,7 +894,6 @@ function SlotChip({
         title={slot.workoutName}
       >
         <span className={styles.chipName}>
-          <span className={styles.menuSpace} aria-hidden="true" />
           {slot.workoutName}
         </span>
       </button>

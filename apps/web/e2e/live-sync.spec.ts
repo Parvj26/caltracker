@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach, dateField } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach, dateField, openProgramSettings } from './helpers';
 
 // Program Live Sync (spec: docs/superpowers/specs/2026-11-06-live-sync-design.md): with the switch on, program edits
 // reach the calendars of clients already on the program.
@@ -75,6 +75,7 @@ test('Live Sync on: program edits reach the client calendar, tagged Live; off: t
   const programUrl = page.url();
 
   // New programs start with Live Sync on. Turn it off for now.
+  await openProgramSettings(page);
   await expect(liveSwitch(page)).toHaveAttribute('aria-checked', 'true');
   await expect(status(page)).toContainText('Live Sync on · 0 clients');
   await liveSwitch(page).click();
@@ -100,6 +101,7 @@ test('Live Sync on: program edits reach the client calendar, tagged Live; off: t
 
   // On: the catch-up sync adds it.
   await page.goto(programUrl);
+  await openProgramSettings(page);
   await liveSwitch(page).click();
   await expect(liveSwitch(page)).toHaveAttribute('aria-checked', 'true');
   await expect(status(page)).toContainText(/Live Sync on · 1 client · last synced (just now|1 min ago)/);

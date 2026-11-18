@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, signInAsCoach, openProgramSettings, listRow } from './helpers';
 
 // Program builder (phase 2 Task 15): a weekly grid of library workouts.
 const admin = serviceClient();
@@ -51,6 +51,7 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
   await expect(programCell(page, 1, 1).getByRole('button', { name: workout, exact: true })).toHaveCount(0);
 
   // Shrinking to 1 week would remove the Week 2 workout: the coach is told first.
+  await openProgramSettings(page);
   await page.getByLabel('Weeks', { exact: true }).fill('1');
   await page.getByRole('button', { name: 'Save details' }).click();
   const confirm = page.getByRole('dialog', { name: 'Remove workouts?' });
@@ -60,6 +61,7 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
   await expect(programCell(page, 2, 3)).toHaveCount(0);
 
   await page.reload();
+  await openProgramSettings(page);
   await expect(page.getByLabel('Weeks', { exact: true })).toHaveValue('1');
   await expect(programCell(page, 2, 3)).toHaveCount(0);
   await expect(programCell(page, 1, 4).getByRole('button', { name: workout, exact: true })).toBeVisible();
@@ -67,9 +69,9 @@ test('build a 2-week program, drag a workout, then shrink to 1 week after a warn
 
   // The list shows it with its length and number of workouts.
   await page.goto('/programs');
-  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: program, exact: true }) });
-  await expect(row.getByRole('cell').nth(1)).toHaveText('1', { useInnerText: true });
-  await expect(row.getByRole('cell').nth(2)).toHaveText('1', { useInnerText: true });
+  const row = listRow(page.getByRole('list', { name: 'Programs' }), program);
+  await expect(row).toContainText('1 week');
+  await expect(row).toContainText('1 workout');
 });
 
 test('remove a workout from the grid with its menu', async ({ page }) => {
@@ -248,7 +250,7 @@ test('on an iPad in portrait all seven days fit and a long workout name wraps on
   const chip = programCell(page, 1, 5).getByRole('button', { name: workout, exact: true });
   await expect(chip).toHaveAttribute('title', workout);
   const lines = await chip.evaluate((el) => {
-    // The name's text node (the name span also holds the empty spacer the "⋯" button sits over).
+    // The name's text node.
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent!.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
     const text = walker.nextNode()!;
     const range = document.createRange();
@@ -264,10 +266,13 @@ test('on an iPad in portrait all seven days fit and a long workout name wraps on
   expect(lines.length).toBeGreaterThan(1);
   expect(lines.join(' ')).toBe(workout);
   for (const line of lines) expect(workout.split(' ')).toEqual(expect.arrayContaining(line.split(' ')));
-  // The "⋯" button sits in the chip's top-right corner, not on a row of its own under the name.
+  // With a mouse the "⋯" button sits in the chip, right-aligned on a slim row under the name: never on top of the name
+  // (the UI audit's overlap rule), and the name keeps the chip's full width so "Conditioning" stays whole.
   const chipBox = (await chip.locator('xpath=..').boundingBox())!;
+  const nameBox = (await chip.boundingBox())!;
   const menuBox = (await page.getByRole('button', { name: `Options for ${workout}` }).boundingBox())!;
-  expect(menuBox.y).toBeLessThanOrEqual(chipBox.y + 1);
+  expect(menuBox.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(chipBox.y + chipBox.height + 1);
   expect(Math.abs(menuBox.x + menuBox.width - (chipBox.x + chipBox.width))).toBeLessThanOrEqual(1);
 
   // A 1280 px laptop and an iPad in landscape also see all seven days without sideways scrolling.

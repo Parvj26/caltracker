@@ -1,11 +1,12 @@
 'use client';
 
 import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
-import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DialogHeader } from '@/components/assign/dialog-header';
-import { DuplicateButton, useDuplicate } from '@/components/duplicate-button';
+import { useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
+import { RowActionToast } from '@/components/row-toast';
 import { AdaptiveDialog, Button, ButtonLink, ErrorText, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
@@ -13,7 +14,6 @@ import { markUndone } from '@/lib/analytics/client';
 import { deleteWorkout, libraryWorkoutUses, previewWorkout, renameWorkout, type WorkoutUses } from './actions';
 import coach from '../coach.module.css';
 import styles from './workouts.module.css';
-import assignStyles from '@/components/assign/assign.module.css';
 import { openLayer } from '@/lib/open-layer';
 
 type Popup = 'preview' | 'rename' | 'delete';
@@ -39,26 +39,24 @@ const DotsIcon = (
 );
 
 /**
- * A Workouts list row's actions. iPad and desktop: Assign, Duplicate and ⋯ (Preview, Rename, Delete…). iPhone: Assign
- * and ⋯, which opens a sheet from the bottom with Preview, Duplicate, Rename and Delete….
+ * A Workouts list row's ⋯ (Assign is the row's one visible action, beside it). iPad and desktop: a menu with Preview,
+ * Duplicate, Rename and Delete…. iPhone: a sheet from the bottom with the same.
  */
-export function WorkoutRowActions({ id, name }: { id: string; name: string }) {
+export function WorkoutRowMore({ id, name }: { id: string; name: string }) {
   const [open, setOpen] = useState<Popup | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const duplicate = useDuplicate('workout', id);
   const label = `More actions for ${name}`;
 
   return (
-    <div className={cx(assignStyles.actions, styles.rowActions)}>
-      <AssignButton kind="workout" id={id} name={name} compact />
-      <span className={styles.wideOnly}>
-        <DuplicateButton kind="workout" id={id} name={name} compact />
-      </span>
+    <span className={styles.rowMore}>
       <MoreMenu
         label={label}
-        className={cx(styles.more, styles.wideOnly)}
+        className={styles.wideOnly}
+        busy={duplicate.pending}
         items={[
           { label: 'Preview', onSelect: () => setOpen('preview') },
+          { label: duplicate.pending ? 'Duplicating…' : 'Duplicate', onSelect: duplicate.run, disabled: duplicate.pending },
           { label: 'Rename', onSelect: () => setOpen('rename') },
           { label: 'Delete…', onSelect: () => setOpen('delete'), danger: true },
         ]}
@@ -74,12 +72,7 @@ export function WorkoutRowActions({ id, name }: { id: string; name: string }) {
       >
         {DotsIcon}
       </button>
-      {duplicate.pending ? (
-        <span className={coach.srClose} role="status">
-          Duplicating…
-        </span>
-      ) : null}
-      {duplicate.error ? <ErrorText code={duplicate.error} /> : null}
+      <RowActionToast pending={duplicate.pending} error={duplicate.error} pendingText="Duplicating…" />
 
       {sheetOpen ? (
         <ActionSheet
@@ -94,7 +87,7 @@ export function WorkoutRowActions({ id, name }: { id: string; name: string }) {
       {open === 'preview' ? <PreviewDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
       {open === 'rename' ? <RenameDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
       {open === 'delete' ? <DeleteDialog id={id} name={name} onClose={() => setOpen(null)} /> : null}
-    </div>
+    </span>
   );
 }
 
@@ -313,7 +306,8 @@ function RenameDialog({ id, name, onClose }: { id: string; name: string; onClose
 }
 
 function usesText(uses: WorkoutUses): string {
-  const programs = `Used in ${count(uses.programs, 'program', 'programs')}`;
+  const one = uses.programList.length === 1 ? uses.programList[0] : undefined;
+  const programs = one ? `Used in “${one.name}”` : `Used in ${count(uses.programs, 'program', 'programs')}`;
   const invites = `in the starting plan of ${count(uses.invitePlans, "invited client who hasn't", "invited clients who haven't")} joined yet`;
   if (uses.programs > 0 && uses.invitePlans > 0) return `${programs} and ${invites} — remove it from those first.`;
   if (uses.programs > 0) return `${programs} — remove it from ${uses.programs === 1 ? 'that program' : 'them'} first.`;
@@ -324,8 +318,22 @@ function usesText(uses: WorkoutUses): string {
  * Delete…: asks first. A workout still used in a program or an open invite's starting plan can't be deleted (that
  * would empty those days); the window says where it is used instead. Used by the Workouts list and the workout page.
  */
-export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
+export function DeleteDialog({
+  id,
+  name,
+  onClose,
+  onDeleted,
+  confirmLeave,
+}: {
+  id: string;
+  name: string;
+  onClose: () => void;
+  onDeleted?: () => void;
+  /** Before "Open “<program>”" leaves the page: asks first when the page has unsaved changes (the workout page). */
+  confirmLeave?: () => Promise<boolean>;
+}) {
   const ref = useRef<AdaptiveDialogHandle>(null);
+  const router = useRouter();
   const bodyId = useId();
   const [uses, setUses] = useState<WorkoutUses | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
@@ -408,6 +416,30 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
             ? usesText(uses)
             : "It's removed from your library. Workouts already on clients' calendars and their logged history stay."}
       </p>
+      {inUse && uses.programList.length > 0 ? (
+        // Each program that blocks the delete, with a way to open it (rulebook §10.3). The pop-up steps off the history
+        // first, so Back from the program comes back to the list, not to this question.
+        <ul className={styles.blockers} aria-label="Programs that use it">
+          {uses.programList.map((p) => (
+            <li key={p.id}>
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => {
+                  void (async () => {
+                    await ref.current?.close();
+                    // Unsaved builder edits under it: "Discard changes?" first (code navigation isn't guarded).
+                    if (confirmLeave && !(await confirmLeave())) return;
+                    router.push(`/programs/${p.id}`);
+                  })();
+                }}
+              >
+                Open “{p.name}”
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {error ? <ErrorText code={error} /> : null}
       {checkFailed ? (
         <Button

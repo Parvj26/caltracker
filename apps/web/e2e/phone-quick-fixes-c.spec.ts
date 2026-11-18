@@ -1,6 +1,6 @@
 import { devices, expect, test } from '@playwright/test';
 import { demoWorkspace, freshClient, seedLibraryWorkout, unique } from './assign-helpers';
-import { seedSectionedWorkout, serviceClient, signInAsCoach } from './helpers';
+import { seedSectionedWorkout, serviceClient, signInAsCoach, listRow } from './helpers';
 
 // iPhone quick fixes C (2026-11-12 Safari review): the ⌘K hint, the invite window, the Workouts search and the
 // session logger's Previous / Next. Chromium with iPhone sizes and touch (the browser can't be chosen per spec). Each
@@ -70,10 +70,9 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     const box = page.getByRole('searchbox', { name: 'Search workouts' });
     // No Search tap needed: the list narrows as the coach types, typos forgiven ("mobilty").
     await box.fill(`mobilty ${tag}`);
-    const list = page.getByRole('table', { name: 'Workouts' });
-    await expect(list.getByRole('link', { name, exact: true })).toBeVisible();
-    // Body rows only: on a phone the header row is hidden (workouts.module.css), so it has no row role.
-    await expect(list.locator('tbody tr')).toHaveCount(1);
+    const list = page.getByRole('list', { name: 'Workouts' });
+    await expect(listRow(list, name)).toBeVisible();
+    await expect(list.getByRole('listitem')).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`[?&]q=mobilty(\\+|%20)${tag}`));
     await box.fill(`zzzz ${tag}`);
     await expect(page.getByText(`No workouts match “zzzz ${tag}”`)).toBeVisible();

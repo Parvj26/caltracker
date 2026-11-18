@@ -1,0 +1,23 @@
+/* One toast, bottom-centred, above the tab bar and the home indicator (rulebook §11). */
+.region {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(var(--ct-space-4) + var(--coach-menu-room, 0px) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--ct-space-4));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-3) var(--ct-space-4);
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  box-shadow: var(--ct-shadow-sticker);
+  font-weight: var(--ct-weight-section-heading);
+}
+.error { margin: 0; flex: 1; min-width: 0; }

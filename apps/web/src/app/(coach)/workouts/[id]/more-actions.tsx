@@ -6,6 +6,7 @@ import { AssignButton } from '@/components/assign/assign-to-clients';
 import { useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
 import { ErrorText } from '@/components/ui';
+import { confirmLeavePage } from '@/lib/history-layers';
 import { DeleteDialog } from '../workout-row-actions';
 import styles from './header.module.css';
 
@@ -36,7 +37,7 @@ export function WorkoutPageActions({ id, name }: { id: string; name: string }) {
         </span>
       ) : null}
       {duplicate.error ? <ErrorText code={duplicate.error} className={styles.error} /> : null}
-      {deleting ? <DeleteDialog id={id} name={name} onClose={() => setDeleting(false)} onDeleted={() => router.replace('/workouts')} /> : null}
+      {deleting ? <DeleteDialog id={id} name={name} onClose={() => setDeleting(false)} onDeleted={() => router.replace('/workouts')} confirmLeave={confirmLeavePage} /> : null}
     </div>
   );
 }

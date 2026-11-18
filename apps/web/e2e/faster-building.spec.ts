@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach, workoutPageMenu } from './helpers';
+import { createProgram, createWorkout, programCell, serviceClient, setRow, signInAsCoach, listRow, workoutPageMenu } from './helpers';
 
 // Faster building (spec: docs/superpowers/specs/2026-11-06-coach-faster-building-design.md): several exercises at
 // once (each starts with 1 set), duplicate a workout or program, copy a program week. (Copy set 1 / fill down gave way to
@@ -95,10 +95,11 @@ test('duplicate a workout from its page and from the list', async ({ page }) => 
   // From the list, the copy of the copy gets its own " (copy)".
   created.workouts.push(`${name} (copy) (copy)`);
   await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
-  await page.getByRole('button', { name: `Duplicate ${name} (copy)`, exact: true }).click();
+  await page.getByRole('button', { name: `More actions for ${name} (copy)`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Duplicate' }).click();
   await expect(page.getByRole('heading', { level: 1, name: `${name} (copy) (copy)` })).toBeVisible();
   await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
-  await expect(page.getByRole('table', { name: 'Workouts' }).getByRole('link')).toHaveCount(3);
+  await expect(page.getByRole('list', { name: 'Workouts' }).getByRole('listitem')).toHaveCount(3);
 });
 
 test('duplicate a program, then copy and repeat a week', async ({ page }) => {
@@ -160,7 +161,7 @@ test('duplicate a program, then copy and repeat a week', async ({ page }) => {
 
   // The original program is untouched.
   await page.goto('/programs');
-  await page.getByRole('link', { name: program, exact: true }).click();
+  await listRow(page.getByRole('list', { name: 'Programs' }), program).getByRole('link').click();
   await expect(chip(2, 3)).toBeVisible();
   await expect(chip(3, 1)).toHaveCount(0);
 });

@@ -123,8 +123,15 @@
     font-weight: var(--ct-weight-section-heading);
     color: var(--ct-ink-muted);
   }
+  /* The headings line up with the rows: no gap after an empty leading slot (--row-leading-width includes the gap when a
+     list has avatars), and the last slot is as wide as the rows' action area (--row-actions-width, set by a list with
+     actions; the actions then sit right-aligned in that width). */
+  .rowList[data-columns] .columnHeader { gap: 0; }
+  .rowList[data-columns] .columnHeader > .cell { margin-left: var(--ct-space-3); }
   .rowList[data-columns] .columnHeader > :nth-child(2) { flex: 1; }
-  .rowList[data-columns] .columnHeader > :first-child { width: var(--row-leading-width, 0px); }
+  .rowList[data-columns] .columnHeader > :first-child { flex: none; width: var(--row-leading-width, 0px); }
+  .rowList[data-columns] .columnHeader > :last-child { flex: none; width: var(--row-actions-width, 0px); }
+  .rowList[data-columns] .listRowActions { box-sizing: border-box; width: var(--row-actions-width, auto); justify-content: flex-end; }
 }
 
 @media (max-width: 599.98px) {

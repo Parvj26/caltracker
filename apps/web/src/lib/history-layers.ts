@@ -678,6 +678,20 @@ export function addLeaveGuard(ask: () => Promise<boolean>, onNoHistory?: () => v
   };
 }
 
+/**
+ * For code that leaves the page (router.push) from a component that doesn't own the page's unsaved guard, such as a
+ * pop-up in the page header while the builder below has unsaved edits: asks "Discard changes?" when a guard is active
+ * and, on Discard, takes the guard off (like UnsavedGuard.confirm() then release()). True when it is fine to leave.
+ */
+export async function confirmLeavePage(): Promise<boolean> {
+  const active = [...guards].filter((g) => g.active && !g.bypassed);
+  if (active.length === 0) return true;
+  if (!(await active[0]!.ask())) return false;
+  for (const g of active) g.bypassed = true;
+  await Promise.all(active.map((g) => dropGuardEntry(g)));
+  return true;
+}
+
 function dropGuardEntry(g: Guard): Promise<void> {
   const entry = g.entry;
   g.entry = null;
