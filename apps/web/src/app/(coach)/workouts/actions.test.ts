@@ -156,28 +156,41 @@ describe('saveWorkout', () => {
   });
 });
 
-describe('deleteWorkout with onlyIfUnused (the Workouts list)', () => {
+describe('deleteWorkout', () => {
+  // Uses count only when the query asks for this workout in this workspace; any other filter finds nothing.
+  const forThis = (call: Call) => call.filters.workout_id === WORKOUT && call.filters.workspace_id === WS;
+  const usage = (call: Call) => calls.filter((c) => c.table === 'program_workouts' || c.table === 'client_invite_plan_items').includes(call);
+
   it('refuses a workout a program still uses, without deleting anything', async () => {
-    respond = (call) => (call.table === 'program_workouts' ? { data: [{ program_id: 'p1' }, { program_id: 'p1' }] } : { data: [], count: 0 });
-    expect(await deleteWorkout(WORKOUT, { onlyIfUnused: true })).toEqual({ ok: false, code: 'workout_in_use' });
+    respond = (call) =>
+      call.table === 'program_workouts' && forThis(call) ? { data: [{ program_id: 'p1' }, { program_id: 'p1' }] } : { data: [], count: 0 };
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_in_use' });
     expect(calls.some((c) => c.op === 'delete')).toBe(false);
   });
 
   it("refuses a workout in an open invite's starting plan", async () => {
-    respond = (call) => (call.table === 'client_invite_plan_items' ? { data: null, count: 1 } : { data: [] });
-    expect(await deleteWorkout(WORKOUT, { onlyIfUnused: true })).toEqual({ ok: false, code: 'workout_in_use' });
+    respond = (call) => (call.table === 'client_invite_plan_items' && forThis(call) ? { data: null, count: 1 } : { data: [], count: 0 });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_in_use' });
     expect(calls.some((c) => c.op === 'delete')).toBe(false);
+  });
+
+  it("checks both uses for this workout in the coach's own workspace", async () => {
+    respond = (call) => (call.op === 'delete' ? { data: [{ id: WORKOUT }] } : { data: [], count: 0 });
+    await deleteWorkout(WORKOUT);
+    const checks = calls.filter(usage);
+    expect(checks.map((c) => c.table).sort()).toEqual(['client_invite_plan_items', 'program_workouts']);
+    for (const c of checks) expect(c.filters).toEqual({ workout_id: WORKOUT, workspace_id: WS });
   });
 
   it('refuses when the check fails', async () => {
     respond = (call) => (call.table === 'program_workouts' ? { data: null, error: { message: 'boom' } } : { data: [] });
-    expect(await deleteWorkout(WORKOUT, { onlyIfUnused: true })).toEqual({ ok: false, code: 'workout_delete_failed' });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_delete_failed' });
     expect(calls.some((c) => c.op === 'delete')).toBe(false);
   });
 
   it("deletes an unused workout, only from this workspace's library", async () => {
     respond = (call) => (call.op === 'delete' ? { data: [{ id: WORKOUT }] } : { data: [], count: 0 });
-    expect(await deleteWorkout(WORKOUT, { onlyIfUnused: true })).toEqual({ ok: true });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: true });
     expect(calls.find((c) => c.op === 'delete')).toMatchObject({ table: 'workouts', filters: { id: WORKOUT, workspace_id: WS, client_id: null } });
   });
 });

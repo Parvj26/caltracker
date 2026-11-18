@@ -141,15 +141,33 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  min-width: 30px;
   height: 30px;
-  border-radius: 50%;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: var(--ct-radius-pill);
   background: var(--ct-lime);
   font-size: var(--ct-size-caption);
   font-weight: var(--ct-weight-button);
 }
 .summaryText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
 .summaryName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
+.previewBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.previewRun { display: flex; flex-direction: column; }
+.previewSection {
+  margin: 0;
+  padding: var(--ct-space-1) var(--ct-space-1) var(--ct-space-2);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-ink-muted);
+}
+/* A superset: one row with its label and its exercises (2a, 2b…) joined by a line on the left. */
+.supersetRow { flex-direction: column; align-items: stretch; gap: var(--ct-space-2); }
+.supersetRow > .summaryList { padding-left: var(--ct-space-2); border-left: var(--ct-border-width-secondary-button) solid var(--ct-lime); display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.supersetLabel { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
+.supersetPart { display: flex; align-items: center; gap: var(--ct-space-3); }
 
 /* ---------- Dialogs (Delete, Rename, Preview) ---------- */
 .dialog {

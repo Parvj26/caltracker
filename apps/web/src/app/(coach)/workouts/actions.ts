@@ -102,24 +102,18 @@ export async function duplicateWorkout(id: string): Promise<DuplicateOutcome> {
 }
 
 /**
- * Deletes a library workout. Program slots go with it (on delete cascade), and so do open invites' starting plans that
- * hold it. Clients' calendar copies are separate rows and stay (their source_workout_id is set to null), and so do
- * logs, except that Live Sync removes untouched upcoming copies from programs that have it on (the slots changed).
- * Library workouts only: a client's calendar copy is edited and deleted from that client's calendar.
- *
- * `onlyIfUnused` (the Workouts list's ⋯ menu): refuse with workout_in_use while any program or open invite plan still
- * uses it, so nothing but the library workout itself is removed. The workout page's Delete keeps the old behaviour (it
- * says how many programs use it and deletes it from them).
+ * Deletes a library workout, but only while no program and no open invite's starting plan uses it (workout_in_use
+ * otherwise), so deleting never takes program days or an invited client's plan with it. Clients' calendar copies are
+ * separate rows and stay (their source_workout_id is set to null), and so do their logs. Library workouts only: a
+ * client's calendar copy is edited and deleted from that client's calendar.
  */
-export async function deleteWorkout(id: string, options: { onlyIfUnused?: boolean } = {}): Promise<{ ok: true } | ActionFailure> {
+export async function deleteWorkout(id: string): Promise<{ ok: true } | ActionFailure> {
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return fail('workout_not_found', 'action:workouts.deleteWorkout');
   const supabase = await createServerSupabase();
-  if (options.onlyIfUnused) {
-    const uses = await workoutUses(supabase, workspaceId, id);
-    if (!uses) return fail('workout_delete_failed', 'action:workouts.deleteWorkout');
-    if (uses.programs > 0 || uses.invitePlans > 0) return fail('workout_in_use', 'action:workouts.deleteWorkout');
-  }
+  const uses = await workoutUses(supabase, workspaceId, id);
+  if (!uses) return fail('workout_delete_failed', 'action:workouts.deleteWorkout');
+  if (uses.programs > 0 || uses.invitePlans > 0) return fail('workout_in_use', 'action:workouts.deleteWorkout');
   const { data, error } = await supabase
     .from('workouts')
     .delete()
@@ -154,7 +148,7 @@ async function workoutUses(supabase: Supabase, workspaceId: string, id: string):
 
 export type WorkoutUses = { programs: number; invitePlans: number };
 
-/** What still uses a library workout, for the Workouts list's Delete… question. Throws when the lookup fails. */
+/** What still uses a library workout, for the Delete… question (Workouts list and workout page). Throws when the lookup fails. */
 export async function libraryWorkoutUses(id: string): Promise<WorkoutUses> {
   const { workspaceId } = await requireCoach();
   if (!UUID.test(id)) return { programs: 0, invitePlans: 0 };
@@ -221,21 +215,6 @@ export async function renameWorkout(id: string, name: unknown): Promise<SaveWork
   revalidatePath('/programs', 'layout');
   revalidatePath('/clients/[clientId]', 'layout');
   return { ok: true, id };
-}
-
-/** How many programs use this library workout (a program using it twice counts once). Client copies count 0. */
-export async function countProgramUses(id: string): Promise<number> {
-  const { workspaceId } = await requireCoach();
-  if (!UUID.test(id)) return 0;
-  const supabase = await createServerSupabase();
-  const { data, error } = await supabase
-    .from('program_workouts')
-    .select('program_id, workouts!inner(client_id)')
-    .eq('workout_id', id)
-    .eq('workspace_id', workspaceId)
-    .is('workouts.client_id', null);
-  if (error) throw new Error(`Could not count programs: ${error.message}`);
-  return new Set(data.map((r) => r.program_id)).size;
 }
 
 /** Set whether the signed-in coach has starred an exercise. Favourites are personal, not shared across the workspace. */

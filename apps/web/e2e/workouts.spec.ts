@@ -117,11 +117,11 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await expect(page.getByRole('link', { name })).toBeVisible();
   await page.getByRole('link', { name }).click();
 
-  // Delete warns about programs first.
+  // Delete asks first.
   await page.getByRole('button', { name: 'Delete workout' }).click();
-  const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
-  await expect(dialog.getByText("Used in 0 programs. Deleting removes it from them. Clients' calendars keep their copies.")).toBeVisible();
-  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  const dialog = page.getByRole('alertdialog', { name: `Delete “${name}”?` });
+  await expect(dialog).toContainText("It's removed from your library. Workouts already on clients' calendars and their logged history stay.");
+  await dialog.getByRole('button', { name: 'Delete workout' }).click();
   await expect(page).toHaveURL(/\/workouts$/);
   await expect(page.getByRole('link', { name })).toHaveCount(0);
 });

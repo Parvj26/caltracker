@@ -1,6 +1,6 @@
 'use client';
 
-import { workoutSummaryRows, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DialogHeader } from '@/components/assign/dialog-header';
@@ -141,6 +141,64 @@ function ActionSheet({ name, onDone }: { name: string; onDone: (next: Popup | 'd
   );
 }
 
+const LETTERS = 'abcdefghij';
+
+/**
+ * The Preview's exercises, as the builder groups them: under their section headings, one numbered row per block. A
+ * superset is one numbered row with its exercises as 2a, 2b…; a pick-one group is one row naming its options.
+ */
+function PreviewBlocks({ doc, units }: { doc: WorkoutDoc; units: Units }) {
+  return (
+    <div className={cx(styles.previewBody, sheet.grow)} role="group" aria-label="Exercises">
+      {sectionRuns(doc.blocks, doc.sections).map((run) => (
+        <div key={run.blockIndexes[0]} className={styles.previewRun} role={run.section ? 'group' : undefined} aria-label={run.section?.name}>
+          {run.section ? <h3 className={styles.previewSection}>{run.section.name}</h3> : null}
+          <ol className={styles.summaryList}>
+            {run.blockIndexes.map((bi) => {
+              const block = doc.blocks[bi]!;
+              const n = bi + 1;
+              const [first] = block.exercises;
+              if (block.kind === 'superset') {
+                return (
+                  <li key={block.id} className={cx(styles.summaryRow, styles.supersetRow)}>
+                    <span className={styles.supersetLabel}>Superset</span>
+                    <ol className={styles.summaryList}>
+                      {block.exercises.map((e, i) => (
+                        <li key={e.id} className={styles.supersetPart}>
+                          <span className={styles.summaryNumber} aria-hidden="true">
+                            {`${n}${LETTERS[i] ?? ''}`}
+                          </span>
+                          <span className={styles.summaryText}>
+                            <span className={styles.summaryName}>{e.exerciseName}</span>
+                            <span className={styles.caption}>{exerciseSummaryLine(e, units)}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </li>
+                );
+              }
+              return (
+                <li key={block.id} className={styles.summaryRow}>
+                  <span className={styles.summaryNumber} aria-hidden="true">
+                    {n}
+                  </span>
+                  <span className={styles.summaryText}>
+                    <span className={styles.summaryName}>
+                      {block.kind === 'choice' ? `Pick one: ${block.exercises.map((e) => e.exerciseName).join(' or ')}` : first?.exerciseName}
+                    </span>
+                    {first ? <span className={styles.caption}>{exerciseSummaryLine(first, units)}</span> : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Read-only: the workout's exercises, one line each with their sets, and its notes. Edit workout opens the builder. */
 function PreviewDialog({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
   const ref = useModal();
@@ -162,34 +220,20 @@ function PreviewDialog({ id, name, onClose }: { id: string; name: string; onClos
       live = false;
     };
   }, [id]);
-  const rows = loaded ? workoutSummaryRows(loaded.doc, loaded.units) : [];
+  const total = loaded ? countExercises(loaded.doc.blocks.map((b) => ({ kind: b.kind, exercises: b.exercises.length }))) : 0;
 
   return (
     <dialog ref={ref} className={cx(styles.dialog, styles.preview, sheet.sheet)} aria-labelledby={titleId} onClose={onClose}>
       <DialogHeader
         titleId={titleId}
         title={loaded?.doc.name ?? name}
-        subtitle={loaded ? count(rows.length, 'exercise', 'exercises') : null}
+        subtitle={loaded ? count(total, 'exercise', 'exercises') : null}
         onClose={() => ref.current?.close()}
       />
       {failed ? <ErrorText code="workout_load_failed" /> : null}
       {!loaded && !failed ? <p className={styles.caption}>Loading…</p> : null}
       {loaded?.doc.notes ? <p className={styles.notesBox}>{loaded.doc.notes}</p> : null}
-      {loaded ? (
-        <ol className={cx(styles.summaryList, sheet.grow)} aria-label="Exercises">
-          {rows.map((r, i) => (
-            <li key={r.key} className={styles.summaryRow}>
-              <span className={styles.summaryNumber} aria-hidden="true">
-                {i + 1}
-              </span>
-              <span className={styles.summaryText}>
-                <span className={styles.summaryName}>{r.name}</span>
-                <span className={styles.caption}>{r.line}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
+      {loaded ? <PreviewBlocks doc={loaded.doc} units={loaded.units} /> : null}
       <div className={cx(styles.dialogActions, sheet.actions)}>
         <Button variant="secondary" onClick={() => ref.current?.close()}>
           Close
@@ -274,10 +318,10 @@ function usesText(uses: WorkoutUses): string {
 }
 
 /**
- * Delete…: asks first. A workout still used in a program or an open invite's starting plan can't be deleted from here
- * (that would empty those days); the window says where it is used instead.
+ * Delete…: asks first. A workout still used in a program or an open invite's starting plan can't be deleted (that
+ * would empty those days); the window says where it is used instead. Used by the Workouts list and the workout page.
  */
-function DeleteDialog({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
+export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
   const ref = useModal();
   const titleId = useId();
   const bodyId = useId();
@@ -303,10 +347,11 @@ function DeleteDialog({ id, name, onClose }: { id: string; name: string; onClose
     setError(null);
     startTransition(async () => {
       try {
-        const outcome = await deleteWorkout(id, { onlyIfUnused: true });
+        const outcome = await deleteWorkout(id);
         if (outcome.ok) {
           markUndone('workout', id);
           ref.current?.close();
+          onDeleted?.();
         } else setError(outcome.code);
       } catch {
         setError('workout_delete_failed');
