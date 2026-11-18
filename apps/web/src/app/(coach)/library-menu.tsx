@@ -15,9 +15,9 @@ const PHONE_QUERY = '(max-width: 599.98px)';
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const SECTIONS = [
-  { href: '/workouts', letter: 'W', name: 'Workouts', sub: 'Single sessions you build and assign', phoneSub: 'Single sessions' },
-  { href: '/exercises', letter: 'E', name: 'Exercise library', sub: 'Built-in and your own exercises', phoneSub: 'Built-in and your own' },
-  { href: '/programs', letter: 'P', name: 'Programs', sub: 'Weeks of workouts on a schedule', phoneSub: 'Weeks on a schedule' },
+  { href: '/workouts', letter: 'W', name: 'Workouts', sub: 'Single sessions' },
+  { href: '/exercises', letter: 'E', name: 'Exercise library', sub: 'Built-in and your own' },
+  { href: '/programs', letter: 'P', name: 'Programs', sub: 'Weeks on a schedule' },
 ] as const;
 
 /**
@@ -63,7 +63,8 @@ function usePanel(open: boolean, close: (refocus: boolean) => void, trigger: Ref
   }, [open, close, trigger, panel]);
 }
 
-function Choices({ phone, onPick }: { phone: boolean; onPick: () => void }) {
+/** The three choices. The sidebar pop-up is the compact list; the iPhone sheet has big buttons. Both use the short lines. */
+function Choices({ onPick }: { onPick: () => void }) {
   const pathname = usePathname();
   return (
     <ul className={styles.choices}>
@@ -86,10 +87,12 @@ function Choices({ phone, onPick }: { phone: boolean; onPick: () => void }) {
                   {s.name}
                 </span>
                 <span className={styles.choiceSub} data-ph-safe="">
-                  {phone ? s.phoneSub : s.sub}
+                  {s.sub}
                 </span>
               </span>
-              <ChevronIcon direction="right" />
+              <span className={styles.chevron}>
+                <ChevronIcon direction="right" />
+              </span>
             </Link>
           </li>
         );
@@ -164,10 +167,7 @@ export function LibraryNavItem({ className }: { className?: string | undefined }
         <>
           <div className={styles.backdrop} aria-hidden="true" />
           <div ref={panelRef} role="dialog" aria-label="Library" className={styles.popover} style={place} data-library-menu="">
-            <p className={styles.heading} aria-hidden="true">
-              Library
-            </p>
-            <Choices phone={false} onPick={() => close(false)} />
+            <Choices onPick={() => close(false)} />
           </div>
         </>
       ) : null}
@@ -203,7 +203,7 @@ export function LibrarySheet({ open, close, trigger }: { open: boolean; close: (
         <button type="button" className={coach.srClose} onClick={() => close(true)}>
           Close library
         </button>
-        <Choices phone onPick={() => close(false)} />
+        <Choices onPick={() => close(false)} />
       </div>
     </>
   );

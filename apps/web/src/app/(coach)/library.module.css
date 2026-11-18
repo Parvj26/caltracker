@@ -9,60 +9,46 @@
 .popover {
   position: fixed;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ct-space-3);
-  width: min(420px, calc(100vw - 100px));
+  width: min(260px, calc(100vw - 100px));
   box-sizing: border-box;
-  padding: var(--ct-space-4-5);
-  border: var(--ct-border-width-card) solid var(--ct-ink);
-  border-radius: 24px;
+  padding: var(--ct-space-2);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-ink);
+  border-radius: 16px;
   background: var(--ct-bg);
-  box-shadow: 0 16px 40px color-mix(in srgb, var(--ct-ink) 18%, transparent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ct-ink) 16%, transparent);
   color: var(--ct-ink);
 }
-.heading {
-  margin: 0;
-  padding: 0 var(--ct-space-1) var(--ct-space-1);
-  font-size: 13px;
-  font-weight: var(--ct-weight-button);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ct-ink-muted);
-}
 
-.choices { display: flex; flex-direction: column; gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; }
+/* The sidebar pop-up: a compact list, one 52 px row per choice, lit on hover and on the page you are on. */
+.choices { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .choice {
   display: flex;
   align-items: center;
-  gap: var(--ct-space-3-5);
-  min-height: 84px;
-  padding: var(--ct-space-2) var(--ct-space-4);
-  border: var(--ct-border-width-secondary-button) solid var(--ct-border);
-  border-radius: 18px;
-  background: var(--ct-surface);
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 10px;
+  border-radius: 10px;
   color: var(--ct-ink);
   text-decoration: none;
 }
-.choice:hover { border-color: var(--ct-ink); }
-.choice:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
-.choice[aria-current='page'] { border-color: var(--ct-ink); }
-.choice svg { flex: none; }
+.choice:hover, .choice[aria-current='page'] { background: var(--ct-surface); }
+.choice:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+.chevron { display: none; }
 .letter {
   display: grid;
   flex: none;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 30px;
+  height: 30px;
   border: var(--ct-border-width-secondary-button) solid var(--ct-ink);
-  border-radius: 14px;
+  border-radius: 9px;
   background: var(--ct-lime);
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 800;
 }
-.choiceText { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
-.choiceName { font-size: 20px; font-weight: 800; }
-.choiceSub { font-size: 14px; color: var(--ct-ink-muted); }
+.choiceText { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.choiceName { font-size: 15px; font-weight: 800; }
+.choiceSub { font-size: 12px; color: var(--ct-ink-muted); }
 
 /* iPhone: the same choices as a bottom sheet just above the tab bar (like the More sheet). */
 .sheet {
@@ -90,9 +76,22 @@
   border-radius: var(--ct-radius-pill);
   background: color-mix(in srgb, var(--ct-ink) 20%, transparent);
 }
+/* The sheet keeps its big bordered buttons. */
 .sheet .choices { gap: var(--ct-space-2-5); }
-.sheet .choice { gap: var(--ct-space-3-5); min-height: 76px; padding: var(--ct-space-2) var(--ct-space-4); }
+.sheet .choice {
+  gap: var(--ct-space-3-5);
+  min-height: 76px;
+  padding: var(--ct-space-2) var(--ct-space-4);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border);
+  border-radius: 18px;
+  background: var(--ct-surface);
+}
+.sheet .choice:hover, .sheet .choice[aria-current='page'] { border-color: var(--ct-ink); }
+.sheet .choice:focus-visible { outline-offset: 2px; }
+.sheet .chevron { display: contents; }
+.sheet .choice svg { flex: none; }
 .sheet .letter { width: 44px; height: 44px; border-radius: var(--ct-radius-input); font-size: 18px; }
+.sheet .choiceText { gap: 3px; }
 .sheet .choiceName { font-size: 18px; }
 .sheet .choiceSub { font-size: 13px; }
 
