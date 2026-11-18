@@ -28,7 +28,7 @@
 .panel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 
-/* Filter chips: ink with a lime label and a cross when on. */
+/* Filter chips: ink with a white label and a cross when on. */
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
 .filterGap { width: var(--ct-space-2); }
 .filter {
@@ -43,10 +43,12 @@
   cursor: pointer;
 }
 .filter:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.filter[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-lime); }
+.filter[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); }
 
-/* Room for one row of picks before the first is ticked (each chip is 44 px tall). */
-.pickedSlot { flex: none; min-height: var(--ct-tap-min); }
+/* The picks row. Empty, it takes no room (out of the flow, so no gap either) and the list starts right under the
+   filters (B#9); it stays mounted so screen readers still hear each pick. */
+.pickedSlot { flex: none; }
+.pickedSlot:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .picked { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 .picked li {
   display: inline-flex;
@@ -54,7 +56,8 @@
   gap: var(--ct-space-1);
   padding-left: var(--ct-space-3);
   border-radius: var(--ct-radius-pill);
-  background: var(--ct-lime);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
   font-weight: var(--ct-weight-section-heading);
 }
 .pickedRemove {
@@ -76,7 +79,9 @@
 .list { margin: 0; padding: 0; list-style: none; }
 .rowWrap { display: flex; align-items: center; border-radius: var(--ct-radius-input); }
 .rowWrap:hover { background: var(--ct-surface); }
-.rowWrap[data-active] { background: var(--ct-lime); }
+/* The row shown in the preview pane: a quiet grey fill and outline, so it never looks picked (B#8). The tick box
+   alone says what is picked. */
+.rowWrap[data-active] { background: var(--ct-surface); box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-border-strong); }
 .row {
   display: flex;
   flex: 1;

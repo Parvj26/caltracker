@@ -297,8 +297,7 @@ export function SearchPanel({
       ) : null}
       <FilterChips filters={filters} onChange={changeFilters} />
       {many ? (
-        // Always mounted, so screen readers hear each pick as it is added. It keeps one chip row's height even when
-        // empty, so the first tick doesn't push the list down under the coach's finger.
+        // Always mounted, so screen readers hear each pick as it is added. Empty, it takes no room (CSS).
         <div aria-live="polite" className={styles.pickedSlot}>
           {selected.length > 0 ? (
             <ol className={styles.picked} aria-label="Picked, in the order they're done">
