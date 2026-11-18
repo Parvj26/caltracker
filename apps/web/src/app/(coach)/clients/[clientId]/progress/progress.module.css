@@ -17,8 +17,8 @@
   font-weight: var(--ct-weight-button);
   cursor: pointer;
 }
-/* Text on a pastel fill is always ink. */
-.range[aria-pressed='true'] { background: var(--ct-lime); box-shadow: none; }
+/* Picked filter chip: ink fill, white text (UI rules §2.4). */
+.range[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); box-shadow: none; }
 /* Touch screens: every range is at least 44 px wide ("All" was 43 px) with 8 px between them. */
 @media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
   .ranges { flex-wrap: wrap; gap: var(--ct-space-2); }
@@ -38,7 +38,7 @@
 .axis { stroke: var(--ct-border); stroke-width: 1; }
 .line { fill: none; stroke: var(--ct-ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .dot { fill: var(--ct-bg); stroke: var(--ct-ink); stroke-width: 2; cursor: pointer; }
-.dot:hover, .dot:focus-visible, .dotActive { fill: var(--ct-lime); }
+.dot:hover, .dot:focus-visible, .dotActive { fill: var(--ct-ink); }
 .note { margin: 0; color: var(--ct-ink-muted); }
 
 .tableWrap { overflow-x: auto; }

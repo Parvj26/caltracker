@@ -64,7 +64,7 @@ for (const size of SIZES) {
       await expect(page).toHaveURL(/\/clients\?filter=nothing_planned&sort=name$/);
 
       // Into the client, through three tabs, then one Back: the list, as it was.
-      await page.getByRole('link', { name: client.name, exact: true }).click();
+      await page.getByRole('link', { name: new RegExp(`^${client.name}`) }).click();
       await expect(page).toHaveURL(new RegExp(`/clients/${client.id}$`));
       const tabs = page.getByRole('navigation', { name: 'Client sections' });
       await tabs.getByRole('link', { name: 'Training' }).click();
@@ -82,7 +82,7 @@ for (const size of SIZES) {
       await expect(sortSelect(page)).toHaveValue('name');
 
       // Back to Clients steps back to the list (same filter), and Back from there leaves Clients: no loop.
-      await page.getByRole('link', { name: client.name, exact: true }).click();
+      await page.getByRole('link', { name: new RegExp(`^${client.name}`) }).click();
       await expect(page).toHaveURL(new RegExp(`/clients/${client.id}$`));
       await page.getByRole('link', { name: 'Back to Clients' }).click();
       await expect(page).toHaveURL(/\/clients\?filter=nothing_planned&sort=name$/);
@@ -200,7 +200,7 @@ test('without the Navigation API (iOS before 26), ‹ Clients and ← calendar s
   await page.goto('/clients');
   await page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Nothing planned/ }).click();
   await expect(page).toHaveURL(/\/clients\?filter=nothing_planned$/);
-  await page.getByRole('link', { name: client.name, exact: true }).click();
+  await page.getByRole('link', { name: new RegExp(`^${client.name}`) }).click();
   await page.getByRole('link', { name: 'Back to Clients' }).click();
   await expect(page).toHaveURL(/\/clients\?filter=nothing_planned$/);
 

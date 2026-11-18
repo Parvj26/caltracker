@@ -57,7 +57,7 @@ import {
   type WorkoutDoc,
   type WorkoutLogDoc,
 } from '@caltracker/shared';
-import { Button, Card, ErrorText } from '@/components/ui';
+import { Button, Card, ErrorText, PhoneActionBar } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureMessage } from '@/lib/action-errors';
 import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
@@ -197,7 +197,9 @@ function ExerciseTable({
   lastTime,
   progression,
   edit,
+  nameHidden = false,
 }: {
+  nameHidden?: boolean;
   exercise: LogExerciseDoc;
   letter: string | null;
   units: Units;
@@ -218,7 +220,7 @@ function ExerciseTable({
   return (
     <section className={styles.exercise} aria-label={exercise.exerciseName}>
       <header className={styles.exerciseHead}>
-        <h3 className={styles.exerciseName}>{name}</h3>
+        <h3 className={nameHidden ? styles.srOnly : styles.exerciseName}>{name}</h3>
         {plan ? <p className={styles.caption}>Coach: {plan}</p> : null}
         <p className={styles.caption}>{last ?? 'Last time: first time'}</p>
         {suggestion ? (
@@ -227,6 +229,7 @@ function ExerciseTable({
           </p>
         ) : null}
       </header>
+      <p className={styles.caption}>The numbers are pre-filled; ✓ saves them as they are.</p>
       <table className={styles.table}>
         <thead>
           <tr>
@@ -374,6 +377,8 @@ function BlockPage({
           lastTime={lastTimes[exercise.exerciseId] ?? []}
           progression={progression}
           edit={edit}
+          // One exercise on its own page: the page title already names it.
+          nameHidden={block.kind === 'straight' && block.exercises.length === 1}
         />
       ))}
     </div>
@@ -453,6 +458,10 @@ export function SessionLogger({
   const savedRevision = useRef(initialLog?.revision ?? 0);
   // The server's copy as last saved (or loaded): what this page's kept copy on the device grew from.
   const savedDoc = useRef<WorkoutLogDoc | null>(initialLog);
+  // The copy Start session is sending. Until the server confirms it, it is the base edits are kept on the device
+  // against: the session already exists on the server by then, and a set typed in that moment must not be lost if the
+  // page closes before the reply arrives.
+  const startedDoc = useRef<WorkoutLogDoc | null>(null);
   // A kept copy taken whole added or removed sets (or made a pick): a refused save can only redo its numbers.
   const shapeUnsaved = useRef(false);
   // This device's kept copies of the session (from tabs closed or left mid-save), read once as the page opens,
@@ -467,8 +476,8 @@ export function SessionLogger({
   const keepOnDevice = useCallback(
     (doc: WorkoutLogDoc | null) => {
       if (!doc) return;
-      const base = savedDoc.current;
-      if (doc.status === 'in_progress' && base && base.id === doc.id && doc.revision > savedRevision.current) {
+      const base = savedDoc.current ?? startedDoc.current;
+      if (doc.status === 'in_progress' && base && base.id === doc.id && doc.revision > Math.max(savedRevision.current, base.revision)) {
         writeDraft({ userId: coachId, tabId: tabId(), savedAt: Date.now(), base, doc });
       } else {
         removeDraftKey(draftKey(doc.id, tabId()));
@@ -713,6 +722,7 @@ export function SessionLogger({
     // The server needs revision 1 or more; this is the session's first version.
     const doc = { ...startLogFromWorkout(workout, uuid, nowIso()), revision: 1 };
     logRef.current = doc;
+    startedDoc.current = doc;
     unsaved.current = [];
     setLog(doc);
     setPage(0);
@@ -955,15 +965,7 @@ export function SessionLogger({
             onBlur={() => edit((l) => setLogNotes(l, notes, nowIso()))}
           />
         </label>
-        <div className={styles.footerActions}>
-          <Button className={styles.footerButton} onClick={requestFinish} pending={finishing}>
-            {finishing ? 'Finishing…' : 'Finish session'}
-          </Button>
-          <Button variant="secondary" className={cx(styles.footerButton, styles.ledgeButton)} onClick={() => void handBack()} pending={handingBack}>
-            Hand back to {client.firstName || 'client'}
-          </Button>
-        </div>
-        {/* Kept apart from Finish and Hand back, at the very bottom, so it is never tapped by mistake. */}
+        {/* Kept apart from Finish and Hand back (in the bar below), so it is never tapped by mistake. */}
         <div className={styles.cancelZone}>
           <button type="button" className={styles.cancelButton} onClick={() => setSheet('discard')}>
             Cancel session…
@@ -971,6 +973,39 @@ export function SessionLogger({
           <span className={styles.caption}>Deletes everything logged in this session</span>
         </div>
       </fieldset>
+      {/* Finish is always in reach: a bar at the bottom of the screen on a phone, a footer that sticks to the bottom
+          of the window on iPad and desktop (UI rules §8). */}
+      <PhoneActionBar label="Session actions" status={`${done} of ${total} ${total === 1 ? 'set' : 'sets'} done`} className={styles.sessionBar}>
+        <Button
+          variant="secondary"
+          className={styles.barButton}
+          onClick={() => void handBack()}
+          pending={handingBack}
+          disabled={locked || finishing}
+          // The full words for screen readers, also on a phone where only "Hand back" shows.
+          aria-label={handingBack ? undefined : `Hand back to ${client.firstName || 'client'}`}
+        >
+          <span className={styles.barNarrow}>Hand back</span>
+          <span className={styles.barWide}>Hand back to {client.firstName || 'client'}</span>
+        </Button>
+        <Button
+          variant="finish"
+          className={styles.barButton}
+          onClick={requestFinish}
+          pending={finishing}
+          disabled={locked || handingBack}
+          aria-label={finishing ? undefined : 'Finish session'}
+        >
+          {finishing ? (
+            'Finishing…'
+          ) : (
+            <>
+              <span className={styles.barNarrow}>Finish</span>
+              <span className={styles.barWide}>Finish session</span>
+            </>
+          )}
+        </Button>
+      </PhoneActionBar>
       {sheet === 'unticked' ? (
         <UntickedSheet
           {...untickedSets(log)}

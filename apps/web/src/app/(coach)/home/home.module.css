@@ -79,13 +79,17 @@
 .liveWho { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
 .liveSub { font-size: var(--ct-size-caption); color: color-mix(in srgb, var(--ct-bg) 70%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .liveTrack { display: block; height: 6px; border-radius: var(--ct-radius-pill); background: color-mix(in srgb, var(--ct-bg) 20%, transparent); overflow: hidden; }
-.liveFill { display: block; height: 100%; border-radius: var(--ct-radius-pill); background: var(--ct-lime); }
+.liveFill { display: block; height: 100%; border-radius: var(--ct-radius-pill); background: var(--ct-bg); }
 .liveFoot { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
 
 /* ---------- Today | Needs attention: side by side when wide, stacked on iPad portrait and narrower ---------- */
-.columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--ct-space-6); align-items: start; }
-@media (max-width: 1099.98px) {
+.columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--ct-space-6); align-items: start; container-type: inline-size; }
+@media (max-width: 999.98px) {
   .columns { grid-template-columns: minmax(0, 1fr); }
+}
+.columnsQuiet { grid-template-columns: minmax(0, 1fr); gap: var(--ct-space-4); }
+@container (min-width: 700px) {
+  .columnsQuiet .attentionList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .todayList {
@@ -103,7 +107,7 @@
 .pill { flex: none; padding: 3px var(--ct-space-2-5); border-radius: var(--ct-radius-pill); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); white-space: nowrap; }
 .pill-idle { background: var(--ct-surface); }
 .pill-live { background: var(--ct-drop); color: var(--ct-magenta-deep); }
-.pill-done { background: var(--ct-lime); }
+.pill-done { background: var(--ct-drop); }
 
 .action {
   flex: none;

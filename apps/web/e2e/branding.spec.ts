@@ -100,7 +100,7 @@ async function signInAsDemoCoach(page: Page) {
   await page.goto('/clients');
 }
 
-test('coach shell: sidebar nav marks Clients as the current page and the page uses token card borders', async ({ page }) => {
+test('coach shell: sidebar nav marks Clients as the current page and the list uses token dividers', async ({ page }) => {
   await signInAsDemoCoach(page);
   const nav = page.getByRole('navigation', { name: 'Main' });
   await expect(nav.getByRole('link', { name: 'Clients' })).toBeVisible();
@@ -122,10 +122,10 @@ test('coach shell: sidebar nav marks Clients as the current page and the page us
     probe.remove();
     return [...document.querySelectorAll('main *')].filter((el) => {
       const s = getComputedStyle(el);
-      return s.borderTopStyle === 'solid' && s.borderTopWidth === '2px' && s.borderTopColor === tokenRgb;
+      return s.borderBottomStyle === 'solid' && s.borderBottomColor === tokenRgb;
     }).length;
   });
-  // The Clients table is the page's card (Past clients adds another when there are any).
+  // The Clients list is plain rows with token dividers (no box around it, UI rules §7).
   expect(cardBorders).toBeGreaterThanOrEqual(1);
 });
 
@@ -171,8 +171,8 @@ test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({
 
 test('clients page: clients show round initials avatars', async ({ page }) => {
   await signInAsDemoCoach(page);
-  const clients = page.getByRole('table', { name: 'Clients', exact: true });
-  const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
+  const clients = page.getByRole('list', { name: 'Clients', exact: true });
+  const demo = clients.getByRole('listitem').filter({ hasText: 'Demo Client' });
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
   // "+ Invite client" sits in the page header, above the list, so it is always in view on a laptop.

@@ -149,6 +149,36 @@ const firstSets = async (logId: string) =>
 test.describe('kept copies on the device', () => {
   test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true });
 
+  test('a weight typed while Start session is still on its way is kept, even if the page closes before the reply', async ({ page }) => {
+    await signInAsCoach(page);
+    const client = await newClient('Slowstart');
+    const today = await browserToday(page);
+    const workoutId = await seedSectionedWorkout(admin, { workspaceId, clientId: client, name: `Navb ${unique()}`, scheduledOn: today, sections: [], blocks: [{ exercises: ['Barbell Squat'] }] });
+    created.workouts.push(workoutId);
+    const url = `/clients/${client}/log/${workoutId}`;
+    await page.goto(url);
+    // The start reaches the server (the session exists there), but its reply never comes back to this page, and the
+    // save of the typed weight is lost too.
+    let reopened = false;
+    let first = true;
+    await page.route('**/*', async (route) => {
+      if (reopened || route.request().method() !== 'POST') return route.continue();
+      if (!first) return route.abort();
+      first = false;
+      await route.fetch();
+      await new Promise(() => {}); // held: the reply is never delivered
+    });
+    await page.getByRole('button', { name: 'Start session' }).click();
+    await expect.poll(async () => (await admin.from('workout_logs').select('status').eq('workout_id', workoutId).maybeSingle()).data?.status).toBe('in_progress');
+    await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('61');
+    // The page closes (a reload) before the start's reply ever arrives; opened again, the weight comes back and is saved.
+    reopened = true;
+    await page.goto(url);
+    await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('61');
+    const log = await admin.from('workout_logs').select('id').eq('workout_id', workoutId).single();
+    await expect.poll(() => firstWeight(log.data!.id), { timeout: 10_000 }).toBe(61);
+  });
+
   test('two tabs: a lost save from one tab and newer sets saved from another are both kept', async ({ page, context }) => {
     const s = await startedSession(page, 'Twotabs');
     const url = `/clients/${s.client}/log/${s.workoutId}`;

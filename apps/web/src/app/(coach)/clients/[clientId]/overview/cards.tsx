@@ -40,11 +40,12 @@ function Tracked({ label, count }: { label: string; count: TrackedCount }) {
   return (
     <div className={styles.stat}>
       <dt>{label}</dt>
+      {/* The notes sit inside the <dd>, so the list holds only dt/dd pairs. */}
       <dd>
         {count.tracked}/{count.planned}
+        <span className={styles.statNote}>tracked</span>
+        {count.added > 0 ? <span className={styles.statNote}>+{count.added} added by the client</span> : null}
       </dd>
-      <span className={styles.statNote}>tracked</span>
-      {count.added > 0 ? <span className={styles.statNote}>+{count.added} added by the client</span> : null}
     </div>
   );
 }
@@ -62,8 +63,10 @@ export function TrainingCard({ data, today }: { data: ClientOverview; today: Iso
         <Tracked label="Last 30 days" count={s.last30} />
         <div className={styles.stat}>
           <dt>Next week</dt>
-          <dd>{s.nextWeek > 0 ? s.nextWeek : 'Not assigned yet'}</dd>
-          {s.nextWeek > 0 ? <span className={styles.statNote}>planned</span> : null}
+          <dd>
+            {s.nextWeek > 0 ? s.nextWeek : 'Not assigned yet'}
+            {s.nextWeek > 0 ? <span className={styles.statNote}>planned</span> : null}
+          </dd>
         </div>
       </dl>
     </Card>

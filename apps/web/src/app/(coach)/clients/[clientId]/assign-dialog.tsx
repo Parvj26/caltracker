@@ -14,17 +14,13 @@ import {
 import type { ErrorCode, IsoDate } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { ReloadButton } from '@/components/reload-button';
-import { DialogHeader } from '@/components/assign/dialog-header';
 import { QuickDayPicker, type QuickDayPickerHandle } from '@/components/assign/quick-day-picker';
-import { Button, ButtonLink, ErrorText } from '@/components/ui';
-import { cx } from '@/components/ui/cx';
-import sheet from '@/components/ui/sheet.module.css';
+import { AdaptiveDialog, Button, ButtonLink, ErrorText, type AdaptiveDialogHandle } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
-import { openLayer } from '@/lib/open-layer';
 
 export type ExistingWorkout = { date: IsoDate; name: string };
 
@@ -110,8 +106,7 @@ export function AssignDialog({
   onClose: () => void;
 }) {
   const completeAssign = useAnalyticsTask('assign_program');
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const [programId, setProgramId] = useState(
     () => programs.find((p) => p.id === defaultProgramId)?.id ?? programs[0]?.id ?? '',
   );
@@ -120,15 +115,6 @@ export function AssignDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<ErrorCode | null>(null);
   const busy = useRef(false);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) openLayer(dialog, { noKeyboardOnTouch: true });
-    return () => {
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
 
   const program = programs.find((p) => p.id === programId) ?? null;
   const validStart = IsoDateSchema.safeParse(startDate).success;
@@ -150,6 +136,8 @@ export function AssignDialog({
       const outcome = await assignProgram({ assignmentId, programId: program.id, clientId, startDate, today });
       if (outcome.ok) {
         completeAssign();
+        // Close first (its step of history goes with it), then report.
+        await dialogRef.current?.close();
         onAssigned(program.name, outcome.count);
         return;
       }
@@ -163,24 +151,37 @@ export function AssignDialog({
     }
   }
 
+  const cancel = () => dialogRef.current?.requestClose();
   return (
-    <dialog
+    <AdaptiveDialog
       ref={dialogRef}
-      // On a phone it fills the screen, with the buttons stuck to the bottom.
-      className={cx(styles.dialog, sheet.sheet)}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      historyId="assign-program"
+      title="Assign a program"
+      titleSafe
       onClose={onClose}
+      busy={pending}
+      noKeyboardOnTouch
+      fullScreenOnPhone
+      // The buttons stay pinned under the scrolling body on every size (the Assign button was cut off on iPad).
+      footer={
+        <>
+          {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
+          <Button variant="secondary" onClick={cancel} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
+            Cancel
+          </Button>
+          {clashes.length > 0 ? (
+            <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
+              Pick another date
+            </Button>
+          ) : null}
+          {programs.length > 0 ? (
+            <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null} data-ph-capture-attribute-label="assign_save" data-ph-safe="">
+              {pending ? 'Assigning…' : clashes.length > 0 ? 'Add alongside' : 'Assign'}
+            </Button>
+          ) : null}
+        </>
+      }
     >
-      <DialogHeader
-        titleId={titleId}
-        title="Assign a program"
-        titleSafe
-        onClose={() => dialogRef.current?.close()}
-        disabled={pending}
-      />
       {programs.length === 0 ? (
         <>
           <p className={styles.dialogBody}>
@@ -190,7 +191,13 @@ export function AssignDialog({
           <div className={styles.emptyActions}>
             <ButtonLink href="/programs/new">Build a program</ButtonLink>
             {onAddWorkout ? (
-              <Button variant="secondary" onClick={onAddWorkout}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  // No dialog opens another: this one closes first.
+                  void dialogRef.current?.close().then(onAddWorkout);
+                }}
+              >
                 Add a single workout
               </Button>
             ) : null}
@@ -251,22 +258,6 @@ export function AssignDialog({
         </>
       )}
       {error ? <ErrorText code={error} /> : null}
-      <div className={cx(styles.dialogActions, sheet.actions)}>
-        {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
-          Cancel
-        </Button>
-        {clashes.length > 0 ? (
-          <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
-            Pick another date
-          </Button>
-        ) : null}
-        {programs.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={!program || startError !== null} data-ph-capture-attribute-label="assign_save" data-ph-safe="">
-            {pending ? 'Assigning…' : clashes.length > 0 ? 'Add alongside' : 'Assign'}
-          </Button>
-        ) : null}
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

@@ -87,13 +87,13 @@
 .exerciseHead { display: flex; flex-direction: column; gap: var(--ct-space-1); }
 .exerciseName { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 
-.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table { width: 100%; max-width: 560px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .table th, .table td { padding: var(--ct-space-1) var(--ct-space-2); text-align: left; }
 .table thead th { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .table tbody tr { border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .table tbody th { width: 3rem; font-weight: var(--ct-weight-section-heading); }
 .table td:last-child, .table th:last-child { width: 4rem; text-align: right; }
-.doneRow { background: color-mix(in srgb, var(--ct-lime) 18%, transparent); }
+.doneRow { background: color-mix(in srgb, var(--ct-drop) 60%, transparent); }
 
 .cell {
   width: 100%;
@@ -108,7 +108,8 @@
   font: inherit;
   font-size: var(--ct-size-section-heading);
 }
-.cell::placeholder { color: var(--ct-ink-muted); }
+/* The pre-filled number is what ✓ saves, so it reads as a value (ink), not a hint. */
+.cell::placeholder { color: var(--ct-ink); opacity: 1; }
 .cell[aria-invalid='true'] { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-magenta-deep); }
 .cell:focus-visible { outline: var(--ct-border-width-secondary-button) solid var(--ct-ink); outline-offset: 2px; }
 
@@ -124,7 +125,7 @@
   font-size: var(--ct-size-section-heading);
   cursor: pointer;
 }
-.tickDone { background: var(--ct-lime); color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.tickDone { background: var(--ct-ink); color: var(--ct-bg); box-shadow: none; }
 
 .rowActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
 .noteLabel { display: flex; flex-direction: column; gap: var(--ct-space-1); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }
@@ -235,3 +236,13 @@
   }
   .grab { display: block; align-self: center; width: 40px; height: 5px; border-radius: var(--ct-radius-pill); background: var(--ct-border); }
 }
+
+/* The Finish / Hand back bar (PhoneActionBar). On a phone the buttons say just "Finish" / "Hand back". */
+.sessionBar .barButton { min-height: var(--ct-button-min-height); white-space: nowrap; }
+.barNarrow { display: none; }
+@media (max-width: 599.98px) {
+  .barWide { display: none; }
+  .barNarrow { display: inline; }
+}
+/* While typing (the on-screen keyboard is up), the bar steps away so Finish is never under the thumb. */
+.sessionBar[data-keyboard] { display: none; }

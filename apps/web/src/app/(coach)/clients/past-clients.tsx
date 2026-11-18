@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { Button, ListRow } from '@/components/ui';
+import { useResendInvite } from './resend-button';
+import { StatusChip } from './status-chip';
 import { cx } from '@/components/ui/cx';
 import styles from './clients.module.css';
 
@@ -25,5 +28,49 @@ export function PastClients({ count, children }: { count: number; children: Reac
         {children}
       </div>
     </section>
+  );
+}
+
+/** A removed client: the whole row opens their (read-only) page; Re-invite on the row, its result in the meta line. */
+export function PastClientRow({
+  id,
+  name,
+  email,
+  firstName,
+  lastName,
+  removed,
+  leading,
+}: {
+  id: string;
+  name: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  removed: string;
+  leading: ReactNode;
+}) {
+  const { resend, pending, message } = useResendInvite({ email, firstName, lastName });
+  return (
+    <ListRow
+      href={`/clients/${id}`}
+      title={name}
+      leading={leading}
+      meta={
+        <>
+          <span className={styles.inviteEmail}>{email}</span>
+          <span>{removed}</span>
+          {message ? (
+            <span role="status" className={styles.inlineStatus}>
+              <StatusChip view={message} />
+            </span>
+          ) : null}
+        </>
+      }
+      action={
+        <Button variant="quiet" size="compact" onClick={resend} pending={pending} aria-label={pending ? undefined : `Re-invite ${name}`}>
+          {pending ? 'Sending…' : 'Re-invite'}
+        </Button>
+      }
+    />
   );
 }

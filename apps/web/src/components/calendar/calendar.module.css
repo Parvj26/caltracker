@@ -63,8 +63,11 @@
 .items { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding: 0; list-style: none; }
 
 .item { position: relative; border-radius: var(--ct-radius-input); color: var(--ct-ink); }
-.programItem { background: var(--ct-lime); }
-.singleItem { background: var(--ct-blue); }
+/* Three looks that never rely on colour alone (UI rules §2): upcoming = plain white card; done = light blue with an ink
+   "✓ Done"; missed = a red outline with a "! Missed" chip. Lime is never a status. Programs vs single workouts are told
+   apart by the program's name on the card. */
+.programItem, .singleItem, .upcomingItem { background: var(--ct-bg); box-shadow: inset 0 0 0 1px var(--ct-border-strong); }
+.doneItem { background: var(--ct-drop); box-shadow: none; }
 /* The "⋯" button sits in the card's top-right corner. The name flows around a spacer the button's size (.menuSpace),
    so its first lines stop short of the button and later lines use the full width; names wrap only between words. */
 .itemRow { position: relative; }
@@ -83,14 +86,30 @@
   font-weight: var(--ct-weight-button);
 }
 .doneNote:hover, .doneNote:focus-visible { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
-/* Missed: an amber outline on white; the word "Missed" carries the meaning, not the colour. */
-.missed { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-amber); }
+/* Missed: a red outline and a "! Missed" chip; the word carries the meaning, the colour supports it. */
+.missed { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-danger); }
 .missedNote {
-  display: block;
-  padding: 0 var(--ct-space-2) var(--ct-space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  margin: 0 var(--ct-space-2) var(--ct-space-1);
+  padding: 2px var(--ct-space-2);
+  border-radius: var(--ct-radius-pill);
+  background: color-mix(in srgb, var(--ct-danger) 14%, var(--ct-bg));
+  color: var(--ct-danger-deep);
   font-size: var(--ct-size-caption);
-  color: var(--ct-ink);
+  font-weight: var(--ct-weight-button);
 }
+.doneTick { font-weight: var(--ct-weight-button); }
+.todayTag {
+  margin-left: var(--ct-space-1);
+  padding: 0 var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-weight: var(--ct-weight-button);
+}
+.emptyDayNote { display: none; }
 .itemHandle {
   display: block;
   width: 100%;
@@ -140,7 +159,7 @@
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-1) var(--ct-space-3);
   border-radius: var(--ct-radius-input);
-  background: var(--ct-lime);
+  background: var(--ct-bg);
   color: var(--ct-ink);
   font-weight: var(--ct-weight-section-heading);
   box-shadow: var(--ct-shadow-sticker);
@@ -271,7 +290,7 @@
   box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) transparent;
 }
 .choice:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-.choiceLime { background: var(--ct-lime); }
+.choiceLime { background: var(--ct-surface); }
 .choiceBlue { background: var(--ct-blue); }
 .choiceTitle { font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .choiceBody { color: var(--ct-ink); }
@@ -324,16 +343,14 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
-/* The assign dialog's programs: rows to tap, each with its full name and size. The list scrolls when long. */
+/* The assign dialog's programs: rows to tap, each with its full name and size. The dialog's body scrolls (one scroll
+   area, UI rules §5.2), not the list. */
 .programChoices { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
 .programChoicesLegend { padding: 0; margin-bottom: var(--ct-space-2); font-weight: var(--ct-weight-section-heading); }
 .programList {
   display: flex;
   flex-direction: column;
   gap: var(--ct-space-1);
-  max-height: min(264px, 40dvh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 .programChoice {
   display: grid;
@@ -354,8 +371,8 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 .programChoiceName { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
 .programChoiceSize { grid-column: 2; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .programChoice:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-/* Text on a pastel fill is always ink. */
-.programChoice:has(input:checked) { background: var(--ct-lime); }
+/* Picked: a white row with an ink outline (UI rules §2.3; lime only means create). */
+.programChoice:has(input:checked) { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .programChoice:has(input:checked) .programChoiceSize { color: var(--ct-ink); }
 .programChoice:has(input:focus-visible) { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
 
@@ -392,7 +409,7 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 }
 .result:hover { background: var(--ct-surface); }
 /* Text on a pastel fill is always ink. */
-.result[aria-pressed='true'] { background: var(--ct-lime); font-weight: var(--ct-weight-section-heading); }
+.result[aria-pressed='true'] { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
 /* Amber marks a warning; the text itself stays ink. */
 .pastNote {
   display: flex;
@@ -521,7 +538,7 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
   .viewLink { min-height: var(--ct-tap-min); }
 }
 /* Text on a pastel fill is always ink. */
-.viewLinkOn, .viewLinkOn:hover { background: var(--ct-lime); }
+.viewLinkOn, .viewLinkOn:hover { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); font-weight: var(--ct-weight-button); }
 
 /* ---------- Week views: taller days, cards with an exercise preview ---------- */
 .weekLayout .grid { min-width: 0; }
@@ -548,13 +565,9 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
   line-height: 1.3;
 }
 .previewMore { font-weight: var(--ct-weight-section-heading); }
-.coachNote {
-  display: block;
-  padding: 0 var(--ct-space-2) var(--ct-space-1);
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-section-heading);
-  color: var(--ct-ink);
-}
+.coachNote { display: block; padding: 0 var(--ct-space-2) var(--ct-space-1); font-size: var(--ct-size-caption); color: var(--ct-ink); }
+/* One line, cut with "…" (the full line is in its title; screen readers hear every exercise). */
+.previewSummary { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ct-ink-muted); }
 .srOnly {
   position: absolute;
   width: 1px;
@@ -573,6 +586,11 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
   .weekLayout .day { min-height: 0; }
   .weekLayout .dayWeekday { display: inline; }
   .weekLayout .addButton { margin-top: 0; }
+  /* An empty day is one short row: the date, "No workouts", and a small "+" at the end. */
+  .weekLayout .day:not(:has(.items)) { flex-direction: row; align-items: center; gap: var(--ct-space-2); padding: 0 0 0 var(--ct-space-1); }
+  .weekLayout .day:not(:has(.items)) .dayNumber { padding: 0 var(--ct-space-1); }
+  .weekLayout .emptyDayNote { display: block; flex: 1; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+  .weekLayout .day:not(:has(.items)) .addButton { width: var(--ct-tap-min); box-shadow: none; }
 }
 
 /* ---------- Phone (the calendar 600 px or narrower) ---------- */
@@ -586,6 +604,8 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 
   /* The month view fits the screen: a dot on each day with workouts (the picked day's list is under the grid). Until
      the page has loaded, the cells just hide their cards, so the wide grid never shows. */
+  /* Nothing is wider than the screen here, so the grid's box doesn't scroll (a scroll box needs keyboard access). */
+  .scroll { overflow-x: visible; }
   .calendar:not(.weekLayout) .grid { min-width: 0; border-spacing: 2px; }
   .calendar:not(.weekLayout) .grid th { padding: var(--ct-space-1) 0; text-align: center; }
   .calendar:not(.weekLayout) .day { min-height: 48px; }
@@ -613,7 +633,7 @@ a.assignmentLink:hover, a.assignmentLink:focus-visible { background: var(--ct-su
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ct-ink); }
 .dotEmpty { visibility: hidden; }
 /* Text on a pastel fill is always ink. */
-.dotDaySelected { background: var(--ct-lime); }
+.dotDaySelected { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
 .otherMonth.dotDaySelected .dayNumber { color: var(--ct-ink); }
 .dayPanel {
   display: flex;

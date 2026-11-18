@@ -48,8 +48,7 @@ function ChoiceTile({
     <button
       type="button"
       className={cx(styles.choice, tone === 'lime' ? styles.choiceLime : styles.choiceBlue)}
-      aria-labelledby={`${id}-t`}
-      aria-describedby={`${id}-d`}
+      // Named by its words (title, then body), so the name matches what is shown.
       onClick={onClick}
     >
       <span id={`${id}-t`} className={styles.choiceTitle}>{title}</span>

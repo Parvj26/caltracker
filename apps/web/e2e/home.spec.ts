@@ -115,7 +115,8 @@ test('an in-progress log shows a Training now card and a Live row with Watch', a
   await expect(row.getByRole('link', { name: /^Watch: / })).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
   // The dark card under "Training now" opens the live view too.
   const now = page.getByRole('region', { name: 'Training now' });
-  const card = now.getByRole('link', { name: new RegExp(`^Watch Home ${last} live: Push, \\d+ of \\d+ sets$`) });
+  // Named by what it shows (name, workout, sets, "Watch live"), so the name matches the visible text.
+  const card = now.getByRole('link', { name: new RegExp(`^Home ${last} Push · \\d+ min \\d+ of \\d+ sets · Watch live`) });
   await expect(card).toHaveAttribute('href', `/clients/${clientId}/logs/${logId}`);
   await expect(card).toContainText(/Push · \d+ min/);
   await expect(card).toContainText(/\d+ of \d+ sets · Watch live →/);

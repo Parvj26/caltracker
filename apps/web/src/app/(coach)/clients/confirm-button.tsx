@@ -1,17 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useId, useImperativeHandle, useRef, useState, useTransition, type Ref, type RefObject } from 'react';
-import { Button, ErrorText } from '@/components/ui';
+import { useId, useImperativeHandle, useRef, useState, useTransition, type Ref } from 'react';
+import { AdaptiveDialog, Button, ErrorText, type AdaptiveDialogHandle } from '@/components/ui';
 import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
 import styles from './clients.module.css';
-import { openRef } from '@/lib/open-layer';
 
 type Props = {
-  /** Visible label on the row button, e.g. "Remove". */
+  /** Visible label on the trigger button, e.g. "Remove client…". */
   label: string;
-  /** Full accessible name, e.g. "Remove Sam Lee", so screen readers know which row. */
+  /** Full accessible name, starting with the visible label, e.g. "Remove client… Sam Lee". */
   ariaLabel: string;
   title: string;
   body: string;
@@ -19,8 +18,8 @@ type Props = {
   onConfirm: () => Promise<SimpleOutcome>;
   /** Element to focus after success (the row, and with it this button, disappears). */
   focusAfterId: string;
-  /** A small text button (inside a row's status line) instead of a bordered row button. */
-  inline?: boolean;
+  /** Names this pop-up in the address while it is open (?sheet=…), so Back closes it. Unique per item. */
+  historyId: string;
   /** Opens the dialog from elsewhere (a row's ⋯ menu). */
   handle?: Ref<ConfirmHandle> | undefined;
   /** False: only the dialog, opened through `handle` (the caller draws its own buttons). */
@@ -29,100 +28,94 @@ type Props = {
 
 export type ConfirmHandle = { open: () => void };
 
-type DialogProps = Pick<Props, 'title' | 'body' | 'confirmLabel' | 'onConfirm' | 'focusAfterId'> & {
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  /** Clears an earlier error; the opener calls it before opening it. */
-  resetRef?: RefObject<(() => void) | null>;
-};
+type DialogProps = Pick<Props, 'title' | 'body' | 'confirmLabel' | 'onConfirm' | 'focusAfterId' | 'historyId'> & { onClose: () => void };
 
 /**
- * The asking part on its own: a native modal dialog (focus is trapped and Escape closes it) that the caller opens with
- * `openRef(dialogRef)`. ConfirmButton uses it, and so does the client page's "⋯ > Remove client".
+ * "Remove …?" / "Cancel this invite?" in the one pop-up (UI rules §10): a sheet on a phone, a centred dialog on iPad
+ * and desktop, closed by Back. Cancel + a red button named after the action. Mount it to ask; it stays open with the
+ * error if the action fails.
  */
-export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfterId, dialogRef, resetRef }: DialogProps) {
+export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfterId, historyId, onClose }: DialogProps) {
   const router = useRouter();
-  const titleId = useId();
+  const ref = useRef<AdaptiveDialogHandle>(null);
   const bodyId = useId();
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
-  useImperativeHandle(resetRef, () => () => setError(null), []);
+  const failed = useRef(false);
 
   function confirm() {
     setError(null);
     startTransition(async () => {
       const outcome = await onConfirm();
       if (outcome.ok) {
-        dialogRef.current?.close();
-        document.getElementById(focusAfterId)?.focus();
-      } else setError(outcome.code);
+        // The row (and with it this question) may already be gone: focus lands on a heading that stays, once the
+        // pop-up has handed focus back.
+        const land = () => document.getElementById(focusAfterId)?.focus();
+        await ref.current?.close();
+        land();
+        setTimeout(land, 50);
+      } else {
+        failed.current = true;
+        setError(outcome.code);
+      }
     });
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      aria-describedby={bodyId}
-      // Escape must not close it mid-request, or an error would land in a closed dialog.
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
-      // After a failure the page may be out of date (for example the invite was accepted meanwhile): refresh it
-      // once the coach has read the message.
+    <AdaptiveDialog
+      ref={ref}
+      historyId={historyId}
+      role="alertdialog"
+      describedBy={bodyId}
+      title={title}
+      busy={pending}
+      stackFooterOnPhone
       onClose={() => {
-        if (!error) return;
-        router.refresh();
-        // Clear it too, so reopening the dialog (from the client header's ⋯) doesn't show the old failure.
-        setError(null);
+        // After a failure the page may be out of date (the invite was accepted meanwhile, say): refresh it once the
+        // coach has read the message.
+        if (failed.current) router.refresh();
+        onClose();
       }}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => ref.current?.requestClose()} disabled={pending} phSafe>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirm} pending={pending} phSafe>
+            {pending ? 'Working…' : confirmLabel}
+          </Button>
+        </>
+      }
     >
-      <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
       <p id={bodyId} className={styles.dialogBody}>{body}</p>
       {error ? <ErrorText code={error} /> : null}
-      <div className={styles.dialogActions}>
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-          Cancel
-        </Button>
-        <Button onClick={confirm} pending={pending}>
-          {pending ? 'Working…' : confirmLabel}
-        </Button>
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }
 
-/** A row button that asks first, in a native modal dialog (focus is trapped and Escape closes it). */
-export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, inline = false, handle, trigger = true }: Props) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const resetRef = useRef<(() => void) | null>(null);
-
-  const open = () => {
-    resetRef.current?.();
-    openRef(dialogRef);
-  };
-  useImperativeHandle(handle, () => ({ open }));
+/** A button that asks first (ConfirmDialog). With `trigger={false}` only the question, opened through `handle`. */
+export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onConfirm, focusAfterId, historyId, handle, trigger = true }: Props) {
+  const [open, setOpen] = useState(false);
+  useImperativeHandle(handle, () => ({ open: () => setOpen(true) }));
 
   return (
     <>
-      {!trigger ? null : inline ? (
-        <button type="button" className={styles.inlineAction} aria-label={ariaLabel} onClick={open}>
-          {label}
-        </button>
-      ) : (
-        <Button variant="secondary" className={styles.rowButton} aria-label={ariaLabel} onClick={open}>
+      {trigger ? (
+        <Button variant="secondary" className={styles.dangerOutline} aria-label={ariaLabel} onClick={() => setOpen(true)}>
           {label}
         </Button>
-      )}
-      <ConfirmDialog
-        title={title}
-        body={body}
-        confirmLabel={confirmLabel}
-        onConfirm={onConfirm}
-        focusAfterId={focusAfterId}
-        dialogRef={dialogRef}
-        resetRef={resetRef}
-      />
+      ) : null}
+      {open ? (
+        <ConfirmDialog
+          title={title}
+          body={body}
+          confirmLabel={confirmLabel}
+          onConfirm={onConfirm}
+          focusAfterId={focusAfterId}
+          historyId={historyId}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

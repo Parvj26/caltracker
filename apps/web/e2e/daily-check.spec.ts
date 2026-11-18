@@ -241,58 +241,65 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   const ids = await seedList(coach);
   await signIn(page, coach);
   await page.goto('/clients');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients 8');
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  const rowOf = (name: string) => table.getByRole('row').filter({ hasText: name });
-  const cell = (name: string, n: number) => rowOf(name).getByRole('cell').nth(n);
+  // The count is clients (7); the invite waits under its own chip.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients 7');
+  const list = page.getByRole('list', { name: 'Clients', exact: true });
+  const rowOf = (name: string) => list.getByRole('listitem').filter({ hasText: name });
 
-  // Client cell: name and a status line.
-  await expect(cell('Tina Training', 0)).toContainText('● Training now');
-  await expect(cell('Rowan Run', 0)).toContainText(ids.rowanMissed > 0 ? `Missed ${ids.rowanMissed} this week` : 'Active');
-  await expect(cell('Olive Once', 0)).toContainText(ids.oliveMissed > 0 ? 'Missed 1 this week' : 'Active');
-  await expect(cell('Enid Ending', 0)).toContainText(`Plan ends ${longWeekday(3)}`);
-  await expect(cell('Nell Nothing', 0)).toContainText('Nothing planned');
-  await expect(cell('Sami Steady', 0)).toContainText('Active');
+  // Status: one chip per row (plus "Training now" / "Plan ends …" where they apply).
+  await expect(rowOf('Tina Training')).toContainText('Training now');
+  if (ids.rowanMissed > 0) await expect(rowOf('Rowan Run')).toContainText(`Missed ${ids.rowanMissed}`);
+  if (ids.oliveMissed > 0) await expect(rowOf('Olive Once')).toContainText('Missed 1');
+  await expect(rowOf('Enid Ending')).toContainText(`Plan ends ${longWeekday(3)}`);
+  await expect(rowOf('Nell Nothing')).toContainText('Nothing planned');
+  await expect(rowOf('Sami Steady')).toContainText('On track');
 
-  // Last workout, this week, 4 weeks.
-  await expect(cell('Sami Steady', 1)).toContainText('Today · Session');
-  await expect(cell('Olive Once', 1)).toContainText('Yesterday · Session');
-  await expect(cell('Nell Nothing', 1)).toContainText('None yet');
-  await expect(cell('Sami Steady', 2)).toContainText(/\d of \d/);
-  await expect(cell('Rowan Run', 3)).toContainText('0%');
-  await expect(cell('Olive Once', 3)).toContainText('50%');
-  await expect(cell('Sami Steady', 3)).toContainText('100%');
-  await expect(cell('Sami Steady', 3).getByText('(1 of 1 done)')).toBeAttached();
+  // Last workout and 4 weeks (columns with headers on a laptop).
+  await expect(page.getByText('4 weeks', { exact: true })).toBeVisible();
+  await expect(rowOf('Sami Steady')).toContainText('Today · Session');
+  await expect(rowOf('Olive Once')).toContainText('Yesterday · Session');
+  await expect(rowOf('Nell Nothing')).toContainText('None yet');
+  await expect(rowOf('Rowan Run')).toContainText('0%');
+  await expect(rowOf('Olive Once')).toContainText('50%');
+  await expect(rowOf('Sami Steady')).toContainText('100%');
+  await expect(rowOf('Sami Steady')).toContainText(/\d of \d this week/);
+  await expect(rowOf('Sami Steady').getByText('(1 of 1 done)')).toBeAttached();
 
-  // Plan: the program and its end; "nothing after" when it ends this week; quick adds when nothing is planned.
-  await expect(cell('Sami Steady', 4)).toContainText('Hypertrophy 8');
-  await expect(cell('Sami Steady', 4)).toContainText(/ends \d{1,2} \w{3}/);
-  await expect(cell('Enid Ending', 4)).toContainText('Strength Block');
-  await expect(cell('Enid Ending', 4)).toContainText('nothing after');
-  await expect(cell('Nell Nothing', 4).getByRole('link', { name: 'Add a workout for Nell Nothing' })).toHaveAttribute(
+  // Plan: the program and its end; "nothing after" when it ends this week; a quiet Assign when nothing is planned.
+  await expect(rowOf('Sami Steady')).toContainText('Hypertrophy 8');
+  await expect(rowOf('Sami Steady')).toContainText(/ends \d{1,2} \w{3}/);
+  await expect(rowOf('Enid Ending')).toContainText('Strength Block');
+  await expect(rowOf('Enid Ending')).toContainText('nothing after');
+  await expect(rowOf('Nell Nothing').getByRole('link', { name: 'Assign a program to Nell Nothing' })).toHaveAttribute(
     'href',
-    `/clients/${ids.nothing}/training?add=workout`,
+    `/clients/${ids.nothing}/training?add=program`,
   );
+  // A single workout is the other quick start, in the row's ⋯.
+  await rowOf('Nell Nothing').getByRole('button', { name: 'More for Nell Nothing' }).click();
+  await page.getByRole('menuitem', { name: 'Add a workout' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${ids.nothing}/training`));
+  await expect(page.getByRole('dialog', { name: 'Add a workout' })).toBeVisible();
+  await page.goto('/clients');
 
-  // The pending invite is a row too, under Invited (the list opens on Active).
-  await expect(rowOf('Ivy Invited')).toHaveCount(0);
+  // The pending invite has its own short row, under Invited (the list opens on Active).
+  const inviteRow = (name: string) => page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: name });
+  await expect(page.getByRole('listitem').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
   await page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Invited/ }).click();
-  const ivy = rowOf('Ivy Invited');
+  const ivy = inviteRow('Ivy Invited');
   await expect(ivy).toContainText('Invited today');
-  await expect(ivy).toContainText('Not joined yet');
+  await expect(ivy).not.toContainText('Not joined yet');
 
   // The chip is kept in the address, so a reload stays on Invited.
   await page.reload();
   await expect(page).toHaveURL(/[?&]filter=invited/);
-  await expect(rowOf('Ivy Invited')).toContainText('Not joined yet');
+  await expect(inviteRow('Ivy Invited')).toContainText('Invited today');
   await page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Active/ }).click();
   await expect(page).toHaveURL(/\/clients$/);
-  await expect(cell('Sami Steady', 0)).toContainText('Active');
+  await expect(rowOf('Sami Steady')).toContainText('On track');
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 
-  // Tapping a row opens the client: the name link covers the whole row, so a tap on the last-workout cell lands on
-  // it (force: Playwright would otherwise wait because the link, not the cell, is on top, which is the point).
-  await cell('Quinn Quiet', 1).click({ force: true });
+  // The whole row opens the client: a tap on the last-workout column lands on it.
+  await rowOf('Quinn Quiet').getByText(/Session|None yet/).locator('visible=true').first().click();
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.quiet}$`));
 });
 
@@ -313,8 +320,9 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   const ids = await seedList(coach);
   await signIn(page, coach);
   await page.goto('/clients');
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  const names = () => table.locator('[data-client-id]').evaluateAll((rows) => rows.map((r) => r.querySelector('a')?.textContent ?? ''));
+  const table = page.getByRole('main');
+  const names = () =>
+    table.locator('[data-client-id]').evaluateAll((rows) => rows.map((r) => r.querySelector('a [class*="_listRowTitle"]')?.textContent ?? ''));
   const filters = page.getByRole('group', { name: 'Filter clients' });
 
   // The result line is always there (a live region), and says so when nothing is filtered.
@@ -330,7 +338,7 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
     'Plan ending 1',
   ]);
   await expect(filters.getByRole('button', { name: /^Active/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
+  await expect(table.getByRole('listitem').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
 
   // Default sort: most recent workout first, never-trained last (by name).
   await expect.poll(names).toEqual(['Sami Steady', 'Enid Ending', 'Olive Once', 'Quinn Quiet', 'Nell Nothing', 'Rowan Run', 'Tina Training']);
@@ -356,7 +364,7 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   await expect(chip(/^Plan ending/)).toHaveAttribute('aria-pressed', 'true');
   await expect(chip(/^Active/)).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(names).toEqual(['Enid Ending']);
-  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
+  await expect(table.getByRole('listitem').filter({ hasText: 'Ivy Invited' })).toHaveCount(0);
   await chip(/^Nothing planned/).click();
   await expect.poll(names).toEqual(['Nell Nothing']);
   if (missed > 0) {
@@ -365,10 +373,10 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   }
   await chip(/^Invited/).click();
   await expect.poll(names).toEqual([]);
-  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toBeVisible();
+  await expect(table.getByRole('listitem').filter({ hasText: 'Ivy Invited' })).toBeVisible();
   // The invite search also matches the email.
   await search.fill('example');
-  await expect(table.getByRole('row').filter({ hasText: 'Ivy Invited' })).toBeVisible();
+  await expect(table.getByRole('listitem').filter({ hasText: 'Ivy Invited' })).toBeVisible();
   await search.fill('');
   await chip(/^Active/).click();
   await expect(page.getByRole('status').filter({ hasText: 'Showing all 7 active' })).toBeAttached();
@@ -383,25 +391,27 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   await expect.poll(async () => (await names()).slice(0, 2)).toEqual(['Enid Ending', 'Sami Steady']);
 });
 
-test('on iPad portrait the Clients list turns into stacked cards with labelled values and no sideways scroll', async ({ page }, testInfo) => {
+test('on iPad portrait the Clients list is plain rows with a meta line; wide, a table with column headers', async ({ page }, testInfo) => {
   const coach = await newCoach();
   await seedList(coach);
   await page.setViewportSize({ width: 820, height: 1180 });
   await signIn(page, coach);
   await page.goto('/clients');
-  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: 'Sami Steady' });
-  await expect(row.getByText('Last workout', { exact: true })).toBeVisible();
-  await expect(row.getByText('4 weeks', { exact: true })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Last workout' })).toBeHidden();
+  const row = page.getByRole('list', { name: 'Clients', exact: true }).getByRole('listitem').filter({ hasText: 'Sami Steady' });
+  await expect(row).toBeVisible();
+  // The filter chips are one row (never stacked), under the search box.
+  const chips = page.getByRole('group', { name: 'Filter clients' }).getByRole('button');
+  const ys = await chips.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().y)));
+  expect(new Set(ys).size).toBe(1);
+  await expect(page.getByText('4 weeks', { exact: true })).toBeHidden();
   const width = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(width).toBeLessThanOrEqual(0);
   // Kept in the CI report, so a reviewer can see both layouts without running the app.
   await testInfo.attach('clients-820', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
-  // Laptop / iPad landscape: a table with column headers, still no sideways scroll.
+  // Laptop / iPad landscape: column headers, still no sideways scroll.
   await page.setViewportSize({ width: 1194, height: 834 });
-  await expect(page.getByRole('columnheader', { name: 'Last workout' })).toBeVisible();
-  await expect(row.getByText('Last workout', { exact: true })).toBeHidden();
+  await expect(page.getByText('4 weeks', { exact: true })).toBeVisible();
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(wide).toBeLessThanOrEqual(0);
   await testInfo.attach('clients-1194', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
@@ -414,69 +424,66 @@ test('on iPad portrait the Clients list turns into stacked cards with labelled v
   await testInfo.attach('invite-1194', { body: await page.screenshot(), contentType: 'image/png' });
 });
 
-test('on an iPhone each client is one line: avatar, name with "…", one chip and ›, or Assign when nothing is planned', async ({ page }, testInfo) => {
+test('on an iPhone each client is a plain row: avatar, full name (up to 2 lines), one chip, and Assign when nothing is planned', async ({ page }, testInfo) => {
   test.slow();
   const coach = await newCoach();
   const ids = await seedList(coach);
-  const long = await addClient(coach, 'Alexandria', 'Montgomery-Wellington-Featherstonehaugh');
+  const long = await addClient(coach, 'Alexandria', 'Montgomery-Wellington');
   await plan(coach, long, 1);
   await page.setViewportSize({ width: 375, height: 667 });
   await signIn(page, coach);
   await page.goto('/clients');
   const width = page.viewportSize()!.width;
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  const rowOf = (name: string) => table.getByRole('row').filter({ hasText: name });
+  const list = page.getByRole('list', { name: 'Clients', exact: true });
+  const rowOf = (name: string) => list.getByRole('listitem').filter({ hasText: name });
 
   // Search first, then the filter chips under it; the list opens on Active.
   const search = page.getByRole('searchbox', { name: 'Search clients' });
   const filters = page.getByRole('group', { name: 'Filter clients' });
   expect((await search.boundingBox())!.y).toBeLessThan((await filters.boundingBox())!.y);
   await expect(filters.getByRole('button', { name: /^Active/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Invite client', exact: true })).toHaveText('Invite', { useInnerText: true });
+  await expect(page.getByRole('button', { name: 'Invite client', exact: true })).toHaveText('+ Invite', { useInnerText: true });
 
   // One chip each; the details stay on the client page.
   await expect(rowOf('Sami Steady').getByText('On track', { exact: true }).locator('visible=true')).toHaveCount(1);
-  // (The laptop's status line and Plan cell say "Nothing planned" too, hidden on a phone: count the visible one.)
   await expect(rowOf('Nell Nothing').getByText('Nothing planned', { exact: true }).locator('visible=true')).toHaveCount(1);
   if (ids.rowanMissed > 0) await expect(rowOf('Rowan Run').getByText(`Missed ${ids.rowanMissed}`, { exact: true }).locator('visible=true')).toHaveCount(1);
   await expect(rowOf('Sami Steady').getByText('Hypertrophy 8')).toBeHidden();
-  await expect(rowOf('Sami Steady').getByText('Active', { exact: true })).toBeHidden();
 
-  // Short rows (about 9 to a screen), a long name stays on one line with "…", and nothing runs off the screen.
+  // A long name is shown in full (two lines), not cut to a few letters; nothing runs off the screen.
+  const longName = rowOf('Alexandria').getByText('Alexandria Montgomery-Wellington', { exact: true });
+  expect(await longName.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
   for (const name of ['Sami Steady', 'Nell Nothing', 'Alexandria']) {
     const box = (await rowOf(name).boundingBox())!;
-    expect(box.height, `${name} row height`).toBeLessThanOrEqual(60);
     expect(box.x + box.width).toBeLessThanOrEqual(width);
   }
-  const longName = rowOf('Alexandria').getByRole('link', { name: /^Alexandria/ });
-  expect(await longName.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await testInfo.attach('clients-375', { body: await page.screenshot(), contentType: 'image/png' });
 
   // Smart search: a typo still finds them.
   await search.fill('steddy');
-  await expect(table.locator('[data-client-id]')).toHaveCount(1);
+  await expect(list.locator('[data-client-id]')).toHaveCount(1);
   await expect(rowOf('Sami Steady')).toBeVisible();
   await search.fill('');
 
-  // Invited: a ⋯ menu with Resend and Cancel invite (red, and it still asks first).
+  // Invited: Resend on the row; Cancel invite… (red) in ⋯, and it still asks first.
   await filters.getByRole('button', { name: /^Invited/ }).click();
-  const ivy = rowOf('Ivy Invited');
-  await expect(ivy.getByText('Invited today', { exact: true }).locator('visible=true')).toHaveCount(1);
-  await expect(ivy.getByRole('button', { name: /^Resend invite to/ })).toBeHidden();
+  const ivy = page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: 'Ivy Invited' });
+  await expect(ivy.getByText('Invited today', { exact: true })).toBeVisible();
+  await expect(ivy.getByRole('button', { name: /^Resend invite to/ })).toBeVisible();
   await ivy.getByRole('button', { name: 'More for Ivy Invited' }).click();
   const menu = page.getByRole('menu', { name: 'More for Ivy Invited' });
-  await expect(menu.getByRole('menuitem')).toHaveText(['Resend invite', 'Cancel invite…']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Cancel invite…']);
   await testInfo.attach('clients-invited-375', { body: await page.screenshot(), contentType: 'image/png' });
   await menu.getByRole('menuitem', { name: 'Cancel invite…' }).click();
-  const confirm = page.getByRole('dialog', { name: 'Cancel this invite?' });
+  const confirm = page.getByRole('alertdialog', { name: 'Cancel this invite?' });
   await expect(confirm).toBeVisible();
   await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(confirm).toBeHidden();
   await expect(ivy).toBeVisible();
 
-  // Nothing planned: Assign instead of ›, straight into the assign dialog.
+  // Nothing planned: a quiet Assign, straight into the assign dialog.
   await filters.getByRole('button', { name: /^Active/ }).click();
   await rowOf('Nell Nothing').getByRole('link', { name: 'Assign a program to Nell Nothing' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.nothing}/training`));
@@ -484,7 +491,7 @@ test('on an iPhone each client is one line: avatar, name with "…", one chip an
 
   // Anywhere else on a row opens the client.
   await page.goto('/clients');
-  await rowOf('Sami Steady').getByText('On track', { exact: true }).click({ force: true });
+  await rowOf('Sami Steady').getByText('On track', { exact: true }).locator('visible=true').click();
   await expect(page).toHaveURL(new RegExp(`/clients/${ids.steady}$`));
 });
 
@@ -495,8 +502,8 @@ test('on an iPhone, search finds an invited person while Active is selected', as
   await page.setViewportSize({ width: 375, height: 667 });
   await signIn(page, coach);
   await page.goto('/clients');
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  const ivy = table.getByRole('row').filter({ hasText: 'Ivy Invited' });
+  const table = page.getByRole('main');
+  const ivy = table.getByRole('listitem').filter({ hasText: 'Ivy Invited' });
   const active = page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Active/ });
   await expect(active).toHaveAttribute('aria-pressed', 'true');
   await expect(ivy).toHaveCount(0);
@@ -506,9 +513,9 @@ test('on an iPhone, search finds an invited person while Active is selected', as
   await search.fill('ivvy');
   await expect(ivy).toBeVisible();
   await expect(table.locator('[data-client-id]')).toHaveCount(0);
-  await expect(ivy.getByText('Invited today', { exact: true }).locator('visible=true')).toHaveCount(1);
+  await expect(ivy.getByText('Invited today', { exact: true })).toBeVisible();
   await ivy.getByRole('button', { name: 'More for Ivy Invited' }).click();
-  await expect(page.getByRole('menu', { name: 'More for Ivy Invited' }).getByRole('menuitem')).toHaveText(['Resend invite', 'Cancel invite…']);
+  await expect(page.getByRole('menu', { name: 'More for Ivy Invited' }).getByRole('menuitem')).toHaveText(['Cancel invite…']);
   await page.keyboard.press('Escape');
 
   // Their email matches too.
@@ -519,5 +526,5 @@ test('on an iPhone, search finds an invited person while Active is selected', as
   await search.fill('');
   await expect(ivy).toHaveCount(0);
   await expect(active).toHaveAttribute('aria-pressed', 'true');
-  await expect(table.getByRole('row').filter({ hasText: 'Sami Steady' })).toBeVisible();
+  await expect(table.getByRole('listitem').filter({ hasText: 'Sami Steady' })).toBeVisible();
 });

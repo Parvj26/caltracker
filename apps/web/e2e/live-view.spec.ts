@@ -309,16 +309,20 @@ test('with two people training, tabs switch between watching one and logging the
   await page.goto(`/clients/${parv.id}/log/${parvWorkout}`);
   await expect(page.getByRole('tab', { name: /^Parv/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Finish session' })).toBeVisible();
-  // Finish and Hand back share one height and line (and wrap neatly on a narrower iPad); Cancel session… sits apart, below.
+  // Finish and Hand back share one height and line in a footer that sticks to the bottom of the window; Cancel
+  // session… sits apart, in the page.
   const footer = ['Finish session', 'Hand back to Parv'].map((name) => page.getByRole('button', { name }));
   const cancel = page.getByRole('button', { name: 'Cancel session…' });
   for (const width of [1194, 820]) {
-    await page.setViewportSize({ width, height: 1400 });
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => window.scrollTo(0, 0));
     const boxes = await Promise.all(footer.map(async (b) => (await b.boundingBox())!));
     for (const b of boxes) expect(b.height).toBe(48);
-    if (width === 1194) for (const b of boxes) expect(b.y).toBe(boxes[0]!.y);
-    expect((await cancel.boundingBox())!.y).toBeGreaterThan(Math.max(...boxes.map((b) => b.y + b.height)) + 24);
-    if (SCREENSHOTS) await footer[0]!.locator('xpath=ancestor::fieldset[1]').screenshot({ path: `${SCREENSHOTS}/session-footer-${width}.png` });
+    for (const b of boxes) expect(b.y).toBe(boxes[0]!.y);
+    for (const b of footer) await expect(b).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('[data-phone-action-bar]').getByRole('button', { name: 'Cancel session…' })).toHaveCount(0);
+    await expect(cancel).toBeAttached();
+    if (SCREENSHOTS) await page.screenshot({ path: `${SCREENSHOTS}/session-footer-${width}.png` });
   }
   await page.setViewportSize({ width: 1194, height: 1400 });
   await page.getByRole('tab', { name: /^Vaishali/ }).click();

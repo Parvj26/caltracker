@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   buildSmartIndex,
@@ -10,7 +10,6 @@ import {
   directoryCounts,
   directoryRows,
   invitedLabel,
-  invitedShortLabel,
   matchesDirectoryFilter,
   smartFilter,
   smartMatch,
@@ -22,8 +21,7 @@ import {
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { MoreMenu } from '@/components/more-menu';
-import { Chip, SearchBox, SearchEmpty, useSearchQuery, type ChipTone } from '@/components/ui';
-import { ChevronIcon } from '@/components/ui/chevron-icon';
+import { Button, ButtonLink, Chip, ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery, type ChipTone } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { homeClients, localDateOf } from '@/lib/daily-check';
@@ -31,6 +29,7 @@ import { useBrowserToday } from '@/lib/local-today';
 import { useRememberUrl } from '@/lib/history-back';
 import { useUrlChoice } from '@/lib/url-state';
 import { avatarTone, initials } from './avatar';
+import { INVITE_CLOSED_EVENT } from './invite-dialog';
 import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from './directory-copy';
 import type { ConfirmHandle } from './confirm-button';
 import { useResendInvite } from './resend-button';
@@ -80,13 +79,13 @@ const STATUS_CLASS: Record<DirectoryRow['status']['kind'], string | undefined> =
   active: styles.statusGood,
 };
 
-/** A phone row's one chip: the words carry the meaning, the colour only supports them. */
+/** A row's one status chip (UI rules §7.4): the words carry the meaning, the colour only supports them. */
 const CHIP_VIEW: Record<DirectoryChip['kind'], { tone: ChipTone; text: (c: DirectoryChip) => string }> = {
   missed: { tone: 'pink', text: (c) => `Missed ${c.kind === 'missed' ? c.count : 0}` },
-  on_track: { tone: 'lime', text: () => 'On track' },
+  on_track: { tone: 'blue', text: () => 'On track' },
   nothing_planned: { tone: 'grey', text: () => 'Nothing planned' },
 };
-/** What the caption above the rows says on a phone ("41 active", "9 invites waiting"). */
+/** What the caption above the rows says ("9 active", "3 invites waiting"). */
 const shownCaption = (filter: DirectoryFilter, n: number) =>
   filter === 'invited' ? `${n} ${n === 1 ? 'invite' : 'invites'} waiting` : `${n} ${FILTER_LABEL[filter].toLowerCase()}`;
 
@@ -107,187 +106,164 @@ function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
   );
 }
 
-/** A cell's caption, shown only when the table becomes stacked cards (the column headers are hidden then). */
-const CardLabel = ({ children }: { children: string }) => (
-  <span aria-hidden="true" className={styles.cardLabel}>{children}</span>
-);
-
 const Dash = () => (
   <>
-    <span aria-hidden="true" className={styles.muted}>—</span>
+    <span aria-hidden="true">—</span>
     <span className={styles.visuallyHidden}>None</span>
   </>
 );
+
+/** The wide list's columns (a table with headers from about 720 px of list width; the meta line says it below that). */
+const COLUMNS = ['Client', 'Status', 'Last workout', '4 weeks', 'Plan'];
 
 function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: string; row: DirectoryRow | null; today: IsoDate | null; lookbackDays: number }) {
   const plan = row && today ? planLines(row.plan, today) : null;
   const pct = row?.fourWeeks.percent ?? null;
   const chip = row && today ? directoryChip(row) : null;
+  const last = row && today ? lastWorkoutText(row, today, lookbackDays) : null;
+  const router = useRouter();
+  const chipEl = chip ? (
+    <Chip tone={CHIP_VIEW[chip.kind].tone} className={styles.rowChip}>
+      {CHIP_VIEW[chip.kind].text(chip)}
+    </Chip>
+  ) : null;
   return (
-    <div role="row" className={cx(styles.row, styles.linkRow)} data-client-id={id}>
-      <div role="cell" className={cx(styles.clientCell, styles.cellClient)}>
-        <Avatar name={name} toneKey={id} />
-        <span className={styles.nameStack}>
-          {/* The link covers the whole row (see .rowLink::after), so tapping anywhere opens the client. */}
-          <Link href={`/clients/${id}`} className={styles.rowLink}>{name || 'Client'}</Link>
-          {row && today ? (
-            <span className={cx(styles.statusLine, styles.wideOnly, STATUS_CLASS[row.status.kind])}>
-              {row.status.kind === 'training' ? <span aria-hidden="true">● </span> : null}
-              {statusText(row.status, today)}
-            </span>
+    <ListRow
+      href={`/clients/${id}`}
+      title={name || 'Client'}
+      leading={<Avatar name={name} toneKey={id} />}
+      itemProps={{ 'data-client-id': id }}
+      className={styles.clientRow}
+      meta={
+        row && today ? (
+          <>
+            {chipEl}
+            {row.status.kind === 'training' || row.status.kind === 'plan_ending' ? (
+              <span className={cx(STATUS_CLASS[row.status.kind])}>{statusText(row.status, today)}</span>
+            ) : null}
+            {last ? <span>{last}</span> : null}
+            {row.week.planned > 0 ? (
+              <span className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned} this week`}</span>
+            ) : null}
+          </>
+        ) : undefined
+      }
+      cells={[
+        <span key="status" className={styles.statusCell}>
+          {chipEl}
+          {row && today && (row.status.kind === 'training' || row.status.kind === 'plan_ending') ? (
+            <span className={cx(styles.statusLine, STATUS_CLASS[row.status.kind])}>{statusText(row.status, today)}</span>
           ) : null}
-        </span>
-        {/* Phones: one chip, then › (or Assign when nothing is planned). */}
-        {chip ? (
-          <Chip tone={CHIP_VIEW[chip.kind].tone} className={cx(styles.phoneOnly, styles.rowChip)}>
-            {CHIP_VIEW[chip.kind].text(chip)}
-          </Chip>
-        ) : null}
-        {chip?.kind === 'nothing_planned' ? (
-          <Link href={`/clients/${id}/training?add=program`} className={cx(styles.phoneOnly, styles.quickAssign)} aria-label={`Assign a program to ${name}`}>
-            Assign
-          </Link>
-        ) : (
-          <span aria-hidden="true" className={cx(styles.phoneOnly, styles.rowChevron)}>
-            <ChevronIcon direction="right" size={18} />
+        </span>,
+        // "Last workout" also carries this week's count ("2 of 3 this week"): a column of its own was mostly "—".
+        last || (row && row.week.planned > 0) ? (
+          <span className={styles.planStack}>
+            {last ? <span>{last}</span> : null}
+            {row && row.week.planned > 0 ? (
+              <span className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned} this week`}</span>
+            ) : null}
           </span>
-        )}
-      </div>
-      <span role="cell" className={cx(styles.cell, styles.cellLast)}>
-        <CardLabel>Last workout</CardLabel>
-        {row && today ? lastWorkoutText(row, today, lookbackDays) : null}
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellWeek)}>
-        <CardLabel>This week</CardLabel>
-        {row ? (
-          row.week.planned === 0 ? (
-            <Dash />
-          ) : (
-            <b className={row.week.missed > 0 ? styles.behind : undefined}>{`${row.week.done} of ${row.week.planned}`}</b>
-          )
-        ) : null}
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellFour)}>
-        <CardLabel>4 weeks</CardLabel>
-        {row ? (
+        ) : null,
+        row ? (
           pct === null ? (
             <Dash />
           ) : (
             <span className={styles.completion}>
               <span aria-hidden="true" className={styles.bar}>
-                <span
-                  className={cx(styles.barFill, pct < LOW_COMPLETION_PERCENT && styles.barLow)}
-                  style={{ width: `${pct}%` }}
-                />
+                <span className={cx(styles.barFill, pct < LOW_COMPLETION_PERCENT && styles.barLow)} style={{ width: `${pct}%` }} />
               </span>
-              <b>{`${pct}%`}</b>
+              <b className={styles.inkText}>{`${pct}%`}</b>
               <span className={styles.visuallyHidden}>{` (${row.fourWeeks.done} of ${row.fourWeeks.due} done)`}</span>
             </span>
           )
-        ) : null}
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellPlan)}>
-        <CardLabel>Plan</CardLabel>
-        {plan ? (
+        ) : null,
+        plan ? (
           <span className={styles.planStack}>
-            <span className={styles.planTitle} title={plan.title}>{plan.title}</span>
+            <span className={cx(styles.planTitle, styles.inkText)}>{plan.title}</span>
             <span className={cx(styles.planDetail, plan.warn && styles.planWarn)}>{plan.detail}</span>
           </span>
         ) : row && today ? (
-          <span className={styles.planEmpty}>
-            <span className={styles.muted}>Nothing planned</span>
-            <span className={styles.planButtons}>
-              <Link href={`/clients/${id}/training?add=workout`} className={styles.miniButton} aria-label={`Add a workout for ${name}`}>
-                + Workout
-              </Link>
-              <Link href={`/clients/${id}/training?add=program`} className={styles.miniButton} aria-label={`Assign a program to ${name}`}>
-                + Program
-              </Link>
-            </span>
-          </span>
-        ) : null}
-      </span>
-    </div>
+          'Nothing planned'
+        ) : null,
+      ]}
+      // The same end on every row, so the columns line up: Assign where nothing is planned, else an empty slot.
+      action={
+        chip?.kind === 'nothing_planned' ? (
+          <ButtonLink href={`/clients/${id}/training?add=program`} variant="quiet" size="compact" className={styles.rowAction} aria-label={`Assign a program to ${name}`}>
+            Assign
+          </ButtonLink>
+        ) : (
+          <span aria-hidden="true" className={styles.rowActionSlot} />
+        )
+      }
+      // Nothing planned: a single workout is the other way to start, in ⋯ (one visible action per row, UI rules §7.3).
+      more={
+        chip?.kind === 'nothing_planned' ? (
+          <MoreMenu
+            label={`More for ${name}`}
+            items={[{ label: 'Add a workout', onSelect: () => router.push(`/clients/${id}/training?add=workout`) }]}
+          />
+        ) : undefined
+      }
+    />
   );
 }
 
+/** "Beginner 3-Day · starts Mon 16 Nov": what a pending invite will begin with, or null. */
+function invitePlanText(plan: InvitePlanSummary): string | null {
+  if (!plan) return null;
+  if (plan.kind === 'program') return `${plan.name} · starts ${formatShortDay(plan.on)}`;
+  return `Single workout: ${plan.name} · ${formatShortDay(plan.on)}${plan.more > 0 ? ` · ${plan.more} more` : ''}`;
+}
+
+/** A pending invite: name, email, when it was sent, what it starts with; Resend, and Cancel invite… in ⋯. */
 function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate | null }) {
   const { expired } = invite;
-  const plan = invite.plan;
   const { resend, pending, message } = useResendInvite(invite);
   const cancelRef = useRef<ConfirmHandle>(null);
-  const resendLabel = pending ? 'Sending…' : 'Resend';
+  const planText = invitePlanText(invite.plan);
   return (
-    <div role="row" className={styles.row} data-invite-id={invite.id}>
-      <div role="cell" className={cx(styles.clientCell, styles.cellClient)}>
-        <Avatar name={invite.name} toneKey={invite.email} />
-        <span className={styles.nameStack}>
-          <span className={styles.rowName}>{invite.name}</span>
-          <span className={cx(styles.statusLine, styles.statusMuted, styles.inviteEmail, styles.wideOnly)}>{invite.email}</span>
-          <span className={cx(styles.statusLine, styles.statusMuted, styles.wideOnly)}>
-            {today ? invitedLabel(localDateOf(invite.sentAt), today) : 'Invited'}
-            {expired ? ' · link expired' : null}
-          </span>
-          <span className={cx(styles.inviteActions, styles.wideOnly)}>
-            <button
-              type="button"
-              className={styles.inlineAction}
-              onClick={resend}
-              disabled={pending}
-              aria-busy={pending || undefined}
-              aria-label={pending ? undefined : `Resend invite to ${invite.email}`}
-            >
-              {resendLabel}
-            </button>
-            <button type="button" className={styles.inlineAction} aria-label={`Cancel invite to ${invite.email}`} onClick={() => cancelRef.current?.open()}>
-              Cancel
-            </button>
-          </span>
-          {message ? <span role="status" className={styles.inlineStatus}><StatusChip view={message} /></span> : null}
-        </span>
-        {/* Phones: how long ago (or that the link ran out), and Resend / Cancel invite behind ⋯. */}
-        <Chip tone="grey" className={cx(styles.phoneOnly, styles.rowChip, styles.chipLine)}>
-          {expired ? 'Link expired' : today ? invitedShortLabel(localDateOf(invite.sentAt), today) : 'Invited'}
-        </Chip>
-        <MoreMenu
-          label={`More for ${invite.name}`}
-          className={cx(styles.phoneOnly, styles.rowMore)}
-          busy={pending}
-          items={[
-            { label: pending ? 'Sending…' : 'Resend invite', onSelect: resend, disabled: pending },
-            { label: 'Cancel invite…', onSelect: () => cancelRef.current?.open(), danger: true },
-          ]}
-        />
-        {/* The confirm step, outside anything hidden on a phone or laptop so it opens on both. */}
-        <CancelInviteButton inviteId={invite.id} email={invite.email} handle={cancelRef} trigger={false} />
-      </div>
-      <span role="cell" className={cx(styles.cell, styles.cellLast, styles.muted)}>
-        <CardLabel>Last workout</CardLabel>
-        Not joined yet
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellWeek)}>
-        <CardLabel>This week</CardLabel>
-        <Dash />
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellFour)}>
-        <CardLabel>4 weeks</CardLabel>
-        <Dash />
-      </span>
-      <span role="cell" className={cx(styles.cell, styles.cellPlan)}>
-        <CardLabel>Plan</CardLabel>
-        {plan ? (
-          <span className={styles.planStack}>
-            <span className={styles.planTitle}>{plan.kind === 'program' ? plan.name : `Single workout: ${plan.name}`}</span>
-            <span className={styles.planDetail}>
-              {plan.kind === 'program' ? `starts ${formatShortDay(plan.on)}` : formatShortDay(plan.on)}
-              {plan.kind === 'single' && plan.more > 0 ? ` · ${plan.more} more` : null}
+    <ListRow
+      title={invite.name}
+      leading={<Avatar name={invite.name} toneKey={invite.email} />}
+      itemProps={{ 'data-invite-id': invite.id }}
+      className={styles.inviteRow}
+      meta={
+        <>
+          <span className={styles.inviteEmail}>{invite.email}</span>
+          <span>{today ? invitedLabel(localDateOf(invite.sentAt), today) : 'Invited'}</span>
+          {expired ? <Chip tone="amber">Link expired</Chip> : null}
+          {planText ? <span>{planText}</span> : null}
+          {message ? (
+            <span role="status" className={styles.inlineStatus}>
+              <StatusChip view={message} />
             </span>
-          </span>
-        ) : (
-          <span className={styles.muted}>Nothing planned</span>
-        )}
-      </span>
-    </div>
+          ) : null}
+        </>
+      }
+      action={
+        <Button
+          variant="quiet"
+          size="compact"
+          className={styles.rowAction}
+          onClick={resend}
+          pending={pending}
+          aria-label={pending ? undefined : `Resend invite to ${invite.email}`}
+        >
+          {pending ? 'Sending…' : 'Resend'}
+        </Button>
+      }
+      more={
+        <>
+          <MoreMenu
+            label={`More for ${invite.name}`}
+            busy={pending}
+            items={[{ label: 'Cancel invite…', onSelect: () => cancelRef.current?.open(), danger: true }]}
+          />
+          <CancelInviteButton inviteId={invite.id} email={invite.email} handle={cancelRef} />
+        </>
+      }
+    />
   );
 }
 
@@ -313,13 +289,27 @@ export function ClientDirectory({
   const [sort, setSort] = useUrlChoice<DirectorySort>('sort', SORTS, 'last_workout');
   // So "‹ Clients" can reopen the list as it is now where the browser can't step back to it.
   useRememberUrl();
-  // A new invite (just sent from the invite window) switches the list to Invited, so the coach sees it there.
+  // A new invite (just sent from the invite window) switches the list to Invited, so the coach sees it there. While
+  // the window is open its step of history is in the address (?sheet=): switch once it has closed, or closing it
+  // (one step back) would bring the old filter back.
   const knownInvites = useRef(invites);
+  const newInvite = useRef(false);
   useEffect(() => {
     const known = new Set(knownInvites.current.map((i) => i.id));
     knownInvites.current = invites;
-    if (invites.some((i) => !known.has(i.id))) setFilter('invited');
+    if (!invites.some((i) => !known.has(i.id))) return;
+    if (new URLSearchParams(window.location.search).has('sheet')) newInvite.current = true;
+    else setFilter('invited');
   }, [invites, setFilter]);
+  useEffect(() => {
+    const closed = () => {
+      if (!newInvite.current) return;
+      newInvite.current = false;
+      setFilter('invited');
+    };
+    window.addEventListener(INVITE_CLOSED_EVENT, closed);
+    return () => window.removeEventListener(INVITE_CLOSED_EVENT, closed);
+  }, [setFilter]);
 
   const people = useMemo(() => {
     const names = new Map(data.clients.map((c) => [c.id, c.lastWorkoutName]));
@@ -379,11 +369,12 @@ export function ClientDirectory({
       <div className={styles.toolbar} role="search" aria-label="Find clients">
         <SearchBox
           label="Search clients"
-          placeholder={`Search ${total} ${total === 1 ? 'client' : 'clients'}`}
+          placeholder="Search clients"
           value={typed}
           onChange={setQuery}
           className={styles.searchField}
         />
+        {/* One row of chips that scrolls sideways when it doesn't fit (never stacked). */}
         <div role="group" aria-label="Filter clients" className={styles.filters}>
           {chips.map((f) => (
             <button
@@ -397,18 +388,22 @@ export function ClientDirectory({
             </button>
           ))}
         </div>
-        {/* Phones: how many show, beside Sort ("41 active"). The status line below says it for screen readers. */}
-        <span aria-hidden="true" className={cx(styles.phoneOnly, styles.shownCaption)}>
-          {searching ? `${shownTotal} found` : shownCaption(filter, shownTotal)}
-        </span>
-        <label className={styles.sortField}>
-          <span>Sort:</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as DirectorySort)} className={styles.sortSelect}>
-            {(Object.keys(SORT_LABEL) as DirectorySort[]).map((s) => (
-              <option key={s} value={s}>{SORT_LABEL[s]}</option>
-            ))}
-          </select>
-        </label>
+        <div className={styles.listBar}>
+          {/* How many show ("9 active"). The status line below says it for screen readers. */}
+          <span aria-hidden="true" className={styles.shownCaption}>
+            {searching ? `${shownTotal} found` : shownCaption(filter, shownTotal)}
+          </span>
+          {filter === 'invited' && !searching ? null : (
+            <label className={styles.sortField}>
+              <span>Sort:</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value as DirectorySort)} className={styles.sortSelect}>
+                {(Object.keys(SORT_LABEL) as DirectorySort[]).map((s) => (
+                  <option key={s} value={s}>{SORT_LABEL[s]}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
       {/* Always rendered (never display: none), so screen readers announce each change. */}
       <p role="status" className={styles.visuallyHidden}>
@@ -419,42 +414,38 @@ export function ClientDirectory({
             : `Showing all ${counts.active} active`}
       </p>
 
-      <div className={styles.tableWrap}>
-        <div role="table" aria-label="Clients" className={styles.table}>
-          <div role="rowgroup" className={styles.tableHead}>
-            <div role="row" className={styles.row}>
-              <span role="columnheader">Client</span>
-              <span role="columnheader">Last workout</span>
-              <span role="columnheader">This week</span>
-              <span role="columnheader">4 weeks</span>
-              <span role="columnheader">Plan</span>
-            </div>
-          </div>
-          <div role="rowgroup">
-            {shownTotal === 0 ? (
-              <div role="row" className={styles.emptyRow}>
-                <div role="cell">
-                  {total === 0 ? (
-                    'No clients yet. Invite your first client.'
-                  ) : searching ? (
-                    <SearchEmpty things="clients" query={query} onClear={() => setQuery('')} />
-                  ) : filter === 'invited' ? (
-                    'No invites waiting.'
-                  ) : (
-                    'No clients match.'
-                  )}
-                </div>
-              </div>
-            ) : null}
-            {shownClients.map((c) => (
-              <ClientRow key={c.id} id={c.id} name={c.name} row={c.row} today={today} lookbackDays={lookbackDays} />
-            ))}
+      {shownTotal === 0 ? (
+        <p className={styles.emptyLine}>
+          {total === 0 ? (
+            'No clients yet. Invite your first client.'
+          ) : searching ? (
+            <SearchEmpty things="clients" query={query} onClear={() => setQuery('')} />
+          ) : filter === 'invited' ? (
+            'No invites waiting.'
+          ) : (
+            'No clients match.'
+          )}
+        </p>
+      ) : null}
+      {shownClients.length > 0 ? (
+        <RowList aria-label="Clients" columns={COLUMNS} className={styles.clientList}>
+          {shownClients.map((c) => (
+            <ClientRow key={c.id} id={c.id} name={c.name} row={c.row} today={today} lookbackDays={lookbackDays} />
+          ))}
+        </RowList>
+      ) : null}
+      {shownInvites.length > 0 ? (
+        <section aria-labelledby="invites-heading" className={styles.inviteSection}>
+          <h3 id="invites-heading" className={cx(styles.subHeading, filter === 'invited' && !searching && styles.visuallyHidden)}>
+            {`Invited · ${shownInvites.length}`}
+          </h3>
+          <RowList aria-label="Invites" className={styles.inviteList}>
             {shownInvites.map((i) => (
               <InviteRow key={i.id} invite={i} today={today} />
             ))}
-          </div>
-        </div>
-      </div>
+          </RowList>
+        </section>
+      ) : null}
     </section>
   );
 }

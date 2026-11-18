@@ -163,6 +163,8 @@
 .backLink:hover { text-decoration: underline; }
 @media (hover: hover) {
   .listRow:hover { background: var(--ct-surface); }
+  /* A row with nothing to open has no hover. */
+  .listRow:has(> .listRowStatic):hover { background: none; }
 }
 .listRowLink:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
 

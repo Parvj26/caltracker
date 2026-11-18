@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { COMPLETION_WINDOW_DAYS, formatFullName, localToday } from '@caltracker/shared';
-import { Card } from '@/components/ui';
+import { PageHeader, RowList } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
 import { loadHomeData } from '@/lib/coach-home';
@@ -11,8 +10,7 @@ import { avatarTone, initials } from './avatar';
 import { ClientDirectory, type DirectoryInvite, type InvitePlanSummary } from './client-directory';
 import { InviteClientButton } from './invite-dialog';
 import { newestInviteFirst } from './pending-order';
-import { PastClients } from './past-clients';
-import { ResendButton } from './resend-button';
+import { PastClientRow, PastClients } from './past-clients';
 import styles from './clients.module.css';
 
 export const metadata: Metadata = { title: 'Clients' };
@@ -101,60 +99,43 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       plan: planSummary(i.client_invite_plan_items),
     }));
 
+  const invitedCount = pending.length;
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>
-          Clients <span className={styles.titleCount}>{data.clients.length + pending.length}</span>
-        </h1>
-        <InviteClientButton
-          coachName={formatFullName({ firstName, lastName }) || 'Your coach'}
-          library={library.data}
-          programs={programs.data}
-          hints={pickerHints(pickerHistory, library.data)}
-        />
-      </header>
+      {/* The count is clients; invites waiting are counted on their own (the Invited chip and this line). */}
+      <PageHeader
+        title="Clients"
+        count={data.clients.length}
+        subtitle={invitedCount > 0 ? `${invitedCount} ${invitedCount === 1 ? 'invite' : 'invites'} waiting` : undefined}
+        action={
+          <InviteClientButton
+            coachName={formatFullName({ firstName, lastName }) || 'Your coach'}
+            library={library.data}
+            programs={programs.data}
+            hints={pickerHints(pickerHistory, library.data)}
+          />
+        }
+      />
 
       <ClientDirectory data={data} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} initialQuery={initialQuery} />
 
       {past.data.length > 0 ? (
-        <Card className={styles.listCard}>
-          <PastClients count={past.data.length}>
-            <div role="table" aria-label="Past clients" className={cx(styles.rows, styles.pastRows)}>
-              <div role="rowgroup" className={styles.headRow}>
-                <div role="row" className={styles.row}>
-                  <span role="columnheader">Name</span>
-                  <span role="columnheader">Email</span>
-                  <span role="columnheader">Removed</span>
-                  <span role="columnheader"><span className={styles.visuallyHidden}>Actions</span></span>
-                </div>
-              </div>
-              <div role="rowgroup">
-                {past.data.map((p) => (
-                  <div role="row" key={p.user_id} className={styles.row}>
-                    <div role="cell" className={styles.nameCell}>
-                      <Avatar name={p.full_name || p.email} toneKey={p.user_id} />
-                      <Link href={`/clients/${p.user_id}`} className={cx(styles.name, styles.nameLink)}>{p.full_name || p.email || 'Client'}</Link>
-                    </div>
-                    <span role="cell" className={styles.email}>{p.email}</span>
-                    <span role="cell" className={styles.meta}>
-                      {`Removed ${dateFormat.format(new Date(p.removed_at))}`}
-                    </span>
-                    <div role="cell" className={styles.actions}>
-                      <ResendButton
-                        email={p.email}
-                        firstName={p.first_name || p.email.split('@')[0] || 'Client'}
-                        lastName={p.last_name}
-                        label="Re-invite"
-                        ariaLabel={`Re-invite ${p.full_name || p.email}`}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </PastClients>
-        </Card>
+        <PastClients count={past.data.length}>
+          <RowList aria-label="Past clients" className={styles.clientList}>
+            {past.data.map((p) => (
+              <PastClientRow
+                key={p.user_id}
+                id={p.user_id}
+                name={p.full_name || p.email || 'Client'}
+                email={p.email}
+                firstName={p.first_name || p.email.split('@')[0] || 'Client'}
+                lastName={p.last_name}
+                removed={`Removed ${dateFormat.format(new Date(p.removed_at))}`}
+                leading={<Avatar name={p.full_name || p.email} toneKey={p.user_id} />}
+              />
+            ))}
+          </RowList>
+        </PastClients>
       ) : null}
     </div>
   );

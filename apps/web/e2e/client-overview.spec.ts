@@ -141,11 +141,11 @@ test('Overview is the default tab and shows training, highlights, body metrics, 
 
   const training = card(page, 'Training');
   await expect(training.getByText('Last 7 days')).toBeVisible();
-  await expect(training.locator('dd').nth(0)).toHaveText('1/2');
+  await expect(training.locator('dd').nth(0)).toHaveText(/^1\/2tracked/);
   // The workout Tara added herself counts in both windows, apart from the plan.
   await expect(training.getByText('+1 added by the client')).toHaveCount(2);
-  await expect(training.locator('dd').nth(1)).toHaveText('2/3');
-  await expect(training.locator('dd').nth(2)).toHaveText('2');
+  await expect(training.locator('dd').nth(1)).toHaveText(/^2\/3tracked/);
+  await expect(training.locator('dd').nth(2)).toHaveText(/^2planned$/);
 
   const highlights = card(page, 'Highlights');
   await expect(highlights.getByText('12,345 kg')).toBeVisible();
@@ -179,7 +179,7 @@ test('the coach keeps a goal, limitations and notes; an injury chip tops Overvie
   await expect(page.getByTestId('injury-chip')).toHaveCount(0);
 
   const goal = card(page, 'Goal & countdown');
-  await goal.getByRole('button', { name: 'Set a goal' }).click();
+  await goal.getByRole('button', { name: 'Set goal' }).click();
   await goal.getByLabel('Goal', { exact: true }).fill('Run the Dubai half marathon');
   await goal.getByLabel('Target date (optional)').fill(dayOffset(10));
   await goal.getByRole('button', { name: 'Save goal' }).click();
@@ -253,7 +253,8 @@ test('the tabs open Training, Body and Documents, ⋯ opens Settings, and old li
   await page.getByRole('button', { name: 'More for this client' }).click();
   await page.getByRole('menuitem', { name: 'Client settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/settings$`));
-  await expect(page.getByRole('button', { name: 'Remove Tara Track' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove client…' })).toBeVisible();
 
   // Home's Add scan shortcut, and links made before the tabs. An old Assign link (?assign=1) lands on Training,
   // with nothing popping up.

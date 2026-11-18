@@ -119,15 +119,21 @@ export function ClientCalendar({
     setShown(entries);
     setItems(entries);
   }
-  const [assigning, setAssigning] = useState(openOnLoad === 'program' && !readOnly);
-  const [adding, setAdding] = useState(openOnLoad === 'workout' && !readOnly);
-  // Once opened, drop ?add= from the address, so a reload or Back doesn't open the dialog again.
+  const [assigning, setAssigning] = useState(false);
+  const [adding, setAdding] = useState(false);
+  // Drop ?add= from the address first, then open the dialog (it adds its own ?sheet= step on top of the clean
+  // address), so a reload or Back doesn't open it again.
   useEffect(() => {
     if (!openOnLoad) return;
     const url = new URL(window.location.href);
     url.searchParams.delete('add');
     window.history.replaceState(window.history.state, '', url);
-  }, [openOnLoad]);
+    if (readOnly) return;
+    // Opening only after the address is clean is the point here (the dialog's own history step copies the address).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (openOnLoad === 'program') setAssigning(true);
+    else setAdding(true);
+  }, [openOnLoad, readOnly]);
   const [picker, setPicker] = useState<{ date: IsoDate } | null>(null);
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   // Every workout this page knows about, by day, for the Move and Add windows' quick days ("free", "1 workout"):
@@ -353,7 +359,7 @@ export function ClientCalendar({
             <Button variant="secondary" onClick={() => setAssigning(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
               Assign program
             </Button>
-            <Button onClick={() => setAdding(true)}>+ Add workout</Button>
+            <Button variant="create" onClick={() => setAdding(true)}>+ Add workout</Button>
           </div>
         )}
       </header>

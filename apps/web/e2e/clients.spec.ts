@@ -104,13 +104,12 @@ test('invite one client: the Sent screen, then they show as Invited and can be r
 
   // The list switches to Invited to show the new invite.
   await expect(page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Invited/ })).toHaveAttribute('aria-pressed', 'true');
-  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: email });
+  const row = page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: email });
   await expect(row).toContainText('New Client');
   await expect(row).toContainText('Invited today');
-  await expect(row).toContainText('Not joined yet');
-  // No plan yet: the Plan cell says so (it used to show the email under the "Plan" label).
-  await expect(row.getByRole('cell').last()).toContainText('Nothing planned');
-  await expect(row.getByRole('cell').last()).not.toContainText(email);
+  // An invite has its own short row: no empty client fields (last workout, this week, plan).
+  await expect(row).not.toContainText('Not joined yet');
+  await expect(row).not.toContainText('Nothing planned');
   // A resend right after sending changes nothing: the link already in the inbox keeps working.
   await row.getByRole('button', { name: `Resend invite to ${email}` }).click();
   await expect(row.getByText(/Already sent a moment ago/)).toBeVisible();
@@ -135,8 +134,8 @@ test('invite with a program: it shows on the Invited row and goes on their calen
   await expect(sent.getByText(`Their ${program.name} program begins ${shortDay(start)}`)).toBeVisible();
   await sent.getByRole('button', { name: 'Done' }).click();
 
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  const row = table.getByRole('row').filter({ hasText: `Pat Program${tag}` });
+  const table = page.getByRole('list', { name: 'Clients', exact: true });
+  const row = page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: `Pat Program${tag}` });
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText(program.name);
   await expect(row).toContainText(`starts ${shortDay(start)}`);
@@ -176,7 +175,7 @@ test('invite with a single workout: pick it, choose the day, and it lands on tha
   await expect(sent.getByText(`${workout.name} is on their calendar for ${shortDay(day)}`)).toBeVisible();
   await sent.getByRole('button', { name: 'Done' }).click();
 
-  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: `Sid Single${tag}` });
+  const row = page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: `Sid Single${tag}` });
   await expect(row).toContainText('Invited today');
   await expect(row).toContainText(`Single workout: ${workout.name}`);
 
@@ -197,7 +196,7 @@ test('re-inviting with "Nothing yet" clears a plan chosen earlier, so it is not 
   await dialog.getByRole('button', { name: workout.name, exact: true }).click();
   await dialog.getByRole('button', { name: 'Send invite' }).click();
   await page.getByRole('dialog', { name: 'Invite sent to Cleo' }).getByRole('button', { name: 'Done' }).click();
-  const row = page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: `Cleo Clear${tag}` });
+  const row = page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: `Cleo Clear${tag}` });
   await expect(row).toContainText(`Single workout: ${workout.name}`);
 
   // The same email again, with Nothing yet (the default).
@@ -236,7 +235,7 @@ test('invites are listed newest first under Invited, apart from the clients', as
     await fillPerson(page, firstName, lastName, email);
     await dialog.getByRole('button', { name: 'Send invite' }).click();
     await page.getByRole('dialog', { name: `Invite sent to ${firstName}` }).getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('table', { name: 'Clients', exact: true }).getByRole('row').filter({ hasText: email })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Invites', exact: true }).getByRole('listitem').filter({ hasText: email })).toBeVisible();
   };
   // Added first, and first by last name: newest-first must still put it below the later one.
   const older = `older-${run}@example.com`;
@@ -246,12 +245,14 @@ test('invites are listed newest first under Invited, apart from the clients', as
   // The plain list (a reload would stay on Invited: the chip is in the address).
   await page.goto('/clients');
   // Active (the default) lists clients only; invites wait under Invited.
-  const table = page.getByRole('table', { name: 'Clients', exact: true });
-  await expect(table.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();
-  await expect(table.getByRole('row').filter({ hasText: newer })).toHaveCount(0);
+  const table = page.getByRole('list', { name: 'Clients', exact: true });
+  const invites = page.getByRole('list', { name: 'Invites', exact: true });
+  await expect(table.getByRole('listitem').filter({ hasText: 'Demo Client' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: newer })).toHaveCount(0);
   await showInvites(page);
-  await expect(table.getByRole('row').filter({ hasText: newer })).toBeVisible();
-  const rows = await table.getByRole('row').allTextContents();
+  await expect(invites.getByRole('listitem').filter({ hasText: newer })).toBeVisible();
+  await expect(table).toHaveCount(0);
+  const rows = await invites.getByRole('listitem').allTextContents();
   const at = (text: string) => rows.findIndex((r) => r.includes(text));
   expect(at(newer)).toBeGreaterThan(-1);
   expect(at(newer)).toBeLessThan(at(older));
@@ -341,16 +342,16 @@ test('CSV upload previews valid rows and line errors, then sends the valid ones'
   await expect(preview.getByText('Invite sent')).toHaveCount(3);
   await dialog.getByRole('button', { name: 'Close' }).click();
 
-  const list = page.getByRole('table', { name: 'Clients', exact: true });
+  const list = page.getByRole('list', { name: 'Invites', exact: true });
   for (const who of ['alice', 'bob', 'cara']) {
     // Exactly one row each, so the duplicate line produced no second copy.
-    await expect(list.getByRole('row').filter({ hasText: `${who}-${run}@example.com` })).toHaveCount(1);
+    await expect(list.getByRole('listitem').filter({ hasText: `${who}-${run}@example.com` })).toHaveCount(1);
   }
   await expect(list.getByText('not-an-email')).toHaveCount(0);
 });
 
 test('the demo client is listed under Clients', async ({ page }) => {
-  const clients = page.getByRole('table', { name: 'Clients', exact: true });
-  await expect(clients.getByRole('row').filter({ hasText: 'Demo Client' })).toBeVisible();
+  const clients = page.getByRole('list', { name: 'Clients', exact: true });
+  await expect(clients.getByRole('listitem').filter({ hasText: 'Demo Client' })).toBeVisible();
   await expect(page.getByText('No clients yet')).toHaveCount(0);
 });

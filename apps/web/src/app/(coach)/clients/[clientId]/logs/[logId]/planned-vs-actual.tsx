@@ -48,6 +48,19 @@ function actualText(s: LogSetDoc, t: TrackingType, units: Units): string {
   return formatResult(values, t, units) ?? '–';
 }
 
+/**
+ * The planned set in the same words as the actual one ("80 kg × 8"), so the two columns compare at a glance. A range
+ * or "to failure" can't be said that way, so it keeps the plan's own wording ("8–10 reps · 80 kg").
+ */
+export function plannedText(t: LogSetDoc['target'], trackingType: TrackingType, units: Units): string {
+  const single = t.repsMin !== null && (t.repsMax === null || t.repsMax === t.repsMin);
+  if (!t.toFailure && (single || t.repsMin === null)) {
+    const same = formatResult({ reps: t.repsMin, weightKg: t.weightKg, durationS: t.durationS, distanceM: t.distanceM }, trackingType, units);
+    if (same) return same;
+  }
+  return formatLogSetTarget(t, trackingType, units);
+}
+
 /** Something the client typed on the phone (a workout or an exercise note), labelled so the coach knows who wrote it. */
 export function ClientNote({ text, label = "Client's note" }: { text: string | null; label?: string }) {
   const body = text?.trim();
@@ -149,7 +162,7 @@ export function PlannedVsActual({
                                 {i + 1}
                                 {set.setType === 'warmup' ? ' · warm-up' : set.setType === 'drop' ? ' · drop' : ''}
                               </th>
-                              <td>{formatLogSetTarget(set.target, ex.trackingType, units)}</td>
+                              <td>{plannedText(set.target, ex.trackingType, units)}</td>
                               <td>
                                 {edit && draft ? (
                                   <span className={styles.inputs}>

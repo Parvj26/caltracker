@@ -50,11 +50,11 @@ export function TodayCard({ data, today, coachId }: { data: ClientOverview; toda
 
   if (t.kind === 'planned') {
     const extra = data.todayPreviews[t.workout.id];
-    const state = t.status.kind === 'done' ? <Chip tone="lime">Done ✓</Chip> : t.status.kind === 'training' ? <Chip tone="lime">● Live</Chip> : null;
+    const state = t.status.kind === 'done' ? <Chip tone="blue">✓ Done</Chip> : t.status.kind === 'training' ? <Chip tone="pink">● Live</Chip> : null;
     return (
       <section aria-label="Today" className={styles.today} data-today="planned">
         <div className={styles.todayTop}>
-          <Chip tone="lime">{dayChip}</Chip>
+          <Chip tone="grey">{dayChip}</Chip>
           {state}
         </div>
         <div>

@@ -475,8 +475,11 @@ function DayCell({
         <span className={styles.dayNumber} aria-hidden="true">
           <span className={styles.dayWeekday}>{formatWeekday(date)} </span>
           {firstShown || date.endsWith('-01') ? formatDayMonth(date) : Number(date.slice(8))}
+          {isToday ? <span className={styles.todayTag}> Today</span> : null}
         </span>
       )}
+      {/* In the narrow list of days an empty day is one short row: "Sat 21 · No workouts  +". */}
+      {layout !== 'month' && items.length === 0 ? <span className={styles.emptyDayNote}>No workouts</span> : null}
       {items.length > 0 ? (
         <DayItems
           date={date}
@@ -674,6 +677,7 @@ function DayItem({
         item.programName ? styles.programItem : styles.singleItem,
         isDragging && styles.dragging,
         missed && styles.missed,
+        item.logId ? styles.doneItem : !missed && styles.upcomingItem,
         href && styles.clickable,
         draggable && styles.grab,
         lockedDone && styles.locked,
@@ -714,27 +718,29 @@ function DayItem({
         ) : null}
       </div>
       {showPreview && item.preview && item.preview.lines.length > 0 ? (
+        // One line: how many exercises and their names (not every set); screen readers hear each exercise in full.
         <div className={styles.cardPreview}>
-          {item.preview.lines.map((line, i) => (
-            <span key={i} className={styles.previewLine} title={line.text}>
-              <span aria-hidden="true">{line.text}</span>
-              <span className={styles.srOnly}>{line.spoken}</span>
-            </span>
-          ))}
-          {item.preview.more > 0 ? (
-            <span className={styles.previewMore}>
-              + {item.preview.more} more {item.preview.more === 1 ? 'exercise' : 'exercises'}
-            </span>
-          ) : null}
+          <span className={styles.previewSummary} aria-hidden="true" title={previewSummary(item.preview)}>
+            {previewSummary(item.preview)}
+          </span>
+          <span className={styles.srOnly}>
+            {item.preview.lines.map((line) => line.spoken).join('. ')}
+            {item.preview.more > 0 ? `. ${item.preview.more} more ${item.preview.more === 1 ? 'exercise' : 'exercises'}` : ''}
+          </span>
         </div>
       ) : null}
       {item.logId && logHref ? (
         <Link href={logHref(item.logId)} className={styles.doneNote} aria-label={`Done: view the ${item.name} log`} {...keepPress}>
-          <span aria-hidden="true">✓</span> Done
+          <span aria-hidden="true" className={styles.doneTick}>✓</span> Done
         </Link>
       ) : null}
       {item.logId && item.loggedByCoach ? <span className={styles.coachNote}>Logged by coach</span> : null}
-      {missed ? <span className={styles.missedNote}>Missed</span> : null}
+      {missed ? (
+        <span className={styles.missedNote}>
+          <span aria-hidden="true">!</span>
+          <span>Missed</span>
+        </span>
+      ) : null}
       {lockedTip ? (
         <span role="status" className={styles.lockedTip}>
           {DONE_STAYS}
@@ -755,6 +761,13 @@ function DayItem({
 }
 
 const DONE_STAYS = 'Done workouts stay on the day they were done';
+
+/** "3 exercises · Barbell Squat, Pushups, Pullups": a card's one-line summary (the names, never every set). */
+export function previewSummary(preview: WorkoutPreview): string {
+  const count = preview.lines.length + preview.more;
+  const names = preview.lines.map((l) => l.text.replace(/^\d+× /, '').split(' · ')[0]);
+  return `${count} ${count === 1 ? 'exercise' : 'exercises'} · ${names.join(', ')}${preview.more > 0 ? ', …' : ''}`;
+}
 /** Presses on these keep their own behaviour: they never reach the card's drag sensors (mouse, touch) or done-card tip. */
 const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
 const keepPress = { onPointerDown: stop, onMouseDown: stop, onTouchStart: stop };
