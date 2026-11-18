@@ -19,15 +19,18 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await page.getByRole('link', { name: 'New workout' }).click();
   await expect(page).toHaveURL(/\/workouts\/new$/);
 
+  // Nothing to save yet: no Save button (UI rules §8).
+  await expect(page.getByRole('button', { name: 'Save workout' })).toHaveCount(0);
+
+  // Straight sets: 3 x 10 @ 60 kg, then a warm-up first and a drop after the last set.
+  await pickExercise(page, '+ Exercise', 'Barbell Squat');
+
   // Saving with no name says so next to the field.
   await page.getByRole('button', { name: 'Save workout' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Enter a name.' })).toBeVisible();
   await expect(page.getByLabel('Workout name')).toHaveAttribute('aria-invalid', 'true');
 
   await page.getByLabel('Workout name').fill(name);
-
-  // Straight sets: 3 x 10 @ 60 kg, then a warm-up first and a drop after the last set.
-  await pickExercise(page, '+ Exercise', 'Barbell Squat');
 
   // Each set has captions over its boxes, and the empty boxes say what goes in them. No per-set notes.
   const squat = page.getByRole('region', { name: 'Barbell Squat' });
@@ -368,8 +371,9 @@ test.describe('sections and pick-one groups', () => {
     await expect(setRow(page, X('Medicine Ball Slam'), 'set 3').getByLabel('Weight (lb)')).toHaveValue('15');
     await expect(page.getByRole('button', { name: `Superset ${X('Lat Pulldown')} with ${X('Tricep Pushdown')}` })).toHaveAttribute('aria-pressed', 'true');
 
-    // Moving the pick-one group (numbered 2: supersets are lettered) into Core empties Finisher, so that section goes away.
-    await page.getByLabel('Move pick-one group 2 to a section').selectOption({ label: 'Core (Activation)' });
+    // Moving the pick-one group (numbered by its place: every block counts once) into Core empties Finisher, so that
+    // section goes away.
+    await page.getByLabel(/^Move pick-one group \d+ to a section$/).selectOption({ label: 'Core (Activation)' });
     await expect(page.getByRole('textbox', { name: 'Section name', exact: true })).toHaveCount(3);
   });
 

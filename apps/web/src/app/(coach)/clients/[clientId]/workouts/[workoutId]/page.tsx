@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { clientWorkoutPageTitle } from '@/lib/page-titles';
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { suggestionsForWorkout } from '@caltracker/shared';
 import { ProgressionCard } from '@/components/progression-card';
+import { ParentLink } from '@/components/ui';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { loadExercisePrefs } from '@/lib/workouts';
 import { requireCoach } from '@/lib/auth';
@@ -50,9 +50,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
   return (
     <div className={styles.page}>
       {/* Back to the days around this workout, in the coach's own calendar view (remembered in a cookie). */}
-      <Link href={`/clients/${client.id}/training?from=${loaded.scheduledOn}`} className={styles.back}>
-        ← {client.name}&apos;s calendar
-      </Link>
+      <ParentLink href={`/clients/${client.id}/training?from=${loaded.scheduledOn}`} label={`${client.name}'s calendar`} />
       <ProgressionCard doc={loaded.doc} suggestions={suggestions} units={units} />
       {/* key: opening a different workout starts a fresh builder. */}
       <WorkoutBuilder

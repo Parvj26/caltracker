@@ -126,7 +126,7 @@ async function savedKinds(id: string): Promise<string[]> {
 test('an 8-exercise workout is one row each, with link icons, the first on screen, and More / + Exercise (+ Save when changed) at the bottom', async ({ page }) => {
   await openSeeded(page);
   // The first exercise is on the first screen, above the bottom bar (B#2).
-  const firstBox = (await row(page, EXERCISES[0]).boundingBox())!;
+  const firstBox = (await row(page, EXERCISES[0]!).boundingBox())!;
   const barTop = (await page.getByRole('button', { name: 'More', exact: true }).boundingBox())!.y;
   expect(firstBox.y + firstBox.height).toBeLessThan(barTop);
   // The name shows once, as the editable title; nothing to save yet, so no Save button.

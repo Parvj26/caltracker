@@ -264,9 +264,15 @@
 .saveBar > :not([role='status']):not(button):not(.barTools):not(.titleField):not(h1) { flex-basis: 100%; }
 /* The workout's name is the page title, edited in place (UI rules §8: the title shows once). Its label is for screen
    readers; the box looks like a heading until hovered or focused. */
-.titleField { flex: 1 1 180px; min-width: 0; }
+.titleField { flex: 1 1 180px; min-width: 0; margin: 0; }
+.titleField label { display: flex; }
 .titleField label > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .titleField input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  color: var(--ct-ink);
+  font-family: inherit;
   min-height: var(--ct-tap-min);
   margin-left: calc(-1 * var(--ct-space-2));
   padding: var(--ct-space-1) var(--ct-space-2);
@@ -842,17 +848,10 @@
   .barTools, .saveBar > .barAdd, .saveBar > .saveButton { display: none; }
   .details { gap: var(--ct-space-2); }
 
-  /* The bottom bar: More and a wide "+ Exercise". */
-  .phoneBar {
-    position: sticky;
-    z-index: 11;
-    bottom: 0;
-    display: flex;
-    gap: var(--ct-space-2-5);
-    padding: var(--ct-space-3) 0 calc(var(--ct-space-3) + env(safe-area-inset-bottom));
-    background: var(--ct-bg);
-    border-top: var(--ct-border-width-card) solid var(--ct-border);
-  }
+  /* The bottom bar (the kit's PhoneActionBar: fixed above the home indicator, rides on the keyboard): More, a wide
+     "+ Exercise" and, while there are unsaved changes, Save. Hidden from 600 px up, where the top bar has them. */
+  .phoneBar { display: flex; }
+  .phoneBar > :last-child { flex: 1; gap: var(--ct-space-2-5); min-width: 0; }
   .phoneBar .addExercise { flex: 1; min-height: 56px; }
   .phoneBar .phoneSave { flex: none; min-height: 56px; padding-inline: var(--ct-space-4-5); }
 }

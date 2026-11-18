@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { workoutPageTitle } from '@/lib/page-titles';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
+import { ParentLink } from '@/components/ui';
 import { requireCoach } from '@/lib/auth';
 import { getWorkoutDoc } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -29,7 +29,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
     <div className={styles.page}>
       {/* The name shows once: the builder's editable title (with the page's h1). Assign and ⋯ sit by the back link. */}
       <div className={header.topRow}>
-        <Link href="/workouts" className={styles.back}>← Workouts</Link>
+        <ParentLink href="/workouts" label="Workouts" />
         <WorkoutPageActions id={loaded.doc.id} name={loaded.doc.name} />
       </div>
       {/* key: opening a different workout starts a fresh builder. */}

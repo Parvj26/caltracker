@@ -1,7 +1,7 @@
 'use client';
 
 import type { ErrorCode } from '@caltracker/shared';
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BUILDER_SETS,
@@ -53,7 +53,7 @@ import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
 import { SAVED_CHIP_MS } from '@/components/save-status';
-import { Button, Chip, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
+import { Button, Chip, ErrorText, notAContact, PhoneActionBar, TextAreaField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
 import { AddSectionMenu } from './add-section-menu';
@@ -219,6 +219,7 @@ export function WorkoutBuilder({
   const [reordering, setReordering] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const nameId = useId();
   // The large title shrinks once the page scrolls (the sentinel just above the top bar leaves the screen).
   const topSentinel = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
@@ -644,6 +645,7 @@ export function WorkoutBuilder({
 
   // Save shows only while there is something to save (UI rules §8, no autosave). A program day's sheet keeps it.
   const showSave = embedded || dirty || pending;
+  const TitleTag = pageTitle ? 'h1' : 'div';
   // A save that failed for a reason other than the fields (offline, server): "Couldn't save" and the button says Retry.
   const failed = dirty && !pending && formError !== null && formError !== 'workout_fields_invalid';
   const saveButton = (label: string, className: string | undefined) => (
@@ -806,33 +808,44 @@ export function WorkoutBuilder({
       {/* The top bar: the workout's name is the title (editable, shown once), its save status, and on iPad and desktop
           the tools, "+ Exercise" and Save while there are unsaved changes. On an iPhone Save sits in the bottom bar. */}
       <div ref={saveBarRef} className={styles.saveBar} data-compact={compact ? '' : undefined}>
-        {pageTitle ? <h1 className={styles.visuallyHidden}>{doc.name.trim() || 'New workout'}</h1> : null}
-        <TextField
-          label="Workout name"
-          className={styles.titleField}
-          enterKeyHint="done"
-          placeholder="New workout"
-          maxLength={100}
-          value={doc.name}
-          // A workout's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check underlines.
-          {...notAContact('workout-title')}
-          autoCorrect="off"
-          autoCapitalize="sentences"
-          spellCheck={false}
-          {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
-          onChange={(e) => {
-            const name = e.target.value;
-            change((d) => ({ ...d, name }));
-            // "Enter a name." goes as soon as the name is valid again, not at the next save.
-            if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
-              setErrors((cur) => {
-                const next = new Map(cur);
-                next.delete('name');
-                return next;
-              });
-            }
-          }}
-        />
+        {/* The name is the title: on its own page an h1 (named after the workout) holding the box itself. Only
+            phrasing content inside, so the heading stays valid HTML; the error goes under it. */}
+        <TitleTag className={styles.titleField} {...(pageTitle ? { 'aria-label': doc.name.trim() || 'New workout' } : {})}>
+          <label>
+            <span>Workout name</span>
+            <input
+              id={nameId}
+              enterKeyHint="done"
+              placeholder="New workout"
+              maxLength={100}
+              value={doc.name}
+              // A workout's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check underlines.
+              {...notAContact('workout-title')}
+              autoCorrect="off"
+              autoCapitalize="sentences"
+              spellCheck={false}
+              aria-invalid={errors.has('name') ? true : undefined}
+              aria-describedby={errors.has('name') ? `${nameId}-error` : undefined}
+              onChange={(e) => {
+                const name = e.target.value;
+                change((d) => ({ ...d, name }));
+                // "Enter a name." goes as soon as the name is valid again, not at the next save.
+                if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
+                  setErrors((cur) => {
+                    const next = new Map(cur);
+                    next.delete('name');
+                    return next;
+                  });
+                }
+              }}
+            />
+          </label>
+        </TitleTag>
+        {errors.has('name') ? (
+          <ErrorText id={`${nameId}-error`} code="field_format">
+            {errors.get('name')![0]!}
+          </ErrorText>
+        ) : null}
         <BuilderStatus pending={pending} dirty={dirty} failed={failed} everSaved={everSaved} savedAt={savedAt} />
         <span className={styles.barTools}>
           <Button variant="secondary" className={styles.toolButton} disabled={doc.blocks.length < 2} onClick={() => setReordering(true)} data-ph-capture-attribute-label="workout_reorder">
@@ -865,7 +878,7 @@ export function WorkoutBuilder({
         {full ? <p className={styles.caption}>{fullNote}</p> : null}
       </div>
 
-      <div className={styles.phoneBar}>
+      <PhoneActionBar className={styles.phoneBar} label="Workout actions">
         <button type="button" className={styles.moreButtonBig} aria-haspopup="dialog" onClick={() => setMoreOpen(true)} data-ph-capture-attribute-label="workout_more">
           <Icon name="dots" size={20} />
           More
@@ -882,7 +895,7 @@ export function WorkoutBuilder({
         </Button>
         {/* Save in thumb reach, only while there is something to save (a program day's sheet has its own Save). */}
         {showSave && !embedded ? saveButton('workout_save_phone', styles.phoneSave) : null}
-      </div>
+      </PhoneActionBar>
 
       {moreOpen ? (
         <MoreSheet
