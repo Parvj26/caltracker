@@ -182,10 +182,12 @@
   text-align: left;
 }
 .grid td { vertical-align: top; padding: 0; }
-.grid .weekHead { width: 6.5rem; white-space: nowrap; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
+.grid .weekHead { width: 4.75rem; white-space: nowrap; color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
 /* The week labels stay in view when the grid scrolls sideways. */
 .grid .weekHead { position: sticky; left: 0; z-index: 1; background: var(--ct-bg); }
 .addWeekRow { display: flex; }
+/* "Copy week" wraps onto two lines in the narrow week column, so the seven days keep their width. */
+.grid .weekHead .smallButton { white-space: normal; line-height: 1.15; padding: var(--ct-space-1) var(--ct-space-2); }
 
 .cell {
   display: flex;
