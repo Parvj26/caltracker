@@ -120,6 +120,13 @@ test.describe('on an iPhone', () => {
     expect(Math.round(sheetBox.y + sheetBox.height)).toBe(Math.round((await tabBar(page).boundingBox())!.y));
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(IPHONE.width);
 
+    // Shift+Tab from the first choice stays in the sheet (its screen-reader Close button), and Tab goes round it.
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Close library' })).toBeFocused();
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('#library-sheet') || document.activeElement?.textContent === 'Library')).toBe(true);
+    }
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(libraryTab(page)).toBeFocused();

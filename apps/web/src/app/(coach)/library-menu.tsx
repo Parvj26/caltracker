@@ -12,6 +12,7 @@ import coach from './coach.module.css';
 import styles from './library.module.css';
 
 const PHONE_QUERY = '(max-width: 599.98px)';
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const SECTIONS = [
   { href: '/workouts', letter: 'W', name: 'Workouts', sub: 'Single sessions you build and assign', phoneSub: 'Single sessions' },
@@ -21,13 +22,21 @@ const SECTIONS = [
 
 /**
  * Keyboard and pointer handling for an open Library panel: focus starts on the first choice, Escape closes and returns
- * focus to the button that opened it, Tab goes round the choices (and that button), and a press outside closes it.
+ * focus to the button that opened it, Tab goes round what the panel shows (and that button), and a press outside or a
+ * change of page (back or forward) closes it.
  */
 function usePanel(open: boolean, close: (refocus: boolean) => void, trigger: RefObject<HTMLElement | null>, panel: RefObject<HTMLElement | null>) {
+  const pathname = usePathname();
+  const openedOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) openedOn.current = null;
+    else if (openedOn.current === null) openedOn.current = pathname;
+    else if (openedOn.current !== pathname) close(false);
+  }, [open, pathname, close]);
   useEffect(() => {
     if (!open) return;
-    const choices = () => Array.from(panel.current?.querySelectorAll<HTMLElement>('a[href]') ?? []);
-    choices()[0]?.focus({ preventScroll: true });
+    panel.current?.querySelector<HTMLElement>('a[href]')?.focus({ preventScroll: true });
+    const choices = () => Array.from(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter((el) => el.getClientRects().length > 0);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();

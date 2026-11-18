@@ -77,3 +77,14 @@ test('Library stays lit on a detail page, and the old addresses still open', asy
   await page.goto('/clients');
   await expect(library(page)).not.toHaveAttribute('aria-current');
 });
+
+test('going back or forward while the pop-up is open closes it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInAsCoach(page);
+  await page.goto('/programs');
+  await library(page).click();
+  await expect(popup(page)).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/clients$/);
+  await expect(popup(page)).toBeHidden();
+});
