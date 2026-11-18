@@ -191,7 +191,8 @@ test('Home lists every client who needs something once, most urgent first, with 
   await expect(row('Quinn Quiet')).toContainText('No workout in 8 days');
 
   // Each row has exactly one fix: Message for a miss or a quiet client, Assign when the plan runs out.
-  for (const r of await rows.all()) await expect(r.getByRole('link')).toHaveCount(1);
+  // (The row itself is a link too: it opens the client.)
+  for (const r of await rows.all()) await expect(r.getByRole('link', { name: /^(Message|Assign to|Add a scan for) / })).toHaveCount(1);
   await expect(row('Rowan Run').getByRole('link', { name: 'Message Rowan Run' })).toHaveAttribute('href', `/messages/${ids.run}`);
   await expect(row('Quinn Quiet').getByRole('link', { name: 'Message Quinn Quiet' })).toHaveAttribute('href', `/messages/${ids.quiet}`);
   await expect(row('Enid Ending').getByRole('link', { name: 'Assign to Enid Ending' })).toHaveAttribute('href', `/clients/${ids.ending}/training`);

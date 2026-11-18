@@ -14,6 +14,7 @@ import {
   weekProgress,
   type HomeClient,
 } from '@caltracker/shared';
+import { ButtonLink, ListRow, RowList } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
 import { checkInput } from '@/lib/daily-check';
@@ -225,7 +226,8 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
                   );
                 })}
               </ul>
-              <p className={styles.hint}>⋯ has Message, Assign and Open client.</p>
+              {/* A hint for screen readers only (sighted coaches see the ⋯ buttons). */}
+              <p className={styles.srOnly}>Each row&apos;s ⋯ has Message, Assign and Open client.</p>
             </>
           )}
         </section>
@@ -254,28 +256,32 @@ export function HomeView({ coachFirstName, coachId, data, live }: { coachFirstNa
                   </button>
                 ))}
               </div>
-              <ul className={styles.attentionList}>
+              <RowList aria-label="Clients who need attention" className={styles.attentionList}>
                 {shown.map(({ clientId, reason, more }) => {
                   const c = byId.get(clientId);
                   if (!c) return null;
                   const name = fullName(c);
                   const fix = fixFor(reason, clientId, name);
                   return (
-                    <li key={clientId} className={styles.attentionRow}>
-                      <span className={styles.who}>
-                        <span className={styles.name} title={name}>{name}</span>
+                    <ListRow
+                      key={clientId}
+                      href={`/clients/${clientId}`}
+                      title={name}
+                      meta={
                         <span className={cx(styles.reason, isUrgent(reason) && styles.reasonUrgent)}>
                           {reasonLine(reason, today)}
                           {more > 0 ? <span className={styles.more}> +{more} more</span> : null}
                         </span>
-                      </span>
-                      <Link href={fix.href} className={cx(styles.action, styles['action-white'])} aria-label={fix.ariaLabel}>
-                        {fix.label}
-                      </Link>
-                    </li>
+                      }
+                      action={
+                        <ButtonLink href={fix.href} variant="quiet" size="compact" aria-label={fix.ariaLabel}>
+                          {fix.label}
+                        </ButtonLink>
+                      }
+                    />
                   );
                 })}
-              </ul>
+              </RowList>
               {attention.length > SHOWN && !showAll ? (
                 <button type="button" className={styles.showAll} onClick={() => setShowAll(true)}>
                   Show all {attention.length}
