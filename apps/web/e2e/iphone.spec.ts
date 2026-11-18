@@ -177,8 +177,9 @@ test('a tap on a link shows the loading bar straight away', async ({ page }) => 
     await new Promise((r) => setTimeout(r, 1500));
     await route.continue();
   });
-  // On an iPhone Programs is a tab in the bottom tab bar.
-  await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: 'Programs' }).click();
+  // On an iPhone Programs is behind the Library tab in the bottom tab bar.
+  await page.getByRole('navigation', { name: 'Tabs' }).getByRole('button', { name: 'Library' }).click();
+  await page.getByRole('dialog', { name: 'Library' }).getByRole('link', { name: /^Programs/ }).click();
   await expect(page.getByTestId('nav-progress')).toBeVisible({ timeout: 1000 });
   await expect(page).toHaveURL(/\/programs$/);
   await expect(page.getByTestId('nav-progress')).toBeHidden();

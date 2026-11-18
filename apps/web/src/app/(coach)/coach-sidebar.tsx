@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cx } from '@/components/ui/cx';
 import { cycleTabTarget } from './focus-trap';
 import { LAST_PAGE_KEY } from './help/support-page';
+import { LibrarySheet } from './library-menu';
 import { UnreadTotalContext, useUnreadTotal } from './messages-nav-link';
 import { PhoneTabBar } from './phone-tab-bar';
 import styles from './coach.module.css';
@@ -15,8 +16,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabi
 
 /**
  * The coach menu. On iPad and desktop it is the side menu (a full sidebar, or an icon rail below 1200 px). On an iPhone
- * a tab bar sits at the bottom (Home, Clients, Messages, Programs, More) and More opens the rest of the menu as a
- * bottom sheet of big tiles: the sidebar itself, restyled by CSS. It also owns the unread message total, so the
+ * a tab bar sits at the bottom (Home, Clients, Library, Messages, More): Library opens a sheet of Workouts, Exercise
+ * library and Programs, and More opens the rest of the menu as a bottom sheet of big tiles: the sidebar itself,
+ * restyled by CSS. It also owns the unread message total, so the
  * sidebar's Messages badge and the tab bar's agree.
  */
 export function CoachSidebar({
@@ -34,6 +36,12 @@ export function CoachSidebar({
   const [open, setOpen] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const libraryRef = useRef<HTMLButtonElement>(null);
+  const closeLibrary = useCallback((refocus: boolean) => {
+    setLibraryOpen(false);
+    if (refocus) libraryRef.current?.focus();
+  }, []);
 
   // Help names the page the coach was on before it in a support email, so remember it (path only, this tab only).
   const pathname = usePathname();
@@ -97,7 +105,19 @@ export function CoachSidebar({
 
   return (
     <UnreadTotalContext.Provider value={unread}>
-      <PhoneTabBar ref={moreRef} unread={unread} moreOpen={open} onMore={() => (open ? close() : setOpen(true))} />
+      <PhoneTabBar
+        ref={moreRef}
+        libraryRef={libraryRef}
+        unread={unread}
+        moreOpen={open}
+        onMore={() => (open ? close() : setOpen(true))}
+        libraryOpen={libraryOpen}
+        onLibrary={() => {
+          setOpen(false);
+          setLibraryOpen((o) => !o);
+        }}
+      />
+      <LibrarySheet open={libraryOpen} close={closeLibrary} trigger={libraryRef} />
       {open ? <div className={styles.backdrop} data-menu-backdrop="" aria-hidden="true" onClick={close} /> : null}
       <aside
         ref={sheetRef}

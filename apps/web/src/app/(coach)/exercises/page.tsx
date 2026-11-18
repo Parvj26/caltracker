@@ -4,6 +4,7 @@ import { requireCoach } from '@/lib/auth';
 import { ButtonLink } from '@/components/ui';
 import { ExerciseBrowser } from './exercise-browser';
 import styles from './exercises.module.css';
+import { LibraryTabs } from '../library-tabs';
 
 export const metadata: Metadata = { title: 'Exercises' };
 
@@ -28,6 +29,7 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
           </span>
         </ButtonLink>
       </header>
+      <LibraryTabs current="/exercises" />
       <ExerciseBrowser
         workspaceId={workspaceId}
         initialQuery={one(sp.q).trim().slice(0, 100)}
