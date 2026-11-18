@@ -1,238 +1,70 @@
-/* Coach shared meals (WebMeals mockup). Colours, radii and sizes via var(--ct-*) where the tokens have them. */
-.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
+/* Coach shared meals. Colours, radii and sizes via var(--ct-*). The page adapts to its own width (container query):
+   wide (iPad landscape, desktop) = list and panel side by side; narrow (phone, iPad portrait) = list, then a meal or
+   the form full screen with "‹ Meals". */
+.page { container-type: inline-size; max-width: 1100px; }
+.inner { display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
 
-.titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); }
-.titleText { flex: 1; display: flex; flex-direction: column; min-width: 240px; }
-.title { margin: 0; font-size: 30px; font-weight: 800; line-height: 1.15; }
-.subtitle { margin: 0; font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); }
-.newButton { min-height: 48px; padding: 0 18px; border-radius: var(--ct-radius-button); border: 2px solid var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); box-shadow: none; }
+.columns { display: flex; flex-direction: column; gap: var(--ct-space-6); }
+.listColumn { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
+.empty { margin: 0; font-size: var(--ct-size-body); color: var(--ct-ink-muted); }
 
-.columns { display: flex; flex-wrap: wrap; gap: var(--ct-space-6); align-items: flex-start; }
-.listColumn { flex: 1 1 340px; display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
-.list { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+.thumb { width: 48px; height: 48px; flex-shrink: 0; border-radius: var(--ct-radius-input); object-fit: cover; box-sizing: border-box; }
+/* No photo: the meal's first letter on a calm grey tile (not an empty square that looks like a broken image). */
+.thumbInitial { display: flex; background: var(--ct-surface); align-items: center; justify-content: center; font-size: 20px; font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--ct-space-3);
-  padding: 10px var(--ct-space-3);
-  border-radius: var(--ct-radius-button);
-  border: 2px solid var(--ct-border);
-  color: var(--ct-ink);
-  text-decoration: none;
-}
-.row:hover { border-color: var(--ct-ink); color: var(--ct-ink); }
-.row:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
-.rowSelected { border-color: var(--ct-ink); background: var(--ct-celebrate-bg); }
-.thumb { width: 56px; height: 56px; flex-shrink: 0; border-radius: var(--ct-radius-input); border: 2px solid var(--ct-ink); object-fit: cover; box-sizing: border-box; }
-/* No photo: the meal's first letter on its colour tile (not an empty square that looks like a broken image). */
-.thumbInitial { display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: var(--ct-ink); }
-.rowText { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.rowName { font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
-.rowMacros { font-size: 13px; font-weight: 600; color: var(--ct-ink-muted); }
-.rowLogged { font-size: var(--ct-size-caption); font-weight: 600; color: var(--ct-ink-muted); }
-.chevron { flex: none; color: var(--ct-ink-muted); }
-.empty { margin: 0; font-size: 15px; color: var(--ct-ink-muted); }
+/* The panel beside the list (wide) or the whole screen (narrow): a meal, the form, or the hint. */
+.panel { display: flex; flex-direction: column; gap: var(--ct-space-4); min-width: 0; box-sizing: border-box; }
+.panelQuiet { padding: var(--ct-space-6); border: var(--ct-border-width-card) solid var(--ct-border); border-radius: var(--ct-radius-card); }
+.panelHeader { min-width: 0; }
 
-.panel {
-  flex: 1 1 380px;
-  box-sizing: border-box;
-  border: 2px solid var(--ct-ink);
-  border-radius: var(--ct-radius-card);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ct-space-3-5);
-}
-.panelQuiet { border-color: var(--ct-border); }
-.panelTitle { margin: 0; font-size: 18px; font-weight: 800; }
+/* ---------- Meal (read-only) ---------- */
+.detailPhoto { width: 100%; max-width: 420px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--ct-radius-card); }
+.detailTile { width: 96px; height: 96px; font-size: 40px; border-radius: var(--ct-radius-card); }
+.macroTiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ct-space-2); margin: 0; }
+.macroTile { padding: var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.macroTile dt { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.macroTile dd { margin: var(--ct-space-1) 0 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
+.detailBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.detailHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.detailText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 
-/* The editor's top bar. From 768 px up only the title shows (the panel's heading); a phone gets ‹ Meals and ⋯ too. */
-.topBar { display: flex; align-items: center; gap: var(--ct-space-2); }
-.back, .more, .topBarSpacer { display: none; }
-.back {
-  align-items: center;
-  gap: 2px;
-  min-height: var(--ct-tap-min);
-  padding: 0 10px 0 4px;
-  color: var(--ct-ink);
-  font-weight: 700;
-  text-decoration: none;
-}
-.back:focus-visible, .moreButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
-.more { position: relative; }
-.moreButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ct-tap-min);
-  height: var(--ct-tap-min);
-  padding: 0;
-  border: 0;
-  border-radius: var(--ct-radius-pill);
-  background: transparent;
-  color: var(--ct-ink);
-  cursor: pointer;
-}
-.moreButton[aria-expanded='true'] { background: var(--ct-surface); }
-.menu {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 4px);
-  right: 0;
-  min-width: 180px;
-  padding: var(--ct-space-1);
-  border: 2px solid var(--ct-ink);
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-bg);
-  box-shadow: 0 4px 0 var(--ct-ink);
-}
-.menuDanger {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: var(--ct-tap-min);
-  padding: 0 var(--ct-space-3);
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ct-danger);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 800;
-  text-align: left;
-  cursor: pointer;
-}
-.menuDanger:hover, .menuDanger:focus-visible { background: var(--ct-surface); }
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-.label { font-size: 13px; font-weight: 800; }
+/* ---------- Form ---------- */
+.field { display: flex; flex-direction: column; gap: var(--ct-space-2); scroll-margin-bottom: calc(var(--ct-action-bar-room, 80px) + var(--ct-space-3)); }
+.label, .macroLabel { font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
 .input, .textarea {
-  min-height: 44px;
   box-sizing: border-box;
-  border-radius: var(--ct-radius-input);
-  border: 1.5px solid var(--ct-ink);
-  padding: 0 var(--ct-space-3);
-  font: inherit;
-  font-size: 15px;
-  background: var(--ct-bg);
-  color: var(--ct-ink);
+  width: 100%;
   min-width: 0;
+  min-height: var(--ct-button-min-height);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: 2px solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: var(--ct-size-body);
+  transition: border-color 80ms ease-out, background-color 80ms ease-out;
 }
-.textarea { padding: 10px var(--ct-space-3); font-size: 14px; line-height: 1.5; resize: vertical; }
-.input:focus-visible, .textarea:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 1px; }
-.input[aria-invalid='true'] { border-color: var(--ct-magenta); }
-.macros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ct-space-2); }
-.macroLabel { font-size: 12px; font-weight: 800; }
-.macroInput { min-height: 40px; border-radius: 10px; padding: 0 var(--ct-space-2); }
+.textarea { line-height: 1.5; resize: vertical; }
+.input:focus, .textarea:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus-visible, .textarea:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.input[aria-invalid='true'] { border-color: var(--ct-danger); }
+.macros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ct-space-3); }
+.macroInput { padding-inline: var(--ct-space-3); }
 
 .photoRow { display: flex; align-items: center; gap: var(--ct-space-3-5); }
-.photo { width: 72px; height: 72px; flex: none; border-radius: 14px; border: 2px solid var(--ct-ink); object-fit: cover; box-sizing: border-box; }
-.photoEmpty { display: flex; align-items: center; justify-content: center; background: var(--ct-surface); border-style: dashed; border-color: var(--ct-ink-muted); color: var(--ct-ink-muted); }
-.photoInitial { display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; color: var(--ct-ink); }
-.photoSide { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.photo { width: 72px; height: 72px; flex: none; border-radius: var(--ct-radius-input); object-fit: cover; box-sizing: border-box; }
+.photoEmpty { display: flex; align-items: center; justify-content: center; background: var(--ct-surface); border: 2px dashed var(--ct-border-strong); color: var(--ct-ink-muted); }
+.photoInitial { display: flex; background: var(--ct-surface); align-items: center; justify-content: center; font-size: 30px; font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
+.photoSide { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
 .photoButtons { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
-.caption { font-size: var(--ct-size-caption); font-weight: 600; color: var(--ct-ink-muted); }
-.smallButton {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: var(--ct-radius-input);
-  border: 1.5px solid var(--ct-ink);
-  background: var(--ct-bg);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ct-ink);
-  cursor: pointer;
-}
-/* Touch screens: a full 44 px tap target. */
-@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
-  .smallButton { min-height: var(--ct-tap-min); }
-}
-.fileInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.caption { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.fileInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
-.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.save {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 14px;
-  border: 2px solid var(--ct-ink);
-  background: var(--ct-ink);
-  color: var(--ct-bg);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.save:disabled { opacity: 0.7; cursor: not-allowed; }
-/* Cancel: Save's size and shape, outlined instead of filled. */
-.cancel {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 14px;
-  border: 2px solid var(--ct-ink);
-  background: transparent;
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.cancel:disabled { opacity: 0.7; cursor: not-allowed; }
-.remove {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ct-danger);
-  text-decoration: underline;
-  cursor: pointer;
-}
-.status { margin: 0; font-weight: 700; }
-
-@media (max-width: 520px) {
-  .macros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* Touch screens (iPhone, iPad): the fields look and size like the shared TextField (48 px, grey fill, ink border on
-   focus) instead of 40 px boxes with a thin border, and Save / Cancel stay stuck to the bottom of the screen while the
-   form is in view, so they aren't lost under the two big text boxes. On an iPhone the floating Menu button is hidden
-   on this screen (data-no-menu-button on the form); Cancel leaves it. Desktop with a mouse is unchanged. */
-@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
-  .label, .macroLabel { font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
-  .input, .textarea {
-    min-height: var(--ct-button-min-height);
-    padding: var(--ct-space-3) var(--ct-space-3-5);
-    border: 2px solid transparent;
-    border-radius: var(--ct-radius-input);
-    background: var(--ct-surface);
-    transition: border-color 80ms ease-out, background-color 80ms ease-out;
-  }
-  .macroInput { min-height: var(--ct-button-min-height); padding-inline: var(--ct-space-3); border-radius: var(--ct-radius-input); }
-  .input:focus, .textarea:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-  .input:focus-visible, .textarea:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
-  .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
-  .input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
-
-  .actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    margin: 0 -20px -20px;
-    padding: var(--ct-space-3) 20px calc(var(--ct-space-3) + env(safe-area-inset-bottom));
-    border-top: var(--ct-border-width-card) solid var(--ct-border);
-    border-radius: 0 0 var(--ct-radius-card) var(--ct-radius-card);
-    background: var(--ct-bg);
-  }
-}
-
-/* Remove meal confirmation */
+/* Discard changes? */
 .dialog {
   max-width: min(420px, calc(100vw - 32px));
-  border: 2px solid var(--ct-ink);
+  border: 0;
   border-radius: var(--ct-radius-card);
   padding: var(--ct-space-6);
   color: var(--ct-ink);
@@ -240,62 +72,24 @@
 }
 .dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
 .dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
-.dialogTitle { margin: 0; font-size: 18px; font-weight: 800; }
+.dialogTitle { margin: 0; font-size: 18px; font-weight: var(--ct-weight-button); }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
 
-/* ---------- Phones (below 768 px) ----------
-   The list is its own screen; a meal and New meal open as a full-screen editor (data-editing) with ‹ Meals, the
-   title and ⋯ in a top bar that sticks, and Save / Cancel stuck to the bottom. Tablets and laptops keep the list and
-   the editor side by side. */
-@media (max-width: 767.98px) {
-  .titleRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ct-space-1) var(--ct-space-3); }
-  .titleText { display: contents; }
-  .title { grid-column: 1; grid-row: 1; align-self: center; }
-  .newButton { grid-column: 2; grid-row: 1; min-height: var(--ct-tap-min); padding: 0 14px; }
-  .subtitle { grid-column: 1 / -1; }
-  .columns { gap: var(--ct-space-4); }
-  .listColumn { flex-basis: 100%; }
-  .list { gap: 10px; }
-  .row { padding: 10px 6px 10px var(--ct-space-3); }
-  .rowName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+/* ---------- Wide: list and panel side by side ---------- */
+@container (min-width: 900px) {
+  .columns { display: grid; grid-template-columns: minmax(300px, 2fr) minmax(0, 3fr); align-items: start; }
+  .panel:not(.panelQuiet) { padding: var(--ct-space-6); border: var(--ct-border-width-card) solid var(--ct-border); border-radius: var(--ct-radius-card); }
+  /* The list is right there, so no "‹ Meals" in the panel. A meal's edit form keeps "‹ <meal>". */
+  .page[data-open] section.panel [data-back-link] { display: none; }
+}
+
+/* ---------- Narrow: one screen at a time ---------- */
+@container (max-width: 899.98px) {
   .hintPanel { display: none; }
-
-  .page[data-editing] { gap: 0; }
-  .page[data-editing] .titleRow,
-  .page[data-editing] .columns > :not(.panel) { display: none; }
-  .page[data-editing] .panel { flex: 1 1 100%; padding: 0; border: 0; border-radius: 0; gap: var(--ct-space-3-5); }
-
-  .topBar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    position: sticky;
-    top: 0;
-    z-index: 3;
-    min-height: 56px;
-    margin: calc(-1 * var(--ct-space-4-5)) calc(-1 * var(--ct-space-4)) 0;
-    padding: env(safe-area-inset-top) var(--ct-space-1) 0;
-    border-bottom: var(--ct-border-width-card) solid var(--ct-border);
-    background: var(--ct-bg);
-  }
-  .back { display: inline-flex; justify-self: start; }
-  .panelTitle { font-size: 17px; text-align: center; }
-  .more { display: block; justify-self: end; }
-  .topBarSpacer { display: block; }
-
-  .photo { width: 88px; height: 88px; border-radius: 18px; }
-  .photoInitial { font-size: 36px; }
-  .macroLabel { font-size: 14px; }
-  .wideOnly { display: none; }
-
-  .actions {
-    flex-wrap: nowrap;
-    margin: 0 calc(-1 * var(--ct-space-4)) calc(-1 * var(--ct-space-4));
-    padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
-    border-radius: 0;
-  }
-  .save { flex: 1; min-height: var(--ct-button-min-height); }
-  /* "Saved" gets its own line at the top of the stuck bar, right above the button that was tapped. */
-  .actions { flex-wrap: wrap; row-gap: var(--ct-space-2); }
-  .status { order: -1; flex-basis: 100%; text-align: center; }
-  .cancel { min-height: var(--ct-button-min-height); padding: 0 20px; }
+  .page[data-open] .header,
+  .page[data-open] .listColumn { display: none; }
+}
+@container (max-width: 519.98px) {
+  .macros, .macroTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photo { width: 88px; height: 88px; }
 }
