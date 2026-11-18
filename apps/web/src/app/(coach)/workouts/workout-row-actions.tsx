@@ -329,6 +329,8 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
   const [uses, setUses] = useState<WorkoutUses | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
+  // Bumped by Try again after the usage check failed.
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     libraryWorkoutUses(id)
@@ -341,8 +343,9 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
     return () => {
       live = false;
     };
-  }, [id]);
+  }, [id, attempt]);
   const inUse = uses !== null && (uses.programs > 0 || uses.invitePlans > 0);
+  const checkFailed = uses === null && error === 'workout_uses_failed';
 
   function confirm() {
     setError(null);
@@ -386,7 +389,7 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
               onClick={confirm}
               pending={pending}
               disabled={uses === null}
-              disabledReason={uses === null ? 'Checking where it is used…' : undefined}
+              disabledReason={checkFailed ? "Couldn't check where it is used. Try again first." : uses === null ? 'Checking where it is used…' : undefined}
               phSafe
             >
               {pending ? 'Deleting…' : 'Delete workout'}
@@ -405,6 +408,20 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
             : "It's removed from your library. Workouts already on clients' calendars and their logged history stay."}
       </p>
       {error ? <ErrorText code={error} /> : null}
+      {checkFailed ? (
+        <Button
+          variant="secondary"
+          size="compact"
+          className={styles.retry}
+          onClick={() => {
+            setError(null);
+            setAttempt((n) => n + 1);
+          }}
+          phSafe
+        >
+          Try again
+        </Button>
+      ) : null}
     </AdaptiveDialog>
   );
 }

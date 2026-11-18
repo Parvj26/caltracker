@@ -26,6 +26,7 @@ import {
   type ClientResult,
 } from '@/app/(coach)/assign/actions';
 import { formatShortDay } from '@/components/calendar/format';
+import { isTouchScreen } from '@/components/calendar/show-dialog';
 import { ReloadButton } from '@/components/reload-button';
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
 import { AdaptiveDialog, Button, Chip, ErrorText, type AdaptiveDialogHandle, type ChipTone, type FieldError } from '@/components/ui';
@@ -115,6 +116,7 @@ export function AssignToClientsDialog({
   onClose: () => void;
 }) {
   const today = useLocalToday();
+  const [touch] = useState(isTouchScreen);
   const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const titleId = useId();
   const listId = useId();
@@ -326,6 +328,8 @@ export function AssignToClientsDialog({
               value={query}
               aria-controls={listId}
               onChange={(e) => setQuery(e.target.value)}
+              // Ready to type when the list arrives; on a phone the keyboard waits for a tap.
+              autoFocus={!touch}
             />
           </label>
           <div className={styles.listHead}>

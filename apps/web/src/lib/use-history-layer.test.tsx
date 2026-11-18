@@ -95,21 +95,72 @@ describe('useHistoryLayer', () => {
     expect(onBack).not.toHaveBeenCalled();
     expect(sheetParam()).toBeNull();
   });
+
+  it('a leftover ?sheet= in the address (shared link, reload) is not mistaken for its own step: closing stays on the page', async () => {
+    window.history.replaceState(null, '', '/stale-page?sheet=assign-w9');
+    const handle: { release: () => Promise<void> } = { release: () => Promise.resolve() };
+    function Stale() {
+      const { release } = useHistoryLayer({ id: 'assign-w9', onBack: () => undefined });
+      useEffect(() => {
+        handle.release = release;
+      }, [release]);
+      return null;
+    }
+    act(() => {
+      root.render(createElement(Stale));
+    });
+    expect(sheetParam()).toBe('assign-w9');
+    await act(() => handle.release());
+    expect(window.location.pathname).toBe('/stale-page');
+    expect(sheetParam()).toBeNull();
+  });
+
+  it('a slow Back during release() is never followed by a second Back when the layer unmounts', async () => {
+    const handle: { release: () => Promise<void> } = { release: () => Promise.resolve() };
+    function Slow() {
+      const { release } = useHistoryLayer({ id: 'delete-w1', onBack: () => undefined });
+      useEffect(() => {
+        handle.release = release;
+      }, [release]);
+      return null;
+    }
+    act(() => {
+      root.render(createElement(Slow));
+    });
+    const spy = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    try {
+      // Back never answers: release() gives up waiting after its timeout.
+      await act(() => handle.release());
+      act(() => {
+        root.render(null);
+      });
+      await settle();
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
-function Harness({ dirty, onClose }: { dirty: boolean; onClose: () => void }) {
+function Harness({ dirty, onClose, busy = false, role = 'dialog' }: { dirty: boolean; onClose: () => void; busy?: boolean; role?: 'dialog' | 'alertdialog' }) {
   const [open, setOpen] = useState(true);
   return open
-    ? createElement(AdaptiveDialog, {
-        historyId: 'assign-w2',
-        title: 'Assign',
-        dirty,
-        onClose: () => {
-          setOpen(false);
-          onClose();
+    ? createElement(
+        AdaptiveDialog,
+        {
+          historyId: 'assign-w2',
+          title: 'Assign',
+          dirty,
+          busy,
+          role,
+          onClose: () => {
+            setOpen(false);
+            onClose();
+          },
+          footer: [createElement('button', { type: 'button', key: 'c' }, 'Cancel'), createElement('button', { type: 'button', key: 'a' }, 'Assign')],
         },
-        footer: createElement('button', { type: 'button' }, 'Assign'),
-      })
+        createElement('input', { 'aria-label': 'Name' }),
+      )
     : null;
 }
 
@@ -161,5 +212,34 @@ describe('AdaptiveDialog and Back', () => {
     expect(host.textContent).not.toContain('Discard changes?');
     expect(onClose).not.toHaveBeenCalled();
     expect(host.querySelector('dialog[open]')).not.toBeNull();
+  });
+
+  it('starts on the first field, not on ×', () => {
+    act(() => {
+      root.render(createElement(Harness, { dirty: false, onClose: vi.fn() }));
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Name');
+  });
+
+  it('a confirm starts on its safe button (Cancel)', () => {
+    act(() => {
+      root.render(createElement(Harness, { dirty: false, onClose: vi.fn(), role: 'alertdialog' }));
+    });
+    expect(document.activeElement?.textContent).toBe('Cancel');
+  });
+
+  it('hides the Discard question while saving', () => {
+    const onClose = vi.fn();
+    act(() => {
+      root.render(createElement(Harness, { dirty: true, onClose }));
+    });
+    act(() => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click();
+    });
+    expect(host.textContent).toContain('Discard changes?');
+    act(() => {
+      root.render(createElement(Harness, { dirty: true, onClose, busy: true }));
+    });
+    expect(host.textContent).not.toContain('Discard changes?');
   });
 });

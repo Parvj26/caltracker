@@ -185,4 +185,5 @@
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+.retry { align-self: flex-start; }
 .dialogForm { display: flex; flex-direction: column; gap: var(--ct-space-3); }

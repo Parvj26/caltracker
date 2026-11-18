@@ -2,13 +2,13 @@
  * Fields that open a native picker on iPhone and iPad as soon as they get focus: a select's wheel, a date or time
  * picker. A dialog must never start on one, or the picker pops open over it.
  */
-const PICKER = 'select, input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"]';
+export const PICKER = 'select, input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"]';
 /** What a dialog's own focusing steps can land on, in page order (close enough to the browser's rule for this check). */
-const FOCUSABLE =
+export const FOCUSABLE =
   'input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
 
 /** A touch screen (iPhone, iPad): focusing a text field there pops the keyboard over half the dialog. */
-const isTouchScreen = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+export const isTouchScreen = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 /**
  * Opens a modal dialog without landing focus on a native picker. When the dialog would start on a select or a date

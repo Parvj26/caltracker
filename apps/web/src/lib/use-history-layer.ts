@@ -9,8 +9,13 @@ const RELEASE_TIMEOUT_MS = 600;
 
 /** Open layers by id, counted so React's development double-mount doesn't push or pop twice. */
 const mounted = new Map<string, number>();
+/**
+ * Layers whose history entry this page pushed and hasn't stepped back over yet. A `?sheet=` that arrived some other
+ * way (a shared link, a reload, a sign-in redirect) is not ours: stepping back over it would leave the page.
+ */
+const pushed = new Set<string>();
 
-/** Whether the current history entry is the layer's: its own state marker, or `?<param>=<id>` in the address. */
+/** Whether the current history entry shows the layer: its own state marker, or `?<param>=<id>` in the address. */
 function isCurrent(id: string, param: string): boolean {
   if (typeof window === 'undefined') return false;
   const state: unknown = window.history.state;
@@ -18,11 +23,21 @@ function isCurrent(id: string, param: string): boolean {
   return new URL(window.location.href).searchParams.get(param) === id;
 }
 
+/** The current entry is the one this page pushed for the layer, so one Back removes exactly it. */
+const ownsCurrent = (id: string, param: string) => pushed.has(id) && isCurrent(id, param);
+
 function push(id: string, param: string) {
   const url = new URL(window.location.href);
+  // A leftover ?sheet= (shared link, reload while open): drop it from this entry first, so going back lands on the
+  // plain page.
+  if (url.searchParams.has(param)) {
+    url.searchParams.delete(param);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
   url.searchParams.set(param, id);
   // Only our own key: Next.js's patched pushState adds its router state and keeps useSearchParams in step.
   window.history.pushState({ [KEY]: id }, '', `${url.pathname}${url.search}${url.hash}`);
+  pushed.add(id);
 }
 
 export type HistoryLayerOptions = {
@@ -61,10 +76,11 @@ export function useHistoryLayer({ id, active = true, onBack, param = 'sheet' }: 
     if (!active) return;
     mounted.set(id, (mounted.get(id) ?? 0) + 1);
     // A remount (development double-mount) finds its entry still there.
-    if (!isCurrent(id, param)) push(id, param);
+    if (!ownsCurrent(id, param)) push(id, param);
 
     const onPopState = () => {
       if (isCurrent(id, param)) return;
+      pushed.delete(id);
       const done = releasing.current;
       if (done) {
         // Our own release(): nothing to ask.
@@ -83,7 +99,9 @@ export function useHistoryLayer({ id, active = true, onBack, param = 'sheet' }: 
       setTimeout(() => {
         if ((mounted.get(id) ?? 0) > 0) return;
         mounted.delete(id);
-        if (isCurrent(id, param)) window.history.back();
+        if (!ownsCurrent(id, param)) return;
+        pushed.delete(id);
+        window.history.back();
       }, 0);
     };
   }, [active, id, param]);
@@ -91,10 +109,12 @@ export function useHistoryLayer({ id, active = true, onBack, param = 'sheet' }: 
   const release = useCallback(
     () =>
       new Promise<void>((resolve) => {
-        if (typeof window === 'undefined' || !isCurrent(id, param)) {
+        if (typeof window === 'undefined' || !ownsCurrent(id, param)) {
           resolve();
           return;
         }
+        // Stepped back over from here on: a slow Back must never be followed by a second one from the cleanup.
+        pushed.delete(id);
         let settled = false;
         const finish = () => {
           if (settled) return;

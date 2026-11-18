@@ -13,7 +13,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { showDialog } from '@/components/calendar/show-dialog';
+import { FOCUSABLE, PICKER, isTouchScreen } from '@/components/calendar/show-dialog';
 import { useHistoryLayer } from '@/lib/use-history-layer';
 import { Button } from './button';
 import { cx } from './cx';
@@ -93,6 +93,8 @@ export function AdaptiveDialog({
   ref,
 }: AdaptiveDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const discardRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const discardId = useId();
@@ -148,14 +150,19 @@ export function AdaptiveDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog, { noKeyboardOnTouch });
+    if (dialog && !dialog.open) {
+      const target = openingFocus(dialog, bodyRef.current, footerRef.current, role, noKeyboardOnTouch);
+      if (target === dialog) dialog.tabIndex = -1;
+      dialog.showModal();
+      target.focus();
+    }
     return () => {
       if (opener?.isConnected) opener.focus();
     };
-  }, [noKeyboardOnTouch]);
+  }, [noKeyboardOnTouch, role]);
 
-  // Changes saved or undone meanwhile: nothing left to ask about.
-  const showDiscard = asking && dirty;
+  // Changes saved or undone meanwhile, or saving: nothing to ask about.
+  const showDiscard = asking && dirty && !busy;
   // The question takes focus, so a keyboard or screen reader user meets it.
   useEffect(() => {
     if (showDiscard) discardRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
@@ -222,9 +229,16 @@ export function AdaptiveDialog({
       aria-labelledby={titleId}
       aria-describedby={describedBy}
       onKeyDown={(e: KeyboardEvent<HTMLDialogElement>) => {
-        if (e.key !== 'Escape') return;
+        // A control inside (a search box clearing itself) already handled it.
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
         // Ours to decide (busy, unsaved changes), not the browser's.
         e.preventDefault();
+        // Esc in a search field with text clears the text first; the next Esc closes.
+        const field = e.target;
+        if (field instanceof HTMLInputElement && field.type === 'search' && field.value !== '') {
+          clearField(field);
+          return;
+        }
         e.stopPropagation();
         if (showDiscard) setAsking(false);
         else requestClose();
@@ -259,7 +273,9 @@ export function AdaptiveDialog({
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      <div className={styles.body}>{children}</div>
+      <div ref={bodyRef} className={styles.body}>
+        {children}
+      </div>
       {showDiscard ? (
         <div ref={discardRef} className={styles.discard} role="group" aria-labelledby={discardId}>
           <p id={discardId} className={styles.discardText} data-ph-safe="">
@@ -276,7 +292,39 @@ export function AdaptiveDialog({
           </div>
         </div>
       ) : null}
-      {footer ? <div className={styles.footer}>{footer}</div> : null}
+      {footer ? (
+        <div ref={footerRef} className={styles.footer}>
+          {footer}
+        </div>
+      ) : null}
     </dialog>
   );
+}
+
+/**
+ * Where focus starts (UI rules §5.7): a confirm starts on its safe button (the first in the footer, Cancel); a form on
+ * its [autofocus] field or its first control, but never on a native picker (that pops open: its search box, else the
+ * dialog itself). With noKeyboardOnTouch a touch screen starts on the dialog itself, so no keyboard pops up.
+ */
+function openingFocus(
+  dialog: HTMLDialogElement,
+  body: HTMLElement | null,
+  footer: HTMLElement | null,
+  role: 'dialog' | 'alertdialog',
+  noKeyboardOnTouch: boolean,
+): HTMLElement {
+  if (noKeyboardOnTouch && isTouchScreen()) return dialog;
+  if (role === 'alertdialog') return footer?.querySelector<HTMLElement>('button') ?? dialog;
+  const first = body?.querySelector<HTMLElement>('[autofocus]') ?? body?.querySelector<HTMLElement>(FOCUSABLE) ?? null;
+  if (first?.matches(PICKER)) return body?.querySelector<HTMLElement>('input[type="search"]:not(:disabled)') ?? dialog;
+  return first ?? dialog;
+}
+
+/** Empties a (React-controlled) field the way typing would, so its onChange runs. */
+function clearField(field: HTMLInputElement) {
+  // The native setter, called on this field (React ignores a plain `field.value = ''`).
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  setValue?.call(field, '');
+  field.dispatchEvent(new Event('input', { bubbles: true }));
 }
