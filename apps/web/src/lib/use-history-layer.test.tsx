@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdaptiveDialog } from '@/components/ui/adaptive-dialog';
 import { SearchBox } from '@/components/ui/search-box';
+import { openLayerCount } from './history-layers';
 import { useHistoryLayer } from './use-history-layer';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -17,7 +18,20 @@ const back = () =>
         window.history.back();
       }),
   );
-const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 20)));
+/** One macrotask, inside act, so React and the history module run what they queued. */
+const tick = () => act(() => new Promise<void>((r) => setTimeout(r, 0)));
+/**
+ * Waits until `check` passes (history steps and their popstate land later in jsdom, later still on a slow CI runner),
+ * instead of a fixed sleep. Fails after 3 s.
+ */
+const until = (check: () => void) =>
+  vi.waitFor(
+    async () => {
+      await tick();
+      check();
+    },
+    { timeout: 3000, interval: 5 },
+  );
 const sheetParam = () => new URL(window.location.href).searchParams.get('sheet');
 
 let root: Root;
@@ -39,7 +53,7 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await settle();
+  await tick();
 });
 
 afterEach(async () => {
@@ -47,7 +61,8 @@ afterEach(async () => {
       root.unmount();
     });
   host.remove();
-  await settle();
+  // Every layer the test left open has stepped off the history.
+  await until(() => expect(openLayerCount()).toBe(0));
 });
 
 function Layer({ onBack }: { onBack: () => boolean | void }) {
@@ -136,8 +151,7 @@ describe('useHistoryLayer', () => {
       act(() => {
         root.render(null);
       });
-      await settle();
-      expect(spy).toHaveBeenCalledTimes(1);
+      await until(() => expect(spy).toHaveBeenCalledTimes(1));
     } finally {
       spy.mockRestore();
     }
@@ -192,9 +206,10 @@ describe('AdaptiveDialog and Back', () => {
     act(() => {
       discard.click();
     });
-    await settle();
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(sheetParam()).toBeNull();
+    await until(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(sheetParam()).toBeNull();
+    });
   });
 
   it('Keep editing leaves it open', () => {
