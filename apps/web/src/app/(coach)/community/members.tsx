@@ -6,6 +6,7 @@ import { CoachAvatar } from '@/components/coach-avatar';
 import { ErrorText } from '@/components/ui';
 import { setMemberRemoved } from './actions';
 import type { Member } from './data';
+import { useConfirm } from './use-confirm';
 import styles from './community.module.css';
 
 /** Who is in the community. Removing someone only takes them out of the community; they stay your client. */
@@ -14,9 +15,19 @@ export function Members({ communityId, members }: { communityId: string; members
   const [pending, startTransition] = useTransition();
   const active = members.filter((m) => !m.removedAt);
   const removed = members.filter((m) => m.removedAt);
+  const confirm = useConfirm();
 
   const change = (m: Member, remove: boolean) => {
-    if (remove && !window.confirm(`Remove ${m.name} from the community? They stay your client and keep the app; they just won't see the community.`)) return;
+    if (remove) {
+      confirm.ask({
+        title: `Remove ${m.name} from the community?`,
+        body: "They stay your client and keep the app; they just won't see the community.",
+        confirmLabel: 'Remove',
+        onConfirm: () => setMemberRemoved(communityId, m.userId, true),
+        focusAfterId: 'members-title',
+      });
+      return;
+    }
     startTransition(async () => {
       setError(null);
       const r = await setMemberRemoved(communityId, m.userId, remove);
@@ -26,7 +37,7 @@ export function Members({ communityId, members }: { communityId: string; members
 
   return (
     <section className={styles.members} aria-labelledby="members-title">
-      <h2 id="members-title" className={styles.sectionTitle}>
+      <h2 id="members-title" tabIndex={-1} className={styles.sectionTitle}>
         Members ({active.length})
       </h2>
       <ul className={styles.memberList}>
@@ -62,6 +73,7 @@ export function Members({ communityId, members }: { communityId: string; members
         </>
       ) : null}
       {error ? <ErrorText code={error} /> : null}
+      {confirm.dialog}
     </section>
   );
 }
