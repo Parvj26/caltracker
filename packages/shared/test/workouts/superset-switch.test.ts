@@ -20,6 +20,7 @@ import {
 } from '../../src/workouts/doc-ops';
 import type { ExercisePick } from '../../src/workouts/doc-ops';
 import { WorkoutDoc } from '../../src/workouts/schema';
+import type { RestMemory } from '../../src/workouts/doc-ops';
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 let counter = 5000;
@@ -231,5 +232,34 @@ describe('review fixes', () => {
     const split = splitSuperset(edited, edited.blocks[0]!.id, 1, makeId);
     expect(rests(restoreRests(edited, split, memory), 0, 0)).toEqual([90, 90]);
     expect(rests(restoreRests(edited, split, {}), 0, 0)).toEqual(rests(split, 0, 0));
+  });
+
+  it('restoreRests leaves a set that still goes straight on: splitting the last switch of a chain of three', () => {
+    let d = straights(2, 2, 2);
+    let memory: RestMemory = {};
+    const join = (doc: WorkoutDoc) => {
+      const out = joinWithNext(doc, doc.blocks[0]!.id, makeId);
+      memory = { ...memory, ...rememberRests(doc, out) };
+      return out;
+    };
+    d = join(d);
+    d = join(d);
+    expect(rests(d, 0, 0)).toEqual([0, 0]);
+    const split = splitSuperset(d, d.blocks[0]!.id, 2, makeId);
+    const out = restoreRests(d, split, memory);
+    // The first exercise still goes straight on to the second.
+    expect(rests(out, 0, 0)).toEqual([0, 0]);
+  });
+
+  it('restoreRests leaves a superset elsewhere alone when another one splits', () => {
+    let d = straights(2, 2, 2, 2);
+    const j1 = joinWithNext(d, d.blocks[0]!.id, makeId);
+    let memory = rememberRests(d, j1);
+    d = joinWithNext(j1, j1.blocks[1]!.id, makeId);
+    memory = { ...memory, ...rememberRests(j1, d) };
+    const split = splitSuperset(d, d.blocks[1]!.id, 1, makeId);
+    const out = restoreRests(d, split, memory);
+    expect(rests(out, 0, 0)).toEqual([0, 0]);
+    expect(rests(out, 1, 0)).toEqual([90, 90]);
   });
 });

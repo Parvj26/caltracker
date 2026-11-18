@@ -807,25 +807,29 @@ export function rememberRests(before: WorkoutDoc, after: WorkoutDoc): RestMemory
 }
 
 /**
- * Turning a Superset switch off again: a set whose rest the join changed, and which still has the rest the join gave
- * it (in `prev`, the doc before the split), gets its own rest back, so on then off is an undo.
+ * Turning a Superset switch off again: a set whose rest the join changed, which still has the rest the join gave it
+ * (in `prev`, the doc before the split) and which now shows a rest box (nothing goes straight on after it any more),
+ * gets its own rest back, so on then off is an undo.
  */
 export function restoreRests(prev: WorkoutDoc, next: WorkoutDoc, memory: RestMemory): WorkoutDoc {
   const was = new Map(allSets(prev).map((s) => [s.id, s.restSeconds]));
-  const back = (s: WorkoutSetDoc): WorkoutSetDoc => {
+  const back = (s: WorkoutSetDoc, shows: boolean): WorkoutSetDoc => {
     const m = memory[s.id];
-    return m && was.get(s.id) === m.after && s.restSeconds !== m.before ? { ...s, restSeconds: m.before } : s;
+    return shows && m && was.get(s.id) === m.after && s.restSeconds !== m.before ? { ...s, restSeconds: m.before } : s;
   };
-  if (!allSets(next).some((s) => back(s) !== s)) return next;
-  return {
-    ...next,
-    blocks: next.blocks.map((b) => ({
-      ...b,
-      exercises: b.exercises.map((e) => ({
-        ...e,
-        sets: e.sets.map(back),
-        substitutes: e.substitutes.map((sub) => ({ ...sub, sets: sub.sets.map(back) })),
-      })),
-    })),
-  };
+  let changed = false;
+  const blocks = next.blocks.map((b) => {
+    const exercises = b.exercises.map((e, ei) => {
+      const sets = e.sets.map((s, si) => back(s, setShowsRest(b, ei, si)));
+      const substitutes = e.substitutes.map((sub) => {
+        const subSets = sub.sets.map((s, si) => back(s, substituteSetShowsRest(b, ei, sub, si)));
+        return subSets.some((s, i) => s !== sub.sets[i]) ? { ...sub, sets: subSets } : sub;
+      });
+      if (sets.every((s, i) => s === e.sets[i]) && substitutes.every((x, i) => x === e.substitutes[i])) return e;
+      changed = true;
+      return { ...e, sets, substitutes };
+    });
+    return exercises.every((e, i) => e === b.exercises[i]) ? b : { ...b, exercises };
+  });
+  return changed ? { ...next, blocks } : next;
 }
