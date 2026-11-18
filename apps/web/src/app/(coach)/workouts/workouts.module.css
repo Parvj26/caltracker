@@ -186,5 +186,3 @@
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
 .dialogForm { display: flex; flex-direction: column; gap: var(--ct-space-3); }
-.dialogActions .dangerButton { background: var(--ct-danger); color: var(--ct-bg); box-shadow: none; }
-.dialogActions .dangerButton:hover:not(:disabled) { background: var(--ct-danger-deep); }

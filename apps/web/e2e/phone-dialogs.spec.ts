@@ -46,6 +46,8 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await page.getByRole('button', { name: `Assign ${name}`, exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Assign ${name}` });
     await expect(dialog.getByRole('list', { name: 'Clients' })).toBeVisible();
+    // Measure where the sheet settles, not mid slide-in.
+    await dialog.evaluate((d) => Promise.all(d.getAnimations().map((a) => a.finished)));
 
     // Edge to edge: the window's own 640 px / 100dvh - 32 px cap (calendar.module.css) would leave a gap.
     const box = (await dialog.boundingBox())!;

@@ -6,7 +6,7 @@ import { AssignButton } from '@/components/assign/assign-to-clients';
 import { DialogHeader } from '@/components/assign/dialog-header';
 import { DuplicateButton, useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
-import { Button, ButtonLink, ErrorText, TextField } from '@/components/ui';
+import { AdaptiveDialog, Button, ButtonLink, ErrorText, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import { markUndone } from '@/lib/analytics/client';
@@ -246,25 +246,26 @@ function PreviewDialog({ id, name, onClose }: { id: string; name: string; onClos
 
 /** A name field, saved through the builder's save (everything else stays as last saved). */
 function RenameDialog({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
-  const ref = useModal();
-  const titleId = useId();
+  const ref = useRef<AdaptiveDialogHandle>(null);
+  const formId = useId();
   const [value, setValue] = useState(name);
   const [error, setError] = useState<ErrorCode | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const changed = value.trim() !== name.trim();
 
   function save(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldError(null);
-    if (value.trim() === name.trim()) {
-      ref.current?.close();
+    if (!changed) {
+      void ref.current?.close();
       return;
     }
     startTransition(async () => {
       try {
         const outcome = await renameWorkout(id, value);
-        if (outcome.ok) ref.current?.close();
+        if (outcome.ok) await ref.current?.close();
         else if ('issues' in outcome && outcome.issues?.[0]) setFieldError(outcome.issues[0].message);
         else setError(outcome.code);
       } catch {
@@ -274,17 +275,26 @@ function RenameDialog({ id, name, onClose }: { id: string; name: string; onClose
   }
 
   return (
-    <dialog
+    <AdaptiveDialog
       ref={ref}
-      className={cx(styles.dialog, sheet.sheet)}
-      aria-labelledby={titleId}
+      historyId={`rename-${id}`}
+      title="Rename workout"
+      titleSafe
       onClose={onClose}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      dirty={changed}
+      busy={pending}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => ref.current?.requestClose()} disabled={pending} phSafe>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} pending={pending} phSafe>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </>
+      }
     >
-      <DialogHeader titleId={titleId} title="Rename workout" titleSafe onClose={() => ref.current?.close()} disabled={pending} />
-      <form className={cx(styles.dialogForm, sheet.body)} onSubmit={save}>
+      <form id={formId} className={styles.dialogForm} onSubmit={save}>
         <TextField
           label="Name"
           name="name"
@@ -296,16 +306,8 @@ function RenameDialog({ id, name, onClose }: { id: string; name: string; onClose
           error={fieldError ? { code: 'workout_fields_invalid', text: fieldError } : undefined}
         />
         {error ? <ErrorText code={error} /> : null}
-        <div className={cx(styles.dialogActions, sheet.actions)}>
-          <Button variant="secondary" onClick={() => ref.current?.close()} disabled={pending}>
-            Cancel
-          </Button>
-          <Button type="submit" pending={pending}>
-            {pending ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
       </form>
-    </dialog>
+    </AdaptiveDialog>
   );
 }
 
@@ -322,8 +324,7 @@ function usesText(uses: WorkoutUses): string {
  * would empty those days); the window says where it is used instead. Used by the Workouts list and the workout page.
  */
 export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
-  const ref = useModal();
-  const titleId = useId();
+  const ref = useRef<AdaptiveDialogHandle>(null);
   const bodyId = useId();
   const [uses, setUses] = useState<WorkoutUses | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
@@ -350,7 +351,8 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
         const outcome = await deleteWorkout(id);
         if (outcome.ok) {
           markUndone('workout', id);
-          ref.current?.close();
+          // Off the history first, so the page's own navigation (back to the list) isn't undone by it.
+          await ref.current?.close();
           onDeleted?.();
         } else setError(outcome.code);
       } catch {
@@ -360,20 +362,39 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
   }
 
   return (
-    <dialog
+    <AdaptiveDialog
       ref={ref}
+      historyId={`delete-${id}`}
       role="alertdialog"
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      aria-describedby={bodyId}
+      describedBy={bodyId}
+      title={inUse ? `“${name}” is still in use` : `Delete “${name}”?`}
       onClose={onClose}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      busy={pending}
+      stackFooterOnPhone
+      footer={
+        inUse ? (
+          <Button onClick={() => void ref.current?.close()} phSafe>
+            OK
+          </Button>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => ref.current?.requestClose()} disabled={pending} phSafe>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirm}
+              pending={pending}
+              disabled={uses === null}
+              disabledReason={uses === null ? 'Checking where it is used…' : undefined}
+              phSafe
+            >
+              {pending ? 'Deleting…' : 'Delete workout'}
+            </Button>
+          </>
+        )
+      }
     >
-      <h2 id={titleId} className={styles.dialogTitle}>
-        {inUse ? `“${name}” is still in use` : `Delete “${name}”?`}
-      </h2>
       <p id={bodyId} className={styles.dialogBody} aria-live="polite">
         {uses === null
           ? error
@@ -384,20 +405,6 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
             : "It's removed from your library. Workouts already on clients' calendars and their logged history stay."}
       </p>
       {error ? <ErrorText code={error} /> : null}
-      <div className={styles.dialogActions}>
-        {inUse ? (
-          <Button onClick={() => ref.current?.close()}>OK</Button>
-        ) : (
-          <>
-            <Button variant="secondary" onClick={() => ref.current?.close()} disabled={pending}>
-              Cancel
-            </Button>
-            <Button className={styles.dangerButton} onClick={confirm} pending={pending} disabled={uses === null}>
-              {pending ? 'Deleting…' : 'Delete workout'}
-            </Button>
-          </>
-        )}
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }
