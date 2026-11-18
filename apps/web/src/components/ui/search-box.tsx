@@ -48,6 +48,16 @@ export function SearchBox({ value, onChange, label, onEnter, inputRef, className
         onKeyDown={(e) => {
           onKeyDown?.(e);
           if (e.defaultPrevented) return;
+          if (e.key === 'Escape') {
+            // In a pop-up, Escape closes it in one press. A search box with text would otherwise use the key to clear
+            // itself (Chrome), and the pop-up would stay open.
+            const dialog = e.currentTarget.closest('dialog');
+            if (dialog?.open) {
+              e.preventDefault();
+              requestDialogClose(dialog);
+            }
+            return;
+          }
           if (e.key === 'Enter') {
             e.preventDefault();
             onEnter?.();
@@ -73,6 +83,15 @@ export function SearchBox({ value, onChange, label, onEnter, inputRef, className
       ) : null}
     </div>
   );
+}
+
+/** Closes a <dialog> the way Escape does: its cancel handlers run first and may keep it open. */
+function requestDialogClose(dialog: HTMLDialogElement) {
+  if (typeof dialog.requestClose === 'function') {
+    dialog.requestClose();
+    return;
+  }
+  if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close();
 }
 
 /** The no-results line: No workouts match “x” · Clear search. */
