@@ -421,3 +421,82 @@ describe('review fixes', () => {
     expect(seq()).toBe(base);
   });
 });
+
+describe('links inside a layer', () => {
+  function link(href: string): HTMLAnchorElement {
+    const a = document.createElement('a');
+    a.href = href;
+    a.textContent = 'Go';
+    document.body.append(a);
+    return a;
+  }
+
+  it('a link in a pop-up that is in the address is followed after the router has had the step back', async () => {
+    pushLayer(() => undefined, { address: { param: 'sheet', id: 'delete-w1' } });
+    // The router's own popstate listener runs after ours, and a browser runs pending promise callbacks between the
+    // two. Its "restore" replaces any navigation started before it, so the link must wait for the next task.
+    let inStepBack = false;
+    const router = () => {
+      inStepBack = true;
+      setTimeout(() => (inStepBack = false), 0);
+    };
+    window.addEventListener('popstate', router);
+    const a = link('/programs');
+    const followed: boolean[] = [];
+    const onLink = (e: Event) => {
+      if (e.target !== a) return;
+      e.preventDefault();
+      followed.push(inStepBack);
+    };
+    document.addEventListener('click', onLink);
+    act(() => a.click());
+    // Not followed straight away: the pop-up's entry comes off first.
+    expect(followed).toEqual([]);
+    await settle(200);
+    window.removeEventListener('popstate', router);
+    document.removeEventListener('click', onLink);
+    a.remove();
+    // Followed once, after the step back's task (not inside it, where the router would then undo it).
+    expect(followed).toEqual([false]);
+    // Back from where the link goes lands on the page under the pop-up, not on it.
+    expect(seq()).toBe(base);
+    expect(window.location.search).toBe('');
+  });
+
+  it('a link taken out of the page while the layer comes off goes through the router', async () => {
+    const layer = pushLayer(() => undefined);
+    const a = link('/programs?x=1');
+    const push = vi.fn();
+    const w = window as unknown as { next?: { router?: { push: (href: string) => void } } };
+    w.next = { router: { push } };
+    act(() => a.click());
+    a.remove();
+    await settle(200);
+    delete w.next;
+    expect(push).toHaveBeenCalledWith('/programs?x=1');
+    void layer;
+  });
+
+  it('leaves new-tab, download and outside links to the browser', async () => {
+    pushLayer(() => undefined);
+    for (const set of [
+      (a: HTMLAnchorElement) => (a.target = '_blank'),
+      (a: HTMLAnchorElement) => a.setAttribute('download', ''),
+      (a: HTMLAnchorElement) => (a.href = 'https://example.com/x'),
+    ]) {
+      const a = link('/programs');
+      set(a);
+      let prevented: boolean | null = null;
+      const spy = (e: Event) => {
+        prevented = e.defaultPrevented;
+        e.preventDefault();
+      };
+      a.addEventListener('click', spy);
+      act(() => a.click());
+      a.remove();
+      expect(prevented).toBe(false);
+    }
+    await settle();
+    expect(seq()).toBeGreaterThan(base);
+  });
+});

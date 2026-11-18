@@ -420,13 +420,27 @@ function onClick(e: MouseEvent) {
       for (const g of guards) if (g.active) g.bypassed = true;
     }
     await unwindAll();
-    if (a.isConnected) {
-      BYPASS.add(a);
-      a.click();
-    } else {
-      window.location.assign(url.href);
-    }
+    // The step back resolves inside our own popstate listener, before the router's: a navigation started now would
+    // be thrown away by the router's "restore" for that step (it replaces any navigation still loading). Wait until
+    // every listener has had it.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    follow(a, url);
   })();
+}
+
+/**
+ * Follows the link once our entries are off: tapped again, so its own handlers run (a Link's push, a BackLink's
+ * step back, a sheet closing itself). Taken out of the page meanwhile: the router opens its address, else the browser.
+ */
+function follow(a: HTMLAnchorElement, url: URL) {
+  if (a.isConnected) {
+    BYPASS.add(a);
+    a.click();
+    return;
+  }
+  const router = (window as unknown as { next?: { router?: { push?: (href: string) => void } } }).next?.router;
+  if (router?.push) router.push(`${url.pathname}${url.search}${url.hash}`);
+  else window.location.assign(url.href);
 }
 
 /** Steps back over every entry of ours on top of the page (layers and guard), without closing anything. */
