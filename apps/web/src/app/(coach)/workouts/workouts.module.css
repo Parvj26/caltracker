@@ -25,6 +25,7 @@
 @media (max-width: 599.98px) { .search { max-width: none; } }
 
 /* ---------- List ---------- */
+@media (max-width: 599.98px) { .intro { display: none; } }
 /* Room for Assign and ⋯ at the end of each row, so the column headings line up with the rows (RowList). */
 .rows { --row-actions-width: calc(var(--ct-space-12) * 3 + var(--ct-space-2)); }
 /* The row's ⋯: a menu on iPad and desktop, a sheet from the bottom on an iPhone. */

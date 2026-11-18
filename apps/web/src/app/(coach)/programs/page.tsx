@@ -45,7 +45,11 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Programs" action={<CreateLink href="/programs/new" thing="program" data-ph-capture-attribute-label="program_new" />} />
+      <PageHeader
+        title="Programs"
+        // One line on what it is; the phone leaves it out to keep the list high (CSS).
+        subtitle={<span className={styles.intro}>A program arranges workouts into weeks. Assign it to a client and every workout lands on their calendar.</span>}
+        action={<CreateLink href="/programs/new" thing="program" data-ph-capture-attribute-label="program_new" />} />
       <LibraryTabs current="/programs" />
 
       <ProgramList rows={rows} total={counted.count ?? found.length} initialQuery={q} limited={limited} limit={LIMIT} />

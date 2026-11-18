@@ -296,28 +296,6 @@ export function SearchPanel({
         </p>
       ) : null}
       <FilterChips filters={filters} onChange={changeFilters} />
-      {many ? (
-        // Always mounted, so screen readers hear each pick as it is added. Empty, it takes no room (CSS).
-        <div aria-live="polite" className={styles.pickedSlot}>
-          {selected.length > 0 ? (
-            <ol className={styles.picked} aria-label="Picked, in the order they're done">
-              {selected.map((ex) => (
-                <li key={ex.id}>
-                  {ex.name}
-                  <button
-                    type="button"
-                    className={styles.pickedRemove}
-                    aria-label={`Remove ${ex.name}`}
-                    onClick={() => setSelected((cur) => cur.filter((s) => s.id !== ex.id))}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </div>
-      ) : null}
 
       {error ? <ErrorText code="exercises_load_failed" /> : null}
       {starError ? <ErrorText code={starError} /> : null}
@@ -382,6 +360,30 @@ export function SearchPanel({
           )}
         </section>
       </div>
+
+      {many ? (
+        // The picks, under the list (above Add), so ticking never moves the list under the coach's finger and nothing
+        // takes room above the list while none are picked (B#9). Always mounted, so screen readers hear each pick.
+        <div aria-live="polite" className={styles.pickedSlot}>
+          {selected.length > 0 ? (
+            <ol className={styles.picked} aria-label="Picked, in the order they're done">
+              {selected.map((ex) => (
+                <li key={ex.id}>
+                  {ex.name}
+                  <button
+                    type="button"
+                    className={styles.pickedRemove}
+                    aria-label={`Remove ${ex.name}`}
+                    onClick={() => setSelected((cur) => cur.filter((s) => s.id !== ex.id))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      ) : null}
 
       {onCancel || many || tapOnlyPicks ? (
         <div className={styles.footer}>

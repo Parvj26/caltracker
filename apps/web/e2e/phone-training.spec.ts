@@ -181,7 +181,7 @@ test('the whole Programs row opens the program; Assign stays its own button', as
   const programId = await seedProgram(admin, workspaceId, program, 3, []);
 
   await page.goto('/programs');
-  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: program, exact: true }) });
+  const row = listRow(page.getByRole('list', { name: 'Programs' }), program);
   await expect(row).toBeVisible();
   // Assign opens its dialog and stays on the list.
   await row.getByRole('button', { name: new RegExp(`^Assign`) }).click();
@@ -190,8 +190,8 @@ test('the whole Programs row opens the program; Assign stays its own button', as
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/programs$/);
-  // A tap on the card's "3 weeks" opens the program.
-  await row.getByRole('cell', { name: '3 weeks', exact: true }).click();
+  // A tap on the row's "3 weeks" opens the program.
+  await row.getByText('3 weeks', { exact: true }).locator('visible=true').first().click();
   await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
 });
 
@@ -227,7 +227,7 @@ test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯
   // The card: the name on at most 2 lines, "4 weeks · 2 workouts", lime Assign and ⋯, all on screen.
   const row = card(long);
   await expect(row).toContainText('4 weeks');
-  await expect(row).toContainText('· 2 workouts');
+  await expect(row).toContainText('2 workouts');
   const name = row.getByText(long, { exact: true });
   const lines = await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
   expect(lines).toBeLessThanOrEqual(2);
@@ -252,7 +252,7 @@ test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯
   await expect(confirm).toBeHidden();
 
   // The whole card opens the program.
-  await row.getByText('4 weeks').click();
+  await row.getByText('4 weeks', { exact: true }).locator('visible=true').first().click();
   await expect(page).toHaveURL(/\/programs\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: long })).toBeVisible();
 
@@ -261,5 +261,5 @@ test('Programs are cards on a phone: smart search, 2-line names, Assign, and ⋯
   await card(other).getByRole('button', { name: `More for ${other}` }).click();
   await page.getByRole('menu', { name: `More for ${other}` }).getByRole('menuitem', { name: 'Delete…' }).click();
   await page.getByRole('dialog', { name: `Delete ${other}?` }).getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(page.getByRole('link', { name: other, exact: true })).toHaveCount(0);
+  await expect(card(other)).toHaveCount(0);
 });

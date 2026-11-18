@@ -132,7 +132,7 @@ test('Delete… refuses a workout a program still uses, and the program keeps it
   const told = page.getByRole('alertdialog', { name: `“${w.name}” is still in use` });
   // It names the program and links to it (rulebook §10.3).
   await expect(told).toContainText(`Used in “${programName}” — remove it from that program first.`);
-  await expect(told.getByRole('link', { name: `Open “${programName}”` })).toHaveAttribute('href', `/programs/${programId}`);
+  await expect(told.getByRole('button', { name: `Open “${programName}”` })).toBeVisible();
   await expect(told.getByRole('button', { name: 'Delete workout' })).toHaveCount(0);
   await told.getByRole('button', { name: 'OK' }).click();
   await expect(told).toBeHidden();
@@ -142,7 +142,7 @@ test('Delete… refuses a workout a program still uses, and the program keeps it
   // The link opens the program; Back comes to the list, not to the question.
   await page.getByRole('button', { name: `More actions for ${w.name}` }).click();
   await page.getByRole('menuitem', { name: 'Delete…' }).click();
-  await told.getByRole('link', { name: `Open “${programName}”` }).click();
+  await told.getByRole('button', { name: `Open “${programName}”` }).click();
   await expect(page).toHaveURL(new RegExp(`/programs/${programId}$`));
   await page.goBack();
   await expect(page).toHaveURL(/\/workouts(\?|$)/);

@@ -23,6 +23,14 @@ import { useFavourites } from './use-favourites';
 import styles from './exercises.module.css';
 import { openRef } from '@/lib/open-layer';
 
+/** The list's address with the search as typed (the address itself catches up a moment later, debounced). */
+function returnUrl(query: string): string {
+  const url = new URL(window.location.href);
+  if (query.trim()) url.searchParams.set('q', query.trim());
+  else url.searchParams.delete('q');
+  return `${url.pathname}${url.search}`;
+}
+
 const PAGE_SIZE = 50;
 /** "body only" -> "Body only" (the library stores them in lower case). */
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -187,7 +195,7 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
             <ListRow
               key={row.id}
               href={`/exercises/${row.id}`}
-              linkProps={{ onClick: () => saveListReturn({ url: `${window.location.pathname}${window.location.search}`, y: window.scrollY, shown }) }}
+              linkProps={{ onClick: () => saveListReturn({ url: returnUrl(query), y: window.scrollY, shown }) }}
               leading={<Photo src={row.imagePath ? imageUrl(row.imagePath) : null} alt="" width={54} height={54} className={styles.phoneThumb ?? ''} />}
               title={row.name}
               meta={

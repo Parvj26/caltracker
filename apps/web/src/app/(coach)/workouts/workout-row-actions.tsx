@@ -1,6 +1,7 @@
 'use client';
 
 import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import { DialogHeader } from '@/components/assign/dialog-header';
 import { useDuplicate } from '@/components/duplicate-button';
@@ -323,6 +324,7 @@ function usesText(uses: WorkoutUses): string {
  */
 export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; name: string; onClose: () => void; onDeleted?: () => void }) {
   const ref = useRef<AdaptiveDialogHandle>(null);
+  const router = useRouter();
   const bodyId = useId();
   const [uses, setUses] = useState<WorkoutUses | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
@@ -406,18 +408,23 @@ export function DeleteDialog({ id, name, onClose, onDeleted }: { id: string; nam
             : "It's removed from your library. Workouts already on clients' calendars and their logged history stay."}
       </p>
       {inUse && uses.programList.length > 0 ? (
-        // Each program that blocks the delete, as a link (rulebook §10.3). Links out of a pop-up step off its history
-        // entry first (history-layers), so Back from the program comes back to the list, not to this question.
+        // Each program that blocks the delete, with a way to open it (rulebook §10.3). The pop-up steps off the history
+        // first, so Back from the program comes back to the list, not to this question.
         <ul className={styles.blockers} aria-label="Programs that use it">
           {uses.programList.map((p) => (
             <li key={p.id}>
-              <ButtonLink
-                href={`/programs/${p.id}`}
+              <Button
                 variant="secondary"
                 size="compact"
+                onClick={() => {
+                  void (async () => {
+                    await ref.current?.close();
+                    router.push(`/programs/${p.id}`);
+                  })();
+                }}
               >
                 Open “{p.name}”
-              </ButtonLink>
+              </Button>
             </li>
           ))}
         </ul>

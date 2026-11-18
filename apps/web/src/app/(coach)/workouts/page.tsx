@@ -50,7 +50,11 @@ export default async function WorkoutsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Workouts" action={<CreateLink href="/workouts/new" thing="workout" data-ph-capture-attribute-label="workout_new" />} />
+      <PageHeader
+        title="Workouts"
+        // One line on what it is; the phone leaves it out to keep the list high (CSS).
+        subtitle={<span className={styles.intro}>A workout is one session: exercises, sets, reps and rest. Build them here, then add them to programs or straight to a client&apos;s calendar.</span>}
+        action={<CreateLink href="/workouts/new" thing="workout" data-ph-capture-attribute-label="workout_new" />} />
       <LibraryTabs current="/workouts" />
 
       <WorkoutList rows={rows} initialQuery={q} limited={limited} limit={LIMIT} />
