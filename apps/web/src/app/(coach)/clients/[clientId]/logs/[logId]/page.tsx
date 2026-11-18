@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { logPageTitle } from '@/lib/page-titles';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { notFound } from 'next/navigation';
 import { awardHasPrs, completedSetCount, formatLogDuration, formatLogVolume, isLoggedByCoach, isPlannedLog, logDurationS, logVolumeKg } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
@@ -50,7 +50,7 @@ export default async function LogPage({
     const active = pickActivePane(now.panes, [switchedTo, log.status === 'in_progress' ? log.id : null]);
     if (active) {
       return (
-        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} coachId={userId} />
       );
     }
   }
@@ -84,9 +84,9 @@ export default async function LogPage({
     <div className={styles.page}>
       {/* Just finished here as a session: award it (only a finished log, and only once). */}
       {awardNow && log.status === 'completed' ? <AwardKickoff logId={log.id} /> : null}
-      <Link href={`/clients/${client.id}/training`} className={styles.back}>
+      <BackLink href={`/clients/${client.id}/training`} className={styles.back}>
         ← {client.name}&apos;s calendar
-      </Link>
+      </BackLink>
       <header className={styles.titleBlock}>
         <h1 className={styles.title}>{log.name}</h1>
         <p className={styles.caption}>

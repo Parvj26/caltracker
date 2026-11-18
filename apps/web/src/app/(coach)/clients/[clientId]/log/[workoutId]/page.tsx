@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { notFound, redirect } from 'next/navigation';
 import { addDays, canStartSessionOn, completedSetCount, localToday } from '@caltracker/shared';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -52,9 +53,9 @@ export default async function SessionPage({
   if (state.kind === 'done') redirect(`/clients/${client.id}/logs/${state.logId}`);
 
   const back = (
-    <Link href={`/clients/${client.id}/training`} className={styles.back}>
+    <BackLink href={`/clients/${client.id}/training`} className={styles.back}>
       ← {client.name}&apos;s calendar
-    </Link>
+    </BackLink>
   );
   // The coach's injury note, near the top while they log (Overview shows the same chip).
   const injury = <InjuryChip text={await getClientLimitations(client.id)} />;
@@ -122,7 +123,7 @@ export default async function SessionPage({
     // Each person's screen in the host carries their own injury note, so it is right whoever the coach switches to.
     if (active) {
       return (
-        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} coachId={userId} />
       );
     }
   }
@@ -137,6 +138,7 @@ export default async function SessionPage({
         client={{ id: client.id, firstName: client.firstName, name: client.name }}
         workout={workout.doc}
         initialLog={log}
+        coachId={userId}
         scheduledOn={workout.scheduledOn}
         units={units}
         lastTimes={lastTimes}

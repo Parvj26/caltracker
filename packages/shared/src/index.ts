@@ -281,6 +281,7 @@ export { canStartSessionOn, coachSessionState, completeAllOpenSets, completeAllS
 export { logReviewByLog } from './logs/review';
 export type { LogReview } from './logs/review';
 export { rebaseEdits } from './logs/rebase';
+export { draftConflicts, draftEdits } from './logs/draft-edits';
 export type { LogEdit } from './logs/rebase';
 export type { CoachSessionState, LoggerKind, SessionLog } from './logs/coach-session';
 export { LOG_TREE_SELECT, logRowToDoc } from './logs/tree';

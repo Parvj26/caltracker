@@ -238,6 +238,34 @@ describe('useUnsavedGuard', () => {
     expect(seq()).toBeLessThan(page);
   });
 
+  it('Discard on Back to a page loaded as its own document (a reload or a link from outside) just goes there', async () => {
+    act(() => root.render(createElement(Editor, { dirty: true })));
+    await settle();
+    await userBack();
+    // The page two steps back is another document: the browser loads it, and no popstate comes here meanwhile
+    // (a slow server can take longer than the wait for one).
+    const nav = { currentEntry: { index: 4 }, entries: () => [0, 1, 2, 3, 4].map((i) => ({ sameDocument: i !== 2 })) };
+    Object.defineProperty(window, 'navigation', { value: nav, configurable: true });
+    const calls: number[] = [];
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const real = History.prototype.go;
+    // Steps within this document happen; the one into the other document is only recorded (it would unload the page).
+    const go = (d: number) => {
+      calls.push(d);
+      if (d !== -2) real.call(window.history, d);
+    };
+    Object.defineProperty(window.history, 'go', { value: go, configurable: true });
+    try {
+      act(() => button('Discard')!.click());
+      await settle(1200);
+      // After the step to where Back was going, nothing more: a "step off the guard" would go a page too far.
+      expect(calls.slice(calls.indexOf(-2))).toEqual([-2]);
+    } finally {
+      delete (window.history as { go?: unknown }).go;
+      delete (window as { navigation?: unknown }).navigation;
+    }
+  });
+
   it('a link while dirty asks first; Keep editing does not follow it', async () => {
     act(() => root.render(createElement(Editor, { dirty: true })));
     await settle();

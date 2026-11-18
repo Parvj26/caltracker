@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { completedSetCount, openSetCount, type Units } from '@caltracker/shared';
@@ -21,13 +21,13 @@ const SWIPE_MIN_PX = 60;
 
 const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && el.closest('input, textarea, select, [contenteditable="true"]') !== null;
 
-function SessionPaneView({ pane, units, onProgress }: { pane: SessionPane; units: Units; onProgress: (logId: string, done: number, total: number) => void }) {
+function SessionPaneView({ pane, units, coachId, onProgress }: { pane: SessionPane; units: Units; coachId: string; onProgress: (logId: string, done: number, total: number) => void }) {
   const report = useCallback((done: number, total: number) => onProgress(pane.logId, done, total), [onProgress, pane.logId]);
   return (
     <div className={sessionStyles.wide}>
-      <Link href={`/clients/${pane.clientId}/training`} className={sessionStyles.back}>
+      <BackLink href={`/clients/${pane.clientId}/training`} className={sessionStyles.back}>
         ← {pane.name}&apos;s calendar
-      </Link>
+      </BackLink>
       {/* This client's injury note, on their own screen: with several people training, each tab shows its own. */}
       <InjuryChip text={pane.injury} />
       <SessionLogger
@@ -36,6 +36,7 @@ function SessionPaneView({ pane, units, onProgress }: { pane: SessionPane; units
         client={{ id: pane.clientId, firstName: pane.firstName, name: pane.name }}
         workout={pane.workout}
         initialLog={pane.log}
+        coachId={coachId}
         scheduledOn={pane.scheduledOn}
         units={units}
         lastTimes={pane.lastTimes}
@@ -62,6 +63,7 @@ export function TrainingNowHost({
   workspaceId,
   units,
   renderedAt,
+  coachId,
 }: {
   panes: TrainingPane[];
   inProgressIds: string[];
@@ -69,6 +71,8 @@ export function TrainingNowHost({
   workspaceId: string;
   units: Units;
   renderedAt: number;
+  /** The signed-in coach (whose copies of a session this device keeps). */
+  coachId: string;
 }) {
   const router = useRouter();
   const [active, setActive] = useState(activeLogId);
@@ -220,7 +224,7 @@ export function TrainingNowHost({
           hidden={p.logId !== active}
           className={cx(p.kind === 'session' && (showTabs ? styles.paneGap : undefined))}
         >
-          {p.kind === 'watch' ? <LiveView pane={p} units={units} joined={showTabs} /> : <SessionPaneView pane={p} units={units} onProgress={onProgress} />}
+          {p.kind === 'watch' ? <LiveView pane={p} units={units} joined={showTabs} /> : <SessionPaneView pane={p} units={units} coachId={coachId} onProgress={onProgress} />}
         </div>
       ))}
       {live.length > 0 ? <LiveRefresh on={live} renderedAt={renderedAt} /> : null}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Chip } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
@@ -65,10 +66,10 @@ export function ClientHeader({ client }: { client: { id: string; name: string; f
 
   return (
     <header className={styles.bar}>
-      <Link href="/clients" className={styles.barBack} aria-label="Back to Clients">
+      <BackLink href="/clients" className={styles.barBack} aria-label="Back to Clients">
         <ChevronIcon direction="left" size={22} />
         <span className={styles.barBackText} aria-hidden="true">Clients</span>
-      </Link>
+      </BackLink>
       <span aria-hidden="true" className={cx(styles.avatar, styles[`avatar-${avatarTone(client.id)}`])}>
         {initials(client.name)}
       </span>

@@ -11,6 +11,7 @@ import { Button, Chip, ErrorText } from '@/components/ui';
 import { addComment, deleteComment, deletePost, setPinned, type CommunityOutcome } from './actions';
 import type { FeedPost } from './data';
 import { ReactionBar } from './reaction-bar';
+import { useConfirm } from './use-confirm';
 import styles from './community.module.css';
 
 /** Post text with http(s) links made clickable (opened in a new tab, without passing the page along). */
@@ -106,9 +107,15 @@ export function PostCard({
       if (!r.ok) setError(r.code);
       else after?.();
     });
-  const removePost = () => {
-    if (window.confirm('Delete this post for everyone?')) run(() => deletePost(post.id));
-  };
+  const confirm = useConfirm();
+  const removePost = () =>
+    confirm.ask({
+      title: 'Delete this post?',
+      body: 'It goes for everyone in the community, with its photos, comments and reactions.',
+      confirmLabel: 'Delete post',
+      onConfirm: () => deletePost(post.id),
+      historyId: `delete-post-${post.id}`,
+    });
   const count = post.comments.length;
 
   return (
@@ -218,7 +225,13 @@ export function PostCard({
                       label: 'Delete comment…',
                       danger: true,
                       onSelect: () => {
-                        if (window.confirm('Delete this comment?')) run(() => deleteComment(c.id));
+                        confirm.ask({
+                          title: 'Delete this comment?',
+                          body: `${c.authorName}’s comment goes for everyone.`,
+                          confirmLabel: 'Delete comment',
+                          onConfirm: () => deleteComment(c.id),
+                          historyId: `delete-comment-${c.id}`,
+                        });
                       },
                     },
                   ]}
@@ -259,6 +272,7 @@ export function PostCard({
       ) : null}
       </div>
       {error ? <ErrorText code={error} /> : null}
+      {confirm.dialog}
     </article>
   );
 }

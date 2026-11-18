@@ -281,7 +281,12 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   await expect(ivy).toContainText('Invited today');
   await expect(ivy).toContainText('Not joined yet');
 
+  // The chip is kept in the address, so a reload stays on Invited.
   await page.reload();
+  await expect(page).toHaveURL(/[?&]filter=invited/);
+  await expect(rowOf('Ivy Invited')).toContainText('Not joined yet');
+  await page.getByRole('group', { name: 'Filter clients' }).getByRole('button', { name: /^Active/ }).click();
+  await expect(page).toHaveURL(/\/clients$/);
   await expect(cell('Sami Steady', 0)).toContainText('Active');
   expect(messages.filter((t) => /hydrat|#418|#423|#425/i.test(t))).toEqual([]);
 
