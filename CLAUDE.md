@@ -15,6 +15,7 @@ Coaching platform: coaches build and assign workout programs, log in-person sess
 - Never force-push to `main`. Never commit secrets: use `.env.local` (git-ignored) and document variables in `.env.example`.
 
 ## Engineering rules
+- UI work follows `docs/design/ui-rules.md`.
 - TypeScript `strict`; no `any` without a comment explaining why.
 - Database changes only through versioned migrations in `supabase/migrations/`.
 - Every table holding workspace data has RLS enabled, and every RLS policy has a pgTAP test proving cross-workspace and cross-client access fails.
