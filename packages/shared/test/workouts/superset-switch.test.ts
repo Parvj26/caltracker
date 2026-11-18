@@ -35,18 +35,20 @@ function straights(...sets: number[]) {
 describe('joinWithNext', () => {
   it('joins two straight exercises into a superset; the first goes straight on where the second has a set', () => {
     const d = straights(3, 1);
-    const out = valid(joinWithNext(d, d.blocks[0]!.id));
+    const out = valid(joinWithNext(d, d.blocks[0]!.id, makeId));
     expect(out.blocks).toHaveLength(1);
     expect(out.blocks[0]!.kind).toBe('superset');
     expect(out.blocks[0]!.id).toBe(d.blocks[0]!.id);
+    expect(out.blocks[0]!.exercises[0]!.id).toBe(d.blocks[0]!.exercises[0]!.id);
+    expect(out.blocks[0]!.exercises[1]!.id).not.toBe(d.blocks[1]!.exercises[0]!.id);
     expect(rests(out, 0, 0)).toEqual([0, 90, 90]);
     expect(rests(out, 0, 1)).toEqual([90]);
   });
 
   it('chains: joining a superset with the next exercise makes one superset of three', () => {
     let d = straights(2, 2, 2);
-    d = joinWithNext(d, d.blocks[0]!.id);
-    d = valid(joinWithNext(d, d.blocks[0]!.id));
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
+    d = valid(joinWithNext(d, d.blocks[0]!.id, makeId));
     expect(d.blocks).toHaveLength(1);
     expect(d.blocks[0]!.exercises.map((e) => e.exerciseName)).toEqual(['Exercise 1', 'Exercise 2', 'Exercise 3']);
     expect([rests(d, 0, 0), rests(d, 0, 1), rests(d, 0, 2)]).toEqual([[0, 0], [0, 0], [90, 90]]);
@@ -54,15 +56,15 @@ describe('joinWithNext', () => {
 
   it('joins a straight exercise onto the start of a superset below', () => {
     let d = straights(1, 2, 2);
-    d = joinWithNext(d, d.blocks[1]!.id);
-    d = valid(joinWithNext(d, d.blocks[0]!.id));
+    d = joinWithNext(d, d.blocks[1]!.id, makeId);
+    d = valid(joinWithNext(d, d.blocks[0]!.id, makeId));
     expect(d.blocks[0]!.exercises).toHaveLength(3);
   });
 
   it('gives a substitute the same rest rule as its exercise', () => {
     let d = straights(2, 2);
     d = addSubstitute(d, d.blocks[0]!.id, d.blocks[0]!.exercises[0]!.id, pick(9), makeId);
-    d = valid(joinWithNext(d, d.blocks[0]!.id));
+    d = valid(joinWithNext(d, d.blocks[0]!.id, makeId));
     expect(d.blocks[0]!.exercises[0]!.substitutes[0]!.sets.map((s) => s.restSeconds)).toEqual([0, 0]);
   });
 
@@ -71,7 +73,7 @@ describe('joinWithNext', () => {
     d = addSection(d, 'Main', makeId);
     d = addStraightBlock(d, pick(2), makeId);
     expect(canJoinWithNext(d, d.blocks[0]!.id)).toBe(false);
-    expect(joinWithNext(d, d.blocks[0]!.id)).toBe(d);
+    expect(joinWithNext(d, d.blocks[0]!.id, makeId)).toBe(d);
     expect(canJoinWithNext(d, d.blocks[1]!.id)).toBe(false);
 
     let c = straights(1);
@@ -88,19 +90,23 @@ describe('joinWithNext', () => {
 describe('splitSuperset', () => {
   it('splits a two-exercise superset back into straight exercises, giving the first its round rest', () => {
     let d = straights(3, 3);
-    d = joinWithNext(d, d.blocks[0]!.id);
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
     d = updateSet(d, d.blocks[0]!.id, d.blocks[0]!.exercises[1]!.id, d.blocks[0]!.exercises[1]!.sets[1]!.id, { restSeconds: 120 });
     const out = valid(splitSuperset(d, d.blocks[0]!.id, 1, makeId));
     expect(out.blocks.map((b) => b.kind)).toEqual(['straight', 'straight']);
     expect(rests(out, 0, 0)).toEqual([90, 120, 90]);
     expect(rests(out, 1, 0)).toEqual([90, 120, 90]);
     expect(out.blocks[1]!.sectionId).toBe(d.blocks[0]!.sectionId);
+    // The exercise that moved to a new block is saved as a new row.
+    const moved = d.blocks[0]!.exercises[1]!;
+    expect(out.blocks[1]!.exercises[0]!.id).not.toBe(moved.id);
+    expect(out.blocks[1]!.exercises[0]!.sets.map((s) => s.id)).not.toContain(moved.sets[0]!.id);
   });
 
   it('splits a superset of three in the middle, keeping the rest rule in the part left a superset', () => {
     let d = straights(3, 1, 3);
-    d = joinWithNext(d, d.blocks[0]!.id);
-    d = joinWithNext(d, d.blocks[0]!.id);
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
     const out = valid(splitSuperset(d, d.blocks[0]!.id, 2, makeId));
     expect(out.blocks.map((b) => b.kind)).toEqual(['superset', 'straight']);
     // Exercise 1's rounds 2 and 3 went on to exercise 3; now no later exercise has them, so they rest.
@@ -111,11 +117,11 @@ describe('splitSuperset', () => {
   it('refuses a straight block, a bad place, or a workout at the 30-block cap', () => {
     const d = straights(1, 1);
     expect(splitSuperset(d, d.blocks[0]!.id, 1, makeId)).toBe(d);
-    const s = joinWithNext(d, d.blocks[0]!.id);
+    const s = joinWithNext(d, d.blocks[0]!.id, makeId);
     expect(splitSuperset(s, s.blocks[0]!.id, 0, makeId)).toBe(s);
     expect(splitSuperset(s, s.blocks[0]!.id, 2, makeId)).toBe(s);
     let full = straights(...Array.from({ length: 30 }, () => 1));
-    full = joinWithNext(full, full.blocks[0]!.id);
+    full = joinWithNext(full, full.blocks[0]!.id, makeId);
     full = addStraightBlock(full, pick(99), makeId);
     expect(full.blocks).toHaveLength(30);
     expect(splitSuperset(full, full.blocks[0]!.id, 1, makeId)).toBe(full);
@@ -160,7 +166,7 @@ describe('Rest checkbox', () => {
 
   it('on gives rest only where a rest box shows: in a superset, the last exercise of each round', () => {
     let d = straights(2, 2);
-    d = joinWithNext(d, d.blocks[0]!.id);
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
     const blk = d.blocks[0]!;
     expect(exerciseRestOff(blk, 0)).toBeNull();
     d = setExerciseRest(d, blk.id, blk.exercises[1]!.id, false);
@@ -171,7 +177,7 @@ describe('Rest checkbox', () => {
 
   it('keepRestOff zeroes a rest an edit gave an exercise whose Rest is off, and is a no-op otherwise', () => {
     let d = straights(1, 2);
-    d = joinWithNext(d, d.blocks[0]!.id);
+    d = joinWithNext(d, d.blocks[0]!.id, makeId);
     const first = d.blocks[0]!.exercises[0]!.id;
     const grown = addSet(d, d.blocks[0]!.id, first, makeId);
     expect(rests(grown, 0, 0)).toEqual([0, 0]);

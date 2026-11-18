@@ -662,6 +662,20 @@ function roundRest(b: WorkoutBlockDoc, round: number): number | undefined {
 }
 
 /**
+ * An exercise moving to another block gets new ids (with its sets and substitutes): the server keeps each saved row
+ * in its own block, so a moved row is saved as a new one and the old one goes.
+ */
+function reIded(e: WorkoutExerciseDoc, makeId: () => string): WorkoutExerciseDoc {
+  const sets = (xs: readonly WorkoutSetDoc[]) => xs.map((x) => ({ ...x, id: makeId() }));
+  return {
+    ...e,
+    id: makeId(),
+    sets: sets(e.sets),
+    substitutes: e.substitutes.map((sub) => ({ ...sub, id: makeId(), sets: sets(sub.sets) })),
+  };
+}
+
+/**
  * Whether the switch between this block and the next one can join them: same section, neither a pick-one group,
  * and at most 10 exercises together.
  */
@@ -677,21 +691,22 @@ export function canJoinWithNext(doc: WorkoutDoc, blockId: string): boolean {
  * The switch turned on: this block and the next become one superset (either may already be one, so switches chain
  * into a superset of 3 or more). Each exercise keeps its own sets (uneven rounds are fine). The rest after a round sits
  * on the round's last exercise, so an earlier exercise's set gets rest 0 wherever a later exercise has a set in its
- * round. Refused (same doc) when canJoinWithNext is false.
+ * round. The next block's exercises move into this one (with new ids, see reIded). Refused (same doc) when
+ * canJoinWithNext is false.
  */
-export function joinWithNext(doc: WorkoutDoc, blockId: string): WorkoutDoc {
+export function joinWithNext(doc: WorkoutDoc, blockId: string, makeId: () => string): WorkoutDoc {
   if (!canJoinWithNext(doc, blockId)) return doc;
   const i = doc.blocks.findIndex((b) => b.id === blockId);
   const a = doc.blocks[i]!;
   const next = doc.blocks[i + 1]!;
-  const joined: WorkoutBlockDoc = { ...a, kind: 'superset', exercises: [...a.exercises, ...next.exercises] };
+  const joined: WorkoutBlockDoc = { ...a, kind: 'superset', exercises: [...a.exercises, ...next.exercises.map((e) => reIded(e, makeId))] };
   const block = { ...joined, exercises: joined.exercises.map((e, ei) => withRest(e, coveredRest(joined, ei))) };
   return { ...doc, blocks: [...doc.blocks.slice(0, i), block, ...doc.blocks.slice(i + 2)] };
 }
 
 /**
  * The switch turned off: the superset splits before exercise `at` (1 to length-1). The exercises after it become a new
- * block straight below; a part left with one exercise is a straight block. A set that loses the later exercise it
+ * block straight below (with new ids, see reIded); a part left with one exercise is a straight block. A set that loses the later exercise it
  * went straight on to gets the rest the round had (1:30 when unknown), so the client still rests. Refused (same doc)
  * at the 30-block cap or for a bad `at`.
  */
@@ -711,7 +726,7 @@ export function splitSuperset(doc: WorkoutDoc, blockId: string, at: number, make
       ),
     ),
   };
-  const tail: WorkoutBlockDoc = { id: makeId(), sectionId: b.sectionId, kind: kindOf(b.exercises.length - at), exercises: b.exercises.slice(at) };
+  const tail: WorkoutBlockDoc = { id: makeId(), sectionId: b.sectionId, kind: kindOf(b.exercises.length - at), exercises: b.exercises.slice(at).map((e) => reIded(e, makeId)) };
   return { ...doc, blocks: [...doc.blocks.slice(0, i), fixed, tail, ...doc.blocks.slice(i + 1)] };
 }
 

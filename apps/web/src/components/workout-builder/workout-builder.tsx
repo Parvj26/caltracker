@@ -210,7 +210,9 @@ export function WorkoutBuilder({
   const [restOff, setRestOff] = useState<ReadonlySet<string>>(() => restOffIn(initial));
   /** Every edit goes through here, so an exercise whose Rest is off never gains a rest (a split or a new set). */
   const change = (fn: (d: WorkoutDoc) => WorkoutDoc, off: ReadonlySet<string> = restOff) => setDoc((d) => keepRestOff(fn(d), off));
-  const knownExercises = useRef<Set<string>>(new Set(initial.blocks.flatMap((b) => b.exercises.map((e) => e.id))));
+  // True from a pick in "+ Exercise" or "+ Pick one" until the new block shows (a split also makes a block).
+  const adding = useRef(false);
+  const knownBlocks = useRef<Set<string>>(new Set(initial.blocks.map((b) => b.id)));
   const [pending, startTransition] = useTransition();
   const saveBarRef = useRef<HTMLDivElement>(null);
   useKeyboardOffset(saveBarRef);
@@ -237,10 +239,10 @@ export function WorkoutBuilder({
   const builderRef = useRef<HTMLDivElement>(null);
   const scrollToId = useRef<string | null>(null);
   useEffect(() => {
-    // A block made by a split keeps its exercises, so it isn't "added".
-    const added = doc.blocks.find((b) => b.exercises.every((e) => !knownExercises.current.has(e.id)));
-    knownExercises.current = new Set(doc.blocks.flatMap((b) => b.exercises.map((e) => e.id)));
-    if (added) {
+    const added = doc.blocks.find((b) => !knownBlocks.current.has(b.id));
+    knownBlocks.current = new Set(doc.blocks.map((b) => b.id));
+    if (added && adding.current) {
+      adding.current = false;
       scrollToId.current = added.id;
       setOpenId(added.id);
     }
@@ -323,6 +325,7 @@ export function WorkoutBuilder({
   function onPick(picked: ExercisePick[]) {
     const p = picker;
     setPicker(null);
+    adding.current = p?.kind === 'straight' || p?.kind === 'choice';
     // Each exercise starts with the measurements and Each side this workspace last saved it with (not a substitute,
     // which keeps its own kind).
     const exs = p?.kind === 'substitute' ? picked : picked.map((x) => applyExercisePrefs(x, prefs.current[x.id]));
@@ -343,6 +346,20 @@ export function WorkoutBuilder({
           return addSubstitute(d, p.blockId, p.exId, ex, makeId);
       }
     });
+  }
+
+  /**
+   * A Superset switch. Exercises that move to another block get new ids, so the Rest checkboxes follow them by place
+   * (a join or split never changes the order of the exercises).
+   */
+  function toggleLink(op: (d: WorkoutDoc) => WorkoutDoc) {
+    const next = op(doc);
+    const ids = (d: WorkoutDoc) => d.blocks.flatMap((b) => b.exercises.map((e) => e.id));
+    const before = ids(doc);
+    const after = ids(next);
+    const off = new Set(after.filter((_, i) => restOff.has(before[i]!)));
+    setRestOff(off);
+    setDoc(keepRestOff(next, off));
   }
 
   const actionsFor = (blockId: string): BlockActions => ({
@@ -470,8 +487,7 @@ export function WorkoutBuilder({
               : canJoinWithNext(doc, blockId)
                 ? null
                 : 'A superset has at most 10 exercises.',
-            onToggle: () =>
-              change((d) => (together ? splitSuperset(d, blockId, next.member!, makeId) : joinWithNext(d, blockId))),
+            onToggle: () => toggleLink(together ? (d) => splitSuperset(d, blockId, next.member!, makeId) : (d) => joinWithNext(d, blockId, makeId)),
           };
         }
         flat.push(card);
@@ -635,7 +651,7 @@ export function WorkoutBuilder({
             <Icon name="reorder" size={18} />
             Reorder
           </Button>
-          <Button variant="secondary" className={styles.toolButton} disabled={full} title={full ? fullNote : undefined} onClick={() => setPicker({ kind: 'choice' })} data-ph-capture-attribute-label="workout_add_pick_one" data-ph-safe="">
+          <Button variant="secondary" className={styles.toolButton} disabled={full} onClick={() => setPicker({ kind: 'choice' })} data-ph-capture-attribute-label="workout_add_pick_one" data-ph-safe="">
             + Pick one
           </Button>
           <AddSectionMenu full={sectionsFull} popover onAdd={addSectionNamed} />
@@ -644,7 +660,6 @@ export function WorkoutBuilder({
           variant="secondary"
           className={cx(styles.addExercise, styles.barAdd)}
           disabled={full}
-          title={full ? fullNote : undefined}
           onClick={() => setPicker({ kind: 'straight' })}
           data-ph-capture-attribute-label="workout_add_exercise"
           data-ph-safe=""
