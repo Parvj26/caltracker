@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { BackLink } from '@/components/back-link';
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { MoreMenu } from '@/components/more-menu';
 import { Chip } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import { avatarTone, initials } from '../avatar';
 import { RemoveClientDialog } from '../row-actions';
-import menuStyles from '@/components/calendar/calendar.module.css';
 import styles from './client-page.module.css';
-import { openRef, useBackLayer } from '@/lib/open-layer';
 
 export const CLIENT_NAME_ID = 'client-name';
 
@@ -29,40 +29,8 @@ function MessageIcon() {
  */
 export function ClientHeader({ client }: { client: { id: string; name: string; firstName: string; removedAt: string | null } }) {
   const past = client.removedAt !== null;
-  const [open, setOpen] = useState(false);
-  // Back (and iOS swipe-back) closes the menu, not the page.
-  useBackLayer(open, () => setOpen(false));
-  const menuId = useId();
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const itemsRef = useRef<(HTMLElement | null)[]>([]);
-  const removeRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    itemsRef.current.find((x) => x != null)?.focus({ preventScroll: true });
-    const outside = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', outside);
-    return () => document.removeEventListener('pointerdown', outside);
-  }, [open]);
-
-  function onMenuKey(e: KeyboardEvent<HTMLUListElement>) {
-    const els = itemsRef.current.filter((x): x is HTMLElement => x != null);
-    const at = els.indexOf(document.activeElement as HTMLElement);
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpen(false);
-      buttonRef.current?.focus();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const step = e.key === 'ArrowDown' ? 1 : -1;
-      els[(at + step + els.length) % els.length]?.focus();
-    } else if (e.key === 'Tab') {
-      setOpen(false);
-    }
-  }
+  const router = useRouter();
+  const [removing, setRemoving] = useState(false);
 
   return (
     <header className={styles.bar}>
@@ -88,61 +56,17 @@ export function ClientHeader({ client }: { client: { id: string; name: string; f
             <span className={styles.barMessageText} aria-hidden="true">Message</span>
           </Link>
         )}
-        <div ref={wrapRef} className={styles.menuWrap}>
-          <button
-            type="button"
-            ref={buttonRef}
-            className={styles.barIconButton}
-            aria-label="More for this client"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-controls={open ? menuId : undefined}
-            onClick={() => setOpen((o) => !o)}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-              <circle cx="5" cy="12" r="2" />
-              <circle cx="12" cy="12" r="2" />
-              <circle cx="19" cy="12" r="2" />
-            </svg>
-          </button>
-          {open ? (
-            <ul id={menuId} role="menu" aria-label="More for this client" className={cx(menuStyles.menu, styles.barMenu)} onKeyDown={onMenuKey}>
-              <li role="none">
-                <Link
-                  href={`/clients/${client.id}/settings`}
-                  role="menuitem"
-                  ref={(el) => {
-                    itemsRef.current[0] = el;
-                  }}
-                  className={menuStyles.menuItem}
-                  onClick={() => setOpen(false)}
-                >
-                  Client settings
-                </Link>
-              </li>
-              {past ? null : (
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    ref={(el) => {
-                      itemsRef.current[1] = el;
-                    }}
-                    className={cx(menuStyles.menuItem, styles.menuDanger)}
-                    onClick={() => {
-                      setOpen(false);
-                      openRef(removeRef);
-                    }}
-                  >
-                    Remove client…
-                  </button>
-                </li>
-              )}
-            </ul>
-          ) : null}
-        </div>
+        {/* ⋯ is a menu (UI rules §5.5); Remove client… is red and asks first in the one pop-up (§10). */}
+        <MoreMenu
+          label="More for this client"
+          className={styles.menuWrap}
+          items={[
+            { label: 'Client settings', onSelect: () => router.push(`/clients/${client.id}/settings`) },
+            ...(past ? [] : [{ label: 'Remove client…', onSelect: () => setRemoving(true), danger: true }]),
+          ]}
+        />
       </div>
-      {past ? null : <RemoveClientDialog userId={client.id} name={client.name} focusAfterId={CLIENT_NAME_ID} dialogRef={removeRef} />}
+      {removing ? <RemoveClientDialog userId={client.id} name={client.name} focusAfterId={CLIENT_NAME_ID} onClose={() => setRemoving(false)} /> : null}
     </header>
   );
 }

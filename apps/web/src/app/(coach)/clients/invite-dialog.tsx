@@ -16,8 +16,7 @@ import {
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
-import { Button, ButtonLink, ErrorText, notAContact, SelectField, TextField } from '@/components/ui';
-import { cx } from '@/components/ui/cx';
+import { AdaptiveDialog, Button, ButtonLink, ErrorText, notAContact, SelectField, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { useBrowserToday } from '@/lib/local-today';
 import type { PickerHints } from '@/lib/picker-hints';
@@ -28,7 +27,6 @@ import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
-import { openLayer } from '@/lib/open-layer';
 
 type LibraryWorkout = { id: string; name: string };
 type Program = { id: string; name: string; weeks: number };
@@ -64,6 +62,9 @@ type Sent = {
   note: StatusView | null;
 };
 
+/** Sent on window once the invite window has closed (and its step of history is gone). */
+export const INVITE_CLOSED_EVENT = 'caltracker:invite-closed';
+
 /** "+ Invite client" and its window. */
 export function InviteClientButton(props: { coachName: string; library: LibraryWorkout[]; programs: Program[]; hints: PickerHints }) {
   const [open, setOpen] = useState(false);
@@ -71,9 +72,9 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
   const [round, setRound] = useState(0);
   return (
     <>
-      {/* Secondary and small: finding a client is the page's main job, inviting one is rarer. */}
+      {/* The page's create button (lime, UI rules §4). On a phone it reads "+ Invite". */}
       <Button
-        variant="secondary"
+        variant="create"
         className={styles.inviteButton}
         aria-label="Invite client"
         data-ph-capture-attribute-label="invite_open"
@@ -83,12 +84,19 @@ export function InviteClientButton(props: { coachName: string; library: LibraryW
           setOpen(true);
         }}
       >
-        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Invite<span className={styles.inviteWord}> client</span>
+        + Invite<span className={styles.inviteWord}> client</span>
       </Button>
-      {open ? <InviteDialog key={round} {...props} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <InviteDialog
+          key={round}
+          {...props}
+          onClose={() => {
+            setOpen(false);
+            // The window's step of history is gone by now; the list may switch to Invited (client-directory.tsx).
+            setTimeout(() => window.dispatchEvent(new Event(INVITE_CLOSED_EVENT)), 0);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -106,113 +114,127 @@ function InviteDialog({
   hints: PickerHints;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
+  const ref = useRef<AdaptiveDialogHandle>(null);
+  const formId = useId();
   const completeInvite = useAnalyticsTask('invite_client');
   const browserToday = useBrowserToday();
   const today = browserToday ?? localToday();
   const [tab, setTab] = useState<'one' | 'csv'>('one');
   const [sent, setSent] = useState<Sent | null>(null);
   const [form, setForm] = useState(0); // bumps to clear the form for "Invite another"
+  const [dirty, setDirty] = useState(false);
+  const [pending, setPending] = useState(false);
 
+  // The Sent view is much shorter than the form, so start it at the top (its tick and title). Also for "Invite another".
   useEffect(() => {
-    const dialog = dialogRef.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) openLayer(dialog);
-    return () => {
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
-
-  // The dialog scrolls; the Sent view is much shorter than the form, so start it at the top (its tick and title),
-  // not wherever the Send button was. Back to the top for "Invite another" too.
-  useEffect(() => {
-    dialogRef.current?.scrollTo({ top: 0 });
+    document.querySelector('[data-invite-body]')?.parentElement?.scrollTo({ top: 0 });
   }, [sent]);
 
+  const close = () => ref.current?.requestClose();
   return (
-    <dialog
-      ref={dialogRef}
-      className={styles.inviteDialog}
-      aria-labelledby={titleId}
+    <AdaptiveDialog
+      ref={ref}
+      historyId="invite"
+      title={sent ? `Invite sent to ${sent.firstName}` : 'Invite a client'}
+      titleSafe={!sent}
       onClose={onClose}
-    >
-      {sent ? (
-        <SentView
-          titleId={titleId}
-          sent={sent}
-          onAnother={() => {
-            setSent(null);
-            setForm((f) => f + 1);
-          }}
-          onDone={() => dialogRef.current?.close()}
-        />
-      ) : (
-        <>
-          <div className={styles.dialogHeader}>
-            <h2 id={titleId} className={styles.inviteTitle} data-ph-safe="">Invite a client</h2>
-            <button type="button" aria-label="Close" className={styles.closeButton} onClick={() => dialogRef.current?.close()}>
-              ×
-            </button>
-          </div>
-          <div role="tablist" aria-label="How many" className={styles.segmented}>
-            {(['one', 'csv'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                id={`invite-tab-${t}`}
-                aria-selected={tab === t}
-                aria-controls={`invite-panel-${t}`}
-                className={styles.segment}
-                data-ph-capture-attribute-label={t === 'csv' ? 'invite_csv_open' : 'invite_one_open'}
-                data-ph-safe=""
-                onClick={() => setTab(t)}
-              >
-                {t === 'one' ? 'One client' : 'Many (CSV)'}
-              </button>
-            ))}
-          </div>
-          <div role="tabpanel" id="invite-panel-one" aria-labelledby="invite-tab-one" hidden={tab !== 'one'} className={styles.tabPanel}>
-            <OneClientForm
-              key={form}
-              today={today}
-              coachName={coachName}
-              library={library}
-              programs={programs}
-              hints={hints}
-              onCancel={() => dialogRef.current?.close()}
-              onSent={(s) => {
-                completeInvite();
-                track('invite_sent');
-                setSent(s);
+      dirty={!sent && tab === 'one' && dirty}
+      busy={pending}
+      fullScreenOnPhone={!sent}
+      footer={
+        sent ? (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSent(null);
+                setDirty(false);
+                setForm((f) => f + 1);
               }}
-            />
-          </div>
-          <div role="tabpanel" id="invite-panel-csv" aria-labelledby="invite-tab-csv" hidden={tab !== 'csv'} className={styles.tabPanel}>
-            <CsvUpload />
-          </div>
-        </>
-      )}
-    </dialog>
+            >
+              Invite another
+            </Button>
+            {/* The form is gone, so focus moves to Done (the window stays open until the coach is finished). */}
+            <Button autoFocus onClick={() => void ref.current?.close()}>Done</Button>
+          </>
+        ) : tab === 'one' ? (
+          <>
+            <Button variant="secondary" onClick={close} disabled={pending} data-ph-capture-attribute-label="invite_cancel" data-ph-safe="">Cancel</Button>
+            <Button type="submit" form={formId} pending={pending} data-ph-capture-attribute-label="invite_send" data-ph-safe="">{pending ? 'Sending…' : 'Send invite'}</Button>
+          </>
+        ) : undefined
+      }
+    >
+      <div data-invite-body="" className={styles.inviteBody}>
+        {sent ? (
+          <SentView sent={sent} />
+        ) : (
+          <>
+            <div role="tablist" aria-label="How many" className={styles.segmented}>
+              {(['one', 'csv'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`invite-tab-${t}`}
+                  aria-selected={tab === t}
+                  aria-controls={`invite-panel-${t}`}
+                  className={styles.segment}
+                  data-ph-capture-attribute-label={t === 'csv' ? 'invite_csv_open' : 'invite_one_open'}
+                  data-ph-safe=""
+                  onClick={() => setTab(t)}
+                >
+                  {t === 'one' ? 'One client' : 'Many (CSV)'}
+                </button>
+              ))}
+            </div>
+            <div role="tabpanel" id="invite-panel-one" aria-labelledby="invite-tab-one" hidden={tab !== 'one'} className={styles.tabPanel}>
+              <OneClientForm
+                key={form}
+                formId={formId}
+                today={today}
+                coachName={coachName}
+                library={library}
+                programs={programs}
+                hints={hints}
+                onDirty={setDirty}
+                onPending={setPending}
+                onSent={(s) => {
+                  completeInvite();
+                  track('invite_sent');
+                  setSent(s);
+                }}
+              />
+            </div>
+            <div role="tabpanel" id="invite-panel-csv" aria-labelledby="invite-tab-csv" hidden={tab !== 'csv'} className={styles.tabPanel}>
+              <CsvUpload />
+            </div>
+          </>
+        )}
+      </div>
+    </AdaptiveDialog>
   );
 }
 
 function OneClientForm({
+  formId,
   today,
   coachName,
   library,
   programs,
   hints,
-  onCancel,
+  onDirty,
+  onPending,
   onSent,
 }: {
+  formId: string;
+  onDirty: (dirty: boolean) => void;
+  onPending: (pending: boolean) => void;
   today: IsoDate;
   coachName: string;
   library: LibraryWorkout[];
   programs: Program[];
   hints: PickerHints;
-  onCancel: () => void;
   onSent: (sent: Sent) => void;
 }) {
   const [firstName, setFirstName] = useState('');
@@ -227,6 +249,10 @@ function OneClientForm({
   const [programId, setProgramId] = useState(() => programs.find((p) => p.id === hints.lastProgramId)?.id ?? programs[0]?.id ?? '');
   const [startOn, setStartOn] = useState<string>(() => nextMonday(today));
   const [items, setItems] = useState<Item[]>(() => [{ key: 'w0', workoutId: null, on: nextMonday(today) }]);
+  // Something typed or picked: closing asks "Discard changes?" first.
+  const dirty = firstName !== '' || lastName !== '' || email !== '' || kind !== 'none';
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => onPending(pending), [pending, onPending]);
 
   const nameOf = (id: string | null) => library.find((w) => w.id === id)?.name ?? '';
   const program = programs.find((p) => p.id === programId) ?? null;
@@ -303,7 +329,7 @@ function OneClientForm({
   const firstChosen = chosen[0];
 
   return (
-    <form onSubmit={onSubmit} className={styles.inviteForm} noValidate>
+    <form id={formId} onSubmit={onSubmit} className={styles.inviteForm} noValidate>
       <div className={styles.nameGrid}>
         {/* Someone else's details, not the coach's: no contact AutoFill, spell-check or autocorrect on names. Safari
             ignores autocomplete="off", so notAContact gives each field a name with "search" in it, which keeps the
@@ -407,9 +433,10 @@ function OneClientForm({
                         className={styles.chosenDay}
                         onChange={(e) => setItems((list) => list.map((x, i) => (i === index ? { ...x, on: e.target.value } : x)))}
                       />
-                      <button
-                        type="button"
-                        className={styles.inlineAction}
+                      <Button
+                        variant="quiet"
+                        size="compact"
+                        className={styles.chosenRemove}
                         aria-label={`Remove ${nameOf(item.workoutId)}`}
                         onClick={() =>
                           setItems((list) => {
@@ -419,7 +446,7 @@ function OneClientForm({
                         }
                       >
                         Remove
-                      </button>
+                      </Button>
                     </li>
                   ) : null,
                 )}
@@ -464,20 +491,14 @@ function OneClientForm({
 
       {error ? <ErrorText code={error} /> : null}
       {result ? <p role="status" className={styles.status}><StatusChip view={result} /></p> : null}
-
-      <div className={styles.inviteActionsRow}>
-        <Button variant="secondary" onClick={onCancel} disabled={pending} data-ph-capture-attribute-label="invite_cancel" data-ph-safe="">Cancel</Button>
-        <Button type="submit" pending={pending} data-ph-capture-attribute-label="invite_send" data-ph-safe="">{pending ? 'Sending…' : 'Send invite'}</Button>
-      </div>
     </form>
   );
 }
 
-function SentView({ titleId, sent, onAnother, onDone }: { titleId: string; sent: Sent; onAnother: () => void; onDone: () => void }) {
+function SentView({ sent }: { sent: Sent }) {
   return (
     <div className={styles.sentView}>
       <span aria-hidden="true" className={styles.sentTick}>✓</span>
-      <h2 id={titleId} className={styles.inviteTitle}>Invite sent to {sent.firstName}</h2>
       <p className={styles.sentLine}>
         We emailed <b>{sent.email}</b>.
         {sent.expiresAt ? (
@@ -501,11 +522,6 @@ function SentView({ titleId, sent, onAnother, onDone }: { titleId: string; sent:
             </li>
           ) : null}
         </ol>
-      </div>
-      <div className={cx(styles.inviteActionsRow, styles.sentActions)}>
-        <Button variant="secondary" onClick={onAnother}>Invite another</Button>
-        {/* The form is gone, so focus moves to Done (the window stays open until the coach is finished). */}
-        <Button autoFocus onClick={onDone}>Done</Button>
       </div>
       <p className={styles.startNote}>
         {sent.firstName} shows on Clients as &ldquo;Invited&rdquo; until they join. You can resend from there.

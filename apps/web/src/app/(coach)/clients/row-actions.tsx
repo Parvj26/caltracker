@@ -1,69 +1,59 @@
 'use client';
 
 import { cancelInvite, removeClient } from './actions';
-import type { Ref, RefObject } from 'react';
+import type { Ref } from 'react';
 import { ConfirmButton, ConfirmDialog, type ConfirmHandle } from './confirm-button';
 
 const REMOVE_BODY =
   "They'll lose access to your workouts, messages and community. Their history stays under Past clients, and re-inviting them brings everything back.";
 
+/** Settings page: "Remove client…" (red outline), asking first. */
 export function RemoveClientButton({ userId, name, focusAfterId = 'clients-heading' }: { userId: string; name: string; focusAfterId?: string }) {
   const who = name || 'this client';
   return (
     <ConfirmButton
-      label="Remove"
-      ariaLabel={`Remove ${who}`}
+      label="Remove client…"
+      ariaLabel="Remove client…"
       title={`Remove ${who}?`}
       body={REMOVE_BODY}
-      confirmLabel="Remove"
+      confirmLabel="Remove client"
       onConfirm={() => removeClient(userId)}
       focusAfterId={focusAfterId}
+      historyId={`remove-${userId}`}
     />
   );
 }
 
-/** The same "Remove …?" question, opened from elsewhere (the client page's ⋯ menu) with `openRef(dialogRef)`. */
-export function RemoveClientDialog({ userId, name, focusAfterId, dialogRef }: { userId: string; name: string; focusAfterId: string; dialogRef: RefObject<HTMLDialogElement | null> }) {
+/** The same "Remove …?" question, mounted while asked (the client page's ⋯ menu). */
+export function RemoveClientDialog({ userId, name, focusAfterId, onClose }: { userId: string; name: string; focusAfterId: string; onClose: () => void }) {
   const who = name || 'this client';
   return (
     <ConfirmDialog
       title={`Remove ${who}?`}
       body={REMOVE_BODY}
-      confirmLabel="Remove"
+      confirmLabel="Remove client"
       onConfirm={() => removeClient(userId)}
       focusAfterId={focusAfterId}
-      dialogRef={dialogRef}
+      historyId={`remove-${userId}`}
+      onClose={onClose}
     />
   );
 }
 
-export function CancelInviteButton({
-  inviteId,
-  email,
-  inline = false,
-  handle,
-  trigger = true,
-}: {
-  inviteId: string;
-  email: string;
-  inline?: boolean;
-  /** Opens the confirm step from elsewhere (the row's ⋯ menu on a phone). */
-  handle?: Ref<ConfirmHandle>;
-  /** False: only the confirm dialog, opened through `handle`. */
-  trigger?: boolean;
-}) {
+/** "Cancel this invite?" opened through `handle` (the invite row's ⋯ menu). */
+export function CancelInviteButton({ inviteId, email, handle }: { inviteId: string; email: string; handle?: Ref<ConfirmHandle> }) {
   return (
     <ConfirmButton
-      inline={inline}
       handle={handle}
-      trigger={trigger}
-      label={inline ? 'Cancel' : 'Cancel invite'}
-      ariaLabel={`Cancel invite to ${email}`}
+      trigger={false}
+      label="Cancel invite…"
+      ariaLabel={`Cancel invite… ${email}`}
       title="Cancel this invite?"
-      body={`Cancel the invite to ${email}? The link in their email will stop working.`}
+      body={`Cancel the invite to ${email}? The link in their email will stop working. You can invite them again later.`}
       confirmLabel="Cancel invite"
       onConfirm={() => cancelInvite(inviteId)}
       focusAfterId="clients-heading"
+      historyId={`cancel-invite-${inviteId}`}
     />
   );
 }

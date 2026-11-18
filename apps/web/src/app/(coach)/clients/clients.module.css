@@ -36,38 +36,6 @@
   white-space: nowrap;
 }
 
-/* ---------- Lists (ARIA tables laid out as rows) ---------- */
-.listCard { container-type: inline-size; padding: var(--ct-space-4) var(--ct-space-4-5) var(--ct-space-2); }
-
-.rows { display: flex; flex-direction: column; }
-.row {
-  display: grid;
-  align-items: center;
-  gap: var(--ct-space-1) var(--ct-space-3);
-  padding: var(--ct-space-2-5) 0;
-  border-bottom: 1px solid var(--ct-border);
-}
-.rows [role='rowgroup']:last-child > .row:last-child { border-bottom: 0; }
-/* Every row is its own grid, so tracks are fixed (rem, not auto/em) to keep the columns lined up with the header. */
-
-.headRow .row {
-  padding: var(--ct-space-1) 0 var(--ct-space-2);
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-caption);
-  color: var(--ct-ink-muted);
-}
-.headRow .row > :first-child { padding-left: 42px; }
-
-.emptyRow { padding: var(--ct-space-3) 0 var(--ct-space-3-5); color: var(--ct-ink-muted); }
-
-.nameCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
-.name { font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
-.nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); color: var(--ct-ink); }
-.email { overflow-wrap: anywhere; }
-.meta { font-size: 14px; color: var(--ct-ink-muted); white-space: nowrap; }
-.narrowOnly { display: none; }
-.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ct-space-2); }
-
 .avatar {
   flex: none;
   display: inline-flex;
@@ -89,15 +57,6 @@
   padding: var(--ct-space-2) var(--ct-space-3-5);
   border-radius: var(--ct-radius-input);
   font-size: 14px;
-}
-
-/* Narrow cards (iPad portrait, phones): each past client stacks into a small block. */
-@container (max-width: 860px) {
-  .headRow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .pastRows .nameCell { grid-area: name; }
-  .pastRows .email { grid-area: email; padding-left: 42px; font-size: 14px; color: var(--ct-ink-muted); }
-  .pastRows .meta { grid-area: meta; }
-  .pastRows .actions { grid-area: actions; }
 }
 
 /* ---------- CSV upload (the invite window's "Many (CSV)" tab) ---------- */
@@ -185,41 +144,31 @@
 .previewTable th { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .previewTable td:last-child { min-width: 12em; }
 
-/* ---------- Confirm dialog (Remove client, Cancel invite) ---------- */
-.dialog {
-  width: min(440px, calc(100vw - 32px));
-  padding: var(--ct-space-6);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-bg);
-  color: var(--ct-ink);
-}
-.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
-.dialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-3); }
-.dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+/* ---------- Confirm (Remove client, Cancel invite) ---------- */
 .dialogBody { margin: 0; }
-.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
 
 /* ---------- Past clients ---------- */
-.pastRows .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem minmax(7rem, 0.7fr); }
-@container (max-width: 860px) {
-  .pastRows .row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'name meta' 'email email' 'actions actions';
-  }
-}
 .pastSection { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 
 /* ---------- Clients list: search, filter chips, sort ---------- */
-.directory { display: flex; flex-direction: column; gap: var(--ct-space-4); }
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2-5); }
-/* The shared SearchBox: a fixed share of the toolbar row. */
-.searchField { flex: 0 1 300px; min-width: 220px; }
-/* Takes the room between search and Sort and wraps its own chips, so Sort stays at the end of the row. */
-.filters { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); flex: 1 1 0; min-width: 0; }
-/* On a phone the search box takes its own row, so the chips are not squeezed past the screen edge. */
-@media (max-width: 599.98px) { .searchField { flex-basis: 100%; } }
+.directory { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
+/* Search on its own row, then one row of chips (scrolls sideways, never stacks), then the count and Sort. */
+.toolbar { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
+.searchField { width: 100%; max-width: 480px; }
+.filters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--ct-space-2);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Room for the focus ring inside the scroll box. */
+  padding: var(--ct-space-1);
+  margin: calc(-1 * var(--ct-space-1));
+}
+.filters::-webkit-scrollbar { display: none; }
 .filterChip {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: var(--ct-space-1);
@@ -232,18 +181,16 @@
   font: inherit;
   font-size: 14px;
   font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
   cursor: pointer;
 }
 .filterChip:hover { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
-/* "Missed this week" stands out while not picked; picked chips are ink. */
+/* "Missed this week" stands out while not picked; picked chips are ink (UI rules §2.4). */
 .filterAlert { background: var(--ct-drop); color: var(--ct-magenta-deep); }
 .filterChip[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); box-shadow: none; }
 .filterCount { font-variant-numeric: tabular-nums; }
-/* Phones: search on its own line, then the chips (they wrap), then Sort, so nothing runs off the screen. */
-@media (max-width: 599.98px) {
-  .searchField { flex: 1 1 100%; min-width: 0; }
-  .filters { flex-basis: 100%; }
-}
+.listBar { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-3); min-height: var(--ct-tap-min); }
+.shownCaption { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .sortField { margin-left: auto; display: flex; align-items: center; gap: var(--ct-space-1); font-size: 14px; color: var(--ct-ink-muted); }
 .sortSelect {
   min-height: var(--ct-tap-min);
@@ -256,177 +203,46 @@
   font-weight: var(--ct-weight-button);
   cursor: pointer;
 }
+.emptyLine { margin: 0; padding: var(--ct-space-3) 0; color: var(--ct-ink-muted); }
 
-/* ---------- Clients table (ARIA table laid out as grid rows) ---------- */
-.tableWrap { container-type: inline-size; }
-.table {
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-card);
-  overflow: hidden;
-}
-.table .row {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr);
-  align-items: center;
-  gap: var(--ct-space-3);
-  padding: var(--ct-space-3) var(--ct-space-4);
-  border-top: var(--ct-border-width-secondary-button) solid var(--ct-border);
-  border-bottom: 0;
-}
-.tableHead .row {
-  padding: var(--ct-space-2-5) var(--ct-space-4);
-  border-top: 0;
-  background: var(--ct-surface-sidebar);
-  color: var(--ct-ink-muted);
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-section-heading);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.table .emptyRow { padding: var(--ct-space-4); border-top: var(--ct-border-width-secondary-button) solid var(--ct-border); }
-.linkRow:hover { background: var(--ct-surface-sidebar); }
-/* The name link stretches over its row, so the whole row opens the client; buttons in the row sit above it. */
-/* Vertical padding on the inline name: a 44 px tall tap box without moving the text (the row is tappable anyway). */
-.rowLink { padding-block: calc((var(--ct-tap-min) - 1em) / 2); margin-block: calc((1em - var(--ct-tap-min)) / 2); color: var(--ct-ink); font-weight: var(--ct-weight-button); text-decoration: none; overflow-wrap: anywhere; }
-.rowLink::after { content: ''; position: absolute; inset: 0; }
-.rowLink:focus-visible { outline: none; }
-/* The whole row gets the standard ring (inset, so the table doesn't clip it). */
-.linkRow:has(.rowLink:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
-.rowName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
-
-.clientCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
-.clientCell .avatar { width: 36px; height: 36px; }
-.nameStack { display: flex; flex-direction: column; min-width: 0; }
+/* ---------- Client and invite rows (ListRow) ---------- */
+.clientList, .inviteList { --row-leading-width: 36px; }
+.clientList .avatar, .inviteList .avatar { width: 36px; height: 36px; }
+.clientRow, .inviteRow { min-width: 0; }
+.rowChip { flex: none; }
+.rowAction { flex: none; }
+/* Every client row ends in the same width (Assign or nothing), so the wide list's columns line up with the header. */
+.rowActionSlot { display: inline-block; width: 88px; }
+.clientList .rowAction { width: 88px; }
+.clientList > div:first-child > span:last-child { flex: none; width: 84px; }
+.statusCell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .statusLine { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }
-/* Colour supports the words, never replaces them. Text stays ink or magenta-deep; amber and lime are only dots. */
-.statusAlert { color: var(--ct-magenta-deep); }
-.statusWarn { color: var(--ct-ink); }
+.inkText { color: var(--ct-ink); }
+/* Colour supports the words, never replaces them. Text stays ink or magenta-deep; amber is only a dot. */
+.statusAlert { color: var(--ct-magenta-deep); font-weight: var(--ct-weight-section-heading); }
+.statusWarn { color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
 .statusWarn::before, .planWarn::before { content: '● '; color: var(--ct-amber); }
 .statusMuted { color: var(--ct-ink-muted); }
-/* An invite's email, under the name (long addresses wrap instead of widening the row). */
-.inviteEmail { overflow-wrap: anywhere; }
 .statusGood { color: var(--ct-ink); }
-.statusGood::before { content: '● '; color: var(--ct-lime); }
-.inviteActions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-3); }
-.inlineAction {
-  position: relative;
-  z-index: 1;
-  min-height: 28px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-button);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.inlineAction:disabled { cursor: default; color: var(--ct-ink-muted); }
+.inviteEmail { overflow-wrap: anywhere; }
 .inlineStatus { flex-basis: 100%; }
-/* Touch screens: Resend and Cancel are full 44 x 44 tap targets, 8 px apart (they were 28 px tall). */
-@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
-  .inviteActions { gap: 0 var(--ct-space-2); }
-  .inlineAction { min-width: var(--ct-tap-min); min-height: var(--ct-tap-min); padding: 0 var(--ct-space-1); }
-}
-
-.cell { display: flex; flex-direction: column; justify-content: center; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
-.cardLabel { display: none; }
-.muted { color: var(--ct-ink-muted); }
+.inviteSection { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.subHeading { margin: var(--ct-space-3) 0 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .behind { color: var(--ct-magenta-deep); }
 .completion { display: flex; align-items: center; gap: var(--ct-space-2); }
-.bar { flex: none; display: block; width: 48px; height: 6px; border-radius: var(--ct-radius-pill); background: var(--ct-border); overflow: hidden; }
+.bar { flex: none; display: block; width: 40px; height: 6px; border-radius: var(--ct-radius-pill); background: var(--ct-border); overflow: hidden; }
 .barFill { display: block; height: 100%; border-radius: var(--ct-radius-pill); background: var(--ct-ink); }
 .barLow { background: var(--ct-magenta); }
 .planStack { display: flex; flex-direction: column; min-width: 0; }
-.planTitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.planTitle { overflow-wrap: anywhere; }
 .planDetail { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .planWarn { color: var(--ct-ink); font-weight: var(--ct-weight-section-heading); }
-.planEmpty { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
-.planButtons { display: flex; flex-wrap: wrap; gap: var(--ct-space-1); }
-.miniButton {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 var(--ct-space-2-5);
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-bg);
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
-  color: var(--ct-ink);
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-button);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.miniButton:hover { background: var(--ct-lime); }
-/* Touch screens: a 44 px tall tap area, while the drawn button stays 32 px (drawn by ::before, 6 px in from each edge). */
-@media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
-  .miniButton, .miniButton:hover { min-height: var(--ct-tap-min); background: none; box-shadow: none; }
-  .miniButton::before {
-    content: '';
-    position: absolute;
-    inset: 6px 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--ct-bg);
-    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
-  }
-  .miniButton:hover::before { background: var(--ct-lime); }
-  .planButtons { row-gap: 0; }
-}
-
-/* Stacked cards (iPad portrait, phones): name and this week on top, then last workout and 4 weeks, then the plan. */
-@container (max-width: 860px) {
-  .tableHead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .table .row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
-    grid-template-areas: 'client week' 'last four' 'plan plan';
-    gap: var(--ct-space-2-5) var(--ct-space-4);
-    border-top: 0;
-    border-bottom: var(--ct-border-width-secondary-button) solid var(--ct-border);
-  }
-  .table [role='rowgroup']:last-child > .row:last-child { border-bottom: 0; }
-  .cellClient { grid-area: client; }
-  .cellWeek { grid-area: week; align-items: flex-end; text-align: right; }
-  .cellLast { grid-area: last; }
-  .cellFour { grid-area: four; align-items: flex-end; }
-  .cellPlan { grid-area: plan; }
-  .cardLabel { display: block; color: var(--ct-ink-muted); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }
-  .planTitle { white-space: normal; }
-}
+.muted { color: var(--ct-ink-muted); }
+/* Settings: Remove client… is an outline in red (the red fill is only for the confirm). */
+.dangerOutline { color: var(--ct-danger-deep); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-danger); }
 
 /* ---------- Invite a client window ---------- */
-.inviteDialog {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  padding: var(--ct-space-6);
-  border: 0;
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-bg);
-  color: var(--ct-ink);
-}
-.inviteDialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 45%, transparent); }
-.inviteDialog[open] { display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
-.dialogHeader { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-3); }
-.inviteTitle { margin: 0; font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); letter-spacing: var(--ct-tracking-screen-title); }
-.closeButton {
-  flex: none;
-  width: var(--ct-tap-min);
-  height: var(--ct-tap-min);
-  border: 0;
-  border-radius: var(--ct-radius-pill);
-  background: var(--ct-surface);
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: 20px;
-  font-weight: var(--ct-weight-button);
-  cursor: pointer;
-}
+.inviteBody { display: flex; flex-direction: column; gap: var(--ct-space-4); }
 .segmented { display: flex; gap: var(--ct-space-1); width: max-content; max-width: 100%; padding: var(--ct-space-1); border-radius: var(--ct-radius-pill); background: var(--ct-surface); }
 .segment, .planOption {
   min-height: 40px;
@@ -456,35 +272,11 @@
 @media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
   .segment, .planOption { min-height: var(--ct-tap-min); }
 }
-/* iPhone: the pill of three choices wrapped onto two lines, so they stack as full-width radio rows instead (still
-   buttons with aria-pressed; the ring and dot only draw the choice). */
+/* iPhone: the choices stay one pill (they wrap if they must), the same control as on iPad. */
 @media (max-width: 599.98px) {
   .startHeader { flex-direction: column; align-items: stretch; }
-  .planToggle { flex-direction: column; flex-wrap: nowrap; gap: var(--ct-space-2); padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
-  .planOption,
-  .planOption[aria-pressed='true'] {
-    display: flex;
-    align-items: center;
-    gap: var(--ct-space-3);
-    width: 100%;
-    padding: 0 var(--ct-space-3-5);
-    border-radius: var(--ct-radius-input);
-    background: var(--ct-bg);
-    color: var(--ct-ink);
-    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
-    font-size: var(--ct-size-body);
-    text-align: left;
-  }
-  .planOption[aria-pressed='true'] { box-shadow: inset 0 0 0 var(--ct-border-width-card) var(--ct-ink); }
-  .planOption::before {
-    content: '';
-    flex: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    box-shadow: inset 0 0 0 2px var(--ct-ink);
-  }
-  .planOption[aria-pressed='true']::before { background: radial-gradient(circle, var(--ct-ink) 0 5px, transparent 6px); }
+  .planToggle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: var(--ct-radius-input); }
+  .planOption { padding: var(--ct-space-1); border-radius: var(--ct-radius-input); line-height: 1.2; }
 }
 .programGrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--ct-space-2-5); }
 .startNote { margin: 0; font-size: 14px; color: var(--ct-ink-muted); }
@@ -498,10 +290,10 @@
   gap: var(--ct-space-2-5);
   padding: var(--ct-space-2) var(--ct-space-3);
   border-radius: var(--ct-radius-input);
-  background: var(--ct-lime);
+  background: var(--ct-surface);
 }
 .chosenName { align-self: center; font-weight: var(--ct-weight-button); }
-.chosenItem .inlineAction { align-self: center; min-height: var(--ct-tap-min); }
+.chosenRemove { align-self: center; }
 .chosenDay { min-width: 0; }
 .addAnother {
   align-self: flex-start;
@@ -528,7 +320,8 @@
   width: 72px;
   height: 72px;
   border-radius: var(--ct-radius-pill);
-  background: var(--ct-lime);
+  background: var(--ct-drop);
+  color: var(--ct-ink);
   font-size: 34px;
   font-weight: var(--ct-weight-button);
 }
@@ -536,80 +329,7 @@
 .sentLine b { color: var(--ct-ink); }
 .nextSteps { display: flex; flex-direction: column; gap: var(--ct-space-2); width: 100%; padding: var(--ct-space-3-5) var(--ct-space-4); border-radius: var(--ct-radius-card); background: var(--ct-surface-sidebar); text-align: left; }
 .stepList { display: flex; flex-direction: column; gap: var(--ct-space-1); margin: 0; padding-left: 1.25em; font-size: 14px; }
-.sentActions { justify-content: center; }
 
 @media (max-width: 520px) {
   .programGrid, .chosenItem { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* ---------- Phones (under 600 px): one line per client ---------- */
-/* Avatar, name (one line, "…"), one chip and ›, about 9 to a screen; the details live on the client page. Invites get
-   a ⋯ menu (Resend, Cancel invite…); clients with nothing planned get Assign instead of ›. */
-.directory .phoneOnly { display: none; }
-@media (max-width: 599.98px) {
-  .directory .phoneOnly { display: inline-flex; }
-  .directory .wideOnly { display: none; }
-  .directory { gap: var(--ct-space-2); }
-
-  .toolbar { gap: var(--ct-space-2-5) var(--ct-space-2); }
-  /* Chips stay on one line and scroll sideways, fading at the edge. */
-  .filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    margin-inline: calc(-1 * var(--ct-space-4));
-    padding-inline: var(--ct-space-4);
-    scrollbar-width: none;
-    mask-image: linear-gradient(to right, black 88%, transparent);
-  }
-  .filters::-webkit-scrollbar { display: none; }
-  .filterChip { flex: none; white-space: nowrap; }
-  .shownCaption { align-items: center; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-  .sortField { font-size: var(--ct-size-caption); }
-
-  .table { border: 0; border-radius: 0; overflow: visible; }
-  .table .row {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: none;
-    gap: 0;
-    min-height: 50px;
-    padding: var(--ct-space-1) 0;
-    border-top: 0;
-    border-bottom: var(--ct-border-width-secondary-button) solid var(--ct-border);
-  }
-  .table .emptyRow { padding: var(--ct-space-4) 0; border-top: 0; }
-  .cellClient { grid-area: auto; }
-  .cellLast, .cellWeek, .cellFour, .cellPlan { display: none; }
-  .clientCell { gap: var(--ct-space-2-5); }
-  .clientCell .avatar { width: 32px; height: 32px; }
-  .nameStack { flex: 1 1 0; }
-  .rowLink, .rowName { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; font-size: 16px; }
-  .rowChip { flex: none; }
-  .chipLine { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border); }
-  .rowChevron { flex: none; color: var(--ct-ink-muted); }
-  .rowMore { margin-right: calc(-1 * var(--ct-space-2-5)); }
-  /* Assign on a row with nothing planned: a small outlined button with a full 44 px tap area. */
-  .quickAssign {
-    position: relative;
-    z-index: 1;
-    flex: none;
-    align-items: center;
-    min-height: var(--ct-tap-min);
-    padding: 0 var(--ct-space-3);
-    color: var(--ct-ink);
-    font-size: 14px;
-    font-weight: var(--ct-weight-button);
-    text-decoration: none;
-  }
-  .quickAssign::before {
-    content: '';
-    position: absolute;
-    inset: 6px 0;
-    z-index: -1;
-    border-radius: var(--ct-radius-input);
-    background: var(--ct-bg);
-    box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
-  }
-  .quickAssign:active::before { background: var(--ct-lime); }
-  /* A resend result goes under the name. */
-  .inlineStatus { padding-bottom: var(--ct-space-1); }
 }

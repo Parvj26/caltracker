@@ -18,7 +18,8 @@ export default async function ClientSettingsPage({ params }: { params: Promise<{
   if (!client) notFound();
   return (
     <Card className={styles.card} aria-labelledby="settings-heading">
-      <h2 id="settings-heading" tabIndex={-1} className={styles.heading}>Remove client</h2>
+      <h2 id="settings-heading" tabIndex={-1} className={styles.heading}>Settings</h2>
+      <h3 className={styles.subheading}>Remove client</h3>
       {client.removedAt ? (
         <p className={styles.body}>
           {client.firstName} was removed on <LocalDate iso={client.removedAt} />. Their history stays here, read-only. Invite them again

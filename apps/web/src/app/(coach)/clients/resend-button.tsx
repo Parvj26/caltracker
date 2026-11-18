@@ -6,7 +6,6 @@ import { Button } from '@/components/ui';
 import { sendInvites } from './actions';
 import { statusView, type StatusView } from './status-copy';
 import { StatusChip } from './status-chip';
-import styles from './clients.module.css';
 
 type Props = {
   email: string;
@@ -16,8 +15,6 @@ type Props = {
   label?: string;
   /** Names the row for screen readers, e.g. "Re-invite Sam Lee". */
   ariaLabel?: string;
-  /** A small text button inside a row's status line (the Clients list) instead of a bordered button. */
-  inline?: boolean;
 };
 
 /** Sends an invite again; `message` is the result to show (a chip). Shared by Resend buttons and row menus. */
@@ -37,23 +34,11 @@ export function useResendInvite({ email, firstName, lastName }: { email: string;
   return { resend, pending, message };
 }
 
-export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel, inline = false }: Props) {
+export function ResendButton({ email, firstName, lastName, label = 'Resend', ariaLabel }: Props) {
   const { resend, pending, message } = useResendInvite({ email, firstName, lastName });
-
-  if (inline) {
-    return (
-      <>
-        <button type="button" className={styles.inlineAction} onClick={resend} disabled={pending} aria-busy={pending || undefined} aria-label={pending ? undefined : ariaLabel}>
-          {pending ? 'Sending…' : label}
-        </button>
-        {message ? <span role="status" className={styles.inlineStatus}><StatusChip view={message} /></span> : null}
-      </>
-    );
-  }
-
   return (
     <>
-      <Button variant="secondary" className={styles.rowButton} onClick={resend} pending={pending} aria-label={pending ? undefined : ariaLabel}>
+      <Button variant="quiet" size="compact" onClick={resend} pending={pending} aria-label={pending ? undefined : ariaLabel}>
         {pending ? 'Sending…' : label}
       </Button>
       {message ? <span role="status"><StatusChip view={message} /></span> : null}

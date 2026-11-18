@@ -35,8 +35,8 @@ export function RowList({
 }
 
 export type ListRowProps = {
-  /** The whole row opens this. */
-  href: string;
+  /** The whole row opens this. Leave out for a row with nothing to open (a pending invite): then only its action and ⋯ act. */
+  href?: string | undefined;
   title: ReactNode;
   /** One meta line (status chips go here, always in the same place). */
   meta?: ReactNode;
@@ -55,6 +55,8 @@ export type ListRowProps = {
   /** Bold title (an unread conversation). */
   emphasis?: boolean;
   linkProps?: Omit<ComponentProps<typeof Link>, 'href' | 'className' | 'children'> & Record<`data-${string}`, string | number | undefined>;
+  /** data-* attributes for the row itself (the <li>), so tests and scripts can find it. */
+  itemProps?: Record<`data-${string}`, string | number | undefined>;
   className?: string | undefined;
 };
 
@@ -63,22 +65,31 @@ export type ListRowProps = {
  * end. The whole row (all but the action and ⋯, which stay their own buttons) is one link, at least 56 px tall, with
  * hover and keyboard focus.
  */
-export function ListRow({ href, title, meta, leading, end, action, more, cells, current = false, emphasis = false, linkProps, className }: ListRowProps) {
-  return (
-    <li className={cx(styles.listRow, current && styles.listRowCurrent, emphasis && styles.listRowEmphasis, className)}>
-      <Link href={href} className={styles.listRowLink} aria-current={current ? 'page' : undefined} {...linkProps}>
-        {leading ? <span className={styles.listRowLeading}>{leading}</span> : null}
-        <span className={styles.listRowText}>
-          <span className={styles.listRowTitle}>{title}</span>
-          {meta ? <span className={styles.listRowMeta}>{meta}</span> : null}
+export function ListRow({ href, title, meta, leading, end, action, more, cells, current = false, emphasis = false, linkProps, itemProps, className }: ListRowProps) {
+  const inner = (
+    <>
+      {leading ? <span className={styles.listRowLeading}>{leading}</span> : null}
+      <span className={styles.listRowText}>
+        <span className={styles.listRowTitle}>{title}</span>
+        {meta ? <span className={styles.listRowMeta}>{meta}</span> : null}
+      </span>
+      {cells?.map((c, i) => (
+        <span key={i} className={styles.cell}>
+          {c}
         </span>
-        {cells?.map((c, i) => (
-          <span key={i} className={styles.cell}>
-            {c}
-          </span>
-        ))}
-        {end ? <span className={styles.listRowEnd}>{end}</span> : null}
-      </Link>
+      ))}
+      {end ? <span className={styles.listRowEnd}>{end}</span> : null}
+    </>
+  );
+  return (
+    <li className={cx(styles.listRow, current && styles.listRowCurrent, emphasis && styles.listRowEmphasis, className)} {...itemProps}>
+      {href !== undefined ? (
+        <Link href={href} className={styles.listRowLink} aria-current={current ? 'page' : undefined} {...linkProps}>
+          {inner}
+        </Link>
+      ) : (
+        <div className={cx(styles.listRowLink, styles.listRowStatic)}>{inner}</div>
+      )}
       {action || more ? (
         <span className={styles.listRowActions}>
           {action}

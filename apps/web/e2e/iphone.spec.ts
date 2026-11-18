@@ -103,7 +103,7 @@ test('no coach page scrolls sideways or has a field that makes Safari zoom', asy
 test('the rail legal links and the clients list are easy to tap', async ({ page }) => {
   await page.goto('/clients');
   await expectTappable(page.getByRole('navigation', { name: 'Legal' }).getByRole('link'), { wide: true });
-  const table = page.getByRole('table', { name: 'Clients' });
+  const table = page.getByRole('list', { name: 'Clients', exact: true });
   await expect(table.getByRole('link').first()).toBeVisible();
   await expectTappable(table.getByRole('link'));
 });

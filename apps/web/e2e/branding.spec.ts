@@ -171,8 +171,8 @@ test('coach shell keeps the full sidebar on iPad landscape and laptop', async ({
 
 test('clients page: clients show round initials avatars', async ({ page }) => {
   await signInAsDemoCoach(page);
-  const clients = page.getByRole('table', { name: 'Clients', exact: true });
-  const demo = clients.getByRole('row').filter({ hasText: 'Demo Client' });
+  const clients = page.getByRole('list', { name: 'Clients', exact: true });
+  const demo = clients.getByRole('listitem').filter({ hasText: 'Demo Client' });
   await expect(demo.locator('[data-avatar]')).toHaveText('DC');
   await expect(demo.locator('[data-avatar]')).toHaveCSS('border-radius', '999px');
   // "+ Invite client" sits in the page header, above the list, so it is always in view on a laptop.

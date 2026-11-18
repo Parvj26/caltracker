@@ -81,7 +81,7 @@ test('the bar and the tabs stay at the top while scrolling; ⋯ has Client setti
   await page.getByRole('button', { name: 'More for this client' }).click();
   await expect(page.getByRole('menuitem', { name: 'Client settings' })).toBeInViewport({ ratio: 1 });
   await page.getByRole('menuitem', { name: 'Remove client…' }).click();
-  const dialog = page.getByRole('dialog', { name: `Remove ${client.name}?` });
+  const dialog = page.getByRole('alertdialog', { name: `Remove ${client.name}?` });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/^They'll lose access to your workouts, messages and community\./)).toBeInViewport();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -91,7 +91,7 @@ test('the bar and the tabs stay at the top while scrolling; ⋯ has Client setti
   await page.getByRole('button', { name: 'More for this client' }).click();
   await page.getByRole('menuitem', { name: 'Client settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/settings$`));
-  await expect(page.getByRole('button', { name: `Remove ${client.name}` })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove client…' })).toBeVisible();
 });
 
 test('Training: the two buttons share a row, programs fold into one line, and the calendar is on the first screen', async ({ page }) => {

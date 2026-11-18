@@ -65,7 +65,7 @@ test('Clients: a typo finds the client, and Back from another page brings the se
   await page.goto('/clients');
   const box = page.getByRole('searchbox', { name: 'Search clients' });
   await box.fill(`mya ${last}`);
-  const table = page.getByRole('table', { name: 'Clients' });
+  const table = page.getByRole('list', { name: 'Clients', exact: true });
   await expect(table.getByText(`Maya ${last}`)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`[?&]q=mya(\\+|%20)${last}`, 'i'));
 
@@ -76,7 +76,7 @@ test('Clients: a typo finds the client, and Back from another page brings the se
   await expect(page).toHaveURL(/\/clients\?/);
   await expect(box).toHaveValue(`mya ${last}`);
   await expect(table.getByText(`Maya ${last}`)).toBeVisible();
-  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table.getByRole('listitem')).toHaveCount(1);
 });
 
 test('Workouts: open a workout from a search, then Back keeps the search', async ({ page }) => {

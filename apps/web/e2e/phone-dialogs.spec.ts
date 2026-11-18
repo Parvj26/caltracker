@@ -143,19 +143,23 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('the invite plan choice is three stacked full-width rows', async ({ page }) => {
+  test('the invite plan choice is one row of three equal choices (the same control as on iPad)', async ({ page }) => {
     await signInAsCoach(page);
     await page.getByRole('button', { name: 'Invite client', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Invite a client' });
-    const boxes = await Promise.all(
-      ['Program', 'Single workout', 'Nothing yet'].map(async (n) => (await dialog.getByRole('button', { name: n, exact: true }).boundingBox())!),
+    // Measured together, in one go (the sheet may still be sliding up).
+    await expect(dialog.getByRole('button', { name: 'Nothing yet', exact: true })).toBeVisible();
+    const boxes = await dialog.getByRole('group', { name: /give them something/ }).getByRole('button').evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      }),
     );
     const [program, single, nothing] = boxes as [NonNullable<(typeof boxes)[0]>, NonNullable<(typeof boxes)[0]>, NonNullable<(typeof boxes)[0]>];
-    expect(single.x).toBe(program.x);
-    expect(nothing.x).toBe(program.x);
-    expect(single.width).toBe(program.width);
-    expect(single.y).toBeGreaterThanOrEqual(program.y + program.height + 8);
-    expect(nothing.y).toBeGreaterThanOrEqual(single.y + single.height + 8);
+    expect(single.y).toBe(program.y);
+    expect(nothing.y).toBe(program.y);
+    expect(Math.round(single.width)).toBe(Math.round(program.width));
+    expect(single.x).toBeGreaterThan(program.x + program.width - 1);
     for (const b of boxes) expect(b.height).toBeGreaterThanOrEqual(44);
     // Choosing still works the same way.
     await dialog.getByRole('button', { name: 'Program', exact: true }).click();
