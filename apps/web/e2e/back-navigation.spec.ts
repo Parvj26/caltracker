@@ -1,12 +1,12 @@
 import { devices, expect, test, type Page } from '@playwright/test';
-import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
+import { demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 import { programCell, serviceClient, signInAsCoach } from './helpers';
 
 // Back and iOS swipe-back go exactly one step (ui-rules §8): every sheet, pop-up, menu and full-screen editor is one
 // step of history, so Back closes it and stays on the page under it; a page with unsaved changes asks "Discard
 // changes?" before Back or a link leaves it. page.goBack() stands in for the swipe.
 const admin = serviceClient();
-const created: { workouts: string[]; programs: string[] } = { workouts: [], programs: [] };
+const created: { workouts: string[]; programs: string[]; users: string[] } = { workouts: [], programs: [], users: [] };
 let workspaceId: string;
 
 test.beforeAll(async () => {
@@ -15,6 +15,8 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (created.programs.length) await admin.from('programs').delete().in('name', created.programs);
   if (created.workouts.length) await admin.from('workouts').delete().in('name', created.workouts).is('client_id', null);
+  if (created.workouts.length) await admin.from('workouts').delete().like('name', 'Back nav % (copy)%').is('client_id', null);
+  for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
 
 async function seedWorkout(prefix = 'Back nav') {
@@ -295,5 +297,71 @@ test.describe('iPad portrait exercises', () => {
     await expect(back).toBeHidden();
     expect(path(page)).toBe('/exercises');
     await expect(page.getByRole('option').first()).toBeVisible();
+  });
+});
+
+test.describe('pages that change their own address, and code that navigates, with a layer open', () => {
+  test('?add=workout opens Add a workout once: Back closes it, and neither Back nor a reload opens it again', async ({ page }) => {
+    const clientId = await freshClient(admin, workspaceId, 'Addy', `Back${unique()}`);
+    created.users.push(clientId);
+    await signInAsCoach(page);
+    await page.goto(`/clients/${clientId}/training?add=workout`);
+    const add = page.getByRole('dialog', { name: 'Add a workout' });
+    await expect(add).toBeVisible();
+    // The page drops ?add= from its address while the dialog is open (the router must not put it back).
+    await expect.poll(() => new URL(page.url()).searchParams.get('add')).toBeNull();
+    await page.goBack();
+    await expect(add).toBeHidden();
+    expect(path(page)).toBe(`/clients/${clientId}/training`);
+    expect(new URL(page.url()).searchParams.get('add')).toBeNull();
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(add).toBeHidden();
+    // One more Back leaves the client (no leftover step for the dialog).
+    await page.goBack();
+    await expect(page).toHaveURL(/\/clients$/);
+  });
+
+  test.describe('iPad portrait', () => {
+    test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true });
+
+    test('Duplicate from the workout ⋯ panel: one Back returns to the original, one more to the list', async ({ page }) => {
+      const w = await seedWorkout();
+      await signInAsCoach(page);
+      await openFromList(page, w);
+      await page.getByRole('button', { name: `More for ${w.name}`, exact: true }).click();
+      await page.getByRole('button', { name: /^Duplicate/ }).click();
+      await expect.poll(() => path(page)).not.toBe(`/workouts/${w.id}`);
+      await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
+      await page.goBack();
+      await expect(page).toHaveURL(new RegExp(`/workouts/${w.id}$`));
+      await page.goBack();
+      await expect(page).toHaveURL(/\/workouts\?q=/);
+    });
+
+    test('Delete from the workout ⋯ panel opens the list in its place: Back never shows the deleted workout', async ({ page }) => {
+      const w = await seedWorkout();
+      await signInAsCoach(page);
+      await openFromList(page, w);
+      await page.getByRole('button', { name: `More for ${w.name}`, exact: true }).click();
+      await page.getByRole('button', { name: 'Delete workout', exact: true }).click();
+      const confirm = page.getByRole('alertdialog').or(page.getByRole('dialog', { name: /Delete/ }));
+      await confirm.getByRole('button', { name: /^Delete/ }).last().click();
+      await expect(page).toHaveURL(/\/workouts$/);
+      await page.goBack();
+      await expect(page).toHaveURL(/\/workouts\?q=/);
+    });
+  });
+
+  test('a page opened straight from a link: Discard on Back goes to its list', async ({ page }) => {
+    await signInAsCoach(page);
+    // A fresh tab with only the form in its history.
+    const tab = await page.context().newPage();
+    await tab.goto('/exercises/new');
+    await tab.getByLabel('Name').fill('Half-typed exercise');
+    await tab.goBack();
+    await discard(tab).getByRole('button', { name: 'Discard' }).click();
+    await expect(tab).toHaveURL(/\/exercises$/);
+    await tab.close();
   });
 });

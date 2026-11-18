@@ -51,7 +51,7 @@ export function ProgramDetails({
   }, [confirm]);
   const dirty = name !== saved.name || description !== saved.description || weeksText !== String(weeks);
   // Back, a link or closing the tab with unsaved details asks first.
-  const guard = useUnsavedGuard(dirty, { message: 'The program’s name, length or description isn’t saved yet.' });
+  const guard = useUnsavedGuard(dirty, { message: 'The program’s name, length or description isn’t saved yet.', parentHref: '/programs' });
 
   async function save(input: ProgramInput, expected: number) {
     setPending(true);

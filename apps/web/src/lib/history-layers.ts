@@ -15,15 +15,17 @@
  *   so a "close the menu, then go to the page" can't be undone by the close.
  * - Stepping back over layers that didn't change the address is hidden from the router (same page, nothing to load).
  *
- * `useHistoryLayer` (address-based pop-ups like AdaptiveDialog) works alongside: its entries are numbered here too.
+ * `useHistoryLayer` (AdaptiveDialog) is built on the same stack: its entries also put `?sheet=<id>` in the address.
  */
 
 type BackResult = boolean | void | Promise<boolean | void>;
 
 type Entry = {
   seq: number;
-  /** A layer of ours, the page's unsaved-changes guard, or a useHistoryLayer pop-up (it handles its own Back). */
-  kind: 'layer' | 'guard' | 'foreign';
+  /** A layer (pop-up, sheet, menu, full-screen editor) or the page's unsaved-changes guard. */
+  kind: 'layer' | 'guard';
+  /** Shown in the address while open (`?<param>=<id>`), for useHistoryLayer. */
+  address?: { param: string; id: string };
   /** Back went past it. Return false to stay open (asking first): the entry goes back on. */
   onBack?: () => BackResult;
   /** The address when it was pushed. */
@@ -40,8 +42,6 @@ export type LayerHandle = {
 };
 
 const SEQ = 'ctSeq';
-/** useHistoryLayer's own state key. */
-const FOREIGN_KEY = 'ctLayer';
 /** How long to wait for a step back the browser never reports (out of range) before carrying on. */
 const TRAVERSAL_TIMEOUT_MS = 700;
 /** How long a dialog's own Escape handling gets to close it (React re-renders) before it counts as "stayed open". */
@@ -54,15 +54,24 @@ const nextSeq = () => (lastSeq = Math.max(Date.now(), lastSeq + 1));
 const stack: Entry[] = [];
 /** The number of the current history entry, as far as we know. */
 let currentSeq = 0;
+type Traversal = {
+  /** Ours (not other code's history.back()). */
+  own: boolean;
+  /** Hide it from the router (and other listeners) as long as it stays on the same page. */
+  hide: boolean;
+  /** The page it started on: a step that leaves it is never hidden. */
+  fromPath: string;
+  done: (arrived: boolean) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
 /** Steps back/forward asked of the browser and not yet reported by popstate, oldest first. */
-const traversals: { own: boolean; done: () => void; timer: ReturnType<typeof setTimeout> }[] = [];
+const traversals: Traversal[] = [];
 /** Layers deciding whether Back may close them. */
 let deciding = 0;
 /** History writes waiting for the traversals and decisions above to finish. */
 let deferred: (() => void)[] = [];
 let settleQueued = false;
 
-let nativeGo: History['go'] | null = null;
 /** True while this module writes history itself (so the wrappers don't treat it as the page's). */
 let writing = false;
 
@@ -73,6 +82,8 @@ type Guard = {
   entry: Entry | null;
   /** The coach chose Discard (or saved and left): let the page go. */
   bypassed: boolean;
+  /** Discard on Back with nothing behind the page in this tab: go here instead (its parent list). */
+  onNoHistory?: () => void;
 };
 const guards = new Set<Guard>();
 
@@ -97,12 +108,15 @@ function flush() {
   }
 }
 
-/** Steps `delta` entries (negative is back) and resolves once the browser reports it. Waits its turn. */
-function traverse(delta: number): Promise<void> {
-  return new Promise<void>((resolve) => {
+/**
+ * Steps `delta` entries (negative is back) and resolves once the browser reports it (true), or after a timeout when
+ * it never does (false: out of range). Waits its turn behind other steps and decisions.
+ */
+function traverse(delta: number, { hide = false, then }: { hide?: boolean; then?: (arrived: boolean) => void } = {}): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     const run = () => {
       let settled = false;
-      const done = () => {
+      const done = (arrived: boolean) => {
         if (settled) return;
         settled = true;
         const i = traversals.findIndex((t) => t.done === done);
@@ -110,32 +124,57 @@ function traverse(delta: number): Promise<void> {
           clearTimeout(traversals[i]!.timer);
           traversals.splice(i, 1);
         }
-        resolve();
+        // Before anything that waited runs.
+        then?.(arrived);
+        resolve(arrived);
         flush();
       };
-      traversals.push({ own: true, done, timer: setTimeout(done, TRAVERSAL_TIMEOUT_MS) });
-      nativeGo!.call(window.history, delta);
+      traversals.push({ own: true, hide, fromPath: window.location.pathname, done, timer: setTimeout(() => done(false), TRAVERSAL_TIMEOUT_MS) });
+      // Looked up each time (not kept), so a test can stand in for the browser.
+      window.history.go(delta);
     };
     if (blocked()) deferred.push(run);
     else run();
   });
 }
 
-function rawPush(entry: Entry, url?: string) {
+/** The address with (or, `id` null, without) `?<param>=<id>`. */
+function withParam(href: string, param: string, id: string | null): string {
+  const url = new URL(href);
+  if (id === null) url.searchParams.delete(param);
+  else url.searchParams.set(param, id);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Writes history ourselves, through the (Next-patched) methods so the router's state and address stay in step. */
+function write(fn: () => void) {
+  writing = true;
+  try {
+    fn();
+  } finally {
+    writing = false;
+  }
+}
+
+function rawPush(entry: Entry) {
   entry.seq = nextSeq();
   // It goes on top of history, so on top of the stack too (it may have waited behind later ones).
   const at = stack.indexOf(entry);
   if (at >= 0) stack.splice(at, 1);
   stack.push(entry);
   entry.pushed = true;
-  entry.href = url ? new URL(url, window.location.href).href : window.location.href;
-  writing = true;
-  try {
-    // Through the (Next-patched) pushState, so the router's state is copied onto the entry.
-    window.history.pushState({ [SEQ]: entry.seq }, '', url);
-  } finally {
-    writing = false;
+  let url: string | undefined;
+  if (entry.address) {
+    const { param, id } = entry.address;
+    // A leftover ?sheet= (a shared link, a reload while open): off this entry first, so Back lands on the plain page.
+    if (new URL(window.location.href).searchParams.has(param)) {
+      const plain = withParam(window.location.href, param, null);
+      write(() => window.history.replaceState(window.history.state, '', plain));
+    }
+    url = withParam(window.location.href, param, id);
   }
+  entry.href = url ? new URL(url, window.location.href).href : window.location.href;
+  write(() => window.history.pushState({ [SEQ]: entry.seq }, '', url));
   currentSeq = entry.seq;
 }
 
@@ -192,7 +231,13 @@ function settle() {
   let n = 0;
   while (n < stack.length && stack[stack.length - 1 - n]!.closing) n++;
   if (n === 0) return;
-  void traverse(-n);
+  const over = stack.slice(stack.length - n);
+  void traverse(-n, {
+    then: (arrived) => {
+      // The browser never reported it: count them gone anyway, so they are never stepped over twice.
+      if (!arrived) for (const e of over) if (stack.includes(e)) stack.splice(stack.indexOf(e), 1);
+    },
+  });
 }
 
 /** Puts each active guard's entry under the layers: only when no layer is open, so the guard is always lowest. */
@@ -207,15 +252,33 @@ function ensureGuards() {
   }
 }
 
+/** Where this tab's history can't go back two steps (the page was opened directly, guard on top). */
+function cannotGoBackTwo(): boolean {
+  const nav = (window as unknown as { navigation?: { currentEntry?: { index?: number } } }).navigation;
+  const index = nav?.currentEntry?.index;
+  return typeof index === 'number' && index < 2;
+}
+
 function guardBack(g: Guard): false {
-  void g.ask().then((discard) => {
+  void g.ask().then(async (discard) => {
     if (!discard || !g.entry) return;
     g.bypassed = true;
-    const i = stack.indexOf(g.entry);
-    if (i >= 0) stack.splice(i, 1);
+    const entry = g.entry;
     g.entry = null;
-    // From the guard entry (put back): over it and the page, to where Back was going.
-    void traverse(-2);
+    if (!cannotGoBackTwo()) {
+      const i = stack.indexOf(entry);
+      if (i >= 0) stack.splice(i, 1);
+      // From the guard entry (put back): over it and the page, to where Back was going.
+      if (await traverse(-2)) return;
+      // Nothing that far back after all: still on the guard entry.
+      stack.push(entry);
+    }
+    // The page is the first in this tab: step off the guard only, then the page's own way out (its parent list).
+    entry.closing = true;
+    if (!stack.includes(entry)) stack.push(entry);
+    queueSettle();
+    await waitGone(entry);
+    g.onNoHistory?.();
   });
   return false;
 }
@@ -226,7 +289,7 @@ async function handleGone(gone: Entry[]) {
     let refused: Entry[] = [];
     for (let i = 0; i < gone.length; i++) {
       const entry = gone[i]!;
-      if (entry.closing || entry.kind === 'foreign') continue;
+      if (entry.closing) continue;
       let result: boolean | void = undefined;
       try {
         result = await entry.onBack?.();
@@ -234,7 +297,7 @@ async function handleGone(gone: Entry[]) {
         result = undefined;
       }
       if (result === false) {
-        refused = gone.slice(i).filter((e) => !e.closing && e.kind !== 'foreign');
+        refused = gone.slice(i).filter((e) => !e.closing);
         break;
       }
     }
@@ -258,16 +321,18 @@ function onPopState(e: PopStateEvent) {
     }
   }
   const t = traversals[0];
-  // Same page under the layers that went: the router has nothing to do (and nothing waiting must be undone).
+  // Same address under the layers that went: the router has nothing to do (and nothing waiting must be undone).
   const lowest = gone[gone.length - 1];
-  const sameAddress = lowest !== undefined && gone.every((g) => g.kind !== 'foreign') && window.location.href === lowest.href;
+  const sameAddress = lowest !== undefined && window.location.href === lowest.href;
   if (t?.own) {
-    if (sameAddress || deferred.length > 0) e.stopImmediatePropagation();
-    t.done();
+    // Never hidden when it left the page: the router must show where it landed.
+    const samePage = window.location.pathname === t.fromPath;
+    if (samePage && (t.hide || sameAddress || deferred.length > 0)) e.stopImmediatePropagation();
+    t.done(true);
     return;
   }
   if (t) {
-    // A step back asked by other code (useHistoryLayer's release): it's theirs, nothing to close here.
+    // Other code's history.back(): the router sees it, and later writes wait for it (done below, via flush).
     clearTimeout(t.timer);
     traversals.shift();
   }
@@ -333,7 +398,7 @@ function unwindAll(): Promise<void> {
       }
       // Marked closed, so nothing is asked; the layers themselves go when the page changes.
       for (const s of stack) s.closing = true;
-      void traverse(-pushed).then(resolve);
+      void traverse(-pushed, { hide: true }).then(() => resolve());
     };
     if (blocked()) deferred.push(run);
     else run();
@@ -360,26 +425,34 @@ export function installHistoryLayers() {
   const innerReplace = h.replaceState;
   const innerBack = h.back;
   /* eslint-enable @typescript-eslint/unbound-method */
-  nativeGo = h.go.bind(h);
   currentSeq = seqOf(h.state);
 
   h.pushState = function pushState(data: unknown, unused: string, url?: string | URL | null) {
     if (writing) return innerPush.call(h, data, unused, url);
     for (const fn of beforePush) fn();
     settle();
+    const target = url != null ? new URL(String(url), window.location.href) : new URL(window.location.href);
     const run = () => {
       const base = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
-      const seq = nextSeq();
-      const next = { ...base, [SEQ]: seq };
-      innerPush.call(h, next, unused, url);
-      currentSeq = seq;
-      if (FOREIGN_KEY in base) {
-        stack.push({ seq, kind: 'foreign', href: window.location.href, closing: false, pushed: true });
-      } else {
-        // A page: our entries are under it now.
-        stack.length = 0;
-        for (const g of guards) g.entry = null;
+      const ours = stack.filter((s) => s.pushed);
+      if (ours.length > 0 && topIsCurrent()) {
+        // Code navigating (router.push) with layers or the guard on top: write the new entry on the page's own,
+        // not above them, or Back would land on their dead entries.
+        const leaving = target.pathname !== window.location.pathname;
+        if (leaving) for (const g of guards) if (g.active) g.bypassed = true;
+        void rewriteUnder(ours, () => {
+          const seq = nextSeq();
+          innerPush.call(h, { ...base, [SEQ]: seq }, unused, url);
+          currentSeq = seq;
+        }, { keep: !leaving });
+        return;
       }
+      const seq = nextSeq();
+      innerPush.call(h, { ...base, [SEQ]: seq }, unused, url);
+      currentSeq = seq;
+      // A new page entry: anything of ours left in the stack is under it now.
+      stack.length = 0;
+      for (const g of guards) g.entry = null;
     };
     if (blocked()) deferred.push(run);
     else run();
@@ -388,23 +461,31 @@ export function installHistoryLayers() {
   h.replaceState = function replaceState(data: unknown, unused: string, url?: string | URL | null) {
     if (writing) return innerReplace.call(h, data, unused, url);
     settle();
+    const fromPath = window.location.pathname;
     const run = () => {
+      // Asked on a page the tab has since left (a Back raced it): it belongs to that page, not this one.
+      if (window.location.pathname !== fromPath) return;
       const base = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
       const cur = h.state && typeof h.state === 'object' ? (h.state as Record<string, unknown>) : {};
-      const next: Record<string, unknown> = { ...base };
-      // Keep the entry's number (and useHistoryLayer's marker) whatever the caller passed (often null).
-      next[SEQ] = typeof cur[SEQ] === 'number' ? cur[SEQ] : nextSeq();
-      if (!(FOREIGN_KEY in next) && FOREIGN_KEY in cur) next[FOREIGN_KEY] = cur[FOREIGN_KEY];
+      // Keep the entry's number whatever the caller passed (often null).
+      const next: Record<string, unknown> = { ...base, [SEQ]: typeof cur[SEQ] === 'number' ? cur[SEQ] : nextSeq() };
       const target = url != null ? new URL(String(url), window.location.href).href : window.location.href;
       const ours = stack.filter((s) => s.pushed);
-      if (target !== window.location.href && ours.length > 0 && topIsCurrent() && ours.every((s) => s.kind !== 'foreign')) {
+      if (target !== window.location.href && ours.length > 0 && topIsCurrent() && ours.every((s) => !s.address)) {
         // The page changed its own address (a search, a tab, a save) while layers or the guard are on top: write it
         // on the page's entry, then put ours back on top of it.
-        void rewriteUnder(ours, () => {
-          const c = h.state && typeof h.state === 'object' ? (h.state as Record<string, unknown>) : {};
-          innerReplace.call(h, { ...base, [SEQ]: typeof c[SEQ] === 'number' ? c[SEQ] : nextSeq() }, unused, url);
-          currentSeq = seqOf(h.state);
-        });
+        // A different page (router.replace after a delete): the layers don't come back on top of it.
+        const leaving = new URL(target).pathname !== window.location.pathname;
+        if (leaving) for (const g of guards) if (g.active) g.bypassed = true;
+        void rewriteUnder(
+          ours,
+          () => {
+            const c = h.state && typeof h.state === 'object' ? (h.state as Record<string, unknown>) : {};
+            innerReplace.call(h, { ...base, [SEQ]: typeof c[SEQ] === 'number' ? c[SEQ] : nextSeq() }, unused, url);
+            currentSeq = seqOf(h.state);
+          },
+          { keep: !leaving },
+        );
         return;
       }
       innerReplace.call(h, next, unused, url);
@@ -414,15 +495,23 @@ export function installHistoryLayers() {
     else run();
   } as History['replaceState'];
 
-  // Other code's own steps back: later writes wait for them too.
+  // Other code's own steps back (Next's router.back()): they wait their turn like ours, and later writes wait for them.
   h.back = function back() {
-    const done = () => {
-      const i = traversals.findIndex((t) => t.done === done);
-      if (i >= 0) traversals.splice(i, 1);
-      flush();
+    settle();
+    const run = () => {
+      const done = () => {
+        const i = traversals.findIndex((t) => t.done === done);
+        if (i >= 0) {
+          clearTimeout(traversals[i]!.timer);
+          traversals.splice(i, 1);
+        }
+        flush();
+      };
+      traversals.push({ own: false, hide: false, fromPath: window.location.pathname, done, timer: setTimeout(done, TRAVERSAL_TIMEOUT_MS) });
+      innerBack.call(h);
     };
-    traversals.push({ own: false, done, timer: setTimeout(done, TRAVERSAL_TIMEOUT_MS) });
-    innerBack.call(h);
+    if (blocked()) deferred.push(run);
+    else run();
   };
 
   window.addEventListener('popstate', onPopState, true);
@@ -430,35 +519,44 @@ export function installHistoryLayers() {
   window.addEventListener('beforeunload', onBeforeUnload);
 }
 
-/** Step back to the page's entry, apply `write` there, then push `entries` again (same layers, new address). */
-async function rewriteUnder(entries: Entry[], write: () => void) {
-  const keep = entries.filter((e) => !e.closing);
+/**
+ * Steps back to the page's entry (hidden from the router), applies `apply` there, then pushes `entries` again on top
+ * (same layers, new address), unless `keep` is false (the page is being left).
+ */
+async function rewriteUnder(entries: Entry[], apply: () => void, { keep = true }: { keep?: boolean } = {}) {
+  const again = keep ? entries.filter((e) => !e.closing) : [];
   for (const e of entries) {
     const i = stack.indexOf(e);
     if (i >= 0) stack.splice(i, 1);
   }
-  await traverse(-entries.length);
-  write();
-  // A guard whose page is saved and leaving stays off.
-  for (const e of keep) {
-    if (e.kind === 'guard') {
-      const g = [...guards].find((x) => x.entry === e);
-      if (!g || !g.active || g.bypassed) {
-        if (g) g.entry = null;
-        continue;
+  if (!keep) for (const g of guards) g.entry = null;
+  await traverse(-entries.length, {
+    hide: true,
+    then: () => {
+      apply();
+      for (const e of again) {
+        // A guard whose page is saved and leaving stays off.
+        if (e.kind === 'guard') {
+          const g = [...guards].find((x) => x.entry === e);
+          if (!g || !g.active || g.bypassed) {
+            if (g) g.entry = null;
+            continue;
+          }
+        }
+        rawPush(e);
       }
-    }
-    rawPush(e);
-  }
+    },
+  });
 }
 
 /**
  * Pushes a history entry for a layer that just opened. `onBack` runs when Back goes past it: close the layer, or
  * return false to stay open (it is pushed again). Call `release()` when it closes any other way.
  */
-export function pushLayer(onBack: () => BackResult): LayerHandle {
+export function pushLayer(onBack: () => BackResult, options: { address?: { param: string; id: string } } = {}): LayerHandle {
   installHistoryLayers();
   const entry: Entry = { seq: 0, kind: 'layer', href: '', closing: false, pushed: false, onBack };
+  if (options.address) entry.address = options.address;
   push(entry);
   return {
     release: () => {
@@ -489,9 +587,10 @@ function waitGone(entry: Entry): Promise<void> {
  * Registers a page's unsaved changes. While `active`, Back from the page asks (`ask`) before leaving, links ask
  * before following, and closing the tab warns.
  */
-export function addLeaveGuard(ask: () => Promise<boolean>) {
+export function addLeaveGuard(ask: () => Promise<boolean>, onNoHistory?: () => void) {
   installHistoryLayers();
   const g: Guard = { active: false, ask, entry: null, bypassed: false };
+  if (onNoHistory) g.onNoHistory = onNoHistory;
   guards.add(g);
   return {
     setActive(active: boolean) {

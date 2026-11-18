@@ -19,7 +19,17 @@ export type UnsavedGuard = {
  * plain <a>) and closing or reloading the tab all ask "Discard changes?" first, with Keep editing and Discard.
  * Navigations made in code: `await confirm()` first.
  */
-export function useUnsavedGuard(dirty: boolean, { message = 'What you changed here isn’t saved yet.' }: { message?: string } = {}): UnsavedGuard {
+export function useUnsavedGuard(
+  dirty: boolean,
+  {
+    message = 'What you changed here isn’t saved yet.',
+    parentHref,
+  }: {
+    message?: string;
+    /** Where Discard on Back goes when the page was opened directly (nothing behind it in this tab): its list. */
+    parentHref?: string | undefined;
+  } = {},
+): UnsavedGuard {
   const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
   const guard = useRef<ReturnType<typeof addLeaveGuard> | null>(null);
   const dirtyRef = useRef(dirty);
@@ -36,8 +46,15 @@ export function useUnsavedGuard(dirty: boolean, { message = 'What you changed he
     [],
   );
 
+  const parent = useRef(parentHref);
   useEffect(() => {
-    const g = addLeaveGuard(ask);
+    parent.current = parentHref;
+  }, [parentHref]);
+
+  useEffect(() => {
+    const g = addLeaveGuard(ask, () => {
+      if (parent.current) window.location.assign(parent.current);
+    });
     guard.current = g;
     g.setActive(dirtyRef.current);
     return () => {

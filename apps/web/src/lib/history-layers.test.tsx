@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pushLayer, resetHistoryLayersForTests } from './history-layers';
 import { openLayer } from './open-layer';
+import { useHistoryLayer } from './use-history-layer';
 import { useUnsavedGuard } from './use-unsaved-guard';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -35,7 +36,8 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
-  // A fresh page entry on top of whatever earlier tests left.
+  // A fresh page entry on top of whatever earlier tests left (forgotten first, so it isn't written under their layers).
+  resetHistoryLayersForTests();
   window.history.pushState({ page: Math.random() }, '', '/workouts/w1');
   resetHistoryLayersForTests();
   base = seq();
@@ -282,5 +284,95 @@ describe('useUnsavedGuard', () => {
     act(() => root.render(createElement(Editor, { dirty: false })));
     await settle();
     expect(seq()).toBe(base);
+  });
+});
+
+describe('review fixes', () => {
+  it('a page’s own address change under an open layer is hidden from the router (no popstate reaches it)', async () => {
+    const onBack = vi.fn();
+    pushLayer(onBack);
+    const router = vi.fn();
+    window.addEventListener('popstate', router);
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/workouts/w1?add=workout');
+    });
+    await settle();
+    expect(router).not.toHaveBeenCalled();
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/workouts/w1');
+    });
+    await settle();
+    expect(router).not.toHaveBeenCalled();
+    window.removeEventListener('popstate', router);
+    // The layer is still one Back away, and the page entry under it has the last address.
+    await userBack();
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname + window.location.search).toBe('/workouts/w1');
+  });
+
+  it('another history.back() waits its turn behind ours (no step is credited to the wrong one)', async () => {
+    const layer = pushLayer(() => undefined);
+    pushLayer(() => undefined);
+    const go = vi.spyOn(window.history, 'go');
+    // Ours: the top layer closes (one step); theirs: Next's router.back() at the same moment.
+    void layer.release();
+    window.history.back();
+    await settle(200);
+    go.mockRestore();
+    // Nothing of ours is left on top, and we are below both layer entries.
+    expect(seq()).toBeLessThanOrEqual(base);
+  });
+
+  it('a replaceState asked on a page that Back has since left is dropped, not written on the new page', async () => {
+    window.history.pushState({}, '', '/prev');
+    window.history.pushState({}, '', '/workouts/w1');
+    const layer = pushLayer(() => undefined);
+    // The step back over the layer races a second Back (a quick double swipe): it lands two pages back.
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- called with history as `this`
+    const real = History.prototype.go;
+    const spy = vi.spyOn(window.history, 'go').mockImplementation((d?: number) => real.call(window.history, (d ?? 0) - 1));
+    void layer.release();
+    await act(() => Promise.resolve());
+    // The old page's router writes its address meanwhile: it waits, then must not land on /prev.
+    window.history.replaceState(null, '', '/workouts/w1?late=1');
+    await settle(200);
+    spy.mockRestore();
+    expect(window.location.pathname).toBe('/prev');
+    expect(window.location.search).toBe('');
+  });
+
+  it('router.push from code with a layer open writes the new page under nothing of ours: one Back returns', async () => {
+    pushLayer(() => undefined);
+    act(() => {
+      window.history.pushState({}, '', '/workouts');
+    });
+    await settle(200);
+    expect(window.location.pathname).toBe('/workouts');
+    await userBack();
+    expect(window.location.pathname).toBe('/workouts/w1');
+    expect(seq()).toBe(base);
+  });
+
+  it('openLayer and useHistoryLayer share one stack: Back closes the address pop-up first, then the dialog under it', async () => {
+    const d = document.createElement('dialog');
+    document.body.append(d);
+    openLayer(d);
+    const onBack = vi.fn();
+    function Pop() {
+      useHistoryLayer({ id: 'assign-x', onBack });
+      return null;
+    }
+    act(() => root.render(createElement(Pop)));
+    await settle();
+    expect(new URL(window.location.href).searchParams.get('sheet')).toBe('assign-x');
+    await userBack();
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(d.open).toBe(true);
+    expect(new URL(window.location.href).searchParams.get('sheet')).toBeNull();
+    act(() => root.render(null));
+    await userBack();
+    expect(d.open).toBe(false);
+    expect(seq()).toBe(base);
+    d.remove();
   });
 });

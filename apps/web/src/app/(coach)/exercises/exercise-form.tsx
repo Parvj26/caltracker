@@ -40,7 +40,7 @@ export function ExerciseForm({ exerciseId, initial = EMPTY }: { exerciseId?: str
   // What the form held when it opened (or was last saved): anything else is an unsaved change.
   const baseline = useRef<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const guard = useUnsavedGuard(dirty);
+  const guard = useUnsavedGuard(dirty, { parentHref: '/exercises' });
   const snapshot = (form: HTMLFormElement) => JSON.stringify([...new FormData(form).entries()].map(([k, v]) => [k, typeof v === 'string' ? v : v.name]));
   function onInput(event: FormEvent<HTMLFormElement>) {
     const now = snapshot(event.currentTarget);

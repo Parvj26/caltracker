@@ -282,7 +282,8 @@ export function WorkoutBuilder({
 
   // A page of its own: Back, links and closing the tab ask before losing unsaved changes. Inside a sheet (a program
   // day) the sheet asks instead, so only closing the tab is guarded here.
-  const guard = useUnsavedGuard(dirty && !embedded);
+  // Opened straight from a link with nothing behind it: Discard on Back goes to the list it belongs to.
+  const guard = useUnsavedGuard(dirty && !embedded, { parentHref: mode === 'library' ? '/workouts' : undefined });
   useEffect(() => {
     if (!dirty || !embedded) return;
     const warn = (e: BeforeUnloadEvent) => {
