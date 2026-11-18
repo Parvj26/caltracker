@@ -138,7 +138,7 @@ test('2 weeks by default; ‹ › step by the view; Today comes back; the picked
   await expect(viewLink(page, 'Month')).toHaveAttribute('aria-current', 'page');
 });
 
-test('week cards preview their exercises, "+ N more", ✓ done and "Logged by coach"', async ({ page }) => {
+test('week cards sum up their exercises on one line, ✓ done and "Logged by coach"', async ({ page }) => {
   await signInAsCoach(page);
   const today = await browserToday(page);
   // Tomorrow: never missed, and on screen with yesterday in a 2-week view from yesterday's week.
@@ -162,10 +162,9 @@ test('week cards preview their exercises, "+ N more", ✓ done and "Logged by co
 
   await page.goto(`/clients/${clientId}/training?view=2w&from=${doneDate}`);
   const preview = card(page, date, big);
-  await expect(preview.locator('[title^="2× Barbell Deadlift · "]')).toBeVisible();
-  await expect(preview.locator('[title^="2× Barbell Squat · "]')).toHaveCount(1);
-  await expect(preview.locator('[title^="2× Cable Crossover · "]')).toBeVisible();
-  await expect(preview.getByText('+ 2 more exercises', { exact: true })).toBeVisible();
+  // One line: how many exercises and their names, not every set (the sets are read out to screen readers).
+  await expect(preview.getByText('5 exercises · Barbell Deadlift, Barbell Squat, Cable Crossover, …', { exact: true })).toBeVisible();
+  await expect(preview.getByText(/Barbell Deadlift, 2 sets/)).toBeAttached();
 
   const done = card(page, doneDate, coachDone);
   await expect(done.getByRole('link', { name: `Done: view the ${coachDone} log` })).toBeVisible();
@@ -175,7 +174,7 @@ test('week cards preview their exercises, "+ N more", ✓ done and "Logged by co
   // The month view stays compact: names only.
   await page.goto(`/clients/${clientId}/training?view=month&from=${date}`);
   await expect(card(page, date, big)).toBeVisible();
-  await expect(card(page, date, big).locator('[title^="2× Barbell Deadlift · "]')).toHaveCount(0);
+  await expect(card(page, date, big).getByText(/^5 exercises/)).toHaveCount(0);
 });
 
 test('a missed past workout can be edited: its card opens the editor and the change is saved', async ({ page }) => {
@@ -201,7 +200,7 @@ test('a missed past workout can be edited: its card opens the editor and the cha
   await page.keyboard.press('Escape');
 
   // A click anywhere on the card opens the editor.
-  await missed.locator('[title^="2× Barbell Squat · "]').click();
+  await missed.locator('[title*=" exercise"]').click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
   const reps = setRow(page, 'Barbell Squat', 'set 1').getByLabel(/^Reps/).first();
   await reps.fill('11');
@@ -213,7 +212,7 @@ test('a missed past workout can be edited: its card opens the editor and the cha
   // Back goes to the days around it, in the coach's own view.
   await page.getByRole('link', { name: /'s calendar$/ }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/training\\?from=${pastDate}$`));
-  await expect(card(page, pastDate, name).locator('[title^="2× Barbell Squat · "]')).toBeVisible();
+  await expect(card(page, pastDate, name).locator('[title*=" exercise"]')).toBeVisible();
 });
 
 test('a done workout: Edit results opens the correction form; its plan stays read-only', async ({ page }) => {
@@ -252,7 +251,7 @@ test('drag a workout by its card body in the 2-week view; a done one stays put a
   await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
   await expect(day(page, next).getByRole('button', { name, exact: true })).toBeVisible();
   // Grab the card by its exercise preview, not its name.
-  const body = card(page, next, name).locator('[title^="2× Barbell Squat · "]');
+  const body = card(page, next, name).locator('[title*=" exercise"]');
   const target = day(page, addDays(next, 2));
   // The second week's tall row can start below the fold; mouse events only reach what is on screen.
   await target.scrollIntoViewIfNeeded();
@@ -286,7 +285,7 @@ test('drag a workout by its card body in the 2-week view; a done one stays put a
   await expect(done).toHaveCSS('cursor', 'default');
   // Trying to drag it shows why, leaves it where it is, and doesn't open its log.
   await day(page, addDays(next, 2)).scrollIntoViewIfNeeded();
-  await drag(page, done.locator('[title^="2× Barbell Squat · "]'), day(page, addDays(next, 2)));
+  await drag(page, done.locator('[title*=" exercise"]'), day(page, addDays(next, 2)));
   await expect(done.getByRole('status')).toHaveText('Done workouts stay on the day they were done');
   await expect(page).toHaveURL(/view=2w/);
   await expect(card(page, next, doneName)).toBeVisible();
@@ -332,7 +331,7 @@ test('after dragging a card back onto its own day, the next click still opens it
   // A real click on the card now opens the editor. (dnd-kit ignores clicks for 50 ms after a drag ends, and a
   // person can't click that fast; before the fix, every later click was ignored too.)
   await page.waitForTimeout(300);
-  await card(page, date, name).locator('[title^="2× Barbell Squat · "]').click();
+  await card(page, date, name).locator('[title*=" exercise"]').click();
   await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/workouts/${id}$`));
 });
 
@@ -367,7 +366,7 @@ test.describe('on a touch screen (iPad, phone)', () => {
     const id = await seedWorkout(name, date);
 
     await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
-    const body = card(page, date, name).locator('[title^="2× Barbell Squat · "]');
+    const body = card(page, date, name).locator('[title*=" exercise"]');
     await expect(body).toBeVisible();
     await body.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const before = (await body.boundingBox())!;
@@ -392,7 +391,7 @@ test.describe('on a touch screen (iPad, phone)', () => {
     const id = await seedWorkout(name, date);
 
     await page.goto(`/clients/${clientId}/training?view=2w&from=${today}`);
-    const body = card(page, date, name).locator('[title^="2× Barbell Squat · "]');
+    const body = card(page, date, name).locator('[title*=" exercise"]');
     await expect(body).toBeVisible();
     await body.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const from = centre((await body.boundingBox())!);

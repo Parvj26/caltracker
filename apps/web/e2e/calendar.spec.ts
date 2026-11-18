@@ -119,7 +119,7 @@ test('assign a program from next Monday; a double click still copies it once', a
 
   // The client's name on the Clients list opens their page (Overview); the Training tab has the calendar.
   await page.goto('/clients');
-  await page.getByRole('table', { name: 'Clients', exact: true }).getByRole('link', { name: meName, exact: true }).click();
+  await page.getByRole('list', { name: 'Clients', exact: true }).getByRole('link', { name: new RegExp(`^${meName}`) }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${me}$`));
   await expect(page.getByRole('heading', { level: 1, name: meName })).toBeVisible();
   await page.getByRole('navigation', { name: 'Client sections' }).getByRole('link', { name: 'Training' }).click();
@@ -460,7 +460,7 @@ test('a past client opens read-only from Past clients; their workout editor is a
 
   await signInAsCoach(page);
   await page.getByRole('heading', { name: /Past clients \(\d+\)/ }).getByRole('button').click();
-  await page.getByRole('table', { name: 'Past clients' }).getByRole('link', { name: `Pat ${lastName}`, exact: true }).click();
+  await page.getByRole('list', { name: 'Past clients' }).getByRole('link', { name: new RegExp(`^Pat ${lastName}`) }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${pastId}$`));
   await expect(page.getByText('Past client', { exact: true })).toBeVisible();
 
@@ -564,10 +564,9 @@ test('a client with nothing scheduled sees the two choice tiles, and each opens 
   await page.goto(`/clients/${freshId}/training`);
   const empty = page.getByRole('region', { name: "Nothing on Robin's calendar yet" });
   await expect(empty).toBeVisible();
-  const assignTile = empty.getByRole('button', { name: 'Assign a program', exact: true });
-  const addTile = empty.getByRole('button', { name: 'Add a single workout', exact: true });
-  await expect(assignTile).toHaveAccessibleDescription('Fill several weeks at once.');
-  await expect(addTile).toHaveAccessibleDescription('Pick a day and a workout.');
+  // Each tile is named by its words, title first (so the name matches what is shown).
+  const assignTile = empty.getByRole('button', { name: 'Assign a program Fill several weeks at once.', exact: true });
+  const addTile = empty.getByRole('button', { name: 'Add a single workout Pick a day and a workout.', exact: true });
 
   await assignTile.click();
   const assign = page.getByRole('dialog', { name: 'Assign a program' });
