@@ -67,17 +67,29 @@ async function startedSession(page: Page, firstName: string, signIn: (p: Page) =
  * From now on every save (POST) from `page` is lost on the way. `sent()` waits until one was sent and lost: the save
  * leaving the page goes out when the page is swapped or the save's short wait ends, which on a slow machine can be
  * after Back has returned, so stopping before then would let it through and the test would prove nothing.
+ *
+ * `reopen(url)` opens the session again (a full page load). Only the reopened page's saves get through: the page that
+ * was left keeps trying its lost save until it is gone (it retries, and sends at once as its screen closes), and those
+ * tries stay lost too. Otherwise one of them can land while the session reopens, the reopened page rightly finds
+ * nothing left to send, and the test would no longer show the kept copy being sent next time.
  */
 async function loseSaves(page: Page) {
   let lostOne: () => void;
   const lost = new Promise<void>((resolve) => (lostOne = resolve));
-  const handler = async (route: Route) => {
-    if (route.request().method() !== 'POST') return route.continue();
+  let reopened: string | null = null;
+  await page.route('**/*', async (route: Route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || new URL(request.url()).pathname === reopened) return route.continue();
     await route.abort();
     lostOne();
+  });
+  return {
+    sent: () => lost,
+    reopen: async (url: string) => {
+      reopened = url;
+      await page.goto(url);
+    },
   };
-  await page.route('**/*', handler);
-  return { sent: () => lost, stop: () => page.unroute('**/*', handler) };
 }
 
 const firstWeight = async (logId: string) =>
@@ -112,9 +124,8 @@ for (const size of [
       await expect(page).toHaveURL(new RegExp(`/clients/${s.client}/training`));
       await lost.sent();
       expect(await firstWeight(s.logId)).toBeNull();
-      await lost.stop();
       // Opening the session again (a full reload) brings the typed weight back and saves it.
-      await page.goto(`/clients/${s.client}/log/${s.workoutId}`);
+      await lost.reopen(`/clients/${s.client}/log/${s.workoutId}`);
       await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('52');
       await expect.poll(() => firstWeight(s.logId), { timeout: 10_000 }).toBe(52);
       await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
@@ -233,7 +244,6 @@ test.describe('kept copies on the device', () => {
     const lost = await loseSaves(page);
     await page.goBack();
     await lost.sent();
-    await lost.stop();
     // Set A's kept copy aside while tab B works, so B saves without it (as when A's copy is written after B opened).
     const keptA = await page.evaluate((prefix) => {
       const out: [string, string][] = Object.keys(localStorage).filter((k) => k.startsWith(prefix)).map((k) => [k, localStorage.getItem(k)!]);
@@ -250,7 +260,7 @@ test.describe('kept copies on the device', () => {
     await b.close();
     // A's copy is back; A opens the session again: A's weight is redone on top of B's sets, and nothing is lost.
     await page.evaluate((items) => items.forEach(([k, v]) => localStorage.setItem(k, v)), keptA);
-    await page.goto(url);
+    await lost.reopen(url);
     await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('47');
     await expect(page.getByRole('button', { name: 'Done: Barbell Squat Set 2 of 2' })).toHaveAttribute('aria-pressed', 'true');
     await expect
@@ -280,3 +290,4 @@ test.describe('kept copies on the device', () => {
     expect(await draftKeys(page)).toEqual([]);
   });
 });
+

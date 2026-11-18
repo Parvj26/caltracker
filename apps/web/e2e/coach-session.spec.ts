@@ -184,9 +184,28 @@ test('a set the phone ticked just before the take over is kept, with the coach\'
   if (row.error) throw row.error;
   const before = logRowToDoc(row.data as unknown as LogTreeRow);
 
-  await page.goto(`/clients/${client}/log/${workoutId}`);
+  const url = `/clients/${client}/log/${workoutId}`;
+  await page.goto(url);
+  // As the coach's screen opens after the take over, it checks the server's copy once (a request with just the log's
+  // id, after the take over's own). The phone's upload lands only after that check has read the server, so the screen
+  // really holds the older copy. (If the upload came first, the screen would simply open on the newer copy, with
+  // nothing to merge, and this test would not show the merge.)
+  let idOnly = 0;
+  let checked!: () => void;
+  const serverRead = new Promise<void>((resolve) => (checked = resolve));
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  await page.route(url, async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST' || request.postData() !== JSON.stringify([logId]) || ++idOnly !== 2) return route.fallback();
+    const response = await route.fetch();
+    checked();
+    await released;
+    await route.fulfill({ response });
+  });
   await page.getByRole('button', { name: 'Take over' }).click();
   await expect(page.getByRole('button', { name: 'Finish session' })).toBeVisible();
+  await serverRead;
 
   // The phone had ticked set 2 and written a note, and uploads them only now (its final save): applied once.
   const phone = await phoneOf(email);
@@ -195,6 +214,7 @@ test('a set the phone ticked just before the take over is kept, with the coach\'
   const saved = await phone.rpc('save_workout_log', { p_doc: phoneDoc as never });
   expect(saved.error).toBeNull();
   expect(saved.data).toMatchObject({ applied: true, loggedByOther: true });
+  release();
 
   // The coach ticks set 3 on the older copy: the save is stale, so the page takes the server copy (with the phone's
   // set and note) and re-applies the coach's tick on top.
