@@ -60,7 +60,7 @@ export function Comments({ logId, comments }: { logId: string; comments: Comment
           </li>
         ))}
       </ul>
-      <TextAreaField label="Comment" value={body} maxLength={1000} rows={3} onChange={(e) => setBody(e.target.value)} />
+      <TextAreaField label="Comment" value={body} maxLength={1000} rows={3} placeholder="Great work today. Next time try 62.5 kg." onChange={(e) => setBody(e.target.value)} />
       <div className={styles.saveBar}>
         {error ? <ErrorText code={error} /> : null}
         {error === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}

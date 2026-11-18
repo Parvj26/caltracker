@@ -188,7 +188,7 @@ test('the log page’s calendar link goes back to the week it came from', async 
   await page.locator(`[data-date="${day}"]`).getByRole('button', { name: `Options for ${name}`, exact: true }).click();
   await page.getByRole('menuitem', { name: 'Log session' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/log/${w.data.id}$`));
-  await page.getByRole('link', { name: /calendar$/ }).click();
+  await page.getByRole('link', { name: `Back to ${client.name}`, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training\\?view=week&from=${day}$`));
 });
 
@@ -212,6 +212,6 @@ test('without the Navigation API (iOS before 26), ‹ Clients and ← calendar s
   created.workouts.push(w.data.id);
   await page.goto(`/clients/${client.id}/training?view=week&from=${day}`);
   await page.goto(`/clients/${client.id}/log/${w.data.id}`);
-  await page.getByRole('link', { name: /calendar$/ }).click();
+  await page.getByRole('link', { name: `Back to ${client.name}`, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training\\?view=week&from=${day}$`));
 });
