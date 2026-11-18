@@ -67,6 +67,19 @@ describe('filterClients', () => {
     expect(filterClients(clients, 'jos').map((c) => c.id)).toEqual(['1', '3']);
     expect(filterClients(clients, 'amy j').map((c) => c.id)).toEqual(['2']);
   });
+
+  it('uses the shared smart search: typos, word order and best match first', () => {
+    const more = [...clients, { id: '4', firstName: 'Maya', lastName: 'Patel' }, { id: '5', firstName: 'Sam', lastName: 'Mayer' }];
+    // One letter swapped in a short name.
+    expect(filterClients(more, 'mya').map((c) => c.id)).toEqual(['4']);
+    // Last name first.
+    expect(filterClients(more, 'patel maya').map((c) => c.id)).toEqual(['4']);
+    // A typo in a longer word.
+    expect(filterClients(more, 'josph').map((c) => c.id)).toEqual(['3']);
+    // A whole first name beats a last name that only starts with it.
+    expect(filterClients(more, 'maya').map((c) => c.id)).toEqual(['4']);
+    expect(filterClients(more, 'may').map((c) => c.id)).toEqual(['4', '5']);
+  });
 });
 
 describe('assignSummary', () => {

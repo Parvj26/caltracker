@@ -4,11 +4,11 @@ import type { ErrorCode } from '@caltracker/shared';
 import { smartFilter } from '@caltracker/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState, useTransition, type FormEvent } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { AssignButton } from '@/components/assign/assign-to-clients';
 import { LinkRow } from '@/components/link-row';
 import { MoreMenu } from '@/components/more-menu';
-import { Card, ErrorText } from '@/components/ui';
+import { Card, ErrorText, SearchBox, SearchCount, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import { DeleteProgram, type DeleteProgramHandle } from './[id]/delete-program';
 import { duplicateProgram } from './actions';
@@ -68,67 +68,43 @@ function ProgramActions({ id, name }: { id: string; name: string }) {
  */
 export function ProgramList({ rows, total, initialQuery, limited, limit }: { rows: ProgramListRow[]; total: number; initialQuery: string; limited: boolean; limit: number }) {
   const router = useRouter();
-  const [query, setQuery] = useState(initialQuery);
+  const { query, setQuery, debounced, searching } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
   const shown = useMemo(() => {
-    const smart = smartFilter(rows, query, (p) => p.name);
+    const smart = smartFilter(rows, debounced, (p) => p.name);
     if (!limited) return smart;
     // Past the cap the server adds older programs whose names contain the text (a plain match): keep those too.
-    const text = query.trim().toLowerCase();
+    const text = debounced.trim().toLowerCase();
     const seen = new Set(smart.map((p) => p.id));
     return [...smart, ...rows.filter((p) => !seen.has(p.id) && text !== '' && p.name.toLowerCase().includes(text))];
-  }, [rows, query, limited]);
-  const searching = query.trim() !== '';
+  }, [rows, debounced, limited]);
 
-  const onChange = (value: string) => {
-    setQuery(value);
-    const url = new URL(window.location.href);
-    if (value.trim()) url.searchParams.set('q', value);
-    else url.searchParams.delete('q');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-  };
-  // The list already shows the matches; Search (Enter) closes the phone keyboard and, past the cap, asks the server.
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  // The list already shows the matches; Enter closes the phone keyboard and, past the cap, asks the server.
+  const onEnter = () => {
     if (limited) router.replace(query.trim() ? `/programs?q=${encodeURIComponent(query.trim())}` : '/programs');
   };
 
   return (
     <>
-      <form method="get" action="/programs" role="search" aria-label="Find programs" className={styles.searchForm} onSubmit={onSubmit}>
-        <label className={styles.searchField}>
-          <span className={styles.visuallyHidden}>Search programs</span>
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-4-4" />
-          </svg>
-          <input
-            type="search"
-            name="q"
-            value={query}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={`Search ${total} ${plural(total, 'program', 'programs')}`}
-            className={styles.searchInput}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="search"
-          />
-        </label>
-        {searching ? (
-          <button type="button" className={styles.clearSearch} aria-label="Clear search" onClick={() => onChange('')}>
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        ) : null}
-      </form>
-      <p role="status" className={searching ? styles.caption : styles.visuallyHidden}>
+      <div role="search" aria-label="Find programs" className={styles.searchForm}>
+        <SearchBox
+          label="Search programs"
+          placeholder={`Search ${total} ${plural(total, 'program', 'programs')}`}
+          value={query}
+          onChange={setQuery}
+          onEnter={onEnter}
+          name="q"
+        />
+      </div>
+      <SearchCount className={searching ? styles.caption : styles.visuallyHidden}>
         {searching ? `${shown.length} of ${total} ${plural(total, 'program', 'programs')}` : ''}
-      </p>
+      </SearchCount>
 
       {shown.length === 0 ? (
-        <p className={styles.empty}>{searching ? 'No programs match.' : 'No programs yet. Build your first one.'}</p>
+        searching ? (
+          <SearchEmpty things="programs" query={debounced} onClear={() => setQuery('')} className={styles.empty} />
+        ) : (
+          <p className={styles.empty}>No programs yet. Build your first one.</p>
+        )
       ) : (
         <Card className={styles.listCard}>
           <table role="table" className={styles.table} aria-label="Programs">

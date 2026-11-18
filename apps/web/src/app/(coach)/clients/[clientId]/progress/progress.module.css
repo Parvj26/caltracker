@@ -63,7 +63,8 @@
   cursor: pointer;
 }
 
-.form { display: flex; flex-direction: column; gap: var(--ct-space-3); overflow-y: auto; }
+/* Inline room so the focus ring of a field isn't clipped by this scroll box. */
+.form { display: flex; flex-direction: column; gap: var(--ct-space-3); overflow-y: auto; padding-inline: var(--ct-space-1); }
 .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-2) var(--ct-space-3); }
 .fieldsFull { grid-column: 1 / -1; }
 .fileRow { display: flex; flex-direction: column; gap: var(--ct-space-1); }

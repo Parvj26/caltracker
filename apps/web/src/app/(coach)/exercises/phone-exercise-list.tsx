@@ -12,7 +12,7 @@ import {
 } from '@caltracker/shared';
 import { FavouriteButton } from '@/components/exercise-search/favourite-button';
 import { Photo } from '@/components/exercise-search/photo';
-import { Button, Chip, ErrorText } from '@/components/ui';
+import { Button, Chip, ErrorText, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { exerciseImageUrl, loadExerciseIndex, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -49,7 +49,7 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [query, setQuery] = useState(initialQuery);
+  const { query, setQuery, debounced } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
   const [filters, setFilters] = useState<SearchFilters>({ ...NO_FILTERS, customOnly: initialSource === 'custom' });
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [shown, setShown] = useState(PAGE_SIZE);
@@ -94,17 +94,13 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   const hits = useMemo(() => {
     if (!index) return [];
     const list = { tracking, builtinOnly: initialSource === 'builtin', favouritesOnly };
-    return searchExercises(index, query, filters, boosts).filter((h) => matchesListFilter(h.row, list, favourites));
-  }, [index, query, filters, boosts, tracking, initialSource, favouritesOnly, favourites]);
+    return searchExercises(index, debounced, filters, boosts).filter((h) => matchesListFilter(h.row, list, favourites));
+  }, [index, debounced, filters, boosts, tracking, initialSource, favouritesOnly, favourites]);
 
+  // The text is kept in the address (useSearchQuery), so Back from an exercise comes back to the same search.
   function changeQuery(value: string) {
     setQuery(value);
     setShown(PAGE_SIZE);
-    // Kept in the address, so Back from an exercise comes back to the same search.
-    const url = new URL(window.location.href);
-    if (value.trim()) url.searchParams.set('q', value);
-    else url.searchParams.delete('q');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
   }
   function changeFilters(next: SearchFilters) {
     setFilters(next);
@@ -122,28 +118,12 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
   return (
     <div className={styles.phoneList}>
       <div className={styles.phoneBar}>
-        <label className={styles.search}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-4-4" />
-          </svg>
-          <input
-            type="search"
-            className={styles.searchInput}
-            aria-label="Search exercises"
-            placeholder={total ? `Search ${total} exercises` : 'Search exercises'}
-            value={query}
-            onChange={(e) => changeQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-            }}
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="search"
-          />
-        </label>
+        <SearchBox
+          label="Search exercises"
+          placeholder={total ? `Search ${total} exercises` : 'Search exercises'}
+          value={query}
+          onChange={changeQuery}
+        />
         <div className={styles.pillRow} role="group" aria-label="Quick filters">
           <button
             type="button"
@@ -180,7 +160,11 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
 
       {data && hits.length === 0 ? (
         <div className={styles.phoneEmpty}>
-          <p>{query.trim() ? `No exercises match "${query.trim()}"` : 'No exercises match these filters'}</p>
+          {debounced.trim() ? (
+            <SearchEmpty things="exercises" query={debounced} onClear={() => changeQuery('')} />
+          ) : (
+            <p>No exercises match these filters</p>
+          )}
           {inSheet > 0 || filters.muscles.length > 0 || favouritesOnly ? (
             <Button
               variant="secondary"

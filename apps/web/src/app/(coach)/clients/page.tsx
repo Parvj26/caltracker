@@ -50,8 +50,13 @@ function planSummary(items: PlanItemRow[]): InvitePlanSummary {
   return { kind: 'single', name: firstWorkout.workouts.name, on: firstWorkout.start_on, more: workouts.length - 1 };
 }
 
-export default async function ClientsPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { workspaceId, userId, firstName, lastName } = await requireCoach();
+  // The search box keeps its text in ?q=, so Back to Clients brings the same results.
+  const rawQ = (await searchParams).q;
+  const initialQuery = ((Array.isArray(rawQ) ? rawQ[0] : rawQ) ?? '').slice(0, 100);
   const supabase = await createServerSupabase();
   const utcToday = localToday('UTC');
 
@@ -110,7 +115,7 @@ export default async function ClientsPage() {
         />
       </header>
 
-      <ClientDirectory data={data} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} />
+      <ClientDirectory data={data} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} initialQuery={initialQuery} />
 
       {past.data.length > 0 ? (
         <Card className={styles.listCard}>

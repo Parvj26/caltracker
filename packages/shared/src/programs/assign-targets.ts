@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { IsoDateSchema, addDays, isoWeekday } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
-import { foldForSearch } from '../coach-home/search';
+import { smartFilter } from '../search/smart-search';
 import type { ProgramClash } from './clashes';
 
 /** Most clients one "Assign" can go to at once (V1 coaches have about 50). */
@@ -35,13 +35,12 @@ export function workoutClashes(date: IsoDate, existing: readonly { date: IsoDate
 }
 
 /**
- * The clients whose "first last" name contains the typed text (case and accents ignored), in the given order, with
- * no cap (the assign picker lists everyone). A blank query keeps everyone.
+ * The clients matching the typed text with the shared smart search (typos, partial words, any word order, case and
+ * accents ignored), best match first, the given order within a tier, with no cap (the assign picker lists everyone).
+ * A blank query keeps everyone.
  */
 export function filterClients<T extends { firstName: string; lastName: string }>(clients: readonly T[], query: string): T[] {
-  const needle = foldForSearch(query.trim());
-  if (needle === '') return [...clients];
-  return clients.filter((c) => foldForSearch(`${c.firstName} ${c.lastName}`).includes(needle));
+  return smartFilter(clients, query, (c) => `${c.firstName} ${c.lastName}`.trim());
 }
 
 /**

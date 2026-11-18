@@ -1,4 +1,4 @@
-import { unreadCount } from '@caltracker/shared';
+import { smartFilter, unreadCount } from '@caltracker/shared';
 
 export const PHOTO_PREVIEW = '📷 Photo';
 
@@ -65,9 +65,12 @@ export function buildInbox(input: {
   });
 }
 
+/**
+ * The inbox rows to show: unread only when asked, then the shared smart search on the client's name (typos, partial
+ * words, any word order), best match first. A blank query keeps the inbox order.
+ */
 export function filterInbox(rows: InboxRow[], opts: { unreadOnly: boolean; query: string }): InboxRow[] {
-  const q = opts.query.trim().toLowerCase();
-  return rows.filter((r) => (!opts.unreadOnly || r.unread > 0) && (q === '' || r.name.toLowerCase().includes(q)));
+  return smartFilter(opts.unreadOnly ? rows.filter((r) => r.unread > 0) : rows, opts.query, (r) => r.name);
 }
 
 /** "3", or "99+" past 99. */

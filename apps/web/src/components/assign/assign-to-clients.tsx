@@ -26,9 +26,10 @@ import {
   type ClientResult,
 } from '@/app/(coach)/assign/actions';
 import { formatShortDay } from '@/components/calendar/format';
+import { isTouchScreen } from '@/components/calendar/show-dialog';
 import { ReloadButton } from '@/components/reload-button';
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
-import { AdaptiveDialog, Button, Chip, ErrorText, type AdaptiveDialogHandle, type ChipTone, type FieldError } from '@/components/ui';
+import { AdaptiveDialog, Button, Chip, ErrorText, SearchBox, SearchEmpty, useSearchQuery, type AdaptiveDialogHandle, type ChipTone, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
@@ -115,6 +116,7 @@ export function AssignToClientsDialog({
   onClose: () => void;
 }) {
   const today = useLocalToday();
+  const [touch] = useState(isTouchScreen);
   const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const titleId = useId();
   const listId = useId();
@@ -127,7 +129,7 @@ export function AssignToClientsDialog({
   const verb = isCopy ? 'Copied' : 'Assigned';
   const [targets, setTargets] = useState<AssignTargets | null>(null);
   const [loadError, setLoadError] = useState<ErrorCode | null>(null);
-  const [query, setQuery] = useState('');
+  const { query, setQuery, debounced } = useSearchQuery();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(preselect));
   const [freeDay, setFreeDay] = useState(false);
   const [initialDate] = useState<string>(() =>
@@ -196,7 +198,7 @@ export function AssignToClientsDialog({
   const clients = targets?.clients ?? [];
   // Next planned day, else a workout missed in the last week (pink, as the Clients list flags it), else Nothing planned.
   const planned = (clientId: string) => planStatus(today, byClient.get(clientId) ?? []);
-  const shown = filterClients(clients, query);
+  const shown = filterClients(clients, debounced);
   const assigned = (id: string) => results.get(id)?.ok === true;
   const chosen = clients.filter((c) => selected.has(c.id) && !assigned(c.id));
   const clashing = chosen.map((c) => ({ client: c, clashes: clashesFor(c.id) })).filter((x) => x.clashes.length > 0);
@@ -318,16 +320,14 @@ export function AssignToClientsDialog({
         <p className={calendar.dialogBody}>You have no clients yet. Invite one from Clients first.</p>
       ) : (
         <>
-          <label className={calendar.searchLabel}>
-            <span>Search clients</span>
-            <input
-              type="search"
-              className={calendar.input}
-              value={query}
-              aria-controls={listId}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          <SearchBox
+            label="Search clients"
+            value={query}
+            onChange={setQuery}
+            aria-controls={listId}
+            // Ready to type when the list arrives; on a phone the keyboard waits for a tap.
+            autoFocus={!touch}
+          />
           <div className={styles.listHead}>
             <span className={calendar.caption}>{n === 0 ? 'No clients picked' : `${n} picked`}</span>
             {shown.some((c) => !selected.has(c.id) && !assigned(c.id)) ? (
@@ -336,7 +336,7 @@ export function AssignToClientsDialog({
                 className={styles.linkButton}
                 onClick={() => setSelected((s) => new Set([...s, ...shown.filter((c) => !assigned(c.id)).map((c) => c.id)]))}
               >
-                Select all{query.trim() ? ' shown' : ''}
+                Select all{debounced.trim() ? ' shown' : ''}
               </button>
             ) : n > 0 ? (
               <button type="button" className={styles.linkButton} onClick={() => setSelected(new Set())}>
@@ -345,7 +345,11 @@ export function AssignToClientsDialog({
             ) : null}
           </div>
           <ul id={listId} className={styles.clients} aria-label="Clients">
-            {shown.length === 0 ? <li className={calendar.caption}>No clients match.</li> : null}
+            {shown.length === 0 ? (
+              <li>
+                <SearchEmpty things="clients" query={debounced} onClear={() => setQuery('')} className={calendar.caption} />
+              </li>
+            ) : null}
             {shown.map((c) => {
               const result = results.get(c.id);
               const on = selected.has(c.id) && !assigned(c.id);

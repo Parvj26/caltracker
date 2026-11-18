@@ -69,6 +69,62 @@ test('Back closes the Assign pop-up and stays on Workouts; with clients picked i
   expect(new URL(page.url()).pathname).toBe('/workouts');
 });
 
+test('focus starts where the work is: Assign on its search box, Rename on Name, Delete on Cancel', async ({ page }) => {
+  const w = await seed();
+  await signInAsCoach(page);
+  await page.goto(`/workouts?q=${encodeURIComponent(w.name)}`);
+  await page.getByRole('button', { name: `Assign ${w.name}`, exact: true }).click();
+  const assign = page.getByRole('dialog', { name: `Assign ${w.name}` });
+  await expect(assign.getByLabel('Search clients')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(assign).toBeHidden();
+
+  const more = page.getByRole('button', { name: `More actions for ${w.name}` }).locator('visible=true');
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
+  const rename = page.getByRole('dialog', { name: 'Rename workout' });
+  await expect(rename.getByLabel('Name')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(rename).toBeHidden();
+
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Delete…' }).click();
+  const del = page.getByRole('alertdialog');
+  await expect(del.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(del).toBeHidden();
+});
+
+test('a leftover ?sheet= in a shared or reloaded link never makes closing leave the page', async ({ page }) => {
+  const w = await seed();
+  await signInAsCoach(page);
+  await page.goto('/home');
+  await page.goto(`/workouts?q=${encodeURIComponent(w.name)}&sheet=assign-workout-${w.id}`);
+  await page.getByRole('button', { name: `Assign ${w.name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Assign ${w.name}` });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => sheetParam(page)).toBeNull();
+  expect(new URL(page.url()).pathname).toBe('/workouts');
+});
+
+test('Escape in the Assign search box clears the text first, then closes the pop-up', async ({ page }) => {
+  const w = await seed();
+  await signInAsCoach(page);
+  await page.goto(`/workouts?q=${encodeURIComponent(w.name)}`);
+  await page.getByRole('button', { name: `Assign ${w.name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Assign ${w.name}` });
+  const search = dialog.getByLabel('Search clients');
+  await search.fill('zzz');
+  await page.keyboard.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => sheetParam(page)).toBeNull();
+});
+
 test('the disabled Assign button stays focusable and says why', async ({ page }) => {
   const w = await seed();
   await signInAsCoach(page);
