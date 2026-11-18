@@ -1,18 +1,15 @@
 'use client';
 
-import { countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { blockBadges, countExercises, exerciseSummaryLine, sectionRuns, type ErrorCode, type Units, type WorkoutDoc } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
-import { DialogHeader } from '@/components/assign/dialog-header';
 import { useDuplicate } from '@/components/duplicate-button';
 import { MoreMenu } from '@/components/more-menu';
 import { RowActionToast } from '@/components/row-toast';
 import { AdaptiveDialog, Button, ButtonLink, ErrorText, TextField, type AdaptiveDialogHandle } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import sheet from '@/components/ui/sheet.module.css';
 import { markUndone } from '@/lib/analytics/client';
 import { deleteWorkout, libraryWorkoutUses, previewWorkout, renameWorkout, type WorkoutUses } from './actions';
-import coach from '../coach.module.css';
 import styles from './workouts.module.css';
 import { openLayer } from '@/lib/open-layer';
 
@@ -125,32 +122,32 @@ function ActionSheet({ name, onDone }: { name: string; onDone: (next: Popup | 'd
       <button type="button" className={styles.sheetItem} onClick={() => pick('rename')}>
         Rename
       </button>
+      {/* Delete is a danger menu item: red text on a normal row, apart from the rest (rulebook §4, §10.1). */}
       <button type="button" className={cx(styles.sheetItem, styles.sheetDanger)} onClick={() => pick('delete')}>
         Delete…
       </button>
-      <button type="button" className={coach.srClose} onClick={() => ref.current?.close()}>
-        Close
+      <button type="button" className={cx(styles.sheetItem, styles.sheetCancel)} onClick={() => ref.current?.close()}>
+        Cancel
       </button>
     </dialog>
   );
 }
 
-const LETTERS = 'abcdefghij';
-
 /**
- * The Preview's exercises, as the builder groups them: under their section headings, one numbered row per block. A
- * superset is one numbered row with its exercises as 2a, 2b…; a pick-one group is one row naming its options.
+ * The Preview's exercises, as the builder groups them: under their section headings, one row per exercise with the
+ * builder's own badge (blockBadges: 1, A1, A2, 3…). A superset's exercises sit together under a "Superset" label; a
+ * pick-one group is one row naming its options.
  */
 function PreviewBlocks({ doc, units }: { doc: WorkoutDoc; units: Units }) {
+  const badges = blockBadges(doc.blocks);
   return (
-    <div className={cx(styles.previewBody, sheet.grow)} role="group" aria-label="Exercises">
+    <div className={styles.previewBody} role="group" aria-label="Exercises">
       {sectionRuns(doc.blocks, doc.sections).map((run) => (
         <div key={run.blockIndexes[0]} className={styles.previewRun} role={run.section ? 'group' : undefined} aria-label={run.section?.name}>
           {run.section ? <h3 className={styles.previewSection}>{run.section.name}</h3> : null}
           <ol className={styles.summaryList}>
             {run.blockIndexes.map((bi) => {
               const block = doc.blocks[bi]!;
-              const n = bi + 1;
               const [first] = block.exercises;
               if (block.kind === 'superset') {
                 return (
@@ -159,8 +156,8 @@ function PreviewBlocks({ doc, units }: { doc: WorkoutDoc; units: Units }) {
                     <ol className={styles.summaryList}>
                       {block.exercises.map((e, i) => (
                         <li key={e.id} className={styles.supersetPart}>
-                          <span className={styles.summaryNumber} aria-hidden="true">
-                            {`${n}${LETTERS[i] ?? ''}`}
+                          <span className={styles.summaryNumber} data-superset="" aria-hidden="true">
+                            {badges[bi]![i]}
                           </span>
                           <span className={styles.summaryText}>
                             <span className={styles.summaryName}>{e.exerciseName}</span>
@@ -175,7 +172,7 @@ function PreviewBlocks({ doc, units }: { doc: WorkoutDoc; units: Units }) {
               return (
                 <li key={block.id} className={styles.summaryRow}>
                   <span className={styles.summaryNumber} aria-hidden="true">
-                    {n}
+                    {badges[bi]![0]}
                   </span>
                   <span className={styles.summaryText}>
                     <span className={styles.summaryName}>
@@ -195,8 +192,6 @@ function PreviewBlocks({ doc, units }: { doc: WorkoutDoc; units: Units }) {
 
 /** Read-only: the workout's exercises, one line each with their sets, and its notes. Edit workout opens the builder. */
 function PreviewDialog({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
-  const ref = useModal();
-  const titleId = useId();
   const [loaded, setLoaded] = useState<{ doc: WorkoutDoc; units: Units } | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -217,24 +212,24 @@ function PreviewDialog({ id, name, onClose }: { id: string; name: string; onClos
   const total = loaded ? countExercises(loaded.doc.blocks.map((b) => ({ kind: b.kind, exercises: b.exercises.length }))) : 0;
 
   return (
-    <dialog ref={ref} className={cx(styles.dialog, styles.preview, sheet.sheet)} aria-labelledby={titleId} onClose={onClose}>
-      <DialogHeader
-        titleId={titleId}
-        title={loaded?.doc.name ?? name}
-        subtitle={loaded ? count(total, 'exercise', 'exercises') : null}
-        onClose={() => ref.current?.close()}
-      />
+    <AdaptiveDialog
+      historyId={`preview-${id}`}
+      title={loaded?.doc.name ?? name}
+      subtitle={loaded ? count(total, 'exercise', 'exercises') : null}
+      onClose={onClose}
+      noKeyboardOnTouch
+      // One way out (×, Esc, swipe down); the footer holds only the main action, full width (rulebook §5.2).
+      footer={
+        <ButtonLink href={`/workouts/${id}`} className={styles.previewEdit}>
+          Edit workout
+        </ButtonLink>
+      }
+    >
       {failed ? <ErrorText code="workout_load_failed" /> : null}
       {!loaded && !failed ? <p className={styles.caption}>Loading…</p> : null}
       {loaded?.doc.notes ? <p className={styles.notesBox}>{loaded.doc.notes}</p> : null}
       {loaded ? <PreviewBlocks doc={loaded.doc} units={loaded.units} /> : null}
-      <div className={cx(styles.dialogActions, sheet.actions)}>
-        <Button variant="secondary" onClick={() => ref.current?.close()}>
-          Close
-        </Button>
-        <ButtonLink href={`/workouts/${id}`}>Edit workout</ButtonLink>
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }
 

@@ -63,7 +63,9 @@ for (const [device, size] of [
     await expect(preview.getByRole('group', { name: 'Exercises' }).getByRole('listitem')).toHaveCount(1);
     await expect(preview.getByText('Barbell Squat')).toBeVisible();
     await expect(preview.getByRole('textbox')).toHaveCount(0);
-    await preview.getByRole('button', { name: 'Close', exact: true }).last().click();
+    // One way out: the × (no extra Close button in the footer, rulebook §5.2).
+    await expect(preview.getByRole('button', { name: 'Close', exact: true })).toHaveCount(1);
+    await preview.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(preview).toBeHidden();
     await expect(more).toBeFocused();
   });
@@ -365,6 +367,8 @@ test('Rename keeps sections, the superset, the pick-one group, notes and sets ex
   await page.getByRole('menuitem', { name: 'Preview' }).click();
   const preview = page.getByRole('dialog', { name });
   await expect(preview.getByRole('group', { name: 'Upper' })).toContainText('Superset');
+  // The builder's own badges: the superset's exercises read A1, A2.
+  await expect(preview.getByRole('group', { name: 'Upper' })).toContainText('A1');
   await expect(preview.getByRole('group', { name: 'Finisher' })).toContainText('Pick one: Plank or Bodyweight Squat');
   await page.keyboard.press('Escape');
 
@@ -402,8 +406,8 @@ test.describe('iPhone', () => {
 
       await more.click();
       const sheet = page.getByRole('dialog', { name: w.name });
-      const items = sheet.getByRole('button').filter({ hasNotText: 'Close' });
-      await expect(items).toHaveText(['Preview', 'Duplicate', 'Rename', 'Delete…']);
+      const items = sheet.getByRole('button');
+      await expect(items).toHaveText(['Preview', 'Duplicate', 'Rename', 'Delete…', 'Cancel']);
       for (const item of await items.all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       const sheetBox = (await sheet.boundingBox())!;
       expect(Math.round(sheetBox.y + sheetBox.height)).toBe(viewport.height);
