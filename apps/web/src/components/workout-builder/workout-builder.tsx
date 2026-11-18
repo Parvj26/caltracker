@@ -847,6 +847,8 @@ export function WorkoutBuilder({
           </ErrorText>
         ) : null}
         <BuilderStatus pending={pending} dirty={dirty} failed={failed} everSaved={everSaved} savedAt={savedAt} />
+        {/* iPad and desktop: the name and status get the first row to themselves, the tools the next. */}
+        <span className={styles.barBreak} aria-hidden="true" />
         <span className={styles.barTools}>
           <Button variant="secondary" className={styles.toolButton} disabled={doc.blocks.length < 2} onClick={() => setReordering(true)} data-ph-capture-attribute-label="workout_reorder">
             <Icon name="reorder" size={18} />
@@ -878,7 +880,11 @@ export function WorkoutBuilder({
         {full ? <p className={styles.caption}>{fullNote}</p> : null}
       </div>
 
-      <PhoneActionBar className={styles.phoneBar} label="Workout actions">
+      {/* iPhone's bottom bar: More, "+ Exercise" and (while there's something to save) Save in thumb reach. On its own
+          page that's the kit's PhoneActionBar; inside a program day's sheet (which has its own Save) a plain bar that
+          sticks to the bottom of the sheet, so nothing is pinned to the page behind it. */}
+      {embedded ? (
+        <div className={styles.phoneBar} data-embedded="">
         <button type="button" className={styles.moreButtonBig} aria-haspopup="dialog" onClick={() => setMoreOpen(true)} data-ph-capture-attribute-label="workout_more">
           <Icon name="dots" size={20} />
           More
@@ -893,9 +899,26 @@ export function WorkoutBuilder({
         >
           + Exercise
         </Button>
-        {/* Save in thumb reach, only while there is something to save (a program day's sheet has its own Save). */}
-        {showSave && !embedded ? saveButton('workout_save_phone', styles.phoneSave) : null}
-      </PhoneActionBar>
+        </div>
+      ) : (
+        <PhoneActionBar className={styles.phoneBar} label="Workout actions">
+        <button type="button" className={styles.moreButtonBig} aria-haspopup="dialog" onClick={() => setMoreOpen(true)} data-ph-capture-attribute-label="workout_more">
+          <Icon name="dots" size={20} />
+          More
+        </button>
+        <Button
+          variant="create"
+          className={styles.addExercise}
+          disabled={full}
+          onClick={() => setPicker({ kind: 'straight' })}
+          data-ph-capture-attribute-label="workout_add_exercise_phone"
+          data-ph-safe=""
+        >
+          + Exercise
+        </Button>
+          {showSave ? saveButton('workout_save_phone', styles.phoneSave) : null}
+        </PhoneActionBar>
+      )}
 
       {moreOpen ? (
         <MoreSheet
