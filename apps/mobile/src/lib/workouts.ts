@@ -2,7 +2,7 @@
 // the fetchers live in ./workouts-api.ts.
 import { demoUrl } from './demo-link';
 import { programDayOf, type ProgramDay } from './workouts-plan';
-import { addDays, countExercises, formatPlainDay, formatPlainDayMonth, formatPlainWeekday, groupDropSets, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
+import { addDays, countExercises, formatPlainDay, formatPlainDayMonth, formatPlainWeekday, groupDropSets, supersetLetter, youtubeFormSearchUrl, type BlockKind, type IsoDate, type SetType } from '@caltracker/shared';
 
 export type WorkoutSummary = {
   id: string;
@@ -100,20 +100,14 @@ export function orList(names: ReadonlyArray<string>): string {
   return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
 }
 
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
 /**
- * Letter per block for labelling superset exercises (A1, A2…): supersets are lettered in order among
- * supersets only (first A, second B); straight blocks get null. The web builder numbers blocks and has no letters.
+ * Letter per block for labelling superset exercises (A1, A2…): supersets are lettered in order among supersets only
+ * (first A, second B, … Z, then AA); other blocks get null. The letters come from the shared supersetLetter, the same
+ * ones the coach's builder shows (its blockBadges).
  */
 export function supersetLetters(blocks: ReadonlyArray<{ kind: 'straight' | 'superset' | 'choice' }>): Array<string | null> {
   let n = 0;
-  return blocks.map((b) => {
-    if (b.kind !== 'superset') return null;
-    const letter = LETTERS[n % 26] + (n >= 26 ? String(Math.floor(n / 26) + 1) : '');
-    n += 1;
-    return letter;
-  });
+  return blocks.map((b) => (b.kind === 'superset' ? supersetLetter(n++) : null));
 }
 
 /**
