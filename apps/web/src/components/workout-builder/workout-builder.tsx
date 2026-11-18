@@ -1,7 +1,7 @@
 'use client';
 
 import type { ErrorCode } from '@caltracker/shared';
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BUILDER_SETS,
@@ -542,23 +542,53 @@ export function WorkoutBuilder({
   // Wide screens: the card shown in the right pane. It is openId when that card still exists; otherwise (it was
   // removed, or a Superset switch gave its exercise a new id) the card now at the same place, so a removal selects a
   // neighbour and nothing selected means the first card.
+  // Whether the two panes show (the builder has WIDE_MIN px or more, as the container query in builder.module.css).
+  // Then only the panes render their exercises, else only the cards: no hidden second copy of an exercise's boxes.
+  // Measured before the first paint, so the right pane is never empty for a frame.
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(false);
+  useLayoutEffect(() => {
+    const el = layoutRef.current;
+    if (!el) return;
+    const measure = () => setWide(el.getBoundingClientRect().width >= WIDE_MIN);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [paneAt, setPaneAt] = useState(0);
   const openAt = cards.findIndex((c) => c.key === openId);
   const selectedAt = cards.length === 0 ? -1 : openAt >= 0 ? openAt : Math.min(paneAt, cards.length - 1);
   if (selectedAt >= 0 && selectedAt !== paneAt) setPaneAt(selectedAt);
-  const selectedItem = selectedAt >= 0 ? items.find((it) => it.kind === 'card' && it.card.key === cards[selectedAt]!.key) : undefined;
+  // On wide screens a selection by place becomes a selection by key, so a move (Move to top, Move to…, Reorder, a
+  // section move) keeps the same exercise in the right pane.
+  if (wide && openAt < 0 && selectedAt >= 0) setOpenId(cards[selectedAt]!.key);
+  const selectedKey = selectedAt >= 0 ? cards[selectedAt]!.key : null;
+  const selectedItem = selectedKey === null ? undefined : items.find((it) => it.kind === 'card' && it.card.key === selectedKey);
   const paneEditorRef = useRef<HTMLElement>(null);
-  // Whether the two panes show (the builder has WIDE_MIN px or more, as the container query in builder.module.css).
-  // Only then is the right pane's editor rendered, so no hidden second copy of an exercise's boxes sits in the page.
-  const layoutRef = useRef<HTMLDivElement>(null);
-  const [wide, setWide] = useState(false);
+  const paneListRef = useRef<HTMLElement>(null);
+  // After the picked exercise is deleted from the right pane, focus goes to the row picked in its place.
+  const focusRowNext = useRef(false);
   useEffect(() => {
-    const el = layoutRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(([entry]) => setWide((entry?.contentRect.width ?? 0) >= WIDE_MIN));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    if (!focusRowNext.current || selectedKey === null) return;
+    focusRowNext.current = false;
+    paneListRef.current?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(selectedKey)}"]`)?.focus();
+  }, [selectedKey]);
+  const paneActions = (blockId: string): BlockActions => {
+    const a = actionsFor(blockId);
+    return {
+      ...a,
+      onRemoveBlock: () => {
+        focusRowNext.current = true;
+        a.onRemoveBlock();
+      },
+      onRemoveExercise: (exId) => {
+        focusRowNext.current = true;
+        a.onRemoveExercise(exId);
+      },
+    };
+  };
   const selectCard = (key: string) => {
     setOpenId(key);
     // The page may be scrolled down a long exercise: show the new one from its top.
@@ -642,9 +672,10 @@ export function WorkoutBuilder({
         ))}
       </div>
 
-      {/* iPad and smaller desktops: the cards, with a Superset switch between two exercises. */}
+      {/* iPad and smaller desktops: the cards, with a Superset switch between two exercises (not rendered when the
+          two panes show). */}
       <div className={cx(styles.blocks, styles.wideList)}>
-        {items.map((item) =>
+        {wide ? null : items.map((item) =>
           item.kind === 'section' ? (
             sectionHeader(item)
           ) : (
@@ -673,7 +704,7 @@ export function WorkoutBuilder({
 
       {/* Wide screens: the exercises as rows on the left (a click picks one), the picked one's editor on the right. */}
       <div className={styles.panes}>
-        <section aria-label="Exercises" className={styles.paneList}>
+        <section ref={paneListRef} aria-label="Exercises" className={styles.paneList}>
           {items.map((item) =>
             item.kind === 'section' ? (
               sectionHeader(item)
@@ -703,7 +734,7 @@ export function WorkoutBuilder({
               sections={doc.sections}
               units={units}
               errors={errors}
-              actions={actionsFor(selectedItem.card.block.id)}
+              actions={paneActions(selectedItem.card.block.id)}
               restOff={restOff}
               siblings={selectedItem.siblings}
               onMoveTo={(to) => change((d) => moveBlock(d, selectedItem.card.block.id, to))}

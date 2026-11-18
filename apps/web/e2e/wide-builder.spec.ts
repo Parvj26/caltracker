@@ -1,11 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import { pickExercise, setRow, signInAsCoach } from './helpers';
+import { pickExercise, serviceClient, setRow, signInAsCoach } from './helpers';
 
 // The wide workout builder (approved "Wide workout builder" mockup): on a 1440 px desktop the exercises are rows on
 // the left and the picked one's editor fills the right. Narrower screens keep the cards (the other builder specs run
 // at 1280 px). Uses only exercises in the CI fixture.
 
 test.use({ viewport: { width: 1440, height: 900 } });
+
+const MOVE_NAME = `Wide builder move ${Date.now()}`;
+test.afterAll(async () => {
+  await serviceClient().from('workouts').delete().eq('name', MOVE_NAME).is('client_id', null);
+});
 
 const list = (page: Page) => page.getByRole('region', { name: 'Exercises', exact: true });
 const editor = (page: Page) => page.getByRole('region', { name: 'Selected exercise', exact: true });
@@ -67,8 +72,43 @@ test('two panes: pick a row to edit its sets, a new exercise is picked, the Supe
   await expect(row(page, 'Pushups')).toHaveCount(0);
   await expect(row(page, 'Pullups')).toHaveAttribute('aria-pressed', 'true');
   await expect(setRow(page, 'Pullups', 'set 1')).toBeVisible();
+  // Focus lands on the row picked in its place.
+  await expect(row(page, 'Pullups')).toBeFocused();
 
   // No sideways scrolling, and the rows are big enough to tap.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await row(page, 'Pullups').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
+test('the exercise picked by default stays in the right pane after it moves', async ({ page }) => {
+  await signInAsCoach(page);
+  await page.goto('/workouts/new');
+  await page.getByLabel('Workout name').fill(MOVE_NAME);
+  await page.getByRole('button', { name: '+ Exercise', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Add exercises' });
+  for (const exercise of ['Pushups', 'Pullups', 'Plank']) {
+    await picker.getByLabel('Search exercises').fill(exercise);
+    await picker.getByRole('option', { name: exercise, exact: true }).click();
+  }
+  await picker.getByRole('button', { name: 'Add 3 exercises' }).click();
+  await expect(picker).toBeHidden();
+  // Reload: nothing clicked, so the first exercise is picked by default.
+  await page.getByRole('button', { name: 'Save workout' }).click();
+  await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
+  await expect(page.getByText('Saved')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Workout name')).toHaveValue(MOVE_NAME);
+  await expect(row(page, 'Pushups')).toHaveAttribute('aria-pressed', 'true');
+
+  const pane = editor(page);
+  await pane.getByRole('button', { name: 'More for Pushups', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Move to…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Move Pushups to…' });
+  await dialog.getByRole('button', { name: /Plank/ }).click();
+  await expect(dialog).toBeHidden();
+  // Pushups is now last, and still the one shown on the right.
+  await expect(list(page).getByRole('button', { name: /: / }).last()).toHaveAccessibleName(/^Pushups: /);
+  await expect(row(page, 'Pushups')).toHaveAttribute('aria-pressed', 'true');
+  await expect(pane.getByRole('button', { name: 'Swap exercise: Pushups', exact: true })).toBeVisible();
+
 });
