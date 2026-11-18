@@ -113,7 +113,7 @@ const Dash = () => (
 );
 
 /** The wide list's columns (a table with headers from about 720 px of list width; the meta line says it below that). */
-const COLUMNS = ['Client', 'Status', 'Last workout', 'This week', '4 weeks', 'Plan'];
+const COLUMNS = ['Client', 'Status', 'Last workout', '4 weeks', 'Plan'];
 
 function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: string; row: DirectoryRow | null; today: IsoDate | null; lookbackDays: number }) {
   const plan = row && today ? planLines(row.plan, today) : null;
@@ -150,14 +150,8 @@ function ClientRow({ name, row, today, lookbackDays, id }: { id: string; name: s
             <span className={cx(styles.statusLine, STATUS_CLASS[row.status.kind])}>{statusText(row.status, today)}</span>
           ) : null}
         </span>,
+        // This week's count is left out: it was "—" for most clients; the status chip already says "Missed N".
         last,
-        row ? (
-          row.week.planned === 0 ? (
-            <Dash />
-          ) : (
-            <b className={row.week.missed > 0 ? styles.behind : styles.inkText}>{`${row.week.done} of ${row.week.planned}`}</b>
-          )
-        ) : null,
         row ? (
           pct === null ? (
             <Dash />

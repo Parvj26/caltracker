@@ -254,12 +254,11 @@ test('the Clients list shows a status line, last workout, this week, 4 weeks and
   await expect(rowOf('Nell Nothing')).toContainText('Nothing planned');
   await expect(rowOf('Sami Steady')).toContainText('On track');
 
-  // Last workout, this week, 4 weeks (columns with headers on a laptop).
+  // Last workout and 4 weeks (columns with headers on a laptop).
   await expect(page.getByText('4 weeks', { exact: true })).toBeVisible();
   await expect(rowOf('Sami Steady')).toContainText('Today · Session');
   await expect(rowOf('Olive Once')).toContainText('Yesterday · Session');
   await expect(rowOf('Nell Nothing')).toContainText('None yet');
-  await expect(rowOf('Sami Steady')).toContainText(/\d of \d/);
   await expect(rowOf('Rowan Run')).toContainText('0%');
   await expect(rowOf('Olive Once')).toContainText('50%');
   await expect(rowOf('Sami Steady')).toContainText('100%');

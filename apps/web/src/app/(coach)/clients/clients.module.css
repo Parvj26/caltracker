@@ -206,15 +206,15 @@
 .emptyLine { margin: 0; padding: var(--ct-space-3) 0; color: var(--ct-ink-muted); }
 
 /* ---------- Client and invite rows (ListRow) ---------- */
-.clientList, .inviteList { --row-leading-width: 36px; }
+.clientList, .inviteList { --row-leading-width: calc(36px + var(--ct-space-3)); }
+/* The wide list's action column (Assign, or an empty slot): the kit lines the header up with it. */
+.clientList { --row-actions-width: calc(88px + var(--ct-space-2)); }
 .clientList .avatar, .inviteList .avatar { width: 36px; height: 36px; }
 .clientRow, .inviteRow { min-width: 0; }
 .rowChip { flex: none; }
 .rowAction { flex: none; }
-/* Every client row ends in the same width (Assign or nothing), so the wide list's columns line up with the header. */
 .rowActionSlot { display: inline-block; width: 88px; }
 .clientList .rowAction { width: 88px; }
-.clientList > div:first-child > span:last-child { flex: none; width: 84px; }
 .statusCell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .statusLine { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); }
 .inkText { color: var(--ct-ink); }

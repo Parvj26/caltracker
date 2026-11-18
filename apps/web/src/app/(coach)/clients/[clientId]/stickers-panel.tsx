@@ -38,7 +38,8 @@ export function StickersPanel({ data, units }: { data: ClientStickers; units: Un
         {data.bests.length === 0 ? (
           <p className={styles.caption}>No personal bests yet.</p>
         ) : (
-          <div className={styles.scroll}>
+          // A wide table scrolls sideways in its own box; the box takes keyboard focus so arrow keys can scroll it.
+          <div className={styles.scroll} tabIndex={0} role="region" aria-label="Personal bests, scrolls sideways">
             <table className={styles.table} aria-label="Personal bests">
               <thead>
                 <tr>
