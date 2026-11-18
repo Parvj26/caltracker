@@ -1,5 +1,5 @@
 import { colors, type ThemeName } from './colors';
-import { borderWidth, buttonBase, buttonMinHeight, pressDepth, radius, shadow, space, tapTarget } from './scale';
+import { borderWidth, buttonBase, buttonCompactHeight, buttonMinHeight, focusRing, pressDepth, radius, shadow, space, tapTarget } from './scale';
 import { typeScale } from './typography';
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
@@ -20,6 +20,11 @@ export function toCssVariables(theme: ThemeName = 'light'): string {
   vars.push(`--ct-base:${buttonBase}px;`);
   vars.push(`--ct-press:${pressDepth}px;`);
   vars.push(`--ct-button-min-height:${buttonMinHeight.web}px;`);
+  vars.push(`--ct-button-compact-height:${buttonCompactHeight}px;`);
+  vars.push(`--ct-focus-ring-width:${focusRing.width}px;`);
+  vars.push(`--ct-focus-ring-offset:${focusRing.offset}px;`);
+  // On ink, blue and red fills the ink ring would vanish against the button: the 2 px gap between them is painted white.
+  vars.push(`--ct-focus-ring-gap:0 0 0 ${focusRing.offset}px var(--ct-bg);`);
   for (const [k, v] of Object.entries(tapTarget)) vars.push(`--ct-tap-${k}:${v}px;`);
   vars.push(`--ct-shadow-sticker:${shadow.sticker};`);
   for (const [k, v] of Object.entries(typeScale)) {

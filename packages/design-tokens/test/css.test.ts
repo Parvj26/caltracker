@@ -30,6 +30,16 @@ describe('toCssVariables shape tokens', () => {
     expect(css).toContain('--ct-border-width-secondary-button:1.5px;');
     expect(css).toContain('--ct-button-min-height:48px;');
     expect(css).toContain('--ct-tap-min:44px;');
+    expect(css).toContain('--ct-button-compact-height:44px;');
+  });
+  it('emits the UI-rules additions: strong border, 32/40/48 spacing and the focus ring', () => {
+    expect(css).toContain('--ct-border-strong:#8A8A8A;');
+    expect(css).toContain('--ct-space-8:32px;');
+    expect(css).toContain('--ct-space-10:40px;');
+    expect(css).toContain('--ct-space-12:48px;');
+    expect(css).toContain('--ct-focus-ring-width:2px;');
+    expect(css).toContain('--ct-focus-ring-offset:2px;');
+    expect(css).toContain('--ct-focus-ring-gap:0 0 0 2px var(--ct-bg);');
   });
   it('emits type weights and tracking, and no hand rotation', () => {
     expect(css).toContain('--ct-weight-body:500;');
