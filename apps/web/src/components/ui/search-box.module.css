@@ -6,9 +6,8 @@
   position: relative;
   display: block;
   min-width: 0;
-  /* The stronger input border, ≥ 3:1 on white and on surface (ink mixed half and half with white, a mid grey). Swap for --ct-border-strong once
-     the UI-foundation tokens land. */
-  --search-border: color-mix(in srgb, var(--ct-ink) 50%, var(--ct-bg));
+  /* The stronger input border, ≥ 3:1 on white and on surface (UI rules §2.8). */
+  --search-border: var(--ct-border-strong);
 }
 .icon {
   position: absolute;
@@ -72,7 +71,7 @@
 .input::-webkit-search-cancel-button,
 .input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-.input:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.input:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .clear:hover { color: var(--ct-ink); }
 .clear:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
 .emptyClear:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }

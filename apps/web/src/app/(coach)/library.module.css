@@ -122,9 +122,10 @@
   text-decoration: none;
 }
 .tab:hover { border-color: var(--ct-border); }
-.tab:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.tab:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+/* Selected (UI rules §2.3): a white pill with an ink border, never lime. */
 .tabOn,
-.tabOn:hover { border-color: var(--ct-ink); background: var(--ct-lime); }
+.tabOn:hover { border-color: var(--ct-ink); background: var(--ct-bg); }
 
 @media (max-width: 599.98px) {
   .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-1); width: auto; align-self: stretch; padding: var(--ct-space-1); border-radius: 14px; }

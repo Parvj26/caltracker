@@ -291,7 +291,8 @@
 .rowLink { padding-block: calc((var(--ct-tap-min) - 1em) / 2); margin-block: calc((1em - var(--ct-tap-min)) / 2); color: var(--ct-ink); font-weight: var(--ct-weight-button); text-decoration: none; overflow-wrap: anywhere; }
 .rowLink::after { content: ''; position: absolute; inset: 0; }
 .rowLink:focus-visible { outline: none; }
-.linkRow:has(.rowLink:focus-visible) { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+/* The whole row gets the standard ring (inset, so the table doesn't clip it). */
+.linkRow:has(.rowLink:focus-visible) { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); }
 .rowName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
 
 .clientCell { display: flex; align-items: center; gap: var(--ct-space-2-5); min-width: 0; }
@@ -439,7 +440,9 @@
   font-weight: var(--ct-weight-section-heading);
   cursor: pointer;
 }
-.segment[aria-selected='true'], .planOption[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); font-weight: var(--ct-weight-button); }
+/* Selected tab (UI rules §2.3): a white pill with an ink border; a selected plan choice stays an ink fill (§2.4). */
+.segment[aria-selected='true'] { background: var(--ct-bg); color: var(--ct-ink); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); font-weight: var(--ct-weight-button); }
+.planOption[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); font-weight: var(--ct-weight-button); }
 .tabPanel { display: flex; flex-direction: column; gap: var(--ct-space-4); }
 .tabPanel[hidden] { display: none; }
 .inviteForm { display: flex; flex-direction: column; gap: var(--ct-space-4); }

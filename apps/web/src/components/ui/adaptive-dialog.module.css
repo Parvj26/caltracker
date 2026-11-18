@@ -1,0 +1,169 @@
+/*
+ * AdaptiveDialog (docs/design/ui-rules.md §5). Centred dialog on iPad and desktop; bottom sheet when the window is
+ * narrow (< 600) or short (< 500). Pinned title bar and buttons; only the body scrolls. Colours and sizes only via
+ * var(--ct-*). JS sets --ad-vv-h (visible height) and --ad-kb (height covered by the on-screen keyboard).
+ * Plain one-class rules sit in the `ct-ui` layer so a caller's className wins; see ui.module.css.
+ */
+@layer ct-base, ct-ui, ct-shared;
+
+@layer ct-ui {
+.dialog {
+  --ad-pad: var(--ct-space-6);
+  --ad-margin: var(--ct-space-6);
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0 0 var(--ad-kb, 0px);
+  width: min(560px, calc(100vw - 2 * var(--ad-margin)));
+  max-width: none;
+  max-height: min(90dvh, calc(var(--ad-vv-h, 100dvh) - 2 * var(--ad-margin)));
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-card);
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--ct-ink) 22%, transparent);
+}
+.wide { width: min(800px, calc(100vw - 2 * var(--ad-margin))); }
+
+.header {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-4) var(--ct-space-4) var(--ct-space-4) var(--ad-pad);
+  border-bottom: 1px solid var(--ct-border);
+}
+.grabber { display: none; }
+.heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: var(--ct-weight-button);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.subtitle { margin: 0; color: var(--ct-ink-muted); font-size: var(--ct-size-caption); }
+/* The one close style: a 44 px grey circle with ×. */
+.close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-4) var(--ad-pad);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.discard {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  margin: 0 var(--ad-pad) var(--ct-space-3);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-ink);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-celebrate-bg);
+}
+.discardText { flex: 1 1 200px; margin: 0; }
+.discardActions { display: flex; gap: var(--ct-space-2); }
+
+.footer {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ct-space-2-5);
+  padding: var(--ct-space-3-5) var(--ad-pad) calc(var(--ct-space-3-5) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ct-border);
+  background: var(--ct-bg);
+}
+
+/* Narrow or short windows: a bottom sheet, up to 90% of the visible height, riding above the keyboard. */
+@media (max-width: 599.98px), (max-height: 499.98px) {
+  .dialog,
+  .wide {
+    --ad-pad: var(--ct-space-4);
+    inset: auto 0 var(--ad-kb, 0px);
+    width: 100%;
+    max-height: min(90dvh, calc(var(--ad-vv-h, 100dvh) - var(--ct-space-4)));
+    margin: 0;
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    border-width: var(--ct-border-width-card) 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+  .header { padding-top: var(--ct-space-4-5); touch-action: none; }
+  .grabber {
+    display: block;
+    position: absolute;
+    top: var(--ct-space-2);
+    left: 50%;
+    width: 40px;
+    height: 5px;
+    margin-left: -20px;
+    border-radius: var(--ct-radius-pill);
+    background: color-mix(in srgb, var(--ct-ink) 20%, transparent);
+  }
+  .discardActions { flex: 1 1 100%; }
+  .discardActions > * { flex: 1 1 0; }
+}
+/* Long forms on a phone: the whole visible screen, still above the keyboard. */
+@media (max-width: 599.98px) {
+  .full {
+    height: var(--ad-vv-h, 100dvh);
+    max-height: none;
+    border-width: 0;
+    border-radius: 0;
+  }
+  .full .header { padding-top: calc(var(--ct-space-3) + env(safe-area-inset-top)); }
+  .full .grabber { display: none; }
+}
+} /* end @layer ct-ui */
+
+/* ---------- Unlayered: states and nested rules ---------- */
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
+/* A focused field never sits flush under the title bar or the buttons. */
+.body :is(input, select, textarea) { scroll-margin-block: var(--ct-space-6); }
+.close[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; }
+.close:hover:not([aria-disabled='true']) { background: var(--ct-border); }
+
+@media (max-width: 599.98px), (max-height: 499.98px) {
+  /* Thumb-sized: the buttons share the row, main action on the right. */
+  .footer > * { flex: 1 1 auto; }
+  /* Destructive confirms: stacked full width, the main (last) one on top. */
+  .stack .footer { flex-direction: column-reverse; flex-wrap: nowrap; }
+  .stack .footer > * { width: 100%; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog[open] { animation: ad-fade 160ms ease-out; }
+  @media (max-width: 599.98px), (max-height: 499.98px) {
+    .dialog[open] { animation: ad-slide 220ms ease-out; }
+  }
+}
+@keyframes ad-fade { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes ad-slide { from { transform: translateY(100%); } to { transform: none; } }

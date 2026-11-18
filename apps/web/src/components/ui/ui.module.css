@@ -51,6 +51,33 @@
   box-shadow: 0 var(--ct-base) 0 var(--ct-magenta-deep);
 }
 
+/* Add / New: the only lime button (UI rules §2.1). */
+.create {
+  background: var(--ct-lime);
+  color: var(--ct-ink);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+}
+
+/* Tonal: the one action repeated on every list row, so long lists stay calm. */
+.quiet {
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+}
+
+/* Only the confirm button of a destructive confirm. */
+.danger {
+  background: var(--ct-danger);
+  color: var(--ct-bg);
+}
+
+/* Dense toolbars and list rows: 44 px, still a full tap target. */
+.compact {
+  min-height: var(--ct-button-compact-height);
+  padding: var(--ct-space-2) var(--ct-space-4);
+  border-radius: var(--ct-radius-input);
+}
+
+
 
 /* ---------- Text field ---------- */
 .field { display: flex; flex-direction: column; gap: var(--ct-space-1); }
@@ -267,19 +294,32 @@
 } /* end @layer ct-ui */
 
 /* ---------- Unlayered: states and nested rules (more specific than one class) ---------- */
-.button:disabled { cursor: not-allowed; opacity: 0.7; }
-.primary:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-lime); }
-.finish:active:not(:disabled) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-magenta-deep); }
+/* Can't be used yet: the same button at half strength, still focusable (aria-disabled), no under-shadow. */
+.button[aria-disabled='true'],
+.button:disabled { cursor: not-allowed; opacity: 0.5; }
+.primary[aria-disabled='true'],
+.finish[aria-disabled='true'] { box-shadow: none; }
+.button[aria-busy='true'] { cursor: progress; }
+.quiet:hover:not([aria-disabled='true']) { background: var(--ct-border); }
+.danger:hover:not([aria-disabled='true']) { background: var(--ct-danger-deep); }
+.primary:active:not([aria-disabled='true']) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-lime); }
+.finish:active:not([aria-disabled='true']) { box-shadow: 0 calc(var(--ct-base) - var(--ct-press)) 0 var(--ct-magenta-deep); }
 @media (prefers-reduced-motion: no-preference) {
-  .primary:active:not(:disabled),
-  .secondary:active:not(:disabled),
-  .finish:active:not(:disabled) { transform: translateY(var(--ct-press)); }
+  .primary:active:not([aria-disabled='true']),
+  .secondary:active:not([aria-disabled='true']),
+  .create:active:not([aria-disabled='true']),
+  .finish:active:not([aria-disabled='true']) { transform: translateY(var(--ct-press)); }
 }
+/* Focus (UI rules §3): the global 2 px ink ring. On ink, blue and red fills the 2 px gap is white, so the ring reads
+   as white inside, ink outside. Never lime. */
+.button:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.primary:focus-visible,
+.finish:focus-visible,
+.danger:focus-visible { box-shadow: var(--ct-focus-ring-gap); }
+/* Fields: an ink border on focus plus the same ring for the keyboard. */
 .input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-.input:focus-visible { outline: none; }
+.input:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
-/* The magenta error border hides the ink focus border, so a focused invalid field gets an ink outline instead. */
-.input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .authPanel .logoMark { box-shadow: 0 0 0 3px var(--ct-bg), var(--ct-shadow-sticker); }
 .authTagline span { display: inline; }
 

@@ -53,8 +53,12 @@ export function SearchBox({ value, onChange, label, onEnter, inputRef, className
             // itself (Chrome), and the pop-up would stay open.
             const dialog = e.currentTarget.closest('dialog');
             if (dialog?.open) {
+              // Handled here (one owner): the dialog's own Escape handling sees defaultPrevented and stays out.
               e.preventDefault();
-              requestDialogClose(dialog);
+              // AdaptiveDialog (UI rules §5): the first Escape clears the text, the next one closes (asking first when
+              // there are unsaved changes).
+              if (value !== '' && dialog.hasAttribute('data-adaptive-dialog')) onChange('');
+              else requestDialogClose(dialog);
             }
             return;
           }
