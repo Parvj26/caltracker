@@ -55,6 +55,13 @@ async function expectWeeks(page: Page, start: string, weeks: number) {
   await expect(page.getByRole('heading', { level: 2, name: rangeLabel(start, addDays(start, weeks * 7 - 1)) })).toBeVisible();
 }
 
+/**
+ * Scroll a day to the middle of the screen before a drag. Mouse events only reach what is on screen, and a drag held
+ * near the top or bottom edge makes dnd-kit scroll the page, which slides the day out from under the pointer (on a
+ * slow CI runner the drop then lands below the calendar and the card is put back).
+ */
+const centre = (el: Locator) => el.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+
 /** Drag with real pointer events: press, move in 10 steps (past the 4 px activation distance), release. */
 async function drag(page: Page, from: Locator, to: Locator) {
   const a = await from.boundingBox();
@@ -253,8 +260,7 @@ test('drag a workout by its card body in the 2-week view; a done one stays put a
   // Grab the card by its exercise preview, not its name.
   const body = card(page, next, name).locator('[title*=" exercise"]');
   const target = day(page, addDays(next, 2));
-  // The second week's tall row can start below the fold; mouse events only reach what is on screen.
-  await target.scrollIntoViewIfNeeded();
+  await centre(target);
   const a = (await body.boundingBox())!;
   const b = (await target.boundingBox())!;
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
@@ -284,7 +290,7 @@ test('drag a workout by its card body in the 2-week view; a done one stays put a
   await expect(done).toHaveAttribute('title', 'Done workouts stay on the day they were done');
   await expect(done).toHaveCSS('cursor', 'default');
   // Trying to drag it shows why, leaves it where it is, and doesn't open its log.
-  await day(page, addDays(next, 2)).scrollIntoViewIfNeeded();
+  await centre(day(page, addDays(next, 2)));
   await drag(page, done.locator('[title*=" exercise"]'), day(page, addDays(next, 2)));
   await expect(done.getByRole('status')).toHaveText('Done workouts stay on the day they were done');
   await expect(page).toHaveURL(/view=2w/);
