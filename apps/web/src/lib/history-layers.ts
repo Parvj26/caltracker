@@ -34,6 +34,8 @@ type Entry = {
   closing: boolean;
   /** Written to history (false while a push waits its turn). */
   pushed: boolean;
+  /** Where focus goes back to when Back closes it: what had focus when it opened, then whatever opened the layer under it. */
+  openers?: HTMLElement[];
 };
 
 export type LayerHandle = {
@@ -344,6 +346,10 @@ async function handleGone(gone: Entry[]) {
     }
     // Still open: back on, bottom first, under anything they opened meanwhile (that waited in `deferred`).
     for (const entry of refused.reverse()) rawPush(entry);
+    // Closed by Back: focus goes back to what opened the lowest one, not to the page's start (rulebook §5.7).
+    const closed = gone.filter((e) => !e.closing && !refused.includes(e));
+    const lowest = closed[closed.length - 1];
+    if (lowest?.openers?.length) restoreFocus(lowest.openers);
   } finally {
     deciding--;
     flush();
@@ -618,7 +624,7 @@ async function rewriteUnder(entries: Entry[], apply: () => void, { keep = true }
  */
 export function pushLayer(onBack: () => BackResult, options: { address?: { param: string; id: string } } = {}): LayerHandle {
   installHistoryLayers();
-  const entry: Entry = { seq: 0, kind: 'layer', href: '', closing: false, pushed: false, onBack };
+  const entry: Entry = { seq: 0, kind: 'layer', href: '', closing: false, pushed: false, onBack, openers: currentOpeners() };
   if (options.address) entry.address = options.address;
   push(entry);
   return {
@@ -629,6 +635,40 @@ export function pushLayer(onBack: () => BackResult, options: { address?: { param
       return waitGone(entry);
     },
   };
+}
+
+/**
+ * What a layer opening now should hand focus back to: the focused element, then the openers of the layer on top (a
+ * menu that is closing as its item opens this pop-up: focus then goes back to the menu's ⋯ button).
+ */
+function currentOpeners(): HTMLElement[] {
+  if (typeof document === 'undefined') return [];
+  const out: HTMLElement[] = [];
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active !== document.body) out.push(active);
+  for (const el of stack[stack.length - 1]?.openers ?? []) if (!out.includes(el)) out.push(el);
+  return out.slice(0, 4);
+}
+
+/** Focus was lost (on the page's body, or on something hidden or removed). */
+function focusLost(): boolean {
+  const active = document.activeElement;
+  return !active || active === document.body || !active.isConnected || (active instanceof HTMLElement && active.getClientRects().length === 0);
+}
+
+/**
+ * After Back closed a layer: once React has taken it away, focus goes to the first opener still on screen, unless
+ * something already took focus (the layer's own code, or the next pop-up).
+ */
+function restoreFocus(openers: HTMLElement[]) {
+  const run = () => {
+    if (!focusLost()) return;
+    const target = openers.find((el) => el.isConnected && el.getClientRects().length > 0 && !el.closest('[inert], dialog:not([open])'));
+    target?.focus({ preventScroll: true });
+  };
+  setTimeout(run, 0);
+  // A pop-up that closes a render later (React state, a close animation).
+  setTimeout(run, 150);
 }
 
 /** Resolves once `entry` has left the stack (stepped over, or buried by a navigation); at worst after a timeout. */

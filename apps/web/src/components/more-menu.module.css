@@ -16,7 +16,8 @@
   cursor: pointer;
 }
 .button:hover, .button[aria-expanded='true'] { background: color-mix(in srgb, var(--ct-ink) 10%, transparent); }
-.button:focus-visible { outline: none; box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+/* The standard focus ring (rulebook §3): 2 px ink outline, 2 px apart. */
+.button:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .button:disabled { opacity: 0.5; cursor: default; }
 .menu {
   position: absolute;
@@ -53,7 +54,8 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.item:hover, .item:focus-visible { outline: none; background: var(--ct-surface); }
+.item:hover { background: var(--ct-surface); }
+.item:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: calc(-1 * var(--ct-focus-ring-width)); background: var(--ct-surface); }
 /* Busy ("Sending…", "Duplicating…"): muted and not tinted on hover, since a tap does nothing. */
 .item:disabled { color: var(--ct-ink-muted); cursor: progress; }
 .item:disabled:hover { background: transparent; }

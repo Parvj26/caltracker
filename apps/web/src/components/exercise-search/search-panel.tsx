@@ -54,6 +54,8 @@ type Props = {
   rowFilter?: (row: ExerciseIndexRow) => boolean;
   /** Pick-many mode: how many are picked but not yet added (the picker asks before dropping them). */
   onSelectionChange?: (count: number) => void;
+  /** The filter chips changed (the Exercises page keeps them in its address). */
+  onFiltersChange?: (filters: SearchFilters) => void;
 };
 
 const PAGE_SIZE = 50;
@@ -78,6 +80,7 @@ export function SearchPanel({
   queryParam,
   rowFilter,
   onSelectionChange,
+  onFiltersChange,
 }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const listId = useId();
@@ -254,6 +257,7 @@ export function SearchPanel({
   function changeFilters(next: SearchFilters) {
     setFilters(next);
     setShown(PAGE_SIZE);
+    onFiltersChange?.(next);
   }
 
   const action = !active

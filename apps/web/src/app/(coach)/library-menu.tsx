@@ -224,6 +224,7 @@ export function LibraryNavItem({ className }: { className?: string | undefined }
         aria-haspopup={wide ? undefined : 'menu'}
         aria-current={current ? 'true' : undefined}
         data-ph-capture-attribute-label="nav_library"
+        data-library-button=""
         onClick={() => (wide ? setExpanded((x) => !x) : setOpen((o) => !o))}
       >
         {NAV_ICONS.workouts}

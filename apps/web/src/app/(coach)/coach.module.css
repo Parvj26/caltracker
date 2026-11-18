@@ -74,6 +74,11 @@
 .navItemCurrent,
 .navItemCurrent:hover { background: var(--ct-ink); color: var(--ct-bg); }
 
+/* iPad rail: the Library menu is open, so the page you are on is not lit meanwhile (Library is, library.module.css). */
+@media (min-width: 600px) and (max-width: 1199.98px) {
+  .sidebar:has([data-library-button][aria-expanded='true']) .navItemCurrent:not([data-library-button]) { background: transparent; color: var(--ct-ink); }
+}
+
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
 
 .navItem { position: relative; }

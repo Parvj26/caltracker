@@ -177,7 +177,8 @@
 .steps { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .more {
   min-height: var(--ct-tap-min);
-  padding: 0;
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-1);
   border: 0;
   background: transparent;
   color: var(--ct-ink);
