@@ -21,7 +21,7 @@ test.afterAll(async () => {
   for (const id of created.users) await admin.auth.admin.deleteUser(id);
 });
 
-async function newClient(firstName: string) {
+async function newClient(firstName: string, joinedDaysAgo = 0) {
   const last = `Navb${unique()}`;
   const u = await admin.auth.admin.createUser({
     email: `navb-${firstName.toLowerCase()}-${unique()}@example.com`,
@@ -31,7 +31,9 @@ async function newClient(firstName: string) {
   });
   if (u.error) throw u.error;
   created.users.push(u.data.user.id);
-  const m = await admin.from('workspace_members').insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client' });
+  const m = await admin
+    .from('workspace_members')
+    .insert({ workspace_id: workspaceId, user_id: u.data.user.id, role: 'client', created_at: new Date(Date.now() - joinedDaysAgo * 86_400_000).toISOString() });
   if (m.error) throw m.error;
   return { id: u.data.user.id, name: `${firstName} ${last}` };
 }
@@ -108,12 +110,15 @@ for (const size of SIZES) {
 
     test('Home attention chip survives Back and reload', async ({ page }) => {
       await signInAsCoach(page);
-      // A client who missed yesterday's workout, so the Missed chip shows.
-      const client = await newClient('Missy');
+      // A client (joined 10 days ago: workouts planned before joining never count) who missed the last two days'
+      // workouts, so the Missed chip shows whatever else the workspace holds.
+      const client = await newClient('Missy', 10);
       const today = await browserToday(page);
-      const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: client.id, scheduled_on: addDays(today, -1), name: `Navb missed ${unique()}` }).select('id').single();
-      if (w.error) throw w.error;
-      created.workouts.push(w.data.id);
+      for (const back of [-1, -2]) {
+        const w = await admin.from('workouts').insert({ workspace_id: workspaceId, client_id: client.id, scheduled_on: addDays(today, back), name: `Navb missed ${unique()}` }).select('id').single();
+        if (w.error) throw w.error;
+        created.workouts.push(w.data.id);
+      }
       await page.goto('/home');
       const group = page.getByRole('group', { name: 'Filter Needs attention' });
       await group.getByRole('button', { name: /^Missed/ }).click();
