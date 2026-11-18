@@ -2,12 +2,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { requireCoach } from '@/lib/auth';
 import { listCoachMeals } from '@/lib/coach-meals';
-import { MealForm } from '../meal-form';
+import { MealDetail } from '../meal-detail';
 import { MealsShell, queryFrom } from '../meals-shell';
 
-export const metadata: Metadata = { title: 'Edit meal · Meals' };
+export const metadata: Metadata = { title: 'Meal · Meals' };
 
-export default async function EditMealPage({
+/** A meal's own page: read-only, with Edit and (in ⋯) Remove. */
+export default async function MealPage({
   params,
   searchParams,
 }: {
@@ -21,24 +22,19 @@ export default async function EditMealPage({
   if (!meal) notFound();
   const query = queryFrom(sp);
   return (
-    <MealsShell meals={meals} selectedId={meal.id} query={query} editing>
-      {/* Keyed by the meal only: after a save the form's fields reset to the saved meal (version), but its "Saved"
-          message is kept, so it no longer flashes away when the page refreshes. */}
-      <MealForm
-        key={meal.id}
-        version={meal.updatedAt}
-        workspaceId={workspaceId}
-        isNew={false}
-        logged={meal.logged}
-        query={query}
-        initial={{
+    <MealsShell meals={meals} selectedId={meal.id} query={query} open>
+      <MealDetail
+        meal={{
           id: meal.id,
           name: meal.name,
           macros: meal.macros,
           ingredients: meal.ingredients,
           howTo: meal.howTo,
-          photo: meal.photo ? { ...meal.photo, url: meal.photoUrl } : null,
+          photoUrl: meal.photoUrl,
+          thumbUrl: meal.thumbUrl,
+          logged: meal.logged,
         }}
+        query={query}
       />
     </MealsShell>
   );

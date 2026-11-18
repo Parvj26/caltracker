@@ -64,10 +64,11 @@ export default async function CoachLayout({ children }: { children: React.ReactN
           ))}
           {/* Workouts, Exercises and Programs sit behind one Library item (an iPhone has it as a tab). */}
           <LibraryNavItem className={styles.inTabBar} />
+          {/* Same order as the phone tab bar: Messages straight after Library (UI rules §8). */}
+          <MessagesNavLink className={styles.inTabBar} />
           {NAV_AFTER_LIBRARY.map(({ tab, ...item }) => (
             <NavLink key={item.href} {...item} className={tab ? styles.inTabBar : undefined} />
           ))}
-          <MessagesNavLink className={styles.inTabBar} />
         </nav>
         <div className={styles.bottom}>
           {/* Sign out is on the Profile page (it asks first). */}

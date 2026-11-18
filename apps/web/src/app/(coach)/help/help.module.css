@@ -23,18 +23,16 @@
 }
 .summary::-webkit-details-marker { display: none; }
 .summary:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; border-radius: var(--ct-radius-input); }
-.number {
+.topicIcon {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--ct-lime);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
   color: var(--ct-ink);
-  font-size: 14px;
-  font-weight: var(--ct-weight-button);
 }
 .howToTitle { flex: 1; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .chevron { flex: none; transition: transform 0.15s ease; }
@@ -89,15 +87,4 @@
 .copy:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .copyStatus { margin: 0; min-height: 1lh; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .copyStatus:empty { min-height: 0; }
-.mailLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ct-space-2);
-  min-height: var(--ct-tap-min);
-  align-self: flex-start;
-  color: var(--ct-ink);
-  font-weight: var(--ct-weight-section-heading);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1.5px;
-}
+.mailLink { align-self: flex-start; }

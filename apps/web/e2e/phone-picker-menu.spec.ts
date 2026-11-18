@@ -99,7 +99,7 @@ test.describe('iPhone SE (375 x 667)', () => {
 test.describe('iPhone 13', () => {
   test.use({ ...iphone13 });
 
-  test('on a chat the tab bar is gone and the message box is full width', async ({ page }) => {
+  test('on a chat the tab bar is gone and the reply box is one full-width row', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto(`/messages/${CLIENT_ID}`);
     const box = page.getByRole('textbox', { name: 'Message' });
@@ -107,8 +107,19 @@ test.describe('iPhone 13', () => {
     await expect(tabBar(page)).toBeHidden();
     const photos = page.getByRole('button', { name: 'Add photos' });
     await expect(photos).toBeInViewport({ ratio: 1 });
-    const width = (await box.boundingBox())!.width;
-    expect(width).toBeGreaterThan(iphone13.viewport.width - 48);
+    const send = page.getByRole('button', { name: 'Send' });
+    await expect(send).toBeInViewport({ ratio: 1 });
+    // One row like iPad (UX review C): [📎][message][Send] across the whole screen, the message taking the rest.
+    const form = (await box.locator('xpath=ancestor::form').boundingBox())!;
+    expect(form.x).toBeLessThanOrEqual(0.5);
+    expect(form.width).toBeGreaterThanOrEqual(iphone13.viewport.width - 1);
+    const b = (await box.boundingBox())!;
+    const p = (await photos.boundingBox())!;
+    const s = (await send.boundingBox())!;
+    expect(Math.abs(b.y + b.height / 2 - (s.y + s.height / 2))).toBeLessThan(8);
+    expect(b.x).toBeGreaterThan(p.x + p.width - 1);
+    expect(b.x + b.width).toBeLessThan(s.x + 1);
+    expect(b.width).toBeGreaterThan(iphone13.viewport.width - 180);
     await expectNoSidewaysScroll(page);
   });
 

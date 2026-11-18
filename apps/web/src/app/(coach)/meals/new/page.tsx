@@ -13,7 +13,7 @@ export default async function NewMealPage({ searchParams }: { searchParams: Prom
   const id = crypto.randomUUID();
   const query = queryFrom(sp);
   return (
-    <MealsShell meals={meals} selectedId={null} query={query} editing>
+    <MealsShell meals={meals} selectedId={null} query={query} open>
       <MealForm
         key={id}
         workspaceId={workspaceId}

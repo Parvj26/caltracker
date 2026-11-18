@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import {
   LOG_TREE_SELECT,
   awardHasPrs,
@@ -14,7 +13,7 @@ import {
   logVolumeKg,
   type LogTreeRow,
 } from '@caltracker/shared';
-import { Card } from '@/components/ui';
+import { ButtonLink, PageHeader } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { renderTime } from '@/lib/live-refresh';
 import { requireCoach } from '@/lib/auth';
@@ -129,18 +128,8 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className={styles.page}>
-      <header className={styles.titleRow}>
-        <div className={styles.titleLine}>
-          <h1 className={styles.title}>Activity</h1>
-          {toReview > 0 ? (
-            <p className={styles.toReview}>
-              <span className={styles.dot} aria-hidden="true" />
-              <b>{toReview}</b> to review
-            </p>
-          ) : null}
-        </div>
-        <ClientFilter clients={options} selectedId={clientFilter} />
-      </header>
+      <PageHeader title="Activity" subtitle={toReview > 0 ? `${toReview} to review` : 'All caught up'} />
+      <ClientFilter clients={options} selectedId={clientFilter} />
 
       {rows.length === 0 ? (
         <p className={styles.empty}>
@@ -151,23 +140,21 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               : 'No finished workouts yet. They show up here as soon as a client finishes one.'}
         </p>
       ) : (
-        <Card>
-          <ActivityFeed rows={rows} now={new Date(renderTime()).toISOString()} />
-        </Card>
+        <ActivityFeed rows={rows} now={new Date(renderTime()).toISOString()} />
       )}
 
       {pageNumber > 1 || hasNext ? (
         <nav aria-label="Pages" className={styles.pager}>
           {pageNumber > 1 ? (
-            <Link href={pageHref(pageNumber - 1)} className={styles.smallButton}>
-              ← Newer
-            </Link>
+            <ButtonLink href={pageHref(pageNumber - 1)} variant="secondary" size="compact" phSafe>
+              Newer
+            </ButtonLink>
           ) : null}
           <span className={styles.caption}>Page {pageNumber}</span>
           {hasNext ? (
-            <Link href={pageHref(pageNumber + 1)} className={styles.smallButton}>
-              Older →
-            </Link>
+            <ButtonLink href={pageHref(pageNumber + 1)} variant="secondary" size="compact" phSafe>
+              Older
+            </ButtonLink>
           ) : null}
         </nav>
       ) : null}

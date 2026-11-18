@@ -30,7 +30,7 @@ test('the support email is copyable and the mail link names the page the coach c
   await expect(page.getByRole('status').filter({ hasText: 'Email address copied.' })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('support@caltracker.app');
 
-  const mail = page.getByRole('link', { name: 'Open in my mail app' });
+  const mail = page.getByRole('link', { name: 'Email support' });
   await expect(mail).toHaveAttribute('href', /^mailto:support@caltracker\.app\?subject=CalTracker%20help&body=/);
   // The browser and page are filled in once the page hydrates (the server renders the link without them).
   await expect(mail).toHaveAttribute('href', /Page%3A%20/);

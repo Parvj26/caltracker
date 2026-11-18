@@ -81,9 +81,9 @@ test.describe('iPhone SE (375 x 667)', () => {
     const freshRow = days.nth(0).getByRole('listitem').filter({ hasText: fresh });
     const olderRow = days.nth(1).getByRole('listitem').filter({ hasText: older });
     // Only the client has commented on the new one: still unreviewed. The coach's comment marks the older one reviewed.
-    await expect(freshRow.getByRole('img', { name: 'Not reviewed' })).toBeVisible();
+    await expect(freshRow.getByText('To review', { exact: true })).toBeVisible();
     await expect(freshRow).toContainText('1 comment');
-    await expect(olderRow.getByRole('img', { name: 'Not reviewed' })).toHaveCount(0);
+    await expect(olderRow.getByText('To review', { exact: true })).toHaveCount(0);
     await expect(olderRow).toContainText('2 comments');
     await expect(main.getByText(/^1 to review$/)).toBeVisible();
 
