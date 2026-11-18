@@ -47,12 +47,13 @@ const LIBRARY_LIMIT = 200;
 // its shape; CalendarRow describes it.
 const CALENDAR_SELECT =
   `${WORKOUT_TREE_SELECT}, customised_at, program_assignments(program_name, programs(live_sync)), ` +
-  'done_logs:workout_logs(id, finished_at, logged_by), started_logs:workout_logs(id)';
+  'done_logs:workout_logs(id, finished_at, logged_by), started_logs:workout_logs(id), live_logs:workout_logs(id)';
 type CalendarRow = WorkoutTreeRow & {
   customised_at: string | null;
   program_assignments: { program_name: string; programs: { live_sync: boolean } | null } | null;
   done_logs: { id: string; finished_at: string | null; logged_by: string | null }[];
   started_logs: { id: string }[];
+  live_logs: { id: string }[];
 };
 
 export default async function ClientPage({
@@ -101,6 +102,7 @@ export default async function ClientPage({
       .eq('done_logs.status', 'completed')
       // Started or done (a discarded log doesn't count): Live Sync no longer changes it, so no "Live" tag.
       .in('started_logs.status', ['in_progress', 'completed'])
+      .eq('live_logs.status', 'in_progress')
       .order('finished_at', { ascending: false, referencedTable: 'done_logs' })
       .order('scheduled_on')
       .order('created_at'),
@@ -188,6 +190,7 @@ export default async function ClientPage({
         programName: w.program_assignments?.program_name ?? null,
         logId: log?.id ?? null,
         loggedByCoach: log ? isLoggedByCoach({ loggedBy: log.logged_by, clientId: client.id }) : false,
+        ...(!log && w.live_logs.length > 0 ? { inProgress: true } : {}),
         preview: workoutPreview(workoutRowToDoc(w), units),
         ...(w.program_assignments
           ? {

@@ -101,6 +101,20 @@
   font-weight: var(--ct-weight-button);
 }
 .doneTick { font-weight: var(--ct-weight-button); }
+/* Being logged right now: a blue "● In progress" chip (blue = info); the word carries the meaning. */
+.inProgressNote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ct-space-1);
+  margin: 0 var(--ct-space-2) var(--ct-space-1);
+  padding: 2px var(--ct-space-2);
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-drop);
+  color: var(--ct-magenta-deep);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.inProgressDot { width: 7px; height: 7px; border-radius: var(--ct-radius-pill); background: currentColor; }
 .todayTag {
   margin-left: var(--ct-space-1);
   padding: 0 var(--ct-space-1);
