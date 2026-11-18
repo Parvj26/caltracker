@@ -893,3 +893,52 @@
 .setRow[data-layout='stacked'] .fieldBox, .setRow[data-layout='stacked'] .stepper { display: flex; flex: 1; min-width: 0; }
 .setRow[data-layout='stacked'] .fieldBox .narrow { flex: 1; width: 0; min-width: 0; text-align: center; font-size: 18px; font-weight: var(--ct-weight-button); }
 .setRow[data-layout='stacked'] .unit { display: none; }
+
+/* ---------- Wide screens: two panes (approved "Wide workout builder" mockup) ----------
+   When the builder has at least 1100 px (a desktop window of about 1360 px or more), the exercises are compact rows
+   on the left and the picked one's full editor fills the right. Narrower (iPad, small laptops, the program's day
+   sheet) keeps the cards above; iPhones keep their own list. A container query, so it follows the builder's own
+   width, not the window's. */
+.layout { container: builder-layout / inline-size; display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
+.panes { display: none; }
+@container builder-layout (min-width: 1100px) {
+  .details { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; max-width: none; }
+  .details > :not(:nth-child(-n + 2)) { grid-column: 1 / -1; }
+  /* One line tall, like the name box (it still grows when dragged). */
+  .details textarea { height: 50px; min-height: 50px; }
+  .wideList { display: none; }
+  .panes { display: grid; grid-template-columns: 460px minmax(0, 1fr); align-items: start; }
+  /* The list sticks under the top bar (--bar-h, measured) and scrolls on its own; the editor scrolls with the page. */
+  .paneList {
+    position: sticky;
+    top: var(--bar-h, 80px);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - var(--bar-h, 80px));
+    padding: var(--ct-space-4) var(--ct-space-4-5) var(--ct-space-6) 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: var(--ct-border-width-card) solid var(--ct-border);
+  }
+  .paneList > .sectionHeader { padding-bottom: var(--ct-space-2); }
+  .paneList > .sectionHeader:first-child { padding-top: 0; }
+  .paneList > .phoneRow + .phoneRow { margin-top: var(--ct-space-2-5); }
+  .paneList > .switchRow { margin: 0; min-height: 44px; }
+  .paneRow { scroll-margin: var(--ct-space-3); }
+  .paneRow .foldText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+  .paneRow .foldTitle { overflow: hidden; font-weight: var(--ct-weight-section-heading); text-overflow: ellipsis; white-space: nowrap; }
+  .paneRow .foldLine { overflow: hidden; font-size: 14px; color: var(--ct-ink-muted); text-overflow: ellipsis; white-space: nowrap; }
+  .paneRow .foldError { font-size: 14px; font-weight: var(--ct-weight-button); color: var(--ct-danger); }
+  .paneRow:hover { border-color: var(--ct-ink-muted); }
+  .paneRow[aria-pressed='true'] { border: 2px solid var(--ct-ink); background: var(--ct-surface); }
+  .paneRow:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+
+  .paneEditor { min-width: 0; padding: var(--ct-space-4) 0 var(--ct-space-6) var(--ct-space-6); scroll-margin-top: var(--bar-h, 80px); }
+  .block[data-pane] { gap: var(--ct-space-4); padding: 0; border: 0; border-radius: 0; }
+  .block[data-pane] .blockHeader { flex-wrap: nowrap; }
+  .block[data-pane] .blockHeader .blockNumber { flex: none; min-width: 34px; height: 34px; }
+  .block[data-pane] .blockTitle { flex: 1; min-width: 0; font-size: 24px; font-weight: var(--ct-weight-button); }
+  .block[data-pane] .blockTitle .swapName { font-size: inherit; font-weight: inherit; }
+  .block[data-pane] .exerciseHeader .blockTools { margin-left: auto; }
+  .paneMenu { flex: none; }
+}

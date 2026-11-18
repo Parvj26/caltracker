@@ -102,6 +102,8 @@ const makeId = () => crypto.randomUUID();
 const NO_PREFS: Record<string, ExercisePrefs> = {};
 /** The most exercises "+ Exercise" adds in one go (a workout holds up to 30 blocks). */
 const STRAIGHT_PICK_MAX = 10;
+/** The builder's width from which it shows two panes (keep in step with @container builder-layout in the CSS). */
+const WIDE_MIN = 1100;
 
 /**
  * A new library workout moves to /workouts/[id] after its first save, which mounts a fresh builder. This remembers
@@ -218,6 +220,15 @@ export function WorkoutBuilder({
   const [pending, startTransition] = useTransition();
   const saveBarRef = useRef<HTMLDivElement>(null);
   useKeyboardOffset(saveBarRef);
+  // The top bar's height as --bar-h, so the wide screens' exercise list sticks just under it.
+  useEffect(() => {
+    const bar = saveBarRef.current;
+    const root = builderRef.current;
+    if (!bar || !root || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => root.style.setProperty('--bar-h', `${bar.getBoundingClientRect().height}px`));
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, []);
   const dirty = useMemo(() => JSON.stringify(doc) !== savedJson, [doc, savedJson]);
   // The workspace's remembered choices per exercise: read with the page, then again after each save. A ref, not
   // state: the picker may hold an onPick from an earlier render.
@@ -528,6 +539,37 @@ export function WorkoutBuilder({
               ? 'Add an option to the pick-one group'
               : '';
 
+  // Wide screens: the card shown in the right pane. It is openId when that card still exists; otherwise (it was
+  // removed, or a Superset switch gave its exercise a new id) the card now at the same place, so a removal selects a
+  // neighbour and nothing selected means the first card.
+  const [paneAt, setPaneAt] = useState(0);
+  const openAt = cards.findIndex((c) => c.key === openId);
+  const selectedAt = cards.length === 0 ? -1 : openAt >= 0 ? openAt : Math.min(paneAt, cards.length - 1);
+  if (selectedAt >= 0 && selectedAt !== paneAt) setPaneAt(selectedAt);
+  const selectedItem = selectedAt >= 0 ? items.find((it) => it.kind === 'card' && it.card.key === cards[selectedAt]!.key) : undefined;
+  const paneEditorRef = useRef<HTMLElement>(null);
+  // Whether the two panes show (the builder has WIDE_MIN px or more, as the container query in builder.module.css).
+  // Only then is the right pane's editor rendered, so no hidden second copy of an exercise's boxes sits in the page.
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const el = layoutRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setWide((entry?.contentRect.width ?? 0) >= WIDE_MIN));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const selectCard = (key: string) => {
+    setOpenId(key);
+    // The page may be scrolled down a long exercise: show the new one from its top.
+    const pane = paneEditorRef.current;
+    const bar = saveBarRef.current;
+    if (pane && bar && pane.getBoundingClientRect().top < bar.getBoundingClientRect().bottom) {
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: window.scrollY + pane.getBoundingClientRect().top - bar.getBoundingClientRect().bottom, behavior: still ? 'auto' : 'smooth' });
+    }
+  };
+
   const editingAt = editing === null ? -1 : cards.findIndex((c) => c.key === editing);
   const editingItem = editingAt >= 0 ? items.find((it) => it.kind === 'card' && it.card.key === editing) : undefined;
 
@@ -552,13 +594,16 @@ export function WorkoutBuilder({
 
   return (
     // data-no-menu-button: on an iPhone the tab bar would sit on the builder's own bottom bar (More, + Exercise).
-    <div ref={builderRef} className={styles.builder} data-no-menu-button="">
+    <div ref={builderRef} className={styles.builder} data-no-menu-button="" data-workout-builder="">
       {mode !== 'library' ? (
         <p className={styles.modeBanner}>
           {mode.clientName}&apos;s workout for {formatDay(mode.date)}. Changes here don&apos;t touch your library.
         </p>
       ) : null}
 
+      {/* The layout container: wide screens (see .panes) put the name and notes side by side, then show the list and
+          one exercise side by side. */}
+      <div ref={layoutRef} className={styles.layout}>
       <div className={styles.details}>
         <TextField
           label="Workout name"
@@ -597,7 +642,7 @@ export function WorkoutBuilder({
         ))}
       </div>
 
-      {/* iPad and desktop: the cards, with a Superset switch between two exercises. */}
+      {/* iPad and smaller desktops: the cards, with a Superset switch between two exercises. */}
       <div className={cx(styles.blocks, styles.wideList)}>
         {items.map((item) =>
           item.kind === 'section' ? (
@@ -624,6 +669,50 @@ export function WorkoutBuilder({
         )}
         {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
         {blockErrors}
+      </div>
+
+      {/* Wide screens: the exercises as rows on the left (a click picks one), the picked one's editor on the right. */}
+      <div className={styles.panes}>
+        <section aria-label="Exercises" className={styles.paneList}>
+          {items.map((item) =>
+            item.kind === 'section' ? (
+              sectionHeader(item)
+            ) : (
+              <Fragment key={item.card.key}>
+                <PhoneRow
+                  card={item.card}
+                  hasErrors={phoneCardHasErrors(item.card, errors)}
+                  selected={selectedItem?.kind === 'card' && selectedItem.card.key === item.card.key}
+                  onOpen={() => selectCard(item.card.key)}
+                />
+                {item.card.link ? <SupersetSwitch link={item.card.link} variant="switch" /> : null}
+              </Fragment>
+            ),
+          )}
+          {doc.blocks.length === 0 ? <p className={styles.caption}>No exercises yet.</p> : null}
+          {blockErrors}
+        </section>
+        <section ref={paneEditorRef} aria-label="Selected exercise" className={styles.paneEditor}>
+          {!wide ? null : selectedItem?.kind === 'card' ? (
+            <BlockEditor
+              key={selectedItem.card.key}
+              pane
+              block={selectedItem.card.block}
+              {...(selectedItem.card.member !== undefined ? { member: selectedItem.card.member } : {})}
+              badge={selectedItem.card.badge}
+              sections={doc.sections}
+              units={units}
+              errors={errors}
+              actions={actionsFor(selectedItem.card.block.id)}
+              restOff={restOff}
+              siblings={selectedItem.siblings}
+              onMoveTo={(to) => change((d) => moveBlock(d, selectedItem.card.block.id, to))}
+            />
+          ) : (
+            <p className={styles.caption}>Add an exercise to start building this workout.</p>
+          )}
+        </section>
+      </div>
       </div>
 
       {/* iPhone: one row per exercise, a link icon between two; a tap opens the exercise on its own screen. */}

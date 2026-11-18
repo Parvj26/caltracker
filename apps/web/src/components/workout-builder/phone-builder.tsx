@@ -37,18 +37,24 @@ export type Card = {
   link: Link | null;
 };
 
-/** iPhone: one compact row per exercise (badge, name, "3 × 12 @ 35 lb · rest 1:30", ›); a tap opens its editor. */
-export function PhoneRow({ card, hasErrors, onOpen }: { card: Card; hasErrors: boolean; onOpen: () => void }) {
+/**
+ * iPhone: one compact row per exercise (badge, name, "3 × 12 @ 35 lb · rest 1:30", ›); a tap opens its editor.
+ * Wide screens use the same row in the left pane: `selected` makes it a pressed/unpressed button that shows the
+ * exercise in the right pane (no chevron, no window).
+ */
+export function PhoneRow({ card, hasErrors, onOpen, selected }: { card: Card; hasErrors: boolean; onOpen: () => void; selected?: boolean }) {
+  const pane = selected !== undefined;
   return (
     <button
       type="button"
-      className={styles.phoneRow}
+      className={cx(styles.phoneRow, pane && styles.paneRow)}
       data-superset={card.member !== undefined ? '' : undefined}
       data-card-id={card.key}
-      aria-haspopup="dialog"
+      aria-haspopup={pane ? undefined : 'dialog'}
+      aria-pressed={pane ? selected : undefined}
       aria-label={`${card.title}: ${card.line}`}
       onClick={onOpen}
-      data-ph-capture-attribute-label="workout_phone_row"
+      data-ph-capture-attribute-label={pane ? 'workout_pane_row' : 'workout_phone_row'}
     >
       <span className={styles.blockNumber} aria-hidden="true">{card.badge}</span>
       <span className={styles.foldText}>
@@ -56,9 +62,11 @@ export function PhoneRow({ card, hasErrors, onOpen }: { card: Card; hasErrors: b
         <span className={styles.foldLine}>{card.line}</span>
         {hasErrors ? <span className={styles.foldError}>Needs a fix</span> : null}
       </span>
-      <span className={styles.phoneRowChevron} aria-hidden="true">
-        <Icon name="chevron" size={20} />
-      </span>
+      {pane ? null : (
+        <span className={styles.phoneRowChevron} aria-hidden="true">
+          <Icon name="chevron" size={20} />
+        </span>
+      )}
     </button>
   );
 }
