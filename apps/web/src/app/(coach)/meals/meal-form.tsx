@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   COACH_MEAL_LIMITS,
   COACH_MEAL_PHOTO_BUCKET,
@@ -17,6 +17,7 @@ import { Button, ButtonLink, ErrorText, PageHeader, PhoneActionBar, notAContact,
 import { cx } from '@/components/ui/cx';
 import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { saveCoachMeal, type CoachMealInput } from './actions';
 import { mealFormDirty, type MealFormSnapshot } from './form-dirty';
 import { mealHref, mealInitial, mealsListHref } from './meal-labels';
@@ -34,7 +35,6 @@ export type MealFormValue = {
 
 const LABEL: Record<MacroKey, string> = { calories: 'Calories (kcal)', protein: 'Protein (g)', carbs: 'Carbs (g)', fat: 'Fat (g)' };
 const toText = (n: number | null) => (n === null ? '' : String(n));
-export const DISCARD_CONFIRM = 'Discard changes?';
 
 async function sizeOf(blob: Blob): Promise<{ width: number; height: number }> {
   const bitmap = await createImageBitmap(blob);
@@ -108,8 +108,6 @@ function MealFormFields({
   const [savedFile, setSavedFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const discardRef = useRef<HTMLDialogElement>(null);
-  const discardTitleId = useId();
 
   // The local preview's link is freed when it is replaced and when the form goes away.
   const previewRef = useRef<string | null>(null);
@@ -176,8 +174,11 @@ function MealFormFields({
       setBaseline({ ...current, newFile: false });
       setSavedFile(file);
       // Replace: Back from the saved meal goes to the list, not to an empty New meal form. The search (?q=) is kept.
-      if (isNew) router.replace(mealHref(initial.id, new URLSearchParams(window.location.search).get('q')));
-      else router.refresh();
+      if (isNew) {
+        // Nothing left to lose: take the guard off before leaving the form.
+        await guard.release();
+        router.replace(mealHref(initial.id, new URLSearchParams(window.location.search).get('q')));
+      } else router.refresh();
     } catch (err) {
       setError(err instanceof PhotoError ? errorFromText(err.message, 'meal_photo_failed') : { code: 'meal_save_failed' });
     } finally {
@@ -188,10 +189,14 @@ function MealFormFields({
   const current: MealFormSnapshot = { name, macroText, ingredients, howTo, photoPath: stored?.path ?? null, newFile: file !== null && file !== savedFile };
   const dirty = mealFormDirty(baseline, current);
 
-  /** Back to the list without saving; asks first if anything was typed. */
-  function cancel() {
-    if (dirty) discardRef.current?.showModal();
-    else router.push(listHref());
+  // Unsaved changes: ‹ Back, the menu's links, the browser's Back and closing the tab all ask "Discard changes?" once.
+  const guard = useUnsavedGuard(dirty, { parentHref: backTo(query) });
+
+  /** Back without saving; asks first if anything was typed. */
+  async function cancel() {
+    if (!(await guard.confirm())) return;
+    await guard.release();
+    router.push(listHref());
   }
 
   const nameField = (
@@ -224,11 +229,6 @@ function MealFormFields({
         back={{
           href: backTo(query),
           label: isNew ? 'Meals' : initial.name,
-          onClick: (e) => {
-            if (!dirty) return;
-            e.preventDefault();
-            discardRef.current?.showModal();
-          },
         }}
       />
 
@@ -312,7 +312,7 @@ function MealFormFields({
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <PhoneActionBar status={status} label="Meal actions">
         {isNew || dirty ? (
-          <Button variant="secondary" onClick={cancel} disabled={pending} phSafe>
+          <Button variant="secondary" onClick={() => void cancel()} disabled={pending} phSafe>
             Cancel
           </Button>
         ) : (
@@ -331,25 +331,7 @@ function MealFormFields({
         ) : null}
       </PhoneActionBar>
 
-      <dialog ref={discardRef} className={styles.dialog} aria-labelledby={discardTitleId}>
-        <h2 id={discardTitleId} className={styles.dialogTitle}>
-          {DISCARD_CONFIRM}
-        </h2>
-        <div className={styles.dialogActions}>
-          <Button variant="secondary" onClick={() => discardRef.current?.close()}>
-            Keep editing
-          </Button>
-          <Button
-            onClick={() => {
-              discardRef.current?.close();
-              router.push(listHref());
-            }}
-          >
-            Discard
-          </Button>
-        </div>
-      </dialog>
-
+      {guard.prompt}
     </form>
   );
 }

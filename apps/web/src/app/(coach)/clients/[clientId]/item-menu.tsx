@@ -1,6 +1,5 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import Link from 'next/link';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { IsoDateSchema, quickDays, scheduleDateError } from '@caltracker/shared';
@@ -15,6 +14,7 @@ import { cx } from '@/components/ui/cx';
 import sheet from '@/components/ui/sheet.module.css';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
+import { openLayer, useBackLayer } from '@/lib/open-layer';
 
 const focusSoon = (domId: string) => requestAnimationFrame(() => document.getElementById(domId)?.focus());
 
@@ -48,6 +48,8 @@ export function ItemMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -255,7 +257,7 @@ export function MoveDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
+    if (dialog) openLayer(dialog, { noKeyboardOnTouch: true });
     // The item remounts on its new day: put focus back on it there.
     return () => {
       focusSoon(calendarItemDomId(entry.id));
@@ -317,7 +319,7 @@ export function DeleteDialog({
   const bodyId = useId();
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
     // The menu that opened this is gone: back to the item if it is still there, else to its day's "+".
     return () => {
       requestAnimationFrame(() =>

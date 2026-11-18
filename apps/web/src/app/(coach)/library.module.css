@@ -1,15 +1,35 @@
-/* Library: the sidebar pop-up, the iPhone sheet and the Workouts | Exercises | Programs row. Colours only via var(--ct-*). */
-.backdrop {
-  position: fixed;
-  z-index: 1;
-  inset: 0;
-  background: color-mix(in srgb, var(--ct-ink) 28%, transparent);
+/* Library: the desktop sidebar's fold-out, the iPad rail's menu, the iPhone sheet and the Workouts | Exercises |
+   Programs row. Colours only via var(--ct-*). */
+
+/* Desktop (labelled sidebar): Library opens in place, its three pages indented under it. */
+.caret { display: none; margin-left: auto; font-size: 12px; }
+.subnav { display: none; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.subItem {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  margin-left: 14px;
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-size: 14px;
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+}
+.subItem:hover { background: var(--ct-surface); }
+.subItem:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: -2px; }
+.subItemOn, .subItemOn:hover { background: var(--ct-ink); color: var(--ct-bg); }
+@media (min-width: 1200px) {
+  .caret { display: inline; }
+  .subnav { display: flex; }
+  .libraryButton[aria-current] { font-weight: 800; }
 }
 
+/* iPad (icon rail): a small menu beside the Library icon. No dimming: the page stays as it is. */
 .popover {
   position: fixed;
-  z-index: 2;
-  width: min(260px, calc(100vw - 100px));
+  z-index: 30;
+  width: min(240px, calc(100vw - 100px));
   box-sizing: border-box;
   padding: var(--ct-space-2);
   border: var(--ct-border-width-secondary-button) solid var(--ct-ink);

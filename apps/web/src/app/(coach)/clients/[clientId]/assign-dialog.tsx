@@ -1,6 +1,5 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   IsoDateSchema,
@@ -25,6 +24,7 @@ import { assignProgram } from './actions';
 import type { PickerProgram } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
+import { openLayer } from '@/lib/open-layer';
 
 export type ExistingWorkout = { date: IsoDate; name: string };
 
@@ -124,7 +124,7 @@ export function AssignDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
+    if (dialog) openLayer(dialog, { noKeyboardOnTouch: true });
     return () => {
       if (opener?.isConnected) opener.focus();
     };

@@ -7,6 +7,7 @@ import { Button, ErrorText } from '@/components/ui';
 import { deleteProgram } from '../actions';
 import styles from '../programs.module.css';
 import { markUndone } from '@/lib/analytics/client';
+import { openRef } from '@/lib/open-layer';
 
 export type DeleteProgramHandle = { open: () => void };
 
@@ -37,7 +38,7 @@ export function DeleteProgram({ id, name, handle }: { id: string; name: string; 
   useImperativeHandle(handle, () => ({
     open: () => {
       setError(null);
-      dialogRef.current?.showModal();
+      openRef(dialogRef);
     },
   }));
 

@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import type { UntickedRow } from '@caltracker/shared';
-import { showDialog } from '@/components/calendar/show-dialog';
 import { Button } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './session.module.css';
+import { openLayer } from '@/lib/open-layer';
 
 const sets = (n: number) => `${n} ${n === 1 ? 'set' : 'sets'}`;
 
@@ -16,7 +16,7 @@ function LoggerSheet({ title, onClose, children }: { title: string; onClose: () 
   useEffect(() => {
     const dialog = ref.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialog) showDialog(dialog);
+    if (dialog) openLayer(dialog);
     return () => {
       if (opener?.isConnected) opener.focus();
     };

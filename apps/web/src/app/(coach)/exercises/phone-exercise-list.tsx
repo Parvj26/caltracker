@@ -21,6 +21,7 @@ import { matchesListFilter, sheetFilterCount } from './list-filter';
 import { clearListReturn, readListReturn, saveListReturn } from './list-return';
 import { useFavourites } from './use-favourites';
 import styles from './exercises.module.css';
+import { openRef } from '@/lib/open-layer';
 
 const PAGE_SIZE = 50;
 /** "body only" -> "Body only" (the library stores them in lower case). */
@@ -128,7 +129,7 @@ export function PhoneExerciseList({ workspaceId, initialQuery, initialSource, tr
             type="button"
             className={cx(styles.pill, styles.pillFilters)}
             aria-haspopup="dialog"
-            onClick={() => sheetRef.current?.showModal()}
+            onClick={() => openRef(sheetRef)}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
               <path d="M4 6h16M7 12h10M10 18h4" />

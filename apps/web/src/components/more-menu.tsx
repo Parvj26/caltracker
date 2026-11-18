@@ -4,6 +4,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent
 import { shouldOpenUp } from '@/components/calendar/menu-placement';
 import { cx } from '@/components/ui/cx';
 import styles from './more-menu.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 export type MoreMenuItem = {
   label: string;
@@ -35,6 +36,8 @@ export function MoreMenu({
   className?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

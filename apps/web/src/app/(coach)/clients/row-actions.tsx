@@ -22,7 +22,7 @@ export function RemoveClientButton({ userId, name, focusAfterId = 'clients-headi
   );
 }
 
-/** The same "Remove …?" question, opened from elsewhere (the client page's ⋯ menu) with `dialogRef.current.showModal()`. */
+/** The same "Remove …?" question, opened from elsewhere (the client page's ⋯ menu) with `openRef(dialogRef)`. */
 export function RemoveClientDialog({ userId, name, focusAfterId, dialogRef }: { userId: string; name: string; focusAfterId: string; dialogRef: RefObject<HTMLDialogElement | null> }) {
   const who = name || 'this client';
   return (

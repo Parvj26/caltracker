@@ -5,6 +5,7 @@ import { SECTION_PRESETS } from '@caltracker/shared';
 import { Button, notAContact } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './builder.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 type Props = {
   /** True when the workout already has the most sections it can hold. */
@@ -20,6 +21,8 @@ type Props = {
 /** "+ Section": a small panel with the preset names and a "Custom…" text box. */
 export function AddSectionMenu({ full, onAdd, popover = false, trigger, triggerClassName }: Props) {
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const [custom, setCustom] = useState(false);
   const [name, setName] = useState('');
 

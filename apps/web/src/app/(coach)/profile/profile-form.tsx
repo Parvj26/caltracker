@@ -6,6 +6,7 @@ import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, PhoneActionBar, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { saveProfile } from './actions';
 import styles from './profile.module.css';
 
@@ -36,6 +37,9 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
 
   const set = <K extends keyof Values>(key: K, value: Values[K]) => setValues((v) => ({ ...v, [key]: value }));
   const dirty = (Object.keys(values) as (keyof Values)[]).some((k) => values[k] !== saved[k]);
+  // Unsaved changes: leaving (a link, Back, closing the tab) asks "Discard changes?" first.
+  const guard = useUnsavedGuard(dirty, { parentHref: '/home' });
+
   const bioCount = characterCount(values.bio.replace(/\r\n?/g, '\n').trim());
   const bioOver = bioCount > BIO_MAX_LENGTH;
 
@@ -152,6 +156,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
           All changes saved
         </p>
       )}
+      {guard.prompt}
     </form>
   );
 }

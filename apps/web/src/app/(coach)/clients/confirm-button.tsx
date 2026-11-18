@@ -6,6 +6,7 @@ import { Button, ErrorText } from '@/components/ui';
 import type { ErrorCode } from '@caltracker/shared';
 import type { SimpleOutcome } from './actions';
 import styles from './clients.module.css';
+import { openRef } from '@/lib/open-layer';
 
 type Props = {
   /** Visible label on the row button, e.g. "Remove". */
@@ -30,13 +31,13 @@ export type ConfirmHandle = { open: () => void };
 
 type DialogProps = Pick<Props, 'title' | 'body' | 'confirmLabel' | 'onConfirm' | 'focusAfterId'> & {
   dialogRef: RefObject<HTMLDialogElement | null>;
-  /** Clears an earlier error; the opener calls it before showModal(). */
+  /** Clears an earlier error; the opener calls it before opening it. */
   resetRef?: RefObject<(() => void) | null>;
 };
 
 /**
  * The asking part on its own: a native modal dialog (focus is trapped and Escape closes it) that the caller opens with
- * `dialogRef.current.showModal()`. ConfirmButton uses it, and so does the client page's "⋯ > Remove client".
+ * `openRef(dialogRef)`. ConfirmButton uses it, and so does the client page's "⋯ > Remove client".
  */
 export function ConfirmDialog({ title, body, confirmLabel, onConfirm, focusAfterId, dialogRef, resetRef }: DialogProps) {
   const router = useRouter();
@@ -98,7 +99,7 @@ export function ConfirmButton({ label, ariaLabel, title, body, confirmLabel, onC
 
   const open = () => {
     resetRef.current?.();
-    dialogRef.current?.showModal();
+    openRef(dialogRef);
   };
   useImperativeHandle(handle, () => ({ open }));
 

@@ -3,6 +3,7 @@
 import { useId, useRef } from 'react';
 import { Button } from '@/components/ui';
 import styles from './profile.module.css';
+import { openRef } from '@/lib/open-layer';
 
 /**
  * Sign out, at the foot of Profile. It asks first, in a native modal dialog (a bottom sheet on an iPhone): signing out
@@ -15,7 +16,7 @@ export function SignOut() {
   const bodyId = useId();
   return (
     <>
-      <Button variant="secondary" className={styles.signOutButton} onClick={() => dialogRef.current?.showModal()} data-ph-capture-attribute-label="sign_out_open" phSafe>
+      <Button variant="secondary" className={styles.signOutButton} onClick={() => openRef(dialogRef)} data-ph-capture-attribute-label="sign_out_open" phSafe>
         Sign out
       </Button>
       <dialog ref={dialogRef} className={styles.signOutDialog} aria-labelledby={titleId} aria-describedby={bodyId}>

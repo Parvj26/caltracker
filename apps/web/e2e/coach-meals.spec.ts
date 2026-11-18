@@ -161,7 +161,7 @@ test('Cancel leaves the meal form, asking "Discard changes?" only after typing',
   await page.goto('/meals/new');
   await form.getByLabel('Name').fill(track(`E2E Unsaved ${unique()}`));
   await form.getByRole('button', { name: 'Cancel' }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('alertdialog', { name: 'Discard changes?' });
   await expect(dialog).toContainText('Discard changes?');
   await dialog.getByRole('button', { name: 'Keep editing' }).click();
   await expect(dialog).toBeHidden();
@@ -169,7 +169,7 @@ test('Cancel leaves the meal form, asking "Discard changes?" only after typing',
   await expect(form.getByLabel('Name')).not.toHaveValue('');
 
   await form.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Discard' }).click();
+  await page.getByRole('alertdialog', { name: 'Discard changes?' }).getByRole('button', { name: 'Discard' }).click();
   await expect(page).toHaveURL(/\/meals$/);
 });
 
@@ -305,8 +305,13 @@ test.describe('on an iPhone', () => {
 
     // Back with something typed asks first, like Cancel.
     await form.getByLabel('Name').fill(track(`E2E Unsaved ${unique()}`));
+    // The phone's own Back asks too, and Keep editing stays on the form.
+    await page.goBack();
+    await page.getByRole('alertdialog', { name: 'Discard changes?' }).getByRole('button', { name: 'Keep editing' }).click();
+    await expect(page).toHaveURL(/\/meals\/new$/);
+    await expect(form.getByLabel('Name')).not.toHaveValue('');
     await form.getByRole('link', { name: 'Back to Meals' }).click();
-    const dialog = page.getByRole('dialog');
+    const dialog = page.getByRole('alertdialog', { name: 'Discard changes?' });
     await expect(dialog).toContainText('Discard changes?');
     await dialog.getByRole('button', { name: 'Discard' }).click();
     await expect(page).toHaveURL(/\/meals$/);

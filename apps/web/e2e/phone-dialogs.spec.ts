@@ -1,7 +1,7 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
-import { demoWorkspace, seedLibraryWorkout, unique } from './assign-helpers';
+import { demoWorkspace, freshClient, seedLibraryWorkout, unique } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // Phone fixes, batch 2: cramped windows and forms, small tap targets and caption size (2026-11-11 phone audit).
@@ -40,12 +40,18 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
 
   test('Assign fills the screen: the client list gets the room and the buttons stay at the bottom', async ({ page }) => {
     const name = `Phone assign ${unique()}`;
-    created.workouts.push(await seedLibraryWorkout(admin, await demoWorkspace(admin), name));
+    const workspaceId = await demoWorkspace(admin);
+    created.workouts.push(await seedLibraryWorkout(admin, workspaceId, name));
+    // Four clients of its own: the list's height depends on how many it shows, and a CI shard's fresh database has
+    // only a few (it failed there with three rows, not because the list was squeezed).
+    const last = `Room${unique()}`;
+    for (const first of ['Ana', 'Ben', 'Cy', 'Di']) created.users.push(await freshClient(admin, workspaceId, first, last));
     await signInAsCoach(page);
     await page.goto(`/workouts?q=${encodeURIComponent(name)}`);
     await page.getByRole('button', { name: `Assign ${name}`, exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Assign ${name}` });
-    await expect(dialog.getByRole('list', { name: 'Clients' })).toBeVisible();
+    await dialog.getByLabel('Search clients').fill(last);
+    await expect(dialog.getByRole('list', { name: 'Clients' }).getByRole('listitem')).toHaveCount(4);
     // Measure where the sheet settles, not mid slide-in.
     await dialog.evaluate((d) => Promise.all(d.getAnimations().map((a) => a.finished)));
 

@@ -8,6 +8,7 @@ import { failureCode } from '@/lib/action-errors';
 import { duplicateProgram } from '../actions';
 import { DeleteProgram, type DeleteProgramHandle } from './delete-program';
 import styles from '../programs.module.css';
+import { useBackLayer } from '@/lib/open-layer';
 
 /**
  * The program header's ⋯ menu: Duplicate (makes "<name> (copy)" and opens it) and Delete program (asks first). Assign
@@ -16,6 +17,8 @@ import styles from '../programs.module.css';
 export function ProgramMenu({ id, name }: { id: string; name: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // Back (and iOS swipe-back) closes the menu, not the page.
+  useBackLayer(open, () => setOpen(false));
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
   const menuId = useId();
