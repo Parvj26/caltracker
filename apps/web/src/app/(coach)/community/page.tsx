@@ -24,7 +24,7 @@ export default async function CommunityPage() {
   if (!data) {
     return (
       <div className={styles.page}>
-        <h1 id="community-title" tabIndex={-1} className={styles.title}>Community</h1>
+        <h1 className={styles.title}>Community</h1>
         <p className={styles.caption}>Your community isn’t set up yet. Please contact support.</p>
       </div>
     );
@@ -34,7 +34,7 @@ export default async function CommunityPage() {
     <div className={styles.page}>
       <header className={styles.titleRow}>
         <div className={styles.titleBlock}>
-          <h1 id="community-title" tabIndex={-1} className={styles.title}>Community</h1>
+          <h1 className={styles.title}>Community</h1>
           <p className={styles.caption}>A private space for you and your clients. Members only see each other’s name and photo.</p>
         </div>
         {/* Only when something needs looking at; /community/reports itself stays reachable. */}

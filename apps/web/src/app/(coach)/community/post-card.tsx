@@ -112,7 +112,7 @@ export function PostCard({
       body: 'It goes for everyone in the community, with its photos, comments and reactions.',
       confirmLabel: 'Delete post',
       onConfirm: () => deletePost(post.id),
-      focusAfterId: 'community-title',
+      historyId: `delete-post-${post.id}`,
     });
   const open = showComments || writing;
   const count = post.comments.length;
@@ -222,7 +222,7 @@ export function PostCard({
                           body: `${c.authorName}’s comment goes for everyone.`,
                           confirmLabel: 'Delete comment',
                           onConfirm: () => deleteComment(c.id),
-                          focusAfterId: `post-${post.id}`,
+                          historyId: `delete-comment-${c.id}`,
                         });
                       },
                     },

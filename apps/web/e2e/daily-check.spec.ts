@@ -342,7 +342,7 @@ test('Clients search filters as you type, chips filter, and sort reorders', asyn
   await search.fill('training tina');
   await expect.poll(names).toEqual(['Tina Training']);
   await search.fill('zzz');
-  await expect(table.getByText('No clients match.')).toBeVisible();
+  await expect(table.getByText('No clients match “zzz”')).toBeVisible();
   await search.fill('');
 
   // Chips are real toggle buttons.

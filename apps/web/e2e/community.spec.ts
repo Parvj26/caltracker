@@ -179,21 +179,27 @@ test('the coach posts with a photo, a client reacts and comments live, and the c
   // Delete the client's comment from its own ⋯ menu; saying no first keeps it.
   await expect(mine.getByRole('button', { name: 'Delete comment' })).toHaveCount(0);
   const commentMenu = mine.getByRole('button', { name: 'More for Sam Tester’s comment' });
-  // The app's own dialog asks (not the browser's confirm box).
+  // The app's own dialog asks (not the browser's confirm box), and Back closes it without leaving the page.
   await commentMenu.click();
   await mine.getByRole('menuitem', { name: 'Delete comment…' }).click();
-  await page.getByRole('dialog', { name: 'Delete this comment?' }).getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alertdialog', { name: 'Delete this comment?' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/community$/);
+  await commentMenu.click();
+  await mine.getByRole('menuitem', { name: 'Delete comment…' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete this comment?' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect(mine.getByText('Glad to be here!')).toBeVisible();
   await commentMenu.click();
   await mine.getByRole('menuitem', { name: 'Delete comment…' }).click();
-  await page.getByRole('dialog', { name: 'Delete this comment?' }).getByRole('button', { name: 'Delete comment' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete this comment?' }).getByRole('button', { name: 'Delete comment' }).click();
   await expect(mine.getByText('Glad to be here!')).toHaveCount(0);
 
   // Delete the post (and its photo).
   await mine.getByRole('button', { name: 'More for this post' }).click();
   await mine.getByRole('menuitem', { name: 'Delete post…' }).click();
-  await page.getByRole('dialog', { name: 'Delete this post?' }).getByRole('button', { name: 'Delete post' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete this post?' }).getByRole('button', { name: 'Delete post' }).click();
   await expect(mine).toHaveCount(0);
   const gone = await admin.from('community_post_images').select('id').eq('post_id', postId);
   expect(gone.data).toEqual([]);
@@ -219,7 +225,7 @@ test('a client reports a post and the coach removes it from the Reports queue', 
   await expect(card).toContainText('Lee Tester reported Kim Tester’s post');
   await expect(card).toContainText('Spam or selling');
   await card.getByRole('button', { name: 'Remove post' }).click();
-  await page.getByRole('dialog', { name: 'Delete this post?' }).getByRole('button', { name: 'Delete post' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete this post?' }).getByRole('button', { name: 'Delete post' }).click();
   await expect(card).toHaveCount(0);
   await expect(page.getByText(`Kim Tester’s post: removed`).first()).toBeVisible();
 
@@ -246,7 +252,7 @@ test('the coach removes a client from the community only, then adds them back', 
   const max = await newClient('Max');
   await openCommunity(page);
   await page.getByRole('button', { name: 'Remove Max Tester from the community' }).click();
-  await page.getByRole('dialog', { name: 'Remove Max Tester from the community?' }).getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.getByRole('alertdialog', { name: 'Remove Max Tester from the community?' }).getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add Max Tester back to the community' })).toBeVisible();
 
   // Out of the community, still a client.

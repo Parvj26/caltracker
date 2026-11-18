@@ -1,6 +1,5 @@
 'use client';
 
-import { showDialog } from '@/components/calendar/show-dialog';
 import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -27,15 +26,14 @@ import {
   type ClientResult,
 } from '@/app/(coach)/assign/actions';
 import { formatShortDay } from '@/components/calendar/format';
+import { isTouchScreen } from '@/components/calendar/show-dialog';
 import { ReloadButton } from '@/components/reload-button';
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
-import { Button, Chip, ErrorText, type ChipTone, type FieldError } from '@/components/ui';
+import { AdaptiveDialog, Button, Chip, ErrorText, SearchBox, SearchEmpty, useSearchQuery, type AdaptiveDialogHandle, type ChipTone, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
-import sheet from '@/components/ui/sheet.module.css';
 import { failureCode, isStaleDeployError } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
-import { DialogHeader } from './dialog-header';
 import { QuickDayPicker, type QuickDayPickerHandle } from './quick-day-picker';
 import styles from './assign.module.css';
 
@@ -65,9 +63,9 @@ export function AssignButton({ kind, id, name, compact = false }: { kind: 'worko
   return (
     <>
       {compact ? (
-        <button type="button" className={styles.small} aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open">
+        <Button variant="quiet" size="compact" aria-label={`Assign ${name}`} onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open">
           Assign
-        </button>
+        </Button>
       ) : (
         <Button onClick={() => setOpen(true)} data-ph-capture-attribute-label="assign_open" data-ph-safe="">
           Assign {kind}
@@ -118,7 +116,8 @@ export function AssignToClientsDialog({
   onClose: () => void;
 }) {
   const today = useLocalToday();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [touch] = useState(isTouchScreen);
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const titleId = useId();
   const listId = useId();
   const dateInputId = useId();
@@ -130,12 +129,13 @@ export function AssignToClientsDialog({
   const verb = isCopy ? 'Copied' : 'Assigned';
   const [targets, setTargets] = useState<AssignTargets | null>(null);
   const [loadError, setLoadError] = useState<ErrorCode | null>(null);
-  const [query, setQuery] = useState('');
+  const { query, setQuery, debounced } = useSearchQuery();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(preselect));
   const [freeDay, setFreeDay] = useState(false);
-  const [date, setDate] = useState<string>(() =>
+  const [initialDate] = useState<string>(() =>
     isCopy && source.date ? copyDefaultDate(source.date, today) : isWorkout ? today : nextMonday(today),
   );
+  const [date, setDate] = useState<string>(initialDate);
   const [results, setResults] = useState<ReadonlyMap<string, ClientResult>>(new Map());
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState(false);
@@ -152,16 +152,6 @@ export function AssignToClientsDialog({
     }
     return id;
   };
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    // The client list shows with its search box ready; on a phone the keyboard waits for a tap on it.
-    if (dialog) showDialog(dialog, { noKeyboardOnTouch: true });
-    return () => {
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
 
   useEffect(() => {
     let live = true;
@@ -208,7 +198,7 @@ export function AssignToClientsDialog({
   const clients = targets?.clients ?? [];
   // Next planned day, else a workout missed in the last week (pink, as the Clients list flags it), else Nothing planned.
   const planned = (clientId: string) => planStatus(today, byClient.get(clientId) ?? []);
-  const shown = filterClients(clients, query);
+  const shown = filterClients(clients, debounced);
   const assigned = (id: string) => results.get(id)?.ok === true;
   const chosen = clients.filter((c) => selected.has(c.id) && !assigned(c.id));
   const clashing = chosen.map((c) => ({ client: c, clashes: clashesFor(c.id) })).filter((x) => x.clashes.length > 0);
@@ -245,6 +235,7 @@ export function AssignToClientsDialog({
       // Earlier successes count too, so the summary covers the whole dialog.
       const all = [...next.values()];
       if (outcome.results.every((r) => r.ok)) {
+        await dialogRef.current?.close();
         onDone(assignSummary(source.name, all, verb));
         return;
       }
@@ -262,6 +253,12 @@ export function AssignToClientsDialog({
   }
 
   const n = chosen.length;
+  // Picked clients or a day but not sent yet: closing asks "Discard changes?" first.
+  const startSelected = new Set(preselect);
+  const dirty =
+    results.size === 0 &&
+    (selected.size !== startSelected.size || [...selected].some((id) => !startSelected.has(id)) || date !== initialDate || freeDay);
+  const assignBlocked = n === 0 ? 'Pick at least 1 client' : dateError ?? (missingProgram ? 'This program no longer exists' : null);
   const action = isCopy ? 'Copy' : 'Assign';
   const label = pending
     ? `${isCopy ? 'Copying' : 'Assigning'}…`
@@ -271,23 +268,44 @@ export function AssignToClientsDialog({
         ? `${action} to ${n} clients`
         : action;
 
+  const footer = (
+    <>
+      {error?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
+      <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
+        {results.size > 0 ? 'Close' : 'Cancel'}
+      </Button>
+      {clashing.length > 0 && !useFreeDay ? (
+        <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
+          Pick another date
+        </Button>
+      ) : null}
+      {clients.length > 0 ? (
+        <Button
+          onClick={() => void assign()}
+          pending={pending}
+          disabled={assignBlocked !== null}
+          disabledReason={assignBlocked ?? undefined}
+          data-ph-capture-attribute-label="assign_save"
+        >
+          {label}
+        </Button>
+      ) : null}
+    </>
+  );
+
   return (
-    <dialog
+    <AdaptiveDialog
       ref={dialogRef}
-      // On an iPhone it fills the screen: the client list takes the spare height and the buttons stay at the bottom.
-      className={cx(calendar.dialog, sheet.sheet)}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-      }}
+      historyId={`assign-${source.kind}-${source.id}`}
+      title={isCopy ? `Copy ${source.name} to…` : `Assign ${source.name}`}
       onClose={onClose}
+      dirty={dirty}
+      discardText={isCopy ? "You haven't copied it yet." : "You picked clients but haven't assigned yet."}
+      busy={pending}
+      noKeyboardOnTouch
+      fullScreenOnPhone
+      footer={footer}
     >
-      <DialogHeader
-        titleId={titleId}
-        title={isCopy ? `Copy ${source.name} to…` : `Assign ${source.name}`}
-        onClose={() => dialogRef.current?.close()}
-        disabled={pending}
-      />
       {isCopy ? (
         <p className={calendar.dialogBody}>
           Copies it as it is now, with your changes, as a separate workout: later program or library edits won&apos;t
@@ -302,16 +320,14 @@ export function AssignToClientsDialog({
         <p className={calendar.dialogBody}>You have no clients yet. Invite one from Clients first.</p>
       ) : (
         <>
-          <label className={calendar.searchLabel}>
-            <span>Search clients</span>
-            <input
-              type="search"
-              className={calendar.input}
-              value={query}
-              aria-controls={listId}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          <SearchBox
+            label="Search clients"
+            value={query}
+            onChange={setQuery}
+            aria-controls={listId}
+            // Ready to type when the list arrives; on a phone the keyboard waits for a tap.
+            autoFocus={!touch}
+          />
           <div className={styles.listHead}>
             <span className={calendar.caption}>{n === 0 ? 'No clients picked' : `${n} picked`}</span>
             {shown.some((c) => !selected.has(c.id) && !assigned(c.id)) ? (
@@ -320,7 +336,7 @@ export function AssignToClientsDialog({
                 className={styles.linkButton}
                 onClick={() => setSelected((s) => new Set([...s, ...shown.filter((c) => !assigned(c.id)).map((c) => c.id)]))}
               >
-                Select all{query.trim() ? ' shown' : ''}
+                Select all{debounced.trim() ? ' shown' : ''}
               </button>
             ) : n > 0 ? (
               <button type="button" className={styles.linkButton} onClick={() => setSelected(new Set())}>
@@ -328,8 +344,12 @@ export function AssignToClientsDialog({
               </button>
             ) : null}
           </div>
-          <ul id={listId} className={cx(styles.clients, sheet.grow)} aria-label="Clients">
-            {shown.length === 0 ? <li className={calendar.caption}>No clients match.</li> : null}
+          <ul id={listId} className={styles.clients} aria-label="Clients">
+            {shown.length === 0 ? (
+              <li>
+                <SearchEmpty things="clients" query={debounced} onClear={() => setQuery('')} className={calendar.caption} />
+              </li>
+            ) : null}
             {shown.map((c) => {
               const result = results.get(c.id);
               const on = selected.has(c.id) && !assigned(c.id);
@@ -428,22 +448,6 @@ export function AssignToClientsDialog({
           <span>{MAYBE_SENT}</span>
         </p>
       ) : null}
-      <div className={cx(calendar.dialogActions, sheet.actions)}>
-        {error?.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
-        <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending} data-ph-capture-attribute-label="assign_cancel" data-ph-safe="">
-          {results.size > 0 ? 'Close' : 'Cancel'}
-        </Button>
-        {clashing.length > 0 && !useFreeDay ? (
-          <Button variant="secondary" onClick={() => dayPicker.current?.openField()} disabled={pending}>
-            Pick another date
-          </Button>
-        ) : null}
-        {clients.length > 0 ? (
-          <Button onClick={() => void assign()} pending={pending} disabled={n === 0 || dateError !== null || missingProgram} data-ph-capture-attribute-label="assign_save">
-            {label}
-          </Button>
-        ) : null}
-      </div>
-    </dialog>
+    </AdaptiveDialog>
   );
 }

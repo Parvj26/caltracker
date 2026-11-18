@@ -8,6 +8,7 @@ describe('colour tokens (design spec section 2)', () => {
       surface: '#F4F4F4',
       surfaceSidebar: '#F6F6F4',
       border: '#EDEDED',
+      borderStrong: '#8A8A8A',
       ink: '#121212',
       inkMuted: 'rgba(18, 18, 18, 0.6)',
       lime: '#C8F169',
@@ -23,5 +24,13 @@ describe('colour tokens (design spec section 2)', () => {
       dangerDeep: '#8C1D18',
       dangerBg: '#FBE9E7',
     });
+  });
+});
+
+describe('web breakpoints (UI rules §1)', () => {
+  it('has phone < 600, tablet 600–1199 and desktop ≥ 1200', async () => {
+    const { breakpoints } = await import('../src/index');
+    expect(breakpoints.tablet).toBe(600);
+    expect(breakpoints.desktop).toBe(1200);
   });
 });

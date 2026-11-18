@@ -24,7 +24,7 @@ export function Members({ communityId, members }: { communityId: string; members
         body: "They stay your client and keep the app; they just won't see the community.",
         confirmLabel: 'Remove',
         onConfirm: () => setMemberRemoved(communityId, m.userId, true),
-        focusAfterId: 'members-title',
+        historyId: `remove-member-${m.userId}`,
       });
       return;
     }
@@ -37,7 +37,7 @@ export function Members({ communityId, members }: { communityId: string; members
 
   return (
     <section className={styles.members} aria-labelledby="members-title">
-      <h2 id="members-title" tabIndex={-1} className={styles.sectionTitle}>
+      <h2 id="members-title" className={styles.sectionTitle}>
         Members ({active.length})
       </h2>
       <ul className={styles.memberList}>

@@ -1,0 +1,77 @@
+/* SearchBox (UI rules §6). Colours and sizes come only from var(--ct-*). See ui.module.css for the layer order. */
+@layer ct-base, ct-ui, ct-shared;
+
+@layer ct-ui {
+.box {
+  position: relative;
+  display: block;
+  min-width: 0;
+  /* The stronger input border, ≥ 3:1 on white and on surface (UI rules §2.8). */
+  --search-border: var(--ct-border-strong);
+}
+.icon {
+  position: absolute;
+  left: var(--ct-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ct-ink-muted);
+  pointer-events: none;
+}
+.input {
+  display: block;
+  width: 100%;
+  height: 48px;
+  margin: 0;
+  padding: 0 48px 0 46px;
+  border: var(--ct-border-width-secondary-button) solid var(--search-border);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  /* 16 px keeps iOS Safari from zooming into the box. */
+  font-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 80ms ease-out, background-color 80ms ease-out;
+}
+.input::placeholder { color: var(--ct-ink-muted); opacity: 1; }
+.clear {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink-muted);
+  cursor: pointer;
+}
+.empty { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--ct-space-2); color: var(--ct-ink-muted); }
+.emptyClear {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.count { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+}
+
+/* States sit outside the layer, so they beat a page's plain class. */
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.clear:hover { color: var(--ct-ink); }
+.clear:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: -2px; }
+.emptyClear:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }

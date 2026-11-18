@@ -27,7 +27,7 @@ export function ReportActions({ reportId, kind }: { reportId: string; kind: 'pos
             body: `It goes for everyone in the community.`,
             confirmLabel: `Delete ${kind}`,
             onConfirm: () => resolveReport(reportId, 'removed'),
-            focusAfterId: 'reports-title',
+            historyId: `remove-report-${reportId}`,
           });
         }}
       >

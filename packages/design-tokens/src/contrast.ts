@@ -57,6 +57,8 @@ export const CONTRAST_PAIRS: ReadonlyArray<{
   ...pastels.map((bg) => ({ fg: 'ink' as const, bg, min: 12, use: 'Text on a pastel tile' })),
   ...neutrals.map((bg) => ({ fg: 'inkMuted' as const, bg, min: 4.5, use: 'Secondary text' })),
   { fg: 'white', bg: 'ink', min: 15, use: 'Label on a primary button' },
+  { fg: 'borderStrong', bg: 'bg', min: 3, use: 'Input borders and chip outlines (non-text, UI rules §2.8)' },
+  { fg: 'borderStrong', bg: 'surface', min: 3, use: 'Input borders on a grey surface' },
   { fg: 'magenta', bg: 'bg', min: 3, use: 'Handwritten notes (large text only)' },
   { fg: 'white', bg: 'magenta', min: 3, use: 'Finish button label (large bold text only)' },
   { fg: 'danger', bg: 'bg', min: 4.5, use: 'Delete account link' },

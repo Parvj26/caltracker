@@ -67,7 +67,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     created.workouts.push(await seedLibraryWorkout(admin, await demoWorkspace(admin), name));
     await signInAsCoach(page);
     await page.goto('/workouts');
-    const box = page.getByRole('searchbox', { name: 'Search' });
+    const box = page.getByRole('searchbox', { name: 'Search workouts' });
     // No Search tap needed: the list narrows as the coach types, typos forgiven ("mobilty").
     await box.fill(`mobilty ${tag}`);
     const list = page.getByRole('table', { name: 'Workouts' });
@@ -76,7 +76,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
     await expect(list.locator('tbody tr')).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`[?&]q=mobilty(\\+|%20)${tag}`));
     await box.fill(`zzzz ${tag}`);
-    await expect(page.getByText('No workouts match.')).toBeVisible();
+    await expect(page.getByText(`No workouts match “zzzz ${tag}”`)).toBeVisible();
   });
 
   test('the session logger brings the next exercise\'s name into view after Next and Previous', async ({ page }) => {

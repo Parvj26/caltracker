@@ -3,6 +3,7 @@ export type ColorToken =
   | 'surface'
   | 'surfaceSidebar'
   | 'border'
+  | 'borderStrong'
   | 'ink'
   | 'inkMuted'
   | 'lime'
@@ -25,6 +26,8 @@ export const colors: { light: Record<ColorToken, string> } = {
     surface: '#F4F4F4',
     surfaceSidebar: '#F6F6F4',
     border: '#EDEDED',
+    // 2026-11-17 (UI rules §2.8): input borders, chip outlines and other non-text edges that must reach 3:1.
+    borderStrong: '#8A8A8A',
     ink: '#121212',
     inkMuted: 'rgba(18, 18, 18, 0.6)',
     lime: '#C8F169',

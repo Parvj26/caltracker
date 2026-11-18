@@ -20,9 +20,9 @@
 .empty { margin: 0; color: var(--ct-ink-muted); }
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
-/* ---------- Search ---------- */
-.searchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
-.searchField { flex: 1 1 220px; }
+/* The search box above the list (the shared SearchBox). */
+.search { max-width: 480px; }
+@media (max-width: 599.98px) { .search { max-width: none; } }
 
 /* ---------- List ---------- */
 .table { width: 100%; border-collapse: collapse; }
@@ -185,6 +185,5 @@
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+.retry { align-self: flex-start; }
 .dialogForm { display: flex; flex-direction: column; gap: var(--ct-space-3); }
-.dialogActions .dangerButton { background: var(--ct-danger); color: var(--ct-bg); box-shadow: none; }
-.dialogActions .dangerButton:hover:not(:disabled) { background: var(--ct-danger-deep); }

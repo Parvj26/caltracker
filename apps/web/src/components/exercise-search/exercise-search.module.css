@@ -27,18 +27,6 @@
 
 .panel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-.searchLabel { display: flex; flex-direction: column; gap: var(--ct-space-1); font-weight: var(--ct-weight-section-heading); }
-.input {
-  min-height: var(--ct-tap-min);
-  padding: var(--ct-space-2) var(--ct-space-3);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-input);
-  background: var(--ct-surface);
-  color: var(--ct-ink);
-  font: inherit;
-}
-.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
-.input:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 
 /* Filter chips: ink with a lime label and a cross when on. */
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
@@ -224,7 +212,7 @@
   }
   .dialog[open] { gap: var(--ct-space-2); }
   .panel { gap: var(--ct-space-2); }
-  .searchLabelText, .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .filters, .picked {
     flex-wrap: nowrap;
     margin: 0 calc(-1 * var(--ct-space-4));
