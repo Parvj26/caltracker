@@ -12,9 +12,10 @@ import { fitSetTargets, targetFieldsFor } from './targets';
  */
 export type ExercisePick = { id: string; name: string; trackingType: TrackingType; eachSide?: boolean };
 
-/** Sets (or superset rounds) a new exercise starts with, and the most one exercise may have. */
+/** Sets a new exercise starts with by default, and the most one exercise may have. */
 export const DEFAULT_SETS = 3;
-const DEFAULT_ROUNDS = DEFAULT_SETS;
+/** Sets an exercise added in the coach's builder starts with: one, and "+ Set" copies it. */
+export const BUILDER_SETS = 1;
 const DEFAULT_REST = 90;
 export const MAX_SETS = 20;
 const MAX_EXERCISES = 10;
@@ -23,7 +24,7 @@ const MAX_SECTIONS = 10;
 const MAX_SECTION_NAME = 40;
 
 /** A set count from the builder (1 to 20 sets; anything else is clamped or rounded). */
-const clampSets = (n: number): number => (Number.isFinite(n) ? Math.min(MAX_SETS, Math.max(1, Math.round(n))) : DEFAULT_ROUNDS);
+const clampSets = (n: number): number => (Number.isFinite(n) ? Math.min(MAX_SETS, Math.max(1, Math.round(n))) : DEFAULT_SETS);
 
 const lastSectionId = (doc: WorkoutDoc): string | null => doc.sections[doc.sections.length - 1]?.id ?? null;
 
@@ -122,7 +123,7 @@ export function emptyWorkout(makeId: () => string, name = ''): WorkoutDoc {
   return { id: makeId(), name, notes: null, sections: [], blocks: [] };
 }
 
-export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string, sets = DEFAULT_ROUNDS): WorkoutDoc {
+export function addStraightBlock(doc: WorkoutDoc, ex: ExercisePick, makeId: () => string, sets = DEFAULT_SETS): WorkoutDoc {
   if (doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
@@ -138,12 +139,12 @@ export function addStraightBlocks(
   doc: WorkoutDoc,
   exs: readonly ExercisePick[],
   makeId: () => string,
-  sets = DEFAULT_ROUNDS,
+  sets = DEFAULT_SETS,
 ): WorkoutDoc {
   return exs.reduce((d, ex) => addStraightBlock(d, ex, makeId, sets), doc);
 }
 
-export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, rounds = DEFAULT_ROUNDS): WorkoutDoc {
+export function addSuperset(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, rounds = DEFAULT_SETS): WorkoutDoc {
   if (exs.length < 2) throw new Error('A superset needs at least two exercises.');
   if (exs.length > MAX_EXERCISES || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
@@ -261,7 +262,7 @@ export function moveBlockToSection(doc: WorkoutDoc, blockId: string, sectionId: 
   return { ...doc, sections, blocks };
 }
 
-export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, sets = DEFAULT_ROUNDS): WorkoutDoc {
+export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => string, sets = DEFAULT_SETS): WorkoutDoc {
   if (exs.length < MIN_CHOICE_OPTIONS || exs.length > MAX_CHOICE_OPTIONS || doc.blocks.length >= MAX_BLOCKS) return doc;
   const block: WorkoutBlockDoc = {
     id: makeId(),
@@ -272,12 +273,18 @@ export function addChoice(doc: WorkoutDoc, exs: ExercisePick[], makeId: () => st
   return { ...doc, blocks: [...doc.blocks, block] };
 }
 
-export function addChoiceOption(doc: WorkoutDoc, blockId: string, ex: ExercisePick, makeId: () => string): WorkoutDoc {
+export function addChoiceOption(
+  doc: WorkoutDoc,
+  blockId: string,
+  ex: ExercisePick,
+  makeId: () => string,
+  sets = DEFAULT_SETS,
+): WorkoutDoc {
   const block = doc.blocks.find((b) => b.id === blockId);
   if (!block || block.kind !== 'choice' || block.exercises.length >= MAX_CHOICE_OPTIONS) return doc;
   return mapBlock(doc, blockId, (b) => ({
     ...b,
-    exercises: [...b.exercises, newExercise(ex, DEFAULT_REST, DEFAULT_ROUNDS, makeId)],
+    exercises: [...b.exercises, newExercise(ex, DEFAULT_REST, clampSets(sets), makeId)],
   }));
 }
 
@@ -637,4 +644,128 @@ export function updateExerciseOptions(
   patch: { eachSide?: boolean; tempo?: string | null },
 ): WorkoutDoc {
   return mapExercise(doc, blockId, workoutExerciseId, (e) => ({ ...e, ...patch }));
+}
+
+// The builder's "Superset" switch between two exercises, its Reorder window and the Rest checkbox.
+
+/** The 1-based rounds of an exercise that a later exercise of the block also has a set in (its rest is 0 there). */
+const coveredRest = (b: WorkoutBlockDoc, i: number) => (s: WorkoutSetDoc, r: number) =>
+  roundHasLaterExercise(b, i, r + 1) ? 0 : s.restSeconds;
+
+/** The rest after a round: the rest of the round's last exercise (the last one with a set in it). */
+function roundRest(b: WorkoutBlockDoc, round: number): number | undefined {
+  for (let i = b.exercises.length - 1; i >= 0; i -= 1) {
+    const set = b.exercises[i]!.sets.filter((s) => s.setType !== 'drop')[round];
+    if (set) return set.restSeconds;
+  }
+  return undefined;
+}
+
+/**
+ * Whether the switch between this block and the next one can join them: same section, neither a pick-one group,
+ * and at most 10 exercises together.
+ */
+export function canJoinWithNext(doc: WorkoutDoc, blockId: string): boolean {
+  const i = doc.blocks.findIndex((b) => b.id === blockId);
+  const a = doc.blocks[i];
+  const b = doc.blocks[i + 1];
+  if (!a || !b || a.sectionId !== b.sectionId || a.kind === 'choice' || b.kind === 'choice') return false;
+  return a.exercises.length + b.exercises.length <= MAX_EXERCISES;
+}
+
+/**
+ * The switch turned on: this block and the next become one superset (either may already be one, so switches chain
+ * into a superset of 3 or more). Each exercise keeps its own sets (uneven rounds are fine). The rest after a round sits
+ * on the round's last exercise, so an earlier exercise's set gets rest 0 wherever a later exercise has a set in its
+ * round. Refused (same doc) when canJoinWithNext is false.
+ */
+export function joinWithNext(doc: WorkoutDoc, blockId: string): WorkoutDoc {
+  if (!canJoinWithNext(doc, blockId)) return doc;
+  const i = doc.blocks.findIndex((b) => b.id === blockId);
+  const a = doc.blocks[i]!;
+  const next = doc.blocks[i + 1]!;
+  const joined: WorkoutBlockDoc = { ...a, kind: 'superset', exercises: [...a.exercises, ...next.exercises] };
+  const block = { ...joined, exercises: joined.exercises.map((e, ei) => withRest(e, coveredRest(joined, ei))) };
+  return { ...doc, blocks: [...doc.blocks.slice(0, i), block, ...doc.blocks.slice(i + 2)] };
+}
+
+/**
+ * The switch turned off: the superset splits before exercise `at` (1 to length-1). The exercises after it become a new
+ * block straight below; a part left with one exercise is a straight block. A set that loses the later exercise it
+ * went straight on to gets the rest the round had (1:30 when unknown), so the client still rests. Refused (same doc)
+ * at the 30-block cap or for a bad `at`.
+ */
+export function splitSuperset(doc: WorkoutDoc, blockId: string, at: number, makeId: () => string): WorkoutDoc {
+  const i = doc.blocks.findIndex((b) => b.id === blockId);
+  const b = doc.blocks[i];
+  if (!b || b.kind !== 'superset' || at < 1 || at >= b.exercises.length || doc.blocks.length >= MAX_BLOCKS) return doc;
+  const kindOf = (n: number): WorkoutBlockDoc['kind'] => (n > 1 ? 'superset' : 'straight');
+  const head: WorkoutBlockDoc = { ...b, kind: kindOf(at), exercises: b.exercises.slice(0, at) };
+  const fixed: WorkoutBlockDoc = {
+    ...head,
+    exercises: head.exercises.map((e, ei) =>
+      withRest(e, (s, r) =>
+        roundHasLaterExercise(b, ei, r + 1) && !roundHasLaterExercise(head, ei, r + 1)
+          ? (roundRest(b, r) ?? DEFAULT_REST)
+          : s.restSeconds,
+      ),
+    ),
+  };
+  const tail: WorkoutBlockDoc = { id: makeId(), sectionId: b.sectionId, kind: kindOf(b.exercises.length - at), exercises: b.exercises.slice(at) };
+  return { ...doc, blocks: [...doc.blocks.slice(0, i), fixed, tail, ...doc.blocks.slice(i + 1)] };
+}
+
+/**
+ * The Reorder window's Done: the blocks in this order. Sections keep their place and each block stays in its own
+ * section (regroup), as moveBlock does. Refused (same doc) unless `ids` is exactly the doc's block ids.
+ */
+export function reorderBlocks(doc: WorkoutDoc, ids: readonly string[]): WorkoutDoc {
+  const byId = new Map(doc.blocks.map((b) => [b.id, b]));
+  if (ids.length !== doc.blocks.length || new Set(ids).size !== ids.length || ids.some((id) => !byId.has(id))) return doc;
+  return { ...doc, blocks: regroup(doc.sections, ids.map((id) => byId.get(id)!)) };
+}
+
+/**
+ * The Rest checkbox, read from the doc: true when every set of the exercise that shows a rest box rests 0 (the
+ * client's phone then shows no rest), false when one rests, null when no set shows a rest box (an exercise that goes
+ * straight on to the next one in a superset).
+ */
+export function exerciseRestOff(block: WorkoutBlockDoc, exerciseIndex: number): boolean | null {
+  const ex = block.exercises[exerciseIndex];
+  if (!ex) return null;
+  const shown = ex.sets.filter((s, si) => s.setType !== 'drop' && setShowsRest(block, exerciseIndex, si));
+  return shown.length === 0 ? null : shown.every((s) => s.restSeconds === 0);
+}
+
+/**
+ * The Rest checkbox: off sets every set's rest (and its substitutes') to 0; on gives each set that shows a rest box
+ * and rests 0 the default 1:30.
+ */
+export function setExerciseRest(doc: WorkoutDoc, blockId: string, workoutExerciseId: string, on: boolean): WorkoutDoc {
+  const block = doc.blocks.find((b) => b.id === blockId);
+  const ei = block ? block.exercises.findIndex((e) => e.id === workoutExerciseId) : -1;
+  if (!block || ei < 0) return doc;
+  if (!on) return mapExercise(doc, blockId, workoutExerciseId, (e) => withRest(e, () => 0));
+  const fill = (s: WorkoutSetDoc, shows: boolean) =>
+    s.setType !== 'drop' && shows && s.restSeconds === 0 ? { ...s, restSeconds: DEFAULT_REST } : s;
+  return mapExercise(doc, blockId, workoutExerciseId, (e) => ({
+    ...e,
+    sets: e.sets.map((s, si) => fill(s, setShowsRest(block, ei, si))),
+    substitutes: e.substitutes.map((sub) => ({
+      ...sub,
+      sets: sub.sets.map((s, si) => fill(s, substituteSetShowsRest(block, ei, sub, si))),
+    })),
+  }));
+}
+
+/** Keeps rest 0 on the exercises whose Rest checkbox is off, after any edit (a split or a new set may give rest). */
+export function keepRestOff(doc: WorkoutDoc, off: ReadonlySet<string>): WorkoutDoc {
+  if (off.size === 0) return doc;
+  const zero = (s: WorkoutSetDoc) => s.setType === 'drop' || s.restSeconds === 0;
+  const needs = doc.blocks.some((b) => b.exercises.some((e) => off.has(e.id) && !(e.sets.every(zero) && e.substitutes.every((x) => x.sets.every(zero)))));
+  if (!needs) return doc;
+  return {
+    ...doc,
+    blocks: doc.blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => (off.has(e.id) ? withRest(e, () => 0) : e)) })),
+  };
 }
