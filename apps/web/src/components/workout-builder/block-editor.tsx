@@ -107,6 +107,11 @@ type Props = {
   siblings?: ReadonlyArray<{ id: string; index: number; title: string }>;
   /** Moves this block to a place in the doc (moveBlock keeps it inside its section). */
   onMoveTo?: (index: number) => void;
+  /**
+   * Wide screens: the card is the right pane's editor for the exercise picked in the list. Always open, no fold
+   * line, and the ⋯ menu stands in for the header's icon buttons.
+   */
+  pane?: boolean;
 };
 
 /** The messages from the last save on these exercises (their substitutes and sets), and on the block itself. */
@@ -143,6 +148,7 @@ export function BlockEditor({
   onToggle,
   siblings = [],
   onMoveTo,
+  pane = false,
 }: Props) {
   const headingId = useId();
   const bodyId = useId();
@@ -167,7 +173,7 @@ export function BlockEditor({
     : blockCollapsedSummary(block, units);
   const hasErrors = cardHasErrors(block, shown.map((x) => x.ex), errors, !inSuperset || member === 0);
   // A card with a message from the last save stays open, so the coach can see what to fix.
-  const unfolded = open || hasErrors;
+  const unfolded = pane || open || hasErrors;
   const place = siblings.findIndex((s) => s.id === block.id);
   const focusNote = () => {
     if (!unfolded) onToggle?.();
@@ -199,9 +205,11 @@ export function BlockEditor({
       data-open={unfolded ? '' : undefined}
       data-superset={inSuperset ? '' : undefined}
       data-block-id={block.id}
-      data-card-id={inSuperset ? first.id : block.id}
+      data-card-id={pane ? undefined : inSuperset ? first.id : block.id}
+      data-pane={pane ? '' : undefined}
     >
       {/* iPad portrait: one tappable line (name, then "4 × 8 @ 60 kg · rest 1:30") and the ⋯ menu. */}
+      {pane ? null : (
       <div className={styles.fold}>
         <button
           type="button"
@@ -231,6 +239,7 @@ export function BlockEditor({
         </button>
         <BlockMenu name={summary.title} items={menuItems} />
       </div>
+      )}
       {moving ? (
         <MoveToDialog
           name={inSuperset ? 'the superset' : summary.title}
@@ -268,6 +277,11 @@ export function BlockEditor({
             onToggleRest={(on) => actions.onToggleRest(first.id, on)}
           />
         ) : null}
+        {pane ? (
+          <div className={styles.paneMenu}>
+            <BlockMenu name={summary.title} items={menuItems} />
+          </div>
+        ) : (
         <div className={styles.blockTools}>
           {targets.length > 0 && (!inSuperset || member === 0) ? (
             <select
@@ -294,6 +308,7 @@ export function BlockEditor({
             onClick={remove}
           />
         </div>
+        )}
       </header>
       {(!inSuperset || member === 0) && (errors.get(`block:${block.id}`) ?? []).map((m) => (
         <ErrorText key={m} code="workout_fields_invalid" safe={false}>

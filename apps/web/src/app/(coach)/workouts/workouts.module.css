@@ -1,5 +1,10 @@
 /* Workout library. Colours, radii and sizes only via var(--ct-*). */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1040px; }
+/* The workout builder takes the full width where it can show its list and editor side by side (1100 px of builder:
+   a window of 1354 px or more with the 190 px sidebar and 32 px gutters). Narrower, it keeps the 1040 px cap. */
+@media (min-width: 1354px) {
+  .page:has(> [data-workout-builder]) { max-width: none; }
+}
 
 .titleRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2) var(--ct-space-3); }
 .titleBlock { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
