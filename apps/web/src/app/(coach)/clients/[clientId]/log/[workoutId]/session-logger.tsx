@@ -458,6 +458,10 @@ export function SessionLogger({
   const savedRevision = useRef(initialLog?.revision ?? 0);
   // The server's copy as last saved (or loaded): what this page's kept copy on the device grew from.
   const savedDoc = useRef<WorkoutLogDoc | null>(initialLog);
+  // The copy Start session is sending. Until the server confirms it, it is the base edits are kept on the device
+  // against: the session already exists on the server by then, and a set typed in that moment must not be lost if the
+  // page closes before the reply arrives.
+  const startedDoc = useRef<WorkoutLogDoc | null>(null);
   // A kept copy taken whole added or removed sets (or made a pick): a refused save can only redo its numbers.
   const shapeUnsaved = useRef(false);
   // This device's kept copies of the session (from tabs closed or left mid-save), read once as the page opens,
@@ -472,8 +476,8 @@ export function SessionLogger({
   const keepOnDevice = useCallback(
     (doc: WorkoutLogDoc | null) => {
       if (!doc) return;
-      const base = savedDoc.current;
-      if (doc.status === 'in_progress' && base && base.id === doc.id && doc.revision > savedRevision.current) {
+      const base = savedDoc.current ?? startedDoc.current;
+      if (doc.status === 'in_progress' && base && base.id === doc.id && doc.revision > Math.max(savedRevision.current, base.revision)) {
         writeDraft({ userId: coachId, tabId: tabId(), savedAt: Date.now(), base, doc });
       } else {
         removeDraftKey(draftKey(doc.id, tabId()));
@@ -718,6 +722,7 @@ export function SessionLogger({
     // The server needs revision 1 or more; this is the session's first version.
     const doc = { ...startLogFromWorkout(workout, uuid, nowIso()), revision: 1 };
     logRef.current = doc;
+    startedDoc.current = doc;
     unsaved.current = [];
     setLog(doc);
     setPage(0);
