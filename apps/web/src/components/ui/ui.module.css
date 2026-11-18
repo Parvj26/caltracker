@@ -87,12 +87,33 @@
   width: 100%;
   min-height: var(--ct-button-min-height);
   padding: var(--ct-space-3) var(--ct-space-3-5);
-  border: 2px solid transparent;
+  /* The stronger input border, ≥ 3:1 on white and on surface (UI rules §2.8), the same as SearchBox. */
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong);
   border-radius: var(--ct-radius-input);
   background: var(--ct-surface);
   color: var(--ct-ink);
   font: inherit;
   transition: border-color 80ms ease-out, background-color 80ms ease-out;
+}
+/* Password box: room on the right for the 44 px show/hide button. */
+.reveal { position: relative; display: block; }
+.revealInput { padding-right: 48px; }
+.revealButton {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink-muted);
+  cursor: pointer;
 }
 .select { cursor: pointer; }
 .textarea { resize: vertical; line-height: 1.4; }
@@ -328,12 +349,18 @@
 .input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
 .input:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
+.revealButton:hover,
+.revealButton[aria-pressed='true'] { color: var(--ct-ink); }
+.revealButton:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: -2px; }
+/* The greeting under the sign-in title is secondary text, not a brand colour. */
+.authHeading .handNote { color: var(--ct-ink-muted); }
 .authPanel .logoMark { box-shadow: 0 0 0 3px var(--ct-bg), var(--ct-shadow-sticker); }
 .authTagline span { display: inline; }
 
 @media (min-width: 900px) {
   .authTagline span { display: block; }
-  .authPreview .tileLabel { font-size: calc(12 * var(--u)); }
+  /* Never under 12 px, also when the cluster shrinks on an iPad in landscape. */
+  .authPreview .tileLabel { font-size: max(12px, calc(12 * var(--u))); }
   .authPreview .tileValue { font-size: calc(26 * var(--u)); margin-top: calc(4 * var(--u)); }
   .authBar i { display: block; width: 86%; height: 100%; background: var(--ct-ink); }
 }

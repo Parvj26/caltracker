@@ -163,7 +163,7 @@ test.describe('pounds round trip', () => {
   test('135 lb is still 135 lb after save and reload', async ({ page }) => {
     await page.goto('/sign-in');
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
+    await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/home$/);
     await page.goto('/workouts/new');
@@ -244,7 +244,7 @@ test.describe('sections and pick-one groups', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/sign-in');
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
+    await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/home$/);
     await page.goto('/workouts/new');

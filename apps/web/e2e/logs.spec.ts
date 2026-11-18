@@ -98,7 +98,7 @@ test('a finished workout shows in the activity feed with its sets and volume in 
   const id = await log({ workspaceId: ws.data.id, clientId: mine, name, startedAt: ago(120), finishedAt: ago(67) });
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
@@ -144,7 +144,7 @@ test('"N to review" counts every waiting workout, not just the first page', asyn
 
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
   await page.goto('/activity');
