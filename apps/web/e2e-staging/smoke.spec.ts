@@ -24,7 +24,7 @@ test('proxy refreshes an expired session and rewrites the cookies', async ({ pag
 
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 
@@ -71,7 +71,7 @@ test('signed-in coach can open the workouts and programs pages', async ({ page }
 
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 
@@ -90,7 +90,7 @@ test('signed-in coach can open the activity page', async ({ page }) => {
 
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/home$/);
 
