@@ -261,14 +261,57 @@
 /* In a window (the program's day sheet) the window already sits below the notch. */
 :global(dialog) .builder > .saveBar { top: 0; }
 /* An error from the last save gets its own line. */
-.saveBar > :not([role='status']):not(button):not(.barTools):not(.barName) { flex-basis: 100%; }
-.barName { display: none; }
+.saveBar > :not([role='status']):not(button):not(.barTools):not(.titleField):not(h1) { flex-basis: 100%; }
+/* The workout's name is the page title, edited in place (UI rules §8: the title shows once). Its label is for screen
+   readers; the box looks like a heading until hovered or focused. */
+.titleField { flex: 1 1 180px; min-width: 0; }
+.titleField label > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.titleField input {
+  min-height: var(--ct-tap-min);
+  margin-left: calc(-1 * var(--ct-space-2));
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border: var(--ct-border-width-card) solid transparent;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  font-size: var(--ct-size-screen-title);
+  font-weight: var(--ct-weight-screen-title);
+  letter-spacing: var(--ct-tracking-screen-title);
+  text-overflow: ellipsis;
+  transition: font-size 0.15s ease-out;
+}
+/* globals.css sets touch screens' fields to 16 px !important (no iOS zoom) with a long :not() selector; a title is
+   bigger, so it may win: :not(#none) lifts this rule above that one. */
+.titleField input:not(#none) { font-size: var(--ct-size-screen-title) !important; }
+.titleField input::placeholder { color: var(--ct-ink-muted); }
+@media (hover: hover) {
+  .titleField input:hover { border-color: var(--ct-border-strong); }
+}
+.titleField input:focus { border-color: var(--ct-ink); background: var(--ct-surface); }
+.titleField input[aria-invalid='true'] { border-color: var(--ct-danger); }
+/* Zero height, just above the top bar: once it scrolls away the bar is "stuck" and its title shrinks. */
+.barSentinel { order: -2; height: 1px; margin-bottom: calc(-1px - var(--ct-space-4-5)); }
+.saveStatus { display: inline-flex; flex: none; align-items: center; min-height: 28px; margin: 0; }
+.statusQuiet { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.statusSaved { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink); }
+.statusFailed { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-danger-deep); }
+.addNotes {
+  align-self: flex-start;
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  margin: calc(-1 * var(--ct-space-2)) 0 calc(-1 * var(--ct-space-2)) calc(-1 * var(--ct-space-3));
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink-muted);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.addNotes:hover { background: var(--ct-surface); color: var(--ct-ink); }
 .barTools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
 .toolButton { display: inline-flex; align-items: center; gap: var(--ct-space-2); }
 .barAdd { margin-left: auto; }
 .addExercise, .saveButton { min-height: 54px; padding-left: var(--ct-space-4-5); padding-right: var(--ct-space-4-5); font-size: 18px; }
-.addExercise { border: 2px solid var(--ct-ink); background: var(--ct-lime); font-weight: var(--ct-weight-button); }
-.addExercise:hover:not(:disabled) { background: var(--ct-lime); }
 .sectionPopover { position: relative; }
 .sectionPopover .sectionChoices {
   position: absolute;
@@ -315,9 +358,9 @@
 }
 .switchThumb { width: 14px; height: 14px; border-radius: var(--ct-radius-pill); background: var(--ct-bg); }
 .switchButton[aria-pressed='true'] .switchTrack { justify-content: flex-end; background: var(--ct-magenta-deep); }
-/* Superset exercises: blue outline and blue A1 / A2 badges. */
+/* Superset exercises: blue outline and blue A1 / A2 badges (the same blue in the list, the cards and the editors). */
 .block[data-superset] { border-color: var(--ct-magenta); }
-.block[data-superset] .blockNumber, .phoneRow[data-superset] .blockNumber { background: var(--ct-blue); }
+.blockNumber[data-superset] { background: var(--ct-blue); }
 .blockNumber { min-width: 28px; width: auto; padding: 0 6px; }
 
 /* ---------- Sections and pick-one groups ---------- */
@@ -546,8 +589,6 @@
   .blockHeader .blockNumber, .blockHeader .blockTitle, .blockHeader > .blockTools { display: none; }
   .blockHeader:not(:has(.measureWrap)) { display: none; }
 
-  /* The status gets its own line above the buttons. */
-  .saveBar > [role='status'] { flex-basis: 100%; }
 }
 
 /* The phone's More sheet: docked to the bottom, lifted above the iOS keyboard by --sheet-keyboard and capped to the
@@ -627,7 +668,7 @@
 .reorderBody { display: flex; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3) var(--ct-space-6) var(--ct-space-4-5); overflow-y: auto; }
 .reorderRun { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .reorderSection { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); text-transform: uppercase; }
-.reorderList { display: flex; flex-direction: column; gap: var(--ct-space-2-5); margin: 0; padding: 0; list-style: none; }
+.reorderList { position: relative; display: flex; flex-direction: column; gap: var(--ct-space-2-5); margin: 0; padding: 0; list-style: none; }
 .reorderItem {
   display: flex;
   align-items: center;
@@ -639,7 +680,10 @@
   background: var(--ct-bg);
 }
 .reorderItem[data-superset] { border-color: var(--ct-magenta); }
-.reorderDragging { opacity: 0.6; box-shadow: var(--ct-shadow-sticker); }
+.reorderItem { transform-origin: center; }
+/* The lifted row: above its neighbours, with a shadow (the scale and position are set while dragging). */
+.reorderDragging { position: relative; z-index: 2; border-color: var(--ct-ink); box-shadow: var(--ct-shadow-sticker); }
+.reorderDragging .reorderHandle { cursor: grabbing; }
 .reorderHandle {
   display: grid;
   flex: none;
@@ -789,13 +833,14 @@
   .phoneList > .sectionHeader { padding-bottom: var(--ct-space-2); }
   .phoneRow { scroll-margin-top: calc(env(safe-area-inset-top) + 80px); scroll-margin-bottom: 100px; }
 
-  /* The top bar: the workout's name over its status, and Save. */
-  .saveBar { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--ct-space-2); row-gap: 0; padding: var(--ct-space-2) 0; }
-  .barName { display: block; overflow: hidden; font-size: 19px; font-weight: var(--ct-weight-button); text-overflow: ellipsis; white-space: nowrap; }
-  .saveBar > [role='status'] { grid-column: 1; justify-self: start; }
-  .saveBar > .saveButton { grid-column: 2; grid-row: 1 / span 2; min-height: var(--ct-tap-min); font-size: 15px; }
-  .saveBar > :not([role='status']):not(button):not(.barName) { grid-column: 1 / -1; }
-  .barTools, .saveBar > .barAdd { display: none; }
+  /* The top bar: just the workout's name over its status (tools and Save sit in the bottom bar). The large title
+     shrinks once the page scrolls, so more of the list shows. */
+  .saveBar { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: var(--ct-space-1) 0 var(--ct-space-2); }
+  .titleField { flex: none; }
+  .saveBar[data-compact] .titleField input:not(#none) { font-size: 18px !important; min-height: 40px; }
+  .saveBar > [role='status'] { min-height: 20px; }
+  .barTools, .saveBar > .barAdd, .saveBar > .saveButton { display: none; }
+  .details { gap: var(--ct-space-2); }
 
   /* The bottom bar: More and a wide "+ Exercise". */
   .phoneBar {
@@ -809,6 +854,7 @@
     border-top: var(--ct-border-width-card) solid var(--ct-border);
   }
   .phoneBar .addExercise { flex: 1; min-height: 56px; }
+  .phoneBar .phoneSave { flex: none; min-height: 56px; padding-inline: var(--ct-space-4-5); }
 }
 
 /* The phone exercise editor: the whole screen, above the keyboard (--sheet-keyboard, useSheetKeyboardInset). */
@@ -908,9 +954,7 @@
 .layout { container: builder-layout / inline-size; display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
 .panes { display: none; }
 @container builder-layout (min-width: 1100px) {
-  .details { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; max-width: none; }
-  .details > :not(:nth-child(-n + 2)) { grid-column: 1 / -1; }
-  /* One line tall, like the name box (it still grows when dragged). */
+  /* One line tall (it still grows when dragged). */
   .details textarea { height: 50px; min-height: 50px; }
   .wideList { display: none; }
   .panes { display: grid; grid-template-columns: 460px minmax(0, 1fr); align-items: start; }
@@ -982,4 +1026,8 @@
   .block[data-pane] .dropRow:not([data-layout='stacked']) { margin-left: 0; }
   .block[data-pane] .dropRow:not([data-layout='stacked']) .setLabel { padding-left: var(--ct-space-3); }
   .paneMenu { flex: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .titleField input { transition: none; }
 }

@@ -57,7 +57,7 @@ export function PhoneRow({ card, hasErrors, onOpen, selected }: { card: Card; ha
       onClick={onOpen}
       data-ph-capture-attribute-label={pane ? 'workout_pane_row' : 'workout_phone_row'}
     >
-      <span className={styles.blockNumber} aria-hidden="true">{card.badge}</span>
+      <span className={styles.blockNumber} data-superset={card.member !== undefined ? '' : undefined} aria-hidden="true">{card.badge}</span>
       <span className={styles.foldText}>
         <span className={styles.foldTitle}>{card.title}</span>
         <span className={styles.foldLine}>{card.line}</span>
@@ -162,7 +162,7 @@ export function PhoneExerciseEditor({ card, place, count, onGo, onClose, units, 
           </button>
         </div>
         <div className={styles.phoneEditorTitle}>
-          <span className={styles.blockNumber} aria-hidden="true">{card.badge}</span>
+          <span className={styles.blockNumber} data-superset={card.member !== undefined ? '' : undefined} aria-hidden="true">{card.badge}</span>
           <h2 className={styles.phoneEditorName}>
             {choice ? card.title : <SwapName name={first.exerciseName} onSwap={() => actions.onSwap(first.id)} />}
           </h2>

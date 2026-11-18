@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addSection, pickExercise, pickSetType, serviceClient, setRow, signInAsCoach } from './helpers';
+import { addSection, pickExercise, pickSetType, serviceClient, setRow, signInAsCoach, workoutNotes, workoutPageMenu } from './helpers';
 
 // Workout library and builder (phase 2 Task 14). The pounds test uses its own coach in its own workspace, so it never
 // changes the shared demo coach's units while other files run alongside it.
@@ -83,17 +83,15 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await expect(page).toHaveURL(/\/workouts\/[0-9a-f-]{36}$/);
   const savedChip = page.getByRole('status').filter({ hasText: '✓ Saved' });
   await expect(savedChip).toBeVisible();
-  // In the top bar, on the Save button's line.
-  const chipBox = (await savedChip.boundingBox())!;
-  const buttonBox = (await saveButton.boundingBox())!;
-  expect(Math.abs(buttonBox.y + buttonBox.height / 2 - (chipBox.y + chipBox.height / 2))).toBeLessThan(24);
+  // Nothing left to save: no Save button until the next change (UI rules §8).
+  await expect(saveButton).toHaveCount(0);
   // After a few seconds it settles to a quiet line.
   await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible({ timeout: 8000 });
 
   // Saving an existing workout shows the tick again.
   await page.getByLabel('Workout name').fill(`${name} `);
   await page.getByLabel('Workout name').fill(name);
-  await page.getByLabel('Workout notes (optional)').fill('Keep the bar path straight.');
+  await (await workoutNotes(page)).fill('Keep the bar path straight.');
   await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
   await saveButton.click();
   await expect(savedChip).toBeVisible();
@@ -117,8 +115,8 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   await expect(page.getByRole('link', { name })).toBeVisible();
   await page.getByRole('link', { name }).click();
 
-  // Delete asks first.
-  await page.getByRole('button', { name: 'Delete workout' }).click();
+  // Delete (in ⋯) asks first.
+  await workoutPageMenu(page, name, 'Delete…');
   const dialog = page.getByRole('alertdialog', { name: `Delete “${name}”?` });
   await expect(dialog).toContainText("It's removed from your library. Workouts already on clients' calendars and their logged history stay.");
   await dialog.getByRole('button', { name: 'Delete workout' }).click();

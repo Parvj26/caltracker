@@ -14,6 +14,7 @@ import {
   addSection,
   addSet,
   addStraightBlocks,
+  blockBadges,
   blockCollapsedSummary,
   canJoinWithNext,
   exerciseCollapsedLine,
@@ -51,8 +52,8 @@ import type { ExercisePick, ExercisePrefs, IsoDate, RestMemory, Units } from '@c
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
-import { SAVED_CHIP_MS, SaveStatus } from '@/components/save-status';
-import { Button, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
+import { SAVED_CHIP_MS } from '@/components/save-status';
+import { Button, Chip, ErrorText, notAContact, TextAreaField, TextField } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
 import { AddSectionMenu } from './add-section-menu';
@@ -90,6 +91,11 @@ type Props = {
   onSaved?: (id: string) => void;
   /** True when `initial` has never been saved (it shows no "Saved" status yet). */
   isNew?: boolean;
+  /**
+   * The page's own title: the builder adds a (visually hidden) h1 with the live name, and the editable name in its
+   * top bar is the visible title (UI rules §8: the title shows once). Leave out inside a sheet with its own heading.
+   */
+  pageTitle?: boolean;
   /** The workspace's remembered measurements and Each side per exercise (loadExercisePrefs). */
   initialPrefs?: Record<string, ExercisePrefs>;
 };
@@ -175,9 +181,6 @@ function restOffIn(doc: WorkoutDoc): Set<string> {
   return new Set(doc.blocks.flatMap((b) => b.exercises.flatMap((e, ei) => (exerciseRestOff(b, ei) === true ? [e.id] : []))));
 }
 
-/** Superset badges: A, B, … then AA, AB, … past 26 (a workout holds at most 30 blocks). */
-const letter = (n: number): string => (n < 26 ? String.fromCharCode(65 + n) : `${letter(Math.floor(n / 26) - 1)}${letter(n % 26)}`);
-
 const formatDay = (date: IsoDate) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' }).format(
     new Date(`${date}T00:00:00Z`),
@@ -195,6 +198,7 @@ export function WorkoutBuilder({
   saveLabel = 'Save workout',
   onDirtyChange,
   embedded = false,
+  pageTitle = false,
 }: Props) {
   const router = useRouter();
   // One rep count per set: an older range (10–12) shows, and saves, as its top number. Not an unsaved change by itself.
@@ -214,6 +218,17 @@ export function WorkoutBuilder({
   const [editing, setEditing] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  // The large title shrinks once the page scrolls (the sentinel just above the top bar leaves the screen).
+  const topSentinel = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = topSentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => setCompact(entry ? !entry.isIntersecting : false));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   // Exercises whose Rest checkbox is off. Not in the saved workout: it reads back from the rests (all 0).
   const [restOff, setRestOff] = useState<ReadonlySet<string>>(() => restOffIn(initial));
   /** Every edit goes through here, so an exercise whose Rest is off never gains a rest (a split or a new set). */
@@ -435,7 +450,7 @@ export function WorkoutBuilder({
 
   // Headings and cards in order. A section with no exercises yet still shows its heading, where it belongs. A
   // superset is one card per exercise; between two cards of one section sits the Superset switch (not next to a
-  // pick-one group). Exercises and pick-one groups are numbered 1, 2, 3…; supersets lettered A1, A2, B1…
+  // pick-one group). Badges come from blockBadges: 1, A1, A2, 3…
   const { items, cards, runs } = useMemo(() => {
     type Siblings = Array<{ id: string; index: number; title: string }>;
     type Item =
@@ -453,20 +468,16 @@ export function WorkoutBuilder({
         }
       });
     };
-    const badges = new Map<string, string>();
-    let number = 0;
-    let letters = 0;
-    for (const b of doc.blocks) {
-      if (b.kind === 'superset') badges.set(b.id, letter(letters++));
-      else badges.set(b.id, String(++number));
-    }
+    // One badge per card (blockBadges): every block is one numbered step, a superset's exercises A1, A2…
+    const badgeList = blockBadges(doc.blocks);
+    const badges = new Map(doc.blocks.map((b, i) => [b.id, badgeList[i]!]));
     const blockCards = (b: WorkoutDoc['blocks'][number]): Card[] => {
       if (b.kind === 'superset') {
         return b.exercises.map((e, ei) => ({
           key: e.id,
           block: b,
           member: ei,
-          badge: `${badges.get(b.id)}${ei + 1}`,
+          badge: badges.get(b.id)![ei]!,
           title: e.exerciseName,
           line: exerciseCollapsedLine(e, units, { rest: restState(b, ei, restOff) === true }),
           link: null,
@@ -474,10 +485,10 @@ export function WorkoutBuilder({
       }
       if (b.kind === 'choice') {
         const sum = blockCollapsedSummary(b, units);
-        return [{ key: b.id, block: b, badge: badges.get(b.id)!, title: b.exercises.map((e) => e.exerciseName).join(' or '), line: `${sum.title} · ${sum.line}`, link: null }];
+        return [{ key: b.id, block: b, badge: badges.get(b.id)![0]!, title: b.exercises.map((e) => e.exerciseName).join(' or '), line: `${sum.title} · ${sum.line}`, link: null }];
       }
       const e = b.exercises[0]!;
-      return [{ key: b.id, block: b, badge: badges.get(b.id)!, title: e.exerciseName, line: exerciseCollapsedLine(e, units, { rest: restState(b, 0, restOff) === true }), link: null }];
+      return [{ key: b.id, block: b, badge: badges.get(b.id)![0]!, title: e.exerciseName, line: exerciseCollapsedLine(e, units, { rest: restState(b, 0, restOff) === true }), link: null }];
     };
     for (const run of sectionRuns(doc.blocks, doc.sections)) {
       if (run.section) {
@@ -493,7 +504,7 @@ export function WorkoutBuilder({
           const b = doc.blocks[bi]!;
           return {
             id: b.id,
-            tag: b.kind === 'superset' ? `Superset ${badges.get(b.id)}` : b.kind === 'choice' ? 'Pick one' : null,
+            tag: b.kind === 'superset' ? `Superset ${badges.get(b.id)![0]!.replace(/\d+$/, '')}` : b.kind === 'choice' ? 'Pick one' : null,
             names: b.exercises.map((e) => e.exerciseName),
           };
         }),
@@ -631,6 +642,31 @@ export function WorkoutBuilder({
     </ErrorText>
   ));
 
+  // Save shows only while there is something to save (UI rules §8, no autosave). A program day's sheet keeps it.
+  const showSave = embedded || dirty || pending;
+  // A save that failed for a reason other than the fields (offline, server): "Couldn't save" and the button says Retry.
+  const failed = dirty && !pending && formError !== null && formError !== 'workout_fields_invalid';
+  const saveButton = (label: string, className: string | undefined) => (
+    <Button
+      onClick={save}
+      pending={pending}
+      className={className}
+      aria-label={pending ? undefined : failed ? `Retry: ${saveLabel}` : saveLabel}
+      data-ph-capture-attribute-label={label}
+    >
+      {pending ? (
+        'Saving…'
+      ) : failed ? (
+        <span>Retry</span>
+      ) : saveLabel === 'Save workout' ? (
+        // The bar says just "Save" (the name stays "Save workout").
+        <span>Save</span>
+      ) : (
+        saveLabel
+      )}
+    </Button>
+  );
+
   return (
     // data-no-menu-button: on an iPhone the tab bar would sit on the builder's own bottom bar (More, + Exercise).
     <div ref={builderRef} className={styles.builder} data-no-menu-button="" data-workout-builder="">
@@ -644,36 +680,22 @@ export function WorkoutBuilder({
           one exercise side by side. */}
       <div ref={layoutRef} className={styles.layout}>
       <div className={styles.details}>
-        <TextField
-          label="Workout name"
-          maxLength={100}
-          value={doc.name}
-          // A workout's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check underlines.
-          {...notAContact('workout-title')}
-          autoCorrect="off"
-          autoCapitalize="sentences"
-          spellCheck={false}
-          {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
-          onChange={(e) => {
-            const name = e.target.value;
-            change((d) => ({ ...d, name }));
-            // "Enter a name." goes as soon as the name is valid again, not at the next save.
-            if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
-              setErrors((cur) => {
-                const next = new Map(cur);
-                next.delete('name');
-                return next;
-              });
-            }
-          }}
-        />
-        <TextAreaField
-          label="Workout notes (optional)"
-          maxLength={2000}
-          rows={2}
-          value={doc.notes ?? ''}
-          onChange={(e) => change((d) => ({ ...d, notes: e.target.value === '' ? null : e.target.value }))}
-        />
+        {notesOpen || (doc.notes ?? '') !== '' || errors.has('notes') ? (
+          <TextAreaField
+            label="Workout notes (optional)"
+            maxLength={2000}
+            rows={2}
+            value={doc.notes ?? ''}
+            // Opened with "+ Add notes": the cursor goes straight in.
+            autoFocus={notesOpen && (doc.notes ?? '') === ''}
+            onChange={(e) => change((d) => ({ ...d, notes: e.target.value === '' ? null : e.target.value }))}
+          />
+        ) : (
+          // Empty notes fold to one short row, so the exercises start higher up (most of all on a phone).
+          <button type="button" className={styles.addNotes} onClick={() => setNotesOpen(true)} data-ph-capture-attribute-label="workout_add_notes">
+            + Add notes
+          </button>
+        )}
         {(errors.get('notes') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}
@@ -779,9 +801,39 @@ export function WorkoutBuilder({
 
       {/* The top bar: on iPad and desktop the tools, "+ Exercise" and Save; on an iPhone the workout's name and Save
           (its tools sit in the bottom bar). */}
-      <div ref={saveBarRef} className={styles.saveBar}>
-        <span className={styles.barName}>{doc.name.trim() || 'New workout'}</span>
-        <SaveStatus pending={pending} dirty={dirty} everSaved={everSaved} savedAt={savedAt} />
+      {/* Above the top bar: when it scrolls out of sight the bar's title shrinks (the large title collapses). */}
+      <div ref={topSentinel} className={styles.barSentinel} aria-hidden="true" />
+      {/* The top bar: the workout's name is the title (editable, shown once), its save status, and on iPad and desktop
+          the tools, "+ Exercise" and Save while there are unsaved changes. On an iPhone Save sits in the bottom bar. */}
+      <div ref={saveBarRef} className={styles.saveBar} data-compact={compact ? '' : undefined}>
+        {pageTitle ? <h1 className={styles.visuallyHidden}>{doc.name.trim() || 'New workout'}</h1> : null}
+        <TextField
+          label="Workout name"
+          className={styles.titleField}
+          enterKeyHint="done"
+          placeholder="New workout"
+          maxLength={100}
+          value={doc.name}
+          // A workout's name, not a person's: no contact AutoFill (see notAContact), autocorrect or spell-check underlines.
+          {...notAContact('workout-title')}
+          autoCorrect="off"
+          autoCapitalize="sentences"
+          spellCheck={false}
+          {...(errors.has('name') ? { error: { code: 'field_format', text: errors.get('name')![0]! } } : {})}
+          onChange={(e) => {
+            const name = e.target.value;
+            change((d) => ({ ...d, name }));
+            // "Enter a name." goes as soon as the name is valid again, not at the next save.
+            if (errors.has('name') && WorkoutDoc.in.shape.name.safeParse(name).success) {
+              setErrors((cur) => {
+                const next = new Map(cur);
+                next.delete('name');
+                return next;
+              });
+            }
+          }}
+        />
+        <BuilderStatus pending={pending} dirty={dirty} failed={failed} everSaved={everSaved} savedAt={savedAt} />
         <span className={styles.barTools}>
           <Button variant="secondary" className={styles.toolButton} disabled={doc.blocks.length < 2} onClick={() => setReordering(true)} data-ph-capture-attribute-label="workout_reorder">
             <Icon name="reorder" size={18} />
@@ -793,7 +845,7 @@ export function WorkoutBuilder({
           <AddSectionMenu full={sectionsFull} popover onAdd={addSectionNamed} />
         </span>
         <Button
-          variant="secondary"
+          variant="create"
           className={cx(styles.addExercise, styles.barAdd)}
           disabled={full}
           onClick={() => setPicker({ kind: 'straight' })}
@@ -802,22 +854,7 @@ export function WorkoutBuilder({
         >
           + Exercise
         </Button>
-        <Button
-          onClick={save}
-          pending={pending}
-          className={styles.saveButton}
-          aria-label={pending ? undefined : saveLabel}
-          data-ph-capture-attribute-label="workout_save"
-        >
-          {pending ? (
-            'Saving…'
-          ) : saveLabel === 'Save workout' ? (
-            // The bar says just "Save" (the name stays "Save workout").
-            <span>Save</span>
-          ) : (
-            saveLabel
-          )}
-        </Button>
+        {showSave ? saveButton('workout_save', styles.saveButton) : null}
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}
@@ -834,7 +871,7 @@ export function WorkoutBuilder({
           More
         </button>
         <Button
-          variant="secondary"
+          variant="create"
           className={styles.addExercise}
           disabled={full}
           onClick={() => setPicker({ kind: 'straight' })}
@@ -843,6 +880,8 @@ export function WorkoutBuilder({
         >
           + Exercise
         </Button>
+        {/* Save in thumb reach, only while there is something to save (a program day's sheet has its own Save). */}
+        {showSave && !embedded ? saveButton('workout_save_phone', styles.phoneSave) : null}
       </div>
 
       {moreOpen ? (
@@ -927,5 +966,51 @@ export function WorkoutBuilder({
       ) : null}
       {guard.prompt}
     </div>
+  );
+}
+
+/**
+ * The builder's save status, read out politely (UI rules §8): "Saving…", "Not saved" after a failed save (the
+ * error under it says why, "Couldn't save…", and the Save button says Retry), "Unsaved changes", "✓ Saved" for a few seconds after a save, then a quiet "All changes saved". A new
+ * workout that was never saved shows nothing until it changes.
+ */
+function BuilderStatus({
+  pending,
+  dirty,
+  failed,
+  everSaved,
+  savedAt,
+}: {
+  pending: boolean;
+  dirty: boolean;
+  failed: boolean;
+  everSaved: boolean;
+  savedAt: number | null;
+}) {
+  const [expired, setExpired] = useState<number | null>(null);
+  useEffect(() => {
+    if (savedAt === null) return;
+    const timer = setTimeout(() => setExpired(savedAt), Math.max(0, SAVED_CHIP_MS - (Date.now() - savedAt)));
+    return () => clearTimeout(timer);
+  }, [savedAt]);
+  const fresh = savedAt !== null && expired !== savedAt;
+  return (
+    <p role="status" aria-live="polite" className={styles.saveStatus}>
+      {pending ? (
+        <span className={styles.statusQuiet}>Saving…</span>
+      ) : failed ? (
+        <span className={styles.statusFailed}>
+          <span aria-hidden="true">⚠</span> Not saved
+        </span>
+      ) : dirty ? (
+        <Chip tone="amber">Unsaved changes</Chip>
+      ) : fresh ? (
+        <span className={styles.statusSaved}>
+          <span aria-hidden="true">✓</span> Saved
+        </span>
+      ) : everSaved ? (
+        <span className={styles.statusQuiet}>All changes saved</span>
+      ) : null}
+    </p>
   );
 }

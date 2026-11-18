@@ -220,7 +220,7 @@ export function BlockEditor({
           onClick={onToggle}
           data-ph-capture-attribute-label="workout_block_fold"
         >
-          <span className={styles.blockNumber} aria-hidden="true">{badge}</span>
+          <span className={styles.blockNumber} data-superset={inSuperset ? '' : undefined} aria-hidden="true">{badge}</span>
           <span className={styles.foldText}>
             <span className={styles.foldTitle}>{summary.title}</span>
             <span className={styles.foldLine}>{summary.line}</span>
@@ -259,7 +259,7 @@ export function BlockEditor({
       ) : null}
       <div id={bodyId} className={styles.blockBody}>
       <header className={styles.blockHeader}>
-        <span className={styles.blockNumber} aria-hidden="true">{badge}</span>
+        <span className={styles.blockNumber} data-superset={inSuperset ? '' : undefined} aria-hidden="true">{badge}</span>
         {choice ? (
           <TitleTag id={headingId} className={styles.blockTitle}>{`Pick one · ${block.exercises.length} options`}</TitleTag>
         ) : (

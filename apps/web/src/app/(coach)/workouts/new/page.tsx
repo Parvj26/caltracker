@@ -17,10 +17,8 @@ export default async function NewWorkoutPage() {
   return (
     <div className={styles.page}>
       <Link href="/workouts" className={styles.back}>← Workouts</Link>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>New workout</h1>
-      </header>
-      <WorkoutBuilder initial={initial} units={units} workspaceId={workspaceId} mode="library" isNew initialPrefs={prefs} />
+      {/* The builder's editable name is the title ("New workout" until it has one), with the page's h1. */}
+      <WorkoutBuilder initial={initial} units={units} workspaceId={workspaceId} mode="library" isNew initialPrefs={prefs} pageTitle />
     </div>
   );
 }

@@ -53,9 +53,6 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
       <Link href={`/clients/${client.id}/training?from=${loaded.scheduledOn}`} className={styles.back}>
         ← {client.name}&apos;s calendar
       </Link>
-      <header className={styles.titleRow}>
-        <h1 className={styles.title}>{loaded.doc.name}</h1>
-      </header>
       <ProgressionCard doc={loaded.doc} suggestions={suggestions} units={units} />
       {/* key: opening a different workout starts a fresh builder. */}
       <WorkoutBuilder
@@ -65,6 +62,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
         workspaceId={workspaceId}
         mode={{ clientName: client.name, date: loaded.scheduledOn }}
         initialPrefs={prefs}
+        pageTitle
       />
     </div>
   );

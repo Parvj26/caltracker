@@ -4,7 +4,8 @@ import { serviceClient, signInAsCoach } from './helpers';
 
 // The workout builder on an iPhone (Luis's builder changes, approved iPhone mockups): one row per exercise with a link
 // icon between two (the superset switch); a tap opens the exercise on its own screen (sets as cards with − / +,
-// Measurements as chips, + Set and Done at the bottom). Save sits in the top bar; More and + Exercise in the bottom bar.
+// Measurements as chips, + Set and Done at the bottom). The name is the title at the top; More, + Exercise and (only
+// while there are unsaved changes) Save sit in the bottom bar.
 // iPhone 13 sizes and touch, on Chromium like the rest of the suite (the browser can't be chosen per spec).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { defaultBrowserType, ...iphone } = devices['iPhone 13'];
@@ -122,18 +123,27 @@ async function savedKinds(id: string): Promise<string[]> {
   return data.map((b) => b.kind);
 }
 
-test('an 8-exercise workout is one row each, with link icons, Save at the top and More / + Exercise at the bottom', async ({ page }) => {
+test('an 8-exercise workout is one row each, with link icons, the first on screen, and More / + Exercise (+ Save when changed) at the bottom', async ({ page }) => {
   await openSeeded(page);
+  // The first exercise is on the first screen, above the bottom bar (B#2).
+  const firstBox = (await row(page, EXERCISES[0]).boundingBox())!;
+  const barTop = (await page.getByRole('button', { name: 'More', exact: true }).boundingBox())!.y;
+  expect(firstBox.y + firstBox.height).toBeLessThan(barTop);
+  // The name shows once, as the editable title; nothing to save yet, so no Save button.
+  await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save workout' })).toHaveCount(0);
   for (const ex of EXERCISES) await expect(row(page, ex)).toContainText('3 × 8 @ 20 kg · rest 1:30');
   await expect(page.getByRole('button', { name: `Superset ${EXERCISES[0]} with ${EXERCISES[1]}` })).toHaveAttribute('aria-pressed', 'false');
   // No set boxes in the list, and no sideways scrolling.
   await expect(page.getByRole('group', { name: `${EXERCISES[0]} set 1` })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
-  // Save stays at the top of the screen while the list scrolls.
+  // A change brings Save into the bottom bar, in thumb reach while the list scrolls.
+  const title = page.getByLabel('Workout name');
+  await title.fill(`${await title.inputValue()} `);
+  await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect(page.getByRole('button', { name: 'Save workout' })).toBeInViewport();
-  for (const name of ['More', '+ Exercise']) {
+  for (const name of ['More', '+ Exercise', 'Save workout']) {
     const b = page.getByRole('button', { name, exact: true });
     await expect(b).toBeInViewport();
     expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
