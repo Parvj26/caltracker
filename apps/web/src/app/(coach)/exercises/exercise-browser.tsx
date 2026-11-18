@@ -74,6 +74,7 @@ export function ExerciseBrowser({ workspaceId, initialQuery, initialSource, init
           mode="browse"
           workspaceId={workspaceId}
           initialQuery={initialQuery}
+          queryParam="q"
           initialFilters={{ customOnly: initialSource === 'custom' }}
           rowFilter={rowFilter}
         />

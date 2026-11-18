@@ -20,9 +20,9 @@
 .empty { margin: 0; color: var(--ct-ink-muted); }
 .back { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
-/* ---------- Search ---------- */
-.searchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
-.searchField { flex: 1 1 220px; }
+/* The search box above the list (the shared SearchBox). */
+.search { max-width: 480px; }
+@media (max-width: 599.98px) { .search { max-width: none; } }
 
 /* ---------- List ---------- */
 .table { width: 100%; border-collapse: collapse; }

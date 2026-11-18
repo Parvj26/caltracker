@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSelectedLayoutSegment } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dayLabel } from '@caltracker/shared';
+import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { avatarTone, initials } from '../clients/avatar';
 import { badgeText, filterInbox, type InboxRow } from './model';
@@ -38,7 +39,7 @@ export function MessagesShell({
   const segment = useSelectedLayoutSegment();
   const supabase = useBrowserSupabase();
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const [query, setQuery] = useState('');
+  const { query, setQuery, debounced } = useSearchQuery();
   const [now, refreshNow] = useNow();
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -72,7 +73,7 @@ export function MessagesShell({
   );
   useOnWake(refresh);
 
-  const shown = useMemo(() => filterInbox(rows, { unreadOnly, query }), [rows, unreadOnly, query]);
+  const shown = useMemo(() => filterInbox(rows, { unreadOnly, query: debounced }), [rows, unreadOnly, debounced]);
 
   return (
     <div className={styles.shell} data-screen={segment ? 'thread' : 'list'}>
@@ -80,23 +81,18 @@ export function MessagesShell({
         <div className={styles.inboxHead}>
           <h1 id="inbox-heading" className={styles.heading}>Messages</h1>
           <div className={styles.filters}>
-            <input
-              type="search"
-              className={styles.search}
-              placeholder="Search clients"
-              aria-label="Search clients"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <SearchBox label="Search clients" value={query} onChange={setQuery} className={styles.search} />
             <button type="button" className={styles.toggle} aria-pressed={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>
               Unread
             </button>
           </div>
         </div>
         {shown.length === 0 ? (
-          <p className={styles.empty}>
-            {rows.length === 0 ? 'No clients yet. Invite one from Clients.' : unreadOnly ? 'Nothing unread.' : 'No clients match.'}
-          </p>
+          rows.length > 0 && debounced.trim() !== '' ? (
+            <SearchEmpty things="clients" query={debounced} onClear={() => setQuery('')} className={styles.empty} />
+          ) : (
+            <p className={styles.empty}>{rows.length === 0 ? 'No clients yet. Invite one from Clients.' : 'Nothing unread.'}</p>
+          )
         ) : (
           <ul className={styles.list} aria-label="Conversations">
             {shown.map((r) => (

@@ -1,9 +1,10 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { pickerSections, smartFilter, type WorkoutHints } from '@caltracker/shared';
 import { EmptyLibrary } from '@/components/empty-library';
 import calendar from '@/components/calendar/calendar.module.css';
+import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import styles from './assign.module.css';
 
@@ -36,10 +37,10 @@ export function WorkoutChoices({
   listClassName?: string | undefined;
 }) {
   const resultsId = useId();
-  const [query, setQuery] = useState('');
+  const { query, setQuery, debounced } = useSearchQuery();
   if (library.length === 0) return <EmptyLibrary className={calendar.dialogBody} forProgram={forProgram} />;
 
-  const searching = query.trim() !== '';
+  const searching = debounced.trim() !== '';
   const sections = !searching && hints ? pickerSections(library, hints) : null;
   const button = (w: ChoiceWorkout) => {
     const chosen = chosenIds?.has(w.id) ?? false;
@@ -68,16 +69,7 @@ export function WorkoutChoices({
 
   return (
     <>
-      <label className={calendar.searchLabel}>
-        <span>Search workouts</span>
-        <input
-          type="search"
-          className={calendar.input}
-          value={query}
-          aria-controls={resultsId}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </label>
+      <SearchBox label="Search workouts" value={query} onChange={setQuery} aria-controls={resultsId} />
       {sections && (sections.recent.length > 0 || sections.mostUsed.length > 0) ? (
         <div id={resultsId} className={cx(styles.pickerScroll, listClassName)}>
           {section('Recent', sections.recent)}
@@ -87,8 +79,14 @@ export function WorkoutChoices({
       ) : (
         <ul id={resultsId} className={cx(calendar.results, listClassName)} aria-label="Library workouts">
           {(() => {
-            const results = smartFilter(library, query, (w) => w.name);
-            return results.length === 0 ? <li className={calendar.caption}>No workouts match.</li> : results.map(button);
+            const results = smartFilter(library, debounced, (w) => w.name);
+            return results.length === 0 ? (
+              <li>
+                <SearchEmpty things="workouts" query={debounced} onClear={() => setQuery('')} className={calendar.caption} />
+              </li>
+            ) : (
+              results.map(button)
+            );
           })()}
         </ul>
       )}
