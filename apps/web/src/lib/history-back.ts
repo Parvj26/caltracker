@@ -19,11 +19,21 @@ type RouterLike = { back: () => void; push: (href: string) => void; replace: (hr
 // that keeps its view in the address (a list's filters, a calendar's week) remembers its last full address for this
 // tab, and "Back to …" opens that, so the page still comes back as it was left.
 const LAST_URL = 'caltracker:last-url:';
+/** Address values that open a layer over the page, left out of a remembered address. */
+export const LAYER_PARAMS = ['sheet', 'add', 'scan'] as const;
+
+/** The address to remember: without open pop-ups (?sheet=, and the ?add= / ?scan= shortcuts that open one). */
+export function rememberable(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  for (const layer of LAYER_PARAMS) params.delete(layer);
+  const query = params.toString();
+  return `${pathname}${query ? `?${query}` : ''}`;
+}
 
 /** Remembers this page's full address (path + query) for this tab. */
 export function rememberUrl(): void {
   try {
-    window.sessionStorage.setItem(`${LAST_URL}${window.location.pathname}`, `${window.location.pathname}${window.location.search}`);
+    window.sessionStorage.setItem(`${LAST_URL}${window.location.pathname}`, rememberable(window.location.pathname, window.location.search));
   } catch {
     // Storage blocked: "Back to …" opens the plain page.
   }

@@ -35,6 +35,7 @@ describe('mergeDrafts', () => {
     const m = mergeDrafts(server, [draft(server, kept)]);
     expect(sets(m.doc)).toHaveLength(sets(kept).length);
     expect(m.partial).toBe(false);
+    expect(m.shapeChanged).toBe(true);
   });
 
   it('two tabs: A lost its save (base 5, at 9); B saved the server on to 8. A\'s weight and B\'s sets both stay', () => {
@@ -47,6 +48,22 @@ describe('mergeDrafts', () => {
     expect(sets(m.doc)[1]!.completedAt).not.toBeNull();
     expect(m.doc.revision).toBe(9);
     expect(m.unsaved).toHaveLength(1);
+  });
+
+  it('a weight changed in another tab since stays, and says so (A 100 over base 80, B saved 110)', () => {
+    const base = { ...weigh(started(5), 0, 80), revision: 5 };
+    const a = weigh(base, 0, 100);
+    const server = { ...weigh(base, 0, 110), revision: 7 };
+    const m = mergeDrafts(server, [draft(base, a)]);
+    expect(sets(m.doc)[0]!.actualWeightKg).toBe(110);
+    expect(m.partial).toBe(true);
+  });
+
+  it('remembers when a copy taken whole changed the sets, for a refused save later', () => {
+    const server = started(5);
+    const kept = addLogSet(server, server.blocks[0]!.exercises[0]!.id, makeId, T);
+    expect(mergeDrafts(server, [draft(server, kept)]).shapeChanged).toBe(true);
+    expect(mergeDrafts(server, [draft(server, weigh(server, 0, 40))]).shapeChanged).toBe(false);
   });
 
   it('says so when a change could not be redone on a server copy that moved on', () => {

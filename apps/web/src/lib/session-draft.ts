@@ -1,4 +1,4 @@
-import { WorkoutLogDoc, draftEdits, rebaseEdits, type LogEdit } from '@caltracker/shared';
+import { WorkoutLogDoc, draftConflicts, draftEdits, rebaseEdits, type LogEdit } from '@caltracker/shared';
 
 // The live session's edits, kept on this device the moment they are made. Saving to the server waits a moment
 // (typing a number is several key presses), and a save sent as the page closes (swipe back, the tab hidden, the app
@@ -62,8 +62,13 @@ export type Merged = {
   doc: WorkoutLogDoc;
   /** The edits not on the server yet, for the stale-save path to redo (each with the revision it reached). */
   unsaved: { edit: LogEdit; revision: number }[];
-  /** Some kept changes couldn't be redone (sets added or removed, a pick) because the session changed elsewhere. */
+  /**
+   * Some kept changes were held back because the session changed elsewhere meanwhile: the same field changed there
+   * too (its newer value stays), or sets were added or removed, or a pick made.
+   */
   partial: boolean;
+  /** A kept copy was taken whole with sets added or removed (or a pick): a refused save later can't redo those. */
+  shapeChanged: boolean;
   /** At least one kept copy brought changes. */
   restored: boolean;
 };
@@ -77,7 +82,8 @@ export function mergeDrafts(server: WorkoutLogDoc, drafts: readonly Draft[], loc
   let unsaved: Merged['unsaved'] = [];
   let partial = false;
   let restored = false;
-  if (server.status !== 'in_progress') return { doc, unsaved, partial, restored };
+  let shapeChanged = false;
+  if (server.status !== 'in_progress') return { doc, unsaved, partial, restored, shapeChanged };
   for (const d of drafts) {
     if (d.doc.status !== 'in_progress' || d.base.revision > server.revision || d.doc.revision <= d.base.revision) continue;
     const { edits, complete } = draftEdits(d.base, d.doc);
@@ -86,8 +92,10 @@ export function mergeDrafts(server: WorkoutLogDoc, drafts: readonly Draft[], loc
       doc = d.doc;
       unsaved = edits.map((edit) => ({ edit, revision: d.doc.revision }));
       restored = true;
+      if (!complete) shapeChanged = true;
       continue;
     }
+    if (draftConflicts(d.base, d.doc, doc)) partial = true;
     const r = rebaseEdits(doc, edits);
     if (r.doc !== doc) restored = true;
     doc = r.doc;
@@ -99,7 +107,7 @@ export function mergeDrafts(server: WorkoutLogDoc, drafts: readonly Draft[], loc
     doc = r.doc;
     unsaved = [...unsaved, ...r.unsaved];
   }
-  return { doc, unsaved, partial, restored };
+  return { doc, unsaved, partial, restored, shapeChanged };
 }
 
 // Storage can be missing or refuse (private windows, full): the page then works as before, saving to the server only.
@@ -167,21 +175,4 @@ export function clearAllDrafts(): void {
 /** Drops broken, other coaches' and old copies (on app load). */
 export function pruneDrafts(userId: string, now = Date.now()): void {
   for (const key of staleDraftKeys(readAllDrafts(), { userId, now })) removeDraftKey(key);
-}
-
-const TAB_KEY = 'caltracker:tab-id';
-let memoryTabId: string | null = null;
-
-/** This tab's id (kept for the tab's life, so a reload finds its own copy). */
-export function tabId(): string {
-  try {
-    const kept = window.sessionStorage.getItem(TAB_KEY);
-    if (kept) return kept;
-    const id = crypto.randomUUID();
-    window.sessionStorage.setItem(TAB_KEY, id);
-    return id;
-  } catch {
-    memoryTabId ??= crypto.randomUUID();
-    return memoryTabId;
-  }
 }

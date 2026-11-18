@@ -63,6 +63,7 @@ import { failureMessage } from '@/lib/action-errors';
 import { laterDayNotice, type LastTimes } from '@/lib/coach-session';
 import { backOrReplace } from '@/lib/history-back';
 import { useBrowserToday } from '@/lib/local-today';
+import { openTabIds, tabId } from '@/lib/tab-id';
 import {
   clearSessionDrafts,
   draftKey,
@@ -70,7 +71,6 @@ import {
   readAllDrafts,
   removeDraftIfUnchanged,
   removeDraftKey,
-  tabId,
   usableDrafts,
   writeDraft,
 } from '@/lib/session-draft';
@@ -453,6 +453,8 @@ export function SessionLogger({
   const savedRevision = useRef(initialLog?.revision ?? 0);
   // The server's copy as last saved (or loaded): what this page's kept copy on the device grew from.
   const savedDoc = useRef<WorkoutLogDoc | null>(initialLog);
+  // A kept copy taken whole added or removed sets (or made a pick): a refused save can only redo its numbers.
+  const shapeUnsaved = useRef(false);
   // This device's kept copies of the session (from tabs closed or left mid-save), read once as the page opens,
   // before anything typed here can replace this tab's own. Merged in once the server's copy arrives.
   const [keptAtOpen] = useState(() =>
@@ -502,6 +504,7 @@ export function SessionLogger({
         }
         if (outcome.applied) {
           if (doc.revision >= savedRevision.current) savedDoc.current = doc;
+          shapeUnsaved.current = false;
           savedRevision.current = Math.max(savedRevision.current, doc.revision);
           unsaved.current = unsaved.current.filter((u) => u.revision > savedRevision.current);
           keepOnDevice(logRef.current);
@@ -534,8 +537,12 @@ export function SessionLogger({
         setLog(rebased.doc);
         if (!typing) setNotes(rebased.doc.notes ?? '');
         setReloads((n) => n + 1);
+        const shapeLost = shapeUnsaved.current;
+        shapeUnsaved.current = false;
         setNotice(
-          rebased.doc.status === 'in_progress'
+          rebased.doc.status === 'in_progress' && shapeLost
+            ? 'This session changed somewhere else, so you now see the latest copy with your numbers and ticks added back. Sets added or removed on this device before it closed could not be added back: check the sets below.'
+            : rebased.doc.status === 'in_progress'
             ? `This session changed somewhere else (for example sets ${client.firstName || 'your client'} ticked on their phone just before you took over). You now see the latest copy, with your own changes kept.`
             : 'This session was changed somewhere else, so you now see the latest saved copy.',
         );
@@ -611,9 +618,16 @@ export function SessionLogger({
         return;
       }
       const m = mergeDrafts(server, keptAtOpen, local);
-      // Copies merged (or with nothing new) are done with; one rewritten meanwhile by a tab still open stays.
-      for (const k of keptAtOpen) removeDraftIfUnchanged(k.key, k.raw);
+      // This tab's old copy is replaced below (or done with). Another tab's goes only once that tab is closed: an
+      // open one may still be saving it. A closed tab's copy, now merged, would otherwise be merged again next time.
+      const mine = tabId();
+      void openTabIds().then((open) => {
+        for (const k of keptAtOpen) {
+          if (k.tabId === mine || (open && !open.has(k.tabId))) removeDraftIfUnchanged(k.key, k.raw);
+        }
+      });
       if (!m.restored && local.length === 0) return;
+      shapeUnsaved.current = m.shapeChanged;
       const typing = notesRef.current !== (current.notes ?? '');
       savedRevision.current = server.revision;
       savedDoc.current = server;
@@ -625,7 +639,7 @@ export function SessionLogger({
       setReloads((n) => n + 1);
       if (m.partial) {
         setNotice(
-          'Some changes kept on this device (sets added or removed, or a pick) could not be added back, because the session changed somewhere else meanwhile. Check the sets below.',
+          'Some changes kept on this device could not be added back, because the session changed somewhere else meanwhile (the newer values stay, and sets added or removed here are left out). Check the sets below.',
         );
       }
       void flushRef.current();

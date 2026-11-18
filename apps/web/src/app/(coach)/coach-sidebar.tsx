@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation';
 import { cx } from '@/components/ui/cx';
 import { pruneDrafts } from '@/lib/session-draft';
+import { startTabPresence } from '@/lib/tab-id';
 import { cycleTabTarget } from './focus-trap';
 import { LAST_PAGE_KEY } from './help/support-page';
 import { LibrarySheet } from './library-menu';
@@ -48,6 +49,8 @@ export function CoachSidebar({
   useEffect(() => {
     pruneDrafts(userId);
   }, [userId]);
+  // This tab answers the others (which tabs are open) and gets a fresh id if it is a duplicated tab.
+  useEffect(() => startTabPresence(), []);
 
   // Help names the page the coach was on before it in a support email, so remember it (path only, this tab only).
   const pathname = usePathname();

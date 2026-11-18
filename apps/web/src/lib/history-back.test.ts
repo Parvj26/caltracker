@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { previousEntryUrl } from './history-back';
+import { previousEntryUrl, rememberable } from './history-back';
 
 const nav = (urls: string[], index: number) => ({
   entries: () => urls.map((url) => ({ url })),
@@ -19,5 +19,13 @@ describe('previousEntryUrl', () => {
   });
   it('ignores entries without an address (another site)', () => {
     expect(previousEntryUrl({ entries: () => [{ url: null }, { url: 'https://x.test/a' }], currentEntry: { index: 1 } })).toBeNull();
+  });
+});
+
+describe('rememberable', () => {
+  it('keeps the view and drops open pop-ups', () => {
+    expect(rememberable('/clients/a/training', '?view=week&from=2026-11-02&sheet=assign-x&add=program')).toBe('/clients/a/training?view=week&from=2026-11-02');
+    expect(rememberable('/clients', '?scan=1')).toBe('/clients');
+    expect(rememberable('/clients', '')).toBe('/clients');
   });
 });
