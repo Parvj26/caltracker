@@ -1,12 +1,13 @@
 'use client';
 
 import type { ErrorCode } from '@caltracker/shared';
+import Link from 'next/link';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { COMMENT_BODY_MAX, cardText, postAge, splitLinks, type CommunityCard, type Units } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { MoreMenu } from '@/components/more-menu';
-import { Chip, ErrorText } from '@/components/ui';
+import { Button, Chip, ErrorText } from '@/components/ui';
 import { addComment, deleteComment, deletePost, setPinned, type CommunityOutcome } from './actions';
 import type { FeedPost } from './data';
 import { ReactionBar } from './reaction-bar';
@@ -72,8 +73,6 @@ function CommentIcon() {
   );
 }
 
-const countComments = (n: number) => `${n} ${n === 1 ? 'comment' : 'comments'}`;
-
 export function PostCard({
   post,
   viewer,
@@ -87,16 +86,19 @@ export function PostCard({
 }) {
   const [error, setError] = useState<ErrorCode | null>(null);
   const [comment, setComment] = useState('');
-  // Comments start folded ("3 comments"); Comment opens the box (and the comments above it).
-  const [showComments, setShowComments] = useState(false);
-  const [writing, setWriting] = useState(false);
+  // Comments start folded; the one comment button ("💬 3", or "Comment") opens them with the reply box under them.
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const commentsId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Opening goes straight to the reply box when there's nothing to read yet, or with a mouse. On a touch screen with
+  // comments to read, the keyboard stays down so it doesn't cover them.
+  const wantsFocus = useRef(false);
   useEffect(() => {
-    if (writing) inputRef.current?.focus();
-  }, [writing]);
+    if (open && wantsFocus.current) inputRef.current?.focus({ preventScroll: true });
+    wantsFocus.current = false;
+  }, [open]);
 
   const run = (action: () => Promise<CommunityOutcome>, after?: () => void) =>
     startTransition(async () => {
@@ -114,7 +116,6 @@ export function PostCard({
       onConfirm: () => deletePost(post.id),
       historyId: `delete-post-${post.id}`,
     });
-  const open = showComments || writing;
   const count = post.comments.length;
 
   return (
@@ -134,6 +135,15 @@ export function PostCard({
               </span>
             ) : null}
             <time dateTime={post.createdAt}>{postAge(post.createdAt, now)}</time>
+            {post.reported ? (
+              <>
+                <span aria-hidden="true"> ·</span>
+                <Chip tone="amber">Reported</Chip>
+                <Link href="/community/reports" className={styles.reviewLink}>
+                  Review
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
         <MoreMenu
@@ -170,34 +180,32 @@ export function PostCard({
       ) : null}
 
       <div className={styles.postActions}>
-        <ReactionBar target={{ postId: post.id }} rows={post.reactions} viewer={viewer} label={`Reactions to ${post.authorName}’s post`} />
-        <button type="button" className={styles.smallButton} aria-expanded={writing} onClick={() => setWriting((w) => !w)}>
+        <ReactionBar target={{ postId: post.id }} rows={post.reactions} viewer={viewer} label={`Reactions to ${post.authorName}’s post`} quietWhenEmpty />
+        <button
+          type="button"
+          className={styles.commentButton}
+          aria-expanded={open}
+          aria-controls={commentsId}
+          onClick={() => {
+            wantsFocus.current = !open && (post.comments.length === 0 || window.matchMedia('(pointer: fine)').matches);
+            setOpen((o) => !o);
+          }}
+        >
           <CommentIcon />
-          <span className={styles.buttonText}>Comment</span>
+          {count > 0 ? (
+            <span>
+              {count}
+              <span className={styles.visuallyHidden}>{count === 1 ? ' comment' : ' comments'}</span>
+            </span>
+          ) : (
+            <span>Comment</span>
+          )}
         </button>
-        {count > 0 ? (
-          <button
-            type="button"
-            className={styles.commentToggle}
-            aria-expanded={open}
-            aria-controls={commentsId}
-            onClick={() => {
-              if (open) {
-                setShowComments(false);
-                setWriting(false);
-              } else setShowComments(true);
-            }}
-          >
-            {countComments(count)}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={styles.toggleChevron}>
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-        ) : null}
       </div>
 
+      <div id={commentsId} className={styles.thread} hidden={!open}>
       {open && count > 0 ? (
-        <ul className={styles.comments} aria-label="Comments" id={commentsId}>
+        <ul className={styles.comments} aria-label="Comments">
           {post.comments.map((c) => (
             <li key={c.id} className={styles.comment}>
               <div className={styles.commentTop}>
@@ -229,23 +237,20 @@ export function PostCard({
                   ]}
                 />
               </div>
-              <ReactionBar target={{ commentId: c.id }} rows={c.reactions} viewer={viewer} label={`Reactions to ${c.authorName}’s comment`} />
+              <ReactionBar target={{ commentId: c.id }} rows={c.reactions} viewer={viewer} label={`Reactions to ${c.authorName}’s comment`} quietWhenEmpty />
             </li>
           ))}
         </ul>
       ) : null}
 
-      {writing ? (
+      {open ? (
         <form
           className={styles.commentForm}
           onSubmit={(e) => {
             e.preventDefault();
             run(
               () => addComment(post.id, comment),
-              () => {
-                setComment('');
-                setShowComments(true);
-              },
+              () => setComment(''),
             );
           }}
         >
@@ -260,11 +265,12 @@ export function PostCard({
               onChange={(e) => setComment(e.target.value)}
             />
           </label>
-          <button type="submit" className={styles.smallButton} disabled={pending || !comment.trim()}>
+          <Button type="submit" variant="secondary" size="compact" disabled={pending || !comment.trim()} disabledReason="Write a comment first" phSafe>
             Send
-          </button>
+          </Button>
         </form>
       ) : null}
+      </div>
       {error ? <ErrorText code={error} /> : null}
       {confirm.dialog}
     </article>

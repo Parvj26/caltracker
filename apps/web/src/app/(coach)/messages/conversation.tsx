@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dayLabel, isAlreadyUploaded, mergeById, mergeOutbox, messageYoutubeIds, photoPaths, seenMessageId, thumbPathOf, type PhotoExt } from '@caltracker/shared';
 import type { ErrorCode, Message, OutboxItem } from '@caltracker/shared';
-import { ErrorText, errorFromText, type FieldError } from '@/components/ui';
+import { ButtonLink, ErrorText, ParentLink, errorFromText, type FieldError } from '@/components/ui';
 import { SharpPhoto } from '@/components/sharp-photo';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
@@ -373,13 +372,21 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
     <>
       {embedded ? null : (
         <header className={styles.threadHead}>
-          <Link href="/messages" className={styles.back} aria-label="Back to all conversations">← Back</Link>
+          <ParentLink href="/messages" label="Messages" className={styles.back} />
           <span aria-hidden="true" className={cx(styles.avatar, styles[`avatar-${avatarTone(clientId)}`])}>{initials(clientName)}</span>
-          <div>
+          <div className={styles.threadWho}>
             <h2 className={styles.threadTitle}>{clientName}</h2>
             {readOnly ? <p className={styles.threadSub}>Past client · read-only history</p> : null}
           </div>
-          <Link href={readOnly ? `/clients/${clientId}` : `/clients/${clientId}/training`} className={styles.threadLink}>{readOnly ? 'Client page' : 'Calendar'}</Link>
+          <ButtonLink
+            href={readOnly ? `/clients/${clientId}` : `/clients/${clientId}/training`}
+            variant="quiet"
+            size="compact"
+            className={styles.threadLink}
+            aria-label={readOnly ? `${clientName}’s client page` : `${clientName}’s training calendar`}
+          >
+            {readOnly ? 'Client page' : 'Calendar'}
+          </ButtonLink>
         </header>
       )}
       <div

@@ -113,8 +113,8 @@ test('a finished workout shows in the activity feed with its sets and volume in 
   // 3 sets x 8 reps x 60 kg = 1,440 kg = 3,175 lb.
   await expect(row).toContainText('53 min · 3 sets · 3,175 lb lifted');
   await expect(row.getByText('Unplanned')).toBeVisible();
-  // No comment from the coach yet: the dot shows, and the title counts it.
-  await expect(row.getByRole('img', { name: 'Not reviewed' })).toBeVisible();
+  // No comment from the coach yet: a "To review" chip (text, not just a dot), and the title counts it.
+  await expect(row.getByText('To review', { exact: true })).toBeVisible();
   await expect(page.getByText(/1 to review/)).toBeVisible();
 });
 

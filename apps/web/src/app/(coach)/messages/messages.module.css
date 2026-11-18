@@ -1,4 +1,4 @@
-/* Coach messages: inbox on the left, conversation on the right (two screens under 900 px).
+/* Coach messages: inbox on the left, conversation on the right (two screens on a phone).
    Colours, radii and sizes only via var(--ct-*). Every tappable control is at least 44 px tall (--ct-tap-min). */
 .shell {
   display: grid;
@@ -28,15 +28,15 @@
   letter-spacing: var(--ct-tracking-screen-title);
   line-height: 1.15;
 }
-.filters { display: flex; align-items: center; gap: var(--ct-space-2); }
-.search { flex: 1; }
+.filters { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
 .toggle {
+  flex: none;
   min-height: var(--ct-tap-min);
   padding: var(--ct-space-2) var(--ct-space-3-5);
   border: 0;
   border-radius: var(--ct-radius-pill);
   background: transparent;
-  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border-strong);
   color: var(--ct-ink);
   font: inherit;
   font-size: var(--ct-size-caption);
@@ -45,29 +45,17 @@
 }
 .toggle[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); box-shadow: none; }
 
-.list { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--ct-space-2); }
 .empty { margin: 0; padding: var(--ct-space-4); color: var(--ct-ink-muted); font-size: var(--ct-size-body); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-.row {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--ct-space-1) var(--ct-space-3);
-  min-height: 64px;
-  padding: var(--ct-space-2-5) var(--ct-space-4);
-  border-top: 1px solid var(--ct-border);
-  color: var(--ct-ink);
-  text-decoration: none;
-}
-.row:hover { background: var(--ct-surface); }
-.rowCurrent, .rowCurrent:hover { background: var(--ct-surface); box-shadow: inset 4px 0 0 var(--ct-ink); }
 .avatar {
-  grid-row: span 2;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--ct-radius-pill);
   color: var(--ct-ink);
   font-size: var(--ct-size-caption);
@@ -76,19 +64,10 @@
 .avatar-lime { background: var(--ct-lime); }
 .avatar-pink { background: var(--ct-pink); }
 .avatar-blue { background: var(--ct-blue); }
-.rowName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--ct-weight-section-heading); }
-.rowUnread .rowName, .rowUnread .preview { font-weight: var(--ct-weight-button); }
+.row :global(a) { min-height: 64px; }
 .rowTime { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); white-space: nowrap; }
-.preview {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--ct-size-caption);
-  color: var(--ct-ink-muted);
-}
+.preview { display: block; min-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .count {
-  justify-self: end;
   min-width: 20px;
   padding: 0 var(--ct-space-2);
   border-radius: var(--ct-radius-pill);
@@ -108,25 +87,19 @@
   padding: var(--ct-space-3) var(--ct-space-4);
   border-bottom: 1px solid var(--ct-border);
 }
-/* Shows on iPads and phones only (below); a full 44 x 44 tap target there, never squeezed by a long name. */
-.back {
-  display: none;
-  flex: none;
-  align-items: center;
-  min-width: var(--ct-tap-min);
-  min-height: var(--ct-tap-min);
-  white-space: nowrap;
-  color: var(--ct-ink);
-  font-weight: var(--ct-weight-button);
-  text-decoration: none;
-}
-.threadTitle { margin: 0; min-width: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+/* "‹ Messages": phones only (on iPad and desktop the inbox is right there). Never squeezed by a long name. */
+.back { display: none; flex: none; }
+.threadWho { flex: 1; min-width: 0; }
+.threadTitle { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .threadSub { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-.threadLink { padding-block: calc((var(--ct-tap-min) - 1em) / 2); margin-block: calc((1em - var(--ct-tap-min)) / 2); margin-left: auto; color: var(--ct-ink); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
+.threadLink { flex: none; font-size: var(--ct-size-caption); }
 
 .messages { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-4); overflow-y: auto; }
 .messages > * { flex-shrink: 0; }
 .placeholder { margin: auto; max-width: 28rem; text-align: center; color: var(--ct-ink-muted); font-size: var(--ct-size-body); }
+.emptyPane { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ct-space-2); margin: auto; padding: var(--ct-space-6); color: var(--ct-ink-muted); text-align: center; }
+.emptyPane .placeholder { margin: 0; }
+.emptyTitle { margin: 0; color: var(--ct-ink); font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .day {
   align-self: center;
   margin: var(--ct-space-3) 0 var(--ct-space-1);
@@ -152,7 +125,7 @@
   cursor: pointer;
 }
 
-.item { display: flex; flex-direction: column; gap: 2px; max-width: min(34rem, 85%); }
+.item { display: flex; flex-direction: column; gap: 2px; max-width: min(75%, 560px); }
 .itemMine { align-self: flex-end; align-items: flex-end; }
 .itemTheirs { align-self: flex-start; align-items: flex-start; }
 .bubble {
@@ -233,6 +206,7 @@
   resize: none;
 }
 .input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .send { flex: none; padding-left: var(--ct-space-4); padding-right: var(--ct-space-4); }
 .thumbs { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
 .thumb { position: relative; width: 64px; height: 64px; }
@@ -265,25 +239,32 @@
 /* Inside the client page (a past client's history). */
 .embedded { height: 560px; max-height: 80dvh; }
 
-@media (max-width: 899.98px) {
-  .shell { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 58px); }
-  .shell[data-screen='list'] .threadPane { display: none; }
-  .shell[data-screen='thread'] .inboxPane { display: none; }
-  .back { display: inline-flex; }
-  .item { max-width: 92%; }
+/* iPad: the inbox stays beside the conversation, a little narrower. */
+@media (max-width: 1199.98px) {
+  .shell { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: var(--ct-space-3); }
 }
 
-/* iPhone: the thread fills the screen edge to edge, the message box gets the full width on its own line (photos and
-   Send below it), and Back is one 44 px line. The floating Menu button is hidden here (coach.module.css). */
+/* Short windows (a phone on its side, iPad with the keyboard up): the panes fit the window, so the reply box stays on
+   screen. */
+@media (max-height: 499.98px) {
+  .shell { height: calc(100dvh - var(--ct-space-6) - var(--ct-space-4)); min-height: 260px; }
+}
+
+/* iPhone: one screen at a time. The inbox is a plain list (no box around it) and the thread fills the screen edge to
+   edge, with "‹ Messages" and a one-row reply box ([📎][message][Send]), as on iPad. The tab bar is hidden here. */
 @media (max-width: 599.98px) {
-  .shell { height: calc(100dvh - 34px); min-height: 360px; }
+  .shell { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 34px); min-height: 360px; }
+  .shell[data-screen='list'] .threadPane { display: none; }
+  .shell[data-screen='thread'] .inboxPane { display: none; }
+  .shell[data-screen='list'] { height: auto; min-height: 0; }
+  .inboxPane { border-width: 0; border-radius: 0; overflow: visible; }
+  .inboxHead { padding: 0 0 var(--ct-space-3); }
+  .list { padding: 0; overflow: visible; }
   .threadPane { margin: 0 calc(-1 * var(--ct-space-4)); border-width: 0; border-radius: 0; }
-  .threadHead { padding: var(--ct-space-2) var(--ct-space-3); gap: var(--ct-space-2); }
-  .back { min-width: var(--ct-tap-min); white-space: nowrap; }
+  .threadHead { padding: var(--ct-space-1) var(--ct-space-3); gap: var(--ct-space-2); }
+  .back { display: inline-flex; }
   .composer { padding: var(--ct-space-2) var(--ct-space-3) calc(var(--ct-space-2) + env(safe-area-inset-bottom)); }
-  .composerRow { flex-wrap: wrap; }
-  .composerRow .input { flex: 1 1 100%; order: -1; }
-  .send { margin-left: auto; }
+  .item { max-width: 85%; }
 }
 
 /* ---------- Error screen (error.tsx) ---------- */

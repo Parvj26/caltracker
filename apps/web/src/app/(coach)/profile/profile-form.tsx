@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { BIO_MAX_LENGTH, BUSINESS_NAME_MAX_LENGTH, ProfileInput, characterCount, codeForMessage, errorMessage, type ErrorCode } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
-import { SaveStatus } from '@/components/save-status';
-import { Button, ErrorText, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
+import { Button, ErrorText, PhoneActionBar, SelectField, TextAreaField, TextField, errorFromText, type FieldError } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { failureCode } from '@/lib/action-errors';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { saveProfile } from './actions';
 import styles from './profile.module.css';
 
@@ -16,17 +16,30 @@ type Values = { firstName: string; lastName: string; businessName: string; bio: 
 /** TextField's `error` is optional, not `string | undefined` (exactOptionalPropertyTypes). */
 const errorProp = (message: string | undefined, fallback: ErrorCode = 'field_format') => (message ? { error: errorFromText(message, fallback) } : {});
 
-/** Photo is handled by AvatarPicker; this form is the names, business, bio and units, with one Save button. */
+/**
+ * Photo is handled by AvatarPicker; this form is the names, business, bio and units. Save shows only when something
+ * changed (UI rules §8): "Unsaved changes" with Save (and Undo) in a bar at the bottom (the phone's action bar, a
+ * sticky footer on larger screens); otherwise a quiet "All changes saved". The email is shown as text: it can't be
+ * changed here.
+ */
 export function ProfileForm({ initial, email }: { initial: Values; email: string }) {
   const [values, setValues] = useState<Values>(initial);
   const [saved, setSaved] = useState<Values>(initial);
   const [errors, setErrors] = useState<Partial<Record<Fields, string>>>({});
   const [formError, setFormError] = useState<FieldError | null>(null);
   const [pending, setPending] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [justSaved, setJustSaved] = useState(0);
+  // After a save the bar (and its Save button) goes away: keep the keyboard focus on the form's status instead.
+  useEffect(() => {
+    if (justSaved > 0) statusRef.current?.focus();
+  }, [justSaved]);
 
   const set = <K extends keyof Values>(key: K, value: Values[K]) => setValues((v) => ({ ...v, [key]: value }));
   const dirty = (Object.keys(values) as (keyof Values)[]).some((k) => values[k] !== saved[k]);
+  // Unsaved changes: leaving (a link, Back, closing the tab) asks "Discard changes?" first.
+  const guard = useUnsavedGuard(dirty, { parentHref: '/home' });
+
   const bioCount = characterCount(values.bio.replace(/\r\n?/g, '\n').trim());
   const bioOver = bioCount > BIO_MAX_LENGTH;
 
@@ -46,11 +59,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
       return;
     }
     setErrors({});
-    // Nothing changed: no write, no error, just the tick.
-    if (!dirty) {
-      setSavedAt(Date.now());
-      return;
-    }
+    if (!dirty) return;
     setPending(true);
     try {
       const outcome = await saveProfile(parsed.data);
@@ -62,7 +71,7 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
       }
       setValues(parsed.data);
       setSaved(parsed.data);
-      setSavedAt(Date.now());
+      setJustSaved((n) => n + 1);
     } catch (err) {
       setFormError({ code: failureCode(err, 'save_failed') });
     } finally {
@@ -114,16 +123,40 @@ export function ProfileForm({ initial, email }: { initial: Values; email: string
         <option value="lb">Pounds (lb)</option>
         <option value="kg">Kilograms (kg)</option>
       </SelectField>
-      <TextField label="Email" value={email} readOnly hint="You sign in with this email. Changing it isn't available yet." />
-
-      <div className={styles.actions}>
-        <Button type="submit" pending={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-        <SaveStatus pending={pending} dirty={dirty} everSaved={false} savedAt={savedAt} />
-        {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
-        {formError?.code === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
+      <div className={styles.readOnly}>
+        <p className={styles.readOnlyLabel}>Email</p>
+        <p className={styles.readOnlyValue} data-testid="profile-email">
+          {email}
+        </p>
+        <p className={styles.hint}>You sign in with this email. Changing it isn&apos;t available yet.</p>
       </div>
+
+      {formError ? <ErrorText code={formError.code}>{formError.text}</ErrorText> : null}
+      {formError?.code === 'stale_deploy' ? <ReloadButton className={styles.smallButton} /> : null}
+      {dirty || pending ? (
+        <PhoneActionBar status={pending ? 'Saving…' : 'Unsaved changes'} label="Profile actions">
+          <Button
+            variant="secondary"
+            disabled={pending}
+            onClick={() => {
+              setValues(saved);
+              setErrors({});
+              setFormError(null);
+            }}
+            phSafe
+          >
+            Undo
+          </Button>
+          <Button type="submit" pending={pending} phSafe>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </PhoneActionBar>
+      ) : (
+        <p ref={statusRef} tabIndex={-1} role="status" className={styles.savedStatus}>
+          All changes saved
+        </p>
+      )}
+      {guard.prompt}
     </form>
   );
 }

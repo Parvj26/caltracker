@@ -134,10 +134,12 @@ test('coach shell collapses to a labelled icon rail below 1200 px (iPad portrait
   await signInAsDemoCoach(page);
   const nav = page.getByRole('navigation', { name: 'Main' });
   const sidebar = page.locator('[data-coach-sidebar]');
-  expect((await sidebar.boundingBox())!.width).toBe(56);
+  // An 80 px rail with a short label under each icon (touch has no hover tooltips; UX review C, approved rail mockup).
+  expect((await sidebar.boundingBox())!.width).toBe(80);
   for (const name of ['Clients', 'Library', 'Meals']) {
     const link = nav.getByRole(name === 'Library' ? 'button' : 'link', { name });
     await expect(link).toHaveAttribute('aria-label', name);
+    await expect(link.getByText(name, { exact: true })).toBeVisible();
     const box = (await link.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);

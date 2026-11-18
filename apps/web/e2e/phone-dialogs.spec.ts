@@ -119,7 +119,7 @@ test.describe('iPhone 13 (390 x 664 page area)', () => {
   test('the message Back link is a full 44 x 44 tap target', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto(`/messages/${CLIENT.split('/').at(-1)}`);
-    const back = page.getByRole('link', { name: 'Back to all conversations' });
+    const back = page.getByRole('link', { name: 'Back to Messages' });
     await expect(back).toBeVisible();
     await expectTappable(back, { wide: true });
   });

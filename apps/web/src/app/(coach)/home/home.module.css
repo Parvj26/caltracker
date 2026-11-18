@@ -149,7 +149,7 @@
 /* ---------- Needs attention ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: var(--ct-space-1) var(--ct-space-1); }
 /* The button is the 44 px tap target; the pill inside is what shows. */
-.filter { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); padding: 0; border: 0; background: transparent; color: var(--ct-ink); font: inherit; cursor: pointer; }
+.filter { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); min-width: var(--ct-tap-min); justify-content: center; padding: 0; border: 0; background: transparent; color: var(--ct-ink); font: inherit; cursor: pointer; }
 .filterPill { padding: var(--ct-space-1) var(--ct-space-2-5); border-radius: var(--ct-radius-pill); background: var(--ct-surface); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); }
 .filter[aria-pressed='true'] .filterPill { background: var(--ct-ink); color: var(--ct-bg); }
 .filter:hover .filterPill { box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }

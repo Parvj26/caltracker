@@ -70,13 +70,19 @@ test.describe('coach profile', () => {
     await expect(sidebarProfile().locator('img')).toHaveCount(0);
     await expect(sidebarProfile()).toContainText('FC');
     await expect(page.getByRole('heading', { level: 1, name: 'Profile' })).toBeVisible();
-    await expect(page.getByLabel('Email')).toHaveValue(email);
-    await expect(page.getByLabel('Email')).toHaveJSProperty('readOnly', true);
+    // Read-only values are text, not a field that looks editable.
+    await expect(page.getByTestId('profile-email')).toHaveText(email);
+    await expect(page.getByRole('textbox', { name: 'Email' })).toHaveCount(0);
   });
 
-  test('saving with no changes shows the tick and no error', async () => {
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('status').filter({ hasText: '✓ Saved' })).toBeVisible();
+  test('with no changes there is no Save button, just "All changes saved"', async () => {
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
+    // A change brings Save (with Undo); Undo puts the saved values back.
+    await page.getByLabel('Bio').fill('Something new');
+    await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
     await expect(page.locator('main').getByRole('alert')).toHaveCount(0);
   });
 
@@ -88,7 +94,7 @@ test.describe('coach profile', () => {
     await page.getByLabel('Units').selectOption('lb');
     await expect(page.getByText('Unsaved changes')).toBeVisible();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('status').filter({ hasText: '✓ Saved' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible();
     await expect(page.locator('main').getByRole('alert')).toHaveCount(0);
 
     await page.reload();

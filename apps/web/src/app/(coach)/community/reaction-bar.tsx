@@ -27,12 +27,15 @@ export function ReactionBar({
   rows,
   viewer,
   label,
+  quietWhenEmpty = false,
 }: {
   target: ReactionTarget;
   rows: ReactionRow[];
   viewer: { userId: string; name: string };
   /** What the bar belongs to, for screen readers ("Reactions to Sam's post"). */
   label: string;
+  /** With no reactions yet, show a small "React" text button instead of the empty "☺+" pill (UX review C). */
+  quietWhenEmpty?: boolean;
 }) {
   const [shown, setShown] = useState(rows);
   const [seen, setSeen] = useState(rows);
@@ -87,7 +90,7 @@ export function ReactionBar({
             <button
               type="button"
               className={styles.reactionCount}
-              aria-label={whoReactedLabel(s)}
+              aria-label={`${s.count}: ${whoReactedLabel(s)}`}
               aria-expanded={who === s.key}
               onClick={() => setWho(who === s.key ? null : s.key)}
             >
@@ -95,17 +98,23 @@ export function ReactionBar({
             </button>
           </span>
         ))}
-        <button
-          ref={plusRef}
-          type="button"
-          className={styles.reactionAdd}
-          aria-label="Add a reaction"
-          aria-expanded={pickerOpen}
-          aria-controls={pickerId}
-          onClick={() => setPickerOpen(!pickerOpen)}
-        >
-          <span aria-hidden="true">☺+</span>
-        </button>
+        {quietWhenEmpty && summary.length === 0 ? (
+          <button ref={plusRef} type="button" className={styles.reactQuiet} aria-expanded={pickerOpen} aria-controls={pickerId} onClick={() => setPickerOpen(!pickerOpen)}>
+            React
+          </button>
+        ) : (
+          <button
+            ref={plusRef}
+            type="button"
+            className={styles.reactionAdd}
+            aria-label="Add a reaction"
+            aria-expanded={pickerOpen}
+            aria-controls={pickerId}
+            onClick={() => setPickerOpen(!pickerOpen)}
+          >
+            <span aria-hidden="true">☺+</span>
+          </button>
+        )}
       </div>
       {pickerOpen ? (
         <div id={pickerId} className={styles.reactionPicker} role="group" aria-label="Choose a reaction">
