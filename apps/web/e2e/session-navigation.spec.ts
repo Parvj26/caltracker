@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { COACH_EMAIL, seedSectionedWorkout, serviceClient, signInAsCoach } from './helpers';
+import { COACH_EMAIL, seedSectionedWorkout, serviceClient, signInAsCoach, signInThroughForm, signOutFromProfile } from './helpers';
 
 // Leaving a live session never loses what was typed, and Back after Finish / Discard / Hand back never shows the
 // session as still live. Each test makes its own client (one workout in progress per client) and removes it after,
@@ -45,8 +45,8 @@ async function newClient(firstName: string): Promise<string> {
 }
 
 /** A client with today's one-exercise workout, and the coach on its live session (started), reached from Training. */
-async function startedSession(page: Page, firstName: string) {
-  await signInAsCoach(page);
+async function startedSession(page: Page, firstName: string, signIn: (p: Page) => Promise<void> = signInAsCoach) {
+  await signIn(page);
   const client = await newClient(firstName);
   const today = await browserToday(page);
   const name = `Navb ${unique()}`;
@@ -137,3 +137,66 @@ for (const size of [
     });
   });
 }
+
+const DRAFTS = 'caltracker:session-draft:';
+const draftKeys = (page: Page) => page.evaluate((prefix) => Object.keys(localStorage).filter((k) => k.startsWith(prefix)), DRAFTS);
+const firstSets = async (logId: string) =>
+  (await admin.from('log_sets').select('actual_weight_kg, actual_reps, completed_at, position').eq('log_id', logId).order('position')).data ?? [];
+
+test.describe('kept copies on the device', () => {
+  test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true });
+
+  test('two tabs: a lost save from one tab and newer sets saved from another are both kept', async ({ page, context }) => {
+    const s = await startedSession(page, 'Twotabs');
+    const url = `/clients/${s.client}/log/${s.workoutId}`;
+    // Tab A types 47 kg on set 1, and its save never arrives.
+    await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('47');
+    await page.route('**/*', (route) => (route.request().method() === 'POST' ? route.abort() : route.continue()));
+    await page.goBack();
+    await page.unroute('**/*');
+    // Set A's kept copy aside while tab B works, so B saves without it (as when A's copy is written after B opened).
+    const keptA = await page.evaluate((prefix) => {
+      const out: [string, string][] = Object.keys(localStorage).filter((k) => k.startsWith(prefix)).map((k) => [k, localStorage.getItem(k)!]);
+      for (const [k] of out) localStorage.removeItem(k);
+      return out;
+    }, DRAFTS);
+    expect(keptA).toHaveLength(1);
+    // Tab B ticks set 2 with 12 reps; the server moves past the copy A grew from.
+    const b = await context.newPage();
+    await b.goto(url);
+    await b.getByLabel('REPS, Barbell Squat Set 2 of 2').fill('12');
+    await b.getByRole('button', { name: 'Done: Barbell Squat Set 2 of 2' }).click();
+    await expect.poll(async () => (await firstSets(s.logId))[1]?.completed_at ?? null, { timeout: 10_000 }).not.toBeNull();
+    await b.close();
+    // A's copy is back; A opens the session again: A's weight is redone on top of B's sets, and nothing is lost.
+    await page.evaluate((items) => items.forEach(([k, v]) => localStorage.setItem(k, v)), keptA);
+    await page.goto(url);
+    await expect(page.getByLabel('KG, Barbell Squat Set 1 of 2')).toHaveValue('47');
+    await expect(page.getByRole('button', { name: 'Done: Barbell Squat Set 2 of 2' })).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(async () => (await firstSets(s.logId)).map((r) => [r.actual_weight_kg, r.actual_reps, r.completed_at !== null]), { timeout: 10_000 })
+      .toEqual([
+        [47, null, false],
+        [expect.anything(), 12, true],
+      ]);
+    // Saved, so no copy is left behind.
+    await expect.poll(() => draftKeys(page)).toEqual([]);
+  });
+
+  test('another coach\'s and old copies are dropped on load; signing out removes every copy', async ({ page }) => {
+    const s = await startedSession(page, 'Signout', (p) => signInThroughForm(p));
+    const other = `${DRAFTS}${s.logId}:someone-else`;
+    await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ v: 2, userId: 'another-coach', tabId: 'x', savedAt: Date.now(), base: {}, doc: {} })), other);
+    await page.reload();
+    await expect.poll(() => draftKeys(page)).not.toContain(other);
+    // A copy kept mid-save, then sign out.
+    await page.getByLabel('KG, Barbell Squat Set 1 of 2').fill('33');
+    await page.route('**/*', (route) => (route.request().method() === 'POST' && !route.request().url().includes('/auth/sign-out') ? route.abort() : route.continue()));
+    await page.goto(`/clients/${s.client}/training`);
+    await page.unroute('**/*');
+    expect(await draftKeys(page)).toHaveLength(1);
+    await signOutFromProfile(page);
+    await expect(page).toHaveURL(/\/sign-in/);
+    expect(await draftKeys(page)).toEqual([]);
+  });
+});

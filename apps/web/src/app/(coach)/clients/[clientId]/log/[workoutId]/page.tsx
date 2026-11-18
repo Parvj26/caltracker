@@ -123,7 +123,7 @@ export default async function SessionPage({
     // Each person's screen in the host carries their own injury note, so it is right whoever the coach switches to.
     if (active) {
       return (
-        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} coachId={userId} />
       );
     }
   }
@@ -138,6 +138,7 @@ export default async function SessionPage({
         client={{ id: client.id, firstName: client.firstName, name: client.name }}
         workout={workout.doc}
         initialLog={log}
+        coachId={userId}
         scheduledOn={workout.scheduledOn}
         units={units}
         lastTimes={lastTimes}

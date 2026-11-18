@@ -50,7 +50,7 @@ export default async function LogPage({
     const active = pickActivePane(now.panes, [switchedTo, log.status === 'in_progress' ? log.id : null]);
     if (active) {
       return (
-        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} />
+        <TrainingNowHost panes={now.panes} inProgressIds={now.inProgressIds} activeLogId={active} workspaceId={workspaceId} units={units} renderedAt={renderTime()} coachId={userId} />
       );
     }
   }

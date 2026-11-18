@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { cx } from '@/components/ui/cx';
+import { pruneDrafts } from '@/lib/session-draft';
 import { cycleTabTarget } from './focus-trap';
 import { LAST_PAGE_KEY } from './help/support-page';
 import { LibrarySheet } from './library-menu';
@@ -42,6 +43,11 @@ export function CoachSidebar({
     setLibraryOpen(false);
     if (refocus) libraryRef.current?.focus();
   }, []);
+
+  // Copies of live sessions kept on this device: drop other coaches', broken and old ones once per load.
+  useEffect(() => {
+    pruneDrafts(userId);
+  }, [userId]);
 
   // Help names the page the coach was on before it in a support email, so remember it (path only, this tab only).
   const pathname = usePathname();
