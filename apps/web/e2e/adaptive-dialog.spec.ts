@@ -109,6 +109,22 @@ test('a leftover ?sheet= in a shared or reloaded link never makes closing leave 
   expect(new URL(page.url()).pathname).toBe('/workouts');
 });
 
+test('Escape in the Assign search box clears the text first, then closes the pop-up', async ({ page }) => {
+  const w = await seed();
+  await signInAsCoach(page);
+  await page.goto(`/workouts?q=${encodeURIComponent(w.name)}`);
+  await page.getByRole('button', { name: `Assign ${w.name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Assign ${w.name}` });
+  const search = dialog.getByLabel('Search clients');
+  await search.fill('zzz');
+  await page.keyboard.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => sheetParam(page)).toBeNull();
+});
+
 test('the disabled Assign button stays focusable and says why', async ({ page }) => {
   const w = await seed();
   await signInAsCoach(page);

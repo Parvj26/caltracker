@@ -14,7 +14,7 @@ import { setFavourite } from '@/app/(coach)/workouts/actions';
 import { failureCode } from '@/lib/action-errors';
 import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, rememberFavourite, type LoadedExerciseIndex } from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { Button, ErrorText } from '@/components/ui';
+import { Button, ErrorText, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { FilterChips, hasActiveFilters } from './filter-chips';
 import { Preview } from './preview';
@@ -47,6 +47,8 @@ type Props = {
   /** Starting search text and chips (the Exercises page fills these from its address). */
   initialQuery?: string;
   initialFilters?: Partial<SearchFilters>;
+  /** Keep the search text in this address parameter (the Exercises page: ?q=), so Back brings the same results. */
+  queryParam?: string;
   /** An extra yes/no test on each row, applied after the search (must be a stable function). */
   rowFilter?: (row: ExerciseIndexRow) => boolean;
 };
@@ -70,6 +72,7 @@ export function SearchPanel({
   footerExtra,
   initialQuery = '',
   initialFilters,
+  queryParam,
   rowFilter,
 }: Props) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -80,7 +83,12 @@ export function SearchPanel({
 
   const [data, setData] = useState<LoadedExerciseIndex | null>(null);
   const [error, setError] = useState(false);
-  const [query, setQuery] = useState(initialQuery);
+  const { query, setQuery, debounced } = useSearchQuery({
+    initial: initialQuery,
+    ...(queryParam ? { urlParam: queryParam } : {}),
+    // Enter and the arrow keys act on the list, so it must always match the typed text (it's a fast in-memory search).
+    delay: 0,
+  });
   const [filters, setFilters] = useState<SearchFilters>({ ...NO_FILTERS, ...initialFilters });
   const [shown, setShown] = useState(PAGE_SIZE);
   const [highlightId, setHighlightId] = useState<string | undefined>();
@@ -118,18 +126,18 @@ export function SearchPanel({
   );
   const hits = useMemo(() => {
     if (!index) return [];
-    const found = searchExercises(index, query, filters, boosts);
+    const found = searchExercises(index, debounced, filters, boosts);
     return rowFilter ? found.filter((h) => rowFilter(h.row)) : found;
-  }, [index, query, filters, boosts, rowFilter]);
+  }, [index, debounced, filters, boosts, rowFilter]);
 
   // A search that finds nothing tells us which exercises to add or rename. Wait until typing settles.
   const noHits = index !== null && hits.length === 0;
   useEffect(() => {
-    const q = query.trim();
+    const q = debounced.trim();
     if (!noHits || q.length < 3) return;
     const timer = setTimeout(() => track('exercise_search_no_results', { query: q }), 1500);
     return () => clearTimeout(timer);
-  }, [noHits, query]);
+  }, [noHits, debounced]);
 
   const activeId = hits.some((h) => h.row.id === highlightId) ? highlightId : hits[0]?.row.id;
   const active = hits.find((h) => h.row.id === activeId)?.row;
@@ -253,32 +261,24 @@ export function SearchPanel({
 
   return (
     <div className={styles.panel}>
-      <label className={styles.searchLabel}>
-        <span className={styles.searchLabelText}>Search exercises</span>
-        <input
-          type="text"
-          ref={searchRef}
-          role="combobox"
-          data-ph-capture-attribute-label="workout_exercise_search"
-          // The list is always shown beside the box (never collapsed), so the combobox is always expanded.
-          aria-expanded="true"
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={activeId ? optionId(activeId) : undefined}
-          aria-describedby={many ? hintId : undefined}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          className={styles.input}
-          placeholder="Search exercises…"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShown(PAGE_SIZE);
-          }}
-          onKeyDown={onKeyDown}
-        />
-      </label>
+      <SearchBox
+        label="Search exercises"
+        inputRef={searchRef}
+        role="combobox"
+        data-ph-capture-attribute-label="workout_exercise_search"
+        // The list is always shown beside the box (never collapsed), so the combobox is always expanded.
+        aria-expanded="true"
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={activeId ? optionId(activeId) : undefined}
+        aria-describedby={many ? hintId : undefined}
+        value={query}
+        onChange={(value) => {
+          setQuery(value);
+          setShown(PAGE_SIZE);
+        }}
+        onKeyDown={onKeyDown}
+      />
       {many ? (
         <p id={hintId} className={cx(styles.caption, styles.hint)}>
           {hint}
@@ -317,7 +317,11 @@ export function SearchPanel({
         <div className={styles.listPane} aria-busy={!data && !error}>
           {data && hits.length === 0 ? (
             <div className={styles.empty}>
-              <p>No exercises match &quot;{query.trim()}&quot;</p>
+              {debounced.trim() ? (
+                <SearchEmpty things="exercises" query={debounced} onClear={() => setQuery('')} />
+              ) : (
+                <p>No exercises match these filters</p>
+              )}
               <div className={styles.emptyActions}>
                 {hasActiveFilters(filters) ? (
                   <Button variant="secondary" onClick={() => changeFilters(NO_FILTERS)}>Clear filters</Button>

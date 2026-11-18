@@ -8,3 +8,4 @@ export { notAContact } from './not-a-contact';
 export { ErrorText, SelectField, TextAreaField, TextField, errorFromText, type ErrorTextProps, type FieldError, type TextFieldProps } from './text-field';
 export { Tile, type TileProps, type Tone } from './tile';
 export { AdaptiveDialog, SHEET_MEDIA, type AdaptiveDialogHandle, type AdaptiveDialogProps } from './adaptive-dialog';
+export { SearchBox, SearchCount, SearchEmpty, useDebounced, useSearchQuery, type SearchBoxProps } from './search-box';

@@ -22,7 +22,7 @@ import {
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
 import { MoreMenu } from '@/components/more-menu';
-import { Chip, type ChipTone } from '@/components/ui';
+import { Chip, SearchBox, SearchEmpty, useSearchQuery, type ChipTone } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import type { HomeData } from '@/lib/coach-home';
@@ -292,9 +292,19 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
  * The Clients list: search, filter chips (only those with someone in them), sort, and one row per client and pending
  * invite. Stats use the coach's own today, so they appear right after the page loads in the browser.
  */
-export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeData; invites: DirectoryInvite[]; lookbackDays: number }) {
+export function ClientDirectory({
+  data,
+  invites,
+  lookbackDays,
+  initialQuery = '',
+}: {
+  data: HomeData;
+  invites: DirectoryInvite[];
+  lookbackDays: number;
+  initialQuery?: string;
+}) {
   const today = useBrowserToday();
-  const [query, setQuery] = useState('');
+  const { query: typed, setQuery, debounced: query } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
   const [filter, setFilter] = useState<DirectoryFilter>('active');
   const [sort, setSort] = useState<DirectorySort>('last_workout');
   // A new invite (just sent from the invite window) switches the list to Invited, so the coach sees it there.
@@ -361,21 +371,13 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
     <section aria-labelledby="clients-heading" className={styles.directory}>
       <h2 id="clients-heading" tabIndex={-1} className={styles.visuallyHidden}>Client list</h2>
       <div className={styles.toolbar} role="search" aria-label="Find clients">
-        <label className={styles.searchField}>
-          <span className={styles.visuallyHidden}>Search clients</span>
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-3.5-3.5" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${total} ${total === 1 ? 'client' : 'clients'}`}
-            className={styles.searchInput}
-            autoComplete="off"
-          />
-        </label>
+        <SearchBox
+          label="Search clients"
+          placeholder={`Search ${total} ${total === 1 ? 'client' : 'clients'}`}
+          value={typed}
+          onChange={setQuery}
+          className={styles.searchField}
+        />
         <div role="group" aria-label="Filter clients" className={styles.filters}>
           {chips.map((f) => (
             <button
@@ -425,13 +427,17 @@ export function ClientDirectory({ data, invites, lookbackDays }: { data: HomeDat
           <div role="rowgroup">
             {shownTotal === 0 ? (
               <div role="row" className={styles.emptyRow}>
-                <span role="cell">
-                  {total === 0
-                    ? 'No clients yet. Invite your first client.'
-                    : filter === 'invited' && query.trim() === ''
-                      ? 'No invites waiting.'
-                      : 'No clients match.'}
-                </span>
+                <div role="cell">
+                  {total === 0 ? (
+                    'No clients yet. Invite your first client.'
+                  ) : searching ? (
+                    <SearchEmpty things="clients" query={query} onClear={() => setQuery('')} />
+                  ) : filter === 'invited' ? (
+                    'No invites waiting.'
+                  ) : (
+                    'No clients match.'
+                  )}
+                </div>
               </div>
             ) : null}
             {shownClients.map((c) => (

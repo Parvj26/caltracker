@@ -1,9 +1,10 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
-import { useId, useRef, useState } from 'react';
+import { useId, useMemo, useRef } from 'react';
 import { smartFilter } from '@caltracker/shared';
 import { EmptyLibrary } from '@/components/empty-library';
+import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { libraryItemDomId } from './grid-ids';
 import type { DragData, LibraryWorkout } from './program-grid';
@@ -23,9 +24,9 @@ export function LibraryPanel({
   /** True right after a drag ended, so the click that ends a drag doesn't also open "Add to which day?". */
   justDragged: () => boolean;
 }) {
-  const [query, setQuery] = useState('');
+  const { query, setQuery, debounced } = useSearchQuery();
   const headingId = useId();
-  const results = smartFilter(library, query, (w) => w.name);
+  const results = useMemo(() => smartFilter(library, debounced, (w) => w.name), [library, debounced]);
   return (
     <section className={styles.library} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.sectionHeading}>Library</h2>
@@ -34,12 +35,13 @@ export function LibraryPanel({
       ) : (
         <>
           <p className={styles.caption}>Tap a workout to add it to a day, or drag it onto one (on a touch screen, press and hold first).</p>
-          <label className={styles.searchLabel}>
-            <span>Search library</span>
-            <input type="search" className={styles.input} value={query} onChange={(e) => setQuery(e.target.value)} />
-          </label>
+          <SearchBox label="Search library" placeholder="Search workouts" value={query} onChange={setQuery} />
           <ul className={styles.libraryList}>
-            {results.length === 0 ? <li className={styles.caption}>No workouts match.</li> : null}
+            {results.length === 0 ? (
+              <li>
+                <SearchEmpty things="workouts" query={debounced} onClear={() => setQuery('')} className={styles.caption} />
+              </li>
+            ) : null}
             {results.map((w) => (
               <LibraryItem key={w.id} workout={w} onPick={() => onPick(w)} justDragged={justDragged} />
             ))}

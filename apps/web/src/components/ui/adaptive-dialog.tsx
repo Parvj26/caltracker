@@ -228,8 +228,10 @@ export function AdaptiveDialog({
       className={cx(styles.dialog, size === 'wide' && styles.wide, stackFooterOnPhone && styles.stack, fullScreenOnPhone && styles.full, className)}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
+      // SearchBox inside clears its text on the first Escape here (and closes on the next).
+      data-adaptive-dialog=""
       onKeyDown={(e: KeyboardEvent<HTMLDialogElement>) => {
-        // A control inside (a search box clearing itself) already handled it.
+        // A control inside already handled it (SearchBox clears its text or asks the dialog to close via cancel).
         if (e.key !== 'Escape' || e.defaultPrevented) return;
         // Ours to decide (busy, unsaved changes), not the browser's.
         e.preventDefault();

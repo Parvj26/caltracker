@@ -3,6 +3,7 @@ import { act, createElement, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdaptiveDialog } from '@/components/ui/adaptive-dialog';
+import { SearchBox } from '@/components/ui/search-box';
 import { useHistoryLayer } from './use-history-layer';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -241,5 +242,30 @@ describe('AdaptiveDialog and Back', () => {
       root.render(createElement(Harness, { dirty: true, onClose, busy: true }));
     });
     expect(host.textContent).not.toContain('Discard changes?');
+  });
+
+  it('Escape in a SearchBox with text clears it first; the next Escape closes (asking first when there are changes)', () => {
+    function WithSearch() {
+      const [q, setQ] = useState('maya');
+      return createElement(
+        AdaptiveDialog,
+        { historyId: 'assign-w3', title: 'Assign', dirty: true, onClose: vi.fn() },
+        createElement(SearchBox, { label: 'Search clients', value: q, onChange: setQ }),
+      );
+    }
+    act(() => {
+      root.render(createElement(WithSearch));
+    });
+    const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const esc = () =>
+      act(() => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      });
+    esc();
+    expect(input.value).toBe('');
+    expect(host.textContent).not.toContain('Discard changes?');
+    esc();
+    expect(host.textContent).toContain('Discard changes?');
+    expect(host.querySelector('dialog[open]')).not.toBeNull();
   });
 });
