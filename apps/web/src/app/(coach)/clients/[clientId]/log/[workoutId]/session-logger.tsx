@@ -621,11 +621,13 @@ export function SessionLogger({
       // Nothing to add on this page, but the server is ahead of the copy it opened with: show the server's.
       const showServer = () => {
         if (local.length > 0 || server.revision <= current.revision) return;
+        // A session note typed but not yet saved (the box not left) is kept; otherwise the box shows the server's.
+        const typing = notesRef.current !== (current.notes ?? '');
         logRef.current = server;
         savedRevision.current = server.revision;
         savedDoc.current = server;
         setLog(server);
-        setNotes(server.notes ?? '');
+        if (!typing) setNotes(server.notes ?? '');
         setReloads((n) => n + 1);
       };
       if (keptAtOpen.length === 0) {
