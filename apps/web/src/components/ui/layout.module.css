@@ -141,6 +141,7 @@
     flex-wrap: nowrap;
     padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-3) + env(safe-area-inset-bottom));
   }
+  .actionBar[data-keyboard] { padding-bottom: var(--ct-space-3); }
   .actionBarButtons { flex: none; }
   /* A focused field or a #link scrolled into view lands above the bar, not under it. */
   :global(html):has([data-phone-action-bar]) { scroll-padding-bottom: calc(var(--action-bar-room, 80px) + var(--ct-space-3)); }

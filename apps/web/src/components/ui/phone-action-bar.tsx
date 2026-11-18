@@ -38,7 +38,10 @@ export function PhoneActionBar({
     let frame = 0;
     const apply = () => {
       frame = 0;
-      el.style.setProperty('--action-bar-keyboard', `${viewport ? keyboardCover(window.innerHeight, viewport) : 0}px`);
+      const cover = viewport ? keyboardCover(window.innerHeight, viewport) : 0;
+      el.style.setProperty('--action-bar-keyboard', `${cover}px`);
+      // On the keyboard there's no home indicator to clear.
+      el.toggleAttribute('data-keyboard', cover > 0);
     };
     const schedule = () => {
       if (frame === 0) frame = requestAnimationFrame(apply);

@@ -32,32 +32,24 @@
   font-weight: var(--ct-weight-section-heading);
 }
 
-/* Composer */
-.composer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ct-space-3);
-  padding: var(--ct-space-4);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-surface);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-}
+/* Composer: one surface (the text box), no card around it. */
+.composer { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .composerLabel { display: block; }
 .composerInput {
   width: 100%;
   min-height: 88px;
-  padding: var(--ct-space-3);
-  border: var(--ct-border-width-card) solid var(--ct-border);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border: 2px solid transparent;
   border-radius: var(--ct-radius-input);
-  background: var(--ct-bg);
+  background: var(--ct-surface);
   color: var(--ct-ink);
   font: inherit;
   resize: vertical;
 }
 .composerActions { display: flex; justify-content: space-between; align-items: center; gap: var(--ct-space-3); }
 .composerActions[hidden], .thread[hidden] { display: none; }
-.composer:not([data-expanded]) { padding: var(--ct-space-2); }
 .composer:not([data-expanded]) .composerInput { min-height: var(--ct-button-min-height); resize: none; }
+.composerInput:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
 .composerInput:focus-visible, .commentInput:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 .photoButton {
   display: inline-flex;

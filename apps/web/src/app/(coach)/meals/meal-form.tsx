@@ -65,12 +65,10 @@ type MealFormProps = {
  * A new photo is compressed in the browser (1600 px + 320 px thumbnail) and
  * uploaded to the meal's own files before saving; the files of a replaced or removed photo are deleted after.
  *
- * Whether it was saved lives here, above the fields: a save refreshes the page, which remounts the fields with the
- * saved meal (a new version), and that has to survive it.
+ * Keyed by the saved version: a save refreshes the page, which remounts the fields with the saved meal.
  */
 export function MealForm(props: MealFormProps) {
-  const [saved, setSaved] = useState(false);
-  return <MealFormFields key={props.version} {...props} saved={saved} setSaved={setSaved} />;
+  return <MealFormFields key={props.version} {...props} />;
 }
 
 function MealFormFields({
@@ -78,8 +76,7 @@ function MealFormFields({
   initial,
   isNew,
   query,
-  setSaved,
-}: MealFormProps & { saved: boolean; setSaved: (saved: boolean) => void }) {
+}: MealFormProps) {
   const router = useRouter();
   // Back to the meal (or, for a new one, the list) with the coach's search kept. The search box beside the form (on a
   // wide page) can change the address after the page loaded, so a tap reads it from there.
@@ -146,7 +143,6 @@ function MealFormFields({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSaved(false);
     const problems = coachMealProblems({ name, ingredients, howTo });
     for (const k of MACRO_KEYS) {
       const r = parseMacroInput(k, macroText[k]);
@@ -177,11 +173,10 @@ function MealFormFields({
         setError({ code: out.code });
         return;
       }
-      setSaved(true);
       setBaseline({ ...current, newFile: false });
       setSavedFile(file);
-      // Replace: Back from the saved meal goes to the list, not to an empty New meal form.
-      if (isNew) router.replace(`/meals/${initial.id}`);
+      // Replace: Back from the saved meal goes to the list, not to an empty New meal form. The search (?q=) is kept.
+      if (isNew) router.replace(mealHref(initial.id, new URLSearchParams(window.location.search).get('q')));
       else router.refresh();
     } catch (err) {
       setError(err instanceof PhotoError ? errorFromText(err.message, 'meal_photo_failed') : { code: 'meal_save_failed' });

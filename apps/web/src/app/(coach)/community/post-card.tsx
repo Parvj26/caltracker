@@ -91,8 +91,12 @@ export function PostCard({
   const commentsId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Opening goes straight to the reply box when there's nothing to read yet, or with a mouse. On a touch screen with
+  // comments to read, the keyboard stays down so it doesn't cover them.
+  const wantsFocus = useRef(false);
   useEffect(() => {
-    if (open) inputRef.current?.focus({ preventScroll: true });
+    if (open && wantsFocus.current) inputRef.current?.focus({ preventScroll: true });
+    wantsFocus.current = false;
   }, [open]);
 
   const run = (action: () => Promise<CommunityOutcome>, after?: () => void) =>
@@ -175,7 +179,10 @@ export function PostCard({
           className={styles.commentButton}
           aria-expanded={open}
           aria-controls={commentsId}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            wantsFocus.current = !open && (post.comments.length === 0 || window.matchMedia('(pointer: fine)').matches);
+            setOpen((o) => !o);
+          }}
         >
           <CommentIcon />
           {count > 0 ? (

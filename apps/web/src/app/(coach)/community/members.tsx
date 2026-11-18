@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { MoreMenu } from '@/components/more-menu';
 import { AdaptiveDialog, Button, ErrorText, type AdaptiveDialogHandle } from '@/components/ui';
+import { useHistoryLayer } from '@/lib/use-history-layer';
 import { setMemberRemoved } from './actions';
 import type { Member } from './data';
 import styles from './community.module.css';
@@ -35,10 +36,23 @@ function MembersDialog({ communityId, members, onClose }: { communityId: string;
   const active = members.filter((m) => !m.removedAt);
   const removed = members.filter((m) => m.removedAt);
 
-  // The question takes focus when it appears (the ⋯ that asked is gone).
+  // "Remove …?" is its own step of history: Back (and Esc) go back to the list first, not out of the pop-up.
+  useHistoryLayer({ id: 'remove-member', param: 'step', active: asking !== null, onBack: () => setAsking(null) });
+
+  // The question takes focus when it appears (the ⋯ that asked is gone). Esc steps back to the list, before the
+  // pop-up's own Esc (which would close it) sees the key.
   useEffect(() => {
-    if (asking) document.getElementById('remove-member-cancel')?.focus();
-  }, [asking]);
+    if (!asking || pending) return;
+    document.getElementById('remove-member-cancel')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setAsking(null);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [asking, pending]);
 
   const change = (m: Member, remove: boolean) =>
     startTransition(async () => {

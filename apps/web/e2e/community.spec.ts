@@ -250,8 +250,20 @@ test('the coach removes a client from the community only, then adds them back', 
   await page.getByRole('button', { name: /^Members \(\d+\)$/ }).click();
   const members = page.getByRole('dialog', { name: /^Members/ });
   await expect(members.getByRole('button', { name: /Remove/ })).toHaveCount(0);
-  await members.getByRole('button', { name: 'More for Max Tester' }).click();
-  await page.getByRole('menuitem', { name: 'Remove from the community…' }).click();
+  const askRemove = async () => {
+    await page.getByRole('dialog').getByRole('button', { name: 'More for Max Tester' }).click();
+    await page.getByRole('menuitem', { name: 'Remove from the community…' }).click();
+    await expect(page.getByRole('dialog', { name: 'Remove Max Tester from the community?' })).toBeVisible();
+  };
+  // Esc and Back step back from the question to the list, not out of the pop-up.
+  await askRemove();
+  await page.keyboard.press('Escape');
+  await expect(members).toBeVisible();
+  await askRemove();
+  await page.goBack();
+  await expect(members).toBeVisible();
+  await expect(page).toHaveURL(/\/community\?sheet=community-members$/);
+  await askRemove();
   const ask = page.getByRole('dialog', { name: 'Remove Max Tester from the community?' });
   await expect(ask).toContainText('They stay your client');
   await ask.getByRole('button', { name: 'Remove', exact: true }).click();
