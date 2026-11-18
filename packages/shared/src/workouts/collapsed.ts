@@ -125,7 +125,7 @@ export type CollapsedBlock = { title: string; line: string; parts: Array<{ key: 
 
 /**
  * What a folded block shows in the builder on a phone. A straight exercise: its name and exerciseCollapsedLine. A
- * superset: "Superset / circuit", "3 rounds · rest 1:30" (or "3 + 2 sets" when uneven) and each exercise's line
+ * superset: "Superset", "3 rounds · rest 1:30" (or "3 + 2 sets" when uneven) and each exercise's line
  * without rest. A pick-one group: "Pick one", "2 options" and each option's line.
  */
 export function blockCollapsedSummary(block: WorkoutBlockDoc, units: Units): CollapsedBlock {
@@ -147,7 +147,7 @@ export function blockCollapsedSummary(block: WorkoutBlockDoc, units: Units): Col
   );
   const line = [even ? plural(counts[0]!, 'round') : `${counts.join(' + ')} sets`, restText(rests)].filter(Boolean).join(' · ');
   return {
-    title: 'Superset / circuit',
+    title: 'Superset',
     line,
     parts: block.exercises.map((e) => ({ key: e.id, name: e.exerciseName, line: exerciseCollapsedLine(e, units, { rest: false }) })),
   };
