@@ -21,7 +21,7 @@ function RowTime({ iso, now }: { iso: string; now: string }) {
 /** How many conversations have unread messages, for the empty pane beside the inbox. */
 export const UnreadPeopleContext = createContext(0);
 
-/** The conversation a wide screen opens instead of an empty pane: the first with unread messages, else the latest. */
+/** The conversation a wide screen opens instead of an empty pane: the latest, only when none shown is unread. */
 export const FirstConversationContext = createContext<string | null>(null);
 
 /**
@@ -80,8 +80,10 @@ export function MessagesShell({
   useOnWake(refresh);
 
   const unreadCount = rows.filter((r) => r.unread > 0).length;
-  const firstConversation = (rows.find((r) => r.unread > 0) ?? rows.find((r) => r.lastMessageAt !== null))?.clientId ?? null;
   const shown = useMemo(() => filterInbox(rows, { unreadOnly, query: debounced }), [rows, unreadOnly, debounced]);
+  // A wide screen opens the latest conversation in the list shown (Unread filter and search applied), but only when
+  // nothing there is unread: then the empty pane says how many are waiting and the coach picks.
+  const firstConversation = shown.some((r) => r.unread > 0) ? null : (shown.find((r) => r.lastMessageAt !== null)?.clientId ?? null);
 
   return (
     <div className={styles.shell} data-screen={segment ? 'thread' : 'list'}>

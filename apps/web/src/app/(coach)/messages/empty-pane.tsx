@@ -10,8 +10,8 @@ import styles from './messages.module.css';
 /**
  * The right-hand pane before a conversation is picked: what's waiting and how to start, instead of a blank 60% of the
  * screen (UX review C). It counts conversations with unread messages. On a wide screen (iPad in landscape, desktop:
- * 1000 px and up) it opens the first conversation with unread messages, else the latest one, in its place; the
- * address is replaced, so Back doesn't land on the empty pane again.
+ * 1000 px and up) with nothing unread, it opens the latest conversation in its place (the address is replaced, so Back
+ * doesn't land on the empty pane again); with something unread it stays, so the coach picks who to read first.
  */
 export function InboxEmptyPane() {
   const unread = useContext(UnreadPeopleContext);

@@ -2,6 +2,7 @@
 
 import { useId, useRef } from 'react';
 import { Button } from '@/components/ui';
+import { clearMessageDrafts } from '@/lib/message-draft';
 import { clearAllDrafts } from '@/lib/session-draft';
 import styles from './profile.module.css';
 import { openRef } from '@/lib/open-layer';
@@ -26,8 +27,16 @@ export function SignOut() {
         <p id={bodyId} className={styles.signOutBody} data-ph-safe="">
           You&apos;ll need your email and password to sign back in on this device.
         </p>
-        {/* The device's kept copies of live sessions hold client data: they go before the sign-out is sent. */}
-        <form action="/auth/sign-out" method="post" className={styles.signOutActions} onSubmit={clearAllDrafts}>
+        {/* The device's kept copies of live sessions and unsent messages hold client data: they go before the sign-out is sent. */}
+        <form
+          action="/auth/sign-out"
+          method="post"
+          className={styles.signOutActions}
+          onSubmit={() => {
+            clearAllDrafts();
+            clearMessageDrafts();
+          }}
+        >
           <Button type="submit" data-ph-capture-attribute-label="sign_out" phSafe>
             Sign out
           </Button>

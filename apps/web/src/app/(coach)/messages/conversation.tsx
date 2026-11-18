@@ -11,6 +11,7 @@ import { PhotoError, compressPhoto } from '@/lib/image-resize';
 import { avatarTone, initials } from '../clients/avatar';
 import { markRead, sendMessage } from './actions';
 import { Composer, type Draft } from './composer';
+import { messageDraftKey } from '@/lib/message-draft';
 import { PAGE_SIZE, loadMessages, loadTheirRead, toMessage, type MessageRow } from './data';
 import { clockTime, useNow, useTimeZone } from './time';
 import { useBrowserSupabase, useChanges, useOnWake } from './use-realtime';
@@ -429,7 +430,7 @@ export function Conversation({ conversationId, workspaceId, me, clientId, client
           {readOnly ? "This client has been removed, so you can read the history but can't send new messages." : 'This conversation is not available.'}
         </p>
       ) : (
-        <Composer onSend={send} initialBody={initialBody} draftKey={`ct-message-draft:${me}:${clientId}`} />
+        <Composer key={messageDraftKey(me, clientId)} onSend={send} initialBody={initialBody} draftKey={messageDraftKey(me, clientId)} />
       )}
     </>
   );

@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@caltracker/shared';
 import { expect, test, type Page } from '@playwright/test';
-import { serviceClient, signInAsCoach } from './helpers';
+import { serviceClient, signInAsCoach, signInThroughForm, signOutFromProfile } from './helpers';
 
 // Coach messages (docs/superpowers/specs/2026-11-05-messages-design.md). The coach's unread badge is shared by every
 // test here, so the file runs in order, and each test makes (and removes) its own client.
@@ -258,38 +258,62 @@ test('a past client\'s Training tab shows their history read-only', async ({ pag
   expect(blocked.error).not.toBeNull();
 });
 
-test('from 1000 px wide, Messages opens the first unread (else the latest) conversation instead of an empty pane', async ({ page }) => {
-  const client = await makeClient('Opal');
-  await clientSays(client.id, 'Opening by itself');
+test('from 1000 px wide, Messages opens the latest conversation when nothing is unread, and waits for a pick when something is', async ({ page }) => {
+  const quiet = await makeClient('Opal');
   await signInAsCoach(page);
   await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto(`/messages/${quiet.id}`);
+  const box = page.getByLabel('Message', { exact: true });
+  await box.fill('Latest from me');
+  await box.press('Enter');
+  await expect(page.getByRole('log').getByText('Latest from me')).toBeVisible();
+  // Saved, not only shown (the bubble appears before the server has it).
+  await expect.poll(async () => (await admin.from('messages').select('id').eq('body', 'Latest from me')).data?.length ?? 0).toBe(1);
+
+  // Nothing unread: the latest conversation opens in place of the empty pane.
   await page.goto('/messages');
-  await expect(page).toHaveURL(/\/messages\/[0-9a-f-]{36}$/);
-  await expect(page.getByText(/Pick a client on the left/)).toHaveCount(0);
-  await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/messages/${quiet.id}$`));
+
+  // Something unread: the pane says how many are waiting and nothing opens by itself.
+  const waiting = await makeClient('Wren');
+  await clientSays(waiting.id, 'Are you there?');
+  await page.goto('/messages');
+  await expect(page.getByText('1 conversation with unread messages')).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page).toHaveURL(/\/messages$/);
 });
 
-test('an unsent message is kept for a reload, Back asks "Discard draft?", and sending clears it', async ({ page }) => {
-  const client = await makeClient('Drafty');
-  await signInAsCoach(page);
-  await page.goto(`/clients/${client.id}`);
-  await page.getByRole('link', { name: 'Message', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
+test('an unsent message is kept per conversation and across a reload, sending clears it, and signing out removes it', async ({ page }) => {
+  const a = await makeClient('Drafty');
+  const b = await makeClient('Second');
+  // Its own session (through the form), since this test signs out and the shared one must stay valid.
+  await signInThroughForm(page);
+  await page.goto(`/messages/${a.id}`);
   const box = page.getByLabel('Message', { exact: true });
   await box.fill('Half a thought');
-  await page.reload();
+  // Switching conversations asks nothing and keeps each draft.
+  await inboxRow(page, b.name).click();
+  await expect(page).toHaveURL(new RegExp(`/messages/${b.id}$`));
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(box).toHaveValue('');
+  await box.fill('For Second');
+  await inboxRow(page, a.name).click();
+  await expect(page).toHaveURL(new RegExp(`/messages/${a.id}$`));
   await expect(box).toHaveValue('Half a thought');
-
-  await page.goBack();
-  const ask = page.getByRole('alertdialog', { name: 'Discard draft?' });
-  await expect(ask).toBeVisible();
-  await ask.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page).toHaveURL(new RegExp(`/messages/${client.id}$`));
+  await page.reload();
   await expect(box).toHaveValue('Half a thought');
 
   await box.press('Enter');
   await expect(page.getByRole('log').getByText('Half a thought')).toBeVisible();
   await expect(box).toHaveValue('');
   await page.reload();
+  await expect(box).toHaveValue('');
+
+  // Signing out removes the other conversation's draft too.
+  await signOutFromProfile(page);
+  await expect(page).toHaveURL(/\/sign-in/);
+  await signInThroughForm(page);
+  await page.goto(`/messages/${b.id}`);
+  await expect(page.getByRole('heading', { name: b.name })).toBeVisible();
   await expect(box).toHaveValue('');
 });
