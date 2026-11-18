@@ -267,7 +267,7 @@
 }
 /* Same rule as the calendar: wrap between words, around the "⋯" button in the top-right corner; a single word wider
    than the whole chip is cut with "…" (the full name is in the title). */
-.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.chipName { display: -webkit-box; overflow: hidden; overflow-wrap: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .chipMenuButton {
   flex: none;
   width: var(--ct-tap-min);

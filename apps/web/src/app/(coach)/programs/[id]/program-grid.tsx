@@ -439,7 +439,13 @@ export function ProgramGrid({
           className={styles.settingsToggle}
           aria-expanded={settingsOpen}
           aria-controls={settingsId}
-          onClick={() => setSettingsOpen((o) => !o)}
+          onClick={(e) => {
+            const toggle = e.currentTarget;
+            const opening = !settingsOpen;
+            setSettingsOpen(opening);
+            // They open below the plan, often at the bottom of the screen: bring them into view.
+            if (opening) requestAnimationFrame(() => toggle.scrollIntoView({ block: 'start' }));
+          }}
         >
           Program settings <span aria-hidden="true">{settingsOpen ? '▴' : '▾'}</span>
         </button>
