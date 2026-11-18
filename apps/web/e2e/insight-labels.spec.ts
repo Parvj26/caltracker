@@ -68,6 +68,8 @@ test('invite: every control is labelled, and a bad email shows its error code', 
   await expect(dialog.locator('[data-ph-capture-attribute-label="invite_csv_upload"]')).toBeAttached();
   await dialog.getByRole('tab', { name: 'One client' }).click();
   await label(page, 'invite_cancel').click();
+  // Something was typed, so Cancel asks first (the one pop-up's "Discard changes?").
+  await dialog.getByRole('button', { name: 'Discard' }).click();
   await expect(dialog).toBeHidden();
 });
 

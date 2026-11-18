@@ -179,7 +179,7 @@ test('Home shows the client Live (and under Training now) when they start, then 
   const log = makeLog(w.data.id, 'Live push', 2);
   await log.save(client.phone, 0);
   await expect(row).toContainText('● Live', LIVE_BUSY);
-  const card = page.getByRole('region', { name: 'Training now' }).getByRole('link', { name: new RegExp(`${last} live`) });
+  const card = page.getByRole('region', { name: 'Training now' }).getByRole('link', { name: new RegExp(`${last} .*Watch live`) });
   await expect(card).toContainText('0 of 2 sets');
   await log.save(client.phone, 2, 'completed');
   await expect(row).toContainText('✓ Done', LIVE_BUSY);
