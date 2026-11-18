@@ -57,21 +57,27 @@ export function ProgressSection({
   const today = useLocalToday();
   // Kept in the address (?range=), so a reload or Back to this tab keeps the chart's range.
   const [range, setRange] = useUrlChoice<ChartRange>('range', CHART_RANGES, '1y');
-  const [editing, setEditing] = useState<Editing | null>(openScan && !readOnly ? { scan: null } : null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState<ScanRow | null>(null);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<ErrorCode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Drop ?scan=1 once it has opened the form, so a reload doesn't open it again.
+  // Drop ?scan=1 from the address first, then open the form (it adds its own ?sheet= step on top of the clean
+  // address), so a reload or Back doesn't open it again.
   useEffect(() => {
     if (!openScan) return;
     const url = new URL(window.location.href);
-    if (!url.searchParams.has('scan')) return;
-    url.searchParams.delete('scan');
-    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-  }, [openScan]);
+    if (url.searchParams.has('scan')) {
+      url.searchParams.delete('scan');
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    }
+    if (readOnly) return;
+    // Opening only after the address is clean is the point here (the form's own history step copies the address).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditing({ scan: null });
+  }, [openScan, readOnly]);
 
   useEffect(() => {
     if (!toast || toast === STALE_DEPLOY_MESSAGE) return;

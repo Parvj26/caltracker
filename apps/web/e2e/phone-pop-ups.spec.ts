@@ -153,7 +153,7 @@ test.describe('session logger', () => {
 });
 
 test.describe('pop-up windows', () => {
-  test('Move to…: full screen, quick days first, and Tomorrow moves it to tomorrow', async ({ page }) => {
+  test('Move to…: a bottom sheet, quick days first, and Tomorrow moves it to tomorrow', async ({ page }) => {
     test.slow();
     const client = await newClient();
     await signInAsCoach(page);
@@ -169,8 +169,11 @@ test.describe('pop-up windows', () => {
     const dialog = page.getByRole('dialog', { name: `Move ${name}` });
     // No keyboard and no date picker on open: the window itself has focus.
     await expect(dialog).toBeFocused();
+    // A bottom sheet as tall as its content (UI rules §5): measured where it settles, not mid slide-in.
+    await dialog.evaluate((d) => Promise.all(d.getAnimations().map((a) => a.finished)));
     const box = (await dialog.boundingBox())!;
-    expect(Math.round(box.height)).toBe(SE.height);
+    expect(Math.round(box.y + box.height)).toBe(SE.height);
+    expect(box.height).toBeLessThan(SE.height);
     await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
     // Its own day (today) is not offered; Tomorrow is picked to start with.
     await expect(dialog.getByRole('button', { name: /^Today/ })).toHaveCount(0);
@@ -229,6 +232,8 @@ test.describe('pop-up windows', () => {
     await page.getByRole('button', { name: '+ Add workout' }).click();
     const add = page.getByRole('dialog', { name: 'Add a workout' });
     await expect(add).toBeFocused();
+    // Measure where the sheet settles, not mid slide-in.
+    await add.evaluate((d) => Promise.all(d.getAnimations().map((a) => a.finished)));
     expect(Math.round((await add.boundingBox())!.height)).toBe(SE.height);
     await expect(add.getByRole('button', { name: /^Today/ })).toHaveAttribute('aria-pressed', 'true');
     await expectOnScreen(page, add.getByRole('button', { name: 'Cancel' }));
@@ -238,6 +243,7 @@ test.describe('pop-up windows', () => {
     await page.getByRole('button', { name: 'Assign program' }).first().click();
     const assign = page.getByRole('dialog', { name: 'Assign a program' });
     await expect(assign).toBeFocused();
+    await assign.evaluate((d) => Promise.all(d.getAnimations().map((a) => a.finished)));
     await assign.getByRole('radio', { name: program, exact: true }).check();
     // A program starts next Monday by default: the Next Mon quick day (or Tomorrow on a Sunday).
     const nextMon = addDays(today, 8 - (((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 1));
