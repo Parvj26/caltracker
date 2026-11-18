@@ -56,7 +56,9 @@ for (const size of SIZES) {
       await page.goto('/clients');
       const chips = page.getByRole('group', { name: 'Filter clients' });
       await chips.getByRole('button', { name: /^Nothing planned/ }).click();
+      await expect(chips.getByRole('button', { name: /^Nothing planned/ })).toHaveAttribute('aria-pressed', 'true');
       await sortSelect(page).selectOption('name');
+      await expect(sortSelect(page)).toHaveValue('name');
       await expect(page).toHaveURL(/\/clients\?filter=nothing_planned&sort=name$/);
 
       // Into the client, through three tabs, then one Back: the list, as it was.
@@ -92,12 +94,14 @@ for (const size of SIZES) {
       await page.goto(`/clients/${client.id}/body`);
       await page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' }).click();
       await expect(page).toHaveURL(/[?&]range=all/);
+      await expect(page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
       await page.reload();
       await expect(page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
 
       await page.goto(`/clients/${client.id}`);
       await page.getByLabel('Period').selectOption('3m');
       await expect(page).toHaveURL(/[?&]period=3m/);
+      await expect(page.getByLabel('Period')).toHaveValue('3m');
       await page.reload();
       await expect(page.getByLabel('Period')).toHaveValue('3m');
     });
@@ -114,6 +118,7 @@ for (const size of SIZES) {
       const group = page.getByRole('group', { name: 'Filter Needs attention' });
       await group.getByRole('button', { name: /^Missed/ }).click();
       await expect(page).toHaveURL(/[?&]needs=missed/);
+      await expect(group.getByRole('button', { name: /^Missed/ })).toHaveAttribute('aria-pressed', 'true');
       await page.goto('/clients');
       await page.goBack();
       await expect(page.getByRole('group', { name: 'Filter Needs attention' }).getByRole('button', { name: /^Missed/ })).toHaveAttribute('aria-pressed', 'true');
@@ -136,6 +141,7 @@ test.describe('iPhone only', () => {
     await page.goto(`/clients/${client.id}/training?view=month&from=${month}-01`);
     await page.locator(`[data-date="${day}"]`).getByRole('button').first().click();
     await expect(page).toHaveURL(new RegExp(`[?&]day=${day}`));
+    await expect(page.locator(`[data-date="${day}"]`).getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
     await page.goto(`/clients/${client.id}/body`);
     await page.goBack();
     await expect(page.locator(`[data-date="${day}"]`).getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
@@ -152,6 +158,7 @@ test.describe('iPhone only', () => {
     const tabs = page.getByRole('tablist', { name: 'Program week' });
     await tabs.getByRole('tab', { name: 'Week 3' }).click();
     await expect(page).toHaveURL(/[?&]week=3/);
+    await expect(tabs.getByRole('tab', { name: 'Week 3' })).toHaveAttribute('aria-selected', 'true');
     await page.goto('/programs');
     await page.goBack();
     await expect(page.getByRole('tablist', { name: 'Program week' }).getByRole('tab', { name: 'Week 3' })).toHaveAttribute('aria-selected', 'true');

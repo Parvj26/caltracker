@@ -20,11 +20,14 @@ export function withParam(href: string, name: string, value: string, fallback: s
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** Writes one address value without a new history entry (keeping Next's own history state). */
+/**
+ * Writes one address value without a new history entry. The state passed is null on purpose: Next copies its own
+ * history state over, and only then tells useSearchParams (passing Next's state back in skips that).
+ */
 export function replaceParam(name: string, value: string, fallback: string): void {
   const next = withParam(window.location.href, name, value, fallback);
   if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-    window.history.replaceState(window.history.state, '', next);
+    window.history.replaceState(null, '', next);
   }
 }
 
