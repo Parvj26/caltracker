@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSelectedLayoutSegment } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dayLabel } from '@caltracker/shared';
-import { SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
+import { ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { avatarTone, initials } from '../clients/avatar';
 import { badgeText, filterInbox, type InboxRow } from './model';
@@ -19,9 +18,12 @@ function RowTime({ iso, now }: { iso: string; now: string }) {
   return <time dateTime={iso} className={styles.rowTime}>{label === 'Today' ? clockTime(iso, timeZone) : label}</time>;
 }
 
+/** How many conversations have unread messages, for the empty pane beside the inbox. */
+export const UnreadPeopleContext = createContext(0);
+
 /**
  * The two panes: the inbox (current clients, latest message first) and, beside it, the open conversation (the
- * route's page). Under 900 px only one shows at a time. The server sends the rows; Realtime events and focus ask the
+ * route's page). On a phone only one shows at a time. The server sends the rows; Realtime events and focus ask the
  * server for fresh ones, so the list stays right while the window is open.
  */
 export function MessagesShell({
@@ -73,6 +75,7 @@ export function MessagesShell({
   );
   useOnWake(refresh);
 
+  const unreadCount = rows.filter((r) => r.unread > 0).length;
   const shown = useMemo(() => filterInbox(rows, { unreadOnly, query: debounced }), [rows, unreadOnly, debounced]);
 
   return (
@@ -83,7 +86,7 @@ export function MessagesShell({
           <div className={styles.filters}>
             <SearchBox label="Search clients" value={query} onChange={setQuery} className={styles.search} />
             <button type="button" className={styles.toggle} aria-pressed={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>
-              Unread
+              Unread{unreadCount > 0 ? ` ${unreadCount}` : ''}
             </button>
           </div>
         </div>
@@ -95,31 +98,40 @@ export function MessagesShell({
             <p className={styles.empty}>{rows.length === 0 ? 'No clients yet. Invite one from Clients.' : 'Nothing unread.'}</p>
           )
         ) : (
-          <ul className={styles.list} aria-label="Conversations">
+          <RowList aria-label="Conversations" className={styles.list}>
             {shown.map((r) => (
-              <li key={r.clientId}>
-                <Link
-                  href={`/messages/${r.clientId}`}
-                  className={cx(styles.row, r.unread > 0 && styles.rowUnread, segment === r.clientId && styles.rowCurrent)}
-                  aria-current={segment === r.clientId ? 'page' : undefined}
-                  aria-label={r.unread > 0 ? `${r.name}, ${r.unread} unread` : r.name}
-                  data-unread={r.unread}
-                >
+              <ListRow
+                key={r.clientId}
+                href={`/messages/${r.clientId}`}
+                current={segment === r.clientId}
+                emphasis={r.unread > 0}
+                className={styles.row}
+                leading={
                   <span aria-hidden="true" className={cx(styles.avatar, styles[`avatar-${avatarTone(r.clientId)}`])}>
                     {initials(r.name)}
                   </span>
-                  <span className={styles.rowName}>{r.name}</span>
-                  {r.lastMessageAt ? <RowTime iso={r.lastMessageAt} now={now} /> : <span />}
-                  <span className={styles.preview}>{r.preview ? `${r.lastFromMe ? 'You: ' : ''}${r.preview}` : 'No messages yet'}</span>
-                  {r.unread > 0 ? <span className={styles.count} aria-hidden="true">{badgeText(r.unread)}</span> : <span />}
-                </Link>
-              </li>
+                }
+                title={r.name}
+                meta={<span className={styles.preview}>{r.preview ? `${r.lastFromMe ? 'You: ' : ''}${r.preview}` : 'No messages yet'}</span>}
+                end={
+                  <>
+                    {r.lastMessageAt ? <RowTime iso={r.lastMessageAt} now={now} /> : null}
+                    {r.unread > 0 ? (
+                      <span className={styles.count}>
+                        {badgeText(r.unread)}
+                        <span className={styles.srOnly}> unread</span>
+                      </span>
+                    ) : null}
+                  </>
+                }
+                linkProps={{ 'data-unread': r.unread }}
+              />
             ))}
-          </ul>
+          </RowList>
         )}
       </section>
       <section className={cx(styles.pane, styles.threadPane)} aria-label="Conversation">
-        {children}
+        <UnreadPeopleContext.Provider value={unreadCount}>{children}</UnreadPeopleContext.Provider>
       </section>
     </div>
   );

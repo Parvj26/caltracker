@@ -1,7 +1,8 @@
-import styles from './messages.module.css';
+import { InboxEmptyPane } from './empty-pane';
 
 export const metadata = { title: 'Messages' };
 
+/** Beside the inbox on iPad and desktop before a conversation is picked (a phone shows the inbox alone). */
 export default function MessagesPage() {
-  return <p className={styles.placeholder}>Pick a client to see your conversation.</p>;
+  return <InboxEmptyPane />;
 }

@@ -135,7 +135,7 @@ export function Composer({ onSend, initialBody = '' }: { onSend: (draft: Draft) 
             }
           }}
         />
-        <Button type="submit" className={styles.send} disabled={!canSend}>
+        <Button type="submit" size="compact" className={styles.send} disabled={!canSend} disabledReason="Type a message or add a photo first" phSafe>
           Send
         </Button>
       </div>
