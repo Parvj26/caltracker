@@ -40,32 +40,141 @@
 .numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nameLink { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
-/* iPhone: each workout is a card (name, then exercises and date, then Assign and Duplicate), never wider than the
-   screen. iPad and desktop keep the table. */
+/* Row actions: Assign, Duplicate and ⋯ on iPad and desktop; Assign and ⋯ (a sheet from the bottom) on an iPhone. */
+.rowActions { flex-wrap: nowrap; justify-content: flex-end; }
+.phoneOnlyFlex { display: none; }
+/* The ⋯ button: outlined like Duplicate beside it. */
+.more > button,
+.moreButton {
+  width: 48px;
+  height: var(--ct-tap-min);
+  border-radius: var(--ct-radius-input);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-border);
+}
+.more > button:hover,
+.more > button[aria-expanded='true'] { background: var(--ct-surface); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); }
+.moreButton {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.moreButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+
+/* iPhone: each workout is a card (name, then exercises and date, with Assign and ⋯ beside them), never wider than
+   the screen. iPad and desktop keep the table. */
 .phoneOnly { display: none; }
 @media (max-width: 599.98px) {
   .phoneOnly { display: inline; }
+  .wideOnly { display: none; }
+  .phoneOnlyFlex { display: inline-flex; }
   .listCard { padding: var(--ct-space-1) var(--ct-space-4); }
   .table, .table tbody { display: block; }
   .table thead { display: none; }
   .table tr {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0 var(--ct-space-3);
-    padding: var(--ct-space-2) 0 var(--ct-space-3);
+    gap: 0 var(--ct-space-2);
+    padding: var(--ct-space-2-5) 0;
     border-top: var(--ct-border-width-card) solid var(--ct-border);
   }
   .table tbody tr:first-child { border-top: 0; }
   .table td { display: block; padding: 0; border-top: 0; }
-  .table td:first-child { grid-column: 1 / -1; }
-  .table td:nth-child(2), .table td:nth-child(3) { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
-  .table td:last-child { grid-column: 1 / -1; padding-top: var(--ct-space-2); }
-  .nameLink { overflow-wrap: anywhere; }
-  .rowActions { display: flex; }
+  .table td:first-child { grid-column: 1 / 3; grid-row: 1; }
+  .table td:nth-child(2), .table td:nth-child(3) { grid-row: 2; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+  .table td:nth-child(3)::before { content: '· '; }
+  .table td:last-child { grid-column: 3; grid-row: 1 / 3; }
+  .nameLink { min-height: 0; padding-bottom: 2px; overflow-wrap: anywhere; }
 }
 
-/* ---------- Delete dialog ---------- */
+/* iPhone ⋯: the row's actions as big buttons in a sheet from the bottom. */
+.actionSheet[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: none;
+  max-height: calc(100dvh - 40px);
+  margin: 0;
+  padding: var(--ct-space-3) var(--ct-space-4) calc(var(--ct-space-6) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border: 0;
+  border-top: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: 24px 24px 0 0;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+.actionSheet::backdrop { background: color-mix(in srgb, var(--ct-ink) 32%, transparent); }
+.grab {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  margin-bottom: var(--ct-space-1);
+  border-radius: var(--ct-radius-pill);
+  background: color-mix(in srgb, var(--ct-ink) 20%, transparent);
+}
+.sheetTitle { margin: 0; padding: var(--ct-space-1) var(--ct-space-1) var(--ct-space-2); font-size: 17px; font-weight: var(--ct-weight-section-heading); overflow-wrap: anywhere; }
+.sheetItem {
+  min-height: 52px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: var(--ct-weight-button);
+  text-align: left;
+  cursor: pointer;
+}
+.sheetItem:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.sheetDanger { background: var(--ct-danger-bg); color: var(--ct-danger-deep); font-weight: 800; }
+
+/* ---------- Preview ---------- */
+.dialog.preview { width: min(560px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 32px)); overflow-y: auto; }
+.notesBox { margin: 0; padding: var(--ct-space-2-5) var(--ct-space-3-5); border-radius: var(--ct-radius-input); background: var(--ct-surface); white-space: pre-wrap; }
+.summaryList { margin: 0; padding: 0; list-style: none; }
+.summaryRow { display: flex; align-items: center; gap: var(--ct-space-3); padding: var(--ct-space-3) var(--ct-space-1); border-top: 1px solid var(--ct-border); }
+.summaryNumber {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-lime);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.summaryText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.summaryName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
+.previewBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.previewRun { display: flex; flex-direction: column; }
+.previewSection {
+  margin: 0;
+  padding: var(--ct-space-1) var(--ct-space-1) var(--ct-space-2);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ct-ink-muted);
+}
+/* A superset: one row with its label and its exercises (2a, 2b…) joined by a line on the left. */
+.supersetRow { flex-direction: column; align-items: stretch; gap: var(--ct-space-2); }
+.supersetRow > .summaryList { padding-left: var(--ct-space-2); border-left: var(--ct-border-width-secondary-button) solid var(--ct-lime); display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.supersetLabel { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
+.supersetPart { display: flex; align-items: center; gap: var(--ct-space-3); }
+
+/* ---------- Dialogs (Delete, Rename, Preview) ---------- */
 .dialog {
   width: min(440px, calc(100vw - 32px));
   padding: var(--ct-space-6);
@@ -79,3 +188,6 @@
 .dialogTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
 .dialogBody { margin: 0; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); margin-top: var(--ct-space-2); }
+.dialogForm { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.dialogActions .dangerButton { background: var(--ct-danger); color: var(--ct-bg); box-shadow: none; }
+.dialogActions .dangerButton:hover:not(:disabled) { background: var(--ct-danger-deep); }

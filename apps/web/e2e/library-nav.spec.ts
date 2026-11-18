@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { signInAsCoach } from './helpers';
 
 // iPad and desktop: Workouts, Exercises and Programs sit behind one Library item in the side menu. It opens a pop-up
-// beside it with the three as big buttons, and each of the three lists has a Workouts | Exercises | Programs row at
+// beside it with the three as a compact list, and each of the three lists has a Workouts | Exercises | Programs row at
 // the top. The iPhone's Library tab and sheet are in phone-nav.spec.ts.
 
 const library = (page: Page) => page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Library' });
@@ -24,7 +24,7 @@ for (const [device, size] of [
     await expect(library(page)).toHaveAttribute('aria-expanded', 'true');
     const choices = popup(page).getByRole('link');
     await expect(choices).toHaveCount(3);
-    await expect(choices.nth(0)).toHaveAccessibleName(/^Workouts Single sessions you build and assign/);
+    await expect(choices.nth(0)).toHaveAccessibleName('Workouts Single sessions');
     await expect(choices.nth(1)).toHaveAccessibleName(/^Exercise library/);
     await expect(choices.nth(2)).toHaveAccessibleName(/^Programs/);
     await expect(choices.nth(0)).toBeFocused();
@@ -33,7 +33,14 @@ for (const [device, size] of [
     expect(box.x).toBeGreaterThan(button.x + button.width);
     expect(box.x + box.width).toBeLessThanOrEqual(size.width);
     expect(box.y + box.height).toBeLessThanOrEqual(size.height);
-    for (const choice of await choices.all()) expect((await choice.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // Compact: a narrow pop-up with no heading, one short row per choice that is still a full tap target.
+    expect(box.width).toBeLessThanOrEqual(270);
+    await expect(popup(page).getByText('Library', { exact: true })).toHaveCount(0);
+    for (const choice of await choices.all()) {
+      const { height } = (await choice.boundingBox())!;
+      expect(height).toBeGreaterThanOrEqual(44);
+      expect(height).toBeLessThanOrEqual(60);
+    }
 
     // Tab goes round the choices and the Library button.
     for (let i = 0; i < 5; i++) {

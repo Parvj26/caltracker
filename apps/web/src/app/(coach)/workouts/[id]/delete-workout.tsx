@@ -1,74 +1,23 @@
 'use client';
 
-import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
-import { Button, ErrorText } from '@/components/ui';
-import { countProgramUses, deleteWorkout } from '../actions';
-import styles from '../workouts.module.css';
+import { useState } from 'react';
+import { Button } from '@/components/ui';
+import { DeleteDialog } from '../workout-row-actions';
 
-/** Delete a library workout, after saying how many programs use it (Review Focus 5). */
+/**
+ * The workout page's Delete workout: the same question as the Workouts list's Delete…. It refuses while a program or
+ * an open invite's starting plan uses the workout, and opens the list once it is deleted.
+ */
 export function DeleteWorkout({ id, name }: { id: string; name: string }) {
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  const [uses, setUses] = useState<number | null>(null);
-  const [error, setError] = useState<ErrorCode | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function open() {
-    setError(null);
-    setUses(null);
-    dialogRef.current?.showModal();
-    countProgramUses(id)
-      .then(setUses)
-      .catch(() => setError('workout_uses_failed'));
-  }
-
-  function confirm() {
-    setError(null);
-    startTransition(async () => {
-      const outcome = await deleteWorkout(id);
-      if (outcome.ok) {
-        dialogRef.current?.close();
-        router.push('/workouts');
-      } else setError(outcome.code);
-    });
-  }
-
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" onClick={open}>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
         Delete workout
       </Button>
-      <dialog
-        ref={dialogRef}
-        className={styles.dialog}
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        onCancel={(e) => {
-          if (pending) e.preventDefault();
-        }}
-      >
-        <h2 id={titleId} className={styles.dialogTitle}>Delete {name}?</h2>
-        <p id={bodyId} className={styles.dialogBody} aria-live="polite">
-          {uses === null
-            ? 'Checking which programs use it…'
-            : `Used in ${uses} ${uses === 1 ? 'program' : 'programs'}. Deleting removes it from them. Clients' calendars keep their copies${
-                uses > 0 ? ', except upcoming ones not yet started from programs with Live Sync on' : ''
-              }.`}
-        </p>
-        {error ? <ErrorText code={error} /> : null}
-        <div className={styles.dialogActions}>
-          <Button variant="secondary" onClick={() => dialogRef.current?.close()} disabled={pending}>
-            Cancel
-          </Button>
-          <Button onClick={confirm} pending={pending} disabled={uses === null}>
-            {pending ? 'Deleting…' : 'Delete'}
-          </Button>
-        </div>
-      </dialog>
+      {open ? <DeleteDialog id={id} name={name} onClose={() => setOpen(false)} onDeleted={() => router.push('/workouts')} /> : null}
     </>
   );
 }

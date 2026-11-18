@@ -82,14 +82,15 @@ test.describe('iPhone SE (375 x 667)', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('the Workouts list fits the screen, with Assign and Duplicate on every card', async ({ page }) => {
+  test('the Workouts list fits the screen, with Assign and ⋯ on every card', async ({ page }) => {
     await signInAsCoach(page);
     await page.goto('/workouts');
     const table = page.getByRole('table', { name: 'Workouts' });
     await expect(table.getByRole('link').first()).toBeVisible();
     await expectNoSidewaysScroll(page);
-    const duplicate = table.getByRole('button', { name: /^Duplicate/ }).first();
-    const box = (await duplicate.boundingBox())!;
+    // Duplicate waits behind ⋯ on an iPhone (workout-list-menu.spec.ts).
+    const more = table.getByRole('button', { name: /^More actions for / }).first();
+    const box = (await more.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(SE.width);
   });
 });

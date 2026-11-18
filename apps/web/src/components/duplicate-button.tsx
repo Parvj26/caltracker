@@ -17,11 +17,8 @@ type Props = {
   compact?: boolean;
 };
 
-/**
- * Makes "<name> (copy)" in the coach's workspace and opens it. It copies what is saved, so unsaved edits in the
- * workout builder are not part of the copy.
- */
-export function DuplicateButton({ kind, id, name, compact = false }: Props) {
+/** Duplicate's work, for a button or a menu item: run() makes the copy and opens it; error is set when it fails. */
+export function useDuplicate(kind: 'workout' | 'program', id: string) {
   const router = useRouter();
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
@@ -41,6 +38,15 @@ export function DuplicateButton({ kind, id, name, compact = false }: Props) {
       }
     });
   }
+  return { run, pending, error };
+}
+
+/**
+ * Makes "<name> (copy)" in the coach's workspace and opens it. It copies what is saved, so unsaved edits in the
+ * workout builder are not part of the copy.
+ */
+export function DuplicateButton({ kind, id, name, compact = false }: Props) {
+  const { run, pending, error } = useDuplicate(kind, id);
 
   const label = pending ? 'Duplicating…' : 'Duplicate';
   return (

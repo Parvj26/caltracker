@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // A stand-in for the Supabase client that records each query's table, operation and eq() filters.
 type Call = { table: string; op: string; filters: Record<string, unknown>; rpc?: string; payload?: unknown };
-type Result = { data?: unknown; error?: { code?: string; message: string } | null };
+type Result = { data?: unknown; count?: number; error?: { code?: string; message: string } | null };
 const calls: Call[] = [];
 let respond: (call: Call) => Result = () => ({ data: null, error: null });
 
@@ -35,7 +35,7 @@ vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => Promise.re
 const loadWorkoutDoc = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock('@/lib/workouts', () => ({ loadWorkoutDoc: (...args: unknown[]) => loadWorkoutDoc(...args) }));
 
-import { duplicateWorkout, saveWorkout, setFavourite } from './actions';
+import { deleteWorkout, duplicateWorkout, renameWorkout, saveWorkout, setFavourite } from './actions';
 
 const COACH = '00000000-0000-4000-8000-0000000000c1';
 const WS = '00000000-0000-4000-8000-000000000001';
@@ -153,5 +153,69 @@ describe('saveWorkout', () => {
     respond = (call) => (call.table === 'workout_logs' ? { data: null, error: { message: 'boom' } } : { data: WORKOUT });
     expect((await saveWorkout(doc)).ok).toBe(false);
     expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  });
+});
+
+describe('deleteWorkout', () => {
+  // Uses count only when the query asks for this workout in this workspace; any other filter finds nothing.
+  const forThis = (call: Call) => call.filters.workout_id === WORKOUT && call.filters.workspace_id === WS;
+  const usage = (call: Call) => calls.filter((c) => c.table === 'program_workouts' || c.table === 'client_invite_plan_items').includes(call);
+
+  it('refuses a workout a program still uses, without deleting anything', async () => {
+    respond = (call) =>
+      call.table === 'program_workouts' && forThis(call) ? { data: [{ program_id: 'p1' }, { program_id: 'p1' }] } : { data: [], count: 0 };
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_in_use' });
+    expect(calls.some((c) => c.op === 'delete')).toBe(false);
+  });
+
+  it("refuses a workout in an open invite's starting plan", async () => {
+    respond = (call) => (call.table === 'client_invite_plan_items' && forThis(call) ? { data: null, count: 1 } : { data: [], count: 0 });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_in_use' });
+    expect(calls.some((c) => c.op === 'delete')).toBe(false);
+  });
+
+  it("checks both uses for this workout in the coach's own workspace", async () => {
+    respond = (call) => (call.op === 'delete' ? { data: [{ id: WORKOUT }] } : { data: [], count: 0 });
+    await deleteWorkout(WORKOUT);
+    const checks = calls.filter(usage);
+    expect(checks.map((c) => c.table).sort()).toEqual(['client_invite_plan_items', 'program_workouts']);
+    for (const c of checks) expect(c.filters).toEqual({ workout_id: WORKOUT, workspace_id: WS });
+  });
+
+  it('refuses when the check fails', async () => {
+    respond = (call) => (call.table === 'program_workouts' ? { data: null, error: { message: 'boom' } } : { data: [] });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: false, code: 'workout_delete_failed' });
+    expect(calls.some((c) => c.op === 'delete')).toBe(false);
+  });
+
+  it("deletes an unused workout, only from this workspace's library", async () => {
+    respond = (call) => (call.op === 'delete' ? { data: [{ id: WORKOUT }] } : { data: [], count: 0 });
+    expect(await deleteWorkout(WORKOUT)).toEqual({ ok: true });
+    expect(calls.find((c) => c.op === 'delete')).toMatchObject({ table: 'workouts', filters: { id: WORKOUT, workspace_id: WS, client_id: null } });
+  });
+});
+
+describe('renameWorkout', () => {
+  it('saves the workout as last saved with only the new name, through save_workout', async () => {
+    respond = (call) => (call.op === 'rpc' ? { data: WORKOUT } : { data: { id: WORKOUT } });
+    loadWorkoutDoc.mockResolvedValue({ doc, clientId: null, scheduledOn: null });
+    expect(await renameWorkout(WORKOUT, '  Upper B ')).toEqual({ ok: true, id: WORKOUT });
+    expect(calls[0]).toMatchObject({ table: 'workouts', filters: { id: WORKOUT, workspace_id: WS, client_id: null } });
+    const args = calls.find((c) => c.op === 'rpc')?.payload as { p_doc: typeof doc & { rememberChoices: boolean } };
+    expect(args.p_doc).toMatchObject({ ...doc, name: 'Upper B', rememberChoices: false });
+  });
+
+  it('refuses an empty name with the field message, without saving', async () => {
+    respond = () => ({ data: { id: WORKOUT } });
+    loadWorkoutDoc.mockResolvedValue({ doc, clientId: null, scheduledOn: null });
+    const outcome = await renameWorkout(WORKOUT, '   ');
+    expect(outcome).toMatchObject({ ok: false, code: 'workout_fields_invalid', issues: [{ path: ['name'], message: 'Enter a name.' }] });
+    expect(calls.some((c) => c.op === 'rpc')).toBe(false);
+  });
+
+  it("refuses a workout that is not in this workspace's library", async () => {
+    respond = () => ({ data: null });
+    expect(await renameWorkout(WORKOUT, 'Upper B')).toEqual({ ok: false, code: 'workout_not_in_library' });
+    expect(loadWorkoutDoc).not.toHaveBeenCalled();
   });
 });

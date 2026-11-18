@@ -4,12 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
 import { smartFilter } from '@caltracker/shared';
-import { AssignButton } from '@/components/assign/assign-to-clients';
-import { DuplicateButton } from '@/components/duplicate-button';
 import { Button, Card, TextField } from '@/components/ui';
 import { LocalDate } from './local-date';
+import { WorkoutRowActions } from './workout-row-actions';
 import styles from './workouts.module.css';
-import assignStyles from '@/components/assign/assign.module.css';
 
 export type WorkoutListRow = { id: string; name: string; updatedAt: string; exercises: number };
 
@@ -94,10 +92,7 @@ export function WorkoutList({ rows, initialQuery, limited, limit }: { rows: Work
                     <LocalDate iso={w.updatedAt} />
                   </td>
                   <td>
-                    <div className={`${assignStyles.actions} ${styles.rowActions}`}>
-                      <AssignButton kind="workout" id={w.id} name={w.name} compact />
-                      <DuplicateButton kind="workout" id={w.id} name={w.name} compact />
-                    </div>
+                    <WorkoutRowActions id={w.id} name={w.name} />
                   </td>
                 </tr>
               ))}
