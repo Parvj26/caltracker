@@ -155,6 +155,7 @@ export {
 export { workoutPreview } from './workouts/preview';
 export { exerciseSummaryLine, workoutSummaryRows } from './workouts/summary';
 export type { WorkoutSummaryRow } from './workouts/summary';
+export { blockBadges, supersetLetter } from './workouts/badges';
 export { blockCollapsedSummary, exerciseCollapsedLine, stepReps, stepWeight, weightStep } from './workouts/collapsed';
 export type { CollapsedBlock } from './workouts/collapsed';
 export {
