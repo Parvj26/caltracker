@@ -5,7 +5,7 @@ import { Chip } from '@/components/ui';
 import { TRACKING_LABELS } from './filters';
 import styles from './exercises.module.css';
 
-/** Tracking-type filter as toggle chips; pressing the pressed one again clears it. */
+/** Tracking-type filter as toggle chips (on = ink chip, white text); pressing the pressed one again clears it. */
 export function TrackingChips({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   return (
     <div role="group" aria-label="Tracking type" className={styles.chipGroup}>
@@ -21,7 +21,7 @@ export function TrackingChips({ value, onChange }: { value: string; onChange: (n
               className={styles.chipButton}
               onClick={() => onChange(pressed ? '' : t)}
             >
-              <Chip tone={pressed ? 'lime' : 'grey'} className={pressed ? styles.chipOn : undefined}>
+              <Chip tone="grey" className={pressed ? styles.chipOn : undefined}>
                 {TRACKING_LABELS[t]}
               </Chip>
             </button>

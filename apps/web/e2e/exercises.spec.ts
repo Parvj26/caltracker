@@ -54,9 +54,20 @@ test('create a custom exercise and see it under My exercises', async ({ page }) 
     await page.goto('/exercises/new');
     await page.getByLabel('Name').fill(name);
     await page.getByLabel('Tracking type').selectOption('distance');
+    // Muscles and equipment are fixed choices as chips (no free text): muscles pick any, equipment picks one.
+    const muscles = page.getByRole('group', { name: 'Primary muscles' });
+    await muscles.getByRole('button', { name: 'Quadriceps' }).click();
+    await muscles.getByRole('button', { name: 'Glutes' }).click();
+    await expect(muscles.getByRole('button', { name: 'Quadriceps' })).toHaveAttribute('aria-pressed', 'true');
+    const equipment = page.getByRole('group', { name: 'Equipment (optional)' });
+    await equipment.getByRole('button', { name: 'Machine' }).click();
+    await equipment.getByRole('button', { name: 'Cable' }).click();
+    await expect(equipment.getByRole('button', { name: 'Machine' })).toHaveAttribute('aria-pressed', 'false');
     await page.getByRole('button', { name: 'Create exercise' }).click();
     await expect(page).toHaveURL(/\/exercises\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name })).toBeVisible();
+    const row = await admin().from('exercises').select('primary_muscles, equipment').eq('name', name).single();
+    expect(row.data).toEqual({ primary_muscles: ['quadriceps', 'glutes'], equipment: 'cable' });
 
     await page.goto('/exercises?source=custom');
     const option = page.getByRole('option', { name, exact: true });
