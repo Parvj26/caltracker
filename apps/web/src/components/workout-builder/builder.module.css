@@ -31,7 +31,7 @@
   color: var(--ct-ink);
   font: inherit;
 }
-.input:focus { outline: none; border-color: var(--ct-ink); background: var(--ct-bg); }
+.input:focus { border-color: var(--ct-ink); background: var(--ct-bg); }
 .input[aria-invalid='true'] { border-color: var(--ct-magenta); }
 .input[aria-invalid='true']:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
 .input::placeholder { color: var(--ct-ink-muted); }
@@ -70,7 +70,8 @@
   width: 28px;
   height: 28px;
   border-radius: var(--ct-radius-pill);
-  background: var(--ct-lime);
+  background: var(--ct-surface);
+  box-shadow: inset 0 0 0 1px var(--ct-border-strong);
   color: var(--ct-ink);
   font-weight: var(--ct-weight-button);
 }
@@ -370,7 +371,7 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .switchButton[aria-pressed='true'] .switchTrack { justify-content: flex-end; background: var(--ct-magenta-deep); }
 /* Superset exercises: blue outline and blue A1 / A2 badges (the same blue in the list, the cards and the editors). */
 .block[data-superset] { border-color: var(--ct-magenta); }
-.blockNumber[data-superset] { background: var(--ct-blue); }
+.blockNumber[data-superset] { background: var(--ct-blue); box-shadow: none; }
 .blockNumber { min-width: 28px; width: auto; padding: 0 6px; }
 
 /* ---------- Sections and pick-one groups ---------- */
@@ -396,52 +397,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .substituteBody { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .substituteBody[hidden] { display: none; }
 
-/* ---------- Measurements tab ("Weight · Reps ⌄") ---------- */
-.measureWrap { position: relative; }
-.measurePill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ct-space-1);
-  min-height: var(--ct-tap-min);
-  padding: 0 var(--ct-space-3);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-pill);
-  background: var(--ct-surface);
-  color: var(--ct-ink);
-  font: inherit;
-  font-size: var(--ct-size-caption);
-  font-weight: var(--ct-weight-button);
-  cursor: pointer;
-}
-.measurePill:hover, .measurePillOpen { border-color: var(--ct-ink); }
-.measureMenu {
-  position: absolute;
-  z-index: 6;
-  top: calc(100% + var(--ct-space-1));
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  max-width: calc(100vw - 2 * var(--ct-space-4));
-  padding: var(--ct-space-3) var(--ct-space-1);
-  border: var(--ct-border-width-card) solid var(--ct-border);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-bg);
-  box-shadow: var(--ct-shadow-sticker);
-}
-.measureTitle { padding: 0 var(--ct-space-3) var(--ct-space-1); font-weight: var(--ct-weight-button); }
-.measureItem {
-  display: flex;
-  align-items: center;
-  gap: var(--ct-space-3);
-  min-height: var(--ct-tap-min);
-  padding: 0 var(--ct-space-3);
-  border-radius: var(--ct-radius-input);
-  font-weight: var(--ct-weight-section-heading);
-  cursor: pointer;
-}
-.measureItem:hover { background: var(--ct-surface); }
-.measureHint { margin: 0; padding: var(--ct-space-1) var(--ct-space-3) 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .checkbox { width: 24px; height: 24px; margin: 0; accent-color: var(--ct-ink); cursor: pointer; }
 .checkbox:disabled { cursor: not-allowed; }
 
@@ -595,9 +550,8 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   .block[data-open] .foldChevron { transform: none; }
   .block:not([data-open]) .blockBody { display: none; }
   .blockBody { display: flex; flex-direction: column; gap: var(--ct-space-3); padding-bottom: var(--ct-space-2); }
-  /* The fold line already names the block, and ⋯ holds swap, move and delete. The measurements tab stays. */
-  .blockHeader .blockNumber, .blockHeader .blockTitle, .blockHeader > .blockTools { display: none; }
-  .blockHeader:not(:has(.measureWrap)) { display: none; }
+  /* The fold line already names the block, and ⋯ holds swap, move and delete. The measurement chips stay. */
+  .blockHeader { display: none; }
 
 }
 
@@ -642,8 +596,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 }
 .sheetArrow:disabled { cursor: not-allowed; color: var(--ct-ink-muted); opacity: 0.5; }
 
-/* The Rest checkbox sits below Weight / Reps / Time, apart from them. */
-.measureRest { margin-top: var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); border-radius: 0; }
 .measureChips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .measureChip {
   min-height: var(--ct-tap-min);
@@ -658,24 +610,12 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   cursor: pointer;
   touch-action: manipulation;
 }
-.measureChip[aria-pressed='true'] { border: var(--ct-border-width-card) solid var(--ct-ink); background: var(--ct-lime); color: var(--ct-ink); }
-.measureChip:disabled { cursor: not-allowed; }
+.measureChip[aria-pressed='true'] { border: var(--ct-border-width-card) solid var(--ct-ink); background: var(--ct-ink); color: var(--ct-bg); }
+.measureChip[aria-disabled='true'] { cursor: not-allowed; }
 
 /* ---------- Reorder window ---------- */
-.reorderDialog {
-  width: min(600px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  padding: 0;
-  border: var(--ct-border-width-card) solid var(--ct-ink);
-  border-radius: var(--ct-radius-card);
-  background: var(--ct-bg);
-  color: var(--ct-ink);
-}
-.reorderDialog::backdrop { background: color-mix(in srgb, var(--ct-ink) 35%, transparent); }
-.reorderDialog[open] { display: flex; flex-direction: column; }
-.reorderHead { display: flex; flex-direction: column; gap: var(--ct-space-1); padding: var(--ct-space-6) var(--ct-space-6) var(--ct-space-2); }
 .dialogTitle { margin: 0; font-size: 24px; font-weight: var(--ct-weight-button); }
-.reorderBody { display: flex; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3) var(--ct-space-6) var(--ct-space-4-5); overflow-y: auto; }
+.reorderBody { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .reorderRun { display: flex; flex-direction: column; gap: var(--ct-space-2); }
 .reorderSection { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); text-transform: uppercase; }
 .reorderList { position: relative; display: flex; flex-direction: column; gap: var(--ct-space-2-5); margin: 0; padding: 0; list-style: none; }
@@ -707,7 +647,8 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   touch-action: none;
 }
 .reorderNames { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
-.reorderName { overflow-wrap: anywhere; font-size: 17px; font-weight: var(--ct-weight-section-heading); }
+.reorderName { display: flex; align-items: center; gap: var(--ct-space-2); min-width: 0; overflow-wrap: break-word; font-size: 17px; font-weight: var(--ct-weight-section-heading); }
+.reorderName .blockNumber { flex: none; font-size: var(--ct-size-caption); }
 .reorderTag {
   align-self: flex-start;
   padding: 2px 10px;
@@ -732,13 +673,7 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   cursor: pointer;
 }
 .reorderArrow:disabled { cursor: not-allowed; color: var(--ct-ink-muted); opacity: 0.5; }
-.reorderActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ct-space-2-5);
-  padding: var(--ct-space-4) var(--ct-space-6) calc(var(--ct-space-4-5) + env(safe-area-inset-bottom));
-  border-top: var(--ct-border-width-card) solid var(--ct-border);
-}
+
 
 /* ---------- iPhone (below 600 px): a list of rows, each exercise edited on its own screen (approved mockups) ---------- */
 .phoneList, .phoneBar { display: none; }
@@ -926,7 +861,7 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   border-top: var(--ct-border-width-card) solid var(--ct-border);
   background: var(--ct-bg);
 }
-.phoneAddSet, .phoneDone {
+.phoneAddSet {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -943,7 +878,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   cursor: pointer;
   touch-action: manipulation;
 }
-.phoneDone { border-width: 2px; background: var(--ct-lime); font-size: 18px; }
 
 /* A set as a card in the phone editor: "Set 1", its type and ×, then one labelled line per box with − / +. */
 .setRow[data-layout='stacked'] { gap: var(--ct-space-2-5); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); }
@@ -1044,3 +978,7 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 @media (prefers-reduced-motion: reduce) {
   .titleField input { transition: none; }
 }
+
+/* The phone editor's Done: the standard main button, as tall as + Set beside it. */
+.phoneDoneButton { flex: 1; min-height: 56px; }
+.emptyState { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-3); padding: var(--ct-space-2) 0; }

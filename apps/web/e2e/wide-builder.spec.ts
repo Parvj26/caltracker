@@ -38,7 +38,7 @@ test('two panes: pick a row to edit its sets, a new exercise is picked, the Supe
   await expect(row(page, 'Pushups')).toHaveAttribute('aria-pressed', 'true');
   const pane = editor(page);
   await expect(pane.getByRole('button', { name: 'Swap exercise: Pushups', exact: true })).toBeVisible();
-  await expect(pane.getByRole('button', { name: /^Measurements: / })).toBeVisible();
+  await expect(pane.getByRole('group', { name: 'Measurements for Pushups' })).toBeVisible();
   await expect(pane.getByRole('button', { name: 'More for Pushups', exact: true })).toBeVisible();
   await pane.getByRole('button', { name: 'Add a set to Pushups' }).click();
   await expect(setRow(page, 'Pushups', 'set 2')).toBeVisible();

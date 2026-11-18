@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
-import { ErrorText } from '@/components/ui';
+import { Button, ErrorText } from '@/components/ui';
 import { AddSectionMenu } from './add-section-menu';
 import {
   AddSetButton,
@@ -242,9 +242,9 @@ export function PhoneExerciseEditor({ card, place, count, onGo, onClose, units, 
             + Set <span className={styles.addSetHint}>copies last set</span>
           </button>
         ) : null}
-        <button type="button" className={styles.phoneDone} onClick={onClose}>
+        <Button className={styles.phoneDoneButton} onClick={onClose} phSafe>
           Done
-        </button>
+        </Button>
       </div>
     </FullScreen>
   );

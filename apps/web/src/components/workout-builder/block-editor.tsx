@@ -14,7 +14,7 @@ import type { Measurement, Units, WorkoutBlockDoc, WorkoutExerciseDoc, WorkoutSe
 import { ErrorText } from '@/components/ui';
 import { BlockMenu, MoveToDialog, type MenuItem } from './block-menu';
 import { Icon, type IconName } from './icons';
-import { MeasurementsMenu } from './measurements-menu';
+import { MeasurementChips } from './measurements-menu';
 import { type SetPatch } from './set-row';
 import { SetTable } from './set-table';
 import { SubstituteEditor, type SubstituteActions } from './substitute-editor';
@@ -268,15 +268,6 @@ export function BlockEditor({
             <SwapName name={first.exerciseName} nameId={headingId} onSwap={() => actions.onSwap(first.id)} />
           </TitleTag>
         )}
-        {!choice ? (
-          <MeasurementsMenu
-            trackingType={first.trackingType}
-            exerciseName={first.exerciseName}
-            onToggle={(m) => actions.onToggleMeasurement(first.id, m)}
-            rest={restState(block, shown[0]!.ei, restOff)}
-            onToggleRest={(on) => actions.onToggleRest(first.id, on)}
-          />
-        ) : null}
         {pane ? (
           <div className={styles.paneMenu}>
             <BlockMenu name={summary.title} items={menuItems} />
@@ -310,6 +301,16 @@ export function BlockEditor({
         </div>
         )}
       </header>
+      {!choice ? (
+        // What the exercise measures: the same toggle chips on every size (rulebook §9.5).
+        <MeasurementChips
+          trackingType={first.trackingType}
+          exerciseName={first.exerciseName}
+          onToggle={(m) => actions.onToggleMeasurement(first.id, m)}
+          rest={restState(block, shown[0]!.ei, restOff)}
+          onToggleRest={(on) => actions.onToggleRest(first.id, on)}
+        />
+      ) : null}
       {(!inSuperset || member === 0) && (errors.get(`block:${block.id}`) ?? []).map((m) => (
         <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}
@@ -323,7 +324,7 @@ export function BlockEditor({
               <ExerciseTag className={styles.exerciseName}>
                 <SwapName name={ex.exerciseName} onSwap={() => actions.onSwap(ex.id)} />
               </ExerciseTag>
-              <MeasurementsMenu
+              <MeasurementChips
                 trackingType={ex.trackingType}
                 exerciseName={ex.exerciseName}
                 onToggle={(m) => actions.onToggleMeasurement(ex.id, m)}
