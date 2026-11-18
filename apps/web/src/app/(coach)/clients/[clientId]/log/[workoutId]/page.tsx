@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { notFound, redirect } from 'next/navigation';
 import { addDays, canStartSessionOn, completedSetCount, localToday } from '@caltracker/shared';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -52,9 +53,9 @@ export default async function SessionPage({
   if (state.kind === 'done') redirect(`/clients/${client.id}/logs/${state.logId}`);
 
   const back = (
-    <Link href={`/clients/${client.id}/training`} className={styles.back}>
+    <BackLink href={`/clients/${client.id}/training`} className={styles.back}>
       ← {client.name}&apos;s calendar
-    </Link>
+    </BackLink>
   );
   // The coach's injury note, near the top while they log (Overview shows the same chip).
   const injury = <InjuryChip text={await getClientLimitations(client.id)} />;
