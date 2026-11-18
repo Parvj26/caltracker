@@ -741,15 +741,19 @@ export function reorderBlocks(doc: WorkoutDoc, ids: readonly string[]): WorkoutD
 }
 
 /**
- * The Rest checkbox, read from the doc: true when every set of the exercise that shows a rest box rests 0 (the
- * client's phone then shows no rest), false when one rests, null when no set shows a rest box (an exercise that goes
- * straight on to the next one in a superset).
+ * The Rest checkbox, read from the doc: true when every set that shows a rest box rests 0, its substitutes' sets
+ * included (the client's phone then shows no rest), false when one rests, null when no set of the exercise shows a
+ * rest box (an exercise that goes straight on to the next one in a superset).
  */
 export function exerciseRestOff(block: WorkoutBlockDoc, exerciseIndex: number): boolean | null {
   const ex = block.exercises[exerciseIndex];
   if (!ex) return null;
   const shown = ex.sets.filter((s, si) => s.setType !== 'drop' && setShowsRest(block, exerciseIndex, si));
-  return shown.length === 0 ? null : shown.every((s) => s.restSeconds === 0);
+  if (shown.length === 0) return null;
+  const subShown = ex.substitutes.flatMap((sub) =>
+    sub.sets.filter((s, si) => s.setType !== 'drop' && substituteSetShowsRest(block, exerciseIndex, sub, si)),
+  );
+  return [...shown, ...subShown].every((s) => s.restSeconds === 0);
 }
 
 /**
@@ -782,5 +786,46 @@ export function keepRestOff(doc: WorkoutDoc, off: ReadonlySet<string>): WorkoutD
   return {
     ...doc,
     blocks: doc.blocks.map((b) => ({ ...b, exercises: b.exercises.map((e) => (off.has(e.id) ? withRest(e, () => 0) : e)) })),
+  };
+}
+
+/** Each set's rest before and after a Superset switch was turned on, by set id (only the sets whose rest changed). */
+export type RestMemory = Readonly<Record<string, { before: number; after: number }>>;
+
+const allSets = (d: WorkoutDoc): WorkoutSetDoc[] =>
+  d.blocks.flatMap((b) => b.exercises.flatMap((e) => [...e.sets, ...e.substitutes.flatMap((sub) => sub.sets)]));
+
+/** What a join changed: the sets whose rest went from `before` to `after` (see restoreRests). */
+export function rememberRests(before: WorkoutDoc, after: WorkoutDoc): RestMemory {
+  const was = new Map(allSets(before).map((s) => [s.id, s.restSeconds]));
+  const out: Record<string, { before: number; after: number }> = {};
+  for (const s of allSets(after)) {
+    const r = was.get(s.id);
+    if (r !== undefined && r !== s.restSeconds) out[s.id] = { before: r, after: s.restSeconds };
+  }
+  return out;
+}
+
+/**
+ * Turning a Superset switch off again: a set whose rest the join changed, and which still has the rest the join gave
+ * it (in `prev`, the doc before the split), gets its own rest back, so on then off is an undo.
+ */
+export function restoreRests(prev: WorkoutDoc, next: WorkoutDoc, memory: RestMemory): WorkoutDoc {
+  const was = new Map(allSets(prev).map((s) => [s.id, s.restSeconds]));
+  const back = (s: WorkoutSetDoc): WorkoutSetDoc => {
+    const m = memory[s.id];
+    return m && was.get(s.id) === m.after && s.restSeconds !== m.before ? { ...s, restSeconds: m.before } : s;
+  };
+  if (!allSets(next).some((s) => back(s) !== s)) return next;
+  return {
+    ...next,
+    blocks: next.blocks.map((b) => ({
+      ...b,
+      exercises: b.exercises.map((e) => ({
+        ...e,
+        sets: e.sets.map(back),
+        substitutes: e.substitutes.map((sub) => ({ ...sub, sets: sub.sets.map(back) })),
+      })),
+    })),
   };
 }

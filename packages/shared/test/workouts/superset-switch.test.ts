@@ -11,7 +11,9 @@ import {
   exerciseRestOff,
   joinWithNext,
   keepRestOff,
+  rememberRests,
   reorderBlocks,
+  restoreRests,
   setExerciseRest,
   splitSuperset,
   updateSet,
@@ -187,5 +189,47 @@ describe('Rest checkbox', () => {
     expect(rests(keepRestOff(split, new Set([first])), 0, 0)).toEqual([0]);
     expect(keepRestOff(split, new Set())).toBe(split);
     expect(keepRestOff(split, new Set([ID(1)]))).toBe(split);
+  });
+});
+
+describe('review fixes', () => {
+  it('exerciseRestOff: a rest on a substitute means Rest is on, so keepRestOff never wipes it', () => {
+    let d = straights(2);
+    const [b, e] = [d.blocks[0]!.id, d.blocks[0]!.exercises[0]!.id];
+    d = addSubstitute(d, b, e, pick(9), makeId);
+    for (const s of d.blocks[0]!.exercises[0]!.sets) d = updateSet(d, b, e, s.id, { restSeconds: 0 });
+    const sub = d.blocks[0]!.exercises[0]!.substitutes[0]!;
+    expect(sub.sets.map((s) => s.restSeconds)).toEqual([90, 90]);
+    expect(exerciseRestOff(d.blocks[0]!, 0)).toBe(false);
+    d = setExerciseRest(d, b, e, false);
+    expect(exerciseRestOff(d.blocks[0]!, 0)).toBe(true);
+  });
+
+  it('a join straight after undone by a split gives the first exercise its own rests back', () => {
+    let d = straights(2, 2);
+    const [a, bEx] = [d.blocks[0]!.exercises[0]!, d.blocks[1]!.exercises[0]!];
+    d = updateSet(d, d.blocks[0]!.id, a.id, a.sets[0]!.id, { restSeconds: 60 });
+    d = updateSet(d, d.blocks[0]!.id, a.id, a.sets[1]!.id, { restSeconds: 60 });
+    d = updateSet(d, d.blocks[1]!.id, bEx.id, bEx.sets[0]!.id, { restSeconds: 120 });
+    d = updateSet(d, d.blocks[1]!.id, bEx.id, bEx.sets[1]!.id, { restSeconds: 120 });
+    const joined = joinWithNext(d, d.blocks[0]!.id, makeId);
+    const memory = rememberRests(d, joined);
+    const split = splitSuperset(joined, joined.blocks[0]!.id, 1, makeId);
+    expect(rests(split, 0, 0)).toEqual([120, 120]);
+    expect(rests(restoreRests(joined, split, memory), 0, 0)).toEqual([60, 60]);
+    // With the second exercise's Rest off the round rest is 0, and the first still gets its own back.
+    const off = setExerciseRest(joined, joined.blocks[0]!.id, joined.blocks[0]!.exercises[1]!.id, false);
+    expect(rests(restoreRests(off, splitSuperset(off, off.blocks[0]!.id, 1, makeId), memory), 0, 0)).toEqual([60, 60]);
+  });
+
+  it('restoreRests leaves a rest the coach changed after the join', () => {
+    const d = straights(2, 2);
+    const joined = joinWithNext(d, d.blocks[0]!.id, makeId);
+    const memory = rememberRests(d, joined);
+    const a = joined.blocks[0]!.exercises[0]!;
+    const edited = updateSet(joined, joined.blocks[0]!.id, a.id, a.sets[0]!.id, { restSeconds: 30 });
+    const split = splitSuperset(edited, edited.blocks[0]!.id, 1, makeId);
+    expect(rests(restoreRests(edited, split, memory), 0, 0)).toEqual([90, 90]);
+    expect(rests(restoreRests(edited, split, {}), 0, 0)).toEqual(rests(split, 0, 0));
   });
 });

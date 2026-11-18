@@ -27,6 +27,8 @@ import {
   removeExercise,
   removeSection,
   reorderBlocks,
+  rememberRests,
+  restoreRests,
   setExerciseRest,
   splitSuperset,
   renameSection,
@@ -45,7 +47,7 @@ import {
   updateExerciseOptions,
   applyExercisePrefs,
 } from '@caltracker/shared';
-import type { ExercisePick, ExercisePrefs, IsoDate, Units } from '@caltracker/shared';
+import type { ExercisePick, ExercisePrefs, IsoDate, RestMemory, Units } from '@caltracker/shared';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { exercisePrefs, saveWorkout, type SaveIssue, type SaveWorkoutOutcome } from '@/app/(coach)/workouts/actions';
 import { ReloadButton } from '@/components/reload-button';
@@ -348,12 +350,17 @@ export function WorkoutBuilder({
     });
   }
 
+  // The rests a Superset switch changed when it went on, so turning it off again gives them back (see restoreRests).
+  const joinedRests = useRef<RestMemory>({});
+
   /**
    * A Superset switch. Exercises that move to another block get new ids, so the Rest checkboxes follow them by place
    * (a join or split never changes the order of the exercises).
    */
-  function toggleLink(op: (d: WorkoutDoc) => WorkoutDoc) {
-    const next = op(doc);
+  function toggleLink(op: (d: WorkoutDoc) => WorkoutDoc, splitting: boolean) {
+    let next = op(doc);
+    if (splitting) next = restoreRests(doc, next, joinedRests.current);
+    else joinedRests.current = { ...joinedRests.current, ...rememberRests(doc, next) };
     const ids = (d: WorkoutDoc) => d.blocks.flatMap((b) => b.exercises.map((e) => e.id));
     const before = ids(doc);
     const after = ids(next);
@@ -487,7 +494,7 @@ export function WorkoutBuilder({
               : canJoinWithNext(doc, blockId)
                 ? null
                 : 'A superset has at most 10 exercises.',
-            onToggle: () => toggleLink(together ? (d) => splitSuperset(d, blockId, next.member!, makeId) : (d) => joinWithNext(d, blockId, makeId)),
+            onToggle: () => toggleLink(together ? (d) => splitSuperset(d, blockId, next.member!, makeId) : (d) => joinWithNext(d, blockId, makeId), together),
           };
         }
         flat.push(card);
