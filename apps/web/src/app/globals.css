@@ -32,7 +32,8 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.2; }
 
 a { color: var(--ct-ink); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
 
-:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+/* The one keyboard focus ring (docs/design/ui-rules.md §3): 2 px ink, 2 px away. Pages must not turn it off. */
+:focus-visible { outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
 
 /* A small text link: a 44 px tall tap area without moving any text. Vertical padding on an inline box grows its hit
    area but not its line; the matching negative margin does the same for a link that is a flex item. */
@@ -50,7 +51,7 @@ a { color: var(--ct-ink); text-underline-offset: 3px; text-decoration-thickness:
 
 /* Instant feedback on a tap: links and buttons dim while pressed, before the next page or the action answers. */
 a[href]:active,
-button:not(:disabled):active,
+button:not(:disabled):not([aria-disabled='true']):active,
 summary:active,
 [role='button']:not([aria-disabled='true']):active,
 [role='tab']:active { opacity: 0.7; }
