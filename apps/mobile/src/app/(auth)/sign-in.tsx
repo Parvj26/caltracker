@@ -1,16 +1,21 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { AuthShell } from '@/components/auth-shell';
 import { LegalLinks } from '@/components/legal-links';
-import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
+import { Button, ErrorText, TextButton, TextField, type TextFieldHandle } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import type { ShownError } from '@/lib/error-shown';
 import { forgotPasswordHref } from '@/lib/forgot-password';
-import { isNetworkFailure } from '@/lib/network-failure';
+import { emailFieldError, signIn, signInFieldErrors, type SignInFieldErrors } from '@/lib/sign-in';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
+/**
+ * Sign in (approved Patterns board, 2026-11-19): Return moves from email to password and then signs in; empty or
+ * invalid fields are caught on the phone with the error under the field; the password has a show/hide eye; a sign-in
+ * that hangs ends with a clear message.
+ */
 export default function SignIn() {
   // Pre-filled when the Join screen sends someone here ("You already have an account").
   const params = useLocalSearchParams<{ email?: string }>();
@@ -18,15 +23,26 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
+  const [fields, setFields] = useState<SignInFieldErrors>({});
+  const passwordRef = useRef<TextFieldHandle>(null);
   const { text } = useTheme();
 
   async function submit() {
-    setBusy(true);
+    if (busy) return;
+    const found = signInFieldErrors(email, password);
+    setFields(found);
     setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (found.email || found.password) return;
+    setBusy(true);
+    const code = await signIn(
+      (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
+      email,
+      password,
+      // Arrived after the timeout message: it simply goes through, so clear the message (the app opens as usual).
+      () => setError(null),
+    );
     setBusy(false);
-    // Never the raw auth message: the same words for an unknown email and a wrong password.
-    if (err) setError({ code: isNetworkFailure(err) ? 'network_offline' : err.code === 'invalid_credentials' || err.status === 400 ? 'sign_in_failed' : 'server_error' });
+    if (code) setError({ code });
     // On success the session listener routes to the app and links the workspace.
   }
 
@@ -39,17 +55,38 @@ export default function SignIn() {
         autoCorrect={false}
         keyboardType="email-address"
         textContentType="none"
+        returnKeyType="next"
+        enterKeyHint="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        onBlur={() => {
+          if (email.trim() !== '') setFields((f) => ({ ...f, email: emailFieldError(email) }));
+        }}
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(v) => {
+          setEmail(v);
+          if (fields.email) setFields((f) => ({ ...f, email: undefined }));
+        }}
+        error={fields.email}
       />
       <TextField
+        ref={passwordRef}
         testID="password-input"
         label="Password"
-        secureTextEntry
+        password
+        eyeTestID="toggle-password"
         autoCapitalize="none"
+        autoCorrect={false}
         textContentType="none"
+        returnKeyType="go"
+        enterKeyHint="go"
+        onSubmitEditing={() => void submit()}
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(v) => {
+          setPassword(v);
+          if (fields.password) setFields((f) => ({ ...f, password: undefined }));
+        }}
+        error={fields.password}
       />
       {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <Button testID="submit-button" title={busy ? 'Signing in...' : 'Sign in'} onPress={() => void submit()} busy={busy} />

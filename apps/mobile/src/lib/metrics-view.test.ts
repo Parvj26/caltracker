@@ -66,12 +66,13 @@ describe('history, last value and the Progress tile', () => {
     expect(lastValueLine([], 'vo2_max', 'kg', TODAY, null)).toBe(null);
   });
   it('the tile shows the latest weight and its 3-month change', () => {
-    expect(metricsTile([], 'kg', TODAY)).toEqual({ value: 'Log a metric', sub: 'no weigh-ins yet' });
-    expect(metricsTile([e({ value: 70, measuredOn: TODAY })], 'kg', TODAY)).toEqual({ value: '70.0 kg', sub: 'latest weigh-in' });
+    expect(metricsTile([], 'kg', TODAY)).toEqual({ value: 'Log a metric', sub: 'No weigh-ins yet' });
+    expect(metricsTile([e({ value: 70, measuredOn: TODAY })], 'kg', TODAY)).toEqual({ value: '70.0 kg', sub: 'Weight · latest weigh-in' });
     expect(metricsTile([e({ id: 'a', value: 72, measuredOn: '2026-10-01' }), e({ id: 'b', value: 70, measuredOn: TODAY })], 'kg', TODAY)).toEqual({
       value: '70.0 kg',
-      sub: '−2.0 kg in 3 months',
+      sub: 'Weight · −2.0 kg in 3 months',
     });
+    expect(metricsTile([e({ value: 70, measuredOn: TODAY, source: 'apple_health' })], 'kg', TODAY).sub).toBe('Weight · latest weigh-in · from Apple Health');
   });
 });
 

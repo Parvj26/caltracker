@@ -6,6 +6,7 @@ import {
   formatLogVolume,
   formatMultiple,
   liveStreak,
+  streakWords,
   type RareRequirement,
   type StickerDef,
   type Units,
@@ -44,6 +45,8 @@ export type AlbumModel = {
   journey: {
     streak: number;
     title: string;
+    /** Under the title when no streak is running: a new journey, never a lost streak (null while one runs). */
+    line: string | null;
     dots: { week: number; key: string; reached: boolean }[];
     next: { key: string; name: string; week: number } | null;
     nextLabel: string;
@@ -78,6 +81,8 @@ export function albumModel(
   stats: AlbumStats | null,
   units: Units = 'kg',
   currentWeek?: string,
+  /** The streak from the shared progressFacts (the same one Today and Progress show); else worked out from `stats`. */
+  streakNow?: number,
 ): AlbumModel {
   const owned = new Map(awards.filter((a) => byKey.has(a.key)).map((a) => [a.key, a]));
   const item = (def: StickerDef): AlbumItem => {
@@ -102,13 +107,15 @@ export function albumModel(
     .sort((a, b) => (a.weightKg ?? 0) - (b.weightKg ?? 0))
     .map(item);
   const rare = ofKind('rare').map(item);
-  const streak = !stats ? 0 : currentWeek ? liveStreak(stats.streak, stats.streakWeek, currentWeek) : stats.streak;
+  const streak = streakNow ?? (!stats ? 0 : currentWeek ? liveStreak(stats.streak, stats.streakWeek, currentWeek) : stats.streak);
+  const words = streakWords({ current: streak, best: stats?.bestStreak ?? 0 }, (stats?.workouts ?? 0) > 0 || owned.size > 0);
   const next = LANDMARK_JOURNEY.find((s) => s.week > streak) ?? null;
 
   return {
     journey: {
       streak,
-      title: `🔥 ${streak}-week streak`,
+      title: streak > 0 ? `🔥 ${streak}-week streak` : words.title,
+      line: words.line,
       dots: LANDMARK_JOURNEY.map((s) => ({ ...s, reached: s.week <= streak })),
       next: next ? { key: next.key, name: byKey.get(next.key)?.name ?? next.key, week: next.week } : null,
       nextLabel: next ? `next: ${byKey.get(next.key)?.name ?? next.key}` : 'every landmark collected',

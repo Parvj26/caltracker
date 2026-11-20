@@ -44,15 +44,18 @@ env:
     timeout: 10000
 - assertVisible: '🔥 .*-week streak'
 - assertVisible: '1 of 30 · Shiny .* / 30'
+# Scroll to the one collected animal (which one depends on how much the workout lifted).
 - scrollUntilVisible:
     element:
       id: 'sticker-.*'
+      text: '.+, 1 collected'
 # The tile is one element for VoiceOver ("Giraffe, 1 collected"), so its ×1 badge is read from the tile's label.
 - assertVisible:
     id: 'sticker-.*'
     text: '.+, 1 collected'
 - tapOn:
     id: 'sticker-.*'
+    text: '.+, 1 collected'
 - assertVisible:
     id: sheet-fact
     text: '.+'

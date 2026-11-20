@@ -438,7 +438,7 @@ export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
 export type { Rng } from './awards/rolls';
 export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
 export type { NamedRecord, PersonalBestRow } from './awards/bests';
-export { shortDate, strengthExercises, strengthSeries, strengthSeriesAll, strengthSummary } from './awards/strength-series';
+export { shortDate, strengthExercises, strengthSeries, strengthSeriesAll } from './awards/strength-series';
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, liftsImprovedBetween, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
@@ -674,7 +674,7 @@ export {
 } from './food/coach-meals';
 export { currentProgramLabel, thisWeekSummary, weekSentence } from './progress/week';
 export type { ProgramAssignmentLite, WeekCounts, WeekSummary } from './progress/week';
-export { CONSISTENCY_WEEKS, consistencyTile, consistencyWeeks, monthCalendar, plannedDonePercent } from './progress/consistency';
+export { CONSISTENCY_WEEKS, consistencyTile, consistencyWeeks, monthCalendar, plannedDoneCount, plannedDonePercent } from './progress/consistency';
 export type { CalendarDay, ConsistencyWeek, WeekState } from './progress/consistency';
 export {
   MOST_TRAINED_DAYS,
@@ -694,6 +694,7 @@ export type { PickerItem, PickerSection, StrengthExerciseLite, StrengthRange, St
 export {
   E1RM_MAX_REPS,
   bestE1rmOf,
+  belowBest,
   bestOf,
   heaviestChange,
   heaviestChart,
@@ -724,6 +725,21 @@ export { WEIGHT_TREND_HALF_LIFE_DAYS, bodyTile, smoothedTrend, weightTrendInRang
 export { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, foodTile } from './progress/food';
 export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, ProteinDayState } from './progress/food';
 export { lifetimeAnimalLine, zooTile } from './progress/zoo';
+export {
+  AWARD_SETTLE_MS,
+  UPDATING,
+  awaitingAward,
+  awaitingLogIds,
+  bestsRow,
+  consistencyRow,
+  progressFacts,
+  progressHeadline,
+  streakFrom,
+  streakWords,
+  weekWords,
+  zooRow,
+} from './progress/facts';
+export type { FinishedLite, HubRow, ProgressFacts, ProgressFactsInput, StickerLite, StoredStreak } from './progress/facts';
 export * from './analytics/index';
 export * from './push/index';
 export * from './admin/index';

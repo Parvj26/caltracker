@@ -54,6 +54,8 @@ export default function AppLayout() {
         <Stack.Screen name="coach-meals/[id]" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="apple-health" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="privacy" />
       </Stack.Protected>
       {/* Reached from Settings, with or without a coach. */}
       <Stack.Screen name="delete-account" />

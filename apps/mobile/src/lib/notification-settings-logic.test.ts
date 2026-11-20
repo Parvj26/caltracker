@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PUSH_PREFS, withType } from '@caltracker/shared';
-import { clockLabel, prefsEditable, prefsNote, settingsSections, settingsSummary, shortClock, timeOptions } from './notification-settings-logic';
+import { clockLabel, groupState, groupTitle, notificationsPaused, prefsEditable, prefsNote, settingsSections, settingsSummary, shortClock, timeOptions } from './notification-settings-logic';
 
 describe('settingsSummary', () => {
   it('summary', () => {
@@ -37,7 +37,8 @@ describe('timeOptions', () => {
 describe('settingsSections', () => {
   it('sections follow the mockup and hide meal comments', () => {
     const s = settingsSections(DEFAULT_PUSH_PREFS);
-    expect(s.map((x) => x.title)).toEqual(['Workouts', 'Your coach', 'Community', 'Quiet hours']);
+    expect(s.map((x) => x.title)).toEqual(['Workouts & reminders', 'Messages from your coach', 'Community', 'Quiet hours']);
+    expect(settingsSections(DEFAULT_PUSH_PREFS, 'Luis')[1]?.title).toBe('Messages from Luis');
     expect(s[0].rows.map((r) => r.label)).toEqual([
       'New workout assigned',
       'Today’s workout changed',
@@ -79,5 +80,24 @@ describe('editing needs the server’s settings', () => {
     expect(prefsNote('server')).toBeNull();
     expect(prefsNote('loading')).toBe('Loading your settings…');
     expect(prefsNote('offline')).toBe('You’re offline. You can change these when you’re back online.');
+  });
+});
+
+describe('notification groups on Settings', () => {
+  it('names the groups as on the approved board', () => {
+    expect(groupTitle('workouts', 'Luis')).toBe('Workouts & reminders');
+    expect(groupTitle('coach', 'Luis')).toBe('Messages from Luis');
+    expect(groupTitle('community', null)).toBe('Community');
+  });
+  it('says Paused while iOS has notifications off, else on, off or how many are on', () => {
+    expect(groupState(DEFAULT_PUSH_PREFS, 'denied', 'coach')).toBe('Paused');
+    expect(groupState(DEFAULT_PUSH_PREFS, 'undetermined', 'coach')).toBe('Paused');
+    expect(groupState(DEFAULT_PUSH_PREFS, 'granted', 'coach')).toBe('On');
+    expect(groupState(withType(DEFAULT_PUSH_PREFS, 'message', false), 'granted', 'coach')).toBe('2 of 3 on');
+    const off = withType(withType(DEFAULT_PUSH_PREFS, 'community_coach_post', false), 'community_activity', false);
+    expect(groupState(off, 'granted', 'community')).toBe('Off');
+    expect(notificationsPaused('denied')).toBe(true);
+    expect(notificationsPaused('granted')).toBe(false);
+    expect(notificationsPaused(null)).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ import {
   type StrengthSession,
   type WorkoutLogDoc,
   type FoodMealLite,
+  type FinishedLite,
 } from '@caltracker/shared';
 import { foodCachePrefix, progressCachePrefix } from './device-cache-keys';
 
@@ -37,8 +38,11 @@ export type HubExercise = {
 export type HubData = {
   version: 1;
   exercises: HubExercise[];
-  /** Each finished workout's day (phone's time zone), oldest first, and whether it followed a plan. */
-  finished: { day: IsoDate; planned: boolean }[];
+  /**
+   * Each finished workout's day (phone's time zone), oldest first, whether it followed a plan, and (missing in copies
+   * saved before them) when it finished, its log and whether the server has awarded it yet (shared progressFacts).
+   */
+  finished: FinishedLite[];
   /** Planned workouts around the last 8 weeks and this month, with their logs. */
   workouts: HomeWorkout[];
   assignments: ProgramAssignmentLite[];
@@ -72,11 +76,17 @@ export function buildHub(input: {
     points: series.get(e.exerciseId) ?? [],
     sessions: exerciseSessions(logs, e.exerciseId, timeZone, SESSIONS_KEPT),
   }));
+  const awarded = new Set(input.awardPrs.map((a) => a.logId));
   const finished = logs
     .filter((l) => l.status === 'completed' && l.finishedAt)
-    .map((l) => ({ at: l.finishedAt!, day: localDay(l.finishedAt!, timeZone), planned: l.workoutId !== null || isPlannedLog(l) }))
-    .sort((a, b) => a.at.localeCompare(b.at))
-    .map(({ day, planned }) => ({ day, planned }));
+    .map((l): FinishedLite => ({
+      day: localDay(l.finishedAt!, timeZone),
+      planned: l.workoutId !== null || isPlannedLog(l),
+      at: l.finishedAt!,
+      logId: l.id,
+      awarded: awarded.has(l.id),
+    }))
+    .sort((a, b) => a.at!.localeCompare(b.at!));
   return {
     version: 1,
     exercises,
@@ -130,3 +140,8 @@ export function parseFoodRangeCache(raw: string | null): FoodRange | null {
     return null;
   }
 }
+
+/** How often Progress asks the server again while the latest workout is still being awarded: quickly at first, then once a minute. */
+export const UPDATING_RETRY_MS = [3000, 5000, 10_000, 20_000, 30_000, 60_000] as const;
+
+export const updatingRetryDelay = (attempt: number): number => UPDATING_RETRY_MS[Math.min(attempt, UPDATING_RETRY_MS.length - 1)];

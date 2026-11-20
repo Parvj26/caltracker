@@ -57,21 +57,17 @@ describe('sign-in legal links', () => {
 
 // No component renderer runs under vitest here, so these check the screens wire the tested pieces in.
 describe('screens', () => {
-  it('the Settings sheet shows HELP & LEGAL above Sign out and the version line below it', () => {
-    const sheet = source('components/today/today-header.tsx');
-    const help = sheet.indexOf('<HelpLegalSection');
-    const signOut = sheet.indexOf('testID="sign-out"');
-    const version = sheet.indexOf('<AppVersionLine');
+  it('Settings shows HELP (help, terms & privacy, version) above Sign out, and Delete account only under Privacy', () => {
+    const settings = source('app/(app)/settings.tsx');
+    const help = settings.indexOf('title="Help"');
+    const signOut = settings.indexOf('testID="sign-out"');
     expect(help).toBeGreaterThan(-1);
+    expect(settings.indexOf('testID="settings-version"')).toBeGreaterThan(help);
     expect(signOut).toBeGreaterThan(help);
-    expect(version).toBeGreaterThan(signOut);
-  });
-
-  it('the section renders every row and opens it through openHelpLegal', () => {
-    const section = source('components/settings/help-legal-section.tsx');
-    expect(section).toContain('HELP_LEGAL_ROWS.map');
-    expect(section).toContain('HELP & LEGAL');
-    expect(section).toContain('openHelpLegal(');
+    expect(settings).toContain('openHelpLegal(');
+    expect(settings).toContain('SIGN_OUT_QUESTION');
+    expect(settings).not.toContain('delete-account');
+    expect(source('app/(app)/privacy.tsx')).toContain("router.push('/delete-account')");
   });
 
   it('the sign-in screen shows the Privacy and Terms links', () => {

@@ -15,6 +15,11 @@ export function Journey({ journey, onOpen }: { journey: AlbumModel['journey']; o
       <Text style={text('sectionHeading')} accessibilityRole="header" testID="zoo-streak">
         {journey.title}
       </Text>
+      {journey.line ? (
+        <Text style={text('body')} testID="zoo-journey-line">
+          {journey.line}
+        </Text>
+      ) : null}
       <View style={[styles.path, { gap: space[1] }]} accessible accessibilityLabel={`${journey.streak} weeks of the journey`}>
         {journey.dots.map((d) => (
           <View key={d.key} style={[styles.dot, d.reached && styles.dotOn]} />

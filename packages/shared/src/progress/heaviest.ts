@@ -177,12 +177,26 @@ export function heaviestSentence(name: string, inRange: readonly HeaviestSession
   const since = formatPlainDayMonthInYear(first.date, today);
   const than = fromStart ? 'than when you started' : `than on ${since}`;
   const amt = amount(change.amount, units);
-  if (change.direction === 'same') return `Your heaviest is holding steady since ${since}.`;
+  // "Holding steady" only when the latest session is the best one (product owner, 2026-11-19); a dip is said plainly.
+  const below = belowBest(inRange, units, style);
+  const dip = below === null ? null : style === 'assisted' ? `${amount(below, units)} more help than your best last time; it happens.` : `Down ${amount(below, units)} from your best last time; it happens.`;
+  if (change.direction === 'same') return dip ? dip.replace(' last time', '') : `Your heaviest is holding steady since ${since}.`;
   // The best in the range is never behind the range's first session, so the change here is always progress.
-  if (style === 'assisted') return `You need ${amt} less help ${than}. Nice work.`;
-  if (style === 'added') return `You add ${amt} more ${than}. Nice work.`;
+  const cheer = dip ? ` ${dip}` : ' Nice work.';
+  if (style === 'assisted') return `You need ${amt} less help ${than}.${cheer}`;
+  if (style === 'added') return `You add ${amt} more ${than}.${cheer}`;
   const verb = verbOf(name);
-  return verb ? `You ${verb} ${amt} more ${than}. Nice work.` : `You lift ${amt} more on ${name} ${than}. Nice work.`;
+  return verb ? `You ${verb} ${amt} more ${than}.${cheer}` : `You lift ${amt} more on ${name} ${than}.${cheer}`;
+}
+
+/** How far the latest session is behind the best in the range (display units, always positive), or null when it is the best. */
+export function belowBest(inRange: readonly HeaviestSession[], units: Units, style: LoadStyle): number | null {
+  const last = inRange.at(-1);
+  const best = bestOf(inRange, style);
+  if (!last || !best || last === best) return null;
+  const raw = shownChange(last.heaviest.weightKg, best.heaviest.weightKg, units);
+  const gap = style === 'assisted' ? -raw : raw;
+  return gap > 0 ? gap : null;
 }
 
 export type SessionRowView = {
@@ -293,15 +307,18 @@ export function strengthExerciseRows(
     .sort((a, b) => (a.lastDate < b.lastDate ? 1 : a.lastDate > b.lastDate ? -1 : a.name.localeCompare(b.name)));
 }
 
-/** The Strength tile on the client's Progress tab: the most-trained exercise's heaviest weight and its 3-month change. */
+/**
+ * The Strength row on the client's Progress tab (approved Progress board): the most-trained exercise and its heaviest
+ * weight ("Barbell Squat 62.5 kg"), then "Heaviest weight · +17.5 kg since 2 Sep" over the last 3 months.
+ */
 export function heaviestTile(exercise: { name: string; points: readonly StrengthPoint[] } | undefined, units: Units, today: IsoDate): { value: string; sub: string } {
-  if (!exercise || exercise.points.length === 0) return { value: 'No lifts yet', sub: 'log a workout to start' };
+  if (!exercise || exercise.points.length === 0) return { value: 'No lifts yet', sub: 'Log a workout to start' };
   const style = loadStyleOf(exercise.name);
   const all = heaviestSessions(exercise.points, style);
   const recent = sessionsSince(all, 91, today);
   const change = heaviestChange(recent, units, style, today);
   const best = bestOf(recent.length > 0 ? recent : all, style)!;
-  if (!change) return { value: `${exercise.name} ${loadText(best.heaviest.weightKg, units, style)}`, sub: 'heaviest' };
-  const first = recent[0]!;
-  return { value: `${exercise.name} ${change.short === 'No change' ? '±0' : change.short}`, sub: `heaviest since ${formatPlainDayMonthInYear(first.date, today)}` };
+  const value = `${exercise.name} ${loadText(best.heaviest.weightKg, units, style)}`;
+  if (!change) return { value, sub: 'Heaviest weight' };
+  return { value, sub: `Heaviest weight · ${change.direction === 'same' ? change.text.replace(/^No change/, 'no change') : change.text}` };
 }

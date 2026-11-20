@@ -20,7 +20,9 @@ const httpError = (status: number, body: unknown) =>
 describe('Delete account: the confirmation', () => {
   it('turns the button on only for DELETE, ignoring spaces around it', () => {
     expect(canConfirmDelete('DELE')).toBe(false);
-    expect(canConfirmDelete('delete')).toBe(false);
+    expect(canConfirmDelete('delete')).toBe(true);
+    expect(canConfirmDelete(' Delete ')).toBe(true);
+    expect(canConfirmDelete('deleted')).toBe(false);
     expect(canConfirmDelete('')).toBe(false);
     expect(canConfirmDelete('DELETE')).toBe(true);
     expect(canConfirmDelete('  DELETE ')).toBe(true);

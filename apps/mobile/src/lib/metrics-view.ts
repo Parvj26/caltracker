@@ -109,14 +109,16 @@ export function lastValueLine(entries: readonly MetricEntry[], key: MetricKey, u
   return `Last: ${formatMetricValue(key, last.value, units)} on ${formatShortDate(last.measuredOn, today)} (${metricSourceLabel(last, coachFirstName)})`;
 }
 
-/** The Progress tab's Metrics tile: the latest weight and its change over 3 months. */
+/** The Progress tab's Metrics row: the latest weight, then "Weight · −2.1 kg in 3 months · from Apple Health". */
 export function metricsTile(entries: readonly MetricEntry[], units: Units, today: IsoDate): { value: string; sub: string } {
   const latest = metricDailyEntries(entries, 'weight_kg').at(-1);
-  if (!latest) return { value: 'Log a metric', sub: 'no weigh-ins yet' };
+  if (!latest) return { value: 'Log a metric', sub: 'No weigh-ins yet' };
   const { change } = metricSummary(entries, 'weight_kg', '3m', today);
   return {
     value: formatMetricValue('weight_kg', latest.value, units),
-    sub: change === null ? 'latest weigh-in' : `${formatMetricDelta('weight_kg', change, units)} in 3 months`,
+    sub: ['Weight', change === null ? 'latest weigh-in' : `${formatMetricDelta('weight_kg', change, units)} in 3 months`, latest.source === 'apple_health' ? 'from Apple Health' : null]
+      .filter(Boolean)
+      .join(' · '),
   };
 }
 

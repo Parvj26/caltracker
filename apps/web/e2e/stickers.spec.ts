@@ -134,7 +134,7 @@ test('a correction through the log page recomputes the client stats', async ({ p
   await expect(page.getByText('1-week streak')).toBeVisible();
 });
 
-test('the client page charts an exercise\'s estimated max over time, with a keyboard-reachable point readout', async ({ page }) => {
+test('the client page charts an exercise\'s heaviest weight (est. 1RM second) over time, with a keyboard-reachable point readout', async ({ page }) => {
   // Three squat workouts, 80 / 90 / 100 kg for 5 reps, a week apart: three points rising.
   const u = await admin.auth.admin.createUser({ email: `stk-${unique()}@example.com`, password: 'client-password-123', email_confirm: true, user_metadata: { first_name: 'Chart', last_name: `Lifter${unique()}` } });
   if (u.error) throw u.error;
@@ -152,9 +152,11 @@ test('the client page charts an exercise\'s estimated max over time, with a keyb
   // The wrapping <label> also contains the options' text, so match the select by role and a name that starts with "Exercise".
   await page.getByRole('combobox', { name: /^Exercise/ }).selectOption({ label: 'Barbell Squat' });
   await expect(page.getByTestId('chart-point')).toHaveCount(3);
+  // Heaviest weight is the headline (with its change), the estimated 1-rep max second.
+  await expect(page.getByTestId('strength-heaviest')).toContainText(/Heaviest weight (100 kg · \+20 kg|220(\.5)? lb · \+44(\.1)? lb) since/);
+  await expect(page.getByTestId('strength-e1rm')).toContainText(/Est\. 1-rep max (116\.7 kg|257(\.\d)? lb)/);
   // The newest workout (100 kg x 5, est. 116.7 kg) is the point read out first.
-  await expect(page.getByTestId('chart-readout')).toContainText(/116\.7 kg|257 lb/);
-  await expect(page.getByText(/Barbell Squat: 3 workouts/)).toBeVisible();
+  await expect(page.getByTestId('chart-readout')).toContainText(/heaviest (100 kg|220(\.5)? lb) × 5.*(116\.7 kg|257(\.\d)? lb)/);
 
   // One tab stop: focus the chart and step back with the arrow keys.
   await page.getByTestId('line-chart').focus();

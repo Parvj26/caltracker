@@ -54,7 +54,7 @@ env:
 - extendedWaitUntil:
     visible: 'Your first workout is coming!'
     timeout: 20000
-# kg/lb lives in Settings (gear on Today), with Sign out at the bottom.
+# kg/lb lives in Settings (gear on Today) on the Units row; the grey ‹ goes back to Today.
 - tapOn:
     id: today-settings
 - assertVisible:

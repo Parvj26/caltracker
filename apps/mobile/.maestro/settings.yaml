@@ -1,0 +1,75 @@
+# Settings (approved Settings board): the account header (email, coached by), ACCOUNT / NOTIFICATIONS / HELP groups,
+# Delete account under Privacy (typing "delete" in any case turns its button on; nothing is deleted here), and Back
+# going exactly one step each time. Run via `pnpm --filter mobile e2e .maestro/settings.yaml`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: today-settings
+- extendedWaitUntil:
+    visible:
+      id: settings-account
+    timeout: 10000
+- assertVisible:
+    id: settings-workspace
+    text: 'client@demo.local · coached by .+'
+- assertVisible: 'Units'
+- assertVisible:
+    id: units-kg
+- assertVisible:
+    id: units-lb
+- assertNotVisible:
+    id: settings-delete-account
+- takeScreenshot: settings-top
+- tapOn:
+    id: settings-privacy-delete
+- takeScreenshot: settings-privacy
+- tapOn:
+    id: settings-delete-account
+# On a small phone (SE) the field sits under the pinned buttons: scroll the page up first.
+- swipe:
+    start: 50%, 60%
+    end: 50%, 20%
+- waitForAnimationToEnd
+- tapOn:
+    id: delete-account-input
+- inputText: 'delete'
+- assertVisible:
+    id: delete-account-confirm
+    enabled: true
+# Done on the keyboard closes it; the back button is at the top again.
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: delete-account-back
+    direction: UP
+- tapOn:
+    id: delete-account-back
+- assertVisible:
+    id: settings-delete-account
+- tapOn:
+    id: privacy-back
+- assertVisible:
+    id: settings-account
+- scrollUntilVisible:
+    element:
+      id: settings-version
+    direction: DOWN
+- assertVisible: 'Terms & privacy policy'
+- takeScreenshot: settings-bottom
+- scrollUntilVisible:
+    element:
+      id: settings-close
+    direction: UP
+- tapOn:
+    id: settings-close
+- assertVisible:
+    id: today-settings
