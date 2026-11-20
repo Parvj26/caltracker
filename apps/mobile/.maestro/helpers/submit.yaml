@@ -1,9 +1,9 @@
-# Dismisses the keyboard and taps the form's submit button.
-# On iOS, Maestro's hideKeyboard can itself submit the form (the keyboard's return key), leaving the
-# screen already gone; so only tap submit if it is still on screen.
+# Taps the form's submit button (it sits above the keyboard, since the screen scrolls the focused field up).
+# No hideKeyboard first: on this simulator Maestro's hideKeyboard taps the screen where the keyboard was, which can
+# land on the Privacy link under the form and open Safari instead.
 appId: app.caltracker.client
 ---
-- hideKeyboard
+- waitForAnimationToEnd
 - runFlow:
     when:
       visible:

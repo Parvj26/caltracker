@@ -72,7 +72,15 @@
           "backgroundColor": "#FFFFFF"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "CalTracker reads the numbers you choose (weight, body fat, VO2 max, resting heart rate and waist) so they show in your Metrics and your coach can see them.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ]
     ]
   }
 }

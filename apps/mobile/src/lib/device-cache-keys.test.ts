@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { albumCacheKey, albumCachePrefix } from './album-logic';
-import { keysToForget, notificationPrefsKey, todayCacheKey } from './device-cache-keys';
+import { keysToForget, notificationPrefsKey, progressCachePrefix, todayCacheKey } from './device-cache-keys';
 
 describe('keysToForget', () => {
   const keys = [
@@ -46,5 +46,12 @@ describe('keysToForget', () => {
     expect(keysToForget(['caltracker.notificationPrefs.u1', 'caltracker.notificationPrefs.u2'], 'u1')).toEqual([
       'caltracker.notificationPrefs.u1',
     ]);
+  });
+});
+
+describe('Apple Health sync state', () => {
+  it('is forgotten on Sign out (it lives under the Progress prefix)', () => {
+    const key = `${progressCachePrefix('u1')}appleHealth.w1`;
+    expect(keysToForget([key, `${progressCachePrefix('u2')}appleHealth.w1`], 'u1')).toEqual([key]);
   });
 });

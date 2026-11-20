@@ -7,6 +7,7 @@ import { tapTarget } from '@caltracker/design-tokens';
 import { DeleteAccountLink } from '@/components/settings/delete-account-link';
 import { AppVersionLine, HelpLegalSection } from '@/components/settings/help-legal-section';
 import { NotificationsRow } from '@/components/settings/notifications-row';
+import { AppleHealthRow } from '@/components/settings/apple-health-row';
 import { Button, TextButton } from '@/components/ui';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -57,7 +58,7 @@ export function TodayHeader({
   );
 }
 
-/** The settings sheet: kg/lb, notifications, who coaches you, help and legal, sign out, delete account and the app version. */
+/** The settings sheet: kg/lb, notifications, Apple Health, who coaches you, help and legal, sign out, delete account and the app version. */
 function SettingsSheet({
   visible,
   workspaceName,
@@ -88,6 +89,12 @@ function SettingsSheet({
             onPress={() => {
               onClose();
               router.push('/notifications');
+            }}
+          />
+          <AppleHealthRow
+            onPress={() => {
+              onClose();
+              router.push('/apple-health');
             }}
           />
           {workspaceName ? <Text style={text('body')} testID="settings-workspace">{`Coached by ${workspaceName}`}</Text> : null}

@@ -1,0 +1,14 @@
+# From Metrics: open Apple Health, tap Sync now, come back to Metrics.
+appId: app.caltracker.client
+---
+- tapOn:
+    id: apple-health-row
+- tapOn:
+    id: apple-health-sync
+- extendedWaitUntil:
+    visible:
+      id: apple-health-status
+      text: 'Synced just now'
+    timeout: 30000
+- tapOn:
+    id: apple-health-back

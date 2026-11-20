@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth } from '@caltracker/design-tokens';
 import {
   bestsTile,
-  bodyTile,
   consistencyTile,
   currentProgramLabel,
   foodPeriodDays,
@@ -28,7 +27,8 @@ import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
 import { streakNow } from '@/lib/progress-view';
 import { useSession } from '@/lib/session';
 import { useCoachProfile } from '@/lib/use-coach-profile';
-import { useAlbum, useBody, useFoodRange, useHub, usePullRefresh } from '@/lib/use-progress-data';
+import { metricsTile } from '@/lib/metrics-view';
+import { useAlbum, useBody, useFoodRange, useHub, useMetrics, usePullRefresh } from '@/lib/use-progress-data';
 import { useUnits } from '@/lib/use-units';
 import { zooHref } from '@/lib/zoo-href';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -40,7 +40,7 @@ type TileModel = { key: string; title: string; value: string; sub: string; href:
 
 /**
  * Progress: this week at a glance (workouts, new PRs, streak and a line of encouragement), the coach's goal, then one
- * tile per section (Strength, Body, Personal bests, Consistency, Food, Zoo book), each with its key number. Every
+ * tile per section (Strength, Metrics, Personal bests, Consistency, Food, Zoo book), each with its key number. Every
  * number is the copy saved on the phone first, so it shows with no signal.
  */
 export default function ProgressScreen() {
@@ -54,8 +54,9 @@ export default function ProgressScreen() {
   const album = useAlbum(refreshKey);
   const body = useBody(refreshKey);
   const food = useFoodRange(refreshKey);
+  const metrics = useMetrics(refreshKey);
   const today = localToday();
-  const offline = [hub, album, body, food].some((l) => l.status === 'offline');
+  const offline = [hub, album, body, food, metrics].some((l) => l.status === 'offline');
 
   const model = useMemo(() => {
     const h = hub.data;
@@ -65,12 +66,11 @@ export default function ProgressScreen() {
     const week = h ? thisWeekSummary({ workouts: h.workouts, addedDays: addedDays(h), prs, streak: streak.current, today }) : null;
     const program = h ? currentProgramLabel(h.assignments, today) : null;
     const bodyModel = body.data ? buildProgress(body.data, '3m', units, today) : null;
-    const weight = bodyModel?.latest.find((l) => l.key === 'weight_kg') ?? null;
     const foodWeek = food.data ? foodPeriodSummary(food.data.meals, food.data.targets, foodPeriodDays('week', today), today) : null;
     const eightWeeksFrom = addDays(startOfWeek(today), -49);
     const tiles: TileModel[] = [
       { key: 'strength', title: 'Strength', ...(h ? strengthTile(h.exercises, units, today) : loading), href: '/progress-detail/strength', tone: 'bg', testID: 'progress-strength' },
-      { key: 'body', title: 'Body', ...(body.data ? bodyTile(weight) : loading), href: '/progress-detail/body', tone: 'bg', testID: 'progress-body' },
+      { key: 'metrics', title: 'Metrics', ...(metrics.data ? metricsTile(metrics.data, units, today) : loading), href: '/progress-detail/metrics', tone: 'bg', testID: 'progress-metrics' },
       {
         key: 'bests',
         title: 'Personal bests',
@@ -112,7 +112,7 @@ export default function ProgressScreen() {
       },
     ];
     return { week, program, goal: bodyModel?.goal ?? null, tiles };
-  }, [hub.data, album.data, body.data, food.data, units, today, userId]);
+  }, [hub.data, album.data, body.data, food.data, metrics.data, units, today, userId]);
 
   const coachName = coach?.name.split(' ')[0] ?? 'your coach';
 
