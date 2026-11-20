@@ -28,7 +28,7 @@ env:
 - tapOn:
     id: tab-coach
 - tapOn:
-    id: open-community
+    id: coach-strip-community
 - extendedWaitUntil:
     visible: 'E2E Welcome to the group!.*'
     timeout: 15000

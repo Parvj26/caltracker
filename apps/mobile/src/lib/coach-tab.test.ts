@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, OutboxItem } from '@caltracker/shared';
-import { QUICK_REPLIES, buildChatRows, coachFirstName, coachSinceLabel, goalCountdown, type WorkoutComment } from './coach-tab';
+import { QUICK_REPLIES, buildChatRows, coachFirstName, coachSinceLabel, coachStrip, goalCountdown, showQuickReplies, type WorkoutComment } from './coach-tab';
 
 const TZ = 'Europe/London';
 const NOW = '2026-11-09T12:00:00.000Z';
@@ -102,4 +102,41 @@ describe('buildChatRows', () => {
 
   it('is empty with nothing to show', () =>
     expect(buildChatRows({ items: [], comments: [], hasMore: false, now: NOW, timeZone: TZ })).toEqual([]));
+});
+
+describe('showQuickReplies', () => {
+  it('shows with no messages and after a coach message', () => {
+    expect(showQuickReplies([], 'me')).toBe(true);
+    expect(showQuickReplies([msg('a', NOW, 'me'), msg('b', NOW)], 'me')).toBe(true);
+  });
+  it('hides once the client has replied, or while a reply is sending', () => {
+    expect(showQuickReplies([msg('a', NOW), msg('b', NOW, 'me')], 'me')).toBe(false);
+    expect(showQuickReplies([msg('a', NOW), pending('p', NOW)], 'me')).toBe(false);
+  });
+});
+
+describe('coachStrip', () => {
+  const base = { goal: { goal: '5K', targetDate: '2026-12-28' }, today: '2026-11-09', mealCount: 3, firstName: 'Luis', hasCommunity: true, communityUnread: 2 };
+  it('shows the goal countdown, the coach meals and community news', () => {
+    expect(coachStrip(base).map((c) => [c.label, c.value])).toEqual([
+      ['GOAL', '5K · 49 days'],
+      ['MEALS', '3 from Luis'],
+      ['COMMUNITY', '2 new'],
+    ]);
+    expect(coachStrip(base)[0]?.accessibilityLabel).toBe('Goal: 5K, 49 days to go');
+  });
+  it('hides the goal without one and says when there is nothing new', () => {
+    const cells = coachStrip({ ...base, goal: null, mealCount: 0, communityUnread: 0 });
+    expect(cells.map((c) => [c.key, c.value])).toEqual([
+      ['meals', 'None yet'],
+      ['community', 'Open'],
+    ]);
+  });
+  it('words a goal day without a number, and a goal without a date', () => {
+    expect(coachStrip({ ...base, goal: { goal: '5K', targetDate: '2026-11-09' } })[0]?.value).toBe('5K · Today');
+    expect(coachStrip({ ...base, goal: { goal: '5K', targetDate: null } })[0]?.value).toBe('5K');
+  });
+  it('drops the community cell without a community', () => {
+    expect(coachStrip({ ...base, hasCommunity: false }).map((c) => c.key)).toEqual(['goal', 'meals']);
+  });
 });

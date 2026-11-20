@@ -2,18 +2,18 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { borderWidth } from '@caltracker/design-tokens';
-import { thumbPathOf } from '@caltracker/shared';
+import { localToday, thumbPathOf } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
-import { BackIcon } from '@/components/community/icons';
 import { Bubble } from '@/components/messages/bubble';
 import { CommentCard } from '@/components/messages/comment-card';
 import { Composer } from '@/components/messages/composer';
 import { useSignedUrls } from '@/components/messages/use-signed-urls';
 import { Button } from '@/components/ui';
-import { QUICK_REPLIES, buildChatRows, coachFirstName, type WorkoutComment } from '@/lib/coach-tab';
+import { QUICK_REPLIES, buildChatRows, coachFirstName, coachStrip, showQuickReplies, type StripCell, type WorkoutComment } from '@/lib/coach-tab';
 import { fetchMyWorkoutComments } from '@/lib/log-api';
 import { useCoachProfile } from '@/lib/use-coach-profile';
+import { useCommunity } from '@/lib/use-community';
+import { useFood } from '@/lib/use-food';
 import { useMessages } from '@/lib/use-messages';
 import { palette, pressedOpacity, space } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -21,9 +21,10 @@ import { useTheme } from '@/theme/use-theme';
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 /**
- * The chat with the coach, opened from the Coach profile's Message button (or a tapped message push). Realtime
- * messages, the offline outbox, photos, earlier messages and "Seen" come from use-messages; the coach's comments on
- * the client's workouts show inline as small cards.
+ * The Coach tab: straight into the chat with the coach (a tapped message push lands here too). A compact header
+ * (photo, name, "Your coach"; tap for their profile) and a strip with the goal, the coach's meals and the community
+ * sit on top. Realtime messages, the offline outbox, photos, earlier messages and "Seen" come from use-messages; the
+ * coach's comments on the client's workouts show inline as small cards.
  */
 export default function CoachChat() {
   const { text } = useTheme();
@@ -36,6 +37,9 @@ export default function CoachChat() {
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [comments, setComments] = useState<WorkoutComment[]>([]);
   const timeZone = useMemo(zone, []);
+  const food = useFood();
+  const community = useCommunity();
+  const loadCoachMeals = food?.loadCoachMeals;
 
   const setViewing = chat?.setViewing;
   // Messages are marked read only while the chat is on screen. Workout comments are fetched again each time it opens
@@ -43,6 +47,8 @@ export default function CoachChat() {
   useFocusEffect(
     useCallback(() => {
       setViewing?.(true);
+      // The coach's meals for the strip: the saved list shows at once, a fresh one loads each visit.
+      void loadCoachMeals?.();
       let alive = true;
       fetchMyWorkoutComments()
         .then((c) => alive && setComments(c))
@@ -51,7 +57,7 @@ export default function CoachChat() {
         alive = false;
         setViewing?.(false);
       };
-    }, [setViewing]),
+    }, [setViewing, loadCoachMeals]),
   );
 
   const items = chat?.items;
@@ -68,22 +74,44 @@ export default function CoachChat() {
     [items, comments, hasMore, timeZone],
   );
 
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/coach'));
+  const cells = coachStrip({
+    goal: coach?.goal ?? null,
+    today: localToday(timeZone),
+    mealCount: food?.coachMeals.length ?? 0,
+    firstName: first,
+    hasCommunity: community.community !== null,
+    communityUnread: community.unread,
+  });
+  const openCell = (key: StripCell['key']) => router.push(key === 'goal' ? '/coach/about' : key === 'meals' ? '/coach-meals' : '/community');
   const header = (
-    <View style={styles.header}>
+    <View>
       <Pressable
-        testID="coach-chat-back"
+        testID="coach-header"
         accessibilityRole="button"
-        accessibilityLabel={first ? `Back to ${first}’s profile` : 'Back to your coach’s profile'}
-        onPress={back}
-        style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
+        accessibilityLabel={`${coachName ?? 'Your coach'}, your coach. About`}
+        onPress={() => router.push('/coach/about')}
+        style={({ pressed }) => [styles.header, pressed && { opacity: pressedOpacity }]}
       >
-        <BackIcon />
+        <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={44} ring={2} />
+        <View style={styles.headerText}>
+          <Text style={[text('sectionHeading'), styles.headerName]} testID="coach-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
+          {coachName ? <Text style={[text('body'), styles.headerSub]}>Your coach</Text> : null}
+        </View>
       </Pressable>
-      <CoachAvatar name={coachName ?? 'Coach'} url={coach?.avatarUrl ?? null} size={40} ring={2} />
-      <View style={styles.headerText} accessibilityRole="header">
-        <Text style={[text('sectionHeading'), styles.headerName]} testID="coach-chat-name" numberOfLines={1}>{coachName ?? 'Your coach'}</Text>
-        {coachName ? <Text style={[text('body'), styles.headerSub]}>Your coach</Text> : null}
+      <View style={styles.strip} testID="coach-strip">
+        {cells.map((c, i) => (
+          <Pressable
+            key={c.key}
+            testID={`coach-strip-${c.key}`}
+            accessibilityRole="button"
+            accessibilityLabel={c.accessibilityLabel}
+            onPress={() => openCell(c.key)}
+            style={({ pressed }) => [styles.cell, i < cells.length - 1 && styles.cellDivider, pressed && { opacity: pressedOpacity }]}
+          >
+            <Text style={[text('caption'), styles.cellLabel]} numberOfLines={1}>{c.label}</Text>
+            <Text style={[text('sectionHeading'), styles.cellValue]} numberOfLines={2}>{c.value}</Text>
+          </Pressable>
+        ))}
       </View>
     </View>
   );
@@ -156,7 +184,11 @@ export default function CoachChat() {
           />
         )}
         {unavailable ? null : (
-          <Composer onSend={chat.send} placeholder={first ? `Message ${first}` : 'Write a message'} quickReplies={QUICK_REPLIES} />
+          <Composer
+            onSend={chat.send}
+            placeholder={first ? `Message ${first}` : 'Message your coach'}
+            quickReplies={showQuickReplies(items ?? [], chat.me) ? QUICK_REPLIES : []}
+          />
         )}
       </KeyboardAvoidingView>
       <Modal visible={openPhoto !== null} transparent animationType="fade" onRequestClose={() => setOpenPhoto(null)}>
@@ -170,20 +202,16 @@ export default function CoachChat() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2.5],
-    paddingHorizontal: space[4],
-    paddingTop: space[2],
-    paddingBottom: space[3],
-    borderBottomWidth: borderWidth.card,
-    borderBottomColor: palette.border,
-  },
-  back: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[2] },
   headerText: { flex: 1 },
-  headerName: { fontSize: 18 },
+  headerName: { fontSize: 20 },
   headerSub: { fontSize: 13, color: palette.inkMuted },
+  // Three equal cells between hairlines, each at least 56 pt tall.
+  strip: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.border },
+  cell: { flex: 1, minHeight: 56, justifyContent: 'center', paddingHorizontal: space[3], paddingVertical: space[1] },
+  cellDivider: { borderRightWidth: 1, borderRightColor: palette.border },
+  cellLabel: { fontSize: 12, color: palette.inkMuted, letterSpacing: 0.4 },
+  cellValue: { fontSize: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6] },
   flip: { transform: [{ scaleY: -1 }] },
   list: { paddingHorizontal: space[4], paddingVertical: space[3], gap: space[2] },
