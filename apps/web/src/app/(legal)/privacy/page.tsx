@@ -39,6 +39,17 @@ export default function PrivacyPage() {
           community. CalTracker staff look at accounts only to fix problems, and every look is logged.
         </p>
       </LegalSection>
+      <LegalSection title="Apple Health">
+        <p>
+          If you turn it on in the app, CalTracker reads these from Apple Health: weight, body fat, VO2 max, waist size and
+          resting heart rate. Nothing else, and only after you say yes.
+        </p>
+        <p>
+          Your coach sees these values next to the ones you log yourself. We never use Apple Health data for ads, never sell
+          it, and never write anything back to Apple Health. It is deleted with your account. You can turn it off any time in
+          the app, or on your iPhone in Settings › Health.
+        </p>
+      </LegalSection>
       <LegalSection title="Services we use">
         <p>
           Supabase (database and file storage), Cloudflare (website), Resend (emails), Apple (notifications) and PostHog (usage
