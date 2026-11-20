@@ -70,7 +70,11 @@ for (const size of SIZES) {
       await expect(page.getByTestId('chart-line-secondary')).toHaveCount(1);
       const sessions = page.getByTestId('strength-sessions');
       await expect(sessions.getByRole('link')).toHaveCount(4);
-      await expect(sessions.getByText('Heaviest yet')).toHaveCount(2);
+      // One tag: the session holding the heaviest set of all.
+      await expect(sessions.getByText('Heaviest yet')).toHaveCount(1);
+      await expect(sessions.getByRole('link', { name: /^82\.5 kg × 3.*Heaviest yet/ })).toBeVisible();
+      // The section shows all time, so its row opens the page on All and the numbers agree.
+      await expect(page).toHaveURL(/\?range=all$/);
       await noSidewaysScroll(page);
 
       // The range is kept in the address, without a new history step.

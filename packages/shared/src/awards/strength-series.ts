@@ -3,58 +3,68 @@ import type { Units } from '../units/units';
 import type { IsoDate } from '../dates/dates';
 import { MONTHS_SHORT } from '../dates/format';
 import type { WorkoutLogDoc } from '../logs/schema';
-import { epley1rm, liftsByExercise } from './prs';
+import { loadStyleOf } from './load-style';
+import { bestE1rmLift, epley1rm, exerciseNames, heavierLift, liftsByExercise } from './prs';
 import { localDay } from './streak';
 
 export type StrengthPoint = {
   date: IsoDate;
+  /** The best estimated 1RM in that workout (see `e1rm`; when it has none, the heaviest set's Epley, for old screens). */
   e1rmKg: number;
-  /** The set with the highest estimated 1RM in that workout. */
+  /** The set `e1rmKg` came from. */
   bestSet: { weightKg: number; reps: number };
   /**
-   * The heaviest set in that workout (most reps breaks a tie), its log and the workout's name. Optional: series saved
-   * on a phone before these existed have none (read heaviestSet as bestSet then).
+   * The best estimated 1-rep max by the one rule (prs.ts estimate1rm: sets of 1–12 reps, plain weight only), or null
+   * when the workout has none. The heaviest set in that workout (most reps breaks a tie), its log and the workout's
+   * name. All optional: series saved on a phone before these existed have none (read heaviestSet as bestSet then).
    */
+  e1rm?: { kg: number; set: { weightKg: number; reps: number } } | null;
   heaviestSet?: { weightKg: number; reps: number };
   logId?: string;
   logName?: string;
 };
 
-/** The finished logs that have a counted set (no warm-ups) of the exercise, with that log's best lift. */
-function points(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone: string): Array<Required<StrengthPoint> & { at: string }> {
-  const out: Array<Required<StrengthPoint> & { at: string }> = [];
+/**
+ * Every exercise's series at once (each log's counted sets are read once): one point per finished workout with a
+ * counted set (no warm-ups) of the exercise, oldest first. `timeZone` decides which calendar day a workout belongs to.
+ */
+export function strengthSeriesAll(logs: readonly WorkoutLogDoc[], timeZone = 'UTC'): Map<string, StrengthPoint[]> {
+  const out = new Map<string, Array<StrengthPoint & { at: string }>>();
   for (const log of logs) {
     if (log.status !== 'completed' || !log.finishedAt) continue;
-    const lifts = liftsByExercise(log).get(exerciseId);
-    if (!lifts || lifts.length === 0) continue;
-    const best = lifts.reduce((a, b) => (epley1rm(b.weightKg, b.reps) > epley1rm(a.weightKg, a.reps) ? b : a));
-    const heaviest = lifts.reduce((a, b) => (b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a));
-    out.push({
-      date: localDay(log.finishedAt, timeZone),
-      at: log.finishedAt,
-      e1rmKg: epley1rm(best.weightKg, best.reps),
-      bestSet: { weightKg: best.weightKg, reps: best.reps },
-      heaviestSet: { weightKg: heaviest.weightKg, reps: heaviest.reps },
-      logId: log.id,
-      logName: log.name,
-    });
+    const names = exerciseNames(log);
+    for (const [exerciseId, lifts] of liftsByExercise(log)) {
+      if (lifts.length === 0) continue;
+      const style = loadStyleOf(names.get(exerciseId) ?? '');
+      const heaviest = lifts.reduce((a, b) => (heavierLift(b, a, style) ? b : a));
+      const e1 = bestE1rmLift(lifts, style);
+      const best = e1?.lift ?? heaviest;
+      const list = out.get(exerciseId) ?? [];
+      list.push({
+        date: localDay(log.finishedAt, timeZone),
+        at: log.finishedAt,
+        e1rmKg: e1?.kg ?? epley1rm(heaviest.weightKg, heaviest.reps),
+        bestSet: { weightKg: best.weightKg, reps: best.reps },
+        e1rm: e1 ? { kg: e1.kg, set: { weightKg: e1.lift.weightKg, reps: e1.lift.reps } } : null,
+        heaviestSet: { weightKg: heaviest.weightKg, reps: heaviest.reps },
+        logId: log.id,
+        logName: log.name,
+      });
+      out.set(exerciseId, list);
+    }
   }
-  return out.sort((a, b) => a.at.localeCompare(b.at));
+  return new Map([...out].map(([id, list]) => [id, list.sort((a, b) => a.at.localeCompare(b.at)).map(withoutAt)]));
 }
 
-/**
- * One point per finished workout for the exercise: that day's best estimated 1RM and the set it came from, oldest
- * first. Warm-ups and unfinished sets are left out. `timeZone` decides which calendar day a workout belongs to.
- */
+function withoutAt(p: StrengthPoint & { at: string }): StrengthPoint {
+  const { at, ...rest } = p;
+  void at;
+  return rest;
+}
+
+/** One exercise's series (strengthSeriesAll); call strengthSeriesAll when you need several. */
 export function strengthSeries(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone = 'UTC'): StrengthPoint[] {
-  return points(logs, exerciseId, timeZone).map((p) => ({
-    date: p.date,
-    e1rmKg: p.e1rmKg,
-    bestSet: p.bestSet,
-    heaviestSet: p.heaviestSet,
-    logId: p.logId,
-    logName: p.logName,
-  }));
+  return strengthSeriesAll(logs, timeZone).get(exerciseId) ?? [];
 }
 
 /** The exercises that have a strength series in these logs, sorted by name, for the exercise dropdown. */

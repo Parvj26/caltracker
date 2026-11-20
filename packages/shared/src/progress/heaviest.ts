@@ -1,5 +1,7 @@
 import type { StrengthPoint } from '../awards/strength-series';
-import { epley1rm } from '../awards/prs';
+import { E1RM_MAX_REPS, loadStyleOf } from '../awards/load-style';
+import type { LoadStyle } from '../awards/load-style';
+import { bestE1rmLift, heavierLift } from '../awards/prs';
 import { addDays } from '../dates/dates';
 import type { IsoDate } from '../dates/dates';
 import { formatPlainDayMonthInYear, formatRelativeDay } from '../dates/format';
@@ -12,28 +14,8 @@ import type { Units } from '../units/units';
  * (StrengthPoint: one per finished workout, from awards/strength-series). Pure, so both apps show the same numbers.
  */
 
-/**
- * How an exercise's logged weight reads:
- * - `weight`: the weight lifted (a barbell squat).
- * - `added`: weight added to the body (a weighted pull-up or dip): "+7.5 kg". Bodyweight alone is not logged as a
- *   counted lift, so only the added part is compared, and no 1-rep max is estimated (it would need the body weight).
- * - `assisted`: help from a machine or band (an assisted pull-up): "20 kg assist". LESS is better, so the best set
- *   is the one with the least help, and no 1-rep max is estimated.
- */
-export type LoadStyle = 'weight' | 'added' | 'assisted';
-
-const ASSISTED = /\bassist(ed|ance)?\b/i;
-const BODYWEIGHT = /\b(pull|chin|push|muscle)[\s-]?ups?\b|\bdips?\b|\binverted rows?\b|\bbody ?weight\b|\bpistol squats?\b|\bnordic\b|\bhanging leg raises?\b|\bback extensions?\b/i;
-
-/** The load style for an exercise from its name (logs keep no equipment). An unknown name is plain `weight`. */
-export function loadStyleOf(name: string): LoadStyle {
-  if (ASSISTED.test(name)) return 'assisted';
-  if (BODYWEIGHT.test(name)) return 'added';
-  return 'weight';
-}
-
-/** Sets with more reps than this give no estimated 1-rep max: the estimate stops meaning much past ~12 reps. */
-export const E1RM_MAX_REPS = 12;
+export { E1RM_MAX_REPS, loadStyleOf } from '../awards/load-style';
+export type { LoadStyle } from '../awards/load-style';
 
 export type LiftSet = { weightKg: number; reps: number };
 
@@ -48,22 +30,14 @@ export function setText(set: LiftSet, units: Units, style: LoadStyle): string {
   return `${loadText(set.weightKg, units, style)} × ${set.reps}`;
 }
 
-/** Whether `a` beats `b` as the heaviest: more weight (less help when assisted), then more reps. */
-function beats(a: LiftSet, b: LiftSet, style: LoadStyle): boolean {
-  if (a.weightKg !== b.weightKg) return style === 'assisted' ? a.weightKg < b.weightKg : a.weightKg > b.weightKg;
-  return a.reps > b.reps;
-}
+const beats = heavierLift;
 
-/** The best estimated 1-rep max in a session from its sets of 1–12 reps, or null (bodyweight style, or only high reps). */
-function sessionE1rm(sets: readonly LiftSet[], style: LoadStyle): { kg: number; from: LiftSet } | null {
+/** The session's estimated 1-rep max: the stored best (1–12 reps, plain weight; prs.ts estimate1rm), else from what an older saved point has. */
+function sessionE1rm(p: StrengthPoint, style: LoadStyle): { kg: number; from: LiftSet } | null {
   if (style !== 'weight') return null;
-  let best: { kg: number; from: LiftSet } | null = null;
-  for (const s of sets) {
-    if (s.reps < 1 || s.reps > E1RM_MAX_REPS || s.weightKg <= 0) continue;
-    const kg = s.reps === 1 ? s.weightKg : epley1rm(s.weightKg, s.reps);
-    if (!best || kg > best.kg) best = { kg, from: s };
-  }
-  return best;
+  if (p.e1rm !== undefined) return p.e1rm ? { kg: p.e1rm.kg, from: p.e1rm.set } : null;
+  const best = bestE1rmLift(p.heaviestSet ? [p.heaviestSet, p.bestSet] : [p.bestSet], style);
+  return best ? { kg: best.kg, from: { weightKg: best.lift.weightKg, reps: best.lift.reps } } : null;
 }
 
 export type HeaviestSession = {
@@ -74,26 +48,25 @@ export type HeaviestSession = {
   workoutName: string | null;
   heaviest: LiftSet;
   e1rm: { kg: number; from: LiftSet } | null;
-  /** This session beat every earlier one (all time, not just the range). The first session ever is not tagged. */
+  /**
+   * This session holds the heaviest set of all (the earliest, on a tie), with at least 2 sessions logged. Only one
+   * session is tagged, so steady progress doesn't tag every row.
+   */
   heaviestYet: boolean;
 };
 
 /** One row per session, oldest first, from an exercise's whole series (so "Heaviest yet" looks at all of history). */
 export function heaviestSessions(points: readonly StrengthPoint[], style: LoadStyle): HeaviestSession[] {
-  let record: LiftSet | null = null;
-  return points.map((p) => {
-    const heaviest = p.heaviestSet ?? p.bestSet;
-    const yet = record !== null && beats(heaviest, record, style) && heaviest.weightKg !== record.weightKg;
-    if (record === null || beats(heaviest, record, style)) record = heaviest;
-    return {
-      logId: p.logId ?? null,
-      date: p.date,
-      workoutName: p.logName ?? null,
-      heaviest,
-      e1rm: sessionE1rm(p.heaviestSet ? [p.heaviestSet, p.bestSet] : [p.bestSet], style),
-      heaviestYet: yet,
-    };
-  });
+  const sessions = points.map<HeaviestSession>((p) => ({
+    logId: p.logId ?? null,
+    date: p.date,
+    workoutName: p.logName ?? null,
+    heaviest: p.heaviestSet ?? p.bestSet,
+    e1rm: sessionE1rm(p, style),
+    heaviestYet: false,
+  }));
+  const best = sessions.length > 1 ? bestOf(sessions, style) : null;
+  return best ? sessions.map((s) => (s === best ? { ...s, heaviestYet: true } : s)) : sessions;
 }
 
 /** The sessions on or after `days` before today (null: all of them). */
@@ -205,9 +178,8 @@ export function heaviestSentence(name: string, inRange: readonly HeaviestSession
   const than = fromStart ? 'than when you started' : `than on ${since}`;
   const amt = amount(change.amount, units);
   if (change.direction === 'same') return `Your heaviest is holding steady since ${since}.`;
-  if (style === 'assisted') {
-    return change.direction === 'up' ? `You need ${amt} less help ${than}. Nice work.` : `You're using ${amt} more help ${than}. Ups and downs are normal.`;
-  }
+  // The best in the range is never behind the range's first session, so the change here is always progress.
+  if (style === 'assisted') return `You need ${amt} less help ${than}. Nice work.`;
   if (style === 'added') return `You add ${amt} more ${than}. Nice work.`;
   const verb = verbOf(name);
   return verb ? `You ${verb} ${amt} more ${than}. Nice work.` : `You lift ${amt} more on ${name} ${than}. Nice work.`;
@@ -260,9 +232,11 @@ export function heaviestChart(name: string, inRange: readonly HeaviestSession[],
   const count = `${inRange.length} ${inRange.length === 1 ? 'session' : 'sessions'}`;
   if (inRange.length === 1) return { points, summary: `${name}, heaviest weight per session: ${count}, ${loadText(first.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(first.date, today)}.` };
   const best = bestOf(inRange, style)!;
+  const topE1rm = bestE1rmOf(inRange);
+  const dashed = topE1rm?.e1rm ? ` The dashed line is the estimated 1-rep max, best ${formatWeight(topE1rm.e1rm.kg, units)} on ${formatPlainDayMonthInYear(topE1rm.date, today)}.` : '';
   return {
     points,
-    summary: `${name}, heaviest weight per session: ${count}, from ${loadText(first.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(first.date, today)} to ${loadText(last.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(last.date, today)}. Heaviest ${loadText(best.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(best.date, today)}.`,
+    summary: `${name}, heaviest weight per session: ${count}, from ${loadText(first.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(first.date, today)} to ${loadText(last.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(last.date, today)}. Heaviest ${loadText(best.heaviest.weightKg, units, style)} on ${formatPlainDayMonthInYear(best.date, today)}.${dashed}`,
   };
 }
 

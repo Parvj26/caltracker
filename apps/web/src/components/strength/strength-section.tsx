@@ -40,7 +40,7 @@ export function StrengthSection({ clientId, rows, headingLevel = 2 }: { clientId
               return (
                 <ListRow
                   key={r.exerciseId}
-                  href={strengthExerciseHref(clientId, r.exerciseId)}
+                  href={`${strengthExerciseHref(clientId, r.exerciseId)}?range=all`}
                   title={r.name}
                   meta={<span>Last: {r.lastSession}</span>}
                   itemProps={{ 'data-exercise-row': r.name }}

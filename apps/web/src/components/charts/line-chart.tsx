@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import styles from './line-chart.module.css';
 
 export type ChartPoint = {
@@ -21,14 +21,15 @@ type Props = {
   yLabel: (y: number) => string;
   xLabel: (x: number) => string;
   /**
-   * An optional second line, drawn dashed in blue, one value per point (null: no value there). With it a legend names
-   * both lines (`name` for the main one, `secondary.name` for this one).
+   * An optional second line, drawn dashed in strong blue (--ct-magenta), one value per point (null: no value there).
+   * With it a legend names both lines (`name` for the main one, `secondary.name` for this one).
    */
   secondary?: { name: string; values: readonly (number | null)[] } | undefined;
   name?: string | undefined;
+  /** Keep the summary for screen readers only (when the page already says it in words). */
+  summaryHidden?: boolean;
 };
 
-const W = 640;
 const H = 260;
 const PAD = { top: 16, right: 20, bottom: 36, left: 64 };
 
@@ -36,12 +37,24 @@ const PAD = { top: 16, right: 20, bottom: 36, left: 64 };
  * A small dependency-free line chart drawn as SVG with the design tokens. It is one tab stop: arrow keys move
  * between points (Home and End jump to the ends) and the chosen point is read out below the chart.
  */
-export function LineChart({ points, title, summary, yLabel, xLabel, secondary, name }: Props) {
+export function LineChart({ points, title, summary, yLabel, xLabel, secondary, name, summaryHidden = false }: Props) {
   const id = useId();
+  // Drawn at the box's real width (1 SVG unit = 1 px), so the axis labels keep their size on a phone.
+  const box = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setW((w) => (el.clientWidth > 0 && Math.abs(el.clientWidth - w) > 1 ? el.clientWidth : w));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [active, setActive] = useState(points.length - 1);
   const last = points.length - 1;
   const current = Math.min(active, last);
-  if (points.length === 0) return <p className={styles.summary}>{summary}</p>;
+  if (points.length === 0) return <p className={summaryHidden ? styles.srOnly : styles.summary}>{summary}</p>;
 
   const xs = points.map((p) => p.x);
   const extra = (secondary?.values ?? []).filter((v): v is number => v !== null);
@@ -88,7 +101,7 @@ export function LineChart({ points, title, summary, yLabel, xLabel, secondary, n
 
   const shown = points[current]!;
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} ref={box}>
       <div
         className={styles.chart}
         role="application"
@@ -129,8 +142,8 @@ export function LineChart({ points, title, summary, yLabel, xLabel, secondary, n
           <li><span className={styles.swatch2} />{secondary.name}</li>
         </ul>
       ) : null}
-      <p id={`${id}-readout`} className={styles.readout} aria-live="polite" data-testid="chart-readout">{shown.label}</p>
-      <p className={styles.summary}>{summary}</p>
+      <p id={`${id}-readout`} className={summaryHidden ? styles.readoutQuiet : styles.readout} aria-live="polite" data-testid="chart-readout">{shown.label}</p>
+      <p className={summaryHidden ? styles.srOnly : styles.summary}>{summary}</p>
     </div>
   );
 }

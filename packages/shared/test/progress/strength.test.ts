@@ -108,6 +108,8 @@ describe('strengthPickerSections', () => {
     expect(s[0]!.items.map((i) => i.name)).toEqual(['Back Squat', 'Bench Press']);
     expect(s[2]!.items.map((i) => i.name)).toEqual(['Back Squat', 'Leg Press']);
     expect(s[0]!.items[0]!.bestKg).toBe(105);
+    expect(s[0]!.items[0]!.best).toBe('105 kg');
+    expect(strengthPickerSections([{ exerciseId: 'p', name: 'Pullups', muscle: null, points: [pt('2026-10-01', 7.5)] }], '')[0]!.items[0]!.best).toBe('+7.5 kg');
   });
   it('uses the app’s smart search: typos, word forms and other names, in its ranked order', () => {
     const lifts = [

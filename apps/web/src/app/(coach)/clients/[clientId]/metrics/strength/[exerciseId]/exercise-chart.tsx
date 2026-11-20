@@ -18,6 +18,7 @@ export function ExerciseChart({ name, points, summary, units }: { name: string; 
       points={points.map((p) => ({ x: diffDays(EPOCH, p.date), y: p.heaviestKg, label: p.label }))}
       secondary={hasE1rm ? { name: 'Estimated 1-rep max', values: points.map((p) => p.e1rmKg) } : undefined}
       summary={summary}
+      summaryHidden
       yLabel={(y) => formatWeight(y, units)}
       xLabel={(x) => shortDate(addDays(EPOCH, x))}
     />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StrengthPoint } from '../../src/awards/strength-series';
-import { strengthSeries } from '../../src/awards/strength-series';
+import { strengthSeries, strengthSeriesAll } from '../../src/awards/strength-series';
 import {
   heaviestChange,
   heaviestChart,
@@ -36,6 +36,8 @@ describe('loadStyleOf', () => {
     expect(loadStyleOf('Dips')).toBe('added');
     expect(loadStyleOf('Machine Assisted Pull Up')).toBe('assisted');
     expect(loadStyleOf('Band Assisted Pull-Up')).toBe('assisted');
+    expect(loadStyleOf('Dip Machine')).toBe('weight');
+    expect(loadStyleOf('Back Extension Machine')).toBe('weight');
   });
 });
 
@@ -59,10 +61,31 @@ describe('strengthSeries', () => {
   });
 });
 
+describe('strengthSeries and the one estimated-max rule', () => {
+  it('keeps the best estimate from any set of 1–12 reps, and none for high reps or bodyweight styles', () => {
+    const log = mkLog([{ sets: [{ w: 60, r: 20 }, { w: 50, r: 10 }, { w: 40, r: 1 }] }], { finishedAt: '2026-11-03T10:00:00.000Z' });
+    const [p] = strengthSeries([log], EX_A);
+    expect(p?.e1rm).toEqual({ kg: 66.7, set: { weightKg: 50, reps: 10 } });
+    expect(p?.heaviestSet).toEqual({ weightKg: 60, reps: 20 });
+    const high = mkLog([{ sets: [{ w: 60, r: 20 }] }], { finishedAt: '2026-11-04T10:00:00.000Z' });
+    expect(strengthSeries([high], EX_A)[0]?.e1rm).toBeNull();
+  });
+  it('reads every exercise of each log once (strengthSeriesAll matches strengthSeries)', () => {
+    const logs = [mkLog([{ sets: [{ w: 100, r: 5 }] }], { finishedAt: '2026-11-03T10:00:00.000Z' })];
+    expect(strengthSeriesAll(logs).get(EX_A)).toEqual(strengthSeries(logs, EX_A));
+  });
+});
+
 describe('heaviestSessions', () => {
-  it('tags a session "Heaviest yet" only when it lifts more than every earlier one', () => {
-    const s = heaviestSessions([pt('2026-09-02', [65, 5]), pt('2026-09-09', [70, 5]), pt('2026-09-16', [70, 8]), pt('2026-09-23', [67.5, 5]), pt('2026-09-30', [75, 3])], 'weight');
-    expect(s.map((x) => x.heaviestYet)).toEqual([false, true, false, false, true]);
+  it('tags only the session holding the heaviest set of all as "Heaviest yet"', () => {
+    const s = heaviestSessions([pt('2026-09-02', [65, 5]), pt('2026-09-09', [70, 5]), pt('2026-09-16', [75, 3]), pt('2026-09-23', [67.5, 5]), pt('2026-09-30', [75, 3])], 'weight');
+    expect(s.map((x) => x.heaviestYet)).toEqual([false, false, true, false, false]);
+    expect(heaviestSessions([pt('2026-09-02', [65, 5])], 'weight')[0]?.heaviestYet).toBe(false);
+  });
+  it('uses the stored best estimate (any set of 1–12 reps), and none when the session has none', () => {
+    const p: StrengthPoint = { ...pt('2026-09-02', [100, 15]), e1rm: { kg: 93.3, set: { weightKg: 80, reps: 5 } } };
+    expect(heaviestSessions([p], 'weight')[0]?.e1rm).toEqual({ kg: 93.3, from: { weightKg: 80, reps: 5 } });
+    expect(heaviestSessions([{ ...p, e1rm: null }], 'weight')[0]?.e1rm).toBeNull();
   });
   it('estimates the 1-rep max from sets of 12 reps or fewer, and a single is its own max', () => {
     const [a, b, c] = heaviestSessions([pt('2026-09-02', [100, 1]), pt('2026-09-09', [60, 20], [60, 20]), pt('2026-09-16', [80, 5])], 'weight');
@@ -142,7 +165,9 @@ describe('heaviestChart', () => {
   it('gives the heaviest and estimate per session and a text alternative', () => {
     const c = heaviestChart('Squat', heaviestSessions([pt('2026-09-02', [65, 5]), pt('2026-11-17', [82.5, 3])], 'weight'), 'kg', 'weight', today);
     expect(c.points.map((p) => [p.heaviestKg, p.e1rmKg])).toEqual([[65, 75.8], [82.5, 90.8]]);
-    expect(c.summary).toBe('Squat, heaviest weight per session: 2 sessions, from 65 kg on 2 Sep to 82.5 kg on 17 Nov. Heaviest 82.5 kg on 17 Nov.');
+    expect(c.summary).toBe(
+      'Squat, heaviest weight per session: 2 sessions, from 65 kg on 2 Sep to 82.5 kg on 17 Nov. Heaviest 82.5 kg on 17 Nov. The dashed line is the estimated 1-rep max, best 90.8 kg on 17 Nov.',
+    );
   });
 });
 

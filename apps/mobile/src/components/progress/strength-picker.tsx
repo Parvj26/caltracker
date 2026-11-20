@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
-import { formatWeight, strengthPickerSections, type StrengthExerciseLite, type Units } from '@caltracker/shared';
+import { strengthPickerSections, type StrengthExerciseLite, type Units } from '@caltracker/shared';
 import { TextButton, TextField } from '@/components/ui';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -29,8 +29,8 @@ export function StrengthPicker({
   const { text, space, radius } = useTheme();
   const [query, setQuery] = useState('');
   const sections = useMemo(
-    () => strengthPickerSections(exercises, query).map((s) => ({ title: s.title, data: s.items })),
-    [exercises, query],
+    () => strengthPickerSections(exercises, query, 5, units).map((s) => ({ title: s.title, data: s.items })),
+    [exercises, query, units],
   );
 
   return (
@@ -60,7 +60,7 @@ export function StrengthPicker({
           )}
           renderItem={({ item }) => {
             const on = item.exerciseId === selectedId;
-            const best = item.bestKg > 0 ? `heaviest ${formatWeight(item.bestKg, units)}` : '';
+            const best = item.best ? `heaviest ${item.best}` : '';
             return (
               <Pressable
                 testID={`strength-pick-${item.name}`}

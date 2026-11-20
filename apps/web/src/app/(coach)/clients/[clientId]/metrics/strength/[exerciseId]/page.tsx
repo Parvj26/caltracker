@@ -52,7 +52,7 @@ export default async function ExerciseProgressPage({
   const [{ clientId, exerciseId }, query] = await Promise.all([params, searchParams]);
   const client = await getClient(clientId);
   if (!client) notFound();
-  const { exercises, timeZone } = await loadClientStrengthIn(await createServerSupabase(), workspaceId, client.id);
+  const { exercises, timeZone } = await loadClientStrengthIn(await createServerSupabase(), workspaceId, client.id, exerciseId);
   const exercise = exercises.find((e) => e.exerciseId === exerciseId);
   if (!exercise) notFound();
 
