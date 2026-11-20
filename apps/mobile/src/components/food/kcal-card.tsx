@@ -5,7 +5,7 @@ import { font, inkShadow } from './food-type';
 
 const NAMES = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' } as const;
 
-/** The lime card: kcal left (or the day's total), a bar per macro, and who set the targets. */
+/** The lime card: kcal left (or the day's total), each macro (with a bar when it has a target), and who set the targets. */
 export function KcalCard({ card, coachName }: { card: KcalCardData; coachName: string | null }) {
   const footer = card.hasTargets ? (coachName ? `Targets set by ${coachName}` : 'Targets set by your coach') : "Your coach hasn't set targets yet";
   return (
@@ -28,13 +28,12 @@ export function KcalCard({ card, coachName }: { card: KcalCardData; coachName: s
                 {b.text}
               </Text>
             </View>
-            <View
-              style={styles.track}
-              accessibilityRole="image"
-              accessibilityLabel={pct === null ? `${NAMES[b.key]} ${b.text}` : `${NAMES[b.key]} ${pct} percent`}
-            >
-              {pct !== null ? <View style={[styles.fill, { width: `${pct}%` }]} /> : null}
-            </View>
+            {/* A bar only against a target: with none, the number alone (an empty bar reads as zero). */}
+            {pct !== null ? (
+              <View style={styles.track} accessibilityRole="image" accessibilityLabel={`${NAMES[b.key]} ${pct} percent`} testID={`food-track-${b.key}`}>
+                <View style={[styles.fill, { width: `${pct}%` }]} />
+              </View>
+            ) : null}
           </View>
         );
       })}

@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MACRO_KEYS, formatMacro, type MacroKey } from '@caltracker/shared';
-import { tileColour } from '@/components/food/coach-meal-tile';
 import { font, foodText, inkShadow } from '@/components/food/food-type';
 import { BackIcon } from '@/components/food/icons';
 import { Button, Screen } from '@/components/ui';
@@ -13,7 +12,7 @@ import { palette, pressedOpacity } from '@/theme/theme';
 
 const LABEL: Record<MacroKey, string> = { calories: 'kcal', protein: 'protein', carbs: 'carbs', fat: 'fat' };
 
-/** A coach meal: photo, name, the four numbers ("—" when blank), ingredients and how to make it, and Log this meal. */
+/** A coach meal: photo (no top block at all without one), name, the four numbers ("—" when blank), ingredients and how to make it, and Log this meal. */
 export default function CoachMealScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -48,21 +47,29 @@ export default function CoachMealScreen() {
     return k === 'calories' ? formatMacro(k, v).replace(/ kcal$/, '') : formatMacro(k, v);
   };
 
+  const back = (
+    <Pressable
+      onPress={() => router.back()}
+      accessibilityRole="button"
+      accessibilityLabel="Back to meals"
+      testID="coach-meal-back"
+      style={({ pressed }) => [meal.photo ? [styles.back, styles.backOver, { top: insets.top + 4 }] : styles.back, pressed && { opacity: pressedOpacity }]}
+    >
+      <BackIcon />
+    </Pressable>
+  );
+
   return (
     <View style={styles.page}>
       <ScrollView contentContainerStyle={{ paddingBottom: 56 + 32 + insets.bottom + 16 }}>
-        <View style={[styles.photo, { backgroundColor: tileColour(meal.id) }]} accessibilityRole="image" accessibilityLabel={`${meal.name} photo`}>
-          {photoUrl ? <Image source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
-          <Pressable
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="Back to meals"
-            testID="coach-meal-back"
-            style={({ pressed }) => [styles.back, { top: insets.top + 4 }, pressed && { opacity: pressedOpacity }]}
-          >
-            <BackIcon />
-          </Pressable>
-        </View>
+        {meal.photo ? (
+          <View style={styles.photo} accessibilityRole="image" accessibilityLabel={`${meal.name} photo`}>
+            {photoUrl ? <Image source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
+            {back}
+          </View>
+        ) : (
+          <View style={[styles.noPhoto, { paddingTop: insets.top + 4 }]}>{back}</View>
+        )}
         <View style={styles.body}>
           <View style={styles.titleBlock}>
             <Text style={[font(700, 13), foodText.muted]}>{food.coachName ? `From ${food.coachName}` : 'From your coach'}</Text>
@@ -120,10 +127,10 @@ export default function CoachMealScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: palette.bg },
-  photo: { height: 240, borderBottomWidth: 2, borderBottomColor: palette.ink, overflow: 'hidden' },
+  photo: { height: 240, borderBottomWidth: 2, borderBottomColor: palette.ink, overflow: 'hidden', backgroundColor: palette.surface },
+  noPhoto: { paddingHorizontal: 16 },
+  backOver: { position: 'absolute', left: 16 },
   back: {
-    position: 'absolute',
-    left: 16,
     width: 44,
     height: 44,
     borderRadius: 22,

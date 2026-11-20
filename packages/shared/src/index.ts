@@ -652,12 +652,15 @@ export {
   weekDays,
 } from './food/food';
 export type { DailyTotals, KcalCard, MacroKey, MacroProgress, MacroTargets, MealMacros, MealPhotoExt, StripDay } from './food/food';
+export { MEAL_TYPES, USUAL_MEAL_MINUTES, macroSumHint, mealTitle, mealTypeForMinutes, mealTypeForTime, mealTypeTag } from './food/meal-type';
+export type { MealType } from './food/meal-type';
 export {
   COACH_MEAL_CHIPS,
   filterCoachMeals,
   frequentMeals,
   mealSearchItems,
   mealSearchMeta,
+  recentAndFrequentMeals,
   searchMeals,
 } from './food/meal-search';
 export type { CoachMeal, CoachMealChip, CoachMealPhoto, HistoryMeal, MealSearchItem } from './food/meal-search';

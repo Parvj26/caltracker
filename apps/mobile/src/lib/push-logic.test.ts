@@ -20,8 +20,8 @@ describe('unreadCommentCount', () => {
 
 describe('tapTarget', () => {
   it('opens a valid route', () => expect(tapTarget({ route: '/food', type: 'meal_comment' }, new Set())).toBe('/food'));
-  it('a message opens the chat itself, not the coach profile', () =>
-    expect(tapTarget({ route: '/coach', type: 'message' }, new Set())).toBe('/coach/chat'));
+  it('a message opens the Coach tab, which is the chat', () =>
+    expect(tapTarget({ route: '/coach', type: 'message' }, new Set())).toBe('/coach'));
   it('ignores foreign routes', () => expect(tapTarget({ route: 'https://x.y' }, new Set())).toBeNull());
   it('ignores the local still-training reminder', () => expect(tapTarget({ kind: 'reminder', logId: L }, new Set())).toBeNull());
   it('ignores anything that is not an object', () => {
@@ -85,10 +85,10 @@ describe('pushCardText', () => {
 });
 
 describe('openPushTarget', () => {
-  it('moves to the one chat instead of stacking another', () => expect(openPushTarget('/coach/chat', '/coach')).toBe('navigate'));
-  it('does nothing when the chat is already open', () => expect(openPushTarget('/coach/chat', '/coach/chat')).toBeNull());
+  it('moves to the one chat instead of stacking another', () => expect(openPushTarget('/coach', '/coach/about')).toBe('navigate'));
+  it('does nothing when the chat is already open', () => expect(openPushTarget('/coach', '/coach')).toBeNull());
   it('pushes every other screen as before', () => {
-    expect(openPushTarget(`/log/${L}/summary`, '/coach/chat')).toBe('push');
+    expect(openPushTarget(`/log/${L}/summary`, '/coach')).toBe('push');
     expect(openPushTarget('/food', '/today')).toBe('push');
   });
 });

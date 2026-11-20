@@ -31,7 +31,7 @@ const LOG_SUMMARY = /^\/log\/([0-9a-f-]{36})\/summary$/i;
 /**
  * Where a tapped push opens, or null to ignore it (not one of ours, or the local still-training reminder, which
  * log-notifications handles). "Coach logged your session" opens the sticker reveal the first time on this phone.
- * A message opens the chat (/coach/chat): the server's route is the Coach tab, whose first screen is the profile.
+ * A message opens the chat: the server's route is the Coach tab, which opens straight into the chat.
  */
 export function tapTarget(data: unknown, revealed: ReadonlySet<string>): string | null {
   if (!isObj(data) || data.kind === 'reminder' || !isPushRoute(data.route)) return null;
@@ -44,8 +44,8 @@ export function tapTarget(data: unknown, revealed: ReadonlySet<string>): string 
   return route;
 }
 
-/** The chat a message push opens (the Coach tab's stack keeps the profile underneath it). */
-const CHAT = '/coach/chat';
+/** The chat a message push opens: the Coach tab's first screen. */
+const CHAT = '/coach';
 
 /**
  * How to open a tapped push's target from the current screen: the chat is moved to (navigate), never stacked a second

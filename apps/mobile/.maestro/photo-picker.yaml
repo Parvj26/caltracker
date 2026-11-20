@@ -14,8 +14,6 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-coach
-- tapOn:
-    id: coach-open-chat
 - extendedWaitUntil:
     visible:
       id: coach-composer-input

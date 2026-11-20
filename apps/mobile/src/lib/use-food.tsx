@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { localDateOf, localToday, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealSearchItem } from '@caltracker/shared';
 import { fetchCoachMealsCached, fetchMealHistory, fetchMealsOn, fetchTargets, readFoodCache, sendFoodOp } from './food-api';
-import { applyFoodOps, buildDeleteOp, buildSaveOp, historySince, historyWithOps, logAgainOp, mealDaysOf, type MealDraft, type PhotoChoice, type ShownMeal } from './food-logic';
+import { applyFoodOps, buildDeleteOp, buildSaveOp, historySince, historyWithOps, logAgainOp, mealDaysOf, whenInstant, type MealDraft, type PhotoChoice, type ShownMeal, type When } from './food-logic';
 import { createFoodQueue, type FoodOp, type FoodQueue, type LocalMealPhoto, type MealRecord } from './food-queue';
 import { deletePhotoFiles, persistPhoto } from './outbox-files';
 import { useSession } from './session';
@@ -38,8 +38,8 @@ type FoodState = {
   coachMeals: CoachMeal[];
   /** The coach's first name, null until known. */
   coachName: string | null;
-  /** Logs a meal like `item` now, in one tap. */
-  logAgain: (item: MealSearchItem) => Promise<void>;
+  /** Logs meals like `items` in one tap, at `when` (default: now). Returns the meals queued, for Undo. */
+  logMeals: (items: readonly MealSearchItem[], when?: When) => Promise<MealRecord[]>;
   loadCoachMeals: () => Promise<void>;
 };
 
@@ -181,14 +181,19 @@ function Loaded({ me, workspaceId, children }: { me: string; workspaceId: string
       coachMeals,
       coachName,
       loadCoachMeals,
-      async logAgain(item) {
+      async logMeals(items, when) {
         const box = boxRef.current;
-        if (!box) return;
-        const now = new Date();
-        await box.enqueue(
-          logAgainOp(item, { opId: randomUUID(), mealId: randomUUID(), userId: me, workspaceId, now: now.toISOString() }, localDateOf(now), now),
-        );
+        if (!box) return [];
+        const out: MealRecord[] = [];
+        for (const item of items) {
+          const now = new Date();
+          const at = when ? whenInstant(when) : now;
+          const op = logAgainOp(item, { opId: randomUUID(), mealId: randomUUID(), userId: me, workspaceId, now: now.toISOString() }, when?.day ?? localDateOf(now), at);
+          await box.enqueue(op);
+          out.push(op.meal);
+        }
         void box.flush();
+        return out;
       },
       targets,
       mealsOn: (day) => sortByTime(shown.filter((m) => m.eatenOn === day)),
