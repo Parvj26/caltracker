@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -17,6 +17,7 @@ import {
   type HostInstance,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewProps,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
@@ -991,12 +992,10 @@ function SectionPages({
           });
           const m = models[index];
           return (
-            <ScrollView
+            <PageScroll
+              page={index}
               testID={`page-${index}`}
               style={{ width }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              automaticallyAdjustKeyboardInsets
               // Room for the ‹ › Done bar above the number pad, so the last rows can scroll clear of it.
               contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] + KEYBOARD_BAR_HEIGHT }]}
             >
@@ -1009,7 +1008,7 @@ function SectionPages({
                   <StraightPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
                 )}
               </View>
-            </ScrollView>
+            </PageScroll>
           );
         }}
       />
@@ -1029,6 +1028,32 @@ function SectionPages({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * A page's scroll view. It tells the keyboard bar how to scroll a focused box clear of the bar (iOS scrolls it above
+ * the keyboard only).
+ */
+function PageScroll({ page, children, ...props }: { page: number; children: ReactNode } & Pick<ScrollViewProps, 'testID' | 'style' | 'contentContainerStyle'>) {
+  const nav = useContext(FieldNavContext);
+  const ref = useRef<ComponentRef<typeof ScrollView>>(null);
+  const offset = useRef(0);
+  useEffect(() => nav?.registerScroller(page, (dy) => ref.current?.scrollTo({ y: offset.current + dy, animated: true })), [nav, page]);
+  return (
+    <ScrollView
+      ref={ref}
+      {...props}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
+      scrollEventThrottle={32}
+      onScroll={(e) => {
+        offset.current = e.nativeEvent.contentOffset.y;
+      }}
+    >
+      {children}
+    </ScrollView>
   );
 }
 

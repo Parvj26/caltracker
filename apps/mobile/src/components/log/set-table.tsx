@@ -1,6 +1,7 @@
 import { createContext, memo, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef } from 'react';
 import {
   AccessibilityInfo,
+  Dimensions,
   Keyboard,
   Platform,
   Pressable,
@@ -38,21 +39,54 @@ const MAX_FONT_SCALE = logMaxFontScale(1.4);
  * The number boxes of the open workout, in page order, so the bar above the number pad can move between them (‹ ›).
  * One per logging screen (FieldNavContext). Each box registers itself with its page and its place on the page.
  */
+type Measure = (done: (top: number, height: number) => void) => void;
+
 export class FieldNav {
-  private fields = new Map<string, { page: number; order: number; focus: () => void }>();
+  private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure }>();
+  private scrollers = new Map<number, (dy: number) => void>();
   private current: string | null = null;
   private listeners = new Set<() => void>();
+  /** Where the keyboard's top is in the window while it is up (the bar sits just above it), else null. */
+  private keyboardTop: number | null = null;
 
-  register(key: string, page: number, order: number, focus: () => void): () => void {
-    this.fields.set(key, { page, order, focus });
+  register(key: string, page: number, order: number, focus: () => void, measure: Measure): () => void {
+    this.fields.set(key, { page, order, focus, measure });
     return () => {
       if (this.fields.get(key)?.focus === focus) this.fields.delete(key);
     };
+  }
+  /** A page's scroll view, so a box hidden behind the bar can be scrolled into view. */
+  registerScroller(page: number, scrollBy: (dy: number) => void): () => void {
+    this.scrollers.set(page, scrollBy);
+    return () => {
+      if (this.scrollers.get(page) === scrollBy) this.scrollers.delete(page);
+    };
+  }
+  keyboardAt(top: number | null): void {
+    this.keyboardTop = top;
+    this.reveal();
   }
   focused(key: string | null): void {
     if (this.current === key) return;
     this.current = key;
     this.listeners.forEach((l) => l());
+    this.reveal();
+  }
+  /**
+   * Keeps the focused box clear of the bar: after iOS has scrolled it above the keyboard (which doesn't count the
+   * bar), scroll on by whatever the bar still covers.
+   */
+  private reveal(): void {
+    const key = this.current;
+    const top = this.keyboardTop;
+    const field = key ? this.fields.get(key) : undefined;
+    if (!field || top === null) return;
+    setTimeout(() => {
+      field.measure((y, h) => {
+        const limit = top - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
+        if (this.current === key && y + h > limit) this.scrollers.get(field.page)?.(y + h - limit);
+      });
+    }, REVEAL_AFTER_MS);
   }
   blurred(key: string): void {
     if (this.current === key) this.focused(null);
@@ -76,6 +110,10 @@ export const FieldNavContext = createContext<FieldNav | null>(null);
 
 /** Height of the bar above the number pad. */
 export const KEYBOARD_BAR_HEIGHT = 56;
+/** Space kept between a focused box and the bar. */
+const REVEAL_GAP = 8;
+/** Lets iOS's own scroll (above the keyboard) settle before checking the bar. */
+const REVEAL_AFTER_MS = 120;
 
 /**
  * The ‹ › Done bar above the number pad (iOS number pads have no return key). Rendered once per logging screen and
@@ -86,23 +124,40 @@ export const KEYBOARD_BAR_HEIGHT = 56;
  */
 export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav }) {
   const { logText: text, space, radius } = useTheme();
-  const { height: windowHeight } = useWindowDimensions();
+  const win = useWindowDimensions();
+  const screen = Dimensions.get('screen');
+  // The keyboard's frame is in screen points: only a full-screen app (not iPad Split View or Stage Manager) can place
+  // the bar against it. Otherwise there is no bar; the keyboard's own hide key still closes it.
+  const fullScreen = Math.round(win.width) === Math.round(screen.width) && Math.round(win.height) === Math.round(screen.height);
   const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
+  // Where the logging screen's bottom edge is in the window (the bar is drawn inside it).
+  const layer = useRef<ComponentRef<typeof View>>(null);
+  const [layerBottom, setLayerBottom] = useState<number | null>(null);
   const current = useSyncExternalStore(nav.subscribe, nav.snapshot);
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
-    const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => setKeyboardTop(e.endCoordinates.screenY));
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardTop(null));
+    const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
+      setKeyboardTop(e.endCoordinates.screenY);
+      nav.keyboardAt(e.endCoordinates.screenY);
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardTop(null);
+      nav.keyboardAt(null);
+    });
     return () => {
       show.remove();
       hide.remove();
     };
-  }, []);
-  if (Platform.OS !== 'ios' || keyboardTop === null || keyboardTop >= windowHeight || current === null) return null;
-  const prev = nav.neighbour(-1);
-  const next = nav.neighbour(1);
+  }, [nav]);
+  const measure = () => layer.current?.measureInWindow((_x, y, _w, h) => setLayerBottom(y + h));
+  const show =
+    Platform.OS === 'ios' && fullScreen && keyboardTop !== null && layerBottom !== null && keyboardTop < layerBottom && current !== null;
+  const prev = show ? nav.neighbour(-1) : null;
+  const next = show ? nav.neighbour(1) : null;
   return (
-    <View testID="keyboard-bar" style={[styles.bar, { bottom: windowHeight - keyboardTop, paddingHorizontal: space[2.5] }]}>
+    <View ref={layer} onLayout={measure} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {show && layerBottom !== null && keyboardTop !== null ? (
+    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop, paddingHorizontal: space[2.5] }]}>
       <Pressable
         testID="keyboard-prev"
         onPress={() => prev?.()}
@@ -135,6 +190,8 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
       >
         <Text style={[text('sectionHeading'), styles.onInk]}>Done</Text>
       </Pressable>
+    </View>
+      ) : null}
     </View>
   );
 });
@@ -193,8 +250,6 @@ function Cell({
   const [draft, setDraft] = useState(cell.value);
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
-  // Set for one moment as the box is tapped: the number is selected, so typing replaces it.
-  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const fields = useContext(FieldNavContext);
   const editable = !disabled && !readOnly;
@@ -203,8 +258,16 @@ function Cell({
   }, [cell.value, focused]);
   useEffect(() => {
     if (!fields || !nav || !editable) return;
-    return fields.register(testID, nav.page, nav.order, () => input.current?.focus());
+    return fields.register(
+      testID,
+      nav.page,
+      nav.order,
+      () => input.current?.focus(),
+      (done) => input.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
+    );
   }, [fields, nav?.page, nav?.order, editable, testID]);
+  /** The greyed suggestion, when it is a number the box can take as its own (not "max reps"). */
+  const suggestion = draft === '' && !row.done && NUMERIC.test(cell.placeholder) ? cell.placeholder : null;
   const label = `${who}${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`;
   return (
     <View style={[styles.cell, { gap: space[1] / 2 }]}>
@@ -217,9 +280,10 @@ function Cell({
         keyboardType={KEYBOARD[cell.field]}
         returnKeyType="done"
         selectTextOnFocus
-        selection={selection}
-        onSelectionChange={() => {
-          if (selection) setSelection(undefined);
+        // A tap: the suggestion becomes the box's number before focus, so selectTextOnFocus selects it and typing
+        // replaces it. Leaving without typing keeps it unsaved (onBlur puts the stored value back).
+        onPressIn={() => {
+          if (suggestion !== null) setDraft(suggestion);
         }}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
@@ -229,16 +293,16 @@ function Cell({
         onFocus={() => {
           setFocused(true);
           fields?.focused(testID);
-          // The greyed suggestion becomes the box's number, selected: typing replaces it, leaving keeps it unsaved.
-          const shown = draft === '' && !row.done && NUMERIC.test(cell.placeholder) ? cell.placeholder : draft;
-          if (shown !== draft) setDraft(shown);
-          if (shown !== '') setSelection({ start: 0, end: shown.length });
+          // Reached with ‹ › (no tap): show the suggestion and select it once it is in the box.
+          if (suggestion !== null) {
+            setDraft(suggestion);
+            requestAnimationFrame(() => input.current?.setSelection(0, suggestion.length));
+          }
         }}
         onBlur={() => {
           setFocused(false);
           fields?.blurred(testID);
           setInvalid(null);
-          setSelection(undefined);
           setDraft(cell.value);
         }}
         onChangeText={(t) => {
@@ -360,6 +424,7 @@ function SetRowLineView({
         {showLast ? (
           <Text
             testID={`last-${id}`}
+            numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             accessibilityLabel={row.last ? `Last time ${row.last}` : 'No last time'}
             style={[text('caption'), styles.lastCol]}
@@ -442,6 +507,15 @@ export const SetRowLine = memo(
     sameCells(a.row.cells, b.row.cells),
 );
 
+/** Above this text size on a phone narrower than this, the Last time column goes (the number boxes need the room). */
+const LAST_COLUMN_MAX_FONT_SCALE = 1.3;
+const LAST_COLUMN_NARROW = 430;
+
+function useShowLastColumn(): boolean {
+  const { width, fontScale } = useWindowDimensions();
+  return !(fontScale > LAST_COLUMN_MAX_FONT_SCALE && width < LAST_COLUMN_NARROW);
+}
+
 /** A straight exercise's sets: SET | LAST TIME | LB | REPS | ✓ (columns follow the tracking type), then + Add set. */
 export function SetTable({
   rows,
@@ -467,15 +541,18 @@ export function SetTable({
 }) {
   const { logText: text, space, radius } = useTheme();
   const headings = rows[0]?.cells.map((c) => c.heading) ?? [];
+  const showLast = useShowLastColumn();
   return (
     <View style={[styles.table, { borderRadius: radius.card, padding: space[2], gap: space[1] }]}>
       <View style={[styles.row, { gap: space[2], paddingHorizontal: space[2] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.tag, styles.headingText]}>
           SET
         </Text>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.lastCol, styles.headingText]}>
-          LAST TIME
-        </Text>
+        {showLast ? (
+          <Text numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.lastCol, styles.headingText]}>
+            LAST TIME
+          </Text>
+        ) : null}
         {headings.map((h) => (
           <Text key={h} maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.cell, styles.centre, styles.headingText]}>
             {h}
@@ -494,7 +571,7 @@ export function SetTable({
           disabled={disabled}
           readOnly={readOnly}
           recent={row.setId === recentSetId}
-          showLast
+          showLast={showLast}
           page={page}
           order={i}
           handlers={handlers}

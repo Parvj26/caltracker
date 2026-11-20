@@ -92,7 +92,7 @@ function LiveCard({ log, client, nowMs }: { log: LiveLog; client: HomeClient; no
           <span className={styles.liveFill} style={{ width: `${pct}%` }} />
         </span>
         <span className={styles.liveFoot}>
-          {log.done} of {log.total} sets · Watch live<span aria-hidden="true"> →</span>
+          {log.done} of {log.totalText} sets · Watch live<span aria-hidden="true"> →</span>
         </span>
       </Link>
     </li>

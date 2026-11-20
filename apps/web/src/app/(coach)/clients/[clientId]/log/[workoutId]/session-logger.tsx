@@ -23,7 +23,9 @@ import {
   kgToInput,
   liveExercises,
   needsPick,
-  openSetCount,
+  logSetCount,
+  setProgressText,
+  type SetRange,
   parseClock,
   pickChoice,
   rebaseEdits,
@@ -416,7 +418,8 @@ export function SessionLogger({
   /** Auto progression history (empty when the program has it off). */
   progression: ProgressionHistory;
   /** Told the sets done and in all whenever they change (the Training now tab shows them). */
-  onProgress?: ((done: number, total: number) => void) | undefined;
+  /** Sets ticked and the total (a range while a pick-one group is still to choose: the shared rule). */
+  onProgress?: ((done: number, total: SetRange) => void) | undefined;
 }) {
   const router = useRouter();
   const [log, setLog] = useState<WorkoutLogDoc | null>(initialLog);
@@ -722,11 +725,13 @@ export function SessionLogger({
     [flush, applyLocal],
   );
 
-  const progressDone = log ? completedSetCount(log) : 0;
-  const progressTotal = log ? progressDone + openSetCount(log) : 0;
+  const progress = log ? logSetCount(log) : null;
+  const progressDone = progress?.done ?? 0;
+  const progressMin = progress?.total.min ?? 0;
+  const progressMax = progress?.total.max ?? 0;
   useEffect(() => {
-    onProgress?.(progressDone, progressTotal);
-  }, [onProgress, progressDone, progressTotal]);
+    onProgress?.(progressDone, { min: progressMin, max: progressMax });
+  }, [onProgress, progressDone, progressMin, progressMax]);
 
   function start() {
     // The server needs revision 1 or more; this is the session's first version.
@@ -878,8 +883,8 @@ export function SessionLogger({
     scrollToHeading.current = true;
     setPage(to);
   };
-  const done = completedSetCount(log);
-  const total = done + openSetCount(log);
+  const { done, total } = logSetCount(log);
+  const setsDone = `${setProgressText(done, total)} done`;
   const locked = log.status !== 'in_progress' || save.kind === 'final' || handingBack;
 
   return (
@@ -891,7 +896,7 @@ export function SessionLogger({
             {log.name} with {client.firstName || client.name}
           </h1>
           <p className={styles.caption}>
-            {done} of {total} {total === 1 ? 'set' : 'sets'} done · Logged by you
+            {setsDone} · Logged by you
           </p>
         </div>
         <p role="status" className={styles.saveStatus}>
@@ -985,7 +990,7 @@ export function SessionLogger({
       </fieldset>
       {/* Finish is always in reach: a bar at the bottom of the screen on a phone, a footer that sticks to the bottom
           of the window on iPad and desktop (UI rules §8). */}
-      <PhoneActionBar label="Session actions" status={`${done} of ${total} ${total === 1 ? 'set' : 'sets'} done`} className={styles.sessionBar}>
+      <PhoneActionBar label="Session actions" status={setsDone} className={styles.sessionBar}>
         <Button
           variant="secondary"
           className={styles.barButton}

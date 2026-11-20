@@ -59,6 +59,15 @@ describe('sessionBestRows', () => {
     expect(row!.compare?.tone).toBe('same');
     expect(row!.heaviestYet).toBe(false);
   });
+  it('reads the workout day in the client time zone', () => {
+    // 22:00 UTC on the 19th is already the 20th in Auckland, so a workout earlier that Auckland day is "last time".
+    const log = { ...logWith([[60, 8]]), finishedAt: '2026-11-19T22:00:00.000Z' };
+    const id = log.blocks[0]!.exercises[0]!.exerciseId;
+    const history = new Map([[id, [point('2026-11-20', 57.5, 8, 'a')]]]);
+    expect(sessionBestRows(log, history, 'kg', 'Pacific/Auckland')[0]!.compare?.tone).toBe('up');
+    expect(sessionBestRows(log, history, 'kg', 'UTC')[0]!.compare?.tone).toBe('first');
+  });
+
   it('leaves the comparison out while the history is unknown', () => {
     expect(sessionBestRows(logWith([[60, 8]]), null, 'kg')[0]!.compare).toBeNull();
   });

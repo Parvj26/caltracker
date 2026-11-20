@@ -57,7 +57,9 @@ export function skippedSetCount(log: Pick<WorkoutLogDoc, 'blocks'>): number {
   return Math.max(0, total.min - done);
 }
 
-const rangeNumber = (r: SetRange) => (r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
+/** "19", "18–19": the number alone ("6/18–19" on a small tab). */
+export const setRangeNumber = (r: SetRange): string => (r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
+const rangeNumber = setRangeNumber;
 
 /** "19 sets", "1 set", "18–19 sets". */
 export function setRangeText(r: SetRange): string {

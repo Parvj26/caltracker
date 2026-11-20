@@ -63,7 +63,7 @@ describe('todayMenu', () => {
 
 describe('liveLogByClient', () => {
   const log = (id: string, clientId: string, startedAt: string): LiveLog => ({
-    id, clientId, name: 'W', startedAt, lastActivityAt: startedAt, done: 0, total: 1, loggedBy: clientId, workoutId: `w-${id}`,
+    id, clientId, name: 'W', startedAt, lastActivityAt: startedAt, done: 0, total: 1, totalText: '1', loggedBy: clientId, workoutId: `w-${id}`,
   });
 
   it('maps each client to their latest-started workout in progress, idle or not', () => {
@@ -88,6 +88,7 @@ describe('trainingNow', () => {
     lastActivityAt: new Date(NOW - idleMinAgo * 60_000).toISOString(),
     done: 1,
     total: 4,
+    totalText: '4',
     loggedBy: clientId,
     workoutId: null,
   });

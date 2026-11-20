@@ -134,7 +134,7 @@ export {
   substituteSetProblems,
 } from './workouts/schema';
 export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
-export { blockSetRange, logBlockSetRange, logSetCount, planSetRange, setProgressText, setRangeText, skippedSetCount } from './workouts/set-count';
+export { blockSetRange, logBlockSetRange, logSetCount, planSetRange, setProgressText, setRangeNumber, setRangeText, skippedSetCount } from './workouts/set-count';
 export type { SetRange } from './workouts/set-count';
 export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';

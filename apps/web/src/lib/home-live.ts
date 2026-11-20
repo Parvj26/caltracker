@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { AUTO_FINISH_IDLE_MS, completedSetCount, LOG_TREE_SELECT, logRowToDoc, openSetCount } from '@caltracker/shared';
+import { AUTO_FINISH_IDLE_MS, LOG_TREE_SELECT, logRowToDoc, logSetCount, setRangeNumber } from '@caltracker/shared';
 import type { Database, LogTreeRow } from '@caltracker/shared';
 
 /** A workout someone is logging right now, with how far through it they are. */
@@ -9,9 +9,13 @@ export type LiveLog = {
   name: string;
   startedAt: string;
   lastActivityAt: string;
-  /** Sets done, and done plus still to do (the shared counting rule: a pick-one group counts once). */
+  /**
+   * Sets done and the total by the shared rule (every tickable row; a pick-one group still to choose is a range):
+   * `total` is its most (for the bar), `totalText` "19" or "18–19", as the client's app says it.
+   */
   done: number;
   total: number;
+  totalText: string;
   /** Who is logging it (the client on their phone, or a coach in person); null for an old row. */
   loggedBy: string | null;
   /** The planned workout it logs (the coach's logger opens on it); null for one the client added. */
@@ -35,7 +39,7 @@ export async function loadLiveLogs(supabase: SupabaseClient<Database>, workspace
   const rows = (data ?? []) as unknown as (LogTreeRow & { client_id: string; logged_by: string | null })[];
   return rows.map((row) => {
     const doc = logRowToDoc(row);
-    const done = completedSetCount(doc);
+    const { done, total } = logSetCount(doc);
     return {
       id: doc.id,
       clientId: row.client_id,
@@ -43,7 +47,8 @@ export async function loadLiveLogs(supabase: SupabaseClient<Database>, workspace
       startedAt: doc.startedAt,
       lastActivityAt: doc.lastActivityAt,
       done,
-      total: done + openSetCount(doc),
+      total: total.max,
+      totalText: setRangeNumber(total),
       loggedBy: row.logged_by,
       workoutId: row.workout_id,
     };

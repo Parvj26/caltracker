@@ -8,7 +8,8 @@ import { Sticker } from '@/components/stickers/sticker';
 import { Button, Card, ErrorText, Screen, TextButton, Toast } from '@/components/ui';
 import { stickerSentence, workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
-import { SHARE_NOT_READY, shareHref, workoutShareCard } from '@/lib/community-share';
+import { SHARE_NOT_READY, prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
+import { ActionMenu } from '@/components/log/action-menu';
 import { useSaveCard } from '@/lib/use-save-card';
 import { milestoneLine, summaryStickers } from '@/lib/awards-logic';
 import { effortLine, formatCommentTime, summaryHeadline, unfinishedLines } from '@/lib/active-log-logic';
@@ -29,7 +30,10 @@ import { useTheme } from '@/theme/use-theme';
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
 /** Saving the stickers usually takes a moment; after this long the summary says it is still saving. */
 const AWARD_SLOW_MS = 10_000;
-const AWARD_RETRY_MS = 3000;
+const AWARD_RETRY_MS = 2000;
+const AWARD_RETRY_MAX_MS = 30_000;
+/** The phone's time zone: which day a workout belongs to, as the Strength screen reads it. */
+const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 type Remote = { kind: 'loading' } | { kind: 'ok'; log: WorkoutLogDoc | null } | { kind: 'failed' };
 type Comments = { kind: 'loading' } | { kind: 'ok'; comments: LogComment[] } | { kind: 'offline' };
@@ -73,6 +77,7 @@ export default function SummaryScreen() {
   );
   // The award normally arrives within a few seconds; after ~10 s without it, say so and offer Try again.
   const [slowAward, setSlowAward] = useState(false);
+  const [shareMenu, setShareMenu] = useState(false);
 
   useEffect(() => {
     if (hasLocal) return;
@@ -99,26 +104,31 @@ export default function SummaryScreen() {
 
   // The stickers and personal bests this workout earned. Best effort: with no signal (or before the award is
   // stored) the row is simply left out.
+  // Keeps asking (with growing gaps) while the screen is open, since the reveal's request may still be saving it. The
+  // "still saving" note shows only right after Finish on this phone, never for an older workout (History, a coach's).
   useEffect(() => {
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     setSlowAward(false);
-    const slow = setTimeout(() => alive && setSlowAward(true), AWARD_SLOW_MS);
-    // A few tries while the reveal's request is still saving it on the server.
-    const load = (left: number): void =>
+    const slow = hasLocal ? setTimeout(() => alive && setSlowAward(true), AWARD_SLOW_MS) : undefined;
+    const load = (wait: number): void =>
       void fetchAward(id).then((a) => {
         if (!alive) return;
         if (a) {
           clearTimeout(slow);
           setSlowAward(false);
           setAward(a);
-        } else if (left > 0) setTimeout(() => load(left - 1), AWARD_RETRY_MS);
+        } else {
+          retry = setTimeout(() => load(Math.min(wait * 2, AWARD_RETRY_MAX_MS)), wait);
+        }
       });
-    load(3);
+    load(AWARD_RETRY_MS);
     return () => {
       alive = false;
       clearTimeout(slow);
+      clearTimeout(retry);
     };
-  }, [id, attempt]);
+  }, [id, attempt, hasLocal]);
 
   const done = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/today')), [router]);
 
@@ -163,7 +173,7 @@ export default function SummaryScreen() {
   }
 
   const changes = [...planChanges(log, (exerciseId) => names[exerciseId]?.name ?? null), ...unfinishedLines(log)];
-  const best = sessionBestRows(log, history, units);
+  const best = sessionBestRows(log, history, units, timeZone());
   const said = effortLine(log.notes, coachFirst);
   // What can be shared: the workout and, when it set any, its PRs. Both need the award on the server (the database
   // builds the card from the log and its award), so until it arrives Share says so.
@@ -186,7 +196,13 @@ export default function SummaryScreen() {
     }
   };
 
-  const share = () => (workoutCard ? router.push(shareHref(workoutCard)) : Alert.alert(SHARE_NOT_READY));
+  const prCard = prShareCard(log, award);
+  // Share: the workout card, or (when it set PRs) a choice of the workout or the PRs.
+  const share = () => {
+    if (!workoutCard) return Alert.alert(SHARE_NOT_READY);
+    if (!prCard) return router.push(shareHref(workoutCard));
+    setShareMenu(true);
+  };
 
   const footer = (
     <View style={[styles.row, { gap: space[2.5] }]}>
@@ -309,6 +325,15 @@ export default function SummaryScreen() {
           <Button variant="secondary" title="Try again" testID="summary-award-retry" onPress={() => setAttempt((n) => n + 1)} />
         </View>
       ) : null}
+
+      <ActionMenu
+        title={shareMenu ? 'Share' : null}
+        items={[
+          ...(workoutCard ? [{ title: 'Share this workout', testID: 'summary-share-workout', onPress: () => router.push(shareHref(workoutCard)) }] : []),
+          ...(prCard ? [{ title: 'Share your PRs', testID: 'summary-share-prs', onPress: () => router.push(shareHref(prCard)) }] : []),
+        ]}
+        onClose={() => setShareMenu(false)}
+      />
 
       {mayReopen ? <TextButton title="Add missed sets" testID="summary-reopen" onPress={() => void addMissedSets()} /> : null}
       {reopening ? <ActivityIndicator color={palette.ink} accessibilityLabel="Opening" /> : null}

@@ -6,6 +6,7 @@ import { fromKg, groupThousands } from '../units/units';
 import type { Units } from '../units/units';
 import { heaviestSessions, setText, type LiftSet } from './heaviest';
 import type { StrengthPoint } from '../awards/strength-series';
+import { localDay } from '../awards/streak';
 
 /**
  * The workout summary's "Your progress" rows (product owner, 2026-11-19): each exercise's best set this workout (the
@@ -51,9 +52,11 @@ export function sessionBestRows(
   log: WorkoutLogDoc,
   history: ReadonlyMap<string, readonly StrengthPoint[]> | null,
   units: Units,
+  /** Which calendar day a workout belongs to (as the strength series reads it). */
+  timeZone = 'UTC',
 ): SessionBestRow[] {
   const names = exerciseNames(log);
-  const finishedAt = log.finishedAt ?? log.lastActivityAt;
+  const day = localDay(log.finishedAt ?? log.lastActivityAt, timeZone);
   const rows: SessionBestRow[] = [];
   for (const [exerciseId, lifts] of liftsByExercise(log)) {
     const name = names.get(exerciseId) ?? '';
@@ -65,8 +68,8 @@ export function sessionBestRows(
     const points = history?.get(exerciseId);
     if (history) {
       // Earlier workouts only (never this one, which may already be in the saved series).
-      const earlier = (points ?? []).filter((p) => p.logId !== log.id && (p.date ?? '') <= finishedAt.slice(0, 10));
-      const mine: StrengthPoint = { date: finishedAt.slice(0, 10), e1rmKg: 0, bestSet: set, heaviestSet: set, logId: log.id };
+      const earlier = (points ?? []).filter((p) => p.logId !== log.id && p.date <= day);
+      const mine: StrengthPoint = { date: day, e1rmKg: 0, bestSet: set, heaviestSet: set, logId: log.id };
       const sessions = heaviestSessions([...earlier, mine], style);
       const prev = sessions.length > 1 ? sessions[sessions.length - 2]!.heaviest : null;
       compare = compareWithLast(set, prev, units, style);
