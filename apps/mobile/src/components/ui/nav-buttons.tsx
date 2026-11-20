@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
-import { palette, pressedOpacity, space } from '@/theme/theme';
+import { palette, pressedOpacity, space, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon, CloseIcon } from './icons';
 
@@ -78,7 +78,7 @@ export function SheetHeader({ title, onClose, closeTestID, titleTestID }: { titl
   const { text } = useTheme();
   return (
     <View style={styles.header}>
-      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" testID={titleTestID}>
+      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" testID={titleTestID} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
         {title}
       </Text>
       <CloseButton testID={closeTestID} onPress={onClose} />

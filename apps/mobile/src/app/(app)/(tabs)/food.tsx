@@ -10,7 +10,7 @@ import { Screen, TextButton } from '@/components/ui';
 import { mealPhotoUrls } from '@/lib/food-api';
 import { MAX_WEEKS_BACK, msUntilMidnight } from '@/lib/food-logic';
 import { useFood } from '@/lib/use-food';
-import { palette, pressedOpacity, radius, space } from '@/theme/theme';
+import { palette, pressedOpacity, radius, space, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 
@@ -96,7 +96,7 @@ export default function FoodScreen() {
         void food.loadDay(day).finally(() => setRefreshing(false));
       }}
     >
-      <Text style={[foodText.title, styles.titlePad]} accessibilityRole="header">
+      <Text style={[foodText.title, styles.titlePad]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
         Food
       </Text>
 

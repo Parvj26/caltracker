@@ -14,7 +14,7 @@ import { useLive } from '@/lib/community-live';
 import { useCommunity } from '@/lib/use-community';
 import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
-import { palette, pressedOpacity, white } from '@/theme/theme';
+import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import type { ShownError } from '@/lib/error-shown';
 
@@ -131,7 +131,9 @@ export default function CommunityScreen() {
       <View style={[styles.row, { gap: space[2.5] }]}>
         <BackButton testID="community-back" fallback="/coach" />
         <View style={styles.flex} accessibilityRole="header" accessible accessibilityLabel={subtitle ? `Community, ${subtitle}` : 'Community'}>
-          <Text style={text('screenTitle')}>Community</Text>
+          <Text style={text('screenTitle')} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            Community
+          </Text>
           {subtitle ? (
             <Text style={text('caption')} testID="community-subtitle" numberOfLines={1}>
               {subtitle}

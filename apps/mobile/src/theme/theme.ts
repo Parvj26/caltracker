@@ -40,3 +40,9 @@ export const exerciseThumbSize = 40;
 /** Height of each photo in the exercise info sheet (full width, cropped to fill). */
 export const exercisePhotoHeight = tapTarget.logging * 4;
 
+
+/**
+ * Screen titles stop growing at this text size, so a one-word title ("Workouts") never breaks letter by letter on a
+ * phone; body text keeps growing.
+ */
+export const TITLE_MAX_SCALE = 1.8;

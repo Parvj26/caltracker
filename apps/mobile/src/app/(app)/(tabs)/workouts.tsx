@@ -25,7 +25,7 @@ import {
   type PlannedWorkout,
   type StripDay,
 } from '@/lib/workouts-plan';
-import { palette, pressedOpacity, radius } from '@/theme/theme';
+import { palette, pressedOpacity, radius, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import { ChevronIcon, HistoryIcon } from '@/components/ui/icons';
@@ -148,7 +148,7 @@ export default function Workouts() {
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
       {/* At large text sizes History moves under the title instead of squeezing it letter by letter. */}
       <View style={[styles.row, styles.wrapRow, { gap: space[2] }]}>
-        <Text style={[text('screenTitle'), styles.titleGrow]} accessibilityRole="header">
+        <Text style={[text('screenTitle'), styles.titleGrow]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
           Workouts
         </Text>
         <HistoryButton onPress={() => router.push('/history')} />

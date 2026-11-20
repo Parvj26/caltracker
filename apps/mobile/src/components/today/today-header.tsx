@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette, pressedOpacity, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const GEAR =
@@ -30,7 +30,7 @@ export function TodayHeader({
         <Text style={[text('caption'), styles.date]} testID="today-date">
           {date}
         </Text>
-        <Text style={[text('screenTitle'), styles.greeting]} accessibilityRole="header" testID="today-greeting">
+        <Text style={[text('screenTitle'), styles.greeting]} accessibilityRole="header" testID="today-greeting" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
           {greeting}
         </Text>
       </View>

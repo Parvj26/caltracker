@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, t
 import { Button, ErrorText } from '@/components/ui';
 import { PROGRESS_LOAD_FAILED } from '@/lib/body-api';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
-import { palette, pressedOpacity, white } from '@/theme/theme';
+import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from '@/components/ui/icons';
 import { fontFamilyFor } from '@/theme/fonts';
@@ -24,7 +24,7 @@ export function SectionHeader({ title, right, backTestID = 'section-back', backL
       >
         <ChevronIcon direction="left" />
       </Pressable>
-      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
         {title}
       </Text>
       {right}

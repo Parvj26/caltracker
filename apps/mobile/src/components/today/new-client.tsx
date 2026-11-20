@@ -8,7 +8,7 @@ import { Button } from '@/components/ui';
 import { nextSteps } from '@/lib/today-logic';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useMessages } from '@/lib/use-messages';
-import { palette, radius } from '@/theme/theme';
+import { palette, radius, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import capybara from '../../../assets/stickers/capybara-locked@256.png';
 import corgi from '../../../assets/stickers/corgi-locked@256.png';
@@ -34,7 +34,7 @@ export function CoachIntroCard({ coachName, workspaceName }: { coachName: string
         <View style={styles.flex}>
           <Overline>Your coach</Overline>
           {name ? (
-            <Text style={[text('screenTitle'), styles.name]} accessibilityRole="header">
+            <Text style={[text('screenTitle'), styles.name]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
               {name}
             </Text>
           ) : null}
