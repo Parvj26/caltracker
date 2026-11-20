@@ -33,6 +33,11 @@ env:
 - takeScreenshot: settings-privacy
 - tapOn:
     id: settings-delete-account
+# On a small phone (SE) the field sits under the pinned buttons: scroll the page up first.
+- swipe:
+    start: 50%, 60%
+    end: 50%, 20%
+- waitForAnimationToEnd
 - tapOn:
     id: delete-account-input
 - inputText: 'delete'

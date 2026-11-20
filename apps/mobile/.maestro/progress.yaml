@@ -74,6 +74,10 @@ env:
 - takeScreenshot: progress-metrics
 # The old Body address still opens Metrics.
 - openLink: caltracker://progress-detail/body
+# A fresh simulator asks once: Open in "CalTracker"?
+- tapOn:
+    text: Open
+    optional: true
 - extendedWaitUntil:
     visible:
       id: metric-value-weight_kg
