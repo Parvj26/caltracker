@@ -18,6 +18,7 @@ import {
 import { CoachAvatar } from '@/components/coach-avatar';
 import { Sticker } from '@/components/stickers/sticker';
 import { Button, TextButton } from '@/components/ui';
+import { CountBadge } from '@/components/ui/count-badge';
 import type { WorkoutStatus } from '@/lib/active-log-logic';
 import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
 import { streakNow } from '@/lib/progress-view';
@@ -413,7 +414,9 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
         <Overline>This week</Overline>
         {tile ? (
           <>
-            <Text style={[text('bigNumber'), styles.weekBig]}>{tile.big}</Text>
+            <Text style={[text('bigNumber'), styles.weekBig]} maxFontSizeMultiplier={1.4}>
+              {tile.big}
+            </Text>
             <Text style={[text('caption'), styles.ink]}>{tile.small}</Text>
           </>
         ) : hub.status === 'loading' ? (
@@ -458,7 +461,7 @@ export function CommunityPeek({ units, refreshKey }: { units: Units; refreshKey:
   const { text, space } = useTheme();
   const router = useRouter();
   const me = useSession().session?.user.id ?? null;
-  const { community, ready, removed, coaches, blocked, unread } = useCommunity();
+  const { community, ready, removed, coaches, blocked, unread, reported } = useCommunity();
   const communityId = community?.id ?? null;
   const posts = useCachedLoad(
     me && communityId ? `${me}:${communityId}` : null,
@@ -467,10 +470,10 @@ export function CommunityPeek({ units, refreshKey }: { units: Units; refreshKey:
     refreshKey,
   );
   const headline = useMemo(() => {
-    const newest = posts.data?.find((p) => !blocked.has(p.authorId));
+    const newest = posts.data?.find((p) => !blocked.has(p.authorId) && !reported.has(p.id));
     if (!posts.data || !me) return null;
     return newest ? communityHeadline(postPreview(newest, { me, coaches, units })) : 'No posts yet. Say hello!';
-  }, [posts.data, me, blocked, coaches, units]);
+  }, [posts.data, me, blocked, reported, coaches, units]);
 
   // No community (none, or taken out by the coach): nothing here; the Community screen explains.
   if (ready && (removed || !community)) return null;
@@ -497,11 +500,7 @@ export function CommunityPeek({ units, refreshKey }: { units: Units; refreshKey:
       <Text style={[text('sectionHeading'), styles.flex]} numberOfLines={1} testID="today-community-line">
         {line}
       </Text>
-      {badge ? (
-        <View style={[styles.newBadge, { paddingHorizontal: space[2], paddingVertical: space[1] / 2 }]}>
-          <Text style={[text('caption'), styles.newText]}>{badge}</Text>
-        </View>
-      ) : null}
+      {badge ? <CountBadge label={badge} /> : null}
     </Pressable>
   );
 }
@@ -597,6 +596,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   peek: { minHeight: 56, borderRadius: 18 },
-  newBadge: { backgroundColor: palette.ink, borderRadius: radius.pill },
-  newText: { color: white, fontSize: 12 },
 });

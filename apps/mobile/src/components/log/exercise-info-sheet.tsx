@@ -4,7 +4,8 @@ import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { exerciseDemoUrl } from '@/lib/demo-link';
 import { exerciseImageUrl } from '@/lib/exercise-detail-api';
 import { openDemo } from '@/lib/open-demo';
-import { Button, TextButton } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { contentMaxWidth, exercisePhotoHeight, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -32,7 +33,7 @@ export function ExerciseInfoSheet({
   const videoUrl = exerciseDemoUrl(detail?.videoUrl, name);
 
   return (
-    <Modal visible={name !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={name !== null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <ScrollView
           testID="exercise-sheet"
@@ -43,7 +44,7 @@ export function ExerciseInfoSheet({
             <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" testID="exercise-sheet-name">
               {name ?? ''}
             </Text>
-            <TextButton testID="exercise-sheet-close" title="Close" onPress={onClose} />
+            <CloseButton testID="exercise-sheet-close" onPress={onClose} />
           </View>
 
           {detail && detail.imagePaths.length > 0 ? (

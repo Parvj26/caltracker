@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { localToday } from '@caltracker/shared';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { fetchHistory, readCachedHistory } from '@/lib/history-api';
 import { useSession } from '@/lib/session';
 import { useCachedLoad } from '@/lib/use-cached-load';
@@ -12,7 +13,6 @@ import { historyRow, monthSummary, type CurrentCoach, type HistoryRow } from '@/
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
-import { ChevronIcon } from '@/components/ui/icons';
 
 const LOAD_FAILED = 'Couldn’t load your history. Check your connection and pull down to try again.';
 
@@ -38,20 +38,11 @@ export default function History() {
   const data = history.data;
   const summary = data ? monthSummary(data.logs, data.prs, localToday(), timeZone) : null;
   const rows = data ? data.logs.map((l) => historyRow(l, units, coach, timeZone)) : [];
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/workouts'));
 
   return (
     <Screen refreshing={history.refreshing} onRefresh={() => setRefreshKey((k) => k + 1)}>
       <View style={[styles.row, { gap: space[2] }]}>
-        <Pressable
-          testID="back"
-          onPress={back}
-          accessibilityRole="button"
-          accessibilityLabel="Back to Workouts"
-          style={({ pressed }) => [styles.back, { borderRadius: radius.pill }, pressed && styles.pressed]}
-        >
-          <ChevronIcon direction="left" />
-        </Pressable>
+        <BackButton testID="back" accessibilityLabel="Back to Workouts" fallback="/workouts" />
         <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
           History
         </Text>

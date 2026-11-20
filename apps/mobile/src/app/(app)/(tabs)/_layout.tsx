@@ -7,6 +7,9 @@ import { useUnreadCount } from '@/lib/use-messages';
 import { palette, white } from '@/theme/theme';
 
 // Files are discovered alphabetically (coach/ first), so a bare navigation into the tabs would open Coach. Today is home.
+/** Tab labels, like iOS's, stop growing past this text size. */
+const TAB_LABEL_MAX_SCALE = 1.4;
+
 export const unstable_settings = { initialRouteName: 'today' };
 
 // Today is the tab group's anchor: opening the group without naming a tab (a guard redirect, a deep link into a
@@ -25,7 +28,11 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: palette.bg, borderTopColor: palette.border },
         // Caption size: bold labels, the active one heavier. Colour comes from the tint.
         tabBarLabel: ({ focused, color, children }) => (
-          <Text style={[styles.label, { color, fontFamily: fontFamilyFor('sans', focused ? 800 : 700) }]}>{children}</Text>
+          // Labels stop growing at 1.4× so the five always fit (iOS's own tab bar does the same); the screen reader
+          // still reads them in full.
+          <Text maxFontSizeMultiplier={TAB_LABEL_MAX_SCALE} numberOfLines={1} style={[styles.label, { color, fontFamily: fontFamilyFor('sans', focused ? 800 : 700) }]}>
+            {children}
+          </Text>
         ),
         tabBarIconStyle: { width: 56, height: 34 },
         sceneStyle: { backgroundColor: palette.bg },

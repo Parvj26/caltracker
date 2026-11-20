@@ -31,6 +31,11 @@ env:
 - takeScreenshot: long-press-delete
 - tapOn:
     id: menu-delete-set
+# Delete is red and confirmed.
+- extendedWaitUntil:
+    visible: 'Delete'
+    timeout: 5000
+- tapOn: 'Delete'
 - extendedWaitUntil:
     notVisible:
       id: set-0-0-2
@@ -55,6 +60,10 @@ env:
     timeout: 5000
 - tapOn:
     id: menu-delete-set-2
+- extendedWaitUntil:
+    visible: 'Delete'
+    timeout: 5000
+- tapOn: 'Delete'
 - extendedWaitUntil:
     notVisible:
       id: set-0-0-2

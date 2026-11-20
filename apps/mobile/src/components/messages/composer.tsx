@@ -101,7 +101,8 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
                 accessibilityLabel={`Remove photo ${i + 1}`}
                 onPress={() => setPhotos((prev) => prev.filter((x) => x.id !== p.id))}
                 style={styles.remove}
-                hitSlop={space[2]}
+                // Drawn 24 pt; the slop makes the target 44 pt.
+                hitSlop={space[2.5]}
               >
                 <Text style={[text('caption'), styles.removeText]}>×</Text>
               </Pressable>

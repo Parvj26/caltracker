@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Fragment, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
@@ -17,6 +17,7 @@ import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
 import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { workoutStatuses } from '@/lib/active-log-logic';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import {
@@ -51,7 +52,6 @@ import { PlanLine } from '@/components/plan/plan-line';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
-import { ChevronIcon } from '@/components/ui/icons';
 
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
 
@@ -87,7 +87,6 @@ async function savedLogs(workoutId: string): Promise<LogForDay[]> {
  */
 export default function PlanPreview() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { text, space, radius } = useTheme();
   const units = useUnits() ?? 'lb';
   const coach = useCoachProfile();
@@ -133,7 +132,6 @@ export default function PlanPreview() {
   const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
   const badges = useMemo(() => (workout ? blockBadges(workout.doc.blocks) : []), [workout]);
   const status = workout ? (workoutStatuses(logs, active, finished, pending)[workout.doc.id] ?? null) : null;
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/workouts'));
 
   const footer = workout ? (
     status?.kind === 'done' ? (
@@ -155,15 +153,7 @@ export default function PlanPreview() {
 
   return (
     <Screen footer={footer}>
-      <Pressable
-        testID="back"
-        onPress={back}
-        accessibilityRole="button"
-        accessibilityLabel="Back to Workouts"
-        style={({ pressed }) => [styles.back, { borderRadius: radius.pill }, pressed && styles.pressed]}
-      >
-        <ChevronIcon direction="left" />
-      </Pressable>
+      <BackButton testID="back" accessibilityLabel="Back to Workouts" fallback="/workouts" />
 
       {loaded.kind === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
       {loaded.kind === 'failed' ? (

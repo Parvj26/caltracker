@@ -59,7 +59,7 @@ import type { TableHandlers } from '@/components/log/set-table';
 import { FieldNav, FieldNavContext, KEYBOARD_BAR_HEIGHT, KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
-import { CloseIcon } from '@/components/ui/icons';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { useCoachLogging } from '@/lib/coach-logging';
 import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
@@ -144,6 +144,14 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
 };
 
 /** The workout being logged: overview, each section's start page, and the section's pages. */
+/** Delete is always red and confirmed (Patterns board). */
+function confirmDeleteSet(what: string, run: () => void) {
+  Alert.alert(`Delete ${what}?`, 'It is removed from this workout.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: run },
+  ]);
+}
+
 export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   // Single active logger: while the coach logs this workout from the website, the client sees the same pages read
@@ -422,7 +430,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           const name = docOf(exId)?.exerciseName;
           setSetMenu({
             title: name ? `${row.name} · ${name}` : row.name,
-            items: [{ title: 'Delete set', testID: 'menu-delete-set', onPress: () => void op((l) => removeLogSet(l, exId, row.setId, nowIso())) }],
+            items: [{ title: 'Delete set', testID: 'menu-delete-set', destructive: true, onPress: () => confirmDeleteSet(row.name, () => void op((l) => removeLogSet(l, exId, row.setId, nowIso()))) }],
           });
         },
         onTag: (row) => {
@@ -525,18 +533,20 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       items.push({
         title: 'Delete a set',
         testID: 'menu-delete-a-set',
+        destructive: true,
         onPress: () =>
           setSetMenu({
             title: `Delete which set? · ${ex.exerciseName}`,
             items: deletable.map((c, i) => ({
               title: c.title,
               testID: `menu-delete-set-${i}`,
-              onPress: () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso())),
+              destructive: true,
+              onPress: () => confirmDeleteSet(c.title, () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso()))),
             })),
           }),
       });
     }
-    items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', onPress: () => confirmRemoveExercise(ex) });
+    items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', destructive: true, onPress: () => confirmRemoveExercise(ex) });
     return items;
   })();
 
@@ -932,15 +942,7 @@ function SectionPages({
   return (
     <View style={styles.fill}>
       <View style={[styles.header, { paddingTop: insets.top + space[1], paddingHorizontal: space[3], paddingBottom: space[2], gap: space[2] }]}>
-        <Pressable
-          testID="close-section"
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel={readOnly ? 'Back' : 'Leave workout. Asks: keep going later or discard.'}
-          style={({ pressed }) => [styles.closeButton, pressed && { opacity: pressedOpacity }]}
-        >
-          <CloseIcon size={16} />
-        </Pressable>
+        <CloseButton testID="close-section" onPress={onClose} accessibilityLabel={readOnly ? 'Back' : 'Leave workout. Asks: keep going later or discard.'} />
         <Pressable
           testID="pages-title"
           onPress={onSections}

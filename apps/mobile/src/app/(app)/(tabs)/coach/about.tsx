@@ -1,14 +1,13 @@
-import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { localDateOf } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
-import { BackIcon } from '@/components/community/icons';
 import { coachFirstName, coachSinceLabel, goalCountdown } from '@/lib/coach-tab';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { borderWidth } from '@caltracker/design-tokens';
-import { palette, pressedOpacity, radius, space } from '@/theme/theme';
+import { palette, radius, space } from '@/theme/theme';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { useTheme } from '@/theme/use-theme';
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -19,7 +18,6 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
  */
 export default function CoachAboutScreen() {
   const { text } = useTheme();
-  const router = useRouter();
   // Null while loading, when there is no coach link, or on first launch offline: the name then says "Your coach".
   const coach = useCoachProfile();
   const timeZone = useMemo(zone, []);
@@ -33,15 +31,7 @@ export default function CoachAboutScreen() {
   return (
     <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable
-          testID="coach-about-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back to the chat"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/coach'))}
-          style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
-        >
-          <BackIcon />
-        </Pressable>
+        <BackButton testID="coach-about-back" accessibilityLabel="Back to the chat" fallback="/coach" />
         <View style={styles.who} accessibilityRole="header">
           <CoachAvatar name={name ?? 'Coach'} url={coach?.avatarUrl ?? null} size={120} ring={3} />
           <Text style={[text('screenTitle'), styles.name]} testID="coach-name" numberOfLines={2}>{name ?? 'Your coach'}</Text>

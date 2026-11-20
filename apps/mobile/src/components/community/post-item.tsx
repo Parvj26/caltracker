@@ -40,6 +40,8 @@ export type PostContext = {
   onChanged: () => void;
   /** I blocked someone: hide them at once. */
   onBlocked: (userId: string) => void;
+  /** I reported a post: hide it from me at once. */
+  onReported?: (postId: string) => void;
 };
 
 const errorText = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.');
@@ -70,10 +72,11 @@ export function useContentMenu(ctx: PostContext) {
         onPress: () =>
           void report(target, reason)
             .then(() => {
+              if (target.postId) ctx.onReported?.(target.postId);
               const mayBlock = canBlock({ userId: ctx.me, isCoach: false }, { id: authorId, isCoach: ctx.coaches.has(authorId) });
               Alert.alert(
                 'Thanks for telling us',
-                'Your coach will take a look.',
+                target.postId ? 'Your coach will take a look. We’ve hidden the post for you.' : 'Your coach will take a look.',
                 mayBlock
                   ? [
                       { text: 'OK', style: 'cancel' },
@@ -111,7 +114,7 @@ export function useContentMenu(ctx: PostContext) {
           ]),
       });
     }
-    setSheet({ title: opts.kind === 'post' ? 'Post' : 'Comment', choices });
+    setSheet({ title: '', choices });
   };
 
   const element = <ChoiceSheet title={sheet?.title ?? null} choices={sheet?.choices ?? []} onClose={() => setSheet(null)} />;

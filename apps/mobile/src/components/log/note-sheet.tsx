@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, TextButton, TextField } from '@/components/ui';
+import { Button, TextField } from '@/components/ui';
+import { SheetHeader } from '@/components/ui/nav-buttons';
+import { closeAsking } from '@/lib/use-discard-guard';
 import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -20,17 +22,18 @@ export function NoteSheet({
   onSave: (note: string | null) => void;
   onClose: () => void;
 }) {
-  const { text, space } = useTheme();
+  const { space } = useTheme();
   const [draft, setDraft] = useState(initial);
   useEffect(() => setDraft(initial), [initial, exerciseName]);
 
+  const dirty = draft.trim() !== initial.trim();
+  const close = () => closeAsking(dirty, onClose);
+
   return (
-    <Modal visible={exerciseName !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={exerciseName !== null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={!dirty} onRequestClose={close}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <View style={[styles.column, { padding: space[4], gap: space[4] }]}>
-          <Text style={text('screenTitle')} accessibilityRole="header">
-            {`Note · ${exerciseName ?? ''}`}
-          </Text>
+          <SheetHeader title={`Note · ${exerciseName ?? ''}`} closeTestID="note-cancel" onClose={close} />
           <TextField
             label="Your note"
             testID="note-input"
@@ -49,7 +52,6 @@ export function NoteSheet({
               onSave(t === '' ? null : t);
             }}
           />
-          <TextButton testID="note-cancel" title="Cancel" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>

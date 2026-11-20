@@ -1,6 +1,6 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActionSheetIOS, Alert, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   IsoDateSchema,
   MACRO_KEYS,
@@ -16,9 +16,12 @@ import {
 } from '@caltracker/shared';
 import { FoodInput } from '@/components/food/food-input';
 import { font, foodText } from '@/components/food/food-type';
-import { CloseIcon, MoreIcon } from '@/components/food/icons';
+import { MoreIcon } from '@/components/food/icons';
 import { WhenLine } from '@/components/food/when-picker';
 import { Button, ErrorText, Screen } from '@/components/ui';
+import { MenuSheet } from '@/components/ui/menu-sheet';
+import { CloseButton } from '@/components/ui/nav-buttons';
+import { useDiscardGuard } from '@/lib/use-discard-guard';
 import { PhotoError } from '@/lib/compress-photo';
 import { defaultMinutes, minutesOf, savedTime, whenFromParams, type PhotoChoice, type When } from '@/lib/food-logic';
 import { mealPhotoUrls } from '@/lib/food-api';
@@ -118,6 +121,9 @@ export default function MealScreen() {
     JSON.stringify({ name, note, macros: macroText }) !== start ||
     photoChanged ||
     (timeTouched && (when.day !== initialWhen.day || when.minutes !== initialWhen.minutes));
+  // ×, swipe-down and Back ask "Discard changes?" while something was changed.
+  const guard = useDiscardGuard(dirty);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (!food) return null;
   if (params.id && !before) {
@@ -173,16 +179,6 @@ export default function MealScreen() {
   // Back to where Add a meal or a coach meal was opened from; an edit goes back one step.
   const leave = () => (params.coachMealId ? router.dismissTo('/food') : params.minutes && !before ? router.dismissAll() : router.back());
 
-  function close() {
-    if (!dirty) {
-      router.back();
-      return;
-    }
-    Alert.alert('Discard changes?', undefined, [
-      { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
-    ]);
-  }
 
   function save() {
     if (!food) return;
@@ -194,7 +190,7 @@ export default function MealScreen() {
     completeMeal({ variant: hasPhoto ? 'photo' : 'macros' });
     void food
       .save(before, { ...savedTime({ isNew: !before, touched: timeTouched, day: when.day, minutes: when.minutes, openedOn: today }), name, note, macros: parsed.macros, coachMealId }, choice)
-      .finally(leave);
+      .finally(() => guard.leave(leave));
   }
 
   function confirmDelete() {
@@ -206,22 +202,12 @@ export default function MealScreen() {
         style: 'destructive',
         onPress: () => {
           setBusy(true);
-          void food.remove(before).finally(() => router.back());
+          void food.remove(before).finally(() => guard.leave(() => router.back()));
         },
       },
     ]);
   }
 
-  function openMenu() {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions({ options: ['Delete meal', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1 }, (i) => i === 0 && confirmDelete());
-    } else {
-      Alert.alert('Meal', undefined, [
-        { text: 'Delete meal', style: 'destructive', onPress: confirmDelete },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  }
 
   return (
     <Screen
@@ -243,21 +229,22 @@ export default function MealScreen() {
         </View>
       }
     >
-      {/* No swipe-down while there are changes: × asks first. */}
-      <Stack.Screen options={{ gestureEnabled: !dirty }} />
       <View style={styles.header}>
         <Text style={[font(800, 24), styles.flex]} accessibilityRole="header">
           {before ? 'Edit meal' : 'New meal'}
         </Text>
         {before ? (
-          <Pressable onPress={openMenu} accessibilityRole="button" accessibilityLabel="More" testID="meal-more" style={({ pressed }) => [styles.round, pressed && { opacity: pressedOpacity }]}>
+          <Pressable onPress={() => setMenuOpen(true)} accessibilityRole="button" accessibilityLabel="More" testID="meal-more" style={({ pressed }) => [styles.round, pressed && { opacity: pressedOpacity }]}>
             <MoreIcon />
           </Pressable>
         ) : null}
-        <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close" testID="meal-cancel" style={({ pressed }) => [styles.round, pressed && { opacity: pressedOpacity }]}>
-          <CloseIcon />
-        </Pressable>
+        <CloseButton testID="meal-cancel" onPress={() => router.back()} />
       </View>
+      <MenuSheet
+        title={menuOpen ? '' : null}
+        items={[{ label: 'Delete meal', testID: 'meal-delete', destructive: true, onPress: confirmDelete }]}
+        onClose={() => setMenuOpen(false)}
+      />
 
       <View style={styles.field}>
         <Text style={font(700, 15)}>Name</Text>

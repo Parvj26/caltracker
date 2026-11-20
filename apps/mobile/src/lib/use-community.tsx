@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { groupNotifications, unreadNotificationCount, type NotificationItem, type NotificationRow } from '@caltracker/shared';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reportedPostsKey } from './device-cache-keys';
 import { coachIds, loadBlocked, loadNotifications, myCommunity, type CommunityInfo } from './community-api';
 import { useLive } from './community-live';
 import { useSession } from './session';
@@ -21,6 +23,18 @@ type CommunityState = {
   refresh: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   setBlocked: (next: Set<string>) => void;
+  /** Posts I reported: hidden from my feed at once (kept on this phone; reporters can't read reports back). */
+  reported: ReadonlySet<string>;
+  hideReported: (postId: string) => void;
+};
+
+const parseIds = (raw: string | null): Set<string> => {
+  try {
+    const v: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
 };
 
 const Ctx = createContext<CommunityState | null>(null);
@@ -39,6 +53,30 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
   const [coaches, setCoaches] = useState<Set<string>>(new Set());
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<NotificationRow[]>([]);
+  const [reported, setReported] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    setReported(new Set());
+    if (!userId) return;
+    let alive = true;
+    void AsyncStorage.getItem(reportedPostsKey(userId))
+      .then((raw) => alive && setReported(parseIds(raw)))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  const hideReported = useCallback(
+    (postId: string) => {
+      setReported((prev) => {
+        const next = new Set(prev).add(postId);
+        if (userId) void AsyncStorage.setItem(reportedPostsKey(userId), JSON.stringify([...next])).catch(() => undefined);
+        return next;
+      });
+    },
+    [userId],
+  );
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -100,8 +138,10 @@ export function CommunityProvider({ children }: { children: ReactNode }) {
       refresh,
       refreshNotifications,
       setBlocked,
+      reported,
+      hideReported,
     };
-  }, [community, ready, offline, workspaceId, coaches, blocked, rows, refresh, refreshNotifications]);
+  }, [community, ready, offline, workspaceId, coaches, blocked, rows, refresh, refreshNotifications, reported, hideReported]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

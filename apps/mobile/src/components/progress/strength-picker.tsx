@@ -95,5 +95,6 @@ const styles = StyleSheet.create({
   head: { borderBottomWidth: 1, borderBottomColor: palette.border },
   row: { flexDirection: 'row', alignItems: 'center' },
   item: { minHeight: tapTarget.min + 4, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: palette.border },
-  itemOn: { backgroundColor: palette.lime },
+  // Selected = ink outline (lime is only for creating).
+  itemOn: { borderWidth: 2, borderColor: palette.ink },
 });

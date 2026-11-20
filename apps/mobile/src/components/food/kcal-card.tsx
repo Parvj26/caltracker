@@ -3,6 +3,9 @@ import type { KcalCard as KcalCardData } from '@caltracker/shared';
 import { palette } from '@/theme/theme';
 import { font, inkShadow } from './food-type';
 
+/** The big number stops growing here; the words next to it keep growing (and wrap). */
+const BIG_MAX_SCALE = 1.4;
+
 const NAMES = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' } as const;
 
 /** The lime card: kcal left (or the day's total), each macro (with a bar when it has a target), and who set the targets. */
@@ -11,7 +14,7 @@ export function KcalCard({ card, coachName }: { card: KcalCardData; coachName: s
   return (
     <View style={[styles.card, inkShadow]} accessibilityLabel={`${card.headline} ${card.caption}`} testID="food-kcal-card">
       <View style={styles.head}>
-        <Text style={[font(800, 34), styles.big]} testID="food-kcal-headline">
+        <Text style={[font(800, 34), styles.big]} testID="food-kcal-headline" maxFontSizeMultiplier={BIG_MAX_SCALE}>
           {card.headline}
         </Text>
         <Text style={font(700, 16)} testID="food-kcal-caption">
@@ -46,7 +49,8 @@ export function KcalCard({ card, coachName }: { card: KcalCardData; coachName: s
 
 const styles = StyleSheet.create({
   card: { backgroundColor: palette.lime, borderWidth: 2, borderColor: palette.ink, borderRadius: 22, padding: 16, gap: 12 },
-  head: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  // Wraps ("kcal left today" under the number) instead of cutting either off at large text sizes.
+  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8 },
   big: { lineHeight: 38 },
   bar: { gap: 4 },
   barHead: { flexDirection: 'row', alignItems: 'baseline' },

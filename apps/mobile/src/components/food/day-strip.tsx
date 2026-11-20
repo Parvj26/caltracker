@@ -1,13 +1,17 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { tapTarget } from '@caltracker/design-tokens';
 import type { IsoDate, StripDay } from '@caltracker/shared';
-import { palette, pressedOpacity, white } from '@/theme/theme';
+import { palette, pressedOpacity } from '@/theme/theme';
+
+/** Day chips stop growing here, so seven still fit across a phone at the largest text sizes. */
+const DAY_MAX_SCALE = 1.4;
 import { useTheme } from '@/theme/use-theme';
 import { font } from './food-type';
 import { ChevronIcon } from '@/components/ui/icons';
 
 /**
- * Seven days, today last (ink). A ● under a day with meals. The arrows page back a week at a time and forward again
+ * Seven days, today last (a small blue dot on top). The selected day has a thick ink outline, as on Workouts. A ●
+ * under a day with meals. The arrows page back a week at a time and forward again
  * up to the week ending today; no future day is ever shown.
  */
 export function DayStrip({
@@ -64,7 +68,7 @@ function Arrow({ direction, label, onPress, disabled, testID }: { direction: 'le
 
 function DayButton({ day, selected, onPress }: { day: StripDay; selected: boolean; onPress: () => void }) {
   const label = `${day.dow} ${day.num}${day.isToday ? ', today' : day.hasMeals ? ', meals logged' : ''}`;
-  const ink = day.isToday ? styles.onInk : !day.hasMeals ? styles.quiet : null;
+  const ink = !day.hasMeals && !day.isToday ? styles.quiet : null;
   return (
     <Pressable
       onPress={onPress}
@@ -75,14 +79,14 @@ function DayButton({ day, selected, onPress }: { day: StripDay; selected: boolea
       style={({ pressed }) => [
         styles.day,
         day.hasMeals ? styles.dayLogged : styles.dayEmpty,
-        selected && !day.isToday && styles.daySelected,
-        day.isToday && styles.dayToday,
+        selected && styles.daySelected,
         pressed && { opacity: pressedOpacity },
       ]}
     >
-      <Text style={[font(700, 12), ink]}>{day.dow}</Text>
-      <Text style={[font(800, 18), ink]}>{day.num}</Text>
-      <Text style={[font(800, 12), styles.mark, ink]}>{day.hasMeals ? '●' : ''}</Text>
+      <View testID={day.isToday ? 'food-today-dot' : undefined} style={[styles.todayDot, day.isToday && styles.todayDotOn]} />
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} style={[font(700, 12), ink]}>{day.dow}</Text>
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} style={[font(800, 18), ink]}>{day.num}</Text>
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} style={[font(800, 12), styles.mark, ink]}>{day.hasMeals ? '●' : ''}</Text>
     </Pressable>
   );
 }
@@ -93,11 +97,12 @@ const styles = StyleSheet.create({
   arrow: { minWidth: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.3 },
   day: { flex: 1, minHeight: 66, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center', gap: 1, paddingVertical: 4 },
-  dayLogged: { backgroundColor: palette.bg, borderColor: palette.ink },
+  dayLogged: { backgroundColor: palette.surface, borderColor: palette.surface },
   dayEmpty: { backgroundColor: palette.bg, borderColor: palette.border },
-  daySelected: { backgroundColor: palette.lime, borderColor: palette.ink },
-  dayToday: { backgroundColor: palette.ink, borderColor: palette.ink },
-  onInk: { color: white },
+  // Selected: a thick ink outline (same rule as the Workouts strip).
+  daySelected: { backgroundColor: palette.bg, borderColor: palette.ink, borderWidth: 3 },
+  todayDot: { width: 6, height: 6, borderRadius: 3 },
+  todayDotOn: { backgroundColor: palette.magenta },
   quiet: { color: palette.inkMuted },
   mark: { height: 14, lineHeight: 14 },
 });

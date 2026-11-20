@@ -257,7 +257,7 @@ function ExerciseSection({
       <View style={[styles.exerciseHeader, { gap: space[2] }]}>
         {label ? (
           <View style={[styles.letterChip, { borderRadius: radius.pill, paddingHorizontal: space[2] }]}>
-            <Text style={text('sectionHeading')}>{label}</Text>
+            <Text style={[text('sectionHeading'), styles.letterText]} maxFontSizeMultiplier={1.4}>{label}</Text>
           </View>
         ) : null}
         {/* The photo opens the exercise info (and its demo); the rest of the row shows or hides each set. */}
@@ -359,7 +359,9 @@ const styles = StyleSheet.create({
   backRow: { alignItems: 'flex-start' },
   // No wrapping: the summary takes the room beside the photo and grows downwards when long.
   exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  letterChip: { backgroundColor: palette.lime },
+  // A1 / A2, as the logger draws them: ink, white letters.
+  letterChip: { backgroundColor: palette.ink },
+  letterText: { color: palette.bg },
   chip: { backgroundColor: palette.surface },
   summaryRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   setRow: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: palette.surface },

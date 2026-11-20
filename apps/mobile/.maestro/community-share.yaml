@@ -52,9 +52,8 @@ env:
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Leg day done'
-# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
-- tapOn:
-    point: '85%,12%'
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the title (the × sits on the right).
+- tapOn: 'Share to community'
 - tapOn:
     id: new-post-submit
 - extendedWaitUntil:

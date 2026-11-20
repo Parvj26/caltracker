@@ -16,9 +16,12 @@ export const notificationPrefsKey = (userId: string) => `caltracker.notification
 /** This user's Progress copies (training summary per coach, the remembered exercise): `caltracker.progressHub.<userId>.…`. */
 export const progressCachePrefix = (userId: string) => `caltracker.progressHub.${userId}.`;
 
+/** The posts this user reported on this phone: hidden from their feed straight away (`caltracker.community.reported.<userId>`). */
+export const reportedPostsKey = (userId: string) => `caltracker.community.reported.${userId}`;
+
 /**
  * The saved keys Sign out removes: this user's sticker book copies (one per coach, plus the older single copy), their
- * food log copies, their Progress copies, their notification settings copy, and
+ * food log copies, their Progress copies, their notification settings copy, the posts they reported, and
  * every Today copy on the phone, whoever it belongs to (they only decorate Today, and a shared phone must not keep
  * the last account's name or posts).
  */
@@ -28,7 +31,7 @@ export function keysToForget(allKeys: readonly string[], userId: string | null):
   const progress = userId ? progressCachePrefix(userId) : null;
   // The body copy (body-api) and the strength copy older versions saved, and the notification settings copy.
   const exact = userId
-    ? new Set([`caltracker.progress.${userId}`, `caltracker.strength.${userId}`, notificationPrefsKey(userId)])
+    ? new Set([`caltracker.progress.${userId}`, `caltracker.strength.${userId}`, notificationPrefsKey(userId), reportedPostsKey(userId)])
     : new Set<string>();
   return allKeys.filter(
     (k) =>
