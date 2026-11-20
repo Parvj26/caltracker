@@ -1,5 +1,5 @@
 begin;
-select plan(57);
+select plan(63);
 
 -- Metrics (migration 20261119000100_body_metrics.sql): body_metrics rows, the metric_entries view that adds the
 -- InBody scan and weigh-in values from body_measurements, and the Apple Health sync.
@@ -39,6 +39,8 @@ select tests.act_as(:'coach_a');
 select public.save_body_measurement(jsonb_build_object('workspace_id', :'ws_a', 'client_id', :'a1',
   'measured_on', '2026-10-01', 'values', jsonb_build_object('weight_kg', 80, 'body_fat_pct', 20, 'smm_kg', 35, 'bmi', 24)))
   as scan_a1 \gset
+select public.save_body_measurement(jsonb_build_object('workspace_id', :'ws_a', 'client_id', :'a2',
+  'measured_on', '2026-10-02', 'values', jsonb_build_object('weight_kg', 70))) as weigh_coach_a2 \gset
 reset role;
 select tests.act_as(:'a1');
 select public.save_body_measurement(jsonb_build_object('workspace_id', :'ws_a', 'client_id', :'a1',
@@ -81,6 +83,12 @@ select throws_ok(format($$insert into public.body_metrics (workspace_id, client_
 select throws_ok(format($$insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on,
   source, entered_by_role) values (%L, %L, 'waist_cm', 80, current_date + 5, 'manual', 'coach')$$, :'ws_a', :'a1'),
   '23514', null, 'a future date is refused');
+select throws_ok(format($$insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on,
+  measured_at, source, entered_by_role) values (%L, %L, 'waist_cm', 80, current_date, now() + interval '2 days', 'manual', 'coach')$$,
+  :'ws_a', :'a1'), '23514', null, 'a time more than a day ahead is refused');
+select throws_ok(format($$insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on,
+  measured_at, source, entered_by_role) values (%L, %L, 'waist_cm', 80, '2026-10-01', '2026-10-05T10:00:00Z', 'manual', 'coach')$$,
+  :'ws_a', :'a1'), '23514', null, 'a time far from its date is refused');
 select lives_ok(format($$insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on,
   source, entered_by_role) values (%L, %L, 'waist_cm', 40, '2026-10-11', 'manual', 'coach'),
   (%L, %L, 'resting_hr_bpm', 220, '2026-10-11', 'manual', 'coach')$$, :'ws_a', :'a1', :'ws_a', :'a1'),
@@ -140,7 +148,7 @@ reset role;
 select is((select value from public.body_metrics where id = :'m_coach'), 43::numeric, 'coach B cannot change or delete coach A''s entry');
 
 select tests.act_as(:'a2');
-select is((select count(*)::int from public.metric_entries), 0, 'A2 sees nothing of A1');
+select is((select count(*)::int from public.metric_entries where client_id <> (select auth.uid())), 0, 'A2 sees nothing of A1');
 reset role;
 
 select tests.act_as(:'a1');
@@ -161,6 +169,8 @@ select is((select id from public.metric_entries where origin = 'body_measurement
 reset role;
 
 select tests.act_as(:'coach_a');
+select results_eq(format($$select source, entered_by_role from public.metric_entries where id = %L$$, :'weigh_coach_a2'),
+  $$values ('manual'::text, 'coach'::text)$$, 'a coach-typed weight on its own is a manual entry by the coach, not a scan');
 select is((select count(*)::int from public.metric_entries where client_id = :'a1'), 8, 'coach A sees all of A1''s entries');
 reset role;
 
@@ -177,6 +187,12 @@ select is(public.sync_apple_health_metrics(:'ws_a', jsonb_build_array(
   jsonb_build_object('external_id', 'hk-2', 'metric_key', 'resting_hr_bpm', 'value', 57, 'measured_on', '2026-10-20'))),
   1, 'a re-sync changes only the sample that changed');
 select is((select count(*)::int from public.body_metrics where source = 'apple_health'), 2, 're-syncing never duplicates');
+select is(public.sync_apple_health_metrics(:'ws_a', jsonb_build_array(
+  jsonb_build_object('external_id', 'hk-dup', 'metric_key', 'vo2_max', 'value', 40, 'measured_on', '2026-10-21'),
+  jsonb_build_object('external_id', 'hk-dup', 'metric_key', 'vo2_max', 'value', 41, 'measured_on', '2026-10-21'))),
+  1, 'the same sample twice in one call is saved once');
+select is((select value from public.body_metrics where external_id = 'hk-dup'), 41::numeric, 'the later copy wins');
+delete from public.body_metrics where external_id = 'hk-dup';
 select is((select value from public.body_metrics where external_id = 'hk-2'), 57::numeric, 'the changed sample has its new value');
 select is((select entered_by_role || '/' || entered_by::text from public.body_metrics where external_id = 'hk-1'),
   'client/' || :'a1', 'imports are marked as the client''s own');
@@ -224,6 +240,9 @@ select is((select count(*)::int from public.metric_entries) + (select count(*)::
 select throws_ok(format($$insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on,
   source, entered_by_role) values (%L, %L, 'waist_cm', 82, '2026-10-12', 'manual', 'client')$$, :'ws_a', :'a1'),
   '42501', null, 'a removed client cannot log');
+select throws_ok(format($$select public.sync_apple_health_metrics(%L, jsonb_build_array(jsonb_build_object(
+  'external_id', 'hk-late', 'metric_key', 'weight_kg', 'value', 70, 'measured_on', '2026-10-20')))$$, :'ws_a'),
+  '42501', null, 'a removed client cannot sync from Apple Health');
 reset role;
 select tests.act_as(:'coach_a');
 select ok((select count(*) from public.metric_entries where client_id = :'a1') >= 1, 'the coach still reads a removed client''s history');

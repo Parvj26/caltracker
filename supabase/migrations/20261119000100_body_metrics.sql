@@ -46,13 +46,18 @@ create index body_metrics_client_idx on public.body_metrics (client_id, metric_k
 create index body_metrics_workspace_idx on public.body_metrics (workspace_id);
 create index body_metrics_entered_by_idx on public.body_metrics (entered_by);
 
--- Dates: not in the future (one day of slack past today in UTC, for time zones ahead of UTC), same as scans.
+-- Dates: not in the future (one day of slack past today in UTC, for time zones ahead of UTC), same as scans; an exact
+-- time at most a day ahead, and on (or a day either side of, for the client's time zone) the date it is filed under.
 -- A trigger rather than a check, because "today" is not a fixed value. Also keeps updated_at current.
 create function public.body_metrics_before_write() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   if new.measured_on > (now() at time zone 'utc')::date + 1 then
     raise exception 'The date is not valid.' using errcode = '23514';
+  end if;
+  if new.measured_at is not null and (new.measured_at > now() + interval '1 day'
+    or abs((new.measured_at at time zone 'utc')::date - new.measured_on) > 1) then
+    raise exception 'The time is not valid.' using errcode = '23514';
   end if;
   new.updated_at := now();
   return new;
@@ -108,8 +113,9 @@ create policy body_metrics_delete on public.body_metrics for delete to authentic
 -- so this shows nobody anything they could not already read.
 --   origin 'body_metrics'      → id is the body_metrics row (edit or delete that row)
 --   origin 'body_measurements' → id is the scan / weight entry (edit through save_body_measurement, as before)
--- A coach-entered body measurement is an InBody scan (source 'inbody_scan'); a client-entered one is the
--- client's own weigh-in (source 'manual').
+-- A coach-entered body measurement counts as an InBody scan (source 'inbody_scan') when it has a printout or any
+-- value besides weight (the scan form's other measures); a coach-entered weight on its own is a manual entry by the
+-- coach. A client-entered one is the client's own weigh-in (source 'manual').
 create view public.metric_entries with (security_invoker = true) as
   select
     'body_metrics'::text as origin,
@@ -136,7 +142,9 @@ create view public.metric_entries with (security_invoker = true) as
     v.value,
     m.measured_on,
     null::timestamptz,
-    case when m.source = 'coach' then 'inbody_scan' else 'manual' end,
+    case when m.source = 'coach' and (m.attachment_path is not null or exists (
+      select 1 from public.body_measurement_values o where o.measurement_id = m.id and o.metric_key <> 'weight_kg'))
+      then 'inbody_scan' else 'manual' end,
     m.source,
     m.entered_by,
     null::text,
@@ -151,7 +159,7 @@ grant select on public.metric_entries to authenticated, service_role;
 -- sync_apple_health_metrics(p_workspace_id, p_samples): the phone's Apple Health import for the signed-in client.
 --   p_samples = [{ external_id, metric_key, value, measured_on 'YYYY-MM-DD', measured_at? }], at most 500 per call.
 -- Adds new samples and updates ones already imported (matched by workspace + client + source + external_id), so a
--- re-sync never duplicates. Security invoker: it runs with the caller's own rights, so the insert and update
+-- re-sync never duplicates. The same external_id twice in one call keeps the later one. Security invoker: it runs with the caller's own rights, so the insert and update
 -- policies above apply to every row; a coach or anyone else gets a permission error. Returns how many rows it
 -- added or changed.
 create function public.sync_apple_health_metrics(p_workspace_id uuid, p_samples jsonb) returns integer
@@ -173,10 +181,12 @@ begin
   insert into public.body_metrics as b
     (workspace_id, client_id, metric_key, value, measured_on, measured_at, source, entered_by_role, entered_by,
      external_id)
-  select p_workspace_id, v_uid, s.metric_key, s.value, s.measured_on, s.measured_at, 'apple_health', 'client', v_uid,
-    s.external_id
-  from jsonb_to_recordset(p_samples)
-    as s(external_id text, metric_key text, value numeric, measured_on date, measured_at timestamptz)
+  select distinct on (s.external_id) p_workspace_id, v_uid, s.metric_key, s.value, s.measured_on, s.measured_at,
+    'apple_health', 'client', v_uid, s.external_id
+  from rows from (jsonb_to_recordset(p_samples)
+      as (external_id text, metric_key text, value numeric, measured_on date, measured_at timestamptz))
+    with ordinality as s(external_id, metric_key, value, measured_on, measured_at, n)
+  order by s.external_id, s.n desc
   on conflict (workspace_id, client_id, source, external_id) do update
     set value = excluded.value, measured_on = excluded.measured_on, measured_at = excluded.measured_at
     where (b.value, b.measured_on, b.measured_at) is distinct from
