@@ -53,19 +53,25 @@ function selectAll(el: HTMLInputElement) {
 
 /**
  * A text box for a number. While the coach types, the box shows exactly what they typed (so "61." or "1:" are not
- * rewritten mid-entry); each readable value is saved to the doc at once. On blur it shows the doc's value again.
+ * rewritten mid-entry); each readable value is saved to the doc at once. While the text can't be read (say "190"
+ * in a clock box), the doc goes back to the value the box had at focus, so a half-typed "19" is not left saved.
+ * On blur it shows the doc's value again, or keeps unreadable text on screen, marked invalid.
  * Tapping or tabbing into a filled box selects its number, so typing replaces it instead of landing mid-number.
  */
 export function NumberInput({ label, value, format, parse, onCommit, className, onFocus, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   // True during a tap that focuses the box: Safari places the caret when that tap ends, undoing the selection.
   const focusingTap = useRef(false);
+  // The doc's value when the box got focus: what an unreadable draft falls back to.
+  const atFocus = useRef<number | null>(value);
   const invalid = draft !== null && Number.isNaN(parse(draft));
   return (
     <input
       {...rest}
       onFocus={(e) => {
         onFocus?.(e);
+        // An invalid draft kept from the last blur was never saved, so the doc value is still the one to restore.
+        atFocus.current = value;
         const el = e.currentTarget;
         // iOS ignores a selection made inside the focus event, so select once it has settled.
         setTimeout(() => selectAll(el), 0);
@@ -92,8 +98,11 @@ export function NumberInput({ label, value, format, parse, onCommit, className, 
         setDraft(text);
         const n = parse(text);
         if (n === null || !Number.isNaN(n)) onCommit(n);
+        else if (value !== atFocus.current) onCommit(atFocus.current);
       }}
-      onBlur={() => setDraft(null)}
+      onBlur={() => {
+        if (!invalid) setDraft(null);
+      }}
     />
   );
 }

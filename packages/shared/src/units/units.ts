@@ -116,20 +116,25 @@ export function formatClock(seconds: number): string {
  * - Digits only, read like a microwave timer (the iPhone number pad has no ':' key): the last two digits are
  *   seconds and anything before them is minutes, so '130' is 1:30, '200' is 2:00 and '1000' is 10:00.
  *   One or two digits are plain seconds: '5' is 0:05, '45' is 0:45 and '90' is 1:30.
+ *   Leading zeros are dropped first, so '090' is 90 s and '0130' is 1:30.
  *   Three or more digits whose last two are 60 or more ('190', '1275') are NaN: they could mean several times,
  *   so the box shows them as invalid and nothing is saved rather than guessing.
+ * A result too big to count exactly (a very long string) is NaN. Callers apply their own max (rest 3600 s).
  */
 export function parseClock(text: string): number | null {
   const t = text.trim();
   if (t === '') return null;
   if (/^\d+$/.test(t)) {
-    if (t.length <= 2) return Number(t);
-    const secs = Number(t.slice(-2));
-    return secs >= 60 ? NaN : Number(t.slice(0, -2)) * 60 + secs;
+    const d = t.replace(/^0+(?=\d)/, '');
+    if (d.length <= 2) return Number(d);
+    const secs = Number(d.slice(-2));
+    const total = Number(d.slice(0, -2)) * 60 + secs;
+    return secs >= 60 || !Number.isSafeInteger(total) ? NaN : total;
   }
   const parts = t.split(':');
   if (parts.length > 3 || !parts.every((p, i) => /^\d*$/.test(p) && (i === 0 ? p !== '' : true))) return NaN;
   const nums = parts.map((p) => (p === '' ? 0 : Number(p)));
   if (nums.slice(1).some((n) => n >= 60)) return NaN;
-  return nums.reduce((acc, n) => acc * 60 + n, 0);
+  const total = nums.reduce((acc, n) => acc * 60 + n, 0);
+  return Number.isSafeInteger(total) ? total : NaN;
 }

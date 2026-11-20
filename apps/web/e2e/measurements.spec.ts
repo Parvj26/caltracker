@@ -170,26 +170,37 @@ test('the Rest checkbox: off hides the rest boxes and saves no rest, and reads b
   for (const n of [1, 2, 3]) await expect(setRow(page, ex, `set ${n}`).getByLabel('Rest (m:ss)')).toHaveValue('1:30');
 });
 
-test('typed rest digits read as m:ss: 200 shows 2:00 and saves 120 s; 190 is refused', async ({ page }) => {
+test('typed rest digits read as m:ss: 200 shows 2:00 and saves 120 s; 190 stays invalid and saves nothing', async ({ page }) => {
   const ex = await customExercise('Cable Fly');
   await signInAsCoach(page);
   await newWorkout(page, ex);
-  const rest = setRow(page, ex, 'set 1').getByLabel('Rest (m:ss)');
-  // Key by key, as on the iPhone number pad (no ':' key).
-  await rest.click();
-  await rest.press('ControlOrMeta+a');
-  await rest.pressSequentially('190');
-  await expect(rest).toHaveAttribute('aria-invalid', 'true');
-  await rest.fill('');
-  // 200 is 2:00 (not 200 s = 3:20); the default rest is 1:30, so this proves the typed value saved.
-  await rest.pressSequentially('200');
-  await expect(rest).not.toHaveAttribute('aria-invalid', 'true');
-  await rest.blur();
-  await expect(rest).toHaveValue('2:00');
+  // + Set copies set 1, so both start at the default 1:30.
+  await page.getByRole('button', { name: `Add a set to ${ex}` }).click();
+  const rest1 = setRow(page, ex, 'set 1').getByLabel('Rest (m:ss)');
+  const rest2 = setRow(page, ex, 'set 2').getByLabel('Rest (m:ss)');
+  await expect(rest2).toHaveValue('1:30');
+
+  // Key by key, as on the iPhone number pad (no ':' key). "19" is readable on the way, "190" is not.
+  await rest2.fill('');
+  await rest2.pressSequentially('190');
+  await expect(rest2).toHaveAttribute('aria-invalid', 'true');
+  await rest2.blur();
+  // Still shown and still red after blur, not snapped to a half-typed 0:19.
+  await expect(rest2).toHaveValue('190');
+  await expect(rest2).toHaveAttribute('aria-invalid', 'true');
+
+  // 200 is 2:00 (not 200 s = 3:20).
+  await rest1.fill('');
+  await rest1.pressSequentially('200');
+  await expect(rest1).not.toHaveAttribute('aria-invalid', 'true');
+  await rest1.blur();
+  await expect(rest1).toHaveValue('2:00');
+
   await save(page);
   const id = page.url().split('/').pop()!;
   const rests = await admin.from('workout_sets').select('rest_seconds').eq('workout_id', id).order('position');
-  expect(rests.data?.[0]?.rest_seconds).toBe(120);
+  // Set 2 kept its value from before the invalid typing: 90 s, never the half-typed 19 s.
+  expect(rests.data?.map((r) => r.rest_seconds)).toEqual([120, 90]);
 });
 
 test('at iPhone width an exercise opens on its own screen, with chips for the measured boxes', async ({ page }) => {

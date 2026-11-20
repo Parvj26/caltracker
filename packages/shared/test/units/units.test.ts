@@ -85,6 +85,18 @@ describe('clock durations', () => {
     expect(parseClock('1000')).toBe(600);
     expect(parseClock('0130')).toBe(90);
     expect(parseClock('005')).toBe(5);
+    expect(parseClock('6000')).toBe(3600); // 60:00, the rest cap
+    expect(parseClock('6001')).toBe(3601); // over the rest cap: the rest schema refuses it
+  });
+  it('drops leading zeros before the rule', () => {
+    expect(parseClock('090')).toBe(90);
+    expect(parseClock('060')).toBe(60);
+    expect(parseClock('0090')).toBe(90);
+    expect(parseClock('000')).toBe(0);
+  });
+  it('rejects a very long string rather than return an inexact number', () => {
+    expect(parseClock('1'.repeat(30))).toBeNaN();
+    expect(parseClock(`${'1'.repeat(30)}:00`)).toBeNaN();
     expect(parseClock(' 130 ')).toBe(90);
   });
   it('reads one or two digits as plain seconds, even 60 to 99', () => {
