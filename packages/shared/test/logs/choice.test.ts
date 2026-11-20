@@ -211,7 +211,7 @@ describe('add and remove', () => {
 });
 
 describe('counts', () => {
-  it('openSetCount: finisher unpicked counts its first option\'s 3 normal sets', () => {
+  it('openSetCount: finisher unpicked counts its smallest option\'s 3 sets', () => {
     let log = build();
     expect(openSetCount(log)).toBe(6);
     for (const s of log.blocks[0]!.exercises[0]!.sets) log = completeSet(log, s.id, LATER);
