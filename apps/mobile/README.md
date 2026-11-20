@@ -113,7 +113,7 @@ It checks the Today and Workouts tabs and the calendar. Run just this flow with
 
 ## Workout logging flows
 
-Clients start today's workout, tick sets (a rest timer runs between sets), and finish to see a summary. Closing the app mid-workout offers Resume on reopen. A workout left open is finished automatically by a `pg_cron` job in the database.
+Clients start today's workout, tick sets, and finish to see a summary. Closing the app mid-workout offers Resume on reopen. A workout left open is finished automatically by a `pg_cron` job in the database.
 
 New Maestro flows in `.maestro/`:
 - `log-workout.yaml`: start, tick sets, finish and see the summary.
@@ -122,6 +122,10 @@ New Maestro flows in `.maestro/`:
 
 They need the built-in exercises (`pnpm import:exercises`) and run with the rest through `bash scripts/run-e2e.sh`.
 
+Settings and sign-in flows (no exercises needed):
+- `settings.yaml`, `notification-settings.yaml`: Settings (account, Privacy & delete account, notification groups), Back one step at a time.
+- `sign-in-checks.yaml`: sign-in field errors, Return to the next field, show/hide password.
+
 ## Metrics and Apple Health
 
 Progress › **Metrics** shows six body metrics (weight, body fat, muscle mass, VO2 max, waist, resting heart rate) from
@@ -129,7 +133,7 @@ the `metric_entries` view, in the client's units, with "+ Log" to add one and Ed
 older weigh-ins too). The old `/progress-detail/body` address redirects there.
 
 **Apple Health** (`@kingstinct/react-native-healthkit`, read only, config plugin in `app.json`): Connect on Metrics
-or Settings › Apple Health shows the explainer and, only on Continue, the iOS prompt for the switched-on metrics. While
+or Settings › Connections › Apple Health shows the explainer and, only on Continue, the iOS prompt for the switched-on metrics. While
 connected the app syncs on open and on coming back to the front (`useAppleHealthAutoSync`), using HealthKit anchors
 (first sync goes a year back) and `sync_apple_health_metrics` in batches of 500. Readings are saved on the phone before
 they are sent, so no signal only delays them. The on/off state lives on the phone under the Progress prefix, so Sign
