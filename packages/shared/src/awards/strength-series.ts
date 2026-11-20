@@ -11,21 +11,32 @@ export type StrengthPoint = {
   e1rmKg: number;
   /** The set with the highest estimated 1RM in that workout. */
   bestSet: { weightKg: number; reps: number };
+  /**
+   * The heaviest set in that workout (most reps breaks a tie), its log and the workout's name. Optional: series saved
+   * on a phone before these existed have none (read heaviestSet as bestSet then).
+   */
+  heaviestSet?: { weightKg: number; reps: number };
+  logId?: string;
+  logName?: string;
 };
 
 /** The finished logs that have a counted set (no warm-ups) of the exercise, with that log's best lift. */
-function points(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone: string): Array<StrengthPoint & { at: string }> {
-  const out: Array<StrengthPoint & { at: string }> = [];
+function points(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone: string): Array<Required<StrengthPoint> & { at: string }> {
+  const out: Array<Required<StrengthPoint> & { at: string }> = [];
   for (const log of logs) {
     if (log.status !== 'completed' || !log.finishedAt) continue;
     const lifts = liftsByExercise(log).get(exerciseId);
     if (!lifts || lifts.length === 0) continue;
     const best = lifts.reduce((a, b) => (epley1rm(b.weightKg, b.reps) > epley1rm(a.weightKg, a.reps) ? b : a));
+    const heaviest = lifts.reduce((a, b) => (b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a));
     out.push({
       date: localDay(log.finishedAt, timeZone),
       at: log.finishedAt,
       e1rmKg: epley1rm(best.weightKg, best.reps),
       bestSet: { weightKg: best.weightKg, reps: best.reps },
+      heaviestSet: { weightKg: heaviest.weightKg, reps: heaviest.reps },
+      logId: log.id,
+      logName: log.name,
     });
   }
   return out.sort((a, b) => a.at.localeCompare(b.at));
@@ -36,7 +47,14 @@ function points(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone: st
  * first. Warm-ups and unfinished sets are left out. `timeZone` decides which calendar day a workout belongs to.
  */
 export function strengthSeries(logs: readonly WorkoutLogDoc[], exerciseId: string, timeZone = 'UTC'): StrengthPoint[] {
-  return points(logs, exerciseId, timeZone).map((p) => ({ date: p.date, e1rmKg: p.e1rmKg, bestSet: p.bestSet }));
+  return points(logs, exerciseId, timeZone).map((p) => ({
+    date: p.date,
+    e1rmKg: p.e1rmKg,
+    bestSet: p.bestSet,
+    heaviestSet: p.heaviestSet,
+    logId: p.logId,
+    logName: p.logName,
+  }));
 }
 
 /** The exercises that have a strength series in these logs, sorted by name, for the exercise dropdown. */

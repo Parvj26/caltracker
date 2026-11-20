@@ -686,6 +686,33 @@ export {
   strengthTile,
 } from './progress/strength';
 export type { PickerItem, PickerSection, StrengthExerciseLite, StrengthRange, StrengthSession } from './progress/strength';
+export {
+  E1RM_MAX_REPS,
+  bestE1rmOf,
+  bestOf,
+  heaviestChange,
+  heaviestChart,
+  heaviestSentence,
+  heaviestSessionRows,
+  heaviestSessions,
+  heaviestTile,
+  loadStyleOf,
+  loadText,
+  sessionsSince,
+  setText,
+  strengthExerciseRows,
+  strengthStats,
+} from './progress/heaviest';
+export type {
+  HeaviestChange,
+  HeaviestChartPoint,
+  HeaviestSession,
+  LiftSet,
+  LoadStyle,
+  SessionRowView,
+  StrengthExerciseRow,
+  StrengthStats,
+} from './progress/heaviest';
 export { WEIGHT_TREND_HALF_LIFE_DAYS, bodyTile, smoothedTrend, weightTrendInRange, weightTrendSummary } from './progress/body';
 export { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, foodTile } from './progress/food';
 export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, ProteinDayState } from './progress/food';

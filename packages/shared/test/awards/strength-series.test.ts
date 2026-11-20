@@ -11,7 +11,7 @@ describe('strengthSeries', () => {
       mkLog([{ sets: [{ w: 140, r: 1, type: 'warmup' }, { w: 60, r: 10 }, { w: 80, r: 5 }] }], at('2026-10-20')),
       mkLog([{ sets: [{ w: 100, r: 8 }, { w: 105, r: 3 }] }], at('2026-10-27')),
     ];
-    expect(strengthSeries(logs, EX_A)).toEqual([
+    expect(strengthSeries(logs, EX_A)).toMatchObject([
       { date: '2026-10-20', e1rmKg: 93.3, bestSet: { weightKg: 80, reps: 5 } },
       { date: '2026-10-27', e1rmKg: 126.7, bestSet: { weightKg: 100, reps: 8 } },
       { date: '2026-11-03', e1rmKg: 116.7, bestSet: { weightKg: 100, reps: 5 } },
