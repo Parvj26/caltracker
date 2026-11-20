@@ -88,6 +88,7 @@ export function WorkoutSheet({
   // (made once, so a retry adds it only once).
   const [alsoLibrary, setAlsoLibrary] = useState(false);
   const [calendarId] = useState(() => crypto.randomUUID());
+  const [libraryId] = useState(() => crypto.randomUUID());
   const week = target.kind === 'new' ? target.week : target.kind === 'edit' ? target.slot.week : 0;
   const day = target.kind === 'new' ? target.day : target.kind === 'edit' ? target.slot.day : 0;
   const where = target.kind === 'client' ? formatShortDay(target.date) : cellLabel(week, day);
@@ -148,6 +149,7 @@ export function WorkoutSheet({
         today: target.today,
         alsoLibrary,
         newId: calendarId,
+        libraryId,
       });
       if (outcome.ok) saved.current = { kind: 'client', id: outcome.id, name: doc.name, date: target.date, library: alsoLibrary };
       return outcome;

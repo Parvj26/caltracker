@@ -146,15 +146,15 @@ export async function quickCreateExercise(input: { name: string; trackingType: s
   const name = v.name.replace(/\s+/g, ' ');
 
   const supabase = await createServerSupabase();
-  // Same words in the same order, any case or spacing: the database narrows it down, the shared rule decides.
+  const mine = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
+  // First the exact name (any case), then the same words in the same order with any spacing: the database narrows it
+  // down, the shared rule decides.
+  const exact = await supabase.from('exercises').select('id, name').or(mine).ilike('name', likeLiteral(name)).limit(1);
+  if (exact.error) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
   const pattern = exerciseNameKey(name).split(' ').map(likeLiteral).join('%');
-  const { data: found, error: findError } = await supabase
-    .from('exercises')
-    .select('id, name')
-    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
-    .ilike('name', pattern)
-    .limit(20);
-  if (findError) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
+  const near = exact.data.length > 0 ? exact : await supabase.from('exercises').select('id, name').or(mine).ilike('name', pattern).limit(20);
+  if (near.error) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
+  const found = near.data;
   const existing = found.find((e) => sameExerciseName(e.name, name));
   if (existing) return { ...fail('exercise_name_taken', 'action:exercises.quickCreateExercise'), existing };
 

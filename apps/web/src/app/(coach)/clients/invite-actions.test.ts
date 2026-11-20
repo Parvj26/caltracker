@@ -12,6 +12,8 @@ const deletes: string[] = [];
 const sends: unknown[] = [];
 let rpcError: { code: string } | null = null;
 let sendStatus = 'sent';
+let lookupFails = false;
+let deleteRemoves = true;
 
 const OLD = {
   id: INVITE,
@@ -34,8 +36,14 @@ function query(table: string) {
     },
     is: () => builder,
     maybeSingle: () =>
-      Promise.resolve(table === 'client_invites' && byEmail ? { data: { id: NEW_INVITE, expires_at: 'x' }, error: null } : { data: OLD, error: null }),
-    then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok),
+      Promise.resolve(
+        table === 'client_invites' && byEmail
+          ? lookupFails
+            ? { data: null, error: { message: 'down' } }
+            : { data: { id: NEW_INVITE, expires_at: 'x' }, error: null }
+          : { data: OLD, error: null },
+      ),
+    then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: deleting && deleteRemoves ? [{ id: INVITE }] : [], error: null }).then(ok),
   };
   return builder;
 }
@@ -65,6 +73,8 @@ beforeEach(() => {
   sends.length = 0;
   rpcError = null;
   sendStatus = 'sent';
+  lookupFails = false;
+  deleteRemoves = true;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-20T12:00:00Z'));
 });
@@ -94,11 +104,28 @@ describe('updateInvitePlan', () => {
 
 describe('changeInviteEmail', () => {
   it('invites the new email with the same name, keeps the plan (from today on), then cancels the old invite', async () => {
-    expect(await changeInviteEmail({ inviteId: INVITE, email: 'ANA@new.test', today: '2026-11-20' })).toMatchObject({ ok: true, inviteId: NEW_INVITE, planError: null });
+    expect(await changeInviteEmail({ inviteId: INVITE, email: 'ANA@new.test', today: '2026-11-20' })).toMatchObject({
+      ok: true,
+      inviteId: NEW_INVITE,
+      planError: null,
+      oldCancelled: true,
+    });
     expect(sends[0]).toMatchObject({ invites: [{ email: 'ana@new.test', firstName: 'Ana', lastName: 'Torres' }] });
     expect(rpcs[0]).toEqual({ name: 'set_invite_plan', payload: { p_invite_id: NEW_INVITE, p_program_id: PROGRAM, p_start_on: '2026-11-20' } });
     expect(deletes).toEqual([INVITE]);
   });
+  it('says so when the old invite could not be cancelled, or the plan could not be kept', async () => {
+    deleteRemoves = false;
+    expect(await changeInviteEmail({ inviteId: INVITE, email: 'ana@new.test', today: '2026-11-20' })).toMatchObject({ ok: true, oldCancelled: false });
+    deleteRemoves = true;
+    lookupFails = true;
+    expect(await changeInviteEmail({ inviteId: INVITE, email: 'ana@new2.test', today: '2026-11-20' })).toMatchObject({
+      ok: true,
+      inviteId: null,
+      planError: 'invite_plan_program_failed',
+    });
+  });
+
   it('changes nothing when the new invite is not sent', async () => {
     sendStatus = 'already_member';
     expect(await changeInviteEmail({ inviteId: INVITE, email: 'ana@new.test', today: '2026-11-20' })).toMatchObject({ ok: true, inviteId: null });

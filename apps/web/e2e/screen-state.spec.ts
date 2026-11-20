@@ -100,6 +100,17 @@ for (const size of SIZES) {
       await page.reload();
       await expect(page.getByRole('list', { name: 'Range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
 
+      // The period picker shows once there is something to chart: one weight entry.
+      const owner = await admin.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'owner').single();
+      const today = await browserToday(page);
+      const m = await admin
+        .from('body_measurements')
+        .insert({ workspace_id: workspaceId, client_id: client.id, measured_on: today, source: 'coach', entered_by: owner.data!.user_id })
+        .select('id')
+        .single();
+      if (m.error) throw m.error;
+      const v = await admin.from('body_measurement_values').insert({ measurement_id: m.data.id, metric_key: 'weight_kg', value: 70 });
+      if (v.error) throw v.error;
       await page.goto(`/clients/${client.id}`);
       await page.getByLabel('Period').selectOption('3m');
       await expect(page).toHaveURL(/[?&]period=3m/);

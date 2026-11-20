@@ -398,7 +398,8 @@ export function ClientDirectory({
   });
   const openInvite = opened ? (invites.find((i) => i.id === opened.id) ?? opened) : null;
   // "Cancel invite…" from the window: asked once the window has closed (one pop-up at a time).
-  const [cancelling, setCancelling] = useState<DirectoryInvite | null>(null);
+  // Each ask is its own request (n), so asking again about the same invite after Cancel opens the question again.
+  const [cancelling, setCancelling] = useState<{ invite: DirectoryInvite; n: number } | null>(null);
   const cancelRef = useRef<ConfirmHandle>(null);
   useEffect(() => {
     if (cancelling) cancelRef.current?.open();
@@ -506,11 +507,13 @@ export function ClientDirectory({
           today={today}
           planOptions={planOptions}
           onMoved={(id, email) => setOpened({ ...openInvite, id, email, sentAt: new Date().toISOString(), expired: false })}
-          onCancelInvite={() => setCancelling(openInvite)}
+          onCancelInvite={() => setCancelling((c) => ({ invite: openInvite, n: (c?.n ?? 0) + 1 }))}
           onClose={() => setOpened(null)}
         />
       ) : null}
-      {cancelling ? <CancelInviteButton key={cancelling.id} inviteId={cancelling.id} email={cancelling.email} handle={cancelRef} /> : null}
+      {cancelling ? (
+        <CancelInviteButton key={cancelling.invite.id} inviteId={cancelling.invite.id} email={cancelling.invite.email} handle={cancelRef} />
+      ) : null}
     </section>
   );
 }

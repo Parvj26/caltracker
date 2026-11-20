@@ -65,7 +65,8 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('createClientWorkout', () => {
-  const input = (alsoLibrary: boolean, d = doc()) => ({ doc: d, clientId: CLIENT, date: '2026-11-20', today: '2026-11-20', alsoLibrary, newId: NEW_ID });
+  const LIB_ID = '00000000-0000-4000-8000-0000000000cc';
+  const input = (alsoLibrary: boolean, d = doc()) => ({ doc: d, clientId: CLIENT, date: '2026-11-20', today: '2026-11-20', alsoLibrary, newId: NEW_ID, libraryId: LIB_ID });
 
   it('puts the workout on the client’s day only, never in the Library', async () => {
     const d = doc();
@@ -78,7 +79,12 @@ describe('createClientWorkout', () => {
     const d = doc();
     expect(await createClientWorkout(input(true, d))).toEqual({ ok: true, id: NEW_ID });
     expect(rpcs.map((r) => r.name)).toEqual(['save_workout', 'schedule_workout']);
-    expect(rpcs[1]!.payload).toMatchObject({ p_new_id: NEW_ID, p_workout_id: d.id, p_client_id: CLIENT, p_date: '2026-11-20' });
+    // The Library copy has its own ids, so flipping the box between retries never collides with the calendar's.
+    const lib = rpcs[0]!.payload.p_doc as WorkoutDoc;
+    expect(lib.id).toBe(LIB_ID);
+    expect(lib.name).toBe(d.name);
+    expect(lib.blocks[0]!.id).not.toBe(d.blocks[0]!.id);
+    expect(rpcs[1]!.payload).toMatchObject({ p_new_id: NEW_ID, p_workout_id: LIB_ID, p_client_id: CLIENT, p_date: '2026-11-20' });
   });
 
   it('refuses a past day and an empty workout before writing anything', async () => {
@@ -95,7 +101,7 @@ describe('createClientWorkout', () => {
 
 describe('saveToLibrary', () => {
   beforeEach(() => {
-    loaded = { doc: doc('Monday Upper'), clientId: CLIENT, scheduledOn: '2026-11-20' };
+    loaded = { doc: { ...doc('Monday Upper'), notes: 'Knee still sore: go light' }, clientId: CLIENT, scheduledOn: '2026-11-20' };
   });
 
   it('saves the plan as a new library workout with fresh ids', async () => {
@@ -107,6 +113,8 @@ describe('saveToLibrary', () => {
     expect(saved.blocks[0]!.id).not.toBe(loaded!.doc.blocks[0]!.id);
     expect(saved.blocks[0]!.exercises[0]!.sets).toHaveLength(loaded!.doc.blocks[0]!.exercises[0]!.sets.length);
     expect(saved.rememberChoices).toBe(false);
+    // The workout's own notes are about this client: they stay on the calendar.
+    expect(saved.notes).toBeNull();
   });
 
   it('on a name clash saves nothing and suggests "<name> (<first name>, <day>)"', async () => {

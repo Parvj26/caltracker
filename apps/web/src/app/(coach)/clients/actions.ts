@@ -197,6 +197,8 @@ export type ChangeEmailOutcome =
       /** The new invite, once one is open for the new email (the old one is then cancelled). */
       inviteId: string | null;
       planError: ErrorCode | null;
+      /** False when the old invite couldn't be cancelled: its link may still work. */
+      oldCancelled: boolean;
     };
 
 /**
@@ -225,7 +227,7 @@ export async function changeInviteEmail(input: { inviteId: string; email: string
   if (!sent.ok) return sent;
   const result = sent.results[0];
   if (!result) return fail('invite_send_failed', 'action:clients.changeInviteEmail');
-  if (!INVITE_OPEN.has(result.status)) return { ok: true, result, inviteId: null, planError: null };
+  if (!INVITE_OPEN.has(result.status)) return { ok: true, result, inviteId: null, planError: null, oldCancelled: false };
 
   const fresh = await supabase
     .from('client_invites')
@@ -247,13 +249,18 @@ export async function changeInviteEmail(input: { inviteId: string; email: string
       : items.some((i) => i.workout_id)
         ? { kind: 'workouts', items: items.flatMap((i) => (i.workout_id ? [{ workoutId: i.workout_id, on: day(i.start_on) }] : [])) }
         : { kind: 'none' };
+  const planFailed: ErrorCode | null = plan.kind === 'none' ? null : plan.kind === 'program' ? 'invite_plan_program_failed' : 'invite_plan_workouts_failed';
   let planError: ErrorCode | null = null;
   if (newId) {
     const kept = await supabase.rpc('set_invite_plan', { p_invite_id: newId, ...invitePlanArgs(plan) });
-    if (kept.error && plan.kind !== 'none') planError = plan.kind === 'program' ? 'invite_plan_program_failed' : 'invite_plan_workouts_failed';
+    if (kept.error) planError = planFailed;
+  } else {
+    // The new invite couldn't be found to keep the plan with it: say so (as inviteClient does).
+    planError = planFailed;
   }
-  // The old link stops working.
-  await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null);
+  // The old link stops working (checked: only a deleted row means it did).
+  const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
+  const oldCancelled = !gone.error && gone.data.length > 0;
   revalidatePath('/clients');
-  return { ok: true, result, inviteId: newId, planError };
+  return { ok: true, result, inviteId: newId, planError, oldCancelled };
 }

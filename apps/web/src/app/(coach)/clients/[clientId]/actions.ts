@@ -177,6 +177,8 @@ export async function createClientWorkout(input: {
   today: IsoDate;
   alsoLibrary: boolean;
   newId: string;
+  /** The Library copy's id when ticked (made once per editor, like newId). */
+  libraryId?: string;
 }): Promise<SaveWorkoutOutcome> {
   const { workspaceId } = await requireCoach();
   const parsed = WorkoutDoc.safeParse(input.doc);
@@ -215,7 +217,11 @@ export async function createClientWorkout(input: {
     return { ok: true, id: parsed.data.id };
   }
 
-  const saved = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: parsed.data });
+  // The Library copy has its own ids (the calendar one keeps the doc's), so ticking and unticking between retries
+  // never makes the two collide; a retry with the box ticked saves the same Library workout again.
+  if (!isUuid(input.libraryId)) return fail('schedule_input_invalid', 'action:clients.createClientWorkout');
+  const libraryDoc = { ...duplicateWorkoutDoc(parsed.data, () => crypto.randomUUID()), id: input.libraryId, name: parsed.data.name };
+  const saved = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: libraryDoc });
   if (saved.error) {
     if (saved.error.code === '23514') return fail('workout_invalid', 'action:clients.createClientWorkout');
     if (saved.error.code === '42501') return fail('workout_edit_denied', 'action:clients.createClientWorkout');
@@ -239,8 +245,8 @@ export type SaveToLibraryOutcome =
   | (ActionFailure & { suggestion?: string; issues?: { path: (string | number)[]; message: string }[] });
 
 /**
- * "Save to Library" in a calendar workout's ⋯ menu: its plan (blocks, exercises, sets and targets, never what the
- * client logged) becomes a new Library workout, with fresh ids. The calendar workout itself doesn't change. `name`
+ * "Save to Library" in a calendar workout's ⋯ menu: its plan (blocks, exercises, sets, targets and their cues, never
+ * what the client logged, nor the workout's own notes) becomes a new Library workout, with fresh ids. The calendar workout itself doesn't change. `name`
  * is the one asked for (the workout's own name at first); when the Library already has it, nothing is saved and
  * `suggestion` offers "<name> (<first name>, <day>)" for the dialog to ask with.
  */
@@ -261,7 +267,9 @@ export async function saveToLibrary(input: { workoutId: string; name?: string })
   if (!loaded) return fail('workout_not_found', 'action:clients.saveToLibrary');
 
   const name = (input.name ?? loaded.doc.name).trim();
-  const copy = WorkoutDoc.safeParse({ ...duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()), name });
+  // The workout's own notes are often about this client ("knee still sore"), so they stay on the calendar; each
+  // exercise's and set's cues go with the plan.
+  const copy = WorkoutDoc.safeParse({ ...duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()), name, notes: null });
   if (!copy.success) {
     const nameIssue = copy.error.issues.find((i) => i.path[0] === 'name');
     return nameIssue
