@@ -1,8 +1,20 @@
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+
+const ROOT_HOST = 'caltracker.app';
+const STAGING_HOST = 'staging.caltracker.app';
 
 // Next 16 renamed the `middleware` file convention to `proxy`.
 export async function proxy(request: NextRequest) {
+  // Until go-live the root domain only serves the public privacy policy and terms (left out of the matcher below), so the
+  // app's links work. Every other root-domain page goes to the staging site, where sign-in lives. Remove at go-live.
+  if (request.nextUrl.hostname === ROOT_HOST) {
+    const url = request.nextUrl.clone();
+    url.protocol = 'https:';
+    url.hostname = STAGING_HOST;
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
   return updateSession(request);
 }
 

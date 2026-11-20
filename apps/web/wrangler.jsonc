@@ -6,5 +6,10 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "caltracker-web-staging" }],
-  "routes": [{ "pattern": "staging.caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" }]
+  "routes": [
+    { "pattern": "staging.caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" },
+    // Until go-live the root domain is served by this staging Worker so the app's privacy link (caltracker.app/privacy)
+    // works. proxy.ts sends every other root-domain page to staging.caltracker.app. Remove at go-live.
+    { "pattern": "caltracker.app", "custom_domain": true, "zone_name": "caltracker.app" }
+  ]
 }
