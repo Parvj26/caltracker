@@ -26,7 +26,7 @@ env:
     file: helpers/call.js
     env: { ACTION: coach-take-over, EMAIL: '${EMAIL}' }
 - extendedWaitUntil:
-    visible: 'Your coach is logging this session'
+    visible: 'Your coach is logging this session.*'
     timeout: 20000
 # The pages stay, read only.
 - assertVisible:
@@ -75,7 +75,8 @@ env:
     id: summary-done
 # Today shows it done, and doesn't reveal it a second time.
 - extendedWaitUntil:
-    visible: 'Done ✓.*'
+    visible:
+      id: 'today-done-.*'
     timeout: 20000
 - assertNotVisible:
     id: reveal-screen

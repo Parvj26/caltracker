@@ -956,7 +956,7 @@ function SectionPages({
             {header.subtitle}
           </Text>
         </Pressable>
-        <Text testID="log-elapsed" style={[text('caption'), styles.elapsed]} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
+        <Text testID="log-elapsed" style={[text('caption'), styles.elapsed]} numberOfLines={2} adjustsFontSizeToFit maxFontSizeMultiplier={ELAPSED_MAX_SCALE}>
           {elapsed}
         </Text>
       </View>
@@ -1080,6 +1080,8 @@ function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: st
 
 /** The header's title may grow this much with the phone's text size (1.6 at the app's size: same largest size). */
 const HEADER_MAX_SCALE = logMaxFontScale(1.6);
+/** "12 min in" sits in a narrow corner: it grows a little, then shrinks to fit (never split mid-word). */
+const ELAPSED_MAX_SCALE = 1.2;
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },

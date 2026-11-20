@@ -1,7 +1,7 @@
 # The section pages on a mixed workout ("E2E Mixed", no sections, so one section named after the workout):
 #   page 1 Barbell Squat: a warm-up row (W, 20 kg × 10) then 2 × 8 @ 60 kg;
 #   page 2 superset Pullups (A1) + Pushups (A2), 2 rounds, scrolled round by round;
-#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (↓ Drop, "max reps").
+#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (↓ Drop, "max").
 # A weight typed on set 1 carries into set 2; a ticked set's numbers stay editable and it stays ticked; ✓ again
 # unticks; Mark all rounds; "Next: …" moves on; the ↓ Drop tag explains itself; Finish workout on the last page
 # opens the finish sheet, which says what isn't ticked; Keep going returns to the page.

@@ -39,7 +39,8 @@ env:
 - assertVisible:
     id: pages-sections
     text: 'Exercise 1 of 1 · All exercises ▾'
-- assertVisible: 'Swap exercise'
+- assertVisible:
+    id: swap-0-0
 # No Finish (or Next) before a set is ticked.
 - assertNotVisible:
     id: page-done
@@ -129,15 +130,18 @@ env:
     id: summary-effort
     text: 'You told .*: Good · “Felt strong today”'
 - assertVisible: 'Your progress'
+- takeScreenshot: summary
 - assertNotVisible:
     id: summary-changes
 - tapOn:
     id: summary-done
 # Today: the card shrinks to a done row.
 - extendedWaitUntil:
-    visible: 'E2E Log done'
+    visible:
+      id: 'today-done-.*'
+      text: 'E2E Log done.*3 of 3 sets.*'
     timeout: 20000
-- assertVisible: '3 of 3 sets.*'
+- takeScreenshot: today-done
 - assertNotVisible: 'Start workout'
 # The feeling and the note were saved with the workout (read back from the server here).
 - runScript:
@@ -154,7 +158,8 @@ env:
     timeout: 20000
 - tapOn:
     id: summary-done
-- assertVisible: 'E2E Log done'
+- assertVisible:
+    id: 'today-done-.*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

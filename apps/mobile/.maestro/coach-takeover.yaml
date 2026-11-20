@@ -35,7 +35,7 @@ env:
     visible:
       id: coach-logging-banner
     timeout: 20000
-- assertVisible: 'Your coach is logging this session'
+- assertVisible: 'Your coach is logging this session.*'
 - assertVisible:
     id: coach-watch-read-only
 - assertNotVisible:

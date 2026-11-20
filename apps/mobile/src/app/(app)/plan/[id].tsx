@@ -268,8 +268,9 @@ function BlockRows({
     const info = supersetPlanInfo(block.exercises);
     return (
       <View testID={`plan-superset-${block.id}`} style={[styles.superset, { borderRadius: radius.card, padding: space[3], gap: space[1] }]}>
-        <View style={[styles.rowTop, { gap: space[2] }]}>
-          <Text style={[text('caption'), styles.overline, styles.flex]}>{info.heading}</Text>
+        {/* Wraps: at large text the rest goes under the heading instead of squeezing it. */}
+        <View style={[styles.rowTop, styles.wrap, { columnGap: space[2] }]}>
+          <Text style={[text('caption'), styles.overline, styles.grow]}>{info.heading}</Text>
           {info.rest ? <Text style={[text('caption'), styles.muted, styles.bold]}>{info.rest}</Text> : null}
         </View>
         {block.exercises.map((e, i) => (
@@ -351,7 +352,9 @@ function ExerciseRow({
     >
       {badge ? (
         <View style={[styles.badge, { borderRadius: radius.input - 2 }]}>
-          <Text style={[text('sectionHeading'), styles.badgeText]}>{badge}</Text>
+          <Text style={[text('sectionHeading'), styles.badgeText]} maxFontSizeMultiplier={1.2}>
+            {badge}
+          </Text>
         </View>
       ) : (
         <ExerciseThumb name={exercise.exerciseName} detail={detail} testID={`plan-thumb-${exercise.id}`} />
@@ -371,6 +374,8 @@ const BADGE = 36;
 const styles = StyleSheet.create({
   rowTop: { flexDirection: 'row', alignItems: 'flex-start' },
   flex: { flex: 1 },
+  grow: { flexGrow: 1 },
+  wrap: { flexWrap: 'wrap' },
   pressed: { opacity: pressedOpacity },
   back: {
     width: tapTarget.min,

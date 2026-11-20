@@ -1,6 +1,6 @@
 # The ‹ › Done bar above the number pad (approved Logger board). Needs the on-screen keypad: in the simulator turn off
 # I/O → Keyboard → Connect Hardware Keyboard. Tapping a box selects its number (typing replaces it), › moves to the
-# next box on the page, Done closes the keypad. On "E2E Log" (Barbell Squat 3 × 8 @ 60 kg, in pounds).
+# next box on the page, Done closes the keypad (iOS 26 shows its own Done; the bar then shows only ‹ ›). On "E2E Log" (Barbell Squat 3 × 8 @ 60 kg, in pounds).
 # Run via `pnpm --filter mobile e2e .maestro/log-keyboard-bar.yaml`.
 appId: app.caltracker.client
 env:
@@ -45,8 +45,13 @@ env:
     id: keyboard-prev
 - assertVisible:
     id: keyboard-bar
+# Done: the bar's own before iOS 26; on iOS 26 the system's Done above the number pad (the bar then has only ‹ ›).
 - tapOn:
     id: keyboard-done
+    optional: true
+- tapOn:
+    text: Done
+    optional: true
 - assertNotVisible:
     id: keyboard-bar
 - tapOn:

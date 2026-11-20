@@ -308,12 +308,17 @@ export function SupersetPage({
           <View key={ex.logExerciseId} style={[styles.exerciseCard, { borderRadius: radius.card, padding: space[3], gap: space[2] }]}>
             <View style={[styles.rowCentre, { gap: space[2.5] }]}>
               <View style={[styles.badge, { borderRadius: radius.input - 2 }]}>
-                <Text style={[text('sectionHeading'), styles.onInk]}>{ex.label}</Text>
+                <Text style={[text('sectionHeading'), styles.onInk]} maxFontSizeMultiplier={BADGE_MAX_SCALE}>
+                  {ex.label}
+                </Text>
               </View>
-              <Text testID={`exercise-name-${idKey}`} style={[text('sectionHeading'), styles.flex]}>
-                {ex.name}
-              </Text>
-              <Text style={[text('caption'), styles.soft]}>{ex.lastLine}</Text>
+              {/* Name, then last time under it (side by side they squeeze each other at large text). */}
+              <View style={styles.flex}>
+                <Text testID={`exercise-name-${idKey}`} style={text('sectionHeading')}>
+                  {ex.name}
+                </Text>
+                <Text style={[text('caption'), styles.soft]}>{ex.lastLine}</Text>
+              </View>
             </View>
             <View style={[styles.rowCentre, { gap: space[3] }]}>
               <ExerciseDemo name={ex.name} detail={details[ex.exerciseId]} testID={`demo-${idKey}`} onPress={() => handlers.onInfo(ex)} />
@@ -414,6 +419,8 @@ export function SupersetPage({
 }
 
 const BADGE = 34;
+/** The A1 badge is a fixed square: its letters stop growing here. */
+const BADGE_MAX_SCALE = 1.2;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

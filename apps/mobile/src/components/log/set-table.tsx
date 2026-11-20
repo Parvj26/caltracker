@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import type { ActualPatch, StepField, Units } from '@caltracker/shared';
+import { ChevronIcon } from '@/components/ui/icons';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { logMaxFontScale } from '@/theme/typography';
@@ -108,6 +109,9 @@ export class FieldNav {
 
 export const FieldNavContext = createContext<FieldNav | null>(null);
 
+/** iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). */
+const SYSTEM_DONE = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
+
 /** Height of the bar above the number pad. */
 export const KEYBOARD_BAR_HEIGHT = 56;
 /** Space kept between a focused box and the bar. */
@@ -167,7 +171,7 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
         accessibilityState={{ disabled: !prev }}
         style={({ pressed }) => [styles.barArrow, !prev && styles.barOff, pressed && styles.pressed]}
       >
-        <Text style={text('screenTitle')}>‹</Text>
+        <ChevronIcon direction="left" size={22} />
       </Pressable>
       <Pressable
         testID="keyboard-next"
@@ -178,9 +182,10 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
         accessibilityState={{ disabled: !next }}
         style={({ pressed }) => [styles.barArrow, !next && styles.barOff, pressed && styles.pressed]}
       >
-        <Text style={text('screenTitle')}>›</Text>
+        <ChevronIcon direction="right" size={22} />
       </Pressable>
       <View style={styles.flex} />
+      {SYSTEM_DONE ? null : (
       <Pressable
         testID="keyboard-done"
         onPress={() => Keyboard.dismiss()}
@@ -190,6 +195,7 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
       >
         <Text style={[text('sectionHeading'), styles.onInk]}>Done</Text>
       </Pressable>
+      )}
     </View>
       ) : null}
     </View>
@@ -219,7 +225,13 @@ export type TableHandlers = {
  * reps, 1:75, too heavy, or a blank on a ticked set) shows as invalid with a short reason, and the saved number
  * comes back when the box is left.
  */
-/** A pre-fill that is a number the box can hold ("60", "1:30"), not words like "max reps". */
+/** What the short word hints in an empty box mean, for screen readers. */
+const WORD_HINTS: Record<string, string> = {
+  max: 'As many reps as you can, to failure.',
+  '+ unit': 'Weight added to your body, optional.',
+};
+
+/** A pre-fill that is a number the box can hold ("60", "1:30"), not a word hint like "max". */
 const NUMERIC = /^[\d.,:]+$/;
 
 function Cell({
@@ -266,7 +278,7 @@ function Cell({
       (done) => input.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
     );
   }, [fields, nav?.page, nav?.order, editable, testID]);
-  /** The greyed suggestion, when it is a number the box can take as its own (not "max reps"). */
+  /** The greyed suggestion, when it is a number the box can take as its own (not "max"). */
   const suggestion = draft === '' && !row.done && NUMERIC.test(cell.placeholder) ? cell.placeholder : null;
   const label = `${who}${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`;
   return (
@@ -282,7 +294,7 @@ function Cell({
         selectTextOnFocus
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
-        accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : undefined)}
+        accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : (WORD_HINTS[cell.placeholder.replace(/kg|lb/, 'unit')] ?? undefined))}
         placeholder={row.done || readOnly ? '' : cell.placeholder || '–'}
         placeholderTextColor={palette.inkMuted}
         onFocus={() => {
@@ -600,7 +612,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   // A ticked set: a light grey row with an ink ✓ (no lime: lime is for creating something new).
   rowDone: { backgroundColor: palette.surface },
-  lastCol: { width: 64, color: palette.inkMuted },
+  lastCol: { width: 80, color: palette.inkMuted },
   flex: { flex: 1 },
   onInk: { color: white },
   rowRecent: { borderWidth: borderWidth.card * 2, borderColor: palette.ink },

@@ -567,9 +567,10 @@ export function setRows(
       cells: fields.map((f) => {
         const base = cellFor(f, set, values, units, eachSide);
         let cell = { ...base, heading: headings.get(f) ?? base.heading };
-        // Nothing to suggest: say what goes in the box ("max reps" on a drop to failure, optional added weight).
-        if (cell.placeholder === '' && f === 'reps' && isDrop && set.target.toFailure) cell = { ...cell, placeholder: 'max reps' };
-        if (cell.placeholder === '' && f === 'weight' && bodyweight) cell = { ...cell, placeholder: `+ ${units} (optional)` };
+        // Nothing to suggest: say what goes in the box ("max" reps on a drop to failure, "+ kg" added weight, which is
+        // optional). Short, so they fit a phone's box; the screen reader hears it in full (set-table.tsx).
+        if (cell.placeholder === '' && f === 'reps' && isDrop && set.target.toFailure) cell = { ...cell, placeholder: 'max' };
+        if (cell.placeholder === '' && f === 'weight' && bodyweight) cell = { ...cell, placeholder: `+ ${units}` };
         return set.completedAt === null ? cell : { ...cell, placeholder: '' };
       }),
       values,
@@ -589,7 +590,7 @@ export function deleteChoices(ex: LogExerciseDoc, units: Units, lastSets: readon
     .filter((r) => r.deletable)
     .map((r) => {
       const parts = r.cells.flatMap((c) => {
-        // Only a number: a word hint ("max reps", "+ kg (optional)") is not a value.
+        // Only a number: a word hint ("max", "+ kg") is not a value.
         const v = c.value || (/^[\d.,:]+$/.test(c.placeholder) ? c.placeholder : '');
         if (!v) return [];
         return [c.field === 'duration' ? v : `${v} ${c.unit}`];

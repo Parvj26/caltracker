@@ -275,12 +275,14 @@ export function FoodCard({ refreshKey }: { refreshKey: number }) {
   }, [loadDay, today, refreshKey]);
   const meals = food?.mealsOn(today);
   const line = useMemo(() => (meals ? foodLine(meals, food?.targets ?? null) : null), [meals, food?.targets]);
+  const stacked = useStacked();
   if (!line) return null;
 
   return (
     <View testID="today-food" style={[styles.quiet, { borderRadius: 18, paddingHorizontal: space[4], paddingVertical: space[3.5], gap: 6 }]}>
-      <View style={[styles.row, { gap: space[2] }]}>
-        <Text style={[text('sectionHeading'), styles.cardTitle, styles.flex]} accessibilityRole="header">
+      {/* Large text: the title and + Add meal stack, so neither is squeezed. */}
+      <View style={[stacked ? styles.foodStack : styles.row, { gap: space[2] }]}>
+        <Text style={[text('sectionHeading'), styles.cardTitle, !stacked && styles.flex]} accessibilityRole="header">
           Food today
         </Text>
         <Pressable
@@ -527,6 +529,7 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 30 },
   restTitle: { fontSize: 18 },
   restCard: { backgroundColor: palette.surface },
+  foodStack: { flexDirection: 'column', alignItems: 'flex-start' },
   wrap: { flexWrap: 'wrap' },
   bold: { fontFamily: fontFamilyFor('sans', 700) },
   heavy: { fontFamily: fontFamilyFor('sans', 800) },

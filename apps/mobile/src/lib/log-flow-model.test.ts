@@ -311,13 +311,13 @@ describe('set rows', () => {
     expect(rows.map((r) => r.indented)).toEqual([false, false, true, false]);
   });
 
-  it('columns follow the tracking type; warm-up W, every drop "↓ Drop" (to failure: "max reps")', () => {
+  it('columns follow the tracking type; warm-up W, every drop "↓ Drop" (to failure: "max")', () => {
     const log = mockLog();
     const push = log.blocks[2].exercises[0];
     const rows = setRows(push, 'lb', []);
     expect(rows.map((r) => r.tag)).toEqual(['W', '1', '↓ Drop', '↓ Drop']);
     expect(rows.map((r) => r.tagKind)).toEqual(['warmup', 'normal', 'drop', 'drop']);
-    expect(rows[3].cells[1].placeholder).toBe('max reps');
+    expect(rows[3].cells[1].placeholder).toBe('max');
     expect(rows[3].cells[0].placeholder).toBe('15');
     expect(rows.map((r) => r.name)).toEqual(['Warm-up 1', 'Set 1', 'Drop set', 'Drop set to failure']);
     expect(rows.map((r) => r.indented)).toEqual([false, false, true, true]);
@@ -877,6 +877,6 @@ describe('the redesigned logger (approved Logger board)', () => {
       blocks: [{ id: uuid(), kind: 'straight', exercises: [exercise('Pull Up', [set('normal', { targetWeightKg: null, targetRepsMin: 8, targetRepsMax: 8 })])] }],
     });
     const log = startLogFromWorkout(doc, uuid, NOW);
-    expect(setRows(log.blocks[0].exercises[0], 'kg', [])[0].cells.map((c) => c.placeholder)).toEqual(['+ kg (optional)', '8']);
+    expect(setRows(log.blocks[0].exercises[0], 'kg', [])[0].cells.map((c) => c.placeholder)).toEqual(['+ kg', '8']);
   });
 });
