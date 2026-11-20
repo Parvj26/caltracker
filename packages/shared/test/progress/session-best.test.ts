@@ -17,7 +17,7 @@ function logWith(sets: Array<[number, number]>): WorkoutLogDoc {
 }
 
 const point = (date: string, kg: number, reps: number, logId: string): StrengthPoint => ({
-  date: date as StrengthPoint['date'],
+  date,
   e1rmKg: 0,
   bestSet: { weightKg: kg, reps },
   heaviestSet: { weightKg: kg, reps },
@@ -39,8 +39,10 @@ describe('compareWithLast', () => {
 
 describe('sessionBestRows', () => {
   it('gives the heaviest set, first time and no tag with no history', () => {
-    const rows = sessionBestRows(logWith([[50, 10], [60, 8]]), new Map(), 'kg');
-    expect(rows).toEqual([{ exerciseId: expect.any(String), name: 'Bench press', best: '60 kg × 8', compare: { text: 'First time', tone: 'first' }, heaviestYet: false }]);
+    const log = logWith([[50, 10], [60, 8]]);
+    const rows = sessionBestRows(log, new Map(), 'kg');
+    const exerciseId = log.blocks[0]!.exercises[0]!.exerciseId;
+    expect(rows).toEqual([{ exerciseId, name: 'Bench press', best: '60 kg × 8', compare: { text: 'First time', tone: 'first' }, heaviestYet: false }]);
   });
   it('compares with the workout before and tags the heaviest yet (ignoring this log in the saved series)', () => {
     const log = logWith([[60, 8]]);
