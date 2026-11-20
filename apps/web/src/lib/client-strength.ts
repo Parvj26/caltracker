@@ -14,6 +14,15 @@ export function buildStrength(logs: readonly WorkoutLogDoc[], timeZone: string):
 
 /** The client's estimated-1RM series for every lift they have done, read through the coach's own session. */
 export async function loadClientStrength(supabase: SupabaseClient<Database>, workspaceId: string, clientId: string): Promise<ClientStrength> {
+  return (await loadClientStrengthIn(supabase, workspaceId, clientId)).exercises;
+}
+
+/** The same series and the client's time zone (Metrics' Strength: "today" and workout days are the client's own). */
+export async function loadClientStrengthIn(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  clientId: string,
+): Promise<{ exercises: ClientStrength; timeZone: string }> {
   const [{ data, error }, profile] = await Promise.all([
     supabase
     .from('workout_logs')
@@ -31,5 +40,5 @@ export async function loadClientStrength(supabase: SupabaseClient<Database>, wor
   const timeZone = safeTimeZone(profile.data?.time_zone);
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
   const logs = (data as unknown as LogTreeRow[]).map(logRowToDoc);
-  return buildStrength(logs, timeZone);
+  return { exercises: buildStrength(logs, timeZone), timeZone };
 }

@@ -10,3 +10,8 @@
 .pointActive { fill: var(--ct-lime); stroke: var(--ct-ink); stroke-width: 3; }
 .readout { margin: 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); font-variant-numeric: tabular-nums; }
 .summary { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.line2 { fill: none; stroke: var(--ct-magenta); stroke-width: 2; stroke-dasharray: 6 5; stroke-linecap: round; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--ct-space-1) var(--ct-space-4); margin: 0; padding: 0; list-style: none; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.legend li { display: inline-flex; align-items: center; gap: var(--ct-space-2); }
+.swatch { display: inline-block; width: 16px; height: 3px; background: var(--ct-ink); }
+.swatch2 { display: inline-block; width: 16px; border-top: 2px dashed var(--ct-magenta); }

@@ -20,6 +20,12 @@ type Props = {
   /** Labels for the lowest and highest value and for the first and last point, drawn on the axes. */
   yLabel: (y: number) => string;
   xLabel: (x: number) => string;
+  /**
+   * An optional second line, drawn dashed in blue, one value per point (null: no value there). With it a legend names
+   * both lines (`name` for the main one, `secondary.name` for this one).
+   */
+  secondary?: { name: string; values: readonly (number | null)[] } | undefined;
+  name?: string | undefined;
 };
 
 const W = 640;
@@ -30,7 +36,7 @@ const PAD = { top: 16, right: 20, bottom: 36, left: 64 };
  * A small dependency-free line chart drawn as SVG with the design tokens. It is one tab stop: arrow keys move
  * between points (Home and End jump to the ends) and the chosen point is read out below the chart.
  */
-export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
+export function LineChart({ points, title, summary, yLabel, xLabel, secondary, name }: Props) {
   const id = useId();
   const [active, setActive] = useState(points.length - 1);
   const last = points.length - 1;
@@ -38,7 +44,8 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
   if (points.length === 0) return <p className={styles.summary}>{summary}</p>;
 
   const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
+  const extra = (secondary?.values ?? []).filter((v): v is number => v !== null);
+  const ys = [...points.map((p) => p.y), ...extra];
   const [xMin, xMax] = [Math.min(...xs), Math.max(...xs)];
   // Pad the value range so a flat line sits mid-chart and the line never touches the edges.
   const rawMin = Math.min(...ys);
@@ -49,6 +56,23 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
   const px = (x: number) => (xMax === xMin ? (PAD.left + W - PAD.right) / 2 : PAD.left + ((x - xMin) / (xMax - xMin)) * (W - PAD.left - PAD.right));
   const py = (y: number) => PAD.top + (1 - (y - yMin) / (yMax - yMin)) * (H - PAD.top - PAD.bottom);
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${px(p.x).toFixed(1)},${py(p.y).toFixed(1)}`).join(' ');
+  // The second line skips points without a value (it restarts after a gap).
+  let gap = true;
+  const path2 = secondary
+    ? points
+        .map((p, i) => {
+          const v = secondary.values[i];
+          if (v === null || v === undefined) {
+            gap = true;
+            return '';
+          }
+          const seg = `${gap ? 'M' : 'L'}${px(p.x).toFixed(1)},${py(v).toFixed(1)}`;
+          gap = false;
+          return seg;
+        })
+        .filter(Boolean)
+        .join(' ')
+    : '';
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const next =
@@ -85,6 +109,7 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
           ) : null}
           <text x={px(xMin)} y={H - 12} className={styles.tick} textAnchor={xMax === xMin ? 'middle' : 'start'}>{xLabel(xMin)}</text>
           {xMax !== xMin ? <text x={px(xMax)} y={H - 12} className={styles.tick} textAnchor="end">{xLabel(xMax)}</text> : null}
+          {path2 ? <path d={path2} className={styles.line2} data-testid="chart-line-secondary" /> : null}
           <path d={path} className={styles.line} />
           {points.map((p, i) => (
             <circle
@@ -98,6 +123,12 @@ export function LineChart({ points, title, summary, yLabel, xLabel }: Props) {
           ))}
         </svg>
       </div>
+      {secondary ? (
+        <ul className={styles.legend} aria-hidden="true">
+          <li><span className={styles.swatch} />{name ?? title}</li>
+          <li><span className={styles.swatch2} />{secondary.name}</li>
+        </ul>
+      ) : null}
       <p id={`${id}-readout`} className={styles.readout} aria-live="polite" data-testid="chart-readout">{shown.label}</p>
       <p className={styles.summary}>{summary}</p>
     </div>
