@@ -18,7 +18,6 @@ import type { ActualPatch, StepField, Units } from '@caltracker/shared';
 import { ChevronIcon } from '@/components/ui/icons';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { numberBoxWidth, unitsInside } from '@/lib/unit-fit';
-import { systemDoneRow } from '@/lib/keyboard-bar';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
@@ -46,7 +45,7 @@ const MAX_FONT_SCALE = logMaxFontScale(1.4);
 type Measure = (done: (top: number, height: number) => void) => void;
 
 export class FieldNav {
-  private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure; pad: boolean }>();
+  private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure }>();
   /** A box asked for before it exists (a drop set just added): focused as soon as it registers. */
   private pending: string | null = null;
   private scrollers = new Map<number, (dy: number) => void>();
@@ -54,12 +53,9 @@ export class FieldNav {
   private listeners = new Set<() => void>();
   /** Where the keyboard's top is in the window while it is up (the bar sits just above it), else null. */
   private keyboardTop: number | null = null;
-  /** The keyboard frame's height (0 while it is down). */
-  private keyboardHeight = 0;
 
-  /** `pad`: the box opens a number pad (no return key), so iOS 26 adds its own Done row above it. */
-  register(key: string, page: number, order: number, focus: () => void, measure: Measure, alias?: string, pad = true): () => void {
-    this.fields.set(key, { page, order, focus, measure, pad });
+  register(key: string, page: number, order: number, focus: () => void, measure: Measure, alias?: string): () => void {
+    this.fields.set(key, { page, order, focus, measure });
     if (alias !== undefined && alias === this.pending) {
       this.pending = null;
       // After the menu sheet has gone, or iOS won't raise the keyboard.
@@ -80,17 +76,11 @@ export class FieldNav {
       if (this.scrollers.get(page) === scrollBy) this.scrollers.delete(page);
     };
   }
-  keyboardAt(top: number | null, height = 0): void {
+  keyboardAt(top: number | null): void {
     this.keyboardTop = top;
-    this.keyboardHeight = top === null ? 0 : height;
-    this.listeners.forEach((l) => l());
     this.reveal();
   }
-  /** How far the bar sits down into the keyboard's frame: iOS 26's Done row, when there is one (systemDoneRow). */
-  doneRow(): number {
-    const field = this.current ? this.fields.get(this.current) : undefined;
-    return systemDoneRow({ ios26: SYSTEM_DONE, isPad: Platform.OS === 'ios' && Platform.isPad, keyboardHeight: this.keyboardHeight, numberPad: field?.pad ?? false });
-  }
+
   focused(key: string | null): void {
     if (this.current === key) return;
     this.current = key;
@@ -108,8 +98,7 @@ export class FieldNav {
     if (!field || top === null) return;
     setTimeout(() => {
       field.measure((y, h) => {
-        // The bar's top: the keyboard's top, moved down onto iOS 26's Done row when there is one.
-        const limit = top + this.doneRow() - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
+        const limit = top - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
         if (this.current === key && y + h > limit) this.scrollers.get(field.page)?.(y + h - limit);
       });
     }, REVEAL_AFTER_MS);
@@ -125,8 +114,6 @@ export class FieldNav {
     const i = same.findIndex((f) => f.order === here.order);
     return same[i + delta]?.focus ?? null;
   }
-  /** What the bar redraws on: the focused box, and the keyboard's frame. */
-  snapshotBar = () => `${this.current ?? ''}|${this.keyboardHeight}`;
   subscribe = (l: () => void) => {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
@@ -136,7 +123,11 @@ export class FieldNav {
 
 export const FieldNavContext = createContext<FieldNav | null>(null);
 
-/** iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). */
+/**
+ * iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). The bar stays above
+ * that Done row, not in it: the row belongs to the keyboard's window, so taps on ‹ › drawn there never reach the app
+ * (log-keyboard-bar.yaml, iOS 26 simulator, 2026-11-20).
+ */
 const SYSTEM_DONE = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
 
 
@@ -169,13 +160,12 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
   const layer = useRef<ComponentRef<typeof View>>(null);
   const [layerBottom, setLayerBottom] = useState<number | null>(null);
   const current = useSyncExternalStore(nav.subscribe, nav.snapshot);
-  useSyncExternalStore(nav.subscribe, nav.snapshotBar);
-  const doneRow = nav.doneRow();
+
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
       setKeyboardTop(e.endCoordinates.screenY);
-      nav.keyboardAt(e.endCoordinates.screenY, e.endCoordinates.height);
+      nav.keyboardAt(e.endCoordinates.screenY);
     });
     const hide = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardTop(null);
@@ -194,7 +184,7 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
   return (
     <View ref={layer} onLayout={measure} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {show && layerBottom !== null && keyboardTop !== null ? (
-    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop - doneRow, paddingHorizontal: space[2.5] }]}>
+    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop, paddingHorizontal: space[2.5] }]}>
       <Pressable
         testID="keyboard-prev"
         onPress={() => prev?.()}
@@ -330,7 +320,6 @@ function Cell({
       // The whole box with its unit or reason under it (large text), so all of it clears the bar.
       (done) => (box.current ?? input.current)?.measureInWindow((_x, y, _w, h) => done(y, h)),
       `${row.setId}:${cell.field}`,
-      KEYBOARD[cell.field] !== 'numbers-and-punctuation',
     );
   }, [fields, nav?.page, nav?.order, editable, testID, row.setId, cell.field]);
   /** The greyed suggestion, when it is a number the box can take as its own (not "max"). */
