@@ -24,6 +24,7 @@ select is(
     'admin_users(created_by)>auth.users:n', 'admin_users(user_id)>auth.users:c',
     'award_bonus_queue(client_id)>auth.users:c', 'awards(client_id)>auth.users:c',
     'body_measurements(client_id)>auth.users:c', 'body_measurements(entered_by)>auth.users:n',
+    'body_metrics(client_id)>auth.users:c', 'body_metrics(entered_by)>auth.users:n',
     'client_documents(client_id)>auth.users:c', 'client_documents(uploaded_by)>auth.users:n',
     'client_goals(client_id)>auth.users:c',
     'client_invites(accepted_by)>auth.users:c', 'client_invites(created_by)>auth.users:n',
@@ -170,6 +171,10 @@ insert into public.body_measurements (workspace_id, client_id, measured_on, ente
 values (:'ws', :'vic', current_date, :'coach', 'coach', :'ws' || '/' || :'vic' || '/' || :'scan_file' || '.pdf')
 returning id as scan \gset
 insert into public.body_measurement_values (measurement_id, metric_key, value) values (:'scan', 'weight_kg', 80);
+insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on, source, entered_by_role, entered_by, external_id)
+values (:'ws', :'vic', 'vo2_max', 40, current_date, 'manual', 'coach', :'coach', null),
+       (:'ws', :'vic', 'waist_cm', 80, current_date, 'manual', 'client', :'vic', null),
+       (:'ws', :'vic', 'weight_kg', 80, current_date, 'apple_health', 'client', :'vic', 'hk-vic-1');
 select gen_random_uuid() as doc_file \gset
 insert into public.client_documents (workspace_id, client_id, name, storage_path, content_type, size_bytes, uploaded_by)
 values (:'ws', :'vic', 'InBody', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf', 'application/pdf', 100, :'coach');
