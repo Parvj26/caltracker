@@ -1,0 +1,22 @@
+# In the Health app (open on Browse), deletes every weight sample, if there are any. The confirm sheets are drawn
+# outside the app, so some taps use screen points (iPhone 18 Pro).
+appId: com.apple.Health
+---
+- tapOn: 'Browse'
+- tapOn: 'Body Measurements'
+- tapOn: 'Weight'
+- scrollUntilVisible:
+    element: 'Show All Data'
+- tapOn: 'Show All Data'
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: 'No Data'
+    commands:
+      - tapOn: 'Edit'
+      - tapOn: 'Delete All'
+      - waitForAnimationToEnd
+      # "Are you sure…?" › Delete All
+      - tapOn:
+          point: 32%,28%
+      - waitForAnimationToEnd

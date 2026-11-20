@@ -19,7 +19,7 @@
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts assert-read client@demo.local   fails unless the client has read the chat
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-messages client@demo.local   delete the demo client's chat
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-scans client@demo.local   two coach scans (weight 82 kg, 80 kg) and a goal
-//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans and goal
+//   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-scans client@demo.local   delete the demo client's scans, Metrics entries and goal
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-food-targets client@demo.local   targets 2,000 kcal and 150 g protein
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts cleanup-food client@demo.local   delete the demo client's meals and targets
 //   pnpm --filter mobile exec tsx scripts/e2e-helper.ts seed-coach-meals client@demo.local   the seed coach shares "Protein oats" (450 kcal, 35/52/11 g)
@@ -672,6 +672,9 @@ export async function cleanupScans(email: string): Promise<void> {
   if (!id) throw new Error(`Seed client ${DEMO_CLIENT} not found (run pnpm db:reset).`);
   const { error } = await admin.from('body_measurements').delete().eq('client_id', id);
   if (error) throw error;
+  // Metrics entries (logged in the app or imported from Apple Health).
+  const metrics = await admin.from('body_metrics').delete().eq('client_id', id);
+  if (metrics.error) throw metrics.error;
   const goal = await admin.from('client_goals').delete().eq('client_id', id);
   if (goal.error) throw goal.error;
 }

@@ -1,0 +1,37 @@
+# Opens the Health app, stepping through its welcome screens on first launch, and leaves it on Browse.
+appId: com.apple.Health
+---
+- launchApp:
+    appId: com.apple.Health
+    stopApp: true
+- repeat:
+    times: 12
+    while:
+      notVisible: 'Browse'
+    commands:
+      - runFlow:
+          when:
+            visible: 'Continue'
+          commands:
+            - tapOn: 'Continue'
+      - runFlow:
+          when:
+            visible: 'Next'
+          commands:
+            - tapOn: 'Next'
+      - runFlow:
+          when:
+            visible: 'Not Now'
+          commands:
+            - tapOn: 'Not Now'
+      - runFlow:
+          when:
+            visible: 'Set Up Later'
+          commands:
+            - tapOn: 'Set Up Later'
+      - runFlow:
+          when:
+            visible: 'Skip'
+          commands:
+            - tapOn: 'Skip'
+      - waitForAnimationToEnd

@@ -1,7 +1,6 @@
-# Progress tab: the coach's goal shows with its countdown on the overview; the Body tile opens Body, where the latest
-# weight, body fat and muscle from the coach's two seeded scans show in lb (the demo client's units), with the 3-month
-# change; the scans make the weight trend and a Body fat chart; the client logs a weight, it shows in the history;
-# deleting it again removes it.
+# Progress tab: the coach's goal shows with its countdown on the overview; the Metrics tile opens Metrics, where the
+# latest weight, body fat and muscle from the coach's two seeded scans show in lb (the demo client's units), with the
+# 3-month change. Logging, changing and deleting a metric: metrics-log.yaml.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -33,82 +32,45 @@ env:
 - assertVisible:
     id: progress-week
 - takeScreenshot: progress-overview
-# The Body tile opens Body: latest numbers in lb: 80 kg = 176.4 lb (−4.4 lb from 82 kg), 19% body fat, 36 kg = 79.4 lb
-# of muscle.
+# The Metrics tile shows the latest weight and its 3-month change, and opens Metrics: latest numbers in lb (80 kg =
+# 176.4 lb, −4.4 lb from 82 kg; 19% body fat; 36 kg = 79.4 lb of muscle), each from the coach's InBody scan.
+- assertVisible:
+    id: progress-metrics
+    text: 'Metrics: 176.4 lb, −4.4 lb in 3 months'
 - tapOn:
-    id: progress-body
+    id: progress-metrics
 - extendedWaitUntil:
     visible:
-      id: latest-weight_kg
+      id: metric-value-weight_kg
     timeout: 20000
 - assertVisible:
-    id: latest-weight_kg
-    text: 'Weight: 176.4 lb, −4.4 lb'
+    id: metric-value-weight_kg
+    text: '176.4'
 - assertVisible:
-    id: latest-body_fat_pct
-    text: 'Body fat: 19.0%.*'
+    id: metric-change-weight_kg
+    text: '−4.4 lb'
 - assertVisible:
-    id: latest-smm_kg
-    text: 'Muscle: 79.4 lb.*'
-# The weight trend, and the body fat chart under it.
+    id: metric-meta-weight_kg
+    text: '.* · InBody scan'
 - assertVisible:
-    id: chart-weight_kg
-- scrollUntilVisible:
-    element:
-      id: chart-body_fat_pct
-- takeScreenshot: progress-body
-# Log a weight: it appears in the history as "Logged by you".
-- scrollUntilVisible:
-    element:
-      id: log-weight-open
-    direction: UP
-- tapOn:
-    id: log-weight-open
-- tapOn:
-    id: weight-input
-- inputText: '175.5'
-- hideKeyboard
-- tapOn:
-    id: weight-save
-- scrollUntilVisible:
-    element:
-      text: 'Logged by you'
-    timeout: 20000
-- assertVisible: '.*175.5 lb.*'
-- takeScreenshot: progress-logged
-# Step the date back a day, then forward again (it stops at today).
-- scrollUntilVisible:
-    element:
-      id: log-weight-open
-    direction: UP
-- tapOn:
-    id: log-weight-open
-- tapOn:
-    id: date-prev
-- tapOn:
-    id: date-next
-# The date reads "Date <day>, today" to VoiceOver (the screen shows "Today, <day>").
-- assertVisible: 'Date .*, today'
-# A weight that is out of range is refused in plain words.
-- tapOn:
-    id: weight-input
-- inputText: '5'
-- hideKeyboard
-- tapOn:
-    id: weight-save
+    id: metric-value-body_fat_pct
+    text: '19.0'
 - assertVisible:
-    id: weight-error
-- tapOn:
-    id: weight-cancel
-# Delete the entry again.
+    id: metric-value-smm_kg
+    text: '79.4'
+- assertVisible:
+    id: metric-meta-vo2_max
+    text: 'Not logged yet'
 - scrollUntilVisible:
     element:
-      text: 'Logged by you'
-- tapOn:
-    id: 'delete-.*'
-- tapOn: 'Delete entry'
+      id: last-scan
+- assertVisible: 'Latest InBody scan'
+- takeScreenshot: progress-metrics
+# The old Body address still opens Metrics.
+- openLink: caltracker://progress-detail/body
 - extendedWaitUntil:
-    notVisible: 'Logged by you'
+    visible:
+      id: metric-value-weight_kg
     timeout: 20000
 # Tidy up.
 - runScript:
