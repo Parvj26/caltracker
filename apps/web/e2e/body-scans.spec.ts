@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { serviceClient, signInAsCoach } from './helpers';
 
-// Body scans on the client page, and the coach home's Needs attention "Scan due" rows. Every test seeds its own uniquely
+// InBody scans on the client's Metrics tab, and the coach home's Needs attention "Scan due" rows. Every test seeds its own uniquely
 // named client in the demo workspace and only looks at its own rows, so tests can run side by side.
 const admin = serviceClient();
 const unique = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -63,7 +63,7 @@ const pdf = (bytes = 600) => Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.al
 
 async function openForm(page: Page, clientId: string) {
   await signInAsCoach(page);
-  await page.goto(`/clients/${clientId}/body`);
+  await page.goto(`/clients/${clientId}/metrics`);
   await page.getByRole('button', { name: 'Add scan' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a scan' });
   await expect(dialog).toBeVisible();
@@ -72,7 +72,7 @@ async function openForm(page: Page, clientId: string) {
 
 const history = (page: Page) => page.getByRole('table', { name: /Scan history/ });
 
-test('adding a scan with values and a PDF shows it in the history and on the chart', async ({ page }) => {
+test('adding a scan with values and a PDF shows it in the history and on the Body card', async ({ page }) => {
   const c = await newClient();
   await seedScan(c.id, 20, { body_fat_pct: 22 });
   const dialog = await openForm(page, c.id);
@@ -90,12 +90,13 @@ test('adding a scan with values and a PDF shows it in the history and on the cha
   const file = await page.request.get((await link.getAttribute('href'))!);
   expect(file.status()).toBe(200);
 
-  const chart = page.getByRole('group', { name: 'Body fat chart' });
-  await expect(chart).toBeVisible();
-  await expect(chart.locator('circle')).toHaveCount(2);
-  await expect(page.getByRole('list', { name: 'Charts' }).getByText('−1.5 since')).toBeVisible();
-  // Only BMI has a single value: no chart for it.
-  await expect(page.getByRole('group', { name: 'BMI chart' })).toHaveCount(0);
+  // The Body card shows the scan's value and the change; the metric's page links the printout.
+  const card = page.getByRole('list', { name: 'Body metrics' }).getByRole('link', { name: /^Body fat\s+20\.5\s*%\s+−1\.5% over 1 year\s+Today · InBody scan$/ });
+  await expect(card).toBeVisible();
+  await card.click();
+  await expect(page.getByTestId('line-chart')).toBeVisible();
+  await expect(page.getByTestId('chart-point')).toHaveCount(2);
+  await expect(page.getByRole('link', { name: /^View printout of the .+ scan$/ })).toHaveCount(1);
 
   const stored = await admin.from('body_measurements').select('attachment_path').eq('client_id', c.id).not('attachment_path', 'is', null).single();
   if (stored.error) throw stored.error;
@@ -103,20 +104,19 @@ test('adding a scan with values and a PDF shows it in the history and on the cha
   expect(stored.data.attachment_path).toMatch(new RegExp(`^${workspaceId}/${c.id}/[0-9a-f-]{36}\\.pdf$`));
 });
 
-test('a client with one scan shows a note instead of a chart', async ({ page }) => {
+test('a client with one scan shows its value without a change', async ({ page }) => {
   const c = await newClient();
   await seedScan(c.id, 3, { body_fat_pct: 22 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}/body`);
-  await expect(page.getByText('Add another scan to see a trend.')).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Body fat chart' })).toHaveCount(0);
+  await page.goto(`/clients/${c.id}/metrics`);
+  await expect(page.getByRole('list', { name: 'Body metrics' }).getByRole('link', { name: /^Body fat\s+22\.0\s*%\s+.+ · InBody scan$/ })).toBeVisible();
 });
 
 test('editing a scan changes its values, and the date can not be in the future', async ({ page }) => {
   const c = await newClient();
   await seedScan(c.id, 5, { body_fat_pct: 22 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}/body`);
+  await page.goto(`/clients/${c.id}/metrics`);
   await page.getByRole('button', { name: /^Edit scan of/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit scan' });
   await expect(dialog.getByLabel('Body fat (%)', { exact: true })).toHaveValue('22');
@@ -141,7 +141,7 @@ test('deleting a scan asks first, removes its row and its printout file', async 
   if (up.error) throw up.error;
   await seedScan(c.id, 5, { body_fat_pct: 22 }, { attachmentPath: path });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}/body`);
+  await page.goto(`/clients/${c.id}/metrics`);
   await page.getByRole('button', { name: /^Delete scan of/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete this scan?' });
   await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -213,7 +213,7 @@ test('a client-entered weight can be deleted but not edited: Add a new scan inst
   const c = await newClient();
   await seedScan(c.id, 2, { weight_kg: 80 }, { source: 'client' });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}/body`);
+  await page.goto(`/clients/${c.id}/metrics`);
   const row = history(page).getByRole('row').filter({ hasText: 'Logged by client' });
   await expect(row).toBeVisible();
   await expect(row.getByRole('button', { name: /^Edit scan of/ })).toHaveCount(0);
@@ -262,7 +262,7 @@ test('a save whose answer never arrives keeps the uploaded printout (it may have
   await dialog.getByLabel('Body fat (%)', { exact: true }).fill('20');
   await dialog.getByLabel(/^Printout/).setInputFiles({ name: 'inbody.pdf', mimeType: 'application/pdf', buffer: pdf() });
   // The browser loses the connection when it sends the save (the server action call).
-  await page.route(`**/clients/${c.id}/body*`, (route) => (route.request().headers()['next-action'] ? route.abort() : route.continue()));
+  await page.route(`**/clients/${c.id}/metrics*`, (route) => (route.request().headers()['next-action'] ? route.abort() : route.continue()));
   await dialog.getByRole('button', { name: 'Save scan' }).click();
   await expect(dialog.getByRole('alert')).toContainText("Couldn't save the scan");
   await expect.poll(async () => (await admin.storage.from('scan-attachments').list(`${workspaceId}/${c.id}`)).data?.length).toBe(1);
@@ -273,21 +273,23 @@ test('a save whose answer never arrives keeps the uploaded printout (it may have
   created.files.push(`${workspaceId}/${c.id}/${left.data![0]!.name}`);
 });
 
-test('scans only outside the chosen range say so and Show all brings the chart back', async ({ page }) => {
+test('older scans count once the range is All, and the metric chart is keyboard-reachable', async ({ page }) => {
   const c = await newClient();
   await seedScan(c.id, 400, { body_fat_pct: 24 });
   await seedScan(c.id, 380, { body_fat_pct: 23 });
   await seedScan(c.id, 3, { body_fat_pct: 21 });
   await signInAsCoach(page);
-  await page.goto(`/clients/${c.id}/body`);
-  await expect(page.getByRole('group', { name: /^Body fat chart/ })).toHaveCount(0);
-  await expect(page.getByText('Not enough scans in this range for a chart.')).toBeVisible();
-  await page.getByRole('button', { name: 'Show all' }).click();
-  const chart = page.getByRole('group', { name: /^Body fat chart/ });
-  await expect(chart).toBeVisible();
+  await page.goto(`/clients/${c.id}/metrics`);
+  const cards = page.getByRole('list', { name: 'Body metrics' });
+  await expect(cards.getByRole('link', { name: /^Body fat\s+21\.0\s*%\s/ })).toBeVisible();
+  await page.getByRole('list', { name: 'Range' }).getByRole('button', { name: 'All' }).click();
+  await expect(page).toHaveURL(/[?&]range=all/);
+  await cards.getByRole('link', { name: /^Body fat\s+21\.0\s*%\s+−3\.0% over all time\s/ }).click();
+  const chart = page.getByTestId('line-chart');
+  await expect(page.getByTestId('chart-point')).toHaveCount(3);
   // One tab stop; the arrow keys move between the three points.
   await chart.focus();
-  const read = page.locator('[class*="chartRead"]');
+  const read = page.getByTestId('chart-readout');
   const before = await read.innerText();
   await chart.press('ArrowLeft');
   await expect(read).not.toHaveText(before);
@@ -302,7 +304,7 @@ test.describe('scan history on a phone', () => {
     await seedScan(c.id, 12, { weight_kg: 70, body_fat_pct: 27 }, { source: 'client' });
     await seedScan(c.id, 5, { weight_kg: 69.4, body_fat_pct: 26.2, smm_kg: 27.9, visceral_fat: 6 });
     await signInAsCoach(page);
-    await page.goto(`/clients/${c.id}/body`);
+    await page.goto(`/clients/${c.id}/metrics`);
 
     // No table on a phone: a list of cards, newest first.
     expect(page.viewportSize()!.width).toBeLessThan(600);
@@ -361,7 +363,7 @@ test.describe('scan history on a phone', () => {
     await seedScan(c.id, 3, { weight_kg: 71 });
     await page.setViewportSize({ width: 820, height: 1180 });
     await signInAsCoach(page);
-    await page.goto(`/clients/${c.id}/body`);
+    await page.goto(`/clients/${c.id}/metrics`);
     await expect(history(page)).toBeVisible();
     await expect(page.getByRole('list', { name: 'Scan history, newest first' })).toBeHidden();
   });

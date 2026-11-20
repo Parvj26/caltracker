@@ -22,8 +22,9 @@ const CLIENT = '/clients/00000000-0000-4000-8000-0000000000c2';
 type AuditPage = { name: string; path: string };
 // `communityPost`: a coach post with a comment and a reaction, so Community's reaction chips and comment controls are
 // checked too (an empty feed would hide them).
+// `bodyMetrics`: two weight entries the coach logged, so the Body cards and a metric's page have a trend.
 // `strengthLog`: two finished squat workouts for the demo client, so Metrics' Strength rows and the exercise page show.
-type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; signedOut?: AuditPage[] };
+type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; bodyMetrics?: true; signedOut?: AuditPage[] };
 
 const GROUPS: Group[] = [
   {
@@ -42,7 +43,7 @@ const GROUPS: Group[] = [
     pages: [
       { name: 'Client overview', path: CLIENT },
       { name: 'Client training', path: `${CLIENT}/training` },
-      { name: 'Client body', path: `${CLIENT}/body` },
+      { name: 'Client metrics', path: `${CLIENT}/metrics` },
       { name: 'Client food', path: `${CLIENT}/food` },
       { name: 'Client documents', path: `${CLIENT}/documents` },
       { name: 'Client settings', path: `${CLIENT}/settings` },
@@ -51,8 +52,10 @@ const GROUPS: Group[] = [
   {
     name: 'client metrics',
     strengthLog: true,
+    bodyMetrics: true,
     pages: [
-      { name: 'Client body', path: `${CLIENT}/body` },
+      { name: 'Client metrics', path: `${CLIENT}/metrics` },
+      { name: 'Body metric', path: `${CLIENT}/metrics/body/weight_kg` },
       { name: 'Exercise progress', path: `${CLIENT}/metrics/strength/:squat` },
     ],
   },
@@ -303,6 +306,17 @@ for (const { size, use } of SIZES) {
             const logId = await seedLog(admin, { workspaceId: ws, clientId, name: `UI audit ${unique()}`, startedAt: day(ago), sets: 2, weightKg });
             cleanup.push(() => admin.from('workout_logs').delete().eq('id', logId));
           }
+        }
+        if (group.bodyMetrics) {
+          const ws = await demoWorkspace(admin);
+          const clientId = CLIENT.split('/').at(-1)!;
+          const isoDay = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+          const rows = await admin
+            .from('body_metrics')
+            .insert([30, 2].map((ago, i) => ({ workspace_id: ws, client_id: clientId, metric_key: 'weight_kg', value: 72 - i, measured_on: isoDay(ago), source: 'manual', entered_by_role: 'coach' })))
+            .select('id');
+          if (rows.error) throw rows.error;
+          for (const r of rows.data) cleanup.push(() => admin.from('body_metrics').delete().eq('id', r.id));
         }
         if (group.communityPost) {
           const ws = await demoWorkspace(admin);

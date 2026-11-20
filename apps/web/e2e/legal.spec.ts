@@ -25,7 +25,7 @@ for (const [path, heading, other] of [
 test('the privacy policy has the short version and every section', async ({ page }) => {
   await page.goto('/privacy');
   await expect(page.getByText('The short version')).toBeVisible();
-  for (const h of ['Who we are', 'What we collect', 'Who can see it', 'Services we use', 'Deleting your data', 'Your rights']) {
+  for (const h of ['Who we are', 'What we collect', 'Who can see it', 'Apple Health', 'Services we use', 'Deleting your data', 'Your rights']) {
     await expect(page.getByRole('heading', { level: 2, name: h })).toBeVisible();
   }
 });

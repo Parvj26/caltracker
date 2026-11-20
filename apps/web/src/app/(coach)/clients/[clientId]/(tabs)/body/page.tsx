@@ -1,48 +1,17 @@
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { requireCoach } from '@/lib/auth';
-import { getClient } from '@/lib/page-data';
-import { clientPageTitle } from '@/lib/page-titles';
-import { localToday, strengthExerciseRows } from '@caltracker/shared';
-import { StrengthSection } from '@/components/strength/strength-section';
-import { loadClientStrengthIn } from '@/lib/client-strength';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { loadProgress } from '../../progress/load';
-import { ProgressSection } from '../../progress/progress-section';
+import { redirect } from 'next/navigation';
+import { metricsTabHref } from '@/lib/metrics-paths';
 
-export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
-  return clientPageTitle((await params).clientId, 'Body');
-}
-
-/**
- * Body: InBody scans and the client's weigh-ins, as charts and a history (the body-scans section), then Strength (the
- * heaviest weight per exercise, each opening its progress page). Becomes the Metrics tab.
- */
-export default async function ClientBodyPage({
+/** The tab was called Body (/body) before it became Metrics: old links and bookmarks land on Metrics, query kept. */
+export default async function OldBodyTab({
   params,
   searchParams,
 }: {
   params: Promise<{ clientId: string }>;
-  searchParams: Promise<{ scan?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { workspaceId, units } = await requireCoach();
   const [{ clientId }, query] = await Promise.all([params, searchParams]);
-  const client = await getClient(clientId);
-  if (!client) notFound();
-  const supabase = await createServerSupabase();
-  const [progress, strength] = await Promise.all([loadProgress(supabase, workspaceId, client.id), loadClientStrengthIn(supabase, workspaceId, client.id)]);
-  const strengthRows = strengthExerciseRows(strength.exercises, units, localToday(strength.timeZone));
-  return (
-    <>
-      <ProgressSection
-        workspaceId={workspaceId}
-        client={{ id: client.id, name: client.name }}
-        units={units}
-        data={progress}
-        readOnly={client.removedAt !== null}
-        openScan={query.scan === '1'}
-      />
-      <StrengthSection clientId={client.id} rows={strengthRows} />
-    </>
-  );
+  const kept = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) for (const one of Array.isArray(v) ? v : v === undefined ? [] : [v]) kept.append(k, one);
+  const q = kept.toString();
+  redirect(`${metricsTabHref(encodeURIComponent(clientId))}${q ? `?${q}` : ''}`);
 }

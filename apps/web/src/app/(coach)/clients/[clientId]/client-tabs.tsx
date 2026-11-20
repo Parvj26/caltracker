@@ -10,7 +10,7 @@ import styles from './client-page.module.css';
 export const CLIENT_TABS = [
   { segment: null, path: '', label: 'Overview' },
   { segment: 'training', path: '/training', label: 'Training' },
-  { segment: 'body', path: '/body', label: 'Body' },
+  { segment: 'metrics', path: '/metrics', label: 'Metrics' },
   { segment: 'food', path: '/food', label: 'Food' },
   { segment: 'documents', path: '/documents', label: 'Documents', short: 'Docs' },
 ] as const;

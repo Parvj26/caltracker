@@ -69,8 +69,8 @@ for (const size of SIZES) {
       const tabs = page.getByRole('navigation', { name: 'Client sections' });
       await tabs.getByRole('link', { name: 'Training' }).click();
       await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training`));
-      await tabs.getByRole('link', { name: 'Body' }).click();
-      await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/body`));
+      await tabs.getByRole('link', { name: 'Metrics' }).click();
+      await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/metrics`));
       await page.goBack();
       await expect(page).toHaveURL(/\/clients\?filter=nothing_planned&sort=name$/);
       await expect(chips.getByRole('button', { name: /^Nothing planned/ })).toHaveAttribute('aria-pressed', 'true');
@@ -90,15 +90,15 @@ for (const size of SIZES) {
       await expect(page).toHaveURL(/\/home/);
     });
 
-    test('Body chart range and Overview period survive a reload', async ({ page }) => {
+    test('Metrics range and Overview period survive a reload', async ({ page }) => {
       await signInAsCoach(page);
       const client = await newClient('Rangey');
-      await page.goto(`/clients/${client.id}/body`);
-      await page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' }).click();
+      await page.goto(`/clients/${client.id}/metrics`);
+      await page.getByRole('list', { name: 'Range' }).getByRole('button', { name: 'All' }).click();
       await expect(page).toHaveURL(/[?&]range=all/);
-      await expect(page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('list', { name: 'Range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
       await page.reload();
-      await expect(page.getByRole('list', { name: 'Chart range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('list', { name: 'Range' }).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
 
       await page.goto(`/clients/${client.id}`);
       await page.getByLabel('Period').selectOption('3m');
