@@ -48,3 +48,38 @@ export function SearchIcon({ size = 18 }: { size?: number }) {
     </Svg>
   );
 }
+
+export function BowlIcon({ size = 20, color = palette.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...line} stroke={color} strokeWidth={2.2} {...hidden}>
+      <Path d="M4 11h16a8 8 0 0 1-16 0z" />
+      <Path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3M16 7c0-1.5 1-2 1-3" />
+    </Svg>
+  );
+}
+
+export function CloseIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...line} stroke={palette.ink} strokeWidth={2.6} {...hidden}>
+      <Path d="M6 6l12 12M18 6L6 18" />
+    </Svg>
+  );
+}
+
+export function MoreIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={palette.ink} {...hidden}>
+      <Circle cx={5} cy={12} r={2} />
+      <Circle cx={12} cy={12} r={2} />
+      <Circle cx={19} cy={12} r={2} />
+    </Svg>
+  );
+}
+
+export function CaretIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...line} stroke={palette.ink} strokeWidth={2.8} {...hidden}>
+      <Path d="M6 9l6 6 6-6" />
+    </Svg>
+  );
+}

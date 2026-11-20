@@ -82,3 +82,73 @@ export function buildChatRows(input: {
   }
   return out.reverse();
 }
+
+/**
+ * The quick replies show until the client answers: with no messages yet, or while the newest message is the
+ * coach's. Anything the client sent (or is still sending) hides them; the coach's next message brings them back.
+ */
+export function showQuickReplies(items: ReadonlyArray<Message | OutboxItem>, me: string | null): boolean {
+  const last = items[items.length - 1];
+  if (!last) return true;
+  if ('state' in last) return false;
+  return last.senderId !== me;
+}
+
+export type StripCell = {
+  key: 'goal' | 'meals' | 'community';
+  label: string;
+  value: string;
+  /** A second line (a long goal's countdown, so it is never cut off). */
+  detail?: string;
+  accessibilityLabel: string;
+};
+
+/** Longest "goal · countdown" kept on one line in a third of a phone's width. */
+const GOAL_ONE_LINE = 18;
+
+/**
+ * The strip under the chat header: GOAL "5K · 49 days", MEALS "3 from Luis" (or "None yet"), COMMUNITY "2 new" (or
+ * "Open"). No goal hides the goal cell; no community hides that one. Meals always shows, so the strip is never empty.
+ */
+export function coachStrip(input: {
+  goal: { goal: string; targetDate: IsoDate | null } | null;
+  today: IsoDate;
+  mealCount: number;
+  firstName: string | null;
+  hasCommunity: boolean;
+  communityUnread: number;
+}): StripCell[] {
+  const out: StripCell[] = [];
+  const goalText = input.goal?.goal.trim();
+  if (input.goal && goalText) {
+    const c = goalCountdown(input.goal.targetDate, input.today);
+    const when = c ? (c.number ? `${c.number} ${c.label.replace(/ to go$/, '')}` : c.label) : null;
+    const oneLine = when ? `${goalText} · ${when}` : goalText;
+    const split = when !== null && oneLine.length > GOAL_ONE_LINE;
+    out.push({
+      key: 'goal',
+      label: 'GOAL',
+      value: split ? goalText : oneLine,
+      ...(split && when ? { detail: when } : {}),
+      accessibilityLabel: `Goal: ${goalText}${c ? `, ${c.number ? `${c.number} ${c.label}` : c.label}` : ''}`,
+    });
+  }
+  const who = input.firstName ?? 'your coach';
+  const meals = input.mealCount > 0 ? `${input.mealCount > 99 ? '99+' : input.mealCount} from ${who}` : 'None yet';
+  out.push({
+    key: 'meals',
+    label: 'MEALS',
+    value: meals,
+    accessibilityLabel: input.mealCount > 0 ? `Meals from ${who}, ${input.mealCount === 1 ? '1 meal' : `${input.mealCount} meals`}` : `Meals from ${who}, none yet`,
+  });
+  if (input.hasCommunity) {
+    const n = input.communityUnread;
+    out.push({
+      key: 'community',
+      label: 'COMMUNITY',
+      value: n > 0 ? `${n > 99 ? '99+' : n} new` : 'Open',
+      accessibilityLabel: n > 0 ? `Community, ${n} new` : 'Community',
+    });
+  }
+  return out;
+}

@@ -16,8 +16,6 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-coach
-- tapOn:
-    id: coach-open-chat
 - extendedWaitUntil:
     visible: 'No messages yet.*'
     timeout: 20000

@@ -123,7 +123,9 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
         </Pressable>
         <TextInput
           testID="coach-composer-input"
-          accessibilityLabel="Message"
+          // VoiceOver reads the placeholder ("Message Luis") while the box is empty; once typed, the same words become
+          // the label, so it is said once either way.
+          accessibilityLabel={body === '' ? undefined : placeholder}
           placeholder={placeholder}
           placeholderTextColor={palette.inkMuted}
           multiline
@@ -152,12 +154,12 @@ export function Composer({ onSend, placeholder = 'Write a message', quickReplies
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingHorizontal: space[4], paddingBottom: space[2] },
   chip: {
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: space[3],
+    paddingHorizontal: space[3.5],
     borderRadius: radius.pill,
     borderWidth: borderWidth.secondaryButton,
-    borderColor: palette.ink,
+    borderColor: palette.borderStrong,
     backgroundColor: palette.bg,
   },
   chipText: { fontSize: 14 },
@@ -175,18 +177,17 @@ const styles = StyleSheet.create({
     paddingTop: space[3],
     paddingBottom: space[3],
   },
+  // Main action = ink (Patterns board); faded while there is nothing to send.
   send: {
     minHeight: 44,
     minWidth: 64,
     paddingHorizontal: space[4],
     borderRadius: 22,
-    borderWidth: borderWidth.card,
-    borderColor: palette.ink,
-    backgroundColor: palette.lime,
+    backgroundColor: palette.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendText: { color: palette.ink },
+  sendText: { color: white },
   disabled: { opacity: 0.4 },
   thumbs: { flexDirection: 'row', gap: space[2] },
   thumb: { width: 64, height: 64 },
