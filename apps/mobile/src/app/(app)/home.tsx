@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button, Card, ErrorText, Logo, Screen, TextButton } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { useSession } from '@/lib/session';
 import { useActiveLog } from '@/lib/use-active-log';
 import { signOutAndForget } from '@/lib/sign-out';
 import { useTheme } from '@/theme/use-theme';
 
 /** Shown only while the client has no coach: never invited, or removed. With a coach they get the tabs. */
+const NOTE_ROW = { flexDirection: 'row', alignItems: 'flex-start', gap: 8 } as const;
+const NOTE_TEXT = { flex: 1 } as const;
+
 export default function Home() {
   const { removedFromWorkspace, claimError, recheck } = useSession();
   // e.g. "You're no longer with …, so this workout wasn't saved." after a removal mid-workout.
@@ -25,10 +29,12 @@ export default function Home() {
       <Logo />
       {banner ? (
         <Card>
-          <Text testID="log-note" style={text('sectionHeading')}>
-            {banner}
-          </Text>
-          <TextButton testID="log-note-ok" title="OK" onPress={dismissBanner} />
+          <View style={NOTE_ROW}>
+            <Text testID="log-note" style={[text('sectionHeading'), NOTE_TEXT]}>
+              {banner}
+            </Text>
+            <CloseButton testID="log-note-ok" accessibilityLabel="Dismiss" onPress={dismissBanner} />
+          </View>
         </Card>
       ) : null}
       <Card>

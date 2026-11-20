@@ -18,7 +18,7 @@ import {
 import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
-import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { openableDemoUrl } from '@/lib/demo-link';
 import { openDemo } from '@/lib/open-demo';
@@ -27,6 +27,7 @@ import { blockRounds, formatDayLabel, orList, supersetLetters } from '@/lib/work
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { BackButton } from '@/components/ui/nav-buttons';
 import type { ShownError } from '@/lib/error-shown';
 
 type Detail = {
@@ -81,7 +82,7 @@ export default function WorkoutDetail() {
   return (
     <Screen>
       <View style={styles.backRow}>
-        <TextButton testID="back" title="Back" onPress={back} />
+        <BackButton testID="back" onPress={back} />
       </View>
 
       {error ? (

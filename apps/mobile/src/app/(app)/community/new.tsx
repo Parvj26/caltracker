@@ -107,7 +107,11 @@ export default function NewPostScreen() {
   };
 
   return (
-    <Screen inSheet>
+    <Screen
+      inSheet
+      // Post stays pinned above the keyboard, so it is always reachable while typing.
+      footer={<Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />}
+    >
       {/* A sheet: title on the left, the grey × on the right. */}
       <View style={[styles.row, { gap: space[2] }]}>
         <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
@@ -133,8 +137,9 @@ export default function NewPostScreen() {
         multiline
         maxLength={POST_BODY_MAX}
         value={body}
-        // Straight into typing, unless the photo picker is opening.
-        autoFocus={params.photos !== '1'}
+        // Straight into typing for a plain post (not while the photo picker opens, nor for a shared card, whose
+        // caption is optional).
+        autoFocus={params.photos !== '1' && !card}
         onChangeText={(t) => {
           setBody(t);
           // "Write something" goes as soon as there is something.
@@ -171,7 +176,6 @@ export default function NewPostScreen() {
           onPress={() => void addPhotos()}
         />
       ) : null}
-      <Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />
     </Screen>
   );
 }

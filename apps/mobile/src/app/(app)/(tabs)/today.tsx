@@ -10,7 +10,7 @@ import { PushCard } from '@/components/today/push-card';
 import { CoachMessageCard, CommunityPeek, FoodCard, GoalStrip, RestCard, WeekAndSticker, WorkoutCard, type WorkoutProgress } from '@/components/today/today-cards';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { TodayHeader } from '@/components/today/today-header';
-import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import { finishedIsLoaded, within, workoutStatuses } from '@/lib/active-log-logic';
 import {
   cacheTodayDetail,
@@ -41,6 +41,7 @@ import {
 } from '@/lib/workouts-api';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import type { ShownError } from '@/lib/error-shown';
 
 /** Whole plans of today's workouts by id, for the card's time and muscle groups. */
@@ -128,6 +129,9 @@ async function workoutToStart(id: string): Promise<WorkoutDoc | null> {
   if (fresh) return fresh.doc;
   return (await readCachedDetail(localToday(), id))?.doc ?? null;
 }
+
+const NOTE_ROW = { flexDirection: 'row', alignItems: 'flex-start', gap: 8 } as const;
+const NOTE_TEXT = { flex: 1 } as const;
 
 export default function Today() {
   useSurpriseReveal();
@@ -319,10 +323,13 @@ export default function Today() {
 
         {banner ? (
           <Card>
-            <Text testID="auto-finish-note" style={text('sectionHeading')}>
-              {banner}
-            </Text>
-            <TextButton testID="auto-finish-ok" title="OK" onPress={dismissBanner} />
+            {/* A note to put away: the grey × (no "OK" link). */}
+            <View style={NOTE_ROW}>
+              <Text testID="auto-finish-note" style={[text('sectionHeading'), NOTE_TEXT]}>
+                {banner}
+              </Text>
+              <CloseButton testID="auto-finish-ok" accessibilityLabel="Dismiss" onPress={dismissBanner} />
+            </View>
           </Card>
         ) : null}
 
