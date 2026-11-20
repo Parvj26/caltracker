@@ -5,7 +5,8 @@ import type { ActionResult } from './actions-shared';
 
 /**
  * Sends one invite through the send-invite Edge Function as the signed-in admin (their JWT), with the same body the
- * coach website sends. The function checks admin_can_invite and writes the resend_invite audit row itself.
+ * coach website sends. The function checks admin_can_invite, which writes the resend_invite audit row (none when the
+ * invite finishes a Move: the move_client row covers it).
  */
 export async function sendInviteAsAdmin(
   supabase: SupabaseClient<Database>,

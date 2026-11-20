@@ -35,7 +35,8 @@ export type ClientDetail = {
   devices: Array<{ app_version: string | null; last_seen_at: string }>;
   notifications_on: boolean;
   last_sync_at: string | null;
-  push_errors: Array<{ at: string; type: string; error: string }>;
+  /** Pushes in the last 7 days that did not reach the phone: no_device, expired or failed (error only for failed). */
+  push_errors: Array<{ at: string; type: string; outcome: 'no_device' | 'expired' | 'failed'; error: string | null }>;
   removed: {
     workspace_id: string;
     workspace_name: string;
@@ -87,6 +88,7 @@ export function auditActionLabel(action: string): string {
     remove_admin: 'Removed an admin',
     cancel_invite: 'Cancelled an invite',
     remove_client: 'Removed a client from their coach',
+    move_client: 'Moved a client to another coach',
     password_reset: 'Sent a password reset',
     send_test_push: 'Sent a test notification',
     log_timeline_view: 'Opened a timeline',

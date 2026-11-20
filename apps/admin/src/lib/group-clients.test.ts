@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { Person } from '@/components/people-search';
 import { groupClientsByCoach } from './group-clients';
 
-const client = (name: string, coach: string | null): Person => ({
+const client = (name: string, coach: string | null, coachId: string | null = coach ? `id-${coach}` : null): Person => ({
   user_id: name,
   kind: 'client',
   name,
   email: `${name.toLowerCase().replace(/\s+/g, '')}@x.test`,
   coach_name: coach,
+  coach_id: coachId,
 });
 
 describe('groupClientsByCoach', () => {
@@ -17,12 +18,21 @@ describe('groupClientsByCoach', () => {
       client('Join One', 'Parv (test)'),
       client('Parv Jain', 'Luis Bueno'),
       client('Apple Review', 'Parv (test)'),
-      { user_id: 'c1', kind: 'coach', name: 'Luis Bueno', email: 'l@x.test', coach_name: null },
+      { user_id: 'c1', kind: 'coach', name: 'Luis Bueno', email: 'l@x.test', coach_name: null, coach_id: null },
+      { user_id: 'a1', kind: 'account', name: 'Never Joined', email: 'n@x.test', coach_name: null, coach_id: null },
     ]);
     expect(groups.map((g) => [g.coachName, g.clients.map((c) => c.name)])).toEqual([
       ['Luis Bueno', ['Parv Jain']],
       ['Parv (test)', ['Apple Review', 'Join One']],
       [null, ['Zed']],
+    ]);
+  });
+
+  it('keeps two coaches with the same name apart', () => {
+    const groups = groupClientsByCoach([client('Al', 'Sam', 'sam-1'), client('Bo', 'Sam', 'sam-2')]);
+    expect(groups.map((g) => [g.coachId, g.clients.map((c) => c.name)])).toEqual([
+      ['sam-1', ['Al']],
+      ['sam-2', ['Bo']],
     ]);
   });
 
@@ -32,9 +42,9 @@ describe('groupClientsByCoach', () => {
     expect(groups[1]!.clients.map((c) => c.name)).toEqual(['bea', 'Cy']);
   });
 
-  it('treats a blank coach name as no coach and leaves out empty groups', () => {
-    expect(groupClientsByCoach([client('Al', '  ')])).toEqual([{ coachName: null, clients: [client('Al', '  ')] }]);
-    expect(groupClientsByCoach([client('Al', 'Adam')]).some((g) => g.coachName === null)).toBe(false);
+  it('a client with no coach id is in No coach, and empty groups are left out', () => {
+    expect(groupClientsByCoach([client('Al', null)])).toEqual([{ coachId: null, coachName: null, clients: [client('Al', null)] }]);
+    expect(groupClientsByCoach([client('Al', 'Adam')]).some((g) => g.coachId === null)).toBe(false);
     expect(groupClientsByCoach([])).toEqual([]);
   });
 });

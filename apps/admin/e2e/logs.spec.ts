@@ -44,3 +44,34 @@ test('logs: the Person search finds a typo, picking filters the rows, × shows e
   await expect(page.getByRole('row', { name: new RegExp(`Kay K${t}`) })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Person' })).toHaveValue('');
 });
+
+test('logs: every notification outcome has plain words, and the type is named', async ({ page }) => {
+  const t = tag();
+  const coach = await seedCoach('Luis', `Bueno${t}`, `Outcome Coaching ${t}`);
+  const client = await seedClient(coach.workspaceId, 'Oto', `O${t}`);
+  for (const outcome of ['sent', 'disabled', 'no_device', 'expired', 'failed']) {
+    sql(`insert into public.push_outbox (user_id, workspace_id, type, group_key, outcome, sent_at)
+         values (${lit(client.id)}, ${lit(coach.workspaceId)}, 'daily_reminder', ${lit(`${outcome}-${t}`)}, ${lit(outcome)}, now())`);
+  }
+  const support = await createUser({ role: 'support', enrolled: true });
+  await signInAdmin(page, support);
+  await page.goto(`/logs?person=${client.id}`);
+  const rows = page.getByRole('row', { name: new RegExp(`Oto O${t}`) });
+  await expect(rows).toHaveCount(5);
+  for (const label of ['Sent', 'Turned off', 'No phone', 'Expired', 'Failed']) {
+    await expect(rows.filter({ hasText: label })).toHaveCount(1);
+  }
+  await expect(rows.filter({ hasText: 'Daily reminder' })).toHaveCount(5);
+  await expect(page.getByText('daily_reminder')).toHaveCount(0);
+  await expect(page.getByText('Waiting')).toHaveCount(0);
+
+  // The client page: Delivered only for the sent one; no phone and failed are Recent errors.
+  await page.goto(`/clients/${client.id}`);
+  const timeline = page.getByRole('region', { name: 'Timeline' });
+  await expect(timeline.getByText('Delivered')).toHaveCount(1);
+  await expect(timeline.getByText('Notification not sent: no phone · Daily reminder')).toBeVisible();
+  const errors = page.getByRole('region', { name: 'Recent errors' });
+  await expect(errors).toContainText('No phone registered');
+  await expect(errors).toContainText('Expired before it could send');
+  await expect(errors).toContainText('Failed');
+});

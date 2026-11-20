@@ -41,18 +41,26 @@ export async function sendTestPush(userId: string): Promise<ActionResult> {
   return { ok: true, message: 'Test notification queued. It should arrive within a minute.' };
 }
 
-/** Remove from the current coach (kept as their past client), then invite into the new coach's workspace. */
-export async function moveClient(userId: string, formData: FormData): Promise<ActionResult> {
+/**
+ * Remove from the coach named in the dialog (fromWorkspaceId; kept as their past client), then invite into the new
+ * coach's workspace. One audit row (move_client): the invite that follows is not logged again.
+ */
+export async function moveClient(userId: string, fromWorkspaceId: string, formData: FormData): Promise<ActionResult> {
   await requireAdmin('support');
   const target = formData.get('workspace_id');
-  if (!UUID.test(userId) || typeof target !== 'string' || !UUID.test(target)) return { ok: false, error: 'Pick the new coach.' };
+  if (!UUID.test(userId) || !UUID.test(fromWorkspaceId)) return { ok: false, error: GENERIC_ERROR };
+  if (typeof target !== 'string' || !UUID.test(target) || target === fromWorkspaceId) return { ok: false, error: 'Pick the new coach.' };
   const supabase = await createServerSupabase();
   const coaches = await supabase.rpc('admin_coaches');
   const to = coaches.data?.find((c) => c.workspace_id === target);
   if (!to) return { ok: false, error: 'Pick the new coach.' };
 
-  const removed = await supabase.rpc('admin_remove_client', { p_user_id: userId });
-  if (removed.error) return { ok: false, error: adminErrorMessage(removed.error) };
+  const moved = await supabase.rpc('admin_move_client', {
+    p_user_id: userId,
+    p_from_workspace_id: fromWorkspaceId,
+    p_to_workspace_id: target,
+  });
+  if (moved.error) return { ok: false, error: adminErrorMessage(moved.error) };
   revalidatePath('/', 'layout');
 
   const { client } = await loadClient(userId);

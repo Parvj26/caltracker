@@ -12,27 +12,15 @@ import { SelectField } from '@/components/ui';
 import { requireAdmin } from '@/lib/admin';
 import { UUID } from '@/lib/actions-shared';
 import { fromJson, nameOr, type ClientDetail } from '@/lib/admin-data';
+import { moveTargets } from '@/lib/move-targets';
 import { fetchPosthogTimeline } from '@/lib/posthog';
+import { pushErrorText, pushTimelineEvent, pushType } from '@/lib/push-labels';
 import { roleAtLeast } from '@/lib/roles';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { moveClient, restoreClient, sendPasswordReset, sendTestPush } from './actions';
 
 export const metadata: Metadata = { title: 'Client' };
 
-const PUSH_TYPES: Record<string, string> = {
-  workout_assigned: 'Workout assigned',
-  workout_changed: 'Workout changed',
-  daily_reminder: 'Daily reminder',
-  coach_logged: 'Coach logged a workout',
-  message: 'New message',
-  workout_comment: 'Workout comment',
-  meal_comment: 'Meal comment',
-  food_targets: 'Food targets',
-  community_coach_post: 'Community post from the coach',
-  community_activity: 'Community activity',
-  test: 'Test notification',
-};
-const pushType = (type: string) => PUSH_TYPES[type] ?? type;
 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -59,17 +47,10 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       supabase.rpc('admin_log_timeline_view', { p_user_id: id }),
       supabase.rpc('admin_coaches'),
     ]);
-    const db: TimelineEvent[] = (pushes.data ?? []).map((p) => ({
-      at: p.sent_at ?? p.at,
-      source: 'db',
-      label: `Notification ${p.outcome === 'failed' ? 'failed' : 'sent'} · ${pushType(p.type)}`,
-      ...(p.outcome === 'failed' ? { status: 'failed' as const } : p.sent_at ? { status: 'delivered' as const } : {}),
-    }));
+    const db: TimelineEvent[] = (pushes.data ?? []).map(pushTimelineEvent);
     const app = logged.error ? new Error('Timeline view not logged') : await fetchPosthogTimeline(id);
     timeline = mergeTimeline(db, app);
-    coaches = (coachRows.data ?? [])
-      .filter((w) => w.workspace_id !== c.workspace_id)
-      .map((w) => ({ workspace_id: w.workspace_id, label: `${nameOr(w.name)} · ${w.workspace_name}` }));
+    coaches = moveTargets(coachRows.data ?? [], c.workspace_id);
   }
 
   const subtitle = c.coach ? (
@@ -106,7 +87,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 <p>{name} gets an email with a link to choose a new password{c.email ? ` (${c.email})` : ''}.</p>
               </ConfirmAction>
               {c.coach ? (
-                <ConfirmAction label="Move to another coach…" title="Move to another coach?" confirmLabel="Move" action={moveClient.bind(null, id)}>
+                <ConfirmAction label="Move to another coach…" title="Move to another coach?" confirmLabel="Move" action={moveClient.bind(null, id, c.workspace_id ?? '')}>
                   <p>{name} is removed from {nameOr(c.coach.name)} (their history is kept) and gets an invite to join the new coach.</p>
                   <SelectField label="New coach" name="workspace_id" required defaultValue="">
                     <option value="" disabled>Pick a coach</option>
@@ -126,9 +107,10 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                   <p>{name} gets an invite to rejoin {c.removed.workspace_name} at {c.removed.email}. Their history comes back when they accept.</p>
                 </ConfirmAction>
               ) : null}
-              <ConfirmAction label="Send test notification" title="Send a test notification?" confirmLabel="Send" action={sendTestPush.bind(null, id)}>
+              <ConfirmAction label="Send test notification" title="Send a test notification?" confirmLabel="Send" action={sendTestPush.bind(null, id)} disabled={!device}>
                 <p>{name}&apos;s phone shows &ldquo;Test notification from CalTracker support&rdquo;.</p>
               </ConfirmAction>
+              {device ? null : <p className={styles.panelNote}>Test notification: no phone registered yet.</p>}
               <p className={styles.panelNote}>Every action asks to confirm and goes in the audit log.</p>
             </ActionStatus>
           </Panel>
@@ -142,7 +124,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               {c.push_errors.map((e, i) => (
                 <li key={`${e.at}-${i}`}>
                   <LocalTime iso={e.at} kind="when" /> · {pushType(e.type)}
-                  <span className={styles.cellNote}>{e.error}</span>
+                  <span className={styles.cellNote}>{pushErrorText(e)}</span>
                 </li>
               ))}
             </ul>
