@@ -20,7 +20,7 @@ test('owner adds a coach and the row appears', async ({ page }) => {
 
   const row = page.getByRole('row', { name: new RegExp(`Sam Rivera${t}`) });
   await expect(row).toContainText(`Sam Fit ${t}`);
-  await expect(row).toContainText('0 · No plan yet');
+  await expect(row).toContainText('0 · no plan yet');
   expect(auditActions({ adminId: owner.id })).toEqual(['add_coach']);
   expect(sql(`select count(*) from public.workspace_members m join auth.users u on u.id = m.user_id
               where lower(u.email) = lower(${lit(email)}) and m.role = 'owner'`)).toBe('1');

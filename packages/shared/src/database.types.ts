@@ -2291,6 +2291,7 @@ export type Database = {
       }
       push_devices: {
         Row: {
+          app_build: number | null
           app_version: string | null
           created_at: string
           platform: string
@@ -2300,6 +2301,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          app_build?: number | null
           app_version?: string | null
           created_at?: string
           platform?: string
@@ -2309,6 +2311,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          app_build?: number | null
           app_version?: string | null
           created_at?: string
           platform?: string
@@ -2908,18 +2911,21 @@ export type Database = {
           badge_style: string
           created_at: string | null
           id: string
+          is_test: boolean
           name: string
         }
         Insert: {
           badge_style?: string
           created_at?: string | null
           id?: string
+          is_test?: boolean
           name: string
         }
         Update: {
           badge_style?: string
           created_at?: string | null
           id?: string
+          is_test?: boolean
           name?: string
         }
         Relationships: []
@@ -3005,6 +3011,7 @@ export type Database = {
           clients: number
           created_at: string
           health: string
+          is_test: boolean
           last_active: string
           name: string
           programs_assigned_week: number
@@ -3092,6 +3099,7 @@ export type Database = {
         }[]
       }
       admin_overview: { Args: never; Returns: Json }
+      admin_owner_overview: { Args: { p_show_test?: boolean }; Returns: Json }
       admin_people: {
         Args: never
         Returns: {
@@ -3482,7 +3490,12 @@ export type Database = {
       }
       reclaim_workout_log: { Args: { p_log_id: string }; Returns: Json }
       register_push_device: {
-        Args: { p_app_version: string; p_secret?: string; p_token: string }
+        Args: {
+          p_app_build?: number
+          p_app_version: string
+          p_secret?: string
+          p_token: string
+        }
         Returns: undefined
       }
       remove_client: {

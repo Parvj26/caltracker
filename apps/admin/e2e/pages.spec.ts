@@ -44,24 +44,25 @@ test('open client page shows health', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'View as Parv (read-only)' })).toBeVisible();
 });
 
-test('resend invite from Needs attention writes an audit row', async ({ page }) => {
+test('resend an expired invite from Logs writes an audit row', async ({ page }) => {
   const t = tag();
   const coach = await seedCoach('Luis', `Bueno${t}`, `Invite Coaching ${t}`);
   const email = `invitee-${t}@e2e.local`;
   const inviteId = seedExpiredInvite(coach, email, 'Newbie', `N${t}`);
   const support = await createUser({ role: 'support', enrolled: true });
   await signInAdmin(page, support);
+  await page.goto('/logs?tab=invites');
 
   const row = page.getByRole('row', { name: new RegExp(`Newbie N${t}`) });
-  await expect(row.getByText('Invite expired')).toBeVisible();
-  await row.getByRole('button', { name: 'Resend invite' }).click();
+  await expect(row.getByText('Expired')).toBeVisible();
+  await row.getByRole('button', { name: 'Resend' }).click();
   const dialog = page.getByRole('dialog', { name: 'Resend invite?' });
   await expect(dialog).toContainText(email);
   await dialog.getByRole('button', { name: 'Resend invite' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Invite sent' })).toBeVisible();
 
   expect(auditActions({ adminId: support.id })).toEqual(['resend_invite']);
-  // A fresh 24 h invite replaced the expired one.
+  // A fresh invite replaced the expired one.
   expect(sql(`select expires_at > now() from public.client_invites where id = ${lit(inviteId)}`)).toBe('t');
 
   // And it is in the audit log.
@@ -163,11 +164,6 @@ test('readonly sees masked emails and no Fix it buttons', async ({ page }) => {
   const readonly = await createUser({ role: 'readonly', enrolled: true });
   await signInAdmin(page, readonly);
 
-  // No row actions on Overview, only Open links.
-  const row = page.getByRole('row', { name: new RegExp(`Rowan I${t}`) });
-  await expect(row.getByText('Invite expired')).toBeVisible();
-  await expect(row.getByRole('button')).toHaveCount(0);
-
   await page.goto(`/clients/${client.id}`);
   await expect(page.getByRole('heading', { level: 1, name: `Rita R${t}` })).toBeVisible();
   await expect(page.getByText(`${client.email.slice(0, 2)}…@e2e.local`)).toBeVisible();
@@ -198,7 +194,7 @@ test('coaches table and coach page', async ({ page }) => {
   await page.getByRole('navigation', { name: 'Admin' }).getByRole('link', { name: 'Coaches' }).click();
   const row = page.getByRole('row', { name: new RegExp(`Luis Bueno${t}`) });
   await expect(row).toContainText(`Table Coaching ${t}`);
-  await expect(row).toContainText('1 · No plan yet');
+  await expect(row).toContainText('1 · no plan yet');
   await expect(row).toContainText('Inactive');
   await row.getByRole('link', { name: `Luis Bueno${t}` }).click();
   await expect(page.getByRole('heading', { level: 1, name: `Luis Bueno${t}` })).toBeVisible();
