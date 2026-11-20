@@ -1,0 +1,31 @@
+# Sign in checks the fields on the phone (approved Patterns board): Sign in with nothing typed shows each error under
+# its field; a half email says "Enter a full email address"; Return on the email moves to the password; the eye shows
+# the password; no sample stat tiles. Run via `pnpm --filter mobile e2e .maestro/sign-in-checks.yaml`.
+appId: app.caltracker.client
+---
+- launchApp:
+    clearState: true
+- assertNotVisible: 'Streak'
+- assertNotVisible: 'New PRs'
+- tapOn:
+    id: submit-button
+- assertVisible:
+    id: email-input-error
+    text: '.*Enter your email address.*'
+- assertVisible:
+    id: password-input-error
+    text: '.*Enter your password.*'
+- tapOn:
+    id: email-input
+- inputText: 'maya@example'
+- pressKey: Enter
+# Return moved to the password: what is typed now lands there.
+- waitForAnimationToEnd
+- inputText: 'secret-pass'
+- tapOn:
+    id: toggle-password
+- assertVisible: 'secret-pass'
+- runFlow: helpers/submit.yaml
+- assertVisible:
+    id: email-input-error
+    text: '.*Enter a full email address.*'
