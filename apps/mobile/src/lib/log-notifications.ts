@@ -29,16 +29,10 @@ export function initNotifications(): void {
   });
 }
 
-/** Asks for permission (alerts, sounds and the app-icon badge, used by push too) the first time only. True when allowed. */
-export async function ensurePermission(): Promise<boolean> {
+/** True when notifications are already allowed. Never asks: iOS asks only from Today's Turn on (or Settings). */
+export async function hasPermission(): Promise<boolean> {
   try {
-    const current = await Notifications.getPermissionsAsync();
-    if (current.granted) return true;
-    if (!current.canAskAgain) return false;
-    const asked = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowSound: true, allowBadge: true },
-    });
-    return asked.granted;
+    return (await Notifications.getPermissionsAsync()).granted;
   } catch (e) {
     warn('permission')(e);
     return false;

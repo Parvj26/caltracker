@@ -308,6 +308,11 @@ export function summaryStickers(award: AwardResult): SummarySticker[] {
 const PR_KIND: Record<string, string> = { heaviest: 'heaviest', reps_at_weight: 'most reps', e1rm: 'best estimated max' };
 
 /** "Bench press: heaviest" for each personal best this workout set. */
+/** How many exercises set a personal best in this workout (Today's "2 new bests"). */
+export function newBestCount(award: Pick<AwardResult, 'prs'>): number {
+  return new Set(award.prs.map((p) => p.exerciseId)).size;
+}
+
 export function prPills(award: AwardResult, log: WorkoutLogDoc): string[] {
   const names = new Map<string, string>();
   for (const b of log.blocks) for (const ex of b.exercises) names.set(ex.exerciseId, ex.exerciseName);

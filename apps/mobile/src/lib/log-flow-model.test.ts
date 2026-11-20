@@ -281,7 +281,7 @@ describe('start page lists', () => {
       ['Dumbbell Bench Press', '35 lb × 12, 45 lb × 12, 35 lb × 12, 35 lb × 12', '×4'],
       ['Alternating DB Curl', '35 lb × 12, 35 lb × 12, 35 lb × 12', '×3'],
     ]);
-    expect(main[1].kind === 'straight' && main[1].item.count).toBe('×2');
+    expect(main[1].kind === 'straight' && main[1].item.count).toBe('×4'); // every tickable row counts, drops too;
     const fin = startGroups(log, s[2], 'lb');
     expect(fin[0].kind === 'choice' && fin[0].items.map((i) => i.name)).toEqual(['Medicine Ball Slam', 'Farmers Walk', 'Overhead Throw']);
     expect(startGroups(log, s[0], 'lb')[0]).toMatchObject({ kind: 'straight', item: { summary: '10 reps', count: '×1', substitute: null } });

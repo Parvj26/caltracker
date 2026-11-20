@@ -176,6 +176,31 @@ export function resumePlace(log: WorkoutLogDoc, sections: readonly FlowSection[]
   return null;
 }
 
+/**
+ * What comes next in a workout in progress, for Today's "6 of 19 sets · next: A1 Romanian Deadlift": the exercise of
+ * the first open page (in a superset the exercise of its next set, with its A1 label), or null when all is ticked.
+ */
+export function nextUpLabel(log: WorkoutLogDoc): string | null {
+  const sections = buildSections(log);
+  const at = resumePlace(log, sections);
+  if (!at) return null;
+  const page = sections[at.section]?.pages[at.page];
+  if (!page) return null;
+  const block = log.blocks[page.blockIndex];
+  if (!block) return null;
+  if (page.kind === 'superset') {
+    const step = currentStep(block);
+    const i = step?.exerciseIndex ?? 0;
+    const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
+    return `${letter}${i + 1} ${block.exercises[i]?.exerciseName ?? ''}`.trim();
+  }
+  if (page.kind === 'option') {
+    const picked = block.exercises.find((e) => e.id === block.pickedExerciseId);
+    return picked ? picked.exerciseName : orList(block.exercises.map((e) => e.exerciseName));
+  }
+  return block.exercises[0]?.exerciseName ?? null;
+}
+
 export type AfterDone = { kind: 'page'; page: number } | { kind: 'section'; section: number } | { kind: 'finish' };
 
 /**

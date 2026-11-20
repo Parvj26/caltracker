@@ -56,30 +56,41 @@ export function openPushTarget(target: string, currentPath: string): 'navigate' 
   return currentPath === CHAT ? null : 'navigate';
 }
 
-/** "Later" on the Today card hides it this long. */
+/** "Not now" (×) on the Today banner hides it this long. */
 export const PUSH_CARD_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+/** After this many "Not now"s the banner never comes back (Settings -> Notifications still turns them on). */
+export const PUSH_CARD_MAX_DISMISSALS = 2;
 
-/** Where this phone keeps when the Today card may show again, per user. */
+/** Where this phone keeps when the Today banner may show again, per user. */
 export const pushCardSnoozeKey = (userId: string) => `caltracker.pushCardSnoozedUntil.${userId}`;
+/** How many times the client has said "Not now", per user. */
+export const pushCardDismissKey = (userId: string) => `caltracker.pushCardDismissals.${userId}`;
 
 /**
- * The Today card asking for notifications: only while iOS has never asked (after that only iPhone Settings can turn
- * them on, which Settings -> Notifications explains) and not while snoozed with "Later". New clients see it too
- * (approved new-client board), so they hear when their first workout arrives.
+ * The Today banner asking for notifications: only while iOS has never asked (after that only iPhone Settings can turn
+ * them on, which Settings -> Notifications explains), not while snoozed with "Not now", and never again after the
+ * second "Not now". New clients see it too, so they hear when their first workout arrives.
  */
 export function showPushCard(s: {
   permission: 'granted' | 'denied' | 'undetermined' | null;
   snoozedUntil: number | null;
   now: number;
+  dismissals?: number;
 }): boolean {
   if (s.permission !== 'undetermined') return false;
+  if ((s.dismissals ?? 0) >= PUSH_CARD_MAX_DISMISSALS) return false;
   return s.snoozedUntil === null || s.now >= s.snoozedUntil;
 }
 
-/** The Today card's line, naming the coach by first name ("your coach" when unknown); a new client's names the first workout. */
+/** What "Not now" stores: one more dismissal, and hidden for a week (for good after the second). */
+export function afterPushDismiss(dismissals: number, now: number): { dismissals: number; snoozedUntil: number } {
+  return { dismissals: dismissals + 1, snoozedUntil: now + PUSH_CARD_SNOOZE_MS };
+}
+
+/** The Today banner's line, naming the coach by first name ("your coach" when unknown); a new client's names the first workout. */
 export function pushCardText(coachName: string | null, firstTime = false): string {
   const first = coachName?.trim().split(/\s+/)[0] || 'your coach';
   return firstTime
-    ? `Get a ping when ${first} assigns your first workout or messages you.`
-    : `Get a ping when ${first} assigns a workout or sends you a message.`;
+    ? `Get a ping when ${first} sends your first workout or a message.`
+    : `Get a ping when ${first} sends a workout or message.`;
 }

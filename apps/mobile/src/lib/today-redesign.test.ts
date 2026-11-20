@@ -3,7 +3,12 @@ import type { MealMacros } from '@caltracker/shared';
 import {
   agoText,
   communityHeadline,
+  doneLine,
   foodCard,
+  foodLine,
+  goalStripDays,
+  restNextLine,
+  restPreviewLabel,
   newCountLabel,
   nextSteps,
   nextUpDay,
@@ -24,13 +29,31 @@ describe('welcome', () => {
 });
 
 describe('workout card', () => {
-  it('reads count, time and up to three muscle groups', () => {
-    expect(workoutMeta(6, 50, ['Chest', 'Back', 'Shoulders', 'Arms'])).toBe('6 exercises · about 50 min · Chest, Back, Shoulders');
-    expect(workoutMeta(1, 10, [])).toBe('1 exercise · about 10 min');
+  it('reads exercises, sets (a range while a pick-one is open) and time', () => {
+    expect(workoutMeta(5, { sets: { min: 18, max: 19 }, minutes: 45 })).toBe('5 exercises · 18–19 sets · about 45 min');
+    expect(workoutMeta(1, { sets: { min: 1, max: 1 }, minutes: 10 })).toBe('1 exercise · 1 set · about 10 min');
   });
 
   it('shows only the count until the plan is loaded', () => {
-    expect(workoutMeta(4, null, [])).toBe('4 exercises');
+    expect(workoutMeta(4, null)).toBe('4 exercises');
+  });
+
+  it('words the rest day, goal strip and done row', () => {
+    expect(restNextLine('Upper Push', '2026-11-21', '2026-11-19')).toBe('Next: Upper Push on Saturday');
+    expect(restPreviewLabel('2026-11-21', '2026-11-19')).toBe('Preview Saturday');
+    expect(goalStripDays({ number: '49', label: 'days to go' })).toBe('49 days');
+    expect(goalStripDays({ number: '1', label: 'day to go' })).toBe('1 day');
+    expect(goalStripDays({ number: null, label: 'Today' })).toBe('Today');
+    expect(doneLine('17 of 19 sets', 2, '46 min')).toBe('17 of 19 sets · 2 new bests');
+    expect(doneLine(null, 0, '46 min')).toBe('46 min');
+  });
+
+  it('food line: what is left against targets, plain numbers without them', () => {
+    const m = (calories: number, protein: number) => ({ macros: { calories, protein, carbs: null, fat: null } as MealMacros });
+    const t = { calories: 2000, protein: 150, carbs: null, fat: null };
+    expect(foodLine([m(450, 58)], t).label).toBe('1,550 kcal left, 92 g protein to go');
+    expect(foodLine([m(1240, 86)], null).label).toBe('1,240 kcal, 86 g protein today');
+    expect(foodLine([m(2140, 160)], t).label).toBe('140 kcal over, 160 g protein · target hit');
   });
 
   it('labels a program day, and nothing for a one-off workout', () => {
