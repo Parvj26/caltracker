@@ -9,7 +9,7 @@ import {
   localToday,
   logSetCount,
   setProgressText,
-  thisWeekSummary,
+  STICKERS,
   type SetRange,
   type Units,
   type WorkoutDoc,
@@ -20,8 +20,6 @@ import { Sticker } from '@/components/stickers/sticker';
 import { Button, TextButton } from '@/components/ui';
 import { CountBadge } from '@/components/ui/count-badge';
 import type { WorkoutStatus } from '@/lib/active-log-logic';
-import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
-import { streakNow } from '@/lib/progress-view';
 import { useSession } from '@/lib/session';
 import { fetchLatestPosts, readCachedPosts } from '@/lib/today-api';
 import {
@@ -40,7 +38,6 @@ import {
   weekTile,
   workoutMeta,
   zooHref,
-  zooSummary,
 } from '@/lib/today-logic';
 import { fetchAward } from '@/lib/awards';
 import { newBestCount } from '@/lib/awards-logic';
@@ -52,7 +49,7 @@ import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useCommunity } from '@/lib/use-community';
 import { useFood } from '@/lib/use-food';
 import { useMessages } from '@/lib/use-messages';
-import { useAlbum, useHub } from '@/lib/use-progress-data';
+import { useProgressFacts } from '@/lib/use-progress-facts';
 import type { WorkoutSummary } from '@/lib/workouts';
 import { planTotals } from '@/lib/workouts-plan';
 import { palette, pressedOpacity, radius, white } from '@/theme/theme';
@@ -387,18 +384,13 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
   const { text, space } = useTheme();
   const router = useRouter();
   const stacked = useStacked();
-  const today = localToday();
-  // The same data and week summary as the Progress tab's This week card, so the two always agree.
-  const hub = useHub(refreshKey);
-  const album = useAlbum(refreshKey);
-  const tile = useMemo(() => {
-    const h = hub.data;
-    if (!h) return null;
-    const streak = streakNow(album.data?.stats ?? null, trainedDays(h), today);
-    return weekTile(thisWeekSummary({ workouts: h.workouts, addedDays: addedDays(h), prs: 0, streak: streak.current, today }));
-  }, [hub.data, album.data, today]);
-  const zoo = useMemo(() => (album.data ? zooSummary(album.data.awards) : null), [album.data]);
-  const newest = zoo?.newest ?? null;
+  // The app's one source for these numbers (useProgressFacts), so Today, Progress and the Zoo book always agree. While
+  // the latest workout is still syncing or being awarded it says "Updating…" instead of numbers that are about to change.
+  const { facts, hub, album } = useProgressFacts(refreshKey);
+  const updating = facts.updating;
+  const tile = useMemo(() => (facts.week ? weekTile(facts.week) : null), [facts.week]);
+  const newest = facts.stickers?.newest ?? null;
+  const zooLabel = facts.stickers ? `Zoo ${facts.stickers.count} of ${STICKERS.length}` : '';
   const half: StyleProp<ViewStyle> = stacked ? undefined : styles.flex;
 
   return (
@@ -407,12 +399,16 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
         testID="today-week"
         onPress={() => router.navigate('/progress')}
         accessibilityRole="button"
-        accessibilityLabel={tile ? `This week: ${tile.big} ${tile.small}` : 'This week'}
+        accessibilityLabel={updating ? 'This week: updating' : tile ? `This week: ${tile.big} ${tile.small}` : 'This week'}
         accessibilityHint="Opens Progress"
         style={({ pressed }) => [styles.tile, styles.weekTile, { padding: space[3.5], gap: TILE_GAP }, half, pressed && styles.pressed]}
       >
         <Overline>This week</Overline>
-        {tile ? (
+        {updating ? (
+          <Text style={[text('sectionHeading'), styles.ink]} testID="today-week-updating">
+            Updating…
+          </Text>
+        ) : tile ? (
           <>
             <Text style={[text('bigNumber'), styles.weekBig]} maxFontSizeMultiplier={1.4}>
               {tile.big}
@@ -429,12 +425,16 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
         testID="today-sticker"
         onPress={() => router.navigate(zooHref())}
         accessibilityRole="button"
-        accessibilityLabel={newest ? `Newest sticker: ${newest.name}${newest.shiny ? ', shiny' : ''}. ${zoo?.label ?? ''}` : 'Newest sticker: none yet'}
+        accessibilityLabel={updating ? 'Newest sticker: updating' : newest ? `Newest sticker: ${newest.name}${newest.shiny ? ', shiny' : ''}. ${zooLabel}` : 'Newest sticker: none yet'}
         accessibilityHint="Opens your zoo book"
         style={({ pressed }) => [styles.tile, { padding: space[3.5], gap: TILE_GAP }, half, pressed && styles.pressed]}
       >
         <Overline>Newest sticker</Overline>
-        {newest ? (
+        {updating ? (
+          <Text style={[text('sectionHeading'), styles.ink]} testID="today-sticker-updating">
+            Updating…
+          </Text>
+        ) : newest ? (
           <View style={[styles.row, { gap: space[2] }]}>
             <View style={[styles.stickerBox, styles.tilt]}>
               <Sticker stickerKey={newest.key} size={STICKER - 8} shiny={newest.shiny} variant="sm" />
@@ -443,7 +443,7 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
               {newest.name}
             </Text>
           </View>
-        ) : zoo ? (
+        ) : facts.stickers ? (
           <Text style={[text('caption'), styles.ink]}>None yet. Finish a workout to earn one.</Text>
         ) : album.status === 'loading' ? (
           <ActivityIndicator color={palette.ink} accessibilityLabel="Loading your stickers" />
