@@ -1,6 +1,6 @@
 -- Admin read functions: Overview, Coaches, Clients and Logs (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(61);
+select plan(64);
 
 -- Admins.
 select tests.create_user('ar-owner@t.local', 'Olive Owner') as owner \gset
@@ -196,6 +196,13 @@ select tests.create_workspace('AR Eta', :'gus') as ws_g \gset
 insert into public.admin_audit_log (admin_id, action, details, at)
 values (:'owner', 'resend_invite', jsonb_build_object('workspace_id', :'ws_g'), now() - interval '10 seconds');
 select tests.create_invite(:'ws_g', 'ar-gus-c@t.local', 'Gus Client', :'gus', 'tok-ar-gus-0000000000000');
+-- Hal's only invite was the end of an admin's Move into his workspace (a move_client row just before): not his work.
+select tests.create_user('ar-hal@t.local', 'Hal Coach') as hal \gset
+select tests.create_workspace('AR Theta', :'hal') as ws_h \gset
+insert into public.admin_audit_log (admin_id, action, details, at)
+values (:'owner', 'move_client', jsonb_build_object('to_workspace_id', :'ws_h'), now() - interval '10 seconds');
+select tests.create_invite(:'ws_h', 'ar-hal-c@t.local', 'Hal Client', :'hal', 'tok-ar-hal-0000000000000');
+select is(private.admin_coach_last_active(:'hal', null), null, 'last active: the invite that finished a Move does not count');
 select is(date_trunc('minute', private.admin_coach_last_active(:'dan', null)),
   date_trunc('minute', now() - interval '1 day'), 'last active: the latest session refresh');
 select tests.act_as_aal(:'owner', 'aal2');
@@ -242,6 +249,27 @@ select tests.act_as_aal(:'owner', 'aal2');
 select is((select jsonb_agg(e - 'at') from jsonb_array_elements(public.admin_client(:'kim')->'push_errors') e),
   '[{"type": "message", "outcome": "no_device", "error": null}, {"type": "daily_reminder", "outcome": "expired", "error": null}]'::jsonb,
   'admin_client push errors include no phone and expired, newest first, last 7 days only');
+-- Last sync is the client's own activity: a coach's correction, a coach-logged session and the auto-finish job don't
+-- move it. Ivy logged 5 days ago; the coach then corrected that log and logged a session for her; a workout she
+-- left open 5 days ago is auto-finished now.
+reset role;
+select set_config('request.jwt.claims', '', true);
+select tests.create_user('ar-ivy@t.local', 'Ivy Lane') as ivy \gset
+select tests.add_client(:'ws_b', :'ivy');
+select tests.create_log(:'ws_b', :'ivy') as log_ivy \gset
+update public.workout_logs set last_activity_at = now() - interval '5 days', started_at = now() - interval '5 days',
+  finished_at = now() - interval '5 days' where id = :'log_ivy';
+update public.workout_logs set notes = 'Coach fixed a weight', updated_at = now() where id = :'log_ivy';
+insert into public.workout_logs (workspace_id, client_id, name, status, started_at, finished_at, last_activity_at, logged_by)
+values (:'ws_b', :'ivy', 'Coach session', 'completed', now() - interval '1 hour', now(), now(), :'bob');
+select tests.create_log(:'ws_b', :'ivy', null, 'in_progress') as log_ivy_open \gset
+update public.workout_logs set last_activity_at = now() - interval '5 days', started_at = now() - interval '5 days'
+where id = :'log_ivy_open';
+select ok(public.auto_finish_stale_logs() >= 1, 'the auto-finish job closes Ivy''s open workout');
+select tests.act_as_aal(:'owner', 'aal2');
+select is(date_trunc('minute', (public.admin_client(:'ivy')->>'last_sync_at')::timestamptz),
+  date_trunc('minute', now() - interval '5 days'), 'last sync ignores coach corrections, coach logging and auto-finish');
+reset role;
 -- Last sync ignores push-token refreshes: Pat has only a device.
 select is(public.admin_client(:'pat')->'last_sync_at', 'null'::jsonb, 'last sync does not count push-token refreshes');
 select is(public.admin_client(:'kim')->'notifications_on', 'false'::jsonb, 'no device: notifications are off');

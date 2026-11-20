@@ -1,7 +1,7 @@
 -- Admin support actions, the test notification and "View as" data
 -- (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(68);
+select plan(77);
 
 select tests.create_user('aa-owner@t.local', 'Olive Owner') as owner \gset
 select tests.create_user('aa-support@t.local', 'Sue Port') as support \gset
@@ -39,6 +39,8 @@ select tests.create_invite(:'ws', 'aa-new@t.local', 'New Person', :'ann', 'tok-a
 select tests.create_invite(:'ws', 'aa-lee@t.local', 'Lee Ray', :'ann', 'tok-aa-lee-0000000000000') as inv_done \gset
 update public.client_invites set accepted_at = now(), accepted_by = :'lee' where id = :'inv_done';
 
+select ok(has_function_privilege('authenticated', 'public.admin_remove_client(uuid)', 'execute'),
+  'admin_remove_client stays for one release (the old admin site''s Move calls it)');
 select ok(not has_function_privilege('authenticated', 'private.remove_client_core(uuid, uuid, uuid)', 'execute'),
   'remove_client_core is not callable through the API');
 
@@ -74,6 +76,8 @@ reset role;
 select tests.act_as_aal(:'support', 'aal2');
 select throws_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws'), '22023',
   'admin: pick a different coach', 'moving to the same coach is refused');
+select throws_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', gen_random_uuid()), 'P0002',
+  'admin: no such coach', 'moving to a workspace that does not exist is refused');
 select lives_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'), 'support moves Kim');
 select throws_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'), 'P0002',
   'admin: not a client of that coach', 'someone who is not a client of that coach cannot be moved from it');
@@ -101,6 +105,29 @@ select ok(public.admin_can_invite(:'ws_b', '{aa-kim@t.local}'), 'a later resend 
 reset role;
 select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite'), 1,
   'a later resend is audited as usual');
+
+-- A pending move covers only its own admin, workspace and the next 10 minutes; every other invite is audited.
+reset role;
+insert into private.admin_pending_moves (admin_id, user_id, workspace_id) values (:'support', :'kim', :'ws');
+select tests.act_as_aal(:'support', 'aal2');
+select ok(public.admin_can_invite(:'ws_b', '{aa-kim@t.local}'), 'invite to a workspace the pending move is not for');
+reset role;
+select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite'), 2,
+  'a pending move for a different workspace does not hide the invite');
+insert into private.admin_pending_moves (admin_id, user_id, workspace_id, created_at)
+values (:'support', :'kim', :'ws_b', now() - interval '11 minutes');
+select tests.act_as_aal(:'support', 'aal2');
+select ok(public.admin_can_invite(:'ws_b', '{aa-kim@t.local}'), 'invite after the pending move expired');
+reset role;
+select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite'), 3,
+  'an expired pending move does not hide the invite');
+select tests.act_as_aal(:'owner', 'aal2');
+select ok(public.admin_can_invite(:'ws', '{aa-kim@t.local}'), 'another admin invites to the pending move''s workspace');
+reset role;
+select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite' and admin_id = :'owner'), 1,
+  'a pending move by a different admin does not hide the invite');
+select is((select count(*)::int from private.admin_pending_moves where admin_id = :'support' and workspace_id = :'ws'), 1,
+  'another admin''s invite does not use up the pending move');
 
 -- cancel only pending.
 select tests.act_as_aal(:'support', 'aal2');
@@ -195,7 +222,7 @@ select ok((:'snap_removed'::jsonb->'today'->>'date') is not null, 'snapshot for 
 -- each action wrote one audit row with the right action.
 select results_eq('select action, count(*)::int from public.admin_audit_log group by action order by action',
   $$values ('cancel_invite'::text, 1), ('log_timeline_view', 1), ('move_client', 1), ('password_reset', 2),
-    ('resend_invite', 1), ('send_test_push', 2), ('view_as_snapshot', 2)$$,
+    ('resend_invite', 4), ('send_test_push', 2), ('view_as_snapshot', 2)$$,
   'each action writes one audit row with the right action');
 select results_eq($$select target_user_id from public.admin_audit_log where action = 'log_timeline_view'$$,
   format($$values (%L::uuid)$$, :'lee'), 'the timeline view is logged against the client');

@@ -11,6 +11,9 @@
 -- 5. admin_people also lists accounts with no coach and no past-client record (kind 'account'), and gives each
 --    client's coach id so the Clients page groups by coach, not by name.
 
+-- For Last active's invite check (admin audit rows for a workspace just before an invite).
+create index admin_audit_log_action_at_idx on public.admin_audit_log (action, at);
+
 -- 1. Last active and health ---------------------------------------------------------------------------------------
 
 -- When a coach last did coaching work, or used the app or website: their latest session refresh, a workout they built,
@@ -97,7 +100,9 @@ grant execute on function public.admin_coaches() to authenticated;
 -- 3. Client page --------------------------------------------------------------------------------------------------
 
 -- As in 20261109010100_admin_reads.sql, except:
---   last_sync_at: the client's own workout logs, meals and body metrics (not push-token refreshes);
+--   last_sync_at: the client's own activity: workout logs they logged (last_activity_at, which coach corrections and the
+--     hourly auto-finish job leave alone, unlike updated_at), meals and body metrics they entered; not push-token
+--     refreshes;
 --   push_errors: the last 7 days' pushes that did not reach the phone: outcome no_device, expired or failed
 --     ({at, type, outcome, error}; error is the sender's message for failed ones, else null).
 create or replace function public.admin_client(p_user_id uuid) returns jsonb
@@ -134,7 +139,8 @@ begin
       from public.push_devices d where d.user_id = p_user_id), '[]'::jsonb),
     'notifications_on', private.admin_notifications_on(p_user_id),
     'last_sync_at', greatest(
-      (select max(l.updated_at) from public.workout_logs l where l.client_id = p_user_id),
+      (select max(l.last_activity_at) from public.workout_logs l
+       where l.client_id = p_user_id and l.logged_by = l.client_id),
       (select max(ml.updated_at) from public.meals ml where ml.client_id = p_user_id),
       (select max(bm.updated_at) from public.body_metrics bm
        where bm.client_id = p_user_id and bm.entered_by_role = 'client')),
@@ -200,8 +206,11 @@ $$;
 revoke execute on function public.admin_move_client(uuid, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.admin_move_client(uuid, uuid, uuid) to authenticated;
 
--- Replaced by admin_move_client (it removed the client from every coach, though the dialog names one).
-drop function public.admin_remove_client(uuid);
+-- Deprecated: replaced by admin_move_client (it removes the client from every coach, though the dialog names one).
+-- Kept for one release: the admin site deployed before this migration still calls it from Move until the new site is
+-- deployed. Drop it in a later migration.
+comment on function public.admin_remove_client(uuid) is
+  'Deprecated (20261120000100): use admin_move_client. Kept for the deploy window; drop in a later migration.';
 
 -- As in 20261110004000_admin_coach.sql, except a single-email invite that finishes a move (admin_move_client, in the
 -- last 10 minutes, by this admin, to this workspace) is not audited again: the move_client row is the record.
