@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import { borderWidth, buttonMinHeight, tapTarget } from '@caltracker/design-tokens';
 import {
   METRIC_CATALOGUE,
@@ -24,6 +23,8 @@ import { deleteMyMetric, saveMyMetric } from '@/lib/metrics-api';
 import { clientEditKind, lastValueLine } from '@/lib/metrics-view';
 import { stepWeightDate } from '@/lib/progress';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
+import { CloseButton } from '@/components/ui/nav-buttons';
+import { closeAsking } from '@/lib/use-discard-guard';
 import { useTheme } from '@/theme/use-theme';
 
 /**
@@ -74,6 +75,10 @@ export function LogMetricSheet({
   const unit = units ? metricUnit(key, units) : '';
   const last = units && !editing ? lastValueLine(entries, key, units, today, coachFirstName) : null;
   const kind = editing ? clientEditKind(editing) : null;
+  // Typed (or changed) value: × asks "Discard changes?", and swipe-down is held back.
+  const startValue = editing && units ? String(metricInputValue(editing.metricKey, editing.value, units)) : '';
+  const dirty = !saving && value.trim() !== startValue.trim();
+  const close = () => closeAsking(dirty, onClose);
   const dateText = date === today ? `Today, ${formatShortDate(date, today)}` : formatShortDate(date, today);
 
   async function save() {
@@ -126,7 +131,7 @@ export function LogMetricSheet({
   const title = editing ? `Change ${def.label.toLowerCase().replace('vo2', 'VO2')} from ${formatShortDate(editing.measuredOn, today)}` : 'Log a metric';
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={!dirty} onRequestClose={close}>
       <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
         {/* The pinned Save stays above the keyboard. */}
         <View style={[styles.column, styles.flex, { paddingBottom: keyboardPad }]}>
@@ -134,7 +139,7 @@ export function LogMetricSheet({
             <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" testID="metric-sheet-title">
               {title}
             </Text>
-            <CloseButton onPress={onClose} />
+            <CloseButton testID="metric-sheet-close" onPress={close} />
           </View>
           <ScrollView contentContainerStyle={{ padding: space[4], gap: space[4.5] }} keyboardShouldPersistTaps="handled">
             {!editing ? (
@@ -175,7 +180,10 @@ export function LogMetricSheet({
                   testID="metric-input"
                   accessibilityLabel={`${def.label}${unit ? ` in ${unit}` : ''}`}
                   value={value}
-                  onChangeText={setValue}
+                  onChangeText={(v) => {
+                    setValue(v);
+                    if (error?.code === 'metric_invalid') setError(null);
+                  }}
                   // No return key: on a number pad React Native would add a "Done" bar that covers the Save button.
                   keyboardType="decimal-pad"
                   editable={units !== null}
@@ -216,7 +224,7 @@ export function LogMetricSheet({
                 {last}
               </Text>
             ) : null}
-            {editing ? <TextButton testID="metric-delete" title="Delete this entry" onPress={confirmDelete} /> : null}
+            {editing ? <TextButton testID="metric-delete" title="Delete this entry" destructive onPress={confirmDelete} /> : null}
           </ScrollView>
           <View style={[styles.footer, { padding: space[4] }]}>
             <Button
@@ -233,21 +241,6 @@ export function LogMetricSheet({
   );
 }
 
-function CloseButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      testID="metric-sheet-close"
-      accessibilityRole="button"
-      accessibilityLabel="Close"
-      onPress={onPress}
-      style={({ pressed }) => [styles.close, pressed && styles.pressed]}
-    >
-      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={palette.ink} strokeWidth={2.4} strokeLinecap="round" accessibilityElementsHidden importantForAccessibility="no">
-        <Path d="M6 6l12 12M18 6L6 18" />
-      </Svg>
-    </Pressable>
-  );
-}
 
 function StepButton({ direction, label, onPress, testID, disabled = false }: { direction: 'left' | 'right'; label: string; onPress: () => void; testID: string; disabled?: boolean }) {
   return (
@@ -281,7 +274,6 @@ const styles = StyleSheet.create({
   step: { width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.4 },
   pressed: { opacity: pressedOpacity },
-  close: { width: tapTarget.min, height: tapTarget.min, borderRadius: tapTarget.min / 2, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
   footer: { borderTopWidth: 1, borderTopColor: palette.border },
 });
 

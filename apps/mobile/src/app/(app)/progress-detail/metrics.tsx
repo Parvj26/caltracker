@@ -9,6 +9,7 @@ import { LogMetricSheet } from '@/components/metrics/log-metric-sheet';
 import { HeartTile, LinkRow, Sparkline } from '@/components/metrics/parts';
 import { LoadState, OfflineNote, SectionHeader, Segmented } from '@/components/progress/parts';
 import { Screen, TextButton } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { appleHealthStatus, type AppleHealthMetric } from '@/lib/apple-health-logic';
 import { useAppleHealth, useAppleHealthDataChanged } from '@/lib/apple-health-sync';
 import { PRINTOUT_FAILED, printoutUrl } from '@/lib/body-api';
@@ -169,11 +170,11 @@ export default function MetricsScreen() {
         onSaved={reload}
       />
 
-      <Modal visible={connectOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setConnectOpen(false)}>
+      <Modal visible={connectOpen} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={() => setConnectOpen(false)}>
         <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
           <ScrollView contentContainerStyle={[styles.column, { padding: space[4], gap: space[2] }]}>
             <View style={styles.end}>
-              <TextButton testID="health-close" title="Close" onPress={() => setConnectOpen(false)} />
+              <CloseButton testID="health-close" onPress={() => setConnectOpen(false)} />
             </View>
             <AppleHealthConnect coachFirstName={coachFirst} initial={health.state?.types} onContinue={connect} />
           </ScrollView>

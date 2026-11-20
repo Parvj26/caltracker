@@ -90,10 +90,12 @@ export function Button({ title, onPress, variant = 'primary', testID, disabled =
 type TextButtonProps = {
   title: string;
   testID?: string;
+  /** Delete, Remove, Block: red text (the action itself asks to confirm). */
+  destructive?: boolean;
 } & ({ href: Href; replace?: boolean; onPress?: never } | { onPress: () => void; href?: never; replace?: never });
 
 /** Ink, underlined text that acts as a link or a quiet button. At least 44 pt tall to tap. */
-export function TextButton({ title, testID, href, replace, onPress }: TextButtonProps) {
+export function TextButton({ title, testID, href, replace, onPress, destructive = false }: TextButtonProps) {
   const { text } = useTheme();
   const body = (
     <Pressable
@@ -103,7 +105,7 @@ export function TextButton({ title, testID, href, replace, onPress }: TextButton
       hitSlop={4}
       style={({ pressed }) => [styles.textButton, pressed && styles.faded]}
     >
-      <Text style={[text('body'), styles.underline]}>{title}</Text>
+      <Text style={[text('body'), styles.underline, destructive && styles.destructive]}>{title}</Text>
     </Pressable>
   );
   return href ? (
@@ -125,4 +127,5 @@ const styles = StyleSheet.create({
   faded: { opacity: 0.75 },
   textButton: { minHeight: tapTarget.min, justifyContent: 'center', alignSelf: 'center', paddingHorizontal: 8 },
   underline: { textDecorationLine: 'underline', textAlign: 'center' },
+  destructive: { color: palette.danger },
 });

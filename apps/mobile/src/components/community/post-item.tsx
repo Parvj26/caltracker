@@ -40,6 +40,8 @@ export type PostContext = {
   onChanged: () => void;
   /** I blocked someone: hide them at once. */
   onBlocked: (userId: string) => void;
+  /** I reported a post: hide it from me at once. */
+  onReported?: (postId: string) => void;
 };
 
 const errorText = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.');
@@ -70,10 +72,11 @@ export function useContentMenu(ctx: PostContext) {
         onPress: () =>
           void report(target, reason)
             .then(() => {
+              if (target.postId) ctx.onReported?.(target.postId);
               const mayBlock = canBlock({ userId: ctx.me, isCoach: false }, { id: authorId, isCoach: ctx.coaches.has(authorId) });
               Alert.alert(
                 'Thanks for telling us',
-                'Your coach will take a look.',
+                target.postId ? 'Your coach will take a look. We’ve hidden the post for you.' : 'Your coach will take a look.',
                 mayBlock
                   ? [
                       { text: 'OK', style: 'cancel' },
@@ -111,7 +114,7 @@ export function useContentMenu(ctx: PostContext) {
           ]),
       });
     }
-    setSheet({ title: opts.kind === 'post' ? 'Post' : 'Comment', choices });
+    setSheet({ title: '', choices });
   };
 
   const element = <ChoiceSheet title={sheet?.title ?? null} choices={sheet?.choices ?? []} onClose={() => setSheet(null)} />;
@@ -129,11 +132,11 @@ export function CoachBadge() {
 }
 
 /** Name (with the Coach label) and age, beside the avatar. */
-function AuthorRow({ name, isCoach, age, avatarUrl, size, menu }: { name: string; isCoach: boolean; age: string; avatarUrl: string | null; size: number; menu?: ReactNode }) {
+function AuthorRow({ name, isCoach, age, avatarUrl, size, menu, self = false }: { name: string; isCoach: boolean; age: string; avatarUrl: string | null; size: number; menu?: ReactNode; self?: boolean }) {
   const { text, space } = useTheme();
   return (
     <View style={[styles.row, { gap: space[2.5] }]}>
-      <CoachAvatar name={name} url={avatarUrl} size={size} ring={2} />
+      <CoachAvatar name={name} url={avatarUrl} size={size} ring={2} self={self} />
       <View style={styles.flex} accessible accessibilityLabel={`${name}${isCoach ? ', coach' : ''}, ${age}`}>
         <View style={[styles.row, styles.wrap, { gap: space[1] }]}>
           <Text style={text('sectionHeading')}>{name}</Text>
@@ -147,11 +150,11 @@ function AuthorRow({ name, isCoach, age, avatarUrl, size, menu }: { name: string
 }
 
 /** One comment in the preview under a feed post: small avatar, bold name, text. */
-function PreviewLine({ comment, avatarUrl }: { comment: PreviewComment; avatarUrl: string | null }) {
+function PreviewLine({ comment, avatarUrl, self }: { comment: PreviewComment; avatarUrl: string | null; self: boolean }) {
   const { text, space } = useTheme();
   return (
     <View style={[styles.previewLine, { gap: space[2] }]} testID={`preview-comment-${comment.id}`}>
-      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} ring={1.5} />
+      <CoachAvatar name={comment.authorName} url={avatarUrl} size={28} ring={1.5} self={self} />
       <Text style={[text('body'), styles.flex]} numberOfLines={3}>
         <Text style={styles.bold}>{comment.authorName}</Text> {comment.body}
       </Text>
@@ -253,7 +256,7 @@ export function PostItem({
           <Text style={[text('caption'), styles.eyebrow]}>{pinnedByLabel(pinnerName)}</Text>
         </View>
       ) : null}
-      <AuthorRow name={post.authorName} isCoach={isCoach} age={postAge(post.createdAt, ctx.now)} avatarUrl={avatarUrl} size={detail ? 44 : 40} menu={menuButton} />
+      <AuthorRow name={post.authorName} isCoach={isCoach} age={postAge(post.createdAt, ctx.now)} avatarUrl={avatarUrl} size={detail ? 44 : 40} menu={menuButton} self={post.authorId === ctx.me} />
 
       {post.body ? <LinkedText text={post.body} testID="post-body" /> : null}
       {post.card ? <CardView card={post.card} units={ctx.units} authorName={post.authorName} /> : null}
@@ -315,7 +318,7 @@ export function PostItem({
       {preview.length > 0 || viewAll ? (
         <View style={[styles.preview, { gap: 6, paddingTop: space[2] }]} testID="comment-preview">
           {preview.map((c) => (
-            <PreviewLine key={c.id} comment={c} avatarUrl={avatarOf?.(c.authorAvatarPath) ?? null} />
+            <PreviewLine key={c.id} comment={c} avatarUrl={avatarOf?.(c.authorAvatarPath) ?? null} self={c.authorId === ctx.me} />
           ))}
           {viewAll ? (
             <Pressable

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { BackCircle } from '@/components/settings/settings-list';
-import { ErrorText, Screen } from '@/components/ui';
+import { Button, ErrorText, Screen } from '@/components/ui';
 import { DELETE_LIST, DELETE_WORD, canConfirmDelete, deleteMyAccount, historyWarning } from '@/lib/delete-account';
 import { supabase } from '@/lib/supabase';
 import { useCoachProfile } from '@/lib/use-coach-profile';
@@ -58,14 +58,8 @@ export default function DeleteAccountScreen() {
       </Pressable>
       {error ? <ErrorText testID="delete-account-error" code={error.code}>{error.text}</ErrorText> : null}
       <Text style={[text('caption'), styles.centre, styles.hint]}>The button turns on once you type {DELETE_WORD}.</Text>
-      <Pressable
-        testID="delete-account-cancel"
-        onPress={back}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.link, styles.centreSelf, pressed && styles.pressed]}
-      >
-        <Text style={[text('sectionHeading'), styles.linkLabel]}>Cancel</Text>
-      </Pressable>
+      {/* A real button, not a "Cancel" link: the way out is the ‹ at the top or this. */}
+      <Button testID="delete-account-cancel" variant="secondary" title="Keep my account" onPress={back} />
     </View>
   );
 

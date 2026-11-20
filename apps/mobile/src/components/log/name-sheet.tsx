@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, TextButton, TextField } from '@/components/ui';
+import { Button, TextField } from '@/components/ui';
+import { SheetHeader } from '@/components/ui/nav-buttons';
+import { closeAsking } from '@/lib/use-discard-guard';
 import { contentMaxWidth, palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -26,13 +28,14 @@ export function NameSheet({
     if (visible) setDraft(DEFAULT_UNPLANNED_NAME);
   }, [visible]);
 
+  const dirty = draft.trim() !== DEFAULT_UNPLANNED_NAME && draft.trim() !== '';
+  const close = () => closeAsking(dirty, onClose);
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal={!dirty} onRequestClose={close}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <View style={[styles.column, { padding: space[4], gap: space[4] }]}>
-          <Text style={text('screenTitle')} accessibilityRole="header">
-            Log a workout
-          </Text>
+          <SheetHeader title="Log a workout" closeTestID="unplanned-cancel" onClose={close} />
           <Text style={text('body')}>A blank workout: add the exercises as you go.</Text>
           <TextField
             label="Workout name"
@@ -51,7 +54,6 @@ export function NameSheet({
             busy={busy}
             onPress={() => onStart(draft.trim() || DEFAULT_UNPLANNED_NAME)}
           />
-          <TextButton testID="unplanned-cancel" title="Cancel" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>

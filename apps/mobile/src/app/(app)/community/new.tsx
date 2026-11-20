@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MAX_POST_PHOTOS, POST_BODY_MAX, PostInput, cardRequestLabel, parseCardRequest, type CommunityCard } from '@caltracker/shared';
 import { CardView } from '@/components/community/parts';
-import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
+import { Button, ErrorText, Screen } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
+import { useDiscardGuard } from '@/lib/use-discard-guard';
 import { createPost, previewCard } from '@/lib/community-api';
 import { markWorkoutShared } from '@/lib/shared-workouts';
 import { PhotoError, pickPhotos, preparePhoto, type PreparedPhoto } from '@/lib/community-photo';
@@ -53,6 +55,8 @@ export default function NewPostScreen() {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
   const [failed, setFailed] = useState(false);
+  // Typed text or picked photos: × and swipe-down ask "Discard changes?".
+  const guard = useDiscardGuard(body.trim().length > 0 || photos.length > 0);
 
   const addPhotos = async () => {
     setError(null);
@@ -93,7 +97,7 @@ export default function NewPostScreen() {
       await createPost({ postId, community, body: body.trim(), card, photos });
       completePost();
       if (card?.kind === 'workout') markWorkoutShared(card.logId);
-      router.back();
+      guard.leave(() => router.back());
     } catch {
       setFailed(true);
       setError({ code: 'post_save_failed' });
@@ -103,13 +107,18 @@ export default function NewPostScreen() {
   };
 
   return (
-    <Screen>
+    <Screen
+      inSheet
+      // Post stays pinned above the keyboard, so it is always reachable while typing.
+      footer={<Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />}
+    >
+      {/* A sheet: title on the left, the grey × on the right. */}
       <View style={[styles.row, { gap: space[2] }]}>
-        <TextButton title="Cancel" testID="new-post-cancel" onPress={() => router.back()} />
+        <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+          {card ? 'Share to community' : 'New post'}
+        </Text>
+        <CloseButton testID="new-post-cancel" onPress={() => router.back()} />
       </View>
-      <Text style={text('screenTitle')} accessibilityRole="header">
-        {card ? 'Share to community' : 'New post'}
-      </Text>
       {card && preview && units ? (
         <View testID="community-card-preview">
           <CardView card={preview} units={units} authorName="You" />
@@ -128,9 +137,18 @@ export default function NewPostScreen() {
         multiline
         maxLength={POST_BODY_MAX}
         value={body}
-        onChangeText={setBody}
-        style={[text('body'), styles.input, { borderRadius: radius.input, padding: space[3.5], minHeight: 120 }]}
+        // Straight into typing for a plain post (not while the photo picker opens, nor for a shared card, whose
+        // caption is optional).
+        autoFocus={params.photos !== '1' && !card}
+        onChangeText={(t) => {
+          setBody(t);
+          // "Write something" goes as soon as there is something.
+          if (error?.code === 'post_empty' && t.trim()) setError(null);
+        }}
+        style={[text('body'), styles.input, error?.code === 'post_empty' && styles.inputInvalid, { borderRadius: radius.input, padding: space[3.5], minHeight: 120 }]}
       />
+      {/* Errors sit right under the box (photo errors too: the photos come next). */}
+      {error ? <ErrorText testID="new-post-error" code={error.code}>{error.text}</ErrorText> : null}
       {photos.length > 0 ? (
         <View style={[styles.row, styles.wrap, { gap: space[2] }]}>
           {photos.map((p, i) => (
@@ -158,8 +176,6 @@ export default function NewPostScreen() {
           onPress={() => void addPhotos()}
         />
       ) : null}
-      {error ? <ErrorText testID="new-post-error" code={error.code}>{error.text}</ErrorText> : null}
-      <Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />
     </Screen>
   );
 }
@@ -167,9 +183,11 @@ export default function NewPostScreen() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
-  input: { borderWidth: 2, borderColor: palette.border, textAlignVertical: 'top', color: palette.ink },
+  flex: { flex: 1 },
+  input: { borderWidth: 2, borderColor: palette.borderStrong, textAlignVertical: 'top', color: palette.ink },
+  inputInvalid: { borderColor: palette.danger },
   thumb: { width: 80, height: 80 },
-  cardChip: { backgroundColor: palette.lime },
+  cardChip: { backgroundColor: palette.surface },
   remove: { position: 'absolute', top: 0, right: 0, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   removeText: { color: palette.bg, textShadowColor: palette.ink, textShadowRadius: 4 },
 });

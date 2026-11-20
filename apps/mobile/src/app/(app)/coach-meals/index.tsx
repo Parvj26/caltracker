@@ -5,8 +5,9 @@ import { COACH_MEAL_CHIPS, filterCoachMeals, type CoachMealChip } from '@caltrac
 import { CoachMealTile } from '@/components/food/coach-meal-tile';
 import { FoodInput } from '@/components/food/food-input';
 import { font, foodText } from '@/components/food/food-type';
-import { BackIcon, SearchIcon } from '@/components/food/icons';
+import { SearchIcon } from '@/components/food/icons';
 import { Screen } from '@/components/ui';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { coachMealPhotoUrls } from '@/lib/coach-meals-api';
 import { useFood } from '@/lib/use-food';
 import { palette, pressedOpacity, white } from '@/theme/theme';
@@ -69,15 +70,7 @@ export default function CoachMealsScreen() {
       }}
     >
       <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Back to Coach"
-          testID="coach-meals-back"
-          style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
-        >
-          <BackIcon />
-        </Pressable>
+        <BackButton testID="coach-meals-back" accessibilityLabel="Back to Coach" fallback="/coach" />
         <View style={styles.flex}>
           <Text style={font(800, 24)} accessibilityRole="header">
             Meals from {who}
@@ -158,7 +151,7 @@ const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.ink },
   input: { minHeight: 44 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: palette.ink, backgroundColor: palette.bg, justifyContent: 'center' },
+  chip: { minHeight: 44, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: palette.ink, backgroundColor: palette.bg, justifyContent: 'center' },
   chipOn: { backgroundColor: palette.ink, borderWidth: 2 },
   onInk: { color: white },
   // Equal cells (the tile's border sat outside its flex share, so a lone tile came out wider than the spacer).

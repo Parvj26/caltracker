@@ -26,6 +26,7 @@ import { useHub, usePullRefresh } from '@/lib/use-progress-data';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { useStacked } from '@/components/today/parts';
 
 /**
  * Strength: one exercise at a time (picked from a searchable list, or a chip for the three most trained in the last 3
@@ -35,6 +36,7 @@ import { useTheme } from '@/theme/use-theme';
  */
 export default function StrengthScreen() {
   const { text, space, radius } = useTheme();
+  const stacked = useStacked();
   const params = useLocalSearchParams<{ exercise?: string }>();
   const userId = useSession().session?.user.id ?? null;
   const units = useUnits() ?? 'lb';
@@ -136,15 +138,16 @@ export default function StrengthScreen() {
               </View>
             ) : null}
 
-            <View style={[styles.tiles, { gap: space[3] }]}>
+            {/* Side by side; one column at large text sizes so neither number is squeezed. */}
+            <View style={[stacked ? null : styles.tiles, { gap: space[3] }]}>
               <View
                 testID="strength-value"
                 accessible
                 accessibilityLabel={`Heaviest weight: ${view.stats.heaviest ?? 'none'}${view.stats.change ? `, ${view.stats.change.text}` : ''}`}
-                style={[styles.tile, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
+                style={[styles.tile, !stacked && styles.half, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
               >
                 <Text style={text('caption')}>Heaviest weight</Text>
-                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit>
+                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.4}>
                   {view.stats.heaviest ?? '–'}
                 </Text>
                 {view.stats.change ? <Text style={[text('sectionHeading'), styles.change]}>{view.stats.change.text}</Text> : null}
@@ -153,10 +156,10 @@ export default function StrengthScreen() {
                 testID="strength-e1rm"
                 accessible
                 accessibilityLabel={`Estimated 1-rep max: ${view.stats.e1rm ?? 'none'}, ${view.stats.e1rmDetail}`}
-                style={[styles.tile, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
+                style={[styles.tile, !stacked && styles.half, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
               >
                 <Text style={text('caption')}>Estimated 1-rep max</Text>
-                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit>
+                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.4}>
                   {view.stats.e1rm ?? '–'}
                 </Text>
                 <Text style={text('caption')}>{view.stats.e1rmDetail}</Text>
@@ -248,7 +251,8 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: palette.ink },
   onInk: { color: white },
   tiles: { flexDirection: 'row' },
-  tile: { flex: 1, minWidth: 0, backgroundColor: palette.surface },
+  tile: { backgroundColor: palette.surface },
+  half: { flex: 1, minWidth: 0 },
   change: { color: palette.magentaDeep },
   session: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget.min, borderWidth: borderWidth.card, borderColor: palette.border },
   yetTag: { color: palette.magentaDeep, backgroundColor: palette.pink, overflow: 'hidden', paddingVertical: 2 },

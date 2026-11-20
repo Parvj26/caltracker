@@ -3,18 +3,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { badgeLabel, coachFilterLabel, communitySubtitle, filterFeed, sortFeed, withoutBlocked, type FeedFilter } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
-import { BackIcon, BellIcon, PhotoIcon } from '@/components/community/icons';
+import { BellIcon, PhotoIcon } from '@/components/community/icons';
 import { PostItem, type PostContext } from '@/components/community/post-item';
 import { usePostMedia } from '@/components/community/use-post-media';
 import { Card, ErrorText, Screen } from '@/components/ui';
+import { CountBadge } from '@/components/ui/count-badge';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { loadFeed, memberCount, myProfile, namesOf, type FeedPost } from '@/lib/community-api';
 import { useLive } from '@/lib/community-live';
 import { useCommunity } from '@/lib/use-community';
 import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
-import { palette, pressedOpacity, white } from '@/theme/theme';
+import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
-import { fontFamilyFor } from '@/theme/fonts';
 import type { ShownError } from '@/lib/error-shown';
 
 /**
@@ -27,7 +28,7 @@ export default function CommunityScreen() {
   const { session, workspace } = useSession();
   const me = session?.user.id ?? '';
   const units = useUnits() ?? 'lb';
-  const { community, ready, removed, offline, coaches, blocked, setBlocked, unread, refresh } = useCommunity();
+  const { community, ready, removed, offline, coaches, blocked, setBlocked, unread, refresh, reported, hideReported } = useCommunity();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
   const [error, setError] = useState<ShownError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +92,7 @@ export default function CommunityScreen() {
     () => void load(),
   );
 
-  const visible = useMemo(() => sortFeed(withoutBlocked(posts ?? [], blocked)), [posts, blocked]);
+  const visible = useMemo(() => sortFeed(withoutBlocked(posts ?? [], blocked)).filter((p) => !reported.has(p.id)), [posts, blocked, reported]);
   const shown = useMemo(() => filterFeed(visible, filter, coaches), [visible, filter, coaches]);
   const myAvatarPaths = useMemo(() => [profile?.avatarPath ?? null], [profile]);
   const media = usePostMedia(visible, myAvatarPaths, blocked);
@@ -105,6 +106,7 @@ export default function CommunityScreen() {
         now,
         onChanged: () => void load(),
         onBlocked: (id) => setBlocked(new Set([...blocked, id])),
+        onReported: hideReported,
       }
     : null;
 
@@ -127,17 +129,11 @@ export default function CommunityScreen() {
       }}
     >
       <View style={[styles.row, { gap: space[2.5] }]}>
-        <Pressable
-          testID="community-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/coach'))}
-          style={({ pressed }) => [circle, pressed && { opacity: pressedOpacity }]}
-        >
-          <BackIcon />
-        </Pressable>
+        <BackButton testID="community-back" fallback="/coach" />
         <View style={styles.flex} accessibilityRole="header" accessible accessibilityLabel={subtitle ? `Community, ${subtitle}` : 'Community'}>
-          <Text style={text('screenTitle')}>Community</Text>
+          <Text style={text('screenTitle')} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            Community
+          </Text>
           {subtitle ? (
             <Text style={text('caption')} testID="community-subtitle" numberOfLines={1}>
               {subtitle}
@@ -153,11 +149,7 @@ export default function CommunityScreen() {
             style={({ pressed }) => [circle, pressed && { opacity: pressedOpacity }]}
           >
             <BellIcon />
-            {badge ? (
-              <View style={[styles.badge, { borderRadius: radius.pill, paddingHorizontal: space[1] }]}>
-                <Text style={[text('caption'), styles.badgeText]}>{badge}</Text>
-              </View>
-            ) : null}
+            {badge ? <CountBadge label={badge} corner /> : null}
           </Pressable>
         ) : null}
       </View>
@@ -176,7 +168,7 @@ export default function CommunityScreen() {
       {community && ctx ? (
         <View style={{ gap: space[3.5] }}>
           <View style={[styles.row, styles.shareBox, { borderRadius: radius.card, gap: space[2.5], paddingHorizontal: space[3], paddingVertical: space[2.5] }]}>
-            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} ring={2} />
+            <CoachAvatar name={profile?.name ?? 'You'} url={media.avatarOf(profile?.avatarPath ?? null)} size={40} ring={2} self />
             <Pressable
               testID="community-new-post"
               accessibilityRole="button"
@@ -254,8 +246,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   ink: { color: palette.ink },
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
-  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, alignItems: 'center', backgroundColor: palette.magenta },
-  badgeText: { color: white, fontFamily: fontFamilyFor('sans', 800) },
   shareBox: { borderWidth: 2, borderColor: palette.ink },
   shareText: { flex: 1, minHeight: 44, justifyContent: 'center' },
   placeholder: { color: palette.inkMuted },

@@ -5,13 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { FEELINGS, type Feeling } from '@caltracker/shared';
 import { Button, TextButton, TextField } from '@/components/ui';
+import { CloseButton, SheetHeader } from '@/components/ui/nav-buttons';
 import { sheetDraft, type FinishModel, type SubstituteCard } from '@/lib/log-flow-model';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const NOTE_MAX = 1900;
 
-/** A sheet from the bottom with a title, some lines and an OK. Tapping outside closes it. */
+/** A sheet from the bottom with a title and some lines. The grey ×, or tapping outside, closes it. */
 export function InfoSheet({
   title,
   lines,
@@ -30,15 +31,12 @@ export function InfoSheet({
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <SafeAreaView edges={['bottom']} style={[styles.sheet, { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }]}>
         <View testID={testID} style={[styles.column, { gap: space[3], padding: space[4.5] }]}>
-          <Text style={text('screenTitle')} accessibilityRole="header">
-            {title ?? ''}
-          </Text>
+          <SheetHeader title={title ?? ''} closeTestID={`${testID}-ok`} onClose={onClose} />
           {lines.map((l, i) => (
             <Text key={i} style={text('body')}>
               {l}
             </Text>
           ))}
-          <Button testID={`${testID}-ok`} title="OK" variant="secondary" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>
@@ -64,7 +62,10 @@ export function SubstituteSheet({
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <SafeAreaView edges={['bottom']} style={[styles.sheet, { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }]}>
         <View testID="substitute-sheet" accessibilityViewIsModal style={[styles.column, { gap: space[3], padding: space[4.5] }]}>
-          <Text style={text('caption')}>{context ?? ''}</Text>
+          <View style={[styles.headRow, { gap: space[2] }]}>
+            <Text style={[text('caption'), styles.flex]}>{context ?? ''}</Text>
+            <CloseButton testID="substitute-cancel" onPress={onClose} />
+          </View>
           <Text style={text('screenTitle')} accessibilityRole="header">
             Which one are you doing?
           </Text>
@@ -91,7 +92,6 @@ export function SubstituteSheet({
             </Pressable>
           ))}
           <Text style={text('caption')}>Your coach will see which one you did.</Text>
-          <TextButton testID="substitute-cancel" title="Cancel" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>
@@ -140,12 +140,11 @@ export function FinishSheet({
   }, [visible]);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => onKeepGoing(feel, note)}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={() => onKeepGoing(feel, note)}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <ScrollView testID="finish-sheet" keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={[styles.column, { padding: space[4], gap: space[4] }]}>
-          <Text style={text('screenTitle')} accessibilityRole="header">
-            Finish workout?
-          </Text>
+          {/* × keeps going (the feeling and note are kept as a draft), like swipe-down. */}
+          <SheetHeader title="Finish workout?" closeTestID="finish-close" onClose={() => onKeepGoing(feel, note)} />
           <Text testID="finish-count" style={text('body')}>
             {[model.headline, model.unticked].filter(Boolean).join(' ')}
           </Text>
@@ -155,7 +154,7 @@ export function FinishSheet({
                 Complete at least one set to finish.
               </Text>
               <Button testID="finish-keep-going" title="Keep going" onPress={() => onKeepGoing(feel, note)} />
-              <TextButton testID="finish-discard" title="Discard workout" onPress={onDiscard} />
+              <TextButton testID="finish-discard" title="Discard workout" destructive onPress={onDiscard} />
             </>
           ) : (
             <>
@@ -221,6 +220,8 @@ const styles = StyleSheet.create({
   onInk: { color: palette.bg },
   actions: { flexDirection: 'row' },
   card: { minHeight: tapTarget.logging, backgroundColor: palette.surface },
-  cardChosen: { backgroundColor: palette.lime },
+  // Chosen = ink outline (lime is only for creating).
+  cardChosen: { backgroundColor: palette.bg, borderWidth: 2, borderColor: palette.ink },
+  headRow: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1 },
 });

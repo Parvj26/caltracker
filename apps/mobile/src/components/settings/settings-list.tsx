@@ -1,7 +1,6 @@
-import { useRouter, type Href } from 'expo-router';
+import type { Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from './icons';
@@ -80,19 +79,11 @@ export function SettingsRow({
 
 /** The grey circle ‹ that goes back exactly one step (the Patterns board), or to `fallback` when there is nothing behind. */
 export function BackCircle({ label, fallback, testID }: { label: string; fallback: Href; testID: string }) {
-  const router = useRouter();
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={() => (router.canGoBack() ? router.back() : router.replace(fallback))}
-      style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-    >
-      <ChevronIcon direction="left" />
-    </Pressable>
-  );
+  // The app's one back control (grey circle ‹), so Settings pages look like every other page.
+  return <BackButton testID={testID} accessibilityLabel={label} fallback={fallback} />;
 }
+
+import { BackButton } from '@/components/ui/nav-buttons';
 
 const styles = StyleSheet.create({
   groupTitle: { textTransform: 'uppercase', letterSpacing: 0.6 },
@@ -103,12 +94,4 @@ const styles = StyleSheet.create({
   danger: { color: palette.danger },
   dim: { opacity: 0.55 },
   pressed: { opacity: pressedOpacity },
-  back: {
-    width: tapTarget.min,
-    height: tapTarget.min,
-    borderRadius: tapTarget.min / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.surface,
-  },
 });

@@ -1,20 +1,20 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { COMMENT_BODY_MAX, CommentInput, commentCountLabel, postAge, withoutBlocked } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
-import { BackIcon } from '@/components/community/icons';
 import { LinkedText } from '@/components/community/parts';
 import { CoachBadge, PostItem, openPostMenu, useContentMenu, type PostContext } from '@/components/community/post-item';
 import { useReactions } from '@/components/community/reactions';
 import { usePostMedia } from '@/components/community/use-post-media';
 import { ErrorText, Screen } from '@/components/ui';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { addComment, deleteComment, loadComments, loadPost, type FeedComment, type FeedPost } from '@/lib/community-api';
 import { useLive } from '@/lib/community-live';
 import { useCommunity } from '@/lib/use-community';
 import { useSession } from '@/lib/session';
 import { useUnits } from '@/lib/use-units';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import type { ShownError } from '@/lib/error-shown';
@@ -27,8 +27,10 @@ export default function PostScreen() {
   const { session } = useSession();
   const me = session?.user.id ?? '';
   const units = useUnits() ?? 'lb';
-  const { community, coaches, blocked, setBlocked } = useCommunity();
+  const { community, coaches, blocked, setBlocked, reported, hideReported } = useCommunity();
   const [post, setPost] = useState<FeedPost | null | undefined>(undefined);
+  // Set once this page has gone back, so a follow-up Block (after Report) doesn't pop a second screen.
+  const left = useRef(false);
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [error, setError] = useState<ShownError | null>(null);
   const [draft, setDraft] = useState('');
@@ -81,7 +83,17 @@ export default function PostScreen() {
         onChanged: () => void load(),
         onBlocked: (uid) => {
           setBlocked(new Set([...blocked, uid]));
-          if (post?.authorId === uid) router.back();
+          if (post?.authorId === uid && !left.current && router.canGoBack()) {
+            left.current = true;
+            router.back();
+          }
+        },
+        onReported: (postId) => {
+          hideReported(postId);
+          if (!left.current && router.canGoBack()) {
+            left.current = true;
+            router.back();
+          }
         },
       }
     : null;
@@ -90,7 +102,7 @@ export default function PostScreen() {
   const menu = useContentMenu(ctx ?? fallbackCtx);
   // A deleted post leaves the page.
   const postMenu = useContentMenu({ ...(ctx ?? fallbackCtx), onChanged: () => (router.canGoBack() ? router.back() : router.replace('/community')) });
-  const showPost = post && ctx && !blocked.has(post.authorId);
+  const showPost = post && ctx && !blocked.has(post.authorId) && !reported.has(post.id);
 
   const send = async () => {
     const parsed = CommentInput.safeParse(draft);
@@ -114,7 +126,6 @@ export default function PostScreen() {
   const circle = [styles.circle, { borderRadius: radius.pill }];
   const footer = post ? (
     <View style={{ gap: space[1] }}>
-      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
       <View style={[styles.row, { gap: space[2] }]}>
         <TextInput
           testID="comment-input"
@@ -124,7 +135,11 @@ export default function PostScreen() {
           multiline
           maxLength={COMMENT_BODY_MAX}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(t) => {
+            setDraft(t);
+            // "Write something" goes as soon as there is something.
+            if (error?.code === 'comment_empty' && t.trim()) setError(null);
+          }}
           style={[text('body'), styles.input, { borderRadius: radius.pill, paddingHorizontal: space[3.5], paddingVertical: space[2.5] }]}
         />
         <Pressable
@@ -141,24 +156,18 @@ export default function PostScreen() {
             pressed && { opacity: pressedOpacity },
           ]}
         >
-          {sending ? <ActivityIndicator color={palette.ink} /> : <Text style={[text('sectionHeading'), styles.ink]}>Post</Text>}
+          {sending ? <ActivityIndicator color={white} /> : <Text style={[text('sectionHeading'), styles.onInk]}>Post</Text>}
         </Pressable>
       </View>
+      {/* Under the box it is about (Patterns board: errors sit under the field). */}
+      {error ? <ErrorText code={error.code}>{error.text}</ErrorText> : null}
     </View>
   ) : undefined;
 
   return (
     <Screen footer={footer}>
       <View style={[styles.row, { gap: space[2.5] }]}>
-        <Pressable
-          testID="post-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back to Community"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/community'))}
-          style={({ pressed }) => [circle, pressed && { opacity: pressedOpacity }]}
-        >
-          <BackIcon />
-        </Pressable>
+        <BackButton testID="post-back" accessibilityLabel="Back to Community" fallback="/community" />
         <Text style={[text('sectionHeading'), styles.title, styles.flex]} accessibilityRole="header">
           Post
         </Text>
@@ -228,7 +237,7 @@ function CommentItem({
   const reactions = useReactions({ target: { commentId: c.id }, rows: c.reactions, me, onChanged });
   return (
     <Pressable accessible={false} onLongPress={reactions.openPicker} style={[styles.commentRow, { gap: space[2.5] }]} testID={`comment-${c.id}`}>
-      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} ring={2} />
+      <CoachAvatar name={c.authorName} url={avatarUrl} size={34} ring={2} self={c.authorId === me} />
       <View style={[styles.flex, { gap: space[1] }]}>
         <View style={[styles.bubble, { paddingVertical: space[2], paddingLeft: space[3], gap: 2 }]}>
           <View style={styles.row}>
@@ -242,7 +251,6 @@ function CommentItem({
               accessibilityRole="button"
               accessibilityLabel={`More options for ${c.authorName}’s comment`}
               onPress={onMenu}
-              hitSlop={{ top: 10, bottom: 10 }}
               style={({ pressed }) => [styles.menuButton, pressed && { opacity: pressedOpacity }]}
             >
               <Text style={text('body')}>•••</Text>
@@ -268,10 +276,11 @@ const styles = StyleSheet.create({
   circle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
   commentRow: { flexDirection: 'row', alignItems: 'flex-start' },
   bubble: { backgroundColor: palette.surface, borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  // Drawn small so the bubble stays tight (as in the mockup); the 44 pt tap area comes from hitSlop.
-  menuButton: { minWidth: 44, height: 24, alignItems: 'center', justifyContent: 'center' },
-  ink: { color: palette.ink },
-  send: { minHeight: 44, justifyContent: 'center', borderWidth: 2, borderColor: palette.ink, backgroundColor: palette.lime },
+  // A full 44 pt target; the negative margins keep the bubble as tight as the mockup draws it.
+  menuButton: { minWidth: 44, minHeight: 44, marginVertical: -10, alignItems: 'center', justifyContent: 'center' },
+  onInk: { color: white },
+  // Main action: ink (lime is only for creating something).
+  send: { minHeight: 44, justifyContent: 'center', backgroundColor: palette.ink },
   sendOff: { opacity: 0.5 },
   input: { flex: 1, minHeight: 44, maxHeight: 120, borderWidth: 1.5, borderColor: palette.ink, color: palette.ink, textAlignVertical: 'center' },
 });

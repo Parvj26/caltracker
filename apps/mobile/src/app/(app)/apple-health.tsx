@@ -1,16 +1,14 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { tapTarget } from '@caltracker/design-tokens';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { METRIC_CATALOGUE } from '@caltracker/shared';
 import { AppleHealthConnect } from '@/components/metrics/apple-health-connect';
 import { HeartTile, SwitchRow } from '@/components/metrics/parts';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
-import { ChevronIcon } from '@/components/ui/icons';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { APPLE_HEALTH_METRICS, APPLE_HEALTH_NOTES, ASK_FAILED, appleHealthStatus } from '@/lib/apple-health-logic';
 import { useAppleHealth } from '@/lib/apple-health-sync';
 import { useCoachProfile } from '@/lib/use-coach-profile';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const REMOVE_FAILED = 'Could not remove the imported readings. Check your connection and try again.';
@@ -21,7 +19,6 @@ const REMOVE_FAILED = 'Could not remove the imported readings. Check your connec
  * "no readings found" points to iPhone Settings.
  */
 export default function AppleHealthScreen() {
-  const router = useRouter();
   const { text, space, radius } = useTheme();
   const coach = useCoachProfile();
   const coachFirst = coach?.name.split(' ')[0] ?? null;
@@ -77,15 +74,7 @@ export default function AppleHealthScreen() {
     <Screen>
       <View style={{ gap: space[4] }}>
         <View style={[styles.row, { gap: space[2] }]}>
-          <Pressable
-            testID="apple-health-back"
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))}
-            style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-          >
-            <ChevronIcon direction="left" />
-          </Pressable>
+          <BackButton testID="apple-health-back" fallback="/today" />
           <Text style={text('screenTitle')} accessibilityRole="header">
             Apple Health
           </Text>
@@ -98,7 +87,7 @@ export default function AppleHealthScreen() {
         ) : !state ? null : !state.enabled ? (
           <>
             <AppleHealthConnect coachFirstName={coachFirst} initial={state.types} onContinue={async (types) => void (await health.connect(types))} />
-            <TextButton testID="apple-health-remove" title="Remove imported readings" onPress={removeImported} />
+            <TextButton testID="apple-health-remove" title="Remove imported readings" destructive onPress={removeImported} />
           </>
         ) : (
           <>
@@ -151,8 +140,6 @@ export default function AppleHealthScreen() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1 },
-  back: { width: tapTarget.min, height: tapTarget.min, borderRadius: tapTarget.min / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface },
-  pressed: { opacity: pressedOpacity },
   list: { borderTopWidth: 1, borderTopColor: palette.border },
   note: { backgroundColor: palette.celebrateBg },
 });

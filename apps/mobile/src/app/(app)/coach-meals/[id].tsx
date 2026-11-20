@@ -4,8 +4,8 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MACRO_KEYS, formatMacro, type MacroKey } from '@caltracker/shared';
 import { font, foodText, inkShadow } from '@/components/food/food-type';
-import { BackIcon } from '@/components/food/icons';
 import { Button, Screen } from '@/components/ui';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { coachMealPhotoUrls } from '@/lib/coach-meals-api';
 import { useFood } from '@/lib/use-food';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -48,15 +48,7 @@ export default function CoachMealScreen() {
   };
 
   const back = (
-    <Pressable
-      onPress={() => router.back()}
-      accessibilityRole="button"
-      accessibilityLabel="Back to meals"
-      testID="coach-meal-back"
-      style={({ pressed }) => [meal.photo ? [styles.back, styles.backOver, { top: insets.top + 4 }] : styles.back, pressed && { opacity: pressedOpacity }]}
-    >
-      <BackIcon />
-    </Pressable>
+    <BackButton testID="coach-meal-back" accessibilityLabel="Back to meals" fallback="/coach-meals" style={meal.photo ? [styles.backOver, { top: insets.top + 4 }] : undefined} />
   );
 
   return (
@@ -118,7 +110,7 @@ export default function CoachMealScreen() {
           testID="coach-meal-log"
           style={({ pressed }) => [styles.log, inkShadow, pressed && { opacity: pressedOpacity }]}
         >
-          <Text style={font(800, 17)}>Log this meal</Text>
+          <Text style={[font(800, 17), styles.onInk]}>Log this meal</Text>
         </Pressable>
       </View>
     </View>
@@ -150,5 +142,7 @@ const styles = StyleSheet.create({
   ingredients: { lineHeight: 24 },
   howTo: { lineHeight: 22 },
   sticky: { position: 'absolute', left: 16, right: 16 },
-  log: { minHeight: 56, borderRadius: 18, borderWidth: 2, borderColor: palette.ink, backgroundColor: palette.lime, alignItems: 'center', justifyContent: 'center' },
+  // Main action: ink (lime is only for creating something).
+  log: { minHeight: 56, borderRadius: 18, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
+  onInk: { color: palette.bg },
 });

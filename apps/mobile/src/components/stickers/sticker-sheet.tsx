@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
 import { Button, Toast, useReduceMotion } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { formatEarned, type AlbumItem } from '@/lib/album-logic';
 import { shareHref, stickerShareCard } from '@/lib/community-share';
 import { useSaveCard } from '@/lib/use-save-card';
@@ -28,6 +29,10 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
       <Pressable style={styles.scrim} onPress={close} accessibilityLabel="Close" />
       {item ? (
         <View style={[styles.sheet, { padding: space[6], gap: space[3], borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }]} testID="sticker-sheet">
+          {/* The sheet's grey × top-right (Patterns board), not a "Close" button at the bottom. */}
+          <View style={styles.closeRow}>
+            <CloseButton testID="sheet-close" onPress={close} />
+          </View>
           <View style={styles.center}>
             <Sticker stickerKey={item.key} size={stickerTheme.sheetSize} shiny={item.shiny} />
           </View>
@@ -61,7 +66,6 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
           ) : null}
           <Button variant="secondary" title="Save image" testID="sheet-save" busy={saving} onPress={() => void save()} />
           <Toast message={toast} onHide={clearToast} testID="sheet-save-toast" />
-          <Button title="Close" testID="sheet-close" onPress={close} />
           <OffScreen>
             <ShareCard
               ref={card}
@@ -78,6 +82,8 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
 }
 
 const styles = StyleSheet.create({
+  // zIndex keeps the × above the sticker row it overlaps, so the whole button takes taps.
+  closeRow: { alignItems: 'flex-end', marginBottom: -44, zIndex: 1, elevation: 1 },
   scrim: { flex: 1, backgroundColor: palette.ink, opacity: stickerTheme.scrimOpacity },
   sheet: { backgroundColor: palette.bg },
   center: { alignItems: 'center' },

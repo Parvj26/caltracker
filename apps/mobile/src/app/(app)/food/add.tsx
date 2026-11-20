@@ -15,11 +15,12 @@ import {
 } from '@caltracker/shared';
 import { FoodInput } from '@/components/food/food-input';
 import { font, foodText } from '@/components/food/food-type';
-import { CameraIcon, CloseIcon, SearchIcon } from '@/components/food/icons';
+import { CameraIcon, SearchIcon } from '@/components/food/icons';
 import { MealThumb } from '@/components/food/meal-thumb';
 import { UndoToast } from '@/components/food/undo-toast';
 import { WhenLine } from '@/components/food/when-picker';
 import { ErrorText } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { coachMealPhotoUrls } from '@/lib/coach-meals-api';
 import { PhotoError } from '@/lib/compress-photo';
 import type { ShownError } from '@/lib/error-shown';
@@ -150,15 +151,7 @@ export default function AddMealScreen() {
             <Text style={[font(800, 24), styles.flex]} accessibilityRole="header">
               Add a meal
             </Text>
-            <Pressable
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              testID="add-meal-close"
-              style={({ pressed }) => [styles.close, pressed && { opacity: pressedOpacity }]}
-            >
-              <CloseIcon />
-            </Pressable>
+            <CloseButton testID="add-meal-close" onPress={() => router.back()} />
           </View>
 
           <WhenLine when={when} today={today} onChange={setPicked} testID="add-meal-when" />
@@ -280,7 +273,6 @@ const styles = StyleSheet.create({
   column: { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center', paddingHorizontal: 16 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   flex: { flex: 1 },
-  close: { width: 44, height: 44, borderRadius: 22, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
   search: {
     marginTop: 6,
     minHeight: 50,

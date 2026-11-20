@@ -40,7 +40,7 @@ export function Sparkline({ points, width = 96, height = 34 }: { points: readonl
   );
 }
 
-/** A labelled on/off row in the app's switch style (ink knob, lime track when on). */
+/** A labelled on/off row in the app's switch style (ink track and white knob when on; lime is only for creating). */
 export function SwitchRow({
   label,
   note,
@@ -74,7 +74,7 @@ export function SwitchRow({
         {note ? <Text style={text('caption')}>{note}</Text> : null}
       </View>
       <View style={[styles.track, on ? styles.trackOn : styles.trackOff]}>
-        <View style={styles.knob} />
+        <View style={[styles.knob, on && styles.knobOn]} />
       </View>
     </Pressable>
   );
@@ -140,7 +140,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     minWidth: tapTarget.min,
   },
-  trackOn: { backgroundColor: palette.lime, alignItems: 'flex-end' },
+  trackOn: { backgroundColor: palette.ink, alignItems: 'flex-end' },
   trackOff: { backgroundColor: palette.surface, alignItems: 'flex-start' },
   knob: { width: KNOB, height: KNOB, borderRadius: KNOB / 2, backgroundColor: palette.ink },
+  knobOn: { backgroundColor: palette.bg },
 });

@@ -25,7 +25,7 @@ import {
   type PlannedWorkout,
   type StripDay,
 } from '@/lib/workouts-plan';
-import { palette, pressedOpacity, radius, white } from '@/theme/theme';
+import { palette, pressedOpacity, radius, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import { ChevronIcon, HistoryIcon } from '@/components/ui/icons';
@@ -146,8 +146,9 @@ export default function Workouts() {
 
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
-      <View style={[styles.row, { gap: space[2] }]}>
-        <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+      {/* At large text sizes History moves under the title instead of squeezing it letter by letter. */}
+      <View style={[styles.row, styles.wrapRow, { gap: space[2] }]}>
+        <Text style={[text('screenTitle'), styles.titleGrow]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
           Workouts
         </Text>
         <HistoryButton onPress={() => router.push('/history')} />
@@ -272,10 +273,15 @@ function WeekArrow({ label, direction, onPress }: { label: string; direction: 'l
   );
 }
 
-/** One day of the strip: today filled ink, workout days outlined with a dot (✓ once done), rest days light. */
+/** Day chips stop growing here, so seven still fit across a phone at the largest text sizes. */
+const DAY_MAX_SCALE = 1.4;
+
+/**
+ * One day of the strip (same rule as Food's): the selected day has a thick ink outline, today has a small blue dot on
+ * top, workout days are grey with a ● (✓ once done), rest days light. Text stops growing at 1.4× so the seven fit.
+ */
 function DayButton({ day, onPress }: { day: StripDay; onPress: () => void }) {
   const { text, radius } = useTheme();
-  const onInk = day.isToday ? styles.onInk : null;
   const mark = day.done ? '✓' : day.hasWorkout ? '●' : '';
   return (
     <Pressable
@@ -288,16 +294,16 @@ function DayButton({ day, onPress }: { day: StripDay; onPress: () => void }) {
         styles.day,
         { borderRadius: radius.input + 2, paddingVertical: 6 },
         day.hasWorkout ? styles.dayWorkout : styles.dayRest,
-        day.selected && !day.isToday && styles.daySelected,
-        day.isToday && styles.dayToday,
+        day.selected && styles.daySelected,
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[text('caption'), styles.dayDow, !day.hasWorkout && !day.isToday && styles.muted, onInk]}>{day.dow}</Text>
-      <Text style={[text('sectionHeading'), styles.dayNum, !day.hasWorkout && !day.isToday && styles.muted, onInk]}>
+      <View testID={day.isToday ? 'today-dot' : undefined} style={[styles.todayDot, day.isToday && styles.todayDotOn]} />
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} style={[text('caption'), styles.dayDow, !day.hasWorkout && !day.isToday && styles.muted]}>{day.dow}</Text>
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} style={[text('sectionHeading'), styles.dayNum, !day.hasWorkout && !day.isToday && styles.muted]}>
         {day.num}
       </Text>
-      <Text testID={day.done ? `done-mark-${day.date}` : undefined} style={[text('caption'), styles.dayMark, onInk]}>
+      <Text maxFontSizeMultiplier={DAY_MAX_SCALE} testID={day.done ? `done-mark-${day.date}` : undefined} style={[text('caption'), styles.dayMark]}>
         {mark}
       </Text>
     </Pressable>
@@ -430,21 +436,24 @@ const styles = StyleSheet.create({
     gap: 2,
     borderWidth: borderWidth.card,
   },
-  dayWorkout: { backgroundColor: palette.surface, borderColor: palette.ink },
+  dayWorkout: { backgroundColor: palette.surface, borderColor: palette.surface },
   dayRest: { backgroundColor: palette.bg, borderColor: palette.border },
-  daySelected: { backgroundColor: palette.lime, borderColor: palette.ink },
-  dayToday: { backgroundColor: palette.ink, borderColor: palette.ink },
+  // Selected: a thick ink outline (lime is only for creating; ink fill is no longer "today").
+  daySelected: { backgroundColor: palette.bg, borderColor: palette.ink, borderWidth: 3 },
+  todayDot: { width: 6, height: 6, borderRadius: 3 },
+  todayDotOn: { backgroundColor: palette.magenta },
   dayDow: { fontFamily: fontFamilyFor('sans', 700), color: palette.ink },
   dayNum: { fontSize: 18, fontFamily: fontFamilyFor('sans', 800) },
   dayMark: { fontFamily: fontFamilyFor('sans', 800), color: palette.ink, minHeight: 16 },
-  onInk: { color: white },
+  wrapRow: { flexWrap: 'wrap' },
+  titleGrow: { flexGrow: 1 },
   muted: { color: palette.inkMuted },
   ink: { color: palette.ink },
   bold: { fontFamily: fontFamilyFor('sans', 700) },
   overline: { fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
   dayCard: { borderWidth: borderWidth.card, borderColor: palette.ink, borderRadius: radius.card, backgroundColor: palette.bg },
   restCard: { borderColor: palette.border },
-  weekChip: { backgroundColor: palette.lime, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink },
+  weekChip: { backgroundColor: palette.surface, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink },
   tags: { flexDirection: 'row', flexWrap: 'wrap' },
   tag: { backgroundColor: palette.surface },
   comingUp: { minHeight: 60, borderWidth: borderWidth.card, borderColor: palette.border },

@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { Button, TextButton } from '@/components/ui';
+import { BackButton, CloseButton } from '@/components/ui/nav-buttons';
 import { logControls } from '@/lib/coach-watch';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import type { FlowSection, StartGroup, StartItem } from '@/lib/log-flow-model';
@@ -114,15 +115,7 @@ export function SectionStart({
     <ScrollView testID="section-start" contentContainerStyle={[styles.content, { padding: space[4], paddingBottom: space[6] + insets.bottom }]}>
       <View style={[styles.column, { gap: space[4] }]}>
         <View style={styles.backRow}>
-          <Pressable
-            testID="section-back"
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Back to workout"
-            style={({ pressed }) => [styles.iconButton, pressed && { opacity: pressedOpacity }]}
-          >
-            <Text style={text('screenTitle')}>⌄</Text>
-          </Pressable>
+          <BackButton testID="section-back" accessibilityLabel="Back to workout" onPress={onBack} />
         </View>
         <View style={{ gap: space[1] }}>
           {of > 1 ? (
@@ -199,15 +192,7 @@ export function WorkoutOverview({
     <ScrollView testID="workout-overview" contentContainerStyle={{ paddingBottom: space[6] + insets.bottom }}>
       <View style={[styles.hero, { paddingTop: insets.top + space[2], padding: space[4], gap: space[2] }]}>
         <View style={[styles.column, { gap: space[2] }]}>
-          <Pressable
-            testID="overview-close"
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Back to your sets"
-            style={({ pressed }) => [styles.iconButton, pressed && { opacity: pressedOpacity }]}
-          >
-            <Text style={[text('screenTitle'), styles.onInk]}>⌄</Text>
-          </Pressable>
+          <CloseButton testID="overview-close" accessibilityLabel="Back to your sets" onPress={onClose} />
           <Text style={[text('caption'), styles.onInk]}>{readOnly ? 'Logged by your coach' : started ? 'Workout in progress' : 'Today’s workout'}</Text>
           <Text testID="overview-name" style={[text('screenTitle'), styles.onInk, styles.title]} accessibilityRole="header">
             {name}

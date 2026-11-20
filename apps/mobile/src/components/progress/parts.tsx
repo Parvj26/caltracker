@@ -4,9 +4,10 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, t
 import { Button, ErrorText } from '@/components/ui';
 import { PROGRESS_LOAD_FAILED } from '@/lib/body-api';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
-import { palette, pressedOpacity, white } from '@/theme/theme';
+import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from '@/components/ui/icons';
+import { fontFamilyFor } from '@/theme/fonts';
 
 /** A Progress section's top row: a round back button (to Progress), the title, and an optional action on the right. */
 export function SectionHeader({ title, right, backTestID = 'section-back', backLabel = 'Back to Progress' }: { title: string; right?: ReactNode; backTestID?: string; backLabel?: string }) {
@@ -23,7 +24,7 @@ export function SectionHeader({ title, right, backTestID = 'section-back', backL
       >
         <ChevronIcon direction="left" />
       </Pressable>
-      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
         {title}
       </Text>
       {right}
@@ -59,7 +60,7 @@ export function Segmented<K extends string>({
             onPress={() => onChange(o.key)}
             style={({ pressed }) => [styles.segment, { borderRadius: radius.input - 2 }, on && styles.segmentOn, pressed && { opacity: pressedOpacity }]}
           >
-            <Text style={[text('sectionHeading'), on && styles.onText]}>{o.label}</Text>
+            <Text style={[text('sectionHeading'), on && styles.segmentOnText]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -139,7 +140,9 @@ const styles = StyleSheet.create({
   back: { width: tapTarget.min, height: tapTarget.min, borderRadius: tapTarget.min / 2, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
   segments: { flexDirection: 'row', backgroundColor: palette.surface },
   segment: { flex: 1, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
-  segmentOn: { backgroundColor: palette.ink },
+  // Selected = white pill with an ink border (UI rules §2.3), not a black fill.
+  segmentOn: { backgroundColor: palette.bg, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink },
+  segmentOnText: { color: palette.ink, fontFamily: fontFamilyFor('sans', 800) },
   onText: { color: white },
   stat: { flex: 1, minWidth: 0 },
   inked: { borderWidth: borderWidth.card, borderColor: palette.ink },

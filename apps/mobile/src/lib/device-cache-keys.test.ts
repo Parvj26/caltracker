@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { albumCacheKey, albumCachePrefix } from './album-logic';
-import { keysToForget, notificationPrefsKey, progressCachePrefix, todayCacheKey } from './device-cache-keys';
+import { keysToForget, notificationPrefsKey, progressCachePrefix, reportedPostsKey, todayCacheKey } from './device-cache-keys';
 
 describe('keysToForget', () => {
   const keys = [
@@ -46,6 +46,13 @@ describe('keysToForget', () => {
     expect(keysToForget(['caltracker.notificationPrefs.u1', 'caltracker.notificationPrefs.u2'], 'u1')).toEqual([
       'caltracker.notificationPrefs.u1',
     ]);
+  });
+});
+
+describe('reported posts', () => {
+  it('forgets this user’s reported posts on Sign out, not another user’s', () => {
+    expect(reportedPostsKey('u1')).toBe('caltracker.community.reported.u1');
+    expect(keysToForget(['caltracker.community.reported.u1', 'caltracker.community.reported.u2'], 'u1')).toEqual(['caltracker.community.reported.u1']);
   });
 });
 

@@ -22,7 +22,7 @@ import { useProgressFacts } from '@/lib/use-progress-facts';
 import { useBody, useFoodRange, useMetrics, usePullRefresh } from '@/lib/use-progress-data';
 import { useUnits } from '@/lib/use-units';
 import { zooHref } from '@/lib/zoo-href';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette, pressedOpacity, TITLE_MAX_SCALE } from '@/theme/theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from '@/components/ui/icons';
@@ -78,7 +78,7 @@ export default function ProgressScreen() {
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={onRefresh}>
       <View style={{ gap: space[1] }}>
-        <Text style={text('screenTitle')} accessibilityRole="header">
+        <Text style={text('screenTitle')} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
           Progress
         </Text>
         <Text style={text('body')} testID="progress-week" accessibilityLiveRegion="polite">

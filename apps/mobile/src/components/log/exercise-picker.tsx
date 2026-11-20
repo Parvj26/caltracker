@@ -12,7 +12,8 @@ import {
   type SearchFilters,
 } from '@caltracker/shared';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
-import { ErrorText, TextButton, TextField } from '@/components/ui';
+import { ErrorText, TextField } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { loadExerciseIndexCached, loadRecentExerciseIds } from '@/lib/exercise-index-api';
 import type { LoadedExerciseIndex } from '@/lib/exercise-index';
@@ -129,14 +130,14 @@ export function ExercisePicker({
   const pick = (r: ExerciseIndexRow) => onPick({ id: r.id, name: r.name, trackingType: r.trackingType });
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
       <SafeAreaView style={styles.fill} edges={['top', 'bottom']}>
         <View style={[styles.fill, styles.column, { padding: space[4], gap: space[3] }]}>
           <View style={styles.headerRow}>
             <Text style={[text('screenTitle'), styles.fill]} accessibilityRole="header">
               {title}
             </Text>
-            <TextButton testID="picker-close" title="Cancel" onPress={onClose} />
+            <CloseButton testID="picker-close" onPress={onClose} />
           </View>
           <TextField
             label="Search exercises"

@@ -1,6 +1,6 @@
 # Share to community from a workout summary and from the zoo book: finish "E2E Log" (3 x 8 at 60 kg, one animal up
 # to a giraffe, picked at random for a new client), tap "Share to community" on the summary, post the card with a
-# caption, then share that animal's sticker (the only owned tile, so `sticker-.*` finds it) from the zoo book.
+# caption, then share that animal's sticker (the only owned tile, so `sticker-(?!art).*` finds it; `sticker-art` is the drawing inside every tile) from the zoo book.
 # Run via `pnpm --filter mobile e2e`.
 appId: app.caltracker.client
 env:
@@ -52,9 +52,8 @@ env:
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Leg day done'
-# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
-- tapOn:
-    point: '85%,12%'
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the title (the × sits on the right).
+- tapOn: 'Share to community'
 - tapOn:
     id: new-post-submit
 - extendedWaitUntil:
@@ -70,11 +69,17 @@ env:
     id: tab-progress
 - tapOn:
     id: progress-zoo
+# Centred: the Zoo book's taller streak strip can leave the tile at the very bottom edge, where the tap misses.
 - scrollUntilVisible:
     element:
-      id: 'sticker-.*'
+      id: 'sticker-(?!art).*'
+    centerElement: true
 - tapOn:
-    id: 'sticker-.*'
+    id: 'sticker-(?!art).*'
+- extendedWaitUntil:
+    visible:
+      id: sheet-share
+    timeout: 5000
 - tapOn:
     id: sheet-share
 - extendedWaitUntil:
@@ -86,7 +91,17 @@ env:
 - tapOn:
     id: new-post-submit
 
-# Both cards are in the feed.
+# Both cards are in the feed. Posting returns to the Zoo book (a page above the tabs): back to Progress first.
+- extendedWaitUntil:
+    notVisible:
+      id: new-post-submit
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: zoo-back
+    direction: UP
+- tapOn:
+    id: zoo-back
 - tapOn:
     id: tab-coach
 - tapOn:
@@ -100,7 +115,8 @@ env:
 # workout's name and counts.
 - assertVisible: '.+ lifted 3,175 lb — about as much as .+'
 - assertVisible: 'E2E Log'
-- assertVisible: '1 exercise · 3 sets'
+- scrollUntilVisible:
+    element: '1 exercise · 3 sets'
 
 - runScript:
     file: helpers/call.js

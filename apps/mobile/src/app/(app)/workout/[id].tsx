@@ -18,7 +18,7 @@ import {
 import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
 import { ExerciseThumb } from '@/components/log/exercise-thumb';
-import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
+import { Button, Card, ErrorText, Screen } from '@/components/ui';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { openableDemoUrl } from '@/lib/demo-link';
 import { openDemo } from '@/lib/open-demo';
@@ -27,6 +27,7 @@ import { blockRounds, formatDayLabel, orList, supersetLetters } from '@/lib/work
 import { fetchMyUnits, fetchWorkoutDetail } from '@/lib/workouts-api';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { BackButton } from '@/components/ui/nav-buttons';
 import type { ShownError } from '@/lib/error-shown';
 
 type Detail = {
@@ -81,7 +82,7 @@ export default function WorkoutDetail() {
   return (
     <Screen>
       <View style={styles.backRow}>
-        <TextButton testID="back" title="Back" onPress={back} />
+        <BackButton testID="back" onPress={back} />
       </View>
 
       {error ? (
@@ -257,7 +258,7 @@ function ExerciseSection({
       <View style={[styles.exerciseHeader, { gap: space[2] }]}>
         {label ? (
           <View style={[styles.letterChip, { borderRadius: radius.pill, paddingHorizontal: space[2] }]}>
-            <Text style={text('sectionHeading')}>{label}</Text>
+            <Text style={[text('sectionHeading'), styles.letterText]} maxFontSizeMultiplier={1.4}>{label}</Text>
           </View>
         ) : null}
         {/* The photo opens the exercise info (and its demo); the rest of the row shows or hides each set. */}
@@ -359,7 +360,9 @@ const styles = StyleSheet.create({
   backRow: { alignItems: 'flex-start' },
   // No wrapping: the summary takes the room beside the photo and grows downwards when long.
   exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  letterChip: { backgroundColor: palette.lime },
+  // A1 / A2, as the logger draws them: ink, white letters.
+  letterChip: { backgroundColor: palette.ink },
+  letterText: { color: palette.bg },
   chip: { backgroundColor: palette.surface },
   summaryRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   setRow: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: palette.surface },

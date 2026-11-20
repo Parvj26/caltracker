@@ -2,7 +2,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { notificationText, postAge } from '@caltracker/shared';
-import { Screen, TextButton } from '@/components/ui';
+import { Screen } from '@/components/ui';
+import { ChevronIcon } from '@/components/ui/icons';
+import { BackButton } from '@/components/ui/nav-buttons';
 import { markNotificationsRead, namesOf } from '@/lib/community-api';
 import { useCommunity } from '@/lib/use-community';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -44,12 +46,12 @@ export default function NotificationsScreen() {
   const now = Date.now();
   return (
     <Screen>
-      <View style={styles.row}>
-        <TextButton title="Back" testID="notifications-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/community'))} />
+      <View style={[styles.row, { gap: space[2.5] }]}>
+        <BackButton testID="notifications-back" accessibilityLabel="Back to Community" fallback="/community" />
+        <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
+          Notifications
+        </Text>
       </View>
-      <Text style={text('screenTitle')} accessibilityRole="header">
-        Notifications
-      </Text>
       {notifications.length === 0 ? <Text style={text('body')}>Nothing yet. Reactions and comments on your posts show up here.</Text> : null}
       {notifications.map((n) => {
         const unread = unreadKeys?.has(n.key) ?? n.unread;
@@ -68,6 +70,7 @@ export default function NotificationsScreen() {
               <Text style={text('body')}>{notificationText(n, (id) => names[id] ?? 'Someone')}</Text>
               <Text style={text('caption')}>{postAge(n.createdAt, now)}</Text>
             </View>
+            {n.postId ? <ChevronIcon size={18} /> : null}
           </Pressable>
         );
       })}

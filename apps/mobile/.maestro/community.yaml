@@ -125,9 +125,8 @@ env:
 - tapOn:
     id: new-post-body
 - inputText: 'E2E Hello from Maestro'
-# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the empty right end of the Cancel row.
-- tapOn:
-    point: '85%,12%'
+# Not hideKeyboard: on the composer it can land on Post or Add photos. Tap the title (the × sits on the right).
+- tapOn: 'New post'
 - tapOn:
     id: new-post-submit
 - extendedWaitUntil:
@@ -147,6 +146,8 @@ env:
 - extendedWaitUntil:
     visible: 'Thanks for telling us'
     timeout: 10000
+# Reporting hides the post for me straight away.
+- assertVisible: '.*We’ve hidden the post for you.*'
 - tapOn: 'Block Buddy Demo'
 - tapOn: 'Block'
 - extendedWaitUntil:

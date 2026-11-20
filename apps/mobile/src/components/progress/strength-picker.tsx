@@ -3,9 +3,10 @@ import { Modal, Pressable, SectionList, StyleSheet, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import { strengthPickerSections, type StrengthExerciseLite, type Units } from '@caltracker/shared';
-import { TextButton, TextField } from '@/components/ui';
+import { TextField } from '@/components/ui';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { CloseButton } from '@/components/ui/nav-buttons';
 
 /**
  * The searchable exercise list for the Strength screen: recently trained first, then every exercise grouped by its
@@ -34,14 +35,14 @@ export function StrengthPicker({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right', 'bottom']}>
         <View style={[styles.head, { padding: space[4], gap: space[3] }]}>
           <View style={styles.row}>
             <Text style={[text('screenTitle'), styles.grow]} accessibilityRole="header">
               Choose an exercise
             </Text>
-            <TextButton title="Close" testID="strength-picker-close" onPress={onClose} />
+            <CloseButton testID="strength-picker-close" onPress={onClose} />
           </View>
           <TextField label="Search" testID="strength-picker-search" value={query} onChangeText={setQuery} placeholder="Exercise name" autoCorrect={false} returnKeyType="search" />
         </View>
@@ -95,5 +96,6 @@ const styles = StyleSheet.create({
   head: { borderBottomWidth: 1, borderBottomColor: palette.border },
   row: { flexDirection: 'row', alignItems: 'center' },
   item: { minHeight: tapTarget.min + 4, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: palette.border },
-  itemOn: { backgroundColor: palette.lime },
+  // Selected = ink outline (lime is only for creating).
+  itemOn: { borderWidth: 2, borderColor: palette.ink },
 });

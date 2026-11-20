@@ -1,7 +1,7 @@
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
-import { TextButton } from '@/components/ui';
+import { CloseButton } from '@/components/ui/nav-buttons';
 import { clockLabel, timeOptions } from '@/lib/notification-settings-logic';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -27,14 +27,14 @@ export function TimeOptionsSheet({
   const selected = value ? value.slice(0, 5) : null;
   const index = Math.max(0, selected ? OPTIONS.indexOf(selected) : 0);
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
       <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
         <View style={[styles.column, styles.flex]}>
           <View style={[styles.header, { padding: space[4] }]}>
             <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header">
               {title}
             </Text>
-            <TextButton title="Close" testID="time-options-close" onPress={onClose} />
+            <CloseButton testID="time-options-close" onPress={onClose} />
           </View>
           <FlatList
             data={OPTIONS}

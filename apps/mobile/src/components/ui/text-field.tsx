@@ -118,7 +118,8 @@ function EyeIcon({ off }: { off: boolean }) {
 }
 
 /**
- * Error message: ink text with a magenta marker, so colour is never the only signal. `code` (from the shared error
+ * Error message: the same red ⚠ + text as a field's own error (Patterns board: one error style), so the ⚠ means colour
+ * is never the only signal. `code` (from the shared error
  * list) is sent with error_shown; the text shown is `children` (fixed copy only, never a raw server message) or the
  * code's catalogue message. The only place that may use accessibilityRole="alert" (lint enforces it).
  */
@@ -130,11 +131,11 @@ export function ErrorText({ code, children, testID }: { code: ErrorCode; childre
     reportErrorShown(code);
   }, [code, shown]);
   return (
-    <View testID={testID} accessibilityRole="alert" style={[styles.errorRow, { gap: space[2] }]}>
-      <Text style={[text('sectionHeading'), styles.marker]} accessibilityElementsHidden importantForAccessibility="no">
+    <View testID={testID} accessibilityRole="alert" style={[styles.errorRow, { gap: space[1] }]}>
+      <Text style={[text('sectionHeading'), styles.fieldError]} accessibilityElementsHidden importantForAccessibility="no">
         ⚠
       </Text>
-      <Text style={[text('sectionHeading'), styles.errorText]}>{shown}</Text>
+      <Text style={[text('sectionHeading'), styles.fieldError, styles.errorText]}>{shown}</Text>
     </View>
   );
 }
@@ -147,6 +148,5 @@ const styles = StyleSheet.create({
   eye: { position: 'absolute', right: 2, width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
   fieldError: { color: palette.dangerDeep, fontSize: 14 },
   errorRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  marker: { color: palette.magenta },
   errorText: { flex: 1 },
 });
