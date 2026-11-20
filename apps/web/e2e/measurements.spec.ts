@@ -170,6 +170,28 @@ test('the Rest checkbox: off hides the rest boxes and saves no rest, and reads b
   for (const n of [1, 2, 3]) await expect(setRow(page, ex, `set ${n}`).getByLabel('Rest (m:ss)')).toHaveValue('1:30');
 });
 
+test('typed rest digits read as m:ss: 200 shows 2:00 and saves 120 s; 190 is refused', async ({ page }) => {
+  const ex = await customExercise('Cable Fly');
+  await signInAsCoach(page);
+  await newWorkout(page, ex);
+  const rest = setRow(page, ex, 'set 1').getByLabel('Rest (m:ss)');
+  // Key by key, as on the iPhone number pad (no ':' key).
+  await rest.click();
+  await rest.press('ControlOrMeta+a');
+  await rest.pressSequentially('190');
+  await expect(rest).toHaveAttribute('aria-invalid', 'true');
+  await rest.fill('');
+  // 200 is 2:00 (not 200 s = 3:20); the default rest is 1:30, so this proves the typed value saved.
+  await rest.pressSequentially('200');
+  await expect(rest).not.toHaveAttribute('aria-invalid', 'true');
+  await rest.blur();
+  await expect(rest).toHaveValue('2:00');
+  await save(page);
+  const id = page.url().split('/').pop()!;
+  const rests = await admin.from('workout_sets').select('rest_seconds').eq('workout_id', id).order('position');
+  expect(rests.data?.[0]?.rest_seconds).toBe(120);
+});
+
 test('at iPhone width an exercise opens on its own screen, with chips for the measured boxes', async ({ page }) => {
   test.slow();
   const ex = await customExercise('Curl');

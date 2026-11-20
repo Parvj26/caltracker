@@ -111,12 +111,22 @@ export function formatClock(seconds: number): string {
 }
 
 /**
- * Reads '90', '1:30' or '1:02:05' as seconds. Blank text is null (no value); text it cannot read is NaN.
- * Minutes and seconds after the first part must be below 60.
+ * Reads a typed clock as seconds. Blank text is null (no value); text it cannot read is NaN.
+ * - With a colon: '1:30', '0:45', '1:02:05'. Minutes and seconds after the first part must be below 60.
+ * - Digits only, read like a microwave timer (the iPhone number pad has no ':' key): the last two digits are
+ *   seconds and anything before them is minutes, so '130' is 1:30, '200' is 2:00 and '1000' is 10:00.
+ *   One or two digits are plain seconds: '5' is 0:05, '45' is 0:45 and '90' is 1:30.
+ *   Three or more digits whose last two are 60 or more ('190', '1275') are NaN: they could mean several times,
+ *   so the box shows them as invalid and nothing is saved rather than guessing.
  */
 export function parseClock(text: string): number | null {
   const t = text.trim();
   if (t === '') return null;
+  if (/^\d+$/.test(t)) {
+    if (t.length <= 2) return Number(t);
+    const secs = Number(t.slice(-2));
+    return secs >= 60 ? NaN : Number(t.slice(0, -2)) * 60 + secs;
+  }
   const parts = t.split(':');
   if (parts.length > 3 || !parts.every((p, i) => /^\d*$/.test(p) && (i === 0 ? p !== '' : true))) return NaN;
   const nums = parts.map((p) => (p === '' ? 0 : Number(p)));
