@@ -6,13 +6,14 @@ import type { IsoDate, WorkoutHints } from '@caltracker/shared';
 import { QuickDayPicker } from '@/components/assign/quick-day-picker';
 import { WorkoutChoices } from '@/components/assign/workout-choices';
 import { AdaptiveDialog, Button, type AdaptiveDialogHandle } from '@/components/ui';
+import { NewWorkoutOption } from '../../programs/[id]/workout-picker';
 import styles from '@/components/calendar/calendar.module.css';
 import page from './client-page.module.css';
 
 type LibraryWorkout = { id: string; name: string };
 
 /**
- * "+ Add workout": pick the day first (today by default, from the quick days or "Pick a date…"), then tap a workout
+ * "+ Add workout": pick the day first (and "+ New workout" builds one for that day in the editor sheet) (today by default, from the quick days or "Pick a date…"), then tap a workout
  * and it is added straight away, like a day's "+". The calendar shows it at once and saves it in the background; its
  * toast offers Undo, and a failed save is undone with a message. Each pick gets its own new id (made by the
  * calendar), so it is added once. In the one pop-up (AdaptiveDialog): Cancel stays pinned at the bottom.
@@ -23,6 +24,7 @@ export function AddWorkoutDialog({
   today,
   dayWorkouts,
   onPick,
+  onNew,
   onClose,
 }: {
   library: LibraryWorkout[];
@@ -32,6 +34,8 @@ export function AddWorkoutDialog({
   /** The client's workouts by day, when known: quick days say "free" or how many. */
   dayWorkouts?: readonly { date: IsoDate }[];
   onPick: (workout: LibraryWorkout, date: IsoDate) => void;
+  /** "+ New workout": build one for this client on the day picked here (the calendar opens the editor sheet). */
+  onNew?: (date: IsoDate) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<AdaptiveDialogHandle>(null);
@@ -57,7 +61,7 @@ export function AddWorkoutDialog({
         </Button>
       }
     >
-      {library.length > 0 ? (
+      {library.length > 0 || onNew ? (
         <QuickDayPicker
           legend="Day"
           today={today}
@@ -66,6 +70,20 @@ export function AddWorkoutDialog({
           {...(dayWorkouts ? { workoutsOn: (d: IsoDate) => dayWorkouts.filter((w) => w.date === d).length } : {})}
           fieldMin={today}
           error={dateError}
+        />
+      ) : null}
+      {onNew ? (
+        <NewWorkoutOption
+          sub="Build it here."
+          orPick={library.length > 0}
+          disabled={dateError !== null}
+          onNew={() => {
+            if (!parsed.success || dateError || picked.current) return;
+            picked.current = true;
+            const day = parsed.data;
+            // Its step of history goes first, then the calendar opens the editor.
+            void dialogRef.current?.close().then(() => onNew(day));
+          }}
         />
       ) : null}
       {library.length > 0 ? <p className={styles.caption}>Tap a workout to add it on this day.</p> : null}

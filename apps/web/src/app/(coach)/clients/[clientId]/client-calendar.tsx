@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_CALENDAR_VIEW, calendarRange, localDateOf, stepCalendar, switchAnchor } from '@caltracker/shared';
-import { errorMessage, type CalendarView, type IsoDate } from '@caltracker/shared';
+import { errorMessage, type CalendarView, type ExercisePrefs, type IsoDate, type Units } from '@caltracker/shared';
 import { CalendarToolbar } from '@/components/calendar/calendar-toolbar';
 import { MonthCalendar, type CalendarItem } from '@/components/calendar/month-calendar';
 import { formatMonth, formatRange, formatShortDay } from '@/components/calendar/format';
@@ -15,7 +15,9 @@ import { useRememberUrl } from '@/lib/history-back';
 import { useLocalToday } from '@/lib/local-today';
 import { NO_HINTS, type PickerHints } from '@/lib/picker-hints';
 import { WorkoutPicker } from '../../programs/[id]/workout-picker';
-import { clientWorkoutExists, deleteClientWorkout, moveClientWorkout, scheduleWorkout } from './actions';
+import { WorkoutSheet } from '../../programs/[id]/workout-sheet';
+import { exercisePrefs as loadPrefs } from '../../workouts/actions';
+import { clientWorkoutExists, deleteClientWorkout, moveClientWorkout, saveToLibrary, scheduleWorkout } from './actions';
 import { LocalDate } from '../../workouts/local-date';
 import { AssignToClientsDialog } from '@/components/assign/assign-to-clients';
 import { AddWorkoutDialog } from './add-workout-dialog';
@@ -23,13 +25,16 @@ import { AssignDialog, type ExistingWorkout } from './assign-dialog';
 import { AssignmentsPanel } from './assignments-panel';
 import { CalendarEmptyState } from './calendar-empty-state';
 import type { ClientRef } from './client';
-import { DeleteDialog, ItemMenu, MoveDialog } from './item-menu';
+import { DeleteDialog, ItemMenu, LibraryNameDialog, MoveDialog } from './item-menu';
+import Link from 'next/link';
+import { failureCode } from '@/lib/action-errors';
 import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 import { cx } from '@/components/ui/cx';
 import styles from '@/components/calendar/calendar.module.css';
 import pageStyles from './client-page.module.css';
 
-export type CalendarEntry = CalendarItem & { date: IsoDate };
+/** inLibrary: still exactly a library workout (its ⋯ menu says "In Library" instead of "Save to Library"). */
+export type CalendarEntry = CalendarItem & { date: IsoDate; inLibrary?: boolean };
 export type AssignmentSummary = {
   id: string;
   /** The program it was copied from, or null once that program has been deleted. */
@@ -80,8 +85,13 @@ export function ClientCalendar({
   upcomingWorkouts,
   hints = NO_HINTS,
   openOnLoad = null,
+  units,
+  workspaceId,
 }: {
   client: ClientRef;
+  /** The coach's units and workspace, for "+ New workout"'s editor. */
+  units: Units;
+  workspaceId: string;
   /** The signed-in coach: the remembered view is theirs. */
   coachId: string;
   /** From ?view=, else the view remembered in a cookie, or null to use localStorage (or the default). */
@@ -136,6 +146,13 @@ export function ClientCalendar({
     else setAdding(true);
   }, [openOnLoad, readOnly]);
   const [picker, setPicker] = useState<{ date: IsoDate } | null>(null);
+  // "+ New workout" from the Add window: the editor sheet for that day, once the workspace's remembered exercise
+  // choices are in (new exercises start with them, as in the Library).
+  const [building, setBuilding] = useState<{ date: IsoDate; prefs: Record<string, ExercisePrefs> } | null>(null);
+  async function openBuilder(date: IsoDate) {
+    const prefs = await loadPrefs().catch(() => ({}));
+    setBuilding({ date, prefs });
+  }
   const [moving, setMoving] = useState<CalendarEntry | null>(null);
   // Every workout this page knows about, by day, for the Move and Add windows' quick days ("free", "1 workout"):
   // the days on screen as they are now, and the server's list of upcoming ones for the days beyond.
@@ -190,10 +207,27 @@ export function ClientCalendar({
   const deleted = useRef(new Set<string>());
   // Adds that got no clear answer, by "workout id|day": their id, reused if the coach picks the same again.
   const unclear = useRef(new Map<string, string>());
-  const say = (message: string | null, undo: Undoable | null = null) => {
+  // "Saved to Library · Open": a link to what was just saved.
+  const [toastLink, setToastLink] = useState<{ href: string; label: string } | null>(null);
+  const say = (message: string | null, undo: Undoable | null = null, link: { href: string; label: string } | null = null) => {
     setToast(message);
     setUndoable(undo);
+    setToastLink(link);
   };
+  // "Save to Library" whose name is already in the Library: the dialog asking for another name.
+  const [naming, setNaming] = useState<{ entry: CalendarEntry; suggestion: string } | null>(null);
+  const savedToLibrary = (saved: { id: string }) => say('Saved to Library', null, { href: `/workouts/${saved.id}`, label: 'Open' });
+  async function saveItemToLibrary(entry: CalendarEntry) {
+    try {
+      const outcome = await saveToLibrary({ workoutId: entry.id });
+      if (outcome.ok) savedToLibrary(outcome);
+      else if (outcome.code === 'library_name_taken' && outcome.suggestion) setNaming({ entry, suggestion: outcome.suggestion });
+      else say(errorMessage(outcome.code));
+    } catch (e) {
+      const code = failureCode(e, 'library_save_failed');
+      say(code === 'stale_deploy' ? STALE_DEPLOY_MESSAGE : errorMessage(code));
+    }
+  }
 
   // Leaving while a move or delete is still saving would drop it: ask first.
   useEffect(() => {
@@ -428,6 +462,8 @@ export function ClientCalendar({
                 logHref={logHref(item.logId)}
                 resultsHref={`${logHref(item.logId)}?edit=1`}
                 onCopy={() => setCopying({ ...item, date })}
+                onSaveToLibrary={() => void saveItemToLibrary({ ...item, date })}
+                inLibrary={(item as CalendarEntry).inLibrary === true}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             ) : (
@@ -441,6 +477,8 @@ export function ClientCalendar({
                 onMove={() => setMoving({ ...item, date })}
                 {...(editable ? {} : { moveLabel: 'Move to another day' })}
                 onCopy={() => setCopying({ ...item, date })}
+                onSaveToLibrary={() => void saveItemToLibrary({ ...item, date })}
+                inLibrary={(item as CalendarEntry).inLibrary === true}
                 onDelete={() => setDeleting({ ...item, date })}
               />
             )
@@ -478,7 +516,29 @@ export function ClientCalendar({
             setAdding(false);
             schedule(workout, date);
           }}
+          onNew={(date) => {
+            setAdding(false);
+            void openBuilder(date);
+          }}
           onClose={() => setAdding(false)}
+        />
+      ) : null}
+
+      {building ? (
+        <WorkoutSheet
+          target={{ kind: 'client', clientId: client.id, clientName: client.name, date: building.date, today }}
+          units={units}
+          workspaceId={workspaceId}
+          exercisePrefs={building.prefs}
+          onSaved={(saved) => {
+            setBuilding(null);
+            if (saved.kind !== 'client') return;
+            setSavedOnce(true);
+            say(`Added ${saved.name} to ${formatShortDay(saved.date)}${saved.library ? ' and saved it to your Library' : ''}.`);
+            // Show the day it went on, if it's outside the days on screen.
+            if (!onScreen(saved.date)) router.push(viewHref(view, saved.date), { scroll: false });
+          }}
+          onClose={() => setBuilding(null)}
         />
       ) : null}
 
@@ -522,6 +582,15 @@ export function ClientCalendar({
         />
       ) : null}
 
+      {naming ? (
+        <LibraryNameDialog
+          entry={naming.entry}
+          suggestion={naming.suggestion}
+          onSaved={savedToLibrary}
+          onClose={() => setNaming(null)}
+        />
+      ) : null}
+
       {deleting ? (
         <DeleteDialog
           entry={deleting}
@@ -540,6 +609,11 @@ export function ClientCalendar({
           <div className={styles.toast}>
             <span>{toast}</span>
             {toast === STALE_DEPLOY_MESSAGE ? <ReloadButton className={styles.smallButton} /> : null}
+            {toastLink ? (
+              <Link href={toastLink.href} className={styles.smallButton}>
+                {toastLink.label}
+              </Link>
+            ) : null}
             {undoable ? (
               <button
                 type="button"

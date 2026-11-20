@@ -97,13 +97,13 @@ describe('importExercises', () => {
       await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), 'caltracker-extra-exercises.json'), 'utf8'),
     ) as { id: string; trackingType: string }[];
     const first = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
-    expect(first.extras).toBe(10);
+    expect(first.extras).toBe(15);
     const { data, error } = await admin
       .from('exercises')
       .select('external_id, source, workspace_id, tracking_type, image_paths')
       .like('external_id', 'caltracker:%');
     expect(error).toBeNull();
-    expect(data).toHaveLength(10);
+    expect(data).toHaveLength(15);
     expect(data!.every((r) => r.source === 'builtin' && r.workspace_id === null && r.image_paths.length === 0)).toBe(true);
     const pull = data!.find((r) => r.external_id === 'caltracker:machine-assisted-pull-up');
     expect(pull?.tracking_type).toBe(extras.find((e) => e.id === pull?.external_id)?.trackingType);

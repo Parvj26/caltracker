@@ -17,9 +17,9 @@ import {
   type DirectoryFilter,
   type DirectoryRow,
   type DirectorySort,
+  type InvitePlan,
   type IsoDate,
 } from '@caltracker/shared';
-import { formatShortDay } from '@/components/calendar/format';
 import { MoreMenu } from '@/components/more-menu';
 import { Button, ButtonLink, Chip, ListRow, RowList, SearchBox, SearchEmpty, useSearchQuery, type ChipTone } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
@@ -28,12 +28,15 @@ import { homeClients, localDateOf } from '@/lib/daily-check';
 import { useBrowserToday } from '@/lib/local-today';
 import { useRememberUrl } from '@/lib/history-back';
 import { useUrlChoice } from '@/lib/url-state';
+import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 import { avatarTone, initials } from './avatar';
 import { INVITE_CLOSED_EVENT } from './invite-dialog';
 import { LOW_COMPLETION_PERCENT, lastWorkoutText, planLines, statusText } from './directory-copy';
 import type { ConfirmHandle } from './confirm-button';
 import { useResendInvite } from './resend-button';
 import { CancelInviteButton } from './row-actions';
+import { invitePlanText } from './invite-plan-text';
+import { InviteSheet, type PlanOptions } from './invite-sheet';
 import { searchScope } from './search-scope';
 import { StatusChip } from './status-chip';
 import styles from './clients.module.css';
@@ -53,6 +56,8 @@ export type DirectoryInvite = {
   /** The link has run out (they need a resend). */
   expired: boolean;
   plan: InvitePlanSummary;
+  /** The same plan as the invite window's plan step reads it ("Change plan" starts from it). */
+  planDetail: InvitePlan;
 };
 
 // "Active" (every joined client) is the default; invites wait under their own chip.
@@ -224,15 +229,11 @@ function emailWithBreak(email: string) {
   );
 }
 
-/** "Beginner 3-Day · starts Mon 16 Nov": what a pending invite will begin with, or null. */
-function invitePlanText(plan: InvitePlanSummary): string | null {
-  if (!plan) return null;
-  if (plan.kind === 'program') return `${plan.name} · starts ${formatShortDay(plan.on)}`;
-  return `Single workout: ${plan.name} · ${formatShortDay(plan.on)}${plan.more > 0 ? ` · ${plan.more} more` : ''}`;
-}
-
-/** A pending invite: name, email, when it was sent, what it starts with; Resend, and Cancel invite… in ⋯. */
-function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate | null }) {
+/**
+ * A pending invite: name, email, when it was sent, what it starts with; Resend, and Cancel invite… in ⋯. Tapping the
+ * row (not Resend or ⋯, which sit beside it) opens the invite's window.
+ */
+function InviteRow({ invite, today, onOpen }: { invite: DirectoryInvite; today: IsoDate | null; onOpen: () => void }) {
   const { expired } = invite;
   const { resend, pending, message } = useResendInvite(invite);
   const cancelRef = useRef<ConfirmHandle>(null);
@@ -242,6 +243,8 @@ function InviteRow({ invite, today }: { invite: DirectoryInvite; today: IsoDate 
       title={invite.name}
       leading={<Avatar name={invite.name} toneKey={invite.email} />}
       itemProps={{ 'data-invite-id': invite.id }}
+      onOpen={onOpen}
+      openLabel={`${invite.name || invite.email}, invite${expired ? ', link expired' : ''}`}
       className={styles.inviteRow}
       meta={
         <>
@@ -291,11 +294,14 @@ export function ClientDirectory({
   invites,
   lookbackDays,
   initialQuery = '',
+  planOptions,
 }: {
   data: HomeData;
   invites: DirectoryInvite[];
   lookbackDays: number;
   initialQuery?: string;
+  /** Library workouts, programs and picker hints, for a pending invite's "Change plan". */
+  planOptions: PlanOptions;
 }) {
   const today = useBrowserToday();
   const { query: typed, setQuery, debounced: query } = useSearchQuery({ initial: initialQuery, urlParam: 'q' });
@@ -380,6 +386,25 @@ export function ClientDirectory({
   if (inviteLimit.key !== listKey) setInviteLimit({ key: listKey, count: INVITE_PAGE });
   const inviteCount = inviteLimit.key === listKey ? inviteLimit.count : INVITE_PAGE;
 
+  // The pending invite open in its window (by id). After its email changes it has a new id; until the list has
+  // reloaded with it, the window keeps showing the invite as it last was.
+  const [opened, setOpened] = useState<DirectoryInvite | null>(null);
+  // A refresh or shared link with ?sheet=invite-<id> opens that invite's window again (UI rules §8.3).
+  useSheetOnLoad((id) => {
+    const found = id.startsWith('invite-') ? invites.find((i) => `invite-${i.id}` === id) : undefined;
+    if (!found) return false;
+    setOpened(found);
+    return true;
+  });
+  const openInvite = opened ? (invites.find((i) => i.id === opened.id) ?? opened) : null;
+  // "Cancel invite…" from the window: asked once the window has closed (one pop-up at a time).
+  // Each ask is its own request (n), so asking again about the same invite after Cancel opens the question again.
+  const [cancelling, setCancelling] = useState<{ invite: DirectoryInvite; n: number } | null>(null);
+  const cancelRef = useRef<ConfirmHandle>(null);
+  useEffect(() => {
+    if (cancelling) cancelRef.current?.open();
+  }, [cancelling]);
+
   const shownTotal = shownClients.length + shownInvites.length;
   const filtering = query.trim() !== '' || filter !== 'active';
 
@@ -461,7 +486,7 @@ export function ClientDirectory({
           </h3>
           <RowList aria-label="Invites" className={styles.inviteList}>
             {shownInvites.slice(0, inviteCount).map((i) => (
-              <InviteRow key={i.id} invite={i} today={today} />
+              <InviteRow key={i.id} invite={i} today={today} onOpen={() => setOpened(i)} />
             ))}
           </RowList>
           {shownInvites.length > inviteCount ? (
@@ -475,6 +500,19 @@ export function ClientDirectory({
             </Button>
           ) : null}
         </section>
+      ) : null}
+      {openInvite ? (
+        <InviteSheet
+          invite={openInvite}
+          today={today}
+          planOptions={planOptions}
+          onMoved={(id, email) => setOpened({ ...openInvite, id, email, sentAt: new Date().toISOString(), expired: false })}
+          onCancelInvite={() => setCancelling((c) => ({ invite: openInvite, n: (c?.n ?? 0) + 1 }))}
+          onClose={() => setOpened(null)}
+        />
+      ) : null}
+      {cancelling ? (
+        <CancelInviteButton key={cancelling.invite.id} inviteId={cancelling.invite.id} email={cancelling.invite.email} handle={cancelRef} />
       ) : null}
     </section>
   );

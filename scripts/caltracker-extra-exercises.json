@@ -188,5 +188,100 @@
       "Log the assistance weight: less assistance means you are lifting more of your own bodyweight."
     ],
     "images": []
+  },
+  {
+    "id": "caltracker:burpee",
+    "name": "Burpee",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["chest", "shoulders", "triceps", "abdominals", "glutes"],
+    "category": "plyometrics",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand tall with your feet shoulder-width apart.",
+      "Squat down and place your hands on the floor in front of your feet.",
+      "Jump or step your feet back into a high plank, then lower your chest to the floor.",
+      "Push up, jump or step your feet back to your hands, then jump up with your arms overhead. That is one rep."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:jumping-jack",
+    "name": "Jumping Jack",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["calves"],
+    "secondaryMuscles": ["shoulders", "glutes", "quadriceps"],
+    "category": "plyometrics",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand tall with your feet together and your arms at your sides.",
+      "Jump your feet out wide while swinging your arms up over your head.",
+      "Jump your feet back together as your arms come back down to your sides.",
+      "Keep a steady rhythm and land softly on the balls of your feet."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:bear-crawl",
+    "name": "Bear Crawl",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": ["abdominals", "quadriceps", "triceps"],
+    "category": "strength",
+    "trackingType": "time",
+    "instructions": [
+      "Start on your hands and knees, hands under your shoulders and knees under your hips.",
+      "Lift your knees an inch or two off the floor, keeping your back flat.",
+      "Crawl forward by moving the opposite hand and foot together in small steps.",
+      "Keep your hips low and your core tight for the whole time."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:high-knees",
+    "name": "High Knees",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["calves", "glutes", "abdominals"],
+    "category": "plyometrics",
+    "trackingType": "time",
+    "instructions": [
+      "Stand tall with your feet hip-width apart.",
+      "Run on the spot, driving each knee up to hip height.",
+      "Pump your arms and stay on the balls of your feet.",
+      "Keep your chest up and go as fast as you can with good form."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:skater-jump",
+    "name": "Skater Jump",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["glutes", "calves", "adductors"],
+    "category": "plyometrics",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand on your right leg with a slight bend in the knee.",
+      "Jump sideways to the left and land softly on your left leg.",
+      "Let your right leg swing behind you and touch lightly without putting weight on it.",
+      "Jump back to the right. Each jump counts as one rep."
+    ],
+    "images": []
   }
 ]

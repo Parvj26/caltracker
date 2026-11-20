@@ -14,10 +14,11 @@ const freeIds = free.map((e) => e.id);
 const good = (): ExtraExercise => structuredClone(extras[0]!);
 
 describe('CalTracker extra exercises', () => {
-  it('ships the 10 trainer exercises and they validate', () => {
-    expect(extras).toHaveLength(10);
-    expect(validateExtras(extras, freeIds)).toHaveLength(10);
+  it('ships the 10 trainer exercises plus 5 conditioning moves, and they validate', () => {
+    expect(extras).toHaveLength(15);
+    expect(validateExtras(extras, freeIds)).toHaveLength(15);
     expect(extras.map((e) => e.name)).toContain('Machine Assisted Pull Up');
+    expect(extras.map((e) => e.name)).toEqual(expect.arrayContaining(['Burpee', 'Jumping Jack', 'Bear Crawl', 'High Knees', 'Skater Jump']));
   });
 
   it('rejects an unknown muscle', () => {

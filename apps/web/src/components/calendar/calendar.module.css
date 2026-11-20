@@ -271,6 +271,8 @@
   cursor: pointer;
 }
 .menuItem:hover, .menuItem:focus-visible { background: var(--ct-surface); }
+/* A menu item shown as already done ("✓ In Library"): greyed, not clickable. */
+.menuItem.menuItemDone { color: var(--ct-ink-muted); cursor: default; }
 
 /* ---------- Client calendar screen ---------- */
 .page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); }

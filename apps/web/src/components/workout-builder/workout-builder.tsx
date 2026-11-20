@@ -98,6 +98,8 @@ type Props = {
   pageTitle?: boolean;
   /** The workspace's remembered measurements and Each side per exercise (loadExercisePrefs). */
   initialPrefs?: Record<string, ExercisePrefs>;
+  /** Inside a sheet whose top bar has Save on every size: the bar's own Save stays in the page (the top bar presses it) but isn't shown. */
+  hideWideSave?: boolean;
 };
 
 type Picker =
@@ -198,6 +200,7 @@ export function WorkoutBuilder({
   saveLabel = 'Save workout',
   onDirtyChange,
   embedded = false,
+  hideWideSave = false,
   pageTitle = false,
 }: Props) {
   const router = useRouter();
@@ -880,7 +883,7 @@ export function WorkoutBuilder({
         >
           + Exercise
         </Button>
-        {showSave ? saveButton('workout_save', styles.saveButton) : null}
+        {showSave ? saveButton('workout_save', cx(styles.saveButton, hideWideSave && styles.saveHidden)) : null}
         {(errors.get('general') ?? []).map((m) => (
           <ErrorText key={m} code="workout_fields_invalid" safe={false}>
           {m}

@@ -371,7 +371,7 @@ export function ProgramGrid({
     } else if (saved.kind === 'everywhere') {
       setSlots((s) => s.map((x) => (x.workoutId === saved.id ? { ...x, workoutName: saved.name } : x)));
       markSaved();
-    } else {
+    } else if (saved.kind === 'copy') {
       setSlots((s) => s.map((x) => (x.id === saved.slotId ? { ...x, workoutId: saved.id, workoutName: saved.name } : x)));
       markSaved();
       setToast(`Saved a copy, “${saved.name}”, on this day only.`);
