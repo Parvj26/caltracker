@@ -38,6 +38,7 @@ export function Screen({
   onRefresh,
   onScrollBegin,
   footer,
+  inSheet = false,
 }: {
   children: ReactNode;
   centred?: boolean;
@@ -54,6 +55,11 @@ export function Screen({
    * keyboard is up, since the keyboard covers it).
    */
   footer?: ReactNode;
+  /**
+   * Shown as an iOS page sheet (presentation: 'modal'). KeyboardAvoidingView measures from the sheet's top, not the
+   * screen's, and leaves a footer under the keyboard; here the content is lifted by the keyboard's own height instead.
+   */
+  inSheet?: boolean;
 }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   // The bottom inset is room inside the scrolling content, not a fixed strip under it, so content scrolls under
@@ -90,23 +96,33 @@ export function Screen({
 
   // On iOS the keyboard covers the home indicator, so a footer drops its bottom inset while the keyboard is up.
   const [keyboardUp, setKeyboardUp] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const hasFooter = Boolean(footer);
   useEffect(() => {
-    if (!hasFooter || Platform.OS !== 'ios') return;
-    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardUp(true));
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardUp(false));
+    if ((!hasFooter && !inSheet) || Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardUp(true);
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardUp(false);
+      setKeyboardHeight(0);
+    });
     return () => {
       show.remove();
       hide.remove();
     };
-  }, [hasFooter]);
+  }, [hasFooter, inSheet]);
 
   const value = useMemo(() => reveal, [reveal]);
 
   return (
     <RevealContext.Provider value={value}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
-        <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={[styles.fill, inSheet && { paddingBottom: keyboardHeight }]}
+          behavior={Platform.OS === 'ios' && !inSheet ? 'padding' : undefined}
+        >
           <ScrollView
             ref={scrollRef}
             style={styles.fill}

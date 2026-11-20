@@ -21,7 +21,7 @@ describe('coach meal rows', () => {
   });
   it('maps a history row', () => {
     expect(
-      toHistoryMeal({ id: 'm', eaten_on: '2026-11-08', eaten_at: 't', name: null, calories: 300, protein_g: null, carbs_g: null, fat_g: null, photo_path: 'p', coach_meal_id: 'c1' }),
-    ).toEqual({ id: 'm', eatenOn: '2026-11-08', eatenAt: 't', name: null, macros: { calories: 300, protein: null, carbs: null, fat: null }, hasPhoto: true, coachMealId: 'c1' });
+      toHistoryMeal({ id: 'm', eaten_on: '2026-11-08', eaten_at: 't', name: null, calories: 300, protein_g: null, carbs_g: null, fat_g: null, photo_path: 'p', photo_thumb_path: 'pt', coach_meal_id: 'c1' }),
+    ).toEqual({ id: 'm', eatenOn: '2026-11-08', eatenAt: 't', name: null, macros: { calories: 300, protein: null, carbs: null, fat: null }, hasPhoto: true, coachMealId: 'c1', thumbPath: 'pt' });
   });
 });

@@ -1,19 +1,22 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { compactMacroLine, formatMealTime } from '@caltracker/shared';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { compactMacroLine, formatMealTime, mealTitle, mealTypeTag } from '@caltracker/shared';
 import type { ShownMeal } from '@/lib/food-logic';
 import { photoUri } from '@/lib/outbox-files';
 import { palette, pressedOpacity } from '@/theme/theme';
 import { font, foodText } from './food-type';
 import { ChevronIcon } from './icons';
+import { MealThumb } from './meal-thumb';
 
 const THUMB = 64;
 
-/** One meal of the day: 64 pt photo (or a "kcal" tile when typed in), name, time and macros. Tap to edit. */
+/** One meal of the day: 64 pt photo (or a plain grey tile), name (or its type), type and time, macros. Tap to edit. */
 export function MealCard({ meal, urls, onPress }: { meal: ShownMeal; urls: Record<string, string>; onPress: () => void }) {
   const local = meal.localPhoto;
   const thumb = local ? photoUri(local.thumbUri) : meal.photo ? urls[meal.photo.thumbPath] : undefined;
-  const title = meal.name ?? 'Meal';
-  const time = formatMealTime(meal.eatenAt).toUpperCase();
+  // Breakfast / Lunch / Dinner / Snack come from the time (the same rule as the coach's website).
+  const title = mealTitle(meal);
+  const tag = mealTypeTag(meal);
+  const time = `${tag ? `${tag} · ` : ''}${formatMealTime(meal.eatenAt).toUpperCase()}`;
   const macros = compactMacroLine(meal.macros);
   const status = meal.pending === 'failed' ? "Didn't save" : meal.pending === 'sending' ? 'Saving…' : null;
   return (
@@ -25,15 +28,7 @@ export function MealCard({ meal, urls, onPress }: { meal: ShownMeal; urls: Recor
       testID={`meal-${meal.id}`}
       style={({ pressed }) => [styles.card, pressed && { opacity: pressedOpacity }]}
     >
-      {meal.photo ? (
-        <View style={[styles.thumb, styles.photoThumb]}>
-          {thumb ? <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors testID="meal-photo" /> : null}
-        </View>
-      ) : (
-        <View style={[styles.thumb, styles.typed]} accessibilityLabel="Typed in">
-          <Text style={font(800, 12)}>kcal</Text>
-        </View>
-      )}
+      <MealThumb uri={meal.photo ? thumb : undefined} size={THUMB} radius={14} />
       <View style={styles.body}>
         <Text style={font(800, 16)}>{title}</Text>
         <Text style={[font(500, 13), foodText.muted]}>{time}</Text>
@@ -51,9 +46,6 @@ export function MealCard({ meal, urls, onPress }: { meal: ShownMeal; urls: Recor
 
 const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: 2, borderColor: palette.border, borderRadius: 18 },
-  thumb: { width: THUMB, height: THUMB, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  photoThumb: { backgroundColor: palette.blue, borderWidth: 2, borderColor: palette.ink },
-  typed: { backgroundColor: palette.surface },
   body: { flex: 1, gap: 2 },
   failed: { color: palette.magentaDeep },
 });

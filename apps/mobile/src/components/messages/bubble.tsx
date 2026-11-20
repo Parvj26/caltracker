@@ -27,7 +27,7 @@ function BubblePhoto({ pathKey, full, thumb }: { pathKey: string; full: string |
 
 const PHOTO_BOX = { maxWidth: 240, maxHeight: 320 };
 
-/** One message: photos, text, YouTube cards, then the time (or Sending… / Didn't send · Retry) and "Seen". */
+/** One message: photos, text, YouTube cards, then the time (or Sending… / Not sent · Tap to retry) and "Seen". */
 export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDelete, onOpenPhoto }: BubbleProps) {
   const { text } = useTheme();
   const pending = 'state' in item ? item : null;
@@ -78,12 +78,16 @@ export function Bubble({ item, mine, seen, timeZone, urls, error, onRetry, onDel
             <Text style={text('caption')} testID="message-sending">Sending…</Text>
           ) : (
             <>
-              <Text style={text('caption')} testID="message-failed">Didn’t send ·</Text>
-              <Pressable accessibilityRole="button" testID="message-retry" onPress={() => onRetry(item.clientMsgId)} hitSlop={space[2]}>
-                <Text style={[text('caption'), styles.retry]}>Retry</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Not sent. Tap to retry"
+                testID="message-retry"
+                onPress={() => onRetry(item.clientMsgId)}
+                style={styles.failedTap}
+              >
+                <Text style={[text('caption'), styles.failedText]} testID="message-failed">Not sent · Tap to retry</Text>
               </Pressable>
-              <Text style={text('caption')}>·</Text>
-              <Pressable accessibilityRole="button" testID="message-delete" onPress={() => onDelete(item.clientMsgId)} hitSlop={space[2]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete this message" testID="message-delete" onPress={() => onDelete(item.clientMsgId)} style={styles.failedTap}>
                 <Text style={[text('caption'), styles.retry]}>Delete</Text>
               </Pressable>
             </>
@@ -106,11 +110,13 @@ const styles = StyleSheet.create({
   bubble: { borderRadius: 18, paddingHorizontal: space[3], paddingVertical: space[2.5], gap: space[2] },
   bubbleMine: { backgroundColor: palette.ink, borderBottomRightRadius: 6 },
   bubbleTheirs: { backgroundColor: palette.surface, borderBottomLeftRadius: 6 },
-  bubbleFailed: { borderWidth: 2, borderColor: palette.magenta },
+  bubbleFailed: { borderWidth: 2, borderColor: palette.danger },
   mineText: { color: white },
   photos: { gap: space[1] },
   youtube: { gap: space[1] },
   youtubeImage: { width: 224, height: 126, borderRadius: radius.input, backgroundColor: palette.border },
   meta: { flexDirection: 'row', gap: space[1], alignItems: 'center' },
   retry: { textDecorationLine: 'underline', color: palette.ink },
+  failedTap: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space[1] },
+  failedText: { color: palette.danger },
 });

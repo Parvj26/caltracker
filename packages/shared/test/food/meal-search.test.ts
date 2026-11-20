@@ -5,6 +5,7 @@ import {
   frequentMeals,
   mealSearchItems,
   mealSearchMeta,
+  recentAndFrequentMeals,
   searchMeals,
   type CoachMeal,
   type CoachMealChip,
@@ -171,5 +172,33 @@ describe('filterCoachMeals', () => {
     expect(f('', ['highProtein', 'under500'])).toEqual(['Éclair', 'Protein oats']);
     expect(f('oats', ['highProtein'])).toEqual(['Protein oats']);
     expect(f('oats', ['lowCarb'])).toEqual([]);
+  });
+});
+
+describe('recentAndFrequentMeals', () => {
+  it('lists own meals most logged first, then the coach meals A to Z', () => {
+    const history = [
+      meal('Tuna wrap', mac(510, 38), '2026-11-08'),
+      meal('Chicken rice bowl', mac(620, 45), '2026-11-02'),
+      meal('Chicken rice bowl', mac(620, 45), '2026-11-05'),
+    ];
+    const out = recentAndFrequentMeals(history, [coach('c2', 'Tofu stir fry', mac(400)), coach('c1', 'Protein oats', mac(450, 35))], TODAY);
+    expect(out.map((m) => m.name)).toEqual(['Chicken rice bowl', 'Tuna wrap', 'Protein oats', 'Tofu stir fry']);
+  });
+
+  it('stops at the limit', () => {
+    const history = ['A', 'B', 'C'].map((x) => meal(x, mac(100), '2026-11-08'));
+    expect(recentAndFrequentMeals(history, [], TODAY, 2)).toHaveLength(2);
+  });
+
+  it('keeps the newest photo of a kind of meal, and the coach meal photo', () => {
+    const history = [
+      meal('Oats', mac(300), '2026-11-01', { hasPhoto: true, thumbPath: 'old-thumb.webp' }),
+      meal('Oats', mac(300), '2026-11-03', { hasPhoto: true, thumbPath: 'new-thumb.webp' }),
+      meal('Oats', mac(300), '2026-11-05'),
+    ];
+    const withPhoto: CoachMeal = { ...coach('c1', 'Bowl', mac(500)), photo: { path: 'c.webp', thumbPath: 'c-thumb.webp', width: 1, height: 1 } };
+    const out = recentAndFrequentMeals(history, [withPhoto], TODAY);
+    expect(out.map((m) => m.thumbPath)).toEqual(['new-thumb.webp', 'c-thumb.webp']);
   });
 });

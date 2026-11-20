@@ -15,6 +15,8 @@ export type HistoryMeal = {
   macros: MealMacros;
   hasPhoto: boolean;
   coachMealId: string | null;
+  /** The photo's thumbnail in the meal-photos bucket (left out by copies saved before it was kept). */
+  thumbPath?: string | null;
 };
 
 export type CoachMealPhoto = { path: string; thumbPath: string; width: number; height: number };
@@ -41,6 +43,11 @@ export type MealSearchItem = {
   count: number;
   lastEatenAt: string | null;
   lastEatenOn: IsoDate | null;
+  /**
+   * A thumbnail to show beside it: the newest photo of this kind of own meal (meal-photos bucket), or the coach
+   * meal's photo (coach-meal-photos bucket, as `source` says). Null without one.
+   */
+  thumbPath?: string | null;
 };
 
 const WINDOW_LOG_AGAIN = 28;
@@ -56,7 +63,7 @@ function kindKey(name: string, m: MealMacros): string {
 /** Named meals with at least one macro within `days` days (today included), grouped by kind. */
 function ownGroups(history: readonly HistoryMeal[], today: IsoDate, days: number): MealSearchItem[] {
   const from = addDays(today, -(days - 1));
-  const groups = new Map<string, MealSearchItem>();
+  const groups = new Map<string, MealSearchItem & { thumbAt: string | null }>();
   for (const m of history) {
     const name = m.name?.trim();
     if (!name || !hasAnyMacro(m.macros) || m.eatenOn < from) continue;
@@ -72,10 +79,16 @@ function ownGroups(history: readonly HistoryMeal[], today: IsoDate, days: number
         count: 1,
         lastEatenAt: m.eatenAt,
         lastEatenOn: m.eatenOn,
+        thumbPath: m.thumbPath ?? null,
+        thumbAt: m.thumbPath ? m.eatenAt : null,
       });
       continue;
     }
     g.count += 1;
+    if (m.thumbPath && (g.thumbAt === null || Date.parse(m.eatenAt) > Date.parse(g.thumbAt))) {
+      g.thumbPath = m.thumbPath;
+      g.thumbAt = m.eatenAt;
+    }
     if (g.lastEatenAt === null || Date.parse(m.eatenAt) > Date.parse(g.lastEatenAt)) {
       g.name = name;
       g.coachMealId = m.coachMealId;
@@ -83,7 +96,11 @@ function ownGroups(history: readonly HistoryMeal[], today: IsoDate, days: number
       g.lastEatenOn = m.eatenOn;
     }
   }
-  return [...groups.values()];
+  return [...groups.values()].map((g): MealSearchItem => {
+    const item: MealSearchItem & { thumbAt?: string | null } = { ...g };
+    delete item.thumbAt;
+    return item;
+  });
 }
 
 const recency = (a: MealSearchItem) => (a.lastEatenAt === null ? -Infinity : Date.parse(a.lastEatenAt));
@@ -116,7 +133,17 @@ export function mealSearchItems(history: readonly HistoryMeal[], coach: readonly
   const coachItems = new Map<string, MealSearchItem>(
     coach.map((c) => [
       c.id,
-      { key: `coach:${c.id}`, source: 'coach', name: c.name, macros: c.macros, coachMealId: c.id, count: 0, lastEatenAt: null, lastEatenOn: null },
+      {
+        key: `coach:${c.id}`,
+        source: 'coach',
+        name: c.name,
+        macros: c.macros,
+        coachMealId: c.id,
+        count: 0,
+        lastEatenAt: null,
+        lastEatenOn: null,
+        thumbPath: c.photo?.thumbPath ?? null,
+      },
     ]),
   );
   const own: MealSearchItem[] = [];
@@ -133,6 +160,19 @@ export function mealSearchItems(history: readonly HistoryMeal[], coach: readonly
     }
   }
   return [...own, ...coachItems.values()];
+}
+
+/**
+ * Add a meal's "Recent & frequent" list before anything is typed: everything mealSearchItems gives, most logged
+ * first, then most recent, then the coach's meals A to Z (default up to 8).
+ */
+export function recentAndFrequentMeals(
+  history: readonly HistoryMeal[],
+  coach: readonly CoachMeal[],
+  today: IsoDate,
+  limit = 8,
+): MealSearchItem[] {
+  return mealSearchItems(history, coach, today).sort(compareItems).slice(0, limit);
 }
 
 /** Log a meal's results: nothing until something is typed, best match tier first, then compareItems. */

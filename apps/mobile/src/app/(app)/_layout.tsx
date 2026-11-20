@@ -48,6 +48,7 @@ export default function AppLayout() {
         <Stack.Screen name="community/notifications" />
         <Stack.Screen name="zoo" />
         <Stack.Screen name="progress-detail" />
+        <Stack.Screen name="food/add" options={{ presentation: 'modal' }} />
         <Stack.Screen name="food/meal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="coach-meals/index" />
         <Stack.Screen name="coach-meals/[id]" />
