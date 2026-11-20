@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
+import { BackCircle } from '@/components/settings/settings-list';
 import { ErrorText, Screen } from '@/components/ui';
 import { DELETE_LIST, DELETE_WORD, canConfirmDelete, deleteMyAccount, historyWarning } from '@/lib/delete-account';
 import { supabase } from '@/lib/supabase';
@@ -11,8 +12,8 @@ import { useTheme } from '@/theme/use-theme';
 import type { ShownError } from '@/lib/error-shown';
 
 /**
- * Settings -> Delete account (approved account-canvas Delete board). What is erased, the coach warning, type DELETE
- * to turn the button on. On success it goes to the "Your account has been deleted" screen, which signs out.
+ * Settings -> Privacy -> Delete account (approved account-canvas Delete board). What is erased, the coach warning, type
+ * DELETE (any letter case) to turn the button on. On success it goes to the "Your account has been deleted" screen, which signs out.
  * A coach signed in on the phone gets the server's "write to support" message and nothing is deleted.
  */
 export default function DeleteAccountScreen() {
@@ -24,7 +25,7 @@ export default function DeleteAccountScreen() {
   const [error, setError] = useState<ShownError | null>(null);
   const ready = canConfirmDelete(typed) && !busy;
 
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/privacy'));
 
   async function confirm() {
     setBusy(true);
@@ -71,15 +72,9 @@ export default function DeleteAccountScreen() {
   return (
     <Screen footer={footer}>
       <View style={{ gap: space[4.5] }}>
-        <Pressable
-          testID="delete-account-back"
-          onPress={back}
-          accessibilityRole="button"
-          accessibilityLabel="Back to Settings"
-          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
-        >
-          <Text style={[text('sectionHeading'), styles.linkLabel]}>‹ Settings</Text>
-        </Pressable>
+        <View style={styles.startSelf}>
+          <BackCircle testID="delete-account-back" label="Back to Privacy" fallback="/privacy" />
+        </View>
         <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
           Delete your account?
         </Text>
@@ -126,6 +121,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   link: { minHeight: tapTarget.min, justifyContent: 'center' },
   centreSelf: { alignSelf: 'center' },
+  startSelf: { alignSelf: 'flex-start' },
   linkLabel: { fontSize: 16 },
   title: { fontSize: 30 },
   body: { fontSize: 16, lineHeight: 23 },

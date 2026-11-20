@@ -6,8 +6,8 @@ import { coachFirstName } from './coach-tab';
 
 export const DELETE_WORD = 'DELETE';
 
-/** The button turns on once the client types DELETE (spaces around it are ignored). */
-export const canConfirmDelete = (typed: string) => typed.trim() === DELETE_WORD;
+/** The button turns on once the client types DELETE, in any letter case (spaces around it are ignored). */
+export const canConfirmDelete = (typed: string) => typed.trim().toUpperCase() === DELETE_WORD;
 
 export const DELETE_LIST = [
   'Workouts, sets and personal bests',

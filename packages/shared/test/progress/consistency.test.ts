@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistencyTile, consistencyWeeks, monthCalendar, plannedDonePercent } from '../../src/progress/consistency';
+import { consistencyTile, consistencyWeeks, monthCalendar, plannedDoneCount, plannedDonePercent } from '../../src/progress/consistency';
 import { planned } from './fixtures';
 
 // Thursday 5 November 2026: this week is Mon 2 to Sun 8 November.
@@ -77,5 +77,13 @@ describe('monthCalendar', () => {
     expect(nov(5)).toMatchObject({ trained: false, isToday: true, label: '5 November, today' });
     expect(nov(6)).toMatchObject({ future: true, label: '6 November' });
     expect(nov(3).label).toBe('3 November');
+  });
+});
+
+describe('plannedDoneCount', () => {
+  it('counts planned workouts done, never a bare percentage, and says the time it covers', () => {
+    expect(plannedDoneCount([planned('2026-11-02', true)], [], today, '2026-11-02')).toEqual({ done: 1, planned: 1, since: 'since you started' });
+    expect(plannedDoneCount([planned('2026-11-02', true), planned('2026-11-03')], [], today, '2026-01-02')).toEqual({ done: 1, planned: 2, since: 'last 8 weeks' });
+    expect(plannedDoneCount([], ['2026-11-02'], today, '2026-11-02')).toBeNull();
   });
 });

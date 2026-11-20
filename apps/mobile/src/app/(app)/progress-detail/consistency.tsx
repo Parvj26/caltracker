@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { borderWidth } from '@caltracker/design-tokens';
-import { consistencyWeeks, localToday, monthCalendar, plannedDonePercent } from '@caltracker/shared';
+import { UPDATING, consistencyWeeks, localToday, monthCalendar, plannedDoneCount, streakWords } from '@caltracker/shared';
 import { InkCard, LoadState, OfflineNote, Overline, SectionHeader, StatBox } from '@/components/progress/parts';
 import { Screen } from '@/components/ui';
 import { addedDays, trainedDays } from '@/lib/progress-hub-logic';
-import { streakNow } from '@/lib/progress-view';
-import { useAlbum, useHub, usePullRefresh } from '@/lib/use-progress-data';
+import { useProgressFacts } from '@/lib/use-progress-facts';
+import { usePullRefresh } from '@/lib/use-progress-data';
 import { palette, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
@@ -16,28 +16,28 @@ const BAR_STEP = 16;
 const GAP = 6;
 
 /**
- * Consistency: share of planned workouts done, the streak now and the best one, workouts per week over 8 weeks (black
- * when every planned one was done, lime when some were), and this month's calendar. No red and no "missed": a rest day
+ * Consistency: planned workouts done as counts ("1 of 1", never a bare 100%), the streak now and the best one, workouts per week over 8 weeks (black
+ * when every planned one was done, lime when some were), and this month's calendar (only days with a workout are filled; past rest days stay plain). No red and no "missed": a rest day
  * is just rest.
  */
 export default function ConsistencyScreen() {
   const { text, space, radius } = useTheme();
   const pull = usePullRefresh();
-  const hub = useHub(pull.refreshKey);
-  const album = useAlbum(pull.refreshKey);
+  const { facts, hub, album } = useProgressFacts(pull.refreshKey);
   const today = localToday();
 
   const view = useMemo(() => {
     const h = hub.data;
-    if (!h) return null;
+    if (!h || !facts.streak) return null;
     const trained = trainedDays(h);
     return {
-      percent: plannedDonePercent(h.workouts, addedDays(h), today),
-      streak: streakNow(album.data?.stats ?? null, trained, today),
+      planned: plannedDoneCount(h.workouts, addedDays(h), today, trained[0] ?? null),
+      streak: facts.streak,
+      words: streakWords(facts.streak, trained.length > 0),
       weeks: consistencyWeeks(h.workouts, addedDays(h), today),
       calendar: monthCalendar(trained, today),
     };
-  }, [hub.data, album.data, today]);
+  }, [hub.data, facts.streak, today]);
 
   return (
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
@@ -48,10 +48,25 @@ export default function ConsistencyScreen() {
         {view ? (
           <>
             <View style={[styles.row, { gap: space[2] }]}>
-              <StatBox tone="lime" value={view.percent === null ? '–' : `${view.percent}%`} label="planned done" testID="consistency-percent" />
-              <StatBox value={`${view.streak.current} wk`} label="streak now" testID="consistency-streak" />
+              <StatBox
+                tone="lime"
+                value={facts.updating ? UPDATING : view.planned ? `${view.planned.done} of ${view.planned.planned}` : '–'}
+                label="planned done"
+                sub={facts.updating ? null : (view.planned?.since ?? null)}
+                testID="consistency-percent"
+              />
+              <StatBox
+                value={facts.updating ? UPDATING : view.streak.current > 0 ? `${view.streak.current} wk` : 'New'}
+                label={view.streak.current > 0 || facts.updating ? 'streak now' : 'journey'}
+                testID="consistency-streak"
+              />
               <StatBox value={`${view.streak.best} wk`} label="best streak" testID="consistency-best" />
             </View>
+            {!facts.updating && view.words.line ? (
+              <Text style={text('body')} testID="consistency-journey">
+                {view.words.line}
+              </Text>
+            ) : null}
 
             <InkCard>
               <Overline>Workouts per week · last 8 weeks</Overline>
@@ -111,7 +126,7 @@ export default function ConsistencyScreen() {
                           styles.cell,
                           styles.day,
                           { borderRadius: radius.input },
-                          d.trained ? styles.dayDone : d.future ? null : styles.dayPast,
+                          d.trained ? styles.dayDone : null,
                           d.isToday && styles.today,
                         ]}
                       >
@@ -148,7 +163,6 @@ const styles = StyleSheet.create({
   // Every day carries today's border width (transparent), so today's ring doesn't widen its column.
   day: { height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: borderWidth.card, borderColor: 'transparent' },
   dayDone: { backgroundColor: palette.ink },
-  dayPast: { backgroundColor: palette.surface },
   today: { borderWidth: borderWidth.card, borderColor: palette.magenta },
   small: { fontSize: 13 },
   onInk: { color: white },

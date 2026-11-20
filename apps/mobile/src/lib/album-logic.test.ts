@@ -95,10 +95,18 @@ describe('albumModel streak as of this week', () => {
     expect(albumModel([], stats({ streak: 3, streakWeek: '2026-10-26' }), 'kg', '2026-11-02').journey.streak).toBe(3);
   });
   it('shows 0 once a whole week went by without a workout', () => {
-    const m = albumModel([], stats({ streak: 3, streakWeek: '2026-10-19' }), 'kg', '2026-11-02');
+    const m = albumModel([], stats({ streak: 3, bestStreak: 3, streakWeek: '2026-10-19' }), 'kg', '2026-11-02');
     expect(m.journey.streak).toBe(0);
-    expect(m.journey.title).toBe('🔥 0-week streak');
+    expect(m.journey.title).toBe('A new journey');
+    expect(m.journey.line).toMatch(/landmarks stay in your book/);
     expect(m.journey.dots.every((d) => !d.reached)).toBe(true);
+  });
+});
+
+describe('albumModel streak from the shared facts', () => {
+  it('uses the streak it is given, so the book matches Today and Progress', () => {
+    expect(albumModel([], stats({ streak: 3, streakWeek: '2026-10-19' }), 'kg', '2026-11-02', 2).journey).toMatchObject({ streak: 2, title: '🔥 2-week streak', line: null });
+    expect(albumModel([], null, 'kg', '2026-11-02', 0).journey.title).toBe('Your journey starts here');
   });
 });
 

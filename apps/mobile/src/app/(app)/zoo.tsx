@@ -1,63 +1,36 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { AlbumGrid } from '@/components/stickers/album-grid';
 import { Journey } from '@/components/stickers/journey';
 import { StickerSheet } from '@/components/stickers/sticker-sheet';
-import { Screen, TextButton } from '@/components/ui';
+import { SectionHeader } from '@/components/progress/parts';
+import { Screen } from '@/components/ui';
 import { weekKey } from '@caltracker/shared';
-import { fetchAlbum, readCachedAlbum } from '@/lib/album-api';
 import { albumModel, type AlbumData, type AlbumItem } from '@/lib/album-logic';
 import { deviceTimeZone } from '@/lib/awards';
-import { useSession } from '@/lib/session';
+import { useProgressFacts } from '@/lib/use-progress-facts';
+import { usePullRefresh } from '@/lib/use-progress-data';
 import { useUnits } from '@/lib/use-units';
 import { useTheme } from '@/theme/use-theme';
 
 /**
  * The zoo book: one scrolling album (streak journey, animals, rare finds, surprise drops). Its own screen (not a tab
- * since the Food tab), opened from Progress and Today through zooHref().
+ * since the Food tab), opened from Progress and Today through zooHref(). The book and streak are the same saved copy
+ * and shared progressFacts as Today and Progress, so the numbers always agree.
  */
 export default function ZooScreen() {
-  const router = useRouter();
   const { text, space } = useTheme();
-  const { session, workspace } = useSession();
-  const userId = session?.user.id ?? null;
-  const workspaceId = workspace?.workspaceId ?? null;
   const units = useUnits();
-  const [data, setData] = useState<AlbumData | null>(null);
-  const [offline, setOffline] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const pull = usePullRefresh();
+  // The same saved book and streak as Today and Progress (shared progressFacts).
+  const { facts, album } = useProgressFacts(pull.refreshKey);
   const [open, setOpen] = useState<string | null>(null);
+  const data: AlbumData | null = album.data ?? (album.status === 'offline' ? { awards: [], stats: null } : null);
 
-  // A different account or coach: drop the book on screen, so nothing from the last one shows while loading.
-  useEffect(() => {
-    setData(null);
-  }, [userId, workspaceId]);
-
-  const load = useCallback(async () => {
-    if (!userId || !workspaceId) return;
-    // The saved copy first, so the book appears at once and works with no signal.
-    const cached = await readCachedAlbum(userId, workspaceId);
-    if (cached) setData((d) => d ?? cached);
-    try {
-      setData(await fetchAlbum(userId, workspaceId));
-      setOffline(false);
-    } catch {
-      setOffline(true);
-      setData((d) => d ?? { awards: [], stats: null });
-    }
-  }, [userId, workspaceId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
-
-  // The streak as it stands this week on the phone's calendar (worked out again each time the book is loaded).
+  // The streak as it stands this week on the phone's calendar.
   const model = useMemo(
-    () => albumModel(data?.awards ?? [], data?.stats ?? null, units ?? 'lb', weekKey(new Date().toISOString(), deviceTimeZone())),
-    [data, units],
+    () => albumModel(data?.awards ?? [], data?.stats ?? null, units ?? 'lb', weekKey(new Date().toISOString(), deviceTimeZone()), facts.streak?.current),
+    [data, units, facts.streak],
   );
   const all = useMemo(
     () => new Map<string, AlbumItem>([...model.animals.items, ...model.rare.items, ...model.drops, ...model.journey.collected].map((i) => [i.key, i])),
@@ -66,20 +39,14 @@ export default function ZooScreen() {
   const opened = open ? (all.get(open) ?? null) : null;
 
   return (
-    <Screen
-      refreshing={refreshing}
-      onRefresh={() => {
-        setRefreshing(true);
-        void load().finally(() => setRefreshing(false));
-      }}
-    >
-      <View style={{ flexDirection: 'row' }}>
-        <TextButton title="Back" testID="zoo-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/progress'))} />
-      </View>
-      <Text style={text('screenTitle')} accessibilityRole="header">
-        Zoo book
-      </Text>
-      {offline ? <Text style={text('caption')}>Showing your saved book. It updates when you’re online.</Text> : null}
+    <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
+      <SectionHeader title="Zoo book" backTestID="zoo-back" backLabel="Back" />
+      {album.status === 'offline' ? <Text style={text('caption')}>Showing your saved book. It updates when you’re online.</Text> : null}
+      {facts.updating ? (
+        <Text style={text('body')} testID="zoo-updating" accessibilityLiveRegion="polite">
+          Updating… your latest workout is still syncing.
+        </Text>
+      ) : null}
 
       <Journey journey={model.journey} onOpen={setOpen} />
 

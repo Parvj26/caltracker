@@ -1,9 +1,9 @@
 import { FirstName, LastName, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordBytes } from '@caltracker/shared';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { AuthShell } from '@/components/auth-shell';
-import { Button, ErrorText, TextButton, TextField } from '@/components/ui';
+import { Button, ErrorText, TextButton, TextField, type TextFieldHandle } from '@/components/ui';
 import { joinCode, joinInvite, joinMessage, loadInvite, type InviteDetails, type JoinFailure } from '@/lib/join-invite';
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { palette } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import type { ShownError } from '@/lib/error-shown';
+import type { ErrorCode } from '@caltracker/shared';
 
 // Opened by caltracker://invite/{token} (the "Open in CalTracker" button on the web invite page).
 // The client sees the coach's details pre-filled and only chooses a password; there is no confirmation email.
@@ -29,7 +30,10 @@ export default function JoinInvite() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  // Errors checked on the phone, each shown under its field.
+  const [fieldErrors, setFieldErrors] = useState<{ firstName?: ErrorCode; lastName?: ErrorCode; password?: ErrorCode }>({});
+  const lastRef = useRef<TextFieldHandle>(null);
+  const passwordRef = useRef<TextFieldHandle>(null);
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
@@ -52,14 +56,19 @@ export default function JoinInvite() {
   const goSignIn = (email?: string) => router.replace({ pathname: '/sign-in', params: email ? { email } : {} });
 
   async function submit() {
-    if (invite?.status !== 'valid') return;
+    if (invite?.status !== 'valid' || busy) return;
     const first = FirstName.safeParse(firstName);
-    if (!first.success) return setError({ code: 'join_first_name_invalid', text: 'Enter your first name (up to 100 characters).' });
     const last = LastName.safeParse(lastName);
-    if (!last.success) return setError({ code: 'invite_last_name_invalid' });
-    if (password.length < PASSWORD_MIN_LENGTH) return setError({ code: 'password_too_short', text: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` });
-    // The limit counts bytes: accented letters and emoji take more than one.
-    if (passwordBytes(password) > PASSWORD_MAX_LENGTH) return setError({ code: 'password_too_long', text: 'That password is too long. Try a shorter one.' });
+    const found = {
+      firstName: first.success ? undefined : ('join_first_name_invalid' as const),
+      lastName: last.success ? undefined : ('invite_last_name_invalid' as const),
+      // The limit counts bytes: accented letters and emoji take more than one.
+      password:
+        password.length < PASSWORD_MIN_LENGTH ? ('password_too_short' as const) : passwordBytes(password) > PASSWORD_MAX_LENGTH ? ('password_too_long' as const) : undefined,
+    };
+    setFieldErrors(found);
+    setError(null);
+    if (!first.success || !last.success || found.password) return;
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -137,34 +146,52 @@ export default function JoinInvite() {
         label="First name"
         textContentType="givenName"
         autoComplete="given-name"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => lastRef.current?.focus()}
         value={firstName}
-        onChangeText={setFirstName}
+        onChangeText={(v) => {
+          setFirstName(v);
+          setFieldErrors((f) => ({ ...f, firstName: undefined }));
+        }}
+        error={fieldErrors.firstName}
       />
       <TextField
+        ref={lastRef}
         testID="last-name-input"
         label="Last name"
         hint="Optional if you use one name."
         textContentType="familyName"
         autoComplete="family-name"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
         value={lastName}
-        onChangeText={setLastName}
+        onChangeText={(v) => {
+          setLastName(v);
+          setFieldErrors((f) => ({ ...f, lastName: undefined }));
+        }}
+        error={fieldErrors.lastName}
       />
       <TextField
+        ref={passwordRef}
         testID="password-input"
         label="Create a password"
         hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
-        secureTextEntry={!showPassword}
+        password
+        eyeTestID="toggle-password"
         autoCapitalize="none"
         autoCorrect={false}
         textContentType="newPassword"
         autoComplete="new-password"
+        returnKeyType="go"
+        onSubmitEditing={() => void submit()}
         value={password}
-        onChangeText={setPassword}
-      />
-      <TextButton
-        testID="toggle-password"
-        title={showPassword ? 'Hide password' : 'Show password'}
-        onPress={() => setShowPassword((s) => !s)}
+        onChangeText={(v) => {
+          setPassword(v);
+          setFieldErrors((f) => ({ ...f, password: undefined }));
+        }}
+        error={fieldErrors.password}
       />
       {error ? <ErrorText testID="join-error" code={error.code}>{error.text}</ErrorText> : null}
       {offerSignIn ? (

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View, type HostInstance, type TextInputProps } from 'react-native';
-import { buttonMinHeight } from '@caltracker/design-tokens';
-import { palette } from '@/theme/theme';
+import { useEffect, useRef, useState, type ComponentRef, type Ref } from 'react';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View, type HostInstance, type TextInputProps } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
+import { buttonMinHeight, tapTarget } from '@caltracker/design-tokens';
+import { palette, pressedOpacity } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { useRevealOnFocus } from './screen';
 import type { ErrorCode } from '@caltracker/shared';
@@ -12,22 +13,36 @@ type TextFieldProps = TextInputProps & {
   testID: string;
   /** Short help under the field, e.g. "At least 8 characters". */
   hint?: string;
+  /** The field's error, shown under it in red with ⚠ (UI rules §9.6). */
+  error?: ErrorCode | null | undefined;
+  /** A password: hidden, with a show/hide eye in the field (`eyeTestID` names the eye). */
+  password?: boolean;
+  eyeTestID?: string;
+  ref?: Ref<TextFieldHandle>;
 };
 
+/** What a TextField's ref points at (the input), e.g. to move focus to it on Return. */
+export type TextFieldHandle = ComponentRef<typeof TextInput>;
+
 /** Labelled input. The label is visible and is also the input's accessibility label. */
-export function TextField({ label, hint, testID, style, onFocus, onBlur, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, testID, style, onFocus, onBlur, error, password = false, eyeTestID, ref, ...rest }: TextFieldProps) {
   const { text, device, radius, space } = useTheme();
   const [focused, setFocused] = useState(false);
+  const [shown, setShown] = useState(false);
   const reveal = useRevealOnFocus();
   const wrapRef = useRef<HostInstance>(null);
   return (
     <View ref={wrapRef} style={{ gap: space[2] }}>
       <Text style={text('sectionHeading')}>{label}</Text>
+      <View style={styles.inputRow}>
       <TextInput
         {...rest}
+        ref={ref}
+        secureTextEntry={password ? !shown : rest.secureTextEntry}
         testID={testID}
         accessibilityLabel={label}
-        accessibilityHint={hint}
+        accessibilityHint={error ? errorTextContent(error) : hint}
+        aria-invalid={error ? true : undefined}
         placeholderTextColor={palette.inkMuted}
         onFocus={(e) => {
           setFocused(true);
@@ -48,11 +63,57 @@ export function TextField({ label, hint, testID, style, onFocus, onBlur, ...rest
             paddingVertical: space[3],
           },
           focused && styles.focused,
+          error ? styles.invalid : null,
+          password ? { paddingRight: tapTarget.min + space[1] } : null,
           style,
         ]}
       />
+      {password ? (
+        <Pressable
+          testID={eyeTestID ?? `${testID}-eye`}
+          onPress={() => setShown((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={shown ? 'Hide password' : 'Show password'}
+          hitSlop={4}
+          style={({ pressed }) => [styles.eye, pressed && { opacity: pressedOpacity }]}
+        >
+          <EyeIcon off={shown} />
+        </Pressable>
+      ) : null}
+      </View>
+      {error ? <FieldError code={error} testID={`${testID}-error`} /> : null}
       {hint ? <Text style={text('caption')}>{hint}</Text> : null}
     </View>
+  );
+}
+
+/** The error under a field: ⚠ and the message in the danger colour, counted like every shown error. */
+function FieldError({ code, testID }: { code: ErrorCode; testID: string }) {
+  const { text, space } = useTheme();
+  const message = errorTextContent(code);
+  useEffect(() => {
+    reportErrorShown(code);
+    // iOS has no live regions: say the new error out loud for VoiceOver (Android uses accessibilityLiveRegion).
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+  }, [code, message]);
+  return (
+    <View testID={testID} style={[styles.errorRow, { gap: space[1] }]} accessibilityLiveRegion="polite">
+      <Text style={[text('sectionHeading'), styles.fieldError]} accessibilityElementsHidden importantForAccessibility="no">
+        ⚠
+      </Text>
+      <Text style={[text('sectionHeading'), styles.fieldError, styles.errorText]}>{message}</Text>
+    </View>
+  );
+}
+
+/** An eye (show the password), or a crossed-out eye (hide it). */
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={palette.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" accessibilityElementsHidden importantForAccessibility="no">
+      <Path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <Circle cx={12} cy={12} r={3} />
+      {off ? <Path d="M4 4l16 16" /> : null}
+    </Svg>
   );
 }
 
@@ -81,6 +142,10 @@ export function ErrorText({ code, children, testID }: { code: ErrorCode; childre
 const styles = StyleSheet.create({
   input: { backgroundColor: palette.surface, borderWidth: 2, borderColor: 'transparent' },
   focused: { borderColor: palette.ink, backgroundColor: palette.bg },
+  invalid: { borderColor: palette.danger },
+  inputRow: { justifyContent: 'center' },
+  eye: { position: 'absolute', right: 2, width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
+  fieldError: { color: palette.dangerDeep, fontSize: 14 },
   errorRow: { flexDirection: 'row', alignItems: 'flex-start' },
   marker: { color: palette.magenta },
   errorText: { flex: 1 },

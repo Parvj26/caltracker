@@ -1,5 +1,3 @@
-import { formatWeight } from '../units/units';
-import type { Units } from '../units/units';
 import type { IsoDate } from '../dates/dates';
 import { MONTHS_SHORT } from '../dates/format';
 import type { WorkoutLogDoc } from '../logs/schema';
@@ -85,15 +83,3 @@ export function shortDate(d: IsoDate): string {
   return `${Number(d.slice(8, 10))} ${MONTHS_SHORT[Number(d.slice(5, 7)) - 1] ?? ''}`;
 }
 
-/** A sentence for the chart's text alternative: how the estimated 1RM moved and its best. */
-export function strengthSummary(name: string, points: readonly StrengthPoint[], units: Units): string {
-  const first = points[0];
-  const last = points.at(-1);
-  if (!first || !last) return `${name}: no workouts yet.`;
-  const count = `${points.length} ${points.length === 1 ? 'workout' : 'workouts'}`;
-  if (points.length === 1) return `${name}: ${count}. Estimated 1RM ${formatWeight(first.e1rmKg, units)} on ${shortDate(first.date)}.`;
-  const change = last.e1rmKg - first.e1rmKg;
-  const trend = change === 0 ? 'no change' : `${change > 0 ? 'up' : 'down'} ${formatWeight(Math.abs(change), units)}`;
-  const best = points.reduce((a, b) => (b.e1rmKg > a.e1rmKg ? b : a));
-  return `${name}: ${count}. Estimated 1RM went from ${formatWeight(first.e1rmKg, units)} on ${shortDate(first.date)} to ${formatWeight(last.e1rmKg, units)} on ${shortDate(last.date)}, ${trend}. Best ${formatWeight(best.e1rmKg, units)} on ${shortDate(best.date)}.`;
-}

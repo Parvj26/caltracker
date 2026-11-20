@@ -54,12 +54,39 @@ export function timeOptions(stepMinutes = 30): string[] {
   return out;
 }
 
-const GROUPS: PushGroup[] = ['workouts', 'coach', 'community'];
+export const NOTIFICATION_GROUPS: readonly PushGroup[] = ['workouts', 'coach', 'community'];
 
-export function settingsSections(prefs: PushPrefs): SettingsSection[] {
-  const sections: SettingsSection[] = GROUPS.map((group) => ({
-    title: PUSH_GROUP_TITLES[group],
-    rows: PUSH_TYPES.filter((t) => notificationCatalogue[t].group === group && notificationCatalogue[t].available).flatMap(
+/** The groups as the approved Settings board names them: "Workouts & reminders", "Messages from Luis", "Community". */
+export function groupTitle(group: PushGroup, coachFirstName: string | null): string {
+  if (group === 'workouts') return 'Workouts & reminders';
+  if (group === 'coach') return coachFirstName ? `Messages from ${coachFirstName}` : 'Messages from your coach';
+  return PUSH_GROUP_TITLES[group];
+}
+
+/** The switches shown in a group (types not built yet are left out). */
+const groupTypes = (group: PushGroup): PushType[] => PUSH_TYPES.filter((t) => notificationCatalogue[t].group === group && notificationCatalogue[t].available);
+
+/**
+ * A group's state on the Settings screen: "Paused" while iOS has notifications off for the app (the switches keep
+ * their settings for when it is back on), else "On", "Off" or "2 of 4 on".
+ */
+export function groupState(prefs: PushPrefs | null, permission: PushPermission | null, group: PushGroup): string {
+  if (permission !== null && permission !== 'granted') return 'Paused';
+  const p = prefs ?? DEFAULT_PUSH_PREFS;
+  const types = groupTypes(group);
+  const on = types.filter((t) => isEnabled(p, t)).length;
+  if (on === types.length) return 'On';
+  if (on === 0) return 'Off';
+  return `${on} of ${types.length} on`;
+}
+
+/** iOS has notifications off for the app (or hasn't asked yet): the switches are shown paused. */
+export const notificationsPaused = (permission: PushPermission | null) => permission !== null && permission !== 'granted';
+
+export function settingsSections(prefs: PushPrefs, coachFirstName: string | null = null): SettingsSection[] {
+  const sections: SettingsSection[] = NOTIFICATION_GROUPS.map((group) => ({
+    title: groupTitle(group, coachFirstName),
+    rows: groupTypes(group).flatMap(
       (type): SettingsRow[] => {
         const { label, hint } = notificationCatalogue[type];
         const on = isEnabled(prefs, type);

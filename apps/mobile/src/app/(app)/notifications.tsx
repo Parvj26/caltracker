@@ -6,9 +6,11 @@ import { DEFAULT_PUSH_PREFS, withType, type PushPrefs } from '@caltracker/shared
 import { ChevronIcon } from '@/components/settings/icons';
 import { TimeOptionsSheet } from '@/components/settings/time-options-sheet';
 import { Button, ErrorText, Screen } from '@/components/ui';
-import { clockLabel, prefsEditable, prefsNote, settingsSections, type SettingsRow, type TimeField } from '@/lib/notification-settings-logic';
+import { clockLabel, notificationsPaused, prefsEditable, prefsNote, settingsSections, type SettingsRow, type TimeField } from '@/lib/notification-settings-logic';
+import { coachFirstName } from '@/lib/coach-tab';
+import { useCoachProfile } from '@/lib/use-coach-profile';
 import { usePush } from '@/lib/use-push';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import type { ShownError } from '@/lib/error-shown';
 
@@ -19,9 +21,10 @@ const TIME_TITLES: Record<TimeField, string> = {
 };
 
 /**
- * Settings -> Notifications: a switch per notification type, the daily reminder time and quiet hours (approved
- * Notifications board). When iOS has notifications off for the app, a banner says so and opens iPhone Settings (or
- * asks, the first time). Changes save at once and are put back if saving fails.
+ * Settings -> Notifications: a switch per notification type in three groups (Workouts & reminders, Messages from <coach>,
+ * Community), the daily reminder time and quiet hours (approved
+ * Notifications board). When iOS has notifications off for the app, a notice says so and opens iPhone Settings (or
+ * asks, the first time), and the switches show as paused. Back returns to Settings (one step). Changes save at once and are put back if saving fails.
  */
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
@@ -32,6 +35,9 @@ export default function NotificationsSettingsScreen() {
   const [editing, setEditing] = useState<TimeField | null>(null);
   const [error, setError] = useState<ShownError | null>(null);
   const current = prefs ?? DEFAULT_PUSH_PREFS;
+  const coach = coachFirstName(useCoachProfile()?.name);
+  // iOS has notifications off for the app: the switches keep their settings but are shown paused (dimmed).
+  const paused = notificationsPaused(permission);
 
   const save = (next: PushPrefs) => {
     setError(null);
@@ -50,7 +56,7 @@ export default function NotificationsSettingsScreen() {
           testID="notifications-settings-back"
           accessibilityRole="button"
           accessibilityLabel="Back to Settings"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           <ChevronIcon direction="left" />
@@ -66,6 +72,7 @@ export default function NotificationsSettingsScreen() {
           style={[styles.banner, { borderRadius: radius.button, padding: space[4], gap: space[2] }]}
         >
           <Text style={text('sectionHeading')}>Notifications are off for CalTracker on this iPhone.</Text>
+          <Text style={text('body')}>Your choices below are paused until you turn them on in iPhone Settings.</Text>
           <View style={styles.start}>
             <Button
               variant="secondary"
@@ -87,7 +94,7 @@ export default function NotificationsSettingsScreen() {
         </Text>
       ) : null}
 
-      {settingsSections(current).map((section) => (
+      {settingsSections(current, coach).map((section) => (
         <View key={section.title} style={{ gap: space[1] }}>
           <Text style={[text('caption'), styles.groupTitle, { paddingHorizontal: space[1] }]} accessibilityRole="header">
             {section.title}
@@ -99,6 +106,7 @@ export default function NotificationsSettingsScreen() {
                 row={row}
                 last={i === section.rows.length - 1}
                 disabled={!editable}
+                paused={paused}
                 onToggle={() => toggle(row)}
                 onTime={(field) => setEditing(field)}
               />
@@ -129,12 +137,14 @@ function SettingsRowView({
   row,
   last,
   disabled,
+  paused,
   onToggle,
   onTime,
 }: {
   row: SettingsRow;
   last: boolean;
   disabled: boolean;
+  paused: boolean;
   onToggle: () => void;
   onTime: (field: TimeField) => void;
 }) {
@@ -143,6 +153,7 @@ function SettingsRowView({
     <View style={[styles.flex, { gap: 2 }]}>
       <Text style={text('sectionHeading')}>{row.label}</Text>
       {row.hint ? <Text style={text('caption')}>{row.hint}</Text> : null}
+      {paused && row.kind === 'switch' && row.on ? <Text style={text('caption')}>Paused</Text> : null}
     </View>
   );
   const frame = [styles.item, { gap: space[3], paddingHorizontal: space[4] }, !last && styles.divider];
@@ -167,15 +178,15 @@ function SettingsRowView({
     <Pressable
       testID={row.kind === 'switch' ? `notif-switch-${row.type}` : 'notif-switch-quiet'}
       accessibilityRole="switch"
-      accessibilityLabel={row.label}
+      accessibilityLabel={paused ? `${row.label}, paused while iPhone notifications are off` : row.label}
       accessibilityState={{ checked: row.on, disabled }}
       disabled={disabled}
       onPress={onToggle}
-      style={({ pressed }) => [...frame, (pressed || disabled) && styles.pressed]}
+      style={({ pressed }) => [...frame, (pressed || disabled) && styles.pressed, paused && styles.paused]}
     >
       {label}
       <View style={[styles.track, row.on ? styles.trackOn : styles.trackOff]}>
-        <View style={styles.knob} />
+        <View style={[styles.knob, row.on && styles.knobOn]} />
       </View>
     </Pressable>
   );
@@ -212,7 +223,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  trackOn: { backgroundColor: palette.lime, alignItems: 'flex-end' },
+  // "On" is ink, not lime (UI rules §2.4: lime is for creating things only).
+  trackOn: { backgroundColor: palette.ink, alignItems: 'flex-end' },
   trackOff: { backgroundColor: palette.surface, alignItems: 'flex-start' },
   knob: { width: KNOB, height: KNOB, borderRadius: KNOB / 2, backgroundColor: palette.ink },
+  knobOn: { backgroundColor: white },
+  paused: { opacity: 0.55 },
 });
