@@ -83,12 +83,12 @@ describe('strengthHeadline', () => {
 });
 
 describe('strengthTile', () => {
-  it('shows the most-trained exercise and its 3-month change', () => {
+  it('shows the most-trained exercise and its 3-month change in heaviest weight', () => {
     const list = [ex('a', 'Squat', ['2026-09-06', '2026-10-01', '2026-11-01']), ex('b', 'Bench', ['2026-10-01'])];
-    expect(strengthTile(list, 'kg', today)).toEqual({ value: 'Squat +10 kg', sub: 'est. max since 6 Sep' });
+    expect(strengthTile(list, 'kg', today)).toEqual({ value: 'Squat +10 kg', sub: 'heaviest since 6 Sep' });
   });
-  it('shows the latest estimated max with one workout', () => {
-    expect(strengthTile([ex('a', 'Squat', ['2026-11-01'])], 'kg', today)).toEqual({ value: 'Squat 100 kg', sub: 'est. max' });
+  it('shows the heaviest weight with one workout', () => {
+    expect(strengthTile([ex('a', 'Squat', ['2026-11-01'])], 'kg', today)).toEqual({ value: 'Squat 100 kg', sub: 'heaviest' });
   });
   it('invites a first workout with none', () => {
     expect(strengthTile([], 'kg', today)).toEqual({ value: 'No lifts yet', sub: 'log a workout to start' });
@@ -108,6 +108,8 @@ describe('strengthPickerSections', () => {
     expect(s[0]!.items.map((i) => i.name)).toEqual(['Back Squat', 'Bench Press']);
     expect(s[2]!.items.map((i) => i.name)).toEqual(['Back Squat', 'Leg Press']);
     expect(s[0]!.items[0]!.bestKg).toBe(105);
+    expect(s[0]!.items[0]!.best).toBe('105 kg');
+    expect(strengthPickerSections([{ exerciseId: 'p', name: 'Pullups', muscle: null, points: [pt('2026-10-01', 7.5)] }], '')[0]!.items[0]!.best).toBe('+7.5 kg');
   });
   it('uses the app’s smart search: typos, word forms and other names, in its ranked order', () => {
     const lifts = [

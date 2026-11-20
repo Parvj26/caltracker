@@ -427,7 +427,7 @@ export {
   seededRng,
 } from './awards/ladder';
 export type { LadderAward, LadderPick } from './awards/ladder';
-export { detectPrs, epley1rm, logBests } from './awards/prs';
+export { bestE1rmLift, detectPrs, epley1rm, estimate1rm, heavierLift, logBests } from './awards/prs';
 export type { PersonalRecord, PrKind } from './awards/prs';
 export { journeyStep, liveStreak, localDay, streakWeek, streakWeeks, weekKey } from './awards/streak';
 export { milestoneFor, newRareFinds } from './awards/rare';
@@ -436,7 +436,7 @@ export { DROP_CHANCE, SHINY_CHANCE, rollDrop, rollShiny } from './awards/rolls';
 export type { Rng } from './awards/rolls';
 export { awardHasPrs, personalBestRows, streakLabel } from './awards/bests';
 export type { NamedRecord, PersonalBestRow } from './awards/bests';
-export { shortDate, strengthExercises, strengthSeries, strengthSummary } from './awards/strength-series';
+export { shortDate, strengthExercises, strengthSeries, strengthSeriesAll, strengthSummary } from './awards/strength-series';
 export type { StrengthPoint } from './awards/strength-series';
 export { awardPrEvents, liftsImprovedBetween, prsThisWeek, prsThisWeekByClient } from './awards/week-prs';
 export type { PrEvent } from './awards/week-prs';
@@ -686,6 +686,33 @@ export {
   strengthTile,
 } from './progress/strength';
 export type { PickerItem, PickerSection, StrengthExerciseLite, StrengthRange, StrengthSession } from './progress/strength';
+export {
+  E1RM_MAX_REPS,
+  bestE1rmOf,
+  bestOf,
+  heaviestChange,
+  heaviestChart,
+  heaviestSentence,
+  heaviestSessionRows,
+  heaviestSessions,
+  heaviestTile,
+  loadStyleOf,
+  loadText,
+  sessionsSince,
+  setText,
+  strengthExerciseRows,
+  strengthStats,
+} from './progress/heaviest';
+export type {
+  HeaviestChange,
+  HeaviestChartPoint,
+  HeaviestSession,
+  LiftSet,
+  LoadStyle,
+  SessionRowView,
+  StrengthExerciseRow,
+  StrengthStats,
+} from './progress/heaviest';
 export { WEIGHT_TREND_HALF_LIFE_DAYS, bodyTile, smoothedTrend, weightTrendInRange, weightTrendSummary } from './progress/body';
 export { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, foodTile } from './progress/food';
 export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, ProteinDayState } from './progress/food';

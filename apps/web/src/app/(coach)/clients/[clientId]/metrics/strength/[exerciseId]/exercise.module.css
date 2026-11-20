@@ -1,0 +1,35 @@
+/* Exercise progress page. Colours, radii and sizes only via var(--ct-*). Controls are at least 44 px tall. */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 880px; min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-3); }
+.tile { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; padding: var(--ct-space-3-5); border-radius: var(--ct-radius-card); background: var(--ct-surface); }
+.tileLabel { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
+.tileValue { margin: 0; font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tileSub { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.tileUp { color: var(--ct-magenta-deep); font-weight: var(--ct-weight-section-heading); }
+
+/* The range: a segmented control (UI rules §2.3: selected = white pill + ink border). Links, so the range is in the address. */
+.ranges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-1); margin: 0; padding: var(--ct-space-1); list-style: none; border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.range {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ct-tap-min);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: none;
+}
+.range[aria-current='true'] { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); font-weight: var(--ct-weight-button); }
+@media (hover: hover) { .range:not([aria-current='true']):hover { background: var(--ct-bg); } }
+
+.section { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
+.sectionHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+.yet { display: inline-flex; padding: 2px var(--ct-space-2-5); border-radius: var(--ct-radius-pill); background: var(--ct-pink); color: var(--ct-magenta-deep); font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); white-space: nowrap; }
+
+@media (min-width: 600px) {
+  .rangeNav { align-self: flex-start; }
+  .ranges { display: flex; }
+}

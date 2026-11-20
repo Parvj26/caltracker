@@ -1,5 +1,5 @@
 # The Progress tab after a finished workout: finish a 3 x 8 at 60 kg, then open Progress. The strength chart for
-# the exercise shows (from the Strength tile) with its readout and plain-English summary. Run via `pnpm --filter mobile e2e`.
+# the exercise shows (from the Strength tile) with its heaviest-weight tiles, readout and plain-English summary. Run via `pnpm --filter mobile e2e`.
 appId: app.caltracker.client
 env:
   EMAIL: client@demo.local
@@ -41,10 +41,14 @@ env:
     timeout: 10000
 - assertVisible:
     id: strength-readout
-    text: '.*estimated 1RM.*'
+    text: '.*heaviest .* × .*'
+- assertVisible:
+    id: strength-value
+- assertVisible:
+    id: strength-e1rm
 - assertVisible:
     id: strength-summary
-    text: '.*(estimated max|One workout).*'
+    text: '.*(more than|One workout|holding steady).*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

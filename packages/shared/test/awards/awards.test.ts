@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeAward, revealCards } from '../../src/awards/award';
 import { LANDMARK_JOURNEY, STICKERS } from '../../src/awards/catalogue';
 import { formatMultiple, isQualifying, pickLadderAnimal } from '../../src/awards/ladder';
-import { detectPrs, epley1rm } from '../../src/awards/prs';
+import { detectPrs, epley1rm, logBests } from '../../src/awards/prs';
 import type { PersonalRecord } from '../../src/awards/prs';
 import { milestoneFor, newRareFinds } from '../../src/awards/rare';
 import { journeyStep, liveStreak, streakWeek, streakWeeks, weekKey } from '../../src/awards/streak';
@@ -71,6 +71,8 @@ describe('prs', () => {
   it('epley', () => {
     expect(epley1rm(100, 5)).toBe(116.7);
     expect(epley1rm(105, 3)).toBe(115.5);
+    // A single is its own max.
+    expect(epley1rm(140, 1)).toBe(140);
   });
   it('first log is a baseline', () => {
     expect(detectPrs(mkLog([{ sets: [{ w: 100, r: 5 }] }]), [], new Set([EX_A]))).toEqual([]);
@@ -101,6 +103,20 @@ describe('prs', () => {
     expect(prs.find((p) => p.kind === 'e1rm')).toMatchObject({ valueKg: epley1rm(110, 5), reps: 5 });
     expect(prs.filter((p) => p.kind === 'reps_at_weight')).toHaveLength(1);
     expect(prs.find((p) => p.kind === 'reps_at_weight')).toMatchObject({ valueKg: 100, reps: 7 });
+  });
+  it('gives no estimated-max PR from a set of more than 12 reps', () => {
+    const prs = detectPrs(mkLog([{ sets: [{ w: 90, r: 20 }] }]), history, new Set());
+    expect(prs.find((p) => p.kind === 'e1rm')).toBeUndefined();
+  });
+  it('never rewards more help on an assisted lift, and gives bodyweight lifts no estimated max', () => {
+    const named = (name: string, w: number, r: number) => {
+      const log = mkLog([{ sets: [{ w, r }] }]);
+      log.blocks[0]!.exercises[0]!.exerciseName = name;
+      return log;
+    };
+    const assisted = detectPrs(named('Machine Assisted Pull Up', 120, 5), history, new Set());
+    expect(assisted.map((p) => p.kind)).toEqual([]);
+    expect(logBests(named('Pullups', 10, 6)).map((r) => r.kind).sort()).toEqual(['heaviest', 'reps_at_weight']);
   });
   it('judges each exercise on its own history', () => {
     expect(detectPrs(mkLog([{ exerciseId: EX_B, sets: [{ w: 300, r: 5 }] }]), history, new Set())).toEqual([]);

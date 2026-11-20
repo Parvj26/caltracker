@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { LOG_TREE_SELECT, logRowToDoc, safeTimeZone, strengthExercises, strengthSeries } from '@caltracker/shared';
+import { LOG_TREE_SELECT, logRowToDoc, safeTimeZone, strengthExercises, strengthSeriesAll } from '@caltracker/shared';
 import type { Database, LogTreeRow, StrengthPoint, WorkoutLogDoc } from '@caltracker/shared';
 
 /** The most recent finished workouts read for the charts. */
@@ -7,13 +7,26 @@ export const STRENGTH_LOG_LIMIT = 300;
 
 export type ClientStrength = Array<{ exerciseId: string; name: string; points: StrengthPoint[] }>;
 
-/** Each lift's series, with workout days read in the client's own time zone (as the phone does). */
-export function buildStrength(logs: readonly WorkoutLogDoc[], timeZone: string): ClientStrength {
-  return strengthExercises(logs).map((e) => ({ ...e, points: strengthSeries(logs, e.exerciseId, timeZone) }));
+/** Each lift's series (or just `onlyExerciseId`'s), with workout days read in the client's own time zone (as the phone does). */
+export function buildStrength(logs: readonly WorkoutLogDoc[], timeZone: string, onlyExerciseId?: string): ClientStrength {
+  const series = strengthSeriesAll(logs, timeZone);
+  return strengthExercises(logs)
+    .filter((e) => onlyExerciseId === undefined || e.exerciseId === onlyExerciseId)
+    .map((e) => ({ ...e, points: series.get(e.exerciseId) ?? [] }));
 }
 
 /** The client's estimated-1RM series for every lift they have done, read through the coach's own session. */
 export async function loadClientStrength(supabase: SupabaseClient<Database>, workspaceId: string, clientId: string): Promise<ClientStrength> {
+  return (await loadClientStrengthIn(supabase, workspaceId, clientId)).exercises;
+}
+
+/** The same series and the client's time zone (Metrics' Strength: "today" and workout days are the client's own). */
+export async function loadClientStrengthIn(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  clientId: string,
+  onlyExerciseId?: string,
+): Promise<{ exercises: ClientStrength; timeZone: string }> {
   const [{ data, error }, profile] = await Promise.all([
     supabase
     .from('workout_logs')
@@ -31,5 +44,5 @@ export async function loadClientStrength(supabase: SupabaseClient<Database>, wor
   const timeZone = safeTimeZone(profile.data?.time_zone);
   // Built by concatenation, so supabase-js cannot infer the shape; LogTreeRow describes it.
   const logs = (data as unknown as LogTreeRow[]).map(logRowToDoc);
-  return buildStrength(logs, timeZone);
+  return { exercises: buildStrength(logs, timeZone, onlyExerciseId), timeZone };
 }
