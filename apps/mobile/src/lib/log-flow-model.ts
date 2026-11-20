@@ -963,15 +963,16 @@ export function dropPlan(
 
 /**
  * The set the exercise ··· menu's "Add drop set" follows: the last ticked working set, else the set the outline is
- * on (cursorStep) when it is this exercise's, else the exercise's last working set.
+ * on (cursorStep) when it is this exercise's working set or drop, else the exercise's last working set.
  */
 export function exerciseDropSetId(block: LogBlockDoc, ex: LogExerciseDoc): string | null {
   const ticked = ex.sets
     .filter((s) => s.setType === 'normal' && s.completedAt !== null)
     .reduce<LogSetDoc | null>((a, s) => (a === null || Date.parse(s.completedAt!) >= Date.parse(a.completedAt!) ? s : a), null);
   if (ticked) return ticked.id;
+  // The outline, only on a working set or a drop (a warm-up under it would hide "Add drop set").
   const cursor = cursorStep(block);
-  if (cursor && block.exercises[cursor.exerciseIndex]?.id === ex.id) return cursor.setId;
+  if (cursor && cursor.kind !== 'warmup' && block.exercises[cursor.exerciseIndex]?.id === ex.id) return cursor.setId;
   return [...ex.sets].reverse().find((s) => s.setType === 'normal')?.id ?? null;
 }
 

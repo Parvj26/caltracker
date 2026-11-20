@@ -1053,6 +1053,14 @@ describe('the superset page (approved SS1–SS5 boards)', () => {
     expect(exerciseDropSetId(block(), block().exercises[1])).toBe(b(log, 0));
   });
 
+  it('a warm-up under the outline does not hide "Add drop set": it falls through to the last working set', () => {
+    const log = mockLog();
+    const push = log.blocks[2];
+    // Cable Tricep Pushdown: W, a working set, two drops. Nothing ticked: the outline is on the warm-up.
+    expect(exerciseDropSetId(push, push.exercises[0])).toBe(push.exercises[0].sets[1].id);
+    expect(dropPlan(push.exercises[0], push.exercises[0].sets[1].id, 'lb', [])).not.toBeNull();
+  });
+
   it('the menus: the exercise ··· in the approved order, the set ··· with Add drop set above Delete set', () => {
     const log = mockLog();
     const bench = log.blocks[1].exercises[0];

@@ -18,6 +18,7 @@ import type { ActualPatch, StepField, Units } from '@caltracker/shared';
 import { ChevronIcon } from '@/components/ui/icons';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
 import { numberBoxWidth, unitsInside } from '@/lib/unit-fit';
+import { systemDoneRow } from '@/lib/keyboard-bar';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
@@ -45,7 +46,7 @@ const MAX_FONT_SCALE = logMaxFontScale(1.4);
 type Measure = (done: (top: number, height: number) => void) => void;
 
 export class FieldNav {
-  private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure }>();
+  private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure; pad: boolean }>();
   /** A box asked for before it exists (a drop set just added): focused as soon as it registers. */
   private pending: string | null = null;
   private scrollers = new Map<number, (dy: number) => void>();
@@ -53,9 +54,12 @@ export class FieldNav {
   private listeners = new Set<() => void>();
   /** Where the keyboard's top is in the window while it is up (the bar sits just above it), else null. */
   private keyboardTop: number | null = null;
+  /** The keyboard frame's height (0 while it is down). */
+  private keyboardHeight = 0;
 
-  register(key: string, page: number, order: number, focus: () => void, measure: Measure, alias?: string): () => void {
-    this.fields.set(key, { page, order, focus, measure });
+  /** `pad`: the box opens a number pad (no return key), so iOS 26 adds its own Done row above it. */
+  register(key: string, page: number, order: number, focus: () => void, measure: Measure, alias?: string, pad = true): () => void {
+    this.fields.set(key, { page, order, focus, measure, pad });
     if (alias !== undefined && alias === this.pending) {
       this.pending = null;
       // After the menu sheet has gone, or iOS won't raise the keyboard.
@@ -76,9 +80,16 @@ export class FieldNav {
       if (this.scrollers.get(page) === scrollBy) this.scrollers.delete(page);
     };
   }
-  keyboardAt(top: number | null): void {
+  keyboardAt(top: number | null, height = 0): void {
     this.keyboardTop = top;
+    this.keyboardHeight = top === null ? 0 : height;
+    this.listeners.forEach((l) => l());
     this.reveal();
+  }
+  /** How far the bar sits down into the keyboard's frame: iOS 26's Done row, when there is one (systemDoneRow). */
+  doneRow(): number {
+    const field = this.current ? this.fields.get(this.current) : undefined;
+    return systemDoneRow({ ios26: SYSTEM_DONE, isPad: Platform.OS === 'ios' && Platform.isPad, keyboardHeight: this.keyboardHeight, numberPad: field?.pad ?? false });
   }
   focused(key: string | null): void {
     if (this.current === key) return;
@@ -98,7 +109,7 @@ export class FieldNav {
     setTimeout(() => {
       field.measure((y, h) => {
         // The bar's top: the keyboard's top, moved down onto iOS 26's Done row when there is one.
-        const limit = top + SYSTEM_DONE_ROW - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
+        const limit = top + this.doneRow() - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
         if (this.current === key && y + h > limit) this.scrollers.get(field.page)?.(y + h - limit);
       });
     }, REVEAL_AFTER_MS);
@@ -114,6 +125,8 @@ export class FieldNav {
     const i = same.findIndex((f) => f.order === here.order);
     return same[i + delta]?.focus ?? null;
   }
+  /** What the bar redraws on: the focused box, and the keyboard's frame. */
+  snapshotBar = () => `${this.current ?? ''}|${this.keyboardHeight}`;
   subscribe = (l: () => void) => {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
@@ -126,12 +139,6 @@ export const FieldNavContext = createContext<FieldNav | null>(null);
 /** iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). */
 const SYSTEM_DONE = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
 
-/**
- * iOS 26's Done floats in a clear row at the top of the keyboard's frame, above the keys. The bar sits down in that
- * row, so ‹ › and Done share one line (approved Logger board) instead of Done hanging under the bar. Measured on the
- * iOS 26 simulator: the row is 50 pt.
- */
-const SYSTEM_DONE_ROW = SYSTEM_DONE ? 50 : 0;
 
 /** A new box gets the cursor this long after it appears (the menu sheet closes first). */
 const FOCUS_AFTER_MS = 350;
@@ -162,11 +169,13 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
   const layer = useRef<ComponentRef<typeof View>>(null);
   const [layerBottom, setLayerBottom] = useState<number | null>(null);
   const current = useSyncExternalStore(nav.subscribe, nav.snapshot);
+  useSyncExternalStore(nav.subscribe, nav.snapshotBar);
+  const doneRow = nav.doneRow();
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
       setKeyboardTop(e.endCoordinates.screenY);
-      nav.keyboardAt(e.endCoordinates.screenY);
+      nav.keyboardAt(e.endCoordinates.screenY, e.endCoordinates.height);
     });
     const hide = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardTop(null);
@@ -185,7 +194,7 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
   return (
     <View ref={layer} onLayout={measure} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {show && layerBottom !== null && keyboardTop !== null ? (
-    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop - SYSTEM_DONE_ROW, paddingHorizontal: space[2.5] }]}>
+    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop - doneRow, paddingHorizontal: space[2.5] }]}>
       <Pressable
         testID="keyboard-prev"
         onPress={() => prev?.()}
@@ -298,6 +307,7 @@ function Cell({
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const box = useRef<ComponentRef<typeof View>>(null);
   /** The stored value when the box was focused: what an unreadable draft goes back to (nothing half-typed is kept). */
   const atFocus = useRef(cell.value);
   const restoreFocusValue = () => {
@@ -317,8 +327,10 @@ function Cell({
       nav.page,
       nav.order,
       () => input.current?.focus(),
-      (done) => input.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
+      // The whole box with its unit or reason under it (large text), so all of it clears the bar.
+      (done) => (box.current ?? input.current)?.measureInWindow((_x, y, _w, h) => done(y, h)),
       `${row.setId}:${cell.field}`,
+      KEYBOARD[cell.field] !== 'numbers-and-punctuation',
     );
   }, [fields, nav?.page, nav?.order, editable, testID, row.setId, cell.field]);
   /** The greyed suggestion, when it is a number the box can take as its own (not "max"). */
@@ -394,6 +406,7 @@ function Cell({
   );
   return (
     <View
+      ref={box}
       style={[styles.cell, { gap: space[1] / 2 }]}
       onLayout={(e) => {
         setBoxWidth(e.nativeEvent.layout.width);
