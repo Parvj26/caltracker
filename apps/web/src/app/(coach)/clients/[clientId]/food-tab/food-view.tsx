@@ -20,6 +20,8 @@ import {
   macroProgress,
   mealMacroLine,
   mealReference,
+  mealTitle,
+  mealTypeTag,
   mealsByDay,
   shortDayLabel,
   startOfWeek,
@@ -155,7 +157,7 @@ export function FoodView({
   const ctx: MealContext = { clientId, firstName, today, timeZone, readOnly, onPhoto: setPhoto };
 
   const targetsRow = <TargetsSummary clientId={clientId} firstName={firstName} targets={targets} readOnly={readOnly} />;
-  const photoDialog = photo?.photo ? <PhotoDialog meal={photo} onClose={() => setPhoto(null)} /> : null;
+  const photoDialog = photo?.photo ? <PhotoDialog meal={photo} timeZone={timeZone} onClose={() => setPhoto(null)} /> : null;
 
   // A client who never logged food: one message in place of a week of zeros.
   if (!everLogged) {
@@ -386,9 +388,12 @@ function PhoneDay({ row, meals, ctx }: { row: ReturnType<typeof weekRows>[number
 
 /** A meal: its photo (tap for the whole photo), name, time and macros, note, and the link to message about it. */
 function MealRow({ meal, ctx, small = false }: { meal: CoachMeal; ctx: MealContext; small?: boolean }) {
-  const title = meal.name ?? 'Meal';
+  // Breakfast / Lunch / Dinner / Snack come from the time (the same rule as the client's app): the title when the
+  // meal has no name, otherwise a tag before the time.
+  const title = mealTitle(meal, ctx.timeZone);
   const macros = mealMacroLine(meal.macros);
-  const time = formatMealTime(meal.eatenAt, ctx.timeZone);
+  const tag = mealTypeTag(meal, ctx.timeZone);
+  const time = tag ? `${tag} · ${formatMealTime(meal.eatenAt, ctx.timeZone)}` : formatMealTime(meal.eatenAt, ctx.timeZone);
   const detail = small && meal.macros.calories !== null ? `${time} · ${formatMacro('calories', meal.macros.calories)}` : [time, macros].filter(Boolean).join(' · ');
   return (
     <li className={cx(styles.meal, small && styles.mealSmall)} data-testid="coach-meal">
@@ -427,10 +432,10 @@ function Thumb({ src }: { src: string }) {
 }
 
 /** The whole photo of a meal, sharp, in a dialog (full screen on a phone). */
-function PhotoDialog({ meal, onClose }: { meal: CoachMeal; onClose: () => void }) {
+function PhotoDialog({ meal, timeZone, onClose }: { meal: CoachMeal; timeZone: string; onClose: () => void }) {
   const ref = useModal();
   const titleId = useId();
-  const title = meal.name ?? 'Meal';
+  const title = mealTitle(meal, timeZone);
   const photo = meal.photo!;
   return (
     <dialog ref={ref} className={cx(calendar.dialog, sheet.sheet, styles.photoDialog)} aria-labelledby={titleId} onClose={onClose}>
