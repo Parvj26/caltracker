@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { StrengthPoint } from '../../src/awards/strength-series';
 import { strengthSeries, strengthSeriesAll } from '../../src/awards/strength-series';
 import {
+  belowBest,
   heaviestChange,
   heaviestChart,
   heaviestSentence,
@@ -150,6 +151,23 @@ describe('heaviestSentence', () => {
     const assisted = heaviestSessions([pt('2026-09-02', [30, 6]), pt('2026-10-02', [20, 6])], 'assisted');
     expect(heaviestSentence('Assisted Pull-up', assisted, 'kg', 'assisted', today, true)).toBe('You need 10 kg less help than when you started. Nice work.');
   });
+  it('says holding steady only when the latest session is the best; a dip is said plainly', () => {
+    const dropped = heaviestSessions([pt('2026-09-02', [60, 5]), pt('2026-09-09', [55, 5])], 'weight');
+    expect(heaviestSentence('Squat', dropped, 'kg', 'weight', today, true)).toBe('Down 5 kg from your best; it happens.');
+    const peaked = heaviestSessions([pt('2026-09-02', [50, 5]), pt('2026-10-02', [67.5, 5]), pt('2026-11-02', [62.5, 5])], 'weight');
+    expect(heaviestSentence('Squat', peaked, 'kg', 'weight', today, true)).toBe('You squat 17.5 kg more than when you started. Down 5 kg from your best last time; it happens.');
+    const assisted = heaviestSessions([pt('2026-09-02', [30, 6]), pt('2026-10-02', [20, 6]), pt('2026-10-09', [25, 6])], 'assisted');
+    expect(heaviestSentence('Assisted Pull-up', assisted, 'kg', 'assisted', today, true)).toBe('You need 10 kg less help than when you started. 5 kg more help than your best last time; it happens.');
+  });
+});
+
+describe('belowBest', () => {
+  it('is how far the latest session is behind the best, or null when it is the best', () => {
+    expect(belowBest(heaviestSessions([pt('2026-09-02', [60, 5]), pt('2026-09-09', [55, 5])], 'weight'), 'kg', 'weight')).toBe(5);
+    expect(belowBest(heaviestSessions([pt('2026-09-02', [55, 5]), pt('2026-09-09', [60, 5])], 'weight'), 'kg', 'weight')).toBeNull();
+    expect(belowBest(heaviestSessions([pt('2026-09-02', [60, 5]), pt('2026-09-09', [60, 3])], 'weight'), 'kg', 'weight')).toBeNull();
+    expect(belowBest([], 'kg', 'weight')).toBeNull();
+  });
 });
 
 describe('heaviestSessionRows', () => {
@@ -199,8 +217,9 @@ describe('strengthExerciseRows', () => {
 
 describe('heaviestTile', () => {
   it('shows the 3-month change in heaviest weight, or the heaviest with one session', () => {
-    expect(heaviestTile({ name: 'Squat', points: [pt('2026-09-02', [65, 5]), pt('2026-11-17', [82.5, 3])] }, 'kg', today)).toEqual({ value: 'Squat +17.5 kg', sub: 'heaviest since 2 Sep' });
-    expect(heaviestTile({ name: 'Squat', points: [pt('2026-11-17', [82.5, 3])] }, 'kg', today)).toEqual({ value: 'Squat 82.5 kg', sub: 'heaviest' });
-    expect(heaviestTile(undefined, 'kg', today)).toEqual({ value: 'No lifts yet', sub: 'log a workout to start' });
+    expect(heaviestTile({ name: 'Squat', points: [pt('2026-09-02', [65, 5]), pt('2026-11-17', [82.5, 3])] }, 'kg', today)).toEqual({ value: 'Squat 82.5 kg', sub: 'Heaviest weight · +17.5 kg since 2 Sep' });
+    expect(heaviestTile({ name: 'Squat', points: [pt('2026-09-02', [65, 5]), pt('2026-11-17', [65, 3])] }, 'kg', today)).toEqual({ value: 'Squat 65 kg', sub: 'Heaviest weight · no change since 2 Sep' });
+    expect(heaviestTile({ name: 'Squat', points: [pt('2026-11-17', [82.5, 3])] }, 'kg', today)).toEqual({ value: 'Squat 82.5 kg', sub: 'Heaviest weight' });
+    expect(heaviestTile(undefined, 'kg', today)).toEqual({ value: 'No lifts yet', sub: 'Log a workout to start' });
   });
 });

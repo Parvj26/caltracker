@@ -69,6 +69,23 @@ export function plannedDonePercent(
   return c.planned === 0 ? null : Math.round((c.tracked / c.planned) * 100);
 }
 
+/**
+ * Planned workouts done over the last `weeks` weeks up to today, as counts ("1 of 1 planned", never a bare 100%), and
+ * the time it covers: "since you started" when the first finished workout is inside that window.
+ */
+export function plannedDoneCount(
+  workouts: readonly HomeWorkout[],
+  addedDays: readonly IsoDate[],
+  today: IsoDate,
+  firstTrained: IsoDate | null,
+  weeks = CONSISTENCY_WEEKS,
+): { done: number; planned: number; since: string } | null {
+  const from = addDays(startOfWeek(today), -7 * (weeks - 1));
+  const c = trackedCount(workouts, addedDays, from, today, today);
+  if (c.planned === 0) return null;
+  return { done: Math.min(c.tracked, c.planned), planned: c.planned, since: firstTrained !== null && firstTrained >= from ? 'since you started' : `last ${weeks} weeks` };
+}
+
 /** The Consistency tile on Progress. `workoutsDone` is every workout finished in the same 8 weeks. */
 export function consistencyTile(percent: number | null, workoutsDone: number): { value: string; sub: string } {
   if (percent !== null) return { value: `${percent}%`, sub: `planned done · ${CONSISTENCY_WEEKS} weeks` };

@@ -9,6 +9,7 @@ import {
   parseHubCache,
   prKeys,
   type HubData,
+  updatingRetryDelay,
 } from './progress-hub-logic';
 
 const log = (id: string, finishedAt: string, workoutId: string | null, planned: boolean, exerciseId = 'sq') => ({
@@ -79,10 +80,18 @@ describe('buildHub', () => {
     expect(h.exercises[0].sessions.map((s) => s.logId)).toEqual(['l2', 'l1']);
     expect(addedDays(h)).toEqual(['2026-11-04']);
     expect(h.finished.map((f) => f.day)).toEqual(['2026-11-02', '2026-11-04']);
+    // Whether the server has awarded each one yet (shared progressFacts shows "Updating…" until it has).
+    expect(h.finished.map((f) => [f.logId, f.awarded])).toEqual([['l1', false], ['l2', true]]);
     expect([...prKeys(h)]).toEqual(['l2|sq']);
     // The Strength screen's heaviest-weight headline and session rows read these.
     expect(h.exercises[0].points.map((p) => p.logId)).toEqual(['l1', 'l2']);
     expect(h.exercises[0].points[0]?.heaviestSet).toBeDefined();
+  });
+});
+
+describe('updatingRetryDelay', () => {
+  it('asks again quickly at first, then once a minute', () => {
+    expect([0, 1, 2, 5, 40].map(updatingRetryDelay)).toEqual([3000, 5000, 10_000, 60_000, 60_000]);
   });
 });
 

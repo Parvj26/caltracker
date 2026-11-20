@@ -9,15 +9,15 @@ import { useTheme } from '@/theme/use-theme';
 import { ChevronIcon } from '@/components/ui/icons';
 
 /** A Progress section's top row: a round back button (to Progress), the title, and an optional action on the right. */
-export function SectionHeader({ title, right }: { title: string; right?: ReactNode }) {
+export function SectionHeader({ title, right, backTestID = 'section-back', backLabel = 'Back to Progress' }: { title: string; right?: ReactNode; backTestID?: string; backLabel?: string }) {
   const { text, space } = useTheme();
   const router = useRouter();
   return (
     <View style={[styles.header, { gap: space[2] }]}>
       <Pressable
-        testID="section-back"
+        testID={backTestID}
         accessibilityRole="button"
-        accessibilityLabel="Back to Progress"
+        accessibilityLabel={backLabel}
         onPress={() => (router.canGoBack() ? router.back() : router.replace('/progress'))}
         style={({ pressed }) => [styles.back, pressed && { opacity: pressedOpacity }]}
       >
