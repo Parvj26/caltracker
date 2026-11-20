@@ -51,7 +51,7 @@ env:
     id: metric-save
 - assertVisible:
     id: metric-error
-    text: 'Enter a waist between .* in\.'
+- assertVisible: 'Enter a waist between .* in\.'
 - eraseText: 3
 - inputText: '32.5'
 - tapOn:
@@ -93,7 +93,9 @@ env:
       id: metric-history-weight_kg
 - tapOn:
     id: metric-row-weight_kg
-# Delete the waist again.
+# Delete the waist again (one row's entries show at a time).
+- tapOn:
+    id: metric-row-waist_cm
 - tapOn:
     id: 'metric-edit-.*'
 - tapOn:

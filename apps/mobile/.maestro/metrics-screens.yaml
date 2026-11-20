@@ -1,0 +1,53 @@
+# Screenshots of the Metrics screens at one size (run on iPhone SE, iPhone 18 Pro and an iPad): Metrics with the
+# coach's seeded scans, the log sheet, and the Connect Apple Health explainer (only where Apple Health exists).
+# Run via `pnpm --filter mobile e2e .maestro/metrics-screens.yaml` with one simulator booted.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-scans, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-progress
+- extendedWaitUntil:
+    visible:
+      id: progress-metrics
+    timeout: 20000
+- takeScreenshot: progress-tab
+- tapOn:
+    id: progress-metrics
+- extendedWaitUntil:
+    visible:
+      id: metric-value-weight_kg
+    timeout: 20000
+- takeScreenshot: metrics
+- tapOn:
+    id: metric-row-weight_kg
+- takeScreenshot: metrics-history
+- tapOn:
+    id: metric-log-open
+- waitForAnimationToEnd
+- takeScreenshot: log-sheet
+- tapOn:
+    id: metric-sheet-close
+- runFlow:
+    when:
+      visible:
+        id: apple-health-row
+    commands:
+      - tapOn:
+          id: apple-health-row
+      - waitForAnimationToEnd
+      - takeScreenshot: apple-health-explainer
+      - tapOn:
+          id: health-close
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }

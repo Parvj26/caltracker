@@ -1,0 +1,28 @@
+# In the Health app, adds a weight of ${KG} kg, ${MONTHS_BACK} months back (0 = now), then returns to Browse.
+# Inputs (env): KG, MONTHS_BACK.
+appId: com.apple.Health
+---
+- tapOn: 'Browse'
+- tapOn: 'Body Measurements'
+- tapOn: 'Weight'
+- tapOn: 'Add Data'
+- inputText: ${KG}
+- runFlow:
+    when:
+      true: ${MONTHS_BACK > 0}
+    commands:
+      - tapOn: '.* 20\d\d'
+      - repeat:
+          times: ${MONTHS_BACK}
+          commands:
+            # The calendar's "previous month" arrow.
+            - tapOn:
+                point: 75%,50%
+      - tapOn: '15'
+      - waitForAnimationToEnd
+      - tapOn:
+          point: 50%,85%
+# Add (the tick, top right).
+- tapOn:
+    point: 90%,11%
+- waitForAnimationToEnd

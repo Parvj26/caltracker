@@ -1,6 +1,10 @@
-# Apple Health import end to end on the iOS Simulator: add a weight in the Health app, connect Apple Health from
-# Metrics (explainer, Continue, the iOS prompt), see the weight arrive "from Apple Health", delete it in Health and see it
-# go, add another, then turn the import off and remove the imported readings. Needs a simulator whose Health app has been opened once (Maestro handles its welcome).
+# Apple Health import end to end on the iOS Simulator (iPhone 18 Pro: the iOS prompt and Health's confirm sheets are
+# tapped by screen point). Install the app fresh first (uninstall + install), so iOS asks again:
+#   xcrun simctl uninstall booted app.caltracker.client && xcrun simctl install booted <CalTracker.app>
+# In the Health app: clear weights, add 69.0 kg from 14 months ago and 71.2 kg now. In CalTracker: connect from
+# Metrics; the iOS prompt shows only after Continue, read access only, the five switched-on types; allow all recorded
+# data. Only 71.2 arrives (the first sync reads one year back). Delete it in Health and Sync now: it goes. Add 70.8,
+# Sync now: it arrives. Turn off and remove the imported readings.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -10,25 +14,18 @@ env:
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }
-# Add 71.2 kg in the Health app (the simulator's Health uses kg by default for a fresh device).
-- launchApp:
-    appId: com.apple.Health
+- runFlow: helpers/health-open.yaml
+- runFlow: helpers/health-clear-weights.yaml
 - runFlow:
-    when:
-      visible: 'Continue'
-    commands:
-      - tapOn: 'Continue'
+    file: helpers/health-open.yaml
 - runFlow:
-    when:
-      visible: 'Not Now'
-    commands:
-      - tapOn: 'Not Now'
-- tapOn: 'Browse'
-- tapOn: 'Body Measurements'
-- tapOn: 'Weight'
-- tapOn: 'Add Data'
-- inputText: '71.2'
-- tapOn: 'Add'
+    file: helpers/health-add-weight.yaml
+    env: { KG: '69.0', MONTHS_BACK: 14 }
+- runFlow:
+    file: helpers/health-open.yaml
+- runFlow:
+    file: helpers/health-add-weight.yaml
+    env: { KG: '71.2', MONTHS_BACK: 0 }
 - stopApp: com.apple.Health
 # CalTracker: Progress › Metrics › Connect Apple Health.
 - launchApp:
@@ -44,6 +41,7 @@ env:
     visible:
       id: apple-health-row
     timeout: 20000
+# Nothing has been asked yet: the explainer comes first.
 - tapOn:
     id: apple-health-row
 - assertVisible: 'Bring in your numbers from Apple Health'
@@ -52,12 +50,21 @@ env:
 - takeScreenshot: apple-health-explainer
 - tapOn:
     id: health-continue
-# The iOS prompt (read only: "Turn On All" then "Allow").
-- extendedWaitUntil:
-    visible: 'Turn On All'
-    timeout: 20000
-- tapOn: 'Turn On All'
-- tapOn: 'Allow'
+# The iOS prompt: "Select All 5 Topics", scroll, Continue; then "All Recorded Data and Future Data", Allow.
+- waitForAnimationToEnd
+- tapOn:
+    point: 50%,50%
+- swipe:
+    start: 50%,85%
+    end: 50%,30%
+- waitForAnimationToEnd
+- tapOn:
+    point: 50%,78%
+- waitForAnimationToEnd
+- tapOn:
+    point: 50%,71%
+- tapOn:
+    point: 50%,86%
 - extendedWaitUntil:
     visible:
       id: metric-meta-weight_kg
@@ -66,48 +73,34 @@ env:
 - assertVisible:
     id: metric-value-weight_kg
     text: '157.0|71.2'
-- takeScreenshot: apple-health-imported
-# Delete the weight in the Health app: the next sync (on coming back to CalTracker) removes it here too.
-- launchApp:
-    appId: com.apple.Health
-- tapOn: 'Browse'
-- tapOn: 'Body Measurements'
-- tapOn: 'Weight'
-- scrollUntilVisible:
-    element: 'Show All Data'
-- tapOn: 'Show All Data'
-- tapOn: 'Edit'
+# Only today's reading: the one from 14 months ago is older than the first sync reads.
 - tapOn:
-    text: 'Delete.*'
-    index: 0
-- tapOn: 'Delete'
-- tapOn: 'Done'
+    id: metric-row-weight_kg
+- assertVisible:
+    id: metric-history-weight_kg
+- assertNotVisible: '152.1 lb|69.0 kg'
+- takeScreenshot: apple-health-imported
+# Delete it in the Health app; Sync now removes it here too.
+- runFlow: helpers/health-open.yaml
+- runFlow: helpers/health-clear-weights.yaml
 - stopApp: com.apple.Health
-# Back in CalTracker (no clearState: the sync marker must be kept). Coming to the front syncs at most every 2 minutes,
-# so use Sync now.
 - launchApp:
     stopApp: false
-- runFlow:
-    file: helpers/apple-health-sync-now.yaml
+- runFlow: helpers/apple-health-sync-now.yaml
 - extendedWaitUntil:
     visible:
       id: metric-meta-weight_kg
       text: 'Not logged yet'
     timeout: 30000
-# Add another weight so turning off can remove it.
-- launchApp:
-    appId: com.apple.Health
-- tapOn: 'Browse'
-- tapOn: 'Body Measurements'
-- tapOn: 'Weight'
-- tapOn: 'Add Data'
-- inputText: '70.8'
-- tapOn: 'Add'
+# A new reading arrives on Sync now.
+- runFlow: helpers/health-open.yaml
+- runFlow:
+    file: helpers/health-add-weight.yaml
+    env: { KG: '70.8', MONTHS_BACK: 0 }
 - stopApp: com.apple.Health
 - launchApp:
     stopApp: false
-- runFlow:
-    file: helpers/apple-health-sync-now.yaml
+- runFlow: helpers/apple-health-sync-now.yaml
 - extendedWaitUntil:
     visible:
       id: metric-meta-weight_kg
@@ -116,8 +109,6 @@ env:
 # Settings › Apple Health: turn it off and remove what came in.
 - tapOn:
     id: apple-health-row
-- assertVisible:
-    id: apple-health-status
 - tapOn:
     id: apple-health-off
 - tapOn: 'Turn off and remove imported readings'

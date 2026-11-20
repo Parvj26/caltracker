@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { borderWidth, buttonMinHeight, tapTarget } from '@caltracker/design-tokens';
 import {
@@ -60,6 +60,7 @@ export function LogMetricSheet({
   const [error, setError] = useState<ShownError | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const keyboardPad = useKeyboardPad(visible);
 
   useEffect(() => {
     if (!visible) return;
@@ -127,7 +128,8 @@ export function LogMetricSheet({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
-        <View style={[styles.column, styles.flex]}>
+        {/* The pinned Save stays above the keyboard. */}
+        <View style={[styles.column, styles.flex, { paddingBottom: keyboardPad }]}>
           <View style={[styles.row, { paddingHorizontal: space[4], paddingTop: space[3], gap: space[2] }]}>
             <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" testID="metric-sheet-title">
               {title}
@@ -174,9 +176,8 @@ export function LogMetricSheet({
                   accessibilityLabel={`${def.label}${unit ? ` in ${unit}` : ''}`}
                   value={value}
                   onChangeText={setValue}
+                  // No return key: on a number pad React Native would add a "Done" bar that covers the Save button.
                   keyboardType="decimal-pad"
-                  returnKeyType="done"
-                  onSubmitEditing={() => void save()}
                   editable={units !== null}
                   autoFocus={!editing}
                   placeholder="0"
@@ -185,6 +186,12 @@ export function LogMetricSheet({
                 />
                 <Text style={text('sectionHeading')}>{unit}</Text>
               </View>
+              {/* Right under the value, so it shows above the keyboard. */}
+              {error ? (
+                <ErrorText testID="metric-error" code={error.code}>
+                  {error.text}
+                </ErrorText>
+              ) : null}
             </View>
 
             <View style={{ gap: space[2] }}>
@@ -209,12 +216,7 @@ export function LogMetricSheet({
                 {last}
               </Text>
             ) : null}
-            {error ? (
-              <ErrorText testID="metric-error" code={error.code}>
-                {error.text}
-              </ErrorText>
-            ) : null}
-            {editing ? <TextButton testID="metric-delete" title="Delete entry" onPress={confirmDelete} /> : null}
+            {editing ? <TextButton testID="metric-delete" title="Delete this entry" onPress={confirmDelete} /> : null}
           </ScrollView>
           <View style={[styles.footer, { padding: space[4] }]}>
             <Button
@@ -282,3 +284,25 @@ const styles = StyleSheet.create({
   close: { width: tapTarget.min, height: tapTarget.min, borderRadius: tapTarget.min / 2, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' },
   footer: { borderTopWidth: 1, borderTopColor: palette.border },
 });
+
+/**
+ * Room to keep the pinned footer above the keyboard. React Native's KeyboardAvoidingView (and measureInWindow) measure
+ * inside the page sheet, which starts below the top of the screen, so they leave the footer under the keyboard. The
+ * sheet reaches the bottom of the screen and the footer sits on the bottom safe area, so the keyboard covers its
+ * height minus that inset.
+ */
+function useKeyboardPad(active: boolean): number {
+  const { bottom } = useSafeAreaInsets();
+  const [pad, setPad] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setPad(Math.max(0, e.endCoordinates.height - bottom)));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setPad(0));
+    return () => {
+      show.remove();
+      hide.remove();
+      setPad(0);
+    };
+  }, [active, bottom]);
+  return pad;
+}
