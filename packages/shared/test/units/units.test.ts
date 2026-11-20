@@ -72,12 +72,45 @@ describe('clock durations', () => {
     expect(formatClock(90)).toBe('1:30');
     expect(formatClock(3725)).toBe('1:02:05');
   });
-  it('parses plain seconds, m:ss and h:mm:ss', () => {
-    expect(parseClock('90')).toBe(90);
+  it('parses m:ss and h:mm:ss', () => {
     expect(parseClock(' 1:30 ')).toBe(90);
     expect(parseClock('0:45')).toBe(45);
     expect(parseClock('1:02:05')).toBe(3725);
     expect(parseClock('2:')).toBe(120);
+  });
+  it('reads digits without a colon like a microwave timer: the last two digits are seconds', () => {
+    expect(parseClock('130')).toBe(90); // 1:30, not 2:10
+    expect(parseClock('200')).toBe(120);
+    expect(parseClock('100')).toBe(60); // 1:00, not 1:40
+    expect(parseClock('1000')).toBe(600);
+    expect(parseClock('0130')).toBe(90);
+    expect(parseClock('005')).toBe(5);
+    expect(parseClock('6000')).toBe(3600); // 60:00, the rest cap
+    expect(parseClock('6001')).toBe(3601); // over the rest cap: the rest schema refuses it
+  });
+  it('drops leading zeros before the rule', () => {
+    expect(parseClock('090')).toBe(90);
+    expect(parseClock('060')).toBe(60);
+    expect(parseClock('0090')).toBe(90);
+    expect(parseClock('000')).toBe(0);
+  });
+  it('rejects a very long string rather than return an inexact number', () => {
+    expect(parseClock('1'.repeat(30))).toBeNaN();
+    expect(parseClock(`${'1'.repeat(30)}:00`)).toBeNaN();
+    expect(parseClock(' 130 ')).toBe(90);
+  });
+  it('reads one or two digits as plain seconds, even 60 to 99', () => {
+    expect(parseClock('1')).toBe(1);
+    expect(parseClock('5')).toBe(5);
+    expect(parseClock('45')).toBe(45);
+    expect(parseClock('90')).toBe(90);
+    expect(parseClock('0')).toBe(0);
+  });
+  it('rejects three or more digits whose last two are 60 or more, rather than guess', () => {
+    expect(parseClock('190')).toBeNaN();
+    expect(parseClock('1275')).toBeNaN();
+    expect(parseClock('160')).toBeNaN();
+    expect(parseClock('159')).toBe(119);
   });
   it('returns null for blank text and NaN for text it cannot read', () => {
     expect(parseClock('')).toBeNull();

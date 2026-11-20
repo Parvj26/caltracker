@@ -155,7 +155,11 @@ const patchOf = (f: Field, v: number | null): ActualPatch =>
 const prefillOf = (v: ReturnType<typeof resolveSetValues>, f: Field) =>
   f === 'weight' ? v.weightKg : f === 'reps' ? v.reps : f === 'time' ? v.durationS : v.distanceM;
 
-/** One number box. Shows the stored number, or the pre-filled one greyed (that is what a tick saves). */
+/**
+ * One number box. Shows the stored number, or the pre-filled one greyed (that is what a tick saves). While the text
+ * can't be saved (say "190" for a time), the log goes back to the value at focus, so a half-typed "19" is not left
+ * saved; on blur unreadable text stays on screen, marked invalid.
+ */
 function NumberCell({
   label,
   field,
@@ -172,6 +176,8 @@ function NumberCell({
   onCommit: (v: number | null) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  // The stored value when the box got focus: what an unreadable draft falls back to.
+  const atFocus = useRef<number | null>(value);
   const text = draft ?? toText(field, value, units);
   const invalid = draft !== null && fromText(field, draft, units) === undefined;
   return (
@@ -182,13 +188,20 @@ function NumberCell({
       inputMode={field === 'reps' ? 'numeric' : field === 'time' ? 'text' : 'decimal'}
       value={text}
       placeholder={toText(field, prefill, units)}
-      onFocus={() => setDraft(toText(field, value, units))}
+      onFocus={() => {
+        atFocus.current = value;
+        // Keep an invalid draft from the last blur on screen; otherwise start from the stored value.
+        if (!invalid) setDraft(toText(field, value, units));
+      }}
       onChange={(e) => {
         setDraft(e.target.value);
         const v = fromText(field, e.target.value, units);
         if (v !== undefined) onCommit(v);
+        else if (value !== atFocus.current) onCommit(atFocus.current);
       }}
-      onBlur={() => setDraft(null)}
+      onBlur={() => {
+        if (!invalid) setDraft(null);
+      }}
     />
   );
 }
