@@ -280,11 +280,6 @@ function Cell({
         keyboardType={KEYBOARD[cell.field]}
         returnKeyType="done"
         selectTextOnFocus
-        // A tap: the suggestion becomes the box's number before focus, so selectTextOnFocus selects it and typing
-        // replaces it. Leaving without typing keeps it unsaved (onBlur puts the stored value back).
-        onPressIn={() => {
-          if (suggestion !== null) setDraft(suggestion);
-        }}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
         accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : undefined)}
@@ -293,7 +288,9 @@ function Cell({
         onFocus={() => {
           setFocused(true);
           fields?.focused(testID);
-          // Reached with ‹ › (no tap): show the suggestion and select it once it is in the box.
+          // Tapped or reached with ‹ ›: the suggestion becomes the box's number, selected once it is in, so typing
+          // replaces it. Only on focus (a press that turns into a swipe changes nothing); leaving without typing keeps
+          // it unsaved (onBlur puts the stored value back).
           if (suggestion !== null) {
             setDraft(suggestion);
             requestAnimationFrame(() => input.current?.setSelection(0, suggestion.length));
