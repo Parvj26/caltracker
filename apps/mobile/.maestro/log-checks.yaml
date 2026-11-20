@@ -57,6 +57,10 @@ env:
 - pressKey: Enter
 - assertNotVisible:
     id: invalid-actual-reps-0-0-2
+# Nothing half-typed is kept: the "12" typed on the way to "12.5" is not saved; the box is as it was at focus.
+- assertNotVisible:
+    id: actual-reps-0-0-2
+    text: '12'
 # A ticked set's box can't be left blank.
 - tapOn:
     id: actual-weight-0-0-0

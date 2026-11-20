@@ -287,6 +287,13 @@ function Cell({
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
+  /** The stored value when the box was focused: what an unreadable draft goes back to (nothing half-typed is kept). */
+  const atFocus = useRef(cell.value);
+  const restoreFocusValue = () => {
+    if (cell.value === atFocus.current) return;
+    const back = readTyped(cell.field, atFocus.current, units, row.done);
+    if (back.kind === 'ok') onType(back.patch);
+  };
   const fields = useContext(FieldNavContext);
   const editable = !disabled && !readOnly;
   useEffect(() => {
@@ -335,6 +342,7 @@ function Cell({
       placeholderTextColor={faded ? palette.borderStrong : palette.inkMuted}
       onFocus={() => {
         setFocused(true);
+        atFocus.current = cell.value;
         fields?.focused(testID);
         // Tapped or reached with ‹ ›: the suggestion becomes the box's number, selected once it is in, so typing
         // replaces it. Only on focus (a press that turns into a swipe changes nothing); leaving without typing keeps
@@ -347,8 +355,14 @@ function Cell({
       onBlur={() => {
         setFocused(false);
         fields?.blurred(testID);
+        // An unreadable draft ("1:7", "190" as m:ss) goes back to the value it had at focus.
+        if (invalid !== null) {
+          restoreFocusValue();
+          setDraft(atFocus.current);
+        } else {
+          setDraft(cell.value);
+        }
         setInvalid(null);
-        setDraft(cell.value);
       }}
       onChangeText={(t) => {
         setDraft(t);
@@ -358,6 +372,8 @@ function Cell({
           const say = invalidAnnouncement(invalid, read.message);
           if (say) AccessibilityInfo.announceForAccessibility(say);
           setInvalid(read.message);
+          // While it can't be read, the set keeps its value from focus (an earlier keystroke may have saved part).
+          restoreFocusValue();
           return;
         }
         setInvalid(null);
