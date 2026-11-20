@@ -71,9 +71,9 @@ export type SetTargetFields = Pick<
 
 export function formatSetTarget(set: SetTargetFields & Partial<WorkoutSetDoc>, trackingType: TrackingType, units: Units): string {
   if (set.toFailure) {
-    // "10 lb × to failure" when the set has a weight to show; otherwise just "To failure".
+    // "10 lb to failure" when the set has a weight to show; otherwise just "To failure".
     const weighted = targetFieldsFor(trackingType).includes('weight') && set.targetWeightKg !== null;
-    return weighted ? `${formatWeight(set.targetWeightKg!, units)} × to failure` : 'To failure';
+    return weighted ? `${formatWeight(set.targetWeightKg!, units)} to failure` : 'To failure';
   }
   const fields = targetFieldsFor(trackingType);
   const parts: string[] = [];

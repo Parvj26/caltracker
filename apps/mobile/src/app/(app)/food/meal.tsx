@@ -321,10 +321,10 @@ export default function MealScreen() {
           {hint}
         </Text>
       ) : null}
-      <Text style={[font(500, 13), foodText.muted]}>Only know some numbers? That’s fine, fill in what you have.</Text>
+      <Text style={[font(500, 13), foodText.muted]}>Fill in what you know</Text>
 
       <View style={styles.field}>
-        <Text style={font(700, 15)}>Note (optional)</Text>
+        <Text style={font(700, 15)}>{`Note for ${food?.coachName ?? 'your coach'} (optional)`}</Text>
         <FoodInput
           testID="meal-note"
           accessibilityLabel="Note"
@@ -332,7 +332,6 @@ export default function MealScreen() {
           onChangeText={setNote}
           maxLength={MEAL_NOTE_MAX}
           multiline
-          placeholder="Anything your coach should know"
           style={[font(500, 16), styles.input, styles.note]}
         />
       </View>

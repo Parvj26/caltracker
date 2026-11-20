@@ -94,12 +94,12 @@ export function settingsSections(prefs: PushPrefs, coachFirstName: string | null
         if (type !== 'daily_reminder' || !on) return [row];
         return [
           row,
-          { kind: 'time', field: 'reminderTime', label: 'Reminder time', hint: 'When the daily reminder arrives', value: prefs.reminderTime },
+          { kind: 'time', field: 'reminderTime', label: 'Reminder time', hint: '', value: prefs.reminderTime },
         ];
       },
     ),
   }));
-  const quiet: SettingsRow[] = [{ kind: 'quiet', label: 'Quiet hours', hint: 'No pings overnight', on: prefs.quietEnabled }];
+  const quiet: SettingsRow[] = [{ kind: 'quiet', label: 'Quiet hours', hint: 'Held till morning', on: prefs.quietEnabled }];
   if (prefs.quietEnabled) {
     quiet.push(
       { kind: 'time', field: 'quietStart', label: 'From', hint: '', value: prefs.quietStart },

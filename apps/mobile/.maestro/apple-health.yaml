@@ -4,7 +4,7 @@
 # In the Health app: clear weights, add 69.0 kg from 14 months ago and 71.2 kg now. In CalTracker: connect from
 # Metrics; the iOS prompt shows only after Continue, read access only, the five switched-on types; allow all recorded
 # data. Only 71.2 arrives (the first sync reads one year back). Delete it in Health and Sync now: it goes. Add 70.8,
-# Sync now: it arrives. Turn off and remove the imported readings.
+# Sync now: it arrives. Turn off and remove data.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -44,7 +44,8 @@ env:
 # Nothing has been asked yet: the explainer comes first.
 - tapOn:
     id: apple-health-row
-- assertVisible: 'Bring in your numbers from Apple Health'
+- assertVisible: 'Connect Apple Health'
+- assertVisible: 'Auto-fill Metrics from your scale or watch.*'
 - assertVisible:
     id: health-switch-smm_kg
 - takeScreenshot: apple-health-explainer
@@ -111,7 +112,7 @@ env:
     id: apple-health-row
 - tapOn:
     id: apple-health-off
-- tapOn: 'Turn off and remove imported readings'
+- tapOn: 'Turn off and remove data'
 - extendedWaitUntil:
     visible:
       id: health-continue

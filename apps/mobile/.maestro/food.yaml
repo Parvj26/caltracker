@@ -1,6 +1,6 @@
 # Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank, so they show numbers, no bars),
 # + Add meal -> New meal (Maestro toast, 300 kcal, 12 g protein), see it under Today's meals and in the kcal card, log it
-# again with Add a meal's + (and Undo once), find it with a typo in "Search your meals" and save the filled-in form,
+# again with Add a meal's + (and Undo once), find it with a typo in "Search meals" and save the filled-in form,
 # edit a meal, look at yesterday in the day strip, then delete all three from the ⋯ menu. Photos need the camera, so
 # they are not covered.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
@@ -62,7 +62,7 @@ env:
 - scrollUntilVisible:
     element:
       id: meal-kcal-hint
-- assertVisible: 'Protein, carbs and fat add up to 48 kcal.'
+- assertVisible: '≈ 48 kcal from macros'
 - tapOn:
     id: meal-calories
 - inputText: '300'
@@ -115,7 +115,7 @@ env:
     notVisible: 'Saving…'
     timeout: 20000
 
-# Search your meals, typos OK: "maestro tost" finds it; the row opens the form filled in to check, then Save.
+# Search meals, typos OK: "maestro tost" finds it; the row opens the form filled in to check, then Save.
 - tapOn:
     id: food-add-meal
 - tapOn:

@@ -6,7 +6,7 @@ import { DayStrip } from '@/components/food/day-strip';
 import { font, foodText } from '@/components/food/food-type';
 import { KcalCard } from '@/components/food/kcal-card';
 import { MealCard } from '@/components/food/meal-card';
-import { Screen, TextButton } from '@/components/ui';
+import { OfflineTitle, Screen, TextButton } from '@/components/ui';
 import { mealPhotoUrls } from '@/lib/food-api';
 import { MAX_WEEKS_BACK, msUntilMidnight } from '@/lib/food-logic';
 import { useFood } from '@/lib/use-food';
@@ -96,9 +96,13 @@ export default function FoodScreen() {
         void food.loadDay(day).finally(() => setRefreshing(false));
       }}
     >
-      <Text style={[foodText.title, styles.titlePad]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-        Food
-      </Text>
+      <View style={styles.titlePad}>
+        <OfflineTitle offline={status === 'offline'}>
+          <Text style={foodText.title} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            Food
+          </Text>
+        </OfflineTitle>
+      </View>
 
       <DayStrip
         days={strip}
@@ -109,7 +113,6 @@ export default function FoodScreen() {
         onNewer={weeksBack > 0 ? () => pageWeek(-1) : null}
         canGoOlder={weeksBack < MAX_WEEKS_BACK}
       />
-      {status === 'offline' ? <Text style={text('caption')}>Showing your saved meals. They update when you’re online.</Text> : null}
 
       <KcalCard card={kcalCard(totals, food.targets, day, today)} coachName={food.coachName} />
 

@@ -5,3 +5,4 @@ export { Logo } from './logo';
 export { Screen } from './screen';
 export { ErrorText, TextField, type TextFieldHandle } from './text-field';
 export { Toast, TOAST_MS } from './toast';
+export { OfflineTitle } from './offline-title';

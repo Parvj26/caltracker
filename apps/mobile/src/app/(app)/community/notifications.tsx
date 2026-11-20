@@ -52,7 +52,7 @@ export default function NotificationsScreen() {
           Notifications
         </Text>
       </View>
-      {notifications.length === 0 ? <Text style={text('body')}>Nothing yet. Reactions and comments on your posts show up here.</Text> : null}
+      {notifications.length === 0 ? <Text style={text('body')}>No activity yet</Text> : null}
       {notifications.map((n) => {
         const unread = unreadKeys?.has(n.key) ?? n.unread;
         return (

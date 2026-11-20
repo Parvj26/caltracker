@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { localToday } from '@caltracker/shared';
-import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { Button, Card, ErrorText, OfflineTitle, Screen } from '@/components/ui';
 import { BackButton } from '@/components/ui/nav-buttons';
 import { fetchHistory, readCachedHistory } from '@/lib/history-api';
 import { useSession } from '@/lib/session';
@@ -43,9 +43,13 @@ export default function History() {
     <Screen refreshing={history.refreshing} onRefresh={() => setRefreshKey((k) => k + 1)}>
       <View style={[styles.row, { gap: space[2] }]}>
         <BackButton testID="back" accessibilityLabel="Back to Workouts" fallback="/workouts" />
-        <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
-          History
-        </Text>
+        <View style={styles.flex}>
+          <OfflineTitle offline={history.status === 'offline' && !!data}>
+            <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
+              History
+            </Text>
+          </OfflineTitle>
+        </View>
       </View>
 
       {history.status === 'loading' && !data ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading" /> : null}
@@ -54,9 +58,6 @@ export default function History() {
           <ErrorText code="history_load_failed">{LOAD_FAILED}</ErrorText>
           <Button variant="secondary" title="Try again" onPress={() => setRefreshKey((k) => k + 1)} />
         </Card>
-      ) : null}
-      {history.status === 'offline' && data ? (
-        <Text style={text('caption')}>No connection. This is your history as last saved on your phone.</Text>
       ) : null}
 
       {summary && data ? (

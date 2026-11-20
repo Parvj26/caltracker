@@ -44,8 +44,8 @@ export function mealTypeTag(meal: Named, timeZone?: string): MealType | null {
   return name.toLowerCase() === type.toLowerCase() ? null : type;
 }
 
-/** "Protein, carbs and fat add up to 442 kcal." once any of the three is filled; a check, never saved. */
+/** "≈ 442 kcal from macros" once any of the three is filled; a check, never saved. */
 export function macroSumHint(m: MealMacros): string | null {
   const kcal = kcalFromMacros(m);
-  return kcal === null ? null : `Protein, carbs and fat add up to ${group(kcal)} kcal.`;
+  return kcal === null ? null : `≈ ${group(kcal)} kcal from macros`;
 }

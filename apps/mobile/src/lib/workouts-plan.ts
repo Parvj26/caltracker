@@ -12,6 +12,7 @@ import {
   muscleChipsOf,
   MUSCLE_CHIPS,
   formatClock,
+  formatDuration,
   formatWeight,
   groupDropSets,
   planSetRange,
@@ -170,7 +171,7 @@ export function previewSubtitle(date: IsoDate, programName: string | null, progr
 /** One piece of an exercise's plan line: a warm-up (shown with a W tag), the working sets, or a drop (↓ Drop tag). */
 export type PlanPart = { kind: 'warmup' | 'work' | 'drop'; text: string };
 
-/** "3 × 8 at 60 kg" (weight and reps), "3 × 30 s"; null when the working sets don't share one target. */
+/** "3 × 8 at 60 kg" (weight and reps), "3 × 30 s at 12 lb" (weight and time), "3 × 30 s"; null when the working sets don't share one target. */
 function sharedTarget(sets: readonly WorkoutExerciseDoc['sets'][number][], trackingType: WorkoutExerciseDoc['trackingType'], units: Units): string | null {
   const first = sets[0];
   if (!first) return null;
@@ -180,6 +181,9 @@ function sharedTarget(sets: readonly WorkoutExerciseDoc['sets'][number][], track
   const max = first.targetRepsMax ?? first.targetRepsMin;
   if (trackingType === 'weight_reps' && !first.toFailure && first.targetWeightKg !== null && min !== null && max !== null) {
     return `${sets.length} × ${min === max ? min : `${min}–${max}`} at ${formatWeight(first.targetWeightKg, units)}`;
+  }
+  if (trackingType === 'weight_time' && !first.toFailure && first.targetWeightKg !== null && first.targetDurationS !== null) {
+    return `${sets.length} × ${formatDuration(first.targetDurationS)} at ${formatWeight(first.targetWeightKg, units)}`;
   }
   return `${sets.length} × ${text}`;
 }
@@ -215,8 +219,8 @@ export function planLineSpoken(parts: readonly PlanPart[]): string {
 }
 
 /**
- * "Last time: 180 lb × 8" from the client's last finished log of this exercise, "First time" when there is none,
- * null when history couldn't be read (`last` null) or there is nothing worth showing.
+ * "Last time: 180 lb × 8" from the client's last finished log of this exercise; null when there is none, when history
+ * couldn't be read (`last` null) or there is nothing worth showing. A first time gets no line at all (less to read).
  */
 export function lastTimeLine(
   e: Pick<WorkoutExerciseDoc, 'exerciseId' | 'trackingType'>,
@@ -225,18 +229,18 @@ export function lastTimeLine(
 ): string | null {
   if (last === null) return null;
   const entry = last[e.exerciseId];
-  if (!entry) return 'First time';
+  if (!entry) return null;
   return formatLastResult(entry.sets, e.trackingType, units);
 }
 
-/** "SUPERSET · 3 ROUNDS" and "Rest 1:00 after each round" for a planned superset (rest: the last exercise's rest). */
+/** "SUPERSET · 3 ROUNDS" and "Back to back, then rest 1:00" for a planned superset (rest: the last exercise's rest). */
 export function supersetPlanInfo(exercises: ReadonlyArray<Pick<WorkoutExerciseDoc, 'sets'>>): { heading: string; rest: string | null } {
   const rounds = Math.max(0, ...exercises.map((e) => groupDropSets(e.sets).length));
   const last = exercises[exercises.length - 1];
   const rest = Math.max(0, ...(last?.sets.filter((s) => s.setType !== 'drop').map((s) => s.restSeconds) ?? []));
   return {
     heading: `Superset · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}`,
-    rest: rest > 0 ? `Rest ${formatClock(rest)} after each round` : null,
+    rest: rest > 0 ? `Back to back, then rest ${formatClock(rest)}` : null,
   };
 }
 
@@ -244,6 +248,21 @@ export function supersetPlanInfo(exercises: ReadonlyArray<Pick<WorkoutExerciseDo
 export function exerciseRest(e: Pick<WorkoutExerciseDoc, 'sets'>): string | null {
   const secs = Math.max(0, ...e.sets.filter((s) => s.setType !== 'drop').map((s) => s.restSeconds));
   return secs > 0 ? `Rest ${formatClock(secs)}` : null;
+}
+
+/**
+ * A preview row's screen-reader label: "A1, Bench Press, Each side, 3 × 8 at 60 kg, <help>, Last time: …". The row
+ * shows only the chips, but the label keeps the superset tag and the help line that explains them.
+ */
+export function planRowLabel(row: {
+  tag: string | null;
+  name: string;
+  badges: readonly string[];
+  spokenLine: string;
+  help: string | null;
+  sub: string | null;
+}): string {
+  return [row.tag, row.name, ...row.badges, row.spokenLine, row.help, row.sub].filter(Boolean).join(', ');
 }
 
 /** The coach's first name for "Note from Luis"; null when there is no name. */

@@ -1,6 +1,7 @@
 // The coach's "Each side" and "Tempo 3-1-1-0" badges under an exercise's name, then the one line explaining them.
 // What they say comes from the shared exerciseBadges; this only draws them (the logging pages, the plan and the
-// workout preview, and the coach's live view, which is the logging pages read only).
+// workout preview, and the coach's live view, which is the logging pages read only). The workout preview shows the
+// chips only (showHelp false): its row's screen-reader label still says the help line.
 import { StyleSheet, Text, View } from 'react-native';
 import { fontFamilyFor } from '@/theme/fonts';
 import { palette } from '@/theme/theme';
@@ -11,12 +12,15 @@ export function ExerciseBadges({
   help,
   testID,
   logging = false,
+  showHelp = true,
 }: {
   badges: readonly string[];
   help: string | null;
   testID: string;
   /** On the logging pages: their slightly bigger text. */
   logging?: boolean;
+  /** False: the chips without the line explaining them (the workout preview). */
+  showHelp?: boolean;
 }) {
   const theme = useTheme();
   const text = logging ? theme.logText : theme.text;
@@ -40,7 +44,7 @@ export function ExerciseBadges({
           </Text>
         ))}
       </View>
-      {help ? (
+      {help && showHelp ? (
         <Text testID={`${testID}-help`} style={[text('body'), styles.help]}>
           {help}
         </Text>

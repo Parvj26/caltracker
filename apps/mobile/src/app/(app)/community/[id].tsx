@@ -194,7 +194,7 @@ export default function PostScreen() {
           <Text style={[text('caption'), styles.eyebrow]} accessibilityRole="header">
             {visibleComments.length === 0 ? 'Comments' : commentCountLabel(visibleComments.length)}
           </Text>
-          {visibleComments.length === 0 ? <Text style={text('caption')}>No comments yet. Be the first!</Text> : null}
+          {visibleComments.length === 0 ? <Text style={text('caption')}>No comments yet</Text> : null}
           {visibleComments.map((c) => (
             <CommentItem
               key={c.id}

@@ -49,9 +49,9 @@ describe('settingsSections', () => {
     ]);
     expect(s[1].rows.map((r) => r.label)).toEqual(['Messages', 'Comments on your workouts', 'Food targets changed']);
     expect(s[2].rows.map((r) => r.label)).toEqual(['New coach posts', 'Reactions and comments']);
-    expect(s[0].rows[3]).toMatchObject({ kind: 'time', field: 'reminderTime', label: 'Reminder time', hint: 'When the daily reminder arrives', value: '08:00' });
+    expect(s[0].rows[3]).toMatchObject({ kind: 'time', field: 'reminderTime', label: 'Reminder time', hint: '', value: '08:00' });
     expect(s[3].rows).toEqual([
-      { kind: 'quiet', label: 'Quiet hours', hint: 'No pings overnight', on: true },
+      { kind: 'quiet', label: 'Quiet hours', hint: 'Held till morning', on: true },
       { kind: 'time', field: 'quietStart', label: 'From', hint: '', value: '22:00' },
       { kind: 'time', field: 'quietEnd', label: 'To', hint: '', value: '07:00' },
     ]);

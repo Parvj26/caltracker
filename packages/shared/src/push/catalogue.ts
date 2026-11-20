@@ -45,14 +45,14 @@ const entry = (group: PushGroup, label: string, hint = '', available = true): Ca
   available,
 });
 
-/** Labels and hints as on the approved Notifications settings board. */
+/** Labels and hints as on the approved Notifications settings board (no hint that only repeats its label: LT7). */
 export const notificationCatalogue: Record<PushType, CatalogueEntry> = {
-  workout_assigned: entry('workouts', 'New workout assigned', 'When your coach adds a workout or program'),
-  workout_changed: entry('workouts', 'Today’s workout changed', 'When your coach edits today’s plan'),
+  workout_assigned: entry('workouts', 'New workout assigned'),
+  workout_changed: entry('workouts', 'Today’s workout changed'),
   daily_reminder: entry('workouts', 'Daily reminder', 'Only on days with a workout'),
   coach_logged: entry('workouts', 'Coach logged your session', 'Your sticker is waiting'),
   still_training: entry('workouts', 'Still training?', '20 minutes after your last set'),
-  message: entry('coach', 'Messages', 'New message from your coach'),
+  message: entry('coach', 'Messages'),
   workout_comment: entry('coach', 'Comments on your workouts'),
   // Meal comments do not exist (coaches reply about a meal by message): no trigger, switch hidden (PO, 2026-11-09).
   meal_comment: entry('coach', 'Comments on your meals', '', false),

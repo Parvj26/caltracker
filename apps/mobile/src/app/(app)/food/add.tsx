@@ -161,8 +161,8 @@ export default function AddMealScreen() {
             <FoodInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search your meals (typos OK)"
-              accessibilityLabel="Search your meals"
+              placeholder="Search meals"
+              accessibilityLabel="Search meals"
               testID="meal-search"
               autoCorrect={false}
               autoCapitalize="none"
@@ -200,7 +200,7 @@ export default function AddMealScreen() {
         <View style={[styles.column, styles.list]}>
           {list.length === 0 ? (
             <Text style={[font(500, 15), foodText.muted, styles.empty]} testID={searching ? 'meal-search-empty' : 'add-meal-none'}>
-              {searching ? 'No meals match. Tap New meal to type it in.' : 'Meals you log show up here, ready to log again in one tap.'}
+              {searching ? 'No meals match. Tap New meal to type it in.' : 'No meals yet'}
             </Text>
           ) : (
             list.map((m) => {
@@ -238,9 +238,6 @@ export default function AddMealScreen() {
               );
             })
           )}
-          {list.length > 0 ? (
-            <Text style={[font(500, 12), foodText.muted, styles.hint]}>Tap a row to check or change it first; tap + to log it straight away.</Text>
-          ) : null}
         </View>
       </ScrollView>
       <View style={[styles.column, styles.toast]} pointerEvents="box-none">

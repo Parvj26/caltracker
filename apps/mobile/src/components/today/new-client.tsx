@@ -1,11 +1,10 @@
-// Today for a client with no workouts at all yet (approved board 3): meet the coach, what happens next, and the
-// stickers to collect. The notifications card sits between the coach and the steps (today.tsx).
+// Today for a client with no workouts at all yet (approved board 3, trimmed on the less-text board LT3): meet the
+// coach and the stickers to collect. The notifications card sits between them (today.tsx).
 import { useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { borderWidth } from '@caltracker/design-tokens';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { Button } from '@/components/ui';
-import { nextSteps } from '@/lib/today-logic';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useMessages } from '@/lib/use-messages';
 import { palette, radius, TITLE_MAX_SCALE } from '@/theme/theme';
@@ -46,36 +45,11 @@ export function CoachIntroCard({ coachName, workspaceName }: { coachName: string
           {coach.bio}
         </Text>
       ) : null}
-      <View style={{ gap: space[1] / 2 }}>
-        <Text testID="today-building-plan" style={[text('sectionHeading'), styles.coming]}>{`${first ?? 'Your coach'} is building your plan`}</Text>
-        <Text style={text('body')}>You’ll get a message as soon as your first workout is ready.</Text>
-      </View>
+      <Text testID="today-building-plan" style={[text('sectionHeading'), styles.coming]}>{`${first ?? 'Your coach'} is building your plan`}</Text>
       {chat ? (
         <Button variant="secondary" title={first ? `Say hi to ${first}` : 'Say hi to your coach'} testID="today-say-hi" onPress={() => router.navigate(COACH_CHAT_HREF)} />
       ) : null}
     </Hero>
-  );
-}
-
-export function NextSteps({ coachName }: { coachName: string | null }) {
-  const { text, space } = useTheme();
-  const coach = useCoachProfile();
-  return (
-    <View testID="today-next-steps" style={[styles.quiet, { padding: space[4], gap: space[3] }]}>
-      <Text style={[text('sectionHeading'), styles.title]} accessibilityRole="header">
-        What happens next
-      </Text>
-      {nextSteps(coach?.name ?? coachName).map((step, i) => (
-        <View key={step} style={[styles.row, { gap: space[3] }]}>
-          <View style={styles.step} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Text style={text('sectionHeading')}>{i + 1}</Text>
-          </View>
-          <Text style={[text('body'), styles.flex]} accessibilityLabel={`Step ${i + 1}: ${step}`}>
-            {step}
-          </Text>
-        </View>
-      ))}
-    </View>
   );
 }
 
@@ -93,7 +67,7 @@ export function StickerTeaser() {
           </View>
         ))}
       </View>
-      <Text style={[text('body'), styles.unlock]}>Finish your first workout to unlock your first sticker.</Text>
+      <Text style={[text('body'), styles.unlock]}>Finish a workout to unlock one</Text>
     </View>
   );
 }
@@ -105,17 +79,6 @@ const styles = StyleSheet.create({
   business: { color: palette.ink, fontSize: 14 },
   coming: { color: palette.magentaDeep },
   title: { fontSize: 18 },
-  quiet: { borderWidth: borderWidth.card, borderColor: palette.border, borderRadius: radius.card },
-  step: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: palette.lime,
-    borderWidth: borderWidth.card,
-    borderColor: palette.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   teaser: { backgroundColor: palette.celebrateBg, borderWidth: borderWidth.card, borderColor: palette.ink, borderRadius: radius.card },
   locked: {
     flex: 1,

@@ -10,7 +10,6 @@ import {
   restNextLine,
   restPreviewLabel,
   newCountLabel,
-  nextSteps,
   nextUpDay,
   programChip,
   weekTile,
@@ -180,13 +179,3 @@ describe('community peek', () => {
   });
 });
 
-describe('new client', () => {
-  it('explains what happens next, naming the coach', () => {
-    expect(nextSteps('Luis Bueno')).toEqual([
-      'Luis builds your plan and it appears here and in Workouts.',
-      'Tap Start, log each set, and finish. It takes a few taps.',
-      'Earn stickers and watch your progress grow.',
-    ]);
-    expect(nextSteps(null)[0]).toBe('Your coach builds your plan and it appears here and in Workouts.');
-  });
-});

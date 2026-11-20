@@ -43,6 +43,7 @@ import {
   planLineParts,
   planLineSpoken,
   planMeta,
+  planRowLabel,
   planTotals,
   previewSubtitle,
   supersetPlanInfo,
@@ -230,7 +231,7 @@ export default function PlanPreview() {
 }
 
 /**
- * A block: a straight exercise as a row; a superset as one grey block (A1, A2, rounds and the rest after each round);
+ * A block: a straight exercise as a row; a superset as one grey block (A1, A2 tags on the photos, rounds and the rest);
  * a pick-one group as one dashed block with OR between its options.
  */
 function BlockRows({
@@ -309,7 +310,7 @@ function ExerciseRow({
   divider = false,
 }: {
   exercise: WorkoutExerciseDoc;
-  /** "A1" in a superset: shown instead of the photo. */
+  /** "A1" in a superset: a small tag on the photo's top-left corner. */
   badge?: string | null;
   units: Units;
   last: LastResults | null;
@@ -330,7 +331,14 @@ function ExerciseRow({
       testID={`plan-exercise-${exercise.id}`}
       onPress={onInfo}
       accessibilityRole="button"
-      accessibilityLabel={[badge, exercise.exerciseName, ...badges.badges, planLineSpoken(parts), badges.help, sub].filter(Boolean).join(', ')}
+      accessibilityLabel={planRowLabel({
+        tag: badge,
+        name: exercise.exerciseName,
+        badges: badges.badges,
+        spokenLine: planLineSpoken(parts),
+        help: badges.help,
+        sub: sub || null,
+      })}
       accessibilityHint="Opens how to do it and the demo"
       style={({ pressed }) => [
         styles.rowTop,
@@ -340,26 +348,32 @@ function ExerciseRow({
         pressed && styles.pressed,
       ]}
     >
-      {badge ? (
-        <View style={[styles.badge, { borderRadius: radius.input - 2 }]}>
-          <Text style={[text('sectionHeading'), styles.badgeText]} maxFontSizeMultiplier={1.2}>
-            {badge}
-          </Text>
-        </View>
-      ) : (
+      {/* Every row has the photo; a superset's "A1" sits on its corner. The tag is outside the thumb because the
+          thumb clips what overflows it. */}
+      <View style={styles.thumbWrap}>
         <ExerciseThumb name={exercise.exerciseName} detail={detail} testID={`plan-thumb-${exercise.id}`} />
-      )}
+        {badge ? (
+          <View
+            testID={`plan-tag-${exercise.id}`}
+            style={[styles.tag, { borderRadius: radius.input / 2 }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Text style={[text('caption'), styles.tagText]} maxFontSizeMultiplier={1.2}>
+              {badge}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       <View style={[styles.flex, { gap: 2 }]}>
         <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
         <PlanLine parts={parts} />
-        <ExerciseBadges badges={badges.badges} help={badges.help} testID={`plan-badges-${exercise.id}`} />
+        <ExerciseBadges badges={badges.badges} help={badges.help} showHelp={false} testID={`plan-badges-${exercise.id}`} />
         {sub ? <Text style={[text('caption'), styles.muted]}>{sub}</Text> : null}
       </View>
     </Pressable>
   );
 }
-
-const BADGE = 36;
 
 const styles = StyleSheet.create({
   rowTop: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -391,6 +405,16 @@ const styles = StyleSheet.create({
   divider: { borderTopWidth: 1, borderTopColor: palette.border },
   orRow: { alignItems: 'center' },
   orLine: { flex: 1, height: 1, backgroundColor: palette.border },
-  badge: { width: BADGE, height: BADGE, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: white, fontSize: 14 },
+  thumbWrap: { position: 'relative' },
+  tag: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    backgroundColor: palette.ink,
+    borderWidth: 1.5,
+    borderColor: white,
+  },
+  tagText: { color: white, fontSize: 11, lineHeight: 14, fontFamily: fontFamilyFor('sans', 800) },
 });

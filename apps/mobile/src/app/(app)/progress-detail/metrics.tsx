@@ -7,7 +7,7 @@ import { METRIC_RANGES, METRIC_RANGE_LABELS, formatMetricValue, formatShortDate,
 import { AppleHealthConnect } from '@/components/metrics/apple-health-connect';
 import { LogMetricSheet } from '@/components/metrics/log-metric-sheet';
 import { HeartTile, LinkRow, Sparkline } from '@/components/metrics/parts';
-import { LoadState, OfflineNote, SectionHeader, Segmented } from '@/components/progress/parts';
+import { LoadState, SectionHeader, Segmented } from '@/components/progress/parts';
 import { Screen, TextButton } from '@/components/ui';
 import { CloseButton } from '@/components/ui/nav-buttons';
 import { appleHealthStatus, type AppleHealthMetric } from '@/lib/apple-health-logic';
@@ -75,6 +75,7 @@ export default function MetricsScreen() {
       <View style={{ gap: space[3.5] }}>
         <SectionHeader
           title="Metrics"
+          offline={metrics.status === 'offline' && entries !== null}
           right={
             <Pressable
               testID="metric-log-open"
@@ -102,13 +103,12 @@ export default function MetricsScreen() {
               testID="apple-health-row"
               icon={<HeartTile />}
               title="Connect Apple Health"
-              sub="Fill in weight, body fat, VO2 max and more automatically"
+              sub="Auto-fill weight and more"
               onPress={() => setConnectOpen(true)}
             />
           )
         ) : null}
 
-        {metrics.status === 'offline' && entries ? <OfflineNote show /> : null}
         <LoadState status={metrics.status} hasData={entries !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
 
         {rows ? (

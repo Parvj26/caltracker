@@ -33,9 +33,9 @@ describe('notificationCatalogue', () => {
     expect(notificationCatalogue.workout_changed).toMatchObject({
       group: 'workouts',
       label: 'Today’s workout changed',
-      hint: 'When your coach edits today’s plan',
+      hint: '',
     });
-    expect(notificationCatalogue.message).toMatchObject({ group: 'coach', label: 'Messages', hint: 'New message from your coach' });
+    expect(notificationCatalogue.message).toMatchObject({ group: 'coach', label: 'Messages', hint: '' });
     expect(notificationCatalogue.community_activity).toMatchObject({
       group: 'community',
       label: 'Reactions and comments',
