@@ -321,6 +321,8 @@
 .feedItem { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ct-space-2); padding: var(--ct-space-2) 0; border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .feedItem:first-child { border-top: 0; }
 .feedText { min-width: 0; overflow-wrap: anywhere; }
+/* An update that opens something (a workout, a scan): at least 24 px tall with a mouse (UI rules §4), without overlapping its neighbours. */
+.feedText > a { display: inline-block; padding-block: var(--ct-space-1); }
 .feedAge { flex: none; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-variant-numeric: tabular-nums; }
 /* Touch screens: a row's link fills its side of the row and is at least 44 px tall (it was the 18 px line of text). */
 @media (max-width: 899.98px), (hover: none) and (pointer: coarse) {
