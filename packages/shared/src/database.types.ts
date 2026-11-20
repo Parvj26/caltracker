@@ -3126,6 +3126,7 @@ export type Database = {
         }[]
       }
       admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
+      admin_remove_client: { Args: { p_user_id: string }; Returns: undefined }
       admin_require_owner: { Args: never; Returns: boolean }
       admin_send_test_push: { Args: { p_user_id: string }; Returns: string }
       admin_set_admin: {
