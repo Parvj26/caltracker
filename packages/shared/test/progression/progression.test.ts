@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dropSetWeightKg,
   exerciseRegion,
   nextSuggestion,
   prefillLastTime,
@@ -15,7 +16,7 @@ import {
   type ProgressionSession,
 } from '../../src/progression/progression';
 import { resolveSetValues } from '../../src/logs/prefill';
-import { toKg } from '../../src/units/units';
+import { kgToInput, toKg } from '../../src/units/units';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from '../../src/logs/schema';
 import type { WorkoutDoc } from '../../src/workouts/schema';
 
@@ -472,5 +473,32 @@ describe('suggestionsForWorkout', () => {
     expect(suggestionsForWorkout(doc, history, 'kg')).toEqual({
       [uuid(1)]: { change: 'up', fromWeightKg: 60, weightKg: 62.5, delta: 2.5 },
     });
+  });
+});
+
+describe('dropSetWeightKg', () => {
+  const lb = (n: number) => toKg(n, 'lb');
+  const shown = (kg: number | null, units: 'lb' | 'kg') => (kg === null ? null : kgToInput(kg, units));
+  it('takes 75% of the set before, rounded down to the plate step', () => {
+    expect(shown(dropSetWeightKg(lb(60), 'lb'), 'lb')).toBe(45);
+    expect(shown(dropSetWeightKg(lb(15), 'lb'), 'lb')).toBe(10);
+    expect(shown(dropSetWeightKg(lb(100), 'lb'), 'lb')).toBe(75);
+    expect(shown(dropSetWeightKg(lb(55), 'lb'), 'lb')).toBe(40);
+  });
+  it('uses 2.5 kg steps in kg', () => {
+    expect(shown(dropSetWeightKg(30, 'kg'), 'kg')).toBe(22.5);
+    expect(shown(dropSetWeightKg(20, 'kg'), 'kg')).toBe(15);
+    expect(shown(dropSetWeightKg(25, 'kg'), 'kg')).toBe(17.5);
+  });
+  it('is always lighter than the set before; nothing when 75% is under one step', () => {
+    expect(shown(dropSetWeightKg(lb(10), 'lb'), 'lb')).toBe(5);
+    expect(shown(dropSetWeightKg(lb(7.5), 'lb'), 'lb')).toBe(5);
+    expect(dropSetWeightKg(lb(5), 'lb')).toBeNull();
+    expect(dropSetWeightKg(2.5, 'kg')).toBeNull();
+    expect(shown(dropSetWeightKg(5, 'kg'), 'kg')).toBe(2.5);
+  });
+  it('has nothing without a weight to start from', () => {
+    expect(dropSetWeightKg(null, 'lb')).toBeNull();
+    expect(dropSetWeightKg(0, 'kg')).toBeNull();
   });
 });

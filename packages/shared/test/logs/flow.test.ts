@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from '../../src/logs/flow';
+import { afterDone, blockRoundCount, blockSteps, currentStep, cursorStep, doneLabel, isBlockDone, nextOpenBlock, roundRestSeconds } from '../../src/logs/flow';
 import { removeLogSet } from '../../src/logs/ops';
 import { startLogFromWorkout } from '../../src/logs/start';
 import type { WorkoutLogDoc } from '../../src/logs/schema';
@@ -320,5 +320,61 @@ describe('roundRestSeconds', () => {
     expect(roundRestSeconds(only.blocks[1]!, 1)).toBe(120);
     expect(roundRestSeconds(withRest(withRest(log, a[0]!, 0), b[0]!, 0).blocks[1]!, 1)).toBe(0);
     expect(roundRestSeconds(log.blocks[1]!, 9)).toBe(0);
+  });
+});
+
+describe('cursorStep', () => {
+  const at = (log: WorkoutLogDoc, iso: string, ...setIds: string[]): WorkoutLogDoc => ({
+    ...log,
+    blocks: log.blocks.map((b) => ({
+      ...b,
+      exercises: b.exercises.map((e) => ({ ...e, sets: e.sets.map((s) => (setIds.includes(s.id) ? { ...s, completedAt: iso } : s)) })),
+    })),
+  });
+  const T = (m: number) => `2026-11-06T10:${String(m).padStart(2, '0')}:00.000Z`;
+
+  it('starts at the first open step', () => {
+    const block = fresh().blocks[1]!;
+    expect(cursorStep(block)).toMatchObject({ exerciseIndex: 0, round: 1 });
+  });
+
+  it('follows the set after the last tick, not the first open one', () => {
+    let log = fresh();
+    const [a1, a2, a3] = ids(log, 1, 0);
+    const [b1, , b3] = ids(log, 1, 1);
+    // Round 1 done, round 2: A2 ticked, B2 skipped; then A3 ticked.
+    log = at(log, T(1), a1!, b1!);
+    log = at(log, T(2), a2!);
+    log = at(log, T(3), a3!);
+    expect(cursorStep(log.blocks[1]!)).toMatchObject({ setId: b3, round: 3 });
+    // The leftover of round 2 still counts as open for currentStep, which stays behind.
+    expect(currentStep(log.blocks[1]!)).toMatchObject({ round: 2 });
+  });
+
+  it('wraps round to a skipped set once everything after the last tick is done', () => {
+    let log = fresh();
+    const [a1, a2, a3] = ids(log, 1, 0);
+    const [b1, b2, b3] = ids(log, 1, 1);
+    log = at(log, T(1), a1!, b1!, a2!);
+    log = at(log, T(2), a3!, b3!);
+    expect(cursorStep(log.blocks[1]!)).toMatchObject({ setId: b2, round: 2 });
+  });
+
+  it('ticking an old leftover moves on from there', () => {
+    let log = fresh();
+    const [a1, a2, a3] = ids(log, 1, 0);
+    const [b1, b2] = ids(log, 1, 1);
+    log = at(log, T(1), a1!, b1!, a2!);
+    log = at(log, T(2), a3!);
+    log = at(log, T(3), b2!);
+    expect(cursorStep(log.blocks[1]!)).toMatchObject({ round: 3, exerciseIndex: 1 });
+  });
+
+  it('a Mark all (same time) goes on from the later step; null once all is ticked', () => {
+    let log = fresh();
+    const all = [...ids(log, 1, 0), ...ids(log, 1, 1)];
+    log = at(log, T(1), ...all.filter((x) => x !== ids(log, 1, 1)[2]));
+    expect(cursorStep(log.blocks[1]!)).toMatchObject({ exerciseIndex: 1, round: 3 });
+    expect(cursorStep(at(log, T(2), ...all).blocks[1]!)).toBeNull();
   });
 });

@@ -15,7 +15,11 @@ import {
   completeSetWith,
   completedSetCount,
   removeLogSet,
-  currentStep,
+  addLogDrop,
+  addLogSet,
+  cursorStep,
+  dropSetWeightKg,
+  updateActual,
   distanceUnitFor,
   formatClock,
   formatResult,
@@ -184,7 +188,7 @@ export function pageLabel(log: WorkoutLogDoc, page: FlowPage): string {
   const block = log.blocks[page.blockIndex];
   if (!block) return '';
   if (page.kind === 'superset') {
-    const i = currentStep(block)?.exerciseIndex ?? 0;
+    const i = cursorStep(block)?.exerciseIndex ?? 0;
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
     return `${letter}${i + 1} ${block.exercises[i]?.exerciseName ?? ''}`.trim();
   }
@@ -233,8 +237,9 @@ export function notTickedTitle(n: number): string {
 }
 
 /**
- * The logger's header: "Lower Body · Main" over "Exercise 1 of 5 · All exercises ▾" (a superset: "Superset A · Round
- * 2 of 3 ▾"; a pick-one group: "Pick one · 5 of 5 ▾"). Pages are counted across the whole workout.
+ * The logger's header: "Lower Body · Main" over "Exercise 1 of 5 ▾" (a superset: "Superset A · Round 2 of 3 ▾", the
+ * round of the set after the last tick; a pick-one group: "Pick one · 5 of 5 ▾"). Pages are counted across the whole
+ * workout. The ▾ opens the list of every exercise.
  */
 export function headerLines(log: WorkoutLogDoc, sections: readonly FlowSection[], at: FlowPlace): { title: string; subtitle: string } {
   const section = sections[at.section];
@@ -247,17 +252,18 @@ export function headerLines(log: WorkoutLogDoc, sections: readonly FlowSection[]
   if (page?.kind === 'superset' && block) {
     const letter = supersetLetters(log.blocks)[page.blockIndex] ?? 'A';
     const total = blockRoundCount(block);
-    const round = Math.min(total, currentStep(block)?.round ?? total);
+    const round = Math.min(total, cursorStep(block)?.round ?? total);
     return { title, subtitle: `Superset ${letter} · Round ${Math.max(1, round)} of ${Math.max(1, total)} ▾` };
   }
   if (page?.kind === 'option') return { title, subtitle: `Pick one · ${n} of ${all.length} ▾` };
-  return { title, subtitle: `Exercise ${n} of ${all.length} · All exercises ▾` };
+  return { title, subtitle: `Exercise ${n} of ${all.length} ▾` };
 }
 
-/** "Just started", "12 min in", "1 h 5 min in". */
+/** "" (under a minute), "12 min in", "1 h 5 min in". */
 export function elapsedLabel(startedAt: string, nowMs: number): string {
   const min = Math.max(0, Math.floor((nowMs - Date.parse(startedAt)) / 60_000));
-  if (Number.isNaN(min) || min < 1) return 'Just started';
+  // Nothing under a minute (approved LT1 board): the header stays quiet until there is time to show.
+  if (Number.isNaN(min) || min < 1) return '';
   if (min < 60) return `${min} min in`;
   return `${Math.floor(min / 60)} h ${min % 60} min in`;
 }
@@ -439,8 +445,10 @@ export type RowModel = {
   deletable: boolean;
   /** Last time's numbers for this set ("57.5 × 8"), matched by kind and order; null when there are none. */
   last: string | null;
-  /** The next set to do on a superset page (ticking A1 moves this to A2). */
+  /** The next set to do on a superset page: the set after the last tick (ticking A1 moves this to A2). */
   current: boolean;
+  /** Its set menu offers "Add drop set": an exercise with weight, and not a warm-up. */
+  canDrop: boolean;
 };
 
 const FIELD_ORDER: readonly StepField[] = ['weight', 'reps', 'duration', 'distance'];
@@ -577,6 +585,7 @@ export function setRows(
       deletable: deletableSets(ex).has(set.id),
       last: lastCellText(lastBySet[si] ?? null, ex.trackingType, units),
       current: false,
+      canDrop: dropPlan(ex, set.id, units, lastSets) !== null,
     };
   });
 }
@@ -621,8 +630,8 @@ export type ExerciseModel = {
   substitute: SubstituteModel | null;
   swappedFromExerciseId: string | null;
   lastTime: readonly LastResultSet[];
-  /** "Last: 37.5 × 10" (last time's first working set), or "First time" once last time is known to be empty. */
-  lastLine: string;
+  /** "Last: 55 lb × 10" (last time's first working set), or null without one (no "First time": approved SS board). */
+  lastLine: string | null;
   /** Auto progression's suggestion, "Suggested 140 lb · ↑ +5 lb", or null. */
   progression: string | null;
   /** The coach's "Each side" and "Tempo 3-1-1-0" badges under the name (shared exerciseBadges), and their help line. */
@@ -655,27 +664,85 @@ export function progressionLine(ex: LogExerciseDoc, last: LastResults, progressi
 
 export type StraightPageModel = { kind: 'straight'; exercise: ExerciseModel; rows: RowModel[]; allDone: boolean };
 
+/**
+ * How a round shows (approved Superset boards SS1–SS5):
+ * - done: folded into one line (✓ Round 1 · 45 × 12 · 15 × 12), tap to open;
+ * - partial: not the current round but with a set still open ("Round 2 · 1 left"), open until folded;
+ * - current: the card "Round 3 of 4" holding the set after the last tick;
+ * - future: after the current round with nothing ticked; its heading and suggested numbers are faded.
+ */
+export type RoundKind = 'done' | 'partial' | 'current' | 'future';
+
 export type RoundModel = {
   round: number;
-  /** "Round 2 of 4", with " ✓" once every set of the round is ticked. The same for every round. */
+  kind: RoundKind;
+  /** "Round 3 of 4": the current and future rounds' heading. */
   heading: string;
+  /** "Round 2": the fold line of a done or partial round. */
+  title: string;
+  /** The fold line's summary: "60 × 6 +↓ 45 × 8 · 20 × 12" (done) or "1 left" (partial). */
+  summary: string;
   /** Each exercise with a set in this round (an uneven superset leaves the shorter one out of later rounds). */
   entries: Array<{ exerciseIndex: number; rows: RowModel[] }>;
+  /** "Rest 1:30", only when the rounds rest differently (else the page's intro says it once). */
   restLine: string | null;
   done: boolean;
 };
 
 export type SupersetPageModel = {
   kind: 'superset';
-  /** "Superset A": the page's title. Each round has its own "Round 2 of 4" heading under it. */
+  blockId: string;
+  /** "Superset A": the page's title. */
   heading: string;
-  /** The first round with an unticked set (the last round when all are done). */
+  /** "Back to back, then rest 1:30" (one rest for every round), else "Back to back". */
+  intro: string;
+  /** The round of the set after the last tick (the last round when all are done). */
   currentRound: number;
   totalRounds: number;
   exercises: ExerciseModel[];
+  /** The badges' explanation ("Each side: …"), under the first exercise that needs it, once per page. */
+  helpAfter: Record<number, string>;
   rounds: RoundModel[];
   allDone: boolean;
 };
+
+/** A done set in short: "45 × 12", "12", "0:45" (the units are on the exercise rows). */
+function setShort(set: LogSetDoc, trackingType: LogExerciseDoc['trackingType'], units: Units): string {
+  return lastCellText({ setType: set.setType, actualReps: set.actualReps, actualWeightKg: set.actualWeightKg, actualDurationS: set.actualDurationS, actualDistanceM: set.actualDistanceM }, trackingType, units) ?? '–';
+}
+
+/**
+ * A folded round's line: each exercise's set in round order, a drop added as "+↓" ("60 × 6 +↓ 45 × 8 · 20 × 12").
+ * The screen cuts a long one short with "…".
+ */
+export function roundSummary(block: LogBlockDoc, entries: ReadonlyArray<{ exerciseIndex: number; setIndexes: readonly number[] }>, units: Units): string {
+  return entries
+    .map((e) => {
+      const ex = block.exercises[e.exerciseIndex];
+      return e.setIndexes
+        .map((si) => {
+          const set = ex.sets[si];
+          const short = setShort(set, ex.trackingType, units);
+          return set.setType === 'drop' ? ` +↓ ${short}` : short;
+        })
+        .join('');
+    })
+    .join(' · ');
+}
+
+/** Which rounds are opened or folded by hand (a round's number to open or not); the rest follow their kind. */
+export type FoldState = Readonly<Record<number, boolean>>;
+
+/** Shown open: the current and future rounds always; a partly done one until folded; a done one once opened. */
+export function isRoundOpen(fold: FoldState, round: Pick<RoundModel, 'round' | 'kind'>): boolean {
+  if (round.kind === 'current' || round.kind === 'future') return true;
+  return fold[round.round] ?? round.kind === 'partial';
+}
+
+/** Tapping a round's line: open it, or fold it again. Opening an old round never moves the header. */
+export function toggleRound(fold: FoldState, round: Pick<RoundModel, 'round' | 'kind'>): FoldState {
+  return { ...fold, [round.round]: !isRoundOpen(fold, round) };
+}
 
 export type OptionChoice = { logExerciseId: string; name: string; chosen: boolean };
 
@@ -702,10 +769,11 @@ export function badgesOf(ex: Pick<LogExerciseDoc, 'trackingType' | 'eachSide' | 
   return { badges, badgeHelp: help };
 }
 
-function lastLineOf(ex: LogExerciseDoc, sets: readonly LastResultSet[], units: Units): string {
-  const first = sets.find((x) => x.setType === 'normal') ?? sets[0] ?? null;
-  const text = lastCellText(first, ex.trackingType, units);
-  return text ? `Last: ${text}` : 'First time';
+function lastLineOf(ex: LogExerciseDoc, sets: readonly LastResultSet[], units: Units): string | null {
+  const l = sets.find((x) => x.setType === 'normal') ?? sets[0] ?? null;
+  if (!l) return null;
+  const text = formatResult({ reps: l.actualReps, weightKg: l.actualWeightKg, durationS: l.actualDurationS, distanceM: l.actualDistanceM }, ex.trackingType, units);
+  return text ? `Last: ${text}` : null;
 }
 
 function exerciseModel(
@@ -760,32 +828,50 @@ export function buildPage(log: WorkoutLogDoc, page: FlowPage, units: Units, last
     const exercises = block.exercises.map((ex, i) => exerciseModel(ex, i, `${letter}${i + 1}`, last, progression, units));
     const plan = supersetRounds(block);
     const roundCount = plan.length;
-    const rounds: RoundModel[] = plan.map(({ round, entries }) => {
+    const cursor = cursorStep(block);
+    const currentRound = cursor?.round ?? Math.max(1, roundCount);
+    const rests = plan.map(({ round }) => roundRestSeconds(block, round));
+    const oneRest = rests.every((r) => r === rests[0]);
+    const rounds: RoundModel[] = plan.map(({ round, entries }, k) => {
       const rows = entries.map((e) => {
         const ex = block.exercises[e.exerciseIndex];
         return { exerciseIndex: e.exerciseIndex, rows: setRows(ex, units, lastOf(ex), e.setIndexes, lastTimeOf(ex)) };
       });
-      const secs = roundRestSeconds(block, round);
-      const done = rows.every((e) => e.rows.every((r) => r.done));
+      const all = rows.flatMap((e) => e.rows);
+      const done = all.every((r) => r.done);
+      const left = all.filter((r) => !r.done).length;
+      const kind: RoundKind =
+        round === currentRound ? 'current' : done ? 'done' : round > currentRound && left === all.length ? 'future' : 'partial';
       return {
         round,
-        heading: `Round ${round} of ${roundCount}${done ? ' ✓' : ''}`,
+        kind,
+        heading: `Round ${round} of ${roundCount}`,
+        title: `Round ${round}`,
+        summary: kind === 'done' ? roundSummary(block, entries, units) : `${left} left`,
         entries: rows,
-        restLine: secs > 0 ? `Rest ${formatClock(secs)} after the round` : null,
+        restLine: !oneRest && rests[k] > 0 ? `Rest ${formatClock(rests[k])}` : null,
         done,
       };
     });
-    const totalRounds = rounds.length;
-    const step = currentStep(block);
-    const currentRound = step?.round ?? Math.max(1, totalRounds);
-    // The next set to do (A1, then A2 once A1 is ticked) is marked, so the client's eye moves with the round.
-    for (const r of rounds) for (const e of r.entries) for (const row of e.rows) row.current = step !== null && row.setId === step.setId;
+    // The set after the last tick is outlined, so the client's eye moves with the round (A1, A2, next round).
+    for (const r of rounds) for (const e of r.entries) for (const row of e.rows) row.current = cursor !== null && row.setId === cursor.setId;
+    const helpAfter: Record<number, string> = {};
+    const said = new Set<string>();
+    for (const ex of exercises) {
+      if (ex.badgeHelp && !said.has(ex.badgeHelp)) {
+        said.add(ex.badgeHelp);
+        helpAfter[ex.exerciseIndex] = ex.badgeHelp;
+      }
+    }
     return {
       kind: 'superset',
+      blockId: block.id,
       heading: `Superset ${letter}`,
+      intro: oneRest && rests[0] > 0 ? `Back to back, then rest ${formatClock(rests[0])}` : 'Back to back',
       currentRound,
-      totalRounds,
+      totalRounds: rounds.length,
       exercises,
+      helpAfter,
       rounds,
       allDone: isBlockDone(block),
     };
@@ -831,6 +917,114 @@ export function pickingFirst(log: WorkoutLogDoc, blockId: string, logExerciseId:
   const block = log.blocks.find((b) => b.id === blockId);
   if (!block || block.kind !== 'choice' || block.pickedExerciseId === logExerciseId) return log;
   return pickChoice(log, blockId, logExerciseId, nowIso);
+}
+
+/**
+ * "+ Add round" on a superset (approved SS5 board): every exercise is topped up to the longest one, then each gets one
+ * more set. New sets copy the exercise's last set (shared addLogSet), so they suggest its numbers in grey.
+ */
+export function addRound(log: WorkoutLogDoc, blockId: string, makeId: () => string, nowIso: string): WorkoutLogDoc {
+  const block = log.blocks.find((b) => b.id === blockId);
+  if (!block) return log;
+  const live = liveExercises(block);
+  const counts = live.map(({ exercise }) => groupDropSets(exercise.sets).length);
+  const longest = Math.max(0, ...counts);
+  let next = log;
+  live.forEach(({ exercise }, i) => {
+    for (let k = counts[i]; k < longest + 1; k += 1) next = addLogSet(next, exercise.id, makeId, nowIso);
+  });
+  return next;
+}
+
+/**
+ * Where a drop for this set would go and the weight it starts at: after the set's own drops, at 75% of the set above
+ * it (done, else as planned), rounded down to the plate step (shared dropSetWeightKg). Null when it can have none: no
+ * weight logged, a warm-up, or too light to drop (75% under one step). An unknown weight still allows one, empty.
+ */
+export function dropPlan(
+  ex: LogExerciseDoc,
+  setId: string,
+  units: Units,
+  lastSets: readonly LastResultSet[],
+): { parentId: string; weightKg: number | null } | null {
+  if (!fieldsFor(ex).includes('weight')) return null;
+  let parentAt = ex.sets.findIndex((s) => s.id === setId);
+  while (parentAt > 0 && ex.sets[parentAt].setType === 'drop') parentAt -= 1;
+  const parent = ex.sets[parentAt];
+  if (!parent || parent.setType !== 'normal') return null;
+  let aboveAt = parentAt;
+  while (ex.sets[aboveAt + 1]?.setType === 'drop') aboveAt += 1;
+  const above = ex.sets[aboveAt];
+  const baseKg = above.actualWeightKg ?? resolveSetValues(ex, above.id, lastSets).weightKg;
+  if (baseKg === null || baseKg <= 0) return { parentId: parent.id, weightKg: null };
+  const weightKg = dropSetWeightKg(baseKg, units);
+  return weightKg === null ? null : { parentId: parent.id, weightKg };
+}
+
+/**
+ * The set the exercise ··· menu's "Add drop set" follows: the last ticked working set, else the set the outline is
+ * on (cursorStep) when it is this exercise's working set or drop, else the exercise's last working set.
+ */
+export function exerciseDropSetId(block: LogBlockDoc, ex: LogExerciseDoc): string | null {
+  const ticked = ex.sets
+    .filter((s) => s.setType === 'normal' && s.completedAt !== null)
+    .reduce<LogSetDoc | null>((a, s) => (a === null || Date.parse(s.completedAt!) >= Date.parse(a.completedAt!) ? s : a), null);
+  if (ticked) return ticked.id;
+  // The outline, only on a working set or a drop (a warm-up under it would hide "Add drop set").
+  const cursor = cursorStep(block);
+  if (cursor && cursor.kind !== 'warmup' && block.exercises[cursor.exerciseIndex]?.id === ex.id) return cursor.setId;
+  return [...ex.sets].reverse().find((s) => s.setType === 'normal')?.id ?? null;
+}
+
+/**
+ * "Add drop set": a ↓ Drop row after the set (after its drops, if any), its weight started as dropPlan says. `dropId`
+ * is the new set's id, so the screen can put the cursor in its reps. Nothing changes when the set can't have a drop.
+ */
+export function addDropSet(
+  log: WorkoutLogDoc,
+  logExerciseId: string,
+  setId: string,
+  dropId: string,
+  units: Units,
+  lastSets: readonly LastResultSet[],
+  nowIso: string,
+): WorkoutLogDoc {
+  const ex = log.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId);
+  const plan = ex ? dropPlan(ex, setId, units, lastSets) : null;
+  if (!plan) return log;
+  const added = addLogDrop(log, logExerciseId, plan.parentId, () => dropId, nowIso);
+  if (added === log) return log;
+  return plan.weightKg === null ? added : updateActual(added, dropId, { actualWeightKg: plan.weightKg });
+}
+
+export type MenuKey = 'note' | 'history' | 'info' | 'add-set' | 'add-drop' | 'delete-set' | 'remove';
+
+/**
+ * An exercise's ··· menu, in order (approved SS5 board): Note for Demo, Last time, How to do it, Add set, Add drop
+ * set, Delete set, Remove exercise. Last time only with a last time; Add drop set only when its set can have one
+ * (dropPlan); Delete set only when a set may go.
+ */
+export function exerciseMenu(
+  ex: LogExerciseDoc,
+  o: { coachName: string | null; hasLastTime: boolean; deletable: boolean; canDrop: boolean },
+): Array<{ key: MenuKey; title: string; destructive?: boolean }> {
+  return [
+    { key: 'note' as const, title: `Note for ${o.coachName ?? 'your coach'}` },
+    ...(o.hasLastTime ? [{ key: 'history' as const, title: 'Last time' }] : []),
+    { key: 'info' as const, title: 'How to do it' },
+    { key: 'add-set' as const, title: 'Add set' },
+    ...(o.canDrop ? [{ key: 'add-drop' as const, title: 'Add drop set' }] : []),
+    ...(o.deletable ? [{ key: 'delete-set' as const, title: 'Delete set', destructive: true }] : []),
+    { key: 'remove' as const, title: 'Remove exercise', destructive: true },
+  ];
+}
+
+/** A set row's menu (its ··· or a long press): Add drop set above Delete set (approved SS3 board). */
+export function setMenu(row: Pick<RowModel, 'canDrop' | 'deletable'>): Array<{ key: 'add-drop' | 'delete-set'; title: string; destructive?: boolean }> {
+  return [
+    ...(row.canDrop ? [{ key: 'add-drop' as const, title: 'Add drop set' }] : []),
+    ...(row.deletable ? [{ key: 'delete-set' as const, title: 'Delete set', destructive: true }] : []),
+  ];
 }
 
 const isEmpty = (v: SetValues) => v.reps === null && v.weightKg === null && v.durationS === null && v.distanceM === null;
@@ -957,36 +1151,26 @@ export function readTyped(field: StepField, text: string, units: Units, ticked: 
 export type FinishModel = {
   done: number;
   total: number;
-  /** "25 of 27 sets done." */
+  /** "25 of 27 done". */
   headline: string;
-  /** "2 sets of Tricep Pushdown aren’t ticked; they’ll be saved as not done." or null when all are ticked. */
+  /** "2 unticked won’t count", or null when all are ticked. */
   unticked: string | null;
   /** Nothing ticked: the workout can't be finished, only discarded. */
   noneDone: boolean;
 };
 
+/** The finish sheet's count (approved LT4 board): "1 of 11 done · 10 unticked won’t count". */
 export function finishModel(log: WorkoutLogDoc): FinishModel {
   const done = completedSetCount(log);
   const open = openSetCount(log);
   const total = done + open;
-  const byExercise: Array<{ name: string; n: number }> = [];
-  for (const b of log.blocks) {
-    if (needsPick(b)) continue;
-    for (const { exercise } of liveExercises(b)) {
-      const n = exercise.sets.filter((s) => s.completedAt === null).length;
-      if (n > 0) byExercise.push({ name: exercise.exerciseName, n });
-    }
-  }
-  const unpicked = log.blocks.filter(needsPick).length;
-  let unticked: string | null = null;
-  if (open > 0) {
-    const where =
-      byExercise.length === 1 && unpicked === 0
-        ? `${plural(byExercise[0].n, 'set')} of ${byExercise[0].name} ${byExercise[0].n === 1 ? "isn’t" : "aren’t"} ticked`
-        : `${plural(open, 'set')} ${open === 1 ? "isn’t" : "aren’t"} ticked`;
-    unticked = `${where}; ${open === 1 ? 'it’ll' : 'they’ll'} be saved as not done.`;
-  }
-  return { done, total, headline: `${done} of ${plural(total, 'set')} done.`, unticked, noneDone: done === 0 };
+  return {
+    done,
+    total,
+    headline: `${done} of ${total} done`,
+    unticked: open > 0 ? `${open} unticked won’t count` : null,
+    noneDone: done === 0,
+  };
 }
 
 /**

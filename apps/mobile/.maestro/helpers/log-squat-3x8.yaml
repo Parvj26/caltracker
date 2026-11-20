@@ -31,4 +31,4 @@ appId: app.caltracker.client
     timeout: 10000
 - assertVisible:
     id: finish-count
-    text: '3 of 3 sets done.'
+    text: '3 of 3 done'

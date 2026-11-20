@@ -5,7 +5,7 @@ import { toTrackingType } from '../exercises/tracking';
 import { formatClock, fromKg } from '../units/units';
 import type { Units } from '../units/units';
 import { formatSetsSummary, targetFieldsFor } from '../workouts/targets';
-import { blockRoundCount, currentStep, liveExercises, needsPick } from './flow';
+import { blockRoundCount, cursorStep, liveExercises, needsPick } from './flow';
 import { formatResult, stepName } from './format';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
 import { logVolumeKg } from './summary';
@@ -66,7 +66,8 @@ export function whereTheyAre(log: WorkoutLogDoc): LivePosition | null {
   return {
     blockIndex: here.blockIndex,
     exerciseId: here.exercise?.id ?? null,
-    round: superset ? (currentStep(block)?.round ?? rounds) : null,
+    // The same round the client's own header shows (the set after their last tick).
+    round: superset ? (cursorStep(block)?.round ?? rounds) : null,
     rounds,
     lastTicked,
   };

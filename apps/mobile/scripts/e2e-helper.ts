@@ -184,7 +184,7 @@ type PlanBlock = {
   kind: 'straight' | 'superset' | 'choice';
   /** The section heading the block sits under (consecutive blocks with the same name share one section). */
   section?: string;
-  exercises: Array<{ name: string; sets: PlanSet[]; substitutes?: Array<{ name: string; sets: PlanSet[] }> }>;
+  exercises: Array<{ name: string; sets: PlanSet[]; eachSide?: boolean; substitutes?: Array<{ name: string; sets: PlanSet[] }> }>;
 };
 
 /**
@@ -230,6 +230,7 @@ async function assignWorkout(email: string, name: string, blocks: PlanBlock[]): 
             exerciseName: ex.name,
             trackingType: ex.tracking_type,
             note: null,
+            ...(e.eachSide ? { eachSide: true } : {}),
             sets: e.sets.map((s) => ({ ...s, id: randomUUID() })),
             substitutes: (e.substitutes ?? []).map((sub) => {
               const subEx = byName.get(sub.name)!;
@@ -469,6 +470,99 @@ export async function assignTodayMockup(email: string): Promise<void> {
         { name: 'Medicine Ball Scoop Throw', sets: [w(10, 10, 30), w(10, 10, 30)] },
       ],
     },
+  ]);
+}
+
+/**
+ * A finished log yesterday for the demo client, so "Last: 55 lb × 10" shows: each exercise's sets as (reps, kg),
+ * in one straight block per exercise.
+ */
+async function finishedLogYesterday(email: string, exercises: Array<{ name: string; sets: Array<[number, number]> }>): Promise<void> {
+  const clientId = (await findUserId(email))!;
+  const { data: m, error: mErr } = await admin.from('workspace_members').select('workspace_id').eq('user_id', clientId).eq('role', 'client').single();
+  if (mErr) throw mErr;
+  const finished = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const logId = randomUUID();
+  const { error: logErr } = await admin.from('workout_logs').insert({
+    id: logId,
+    workspace_id: m.workspace_id,
+    client_id: clientId,
+    name: 'E2E Yesterday',
+    status: 'completed',
+    started_at: finished,
+    finished_at: finished,
+    last_activity_at: finished,
+  });
+  if (logErr) throw logErr;
+  type BlockInsert = Database['public']['Tables']['log_blocks']['Insert'];
+  type ExerciseInsert = Database['public']['Tables']['log_exercises']['Insert'];
+  type SetInsert = Database['public']['Tables']['log_sets']['Insert'];
+  for (const [position, e] of exercises.entries()) {
+    const { data: ex, error: exErr } = await admin.from('exercises').select('id').eq('source', 'builtin').eq('name', e.name).single();
+    if (exErr) throw exErr;
+    const blockId = randomUUID();
+    const { error: bErr } = await admin.from('log_blocks').insert({ id: blockId, log_id: logId, position, kind: 'straight' } as BlockInsert);
+    if (bErr) throw bErr;
+    const leId = randomUUID();
+    const { error: eErr } = await admin.from('log_exercises').insert({ id: leId, block_id: blockId, log_id: logId, position: 0, exercise_id: ex.id } as ExerciseInsert);
+    if (eErr) throw eErr;
+    const sets = e.sets.map(
+      ([reps, kg], i) =>
+        ({ log_exercise_id: leId, log_id: logId, position: i, set_type: 'normal', actual_reps: reps, actual_weight_kg: kg, completed_at: finished }) as SetInsert,
+    );
+    const { error: sErr } = await admin.from('log_sets').insert(sets);
+    if (sErr) throw sErr;
+  }
+}
+
+/**
+ * "E2E Upper Body" today, the approved superset and less-text boards (SS1–SS5, LT1, LT2): Superset A [Hanging Leg Raise +
+ * Toe Touchers, 3 × 12 reps, back to back]; Superset B [Dumbbell Bench Press each side 45/55/60/60 lb + Side Lateral
+ * Raise 15/15/20 lb, rest 1:30]; Superset C [Seated Dumbbell Press + Hammer Curls]; Dumbbell Bench Press done instead
+ * of the planned Barbell Bench Press (each side, a warm-up); pick one: Dumbbell Bicep Curl or Hammer Curls. Last time:
+ * 55 lb × 10 bench, 15 lb × 12 raises.
+ */
+export async function assignTodaySupersets(email: string): Promise<void> {
+  await cleanupLogs(email);
+  const w = (reps: number, pounds: number, rest: number) => plan('normal', reps, lb(pounds), rest);
+  const reps = (n: number) => Array.from({ length: n }, () => plan('normal', 12, null, 0));
+  await assignWorkout(email, 'E2E Upper Body', [
+    { kind: 'superset', exercises: [{ name: 'Hanging Leg Raise', sets: reps(3) }, { name: 'Toe Touchers', sets: reps(3) }] },
+    {
+      kind: 'superset',
+      exercises: [
+        { name: 'Dumbbell Bench Press', eachSide: true, sets: [w(12, 45, 0), w(10, 55, 0), w(12, 60, 0), w(12, 60, 0)] },
+        { name: 'Side Lateral Raise', sets: [w(12, 15, 90), w(12, 15, 90), w(12, 20, 90)] },
+      ],
+    },
+    {
+      kind: 'superset',
+      exercises: [
+        { name: 'Seated Dumbbell Press', sets: [w(10, 30, 0), w(10, 30, 0)] },
+        { name: 'Hammer Curls', sets: [w(12, 25, 60), w(12, 25, 60)] },
+      ],
+    },
+    {
+      kind: 'straight',
+      exercises: [
+        {
+          name: 'Barbell Bench Press - Medium Grip',
+          sets: [plan('warmup', 10, lb(45), 90), w(10, 95, 90), w(10, 95, 90), w(10, 95, 90)],
+          substitutes: [{ name: 'Dumbbell Bench Press', sets: [plan('warmup', 10, lb(20), 90), w(10, 45, 90), w(10, 45, 90), w(10, 45, 90)] }],
+        },
+      ],
+    },
+    {
+      kind: 'choice',
+      exercises: [
+        { name: 'Dumbbell Bicep Curl', sets: [w(12, 25, 60), w(12, 25, 60), w(12, 25, 60)] },
+        { name: 'Hammer Curls', sets: [w(12, 25, 60), w(12, 25, 60), w(12, 25, 60)] },
+      ],
+    },
+  ]);
+  await finishedLogYesterday(email, [
+    { name: 'Dumbbell Bench Press', sets: [[10, lb(55)], [10, lb(55)]] },
+    { name: 'Side Lateral Raise', sets: [[12, lb(15)], [12, lb(15)]] },
   ]);
 }
 
@@ -873,6 +967,7 @@ async function run(action: string, email: string, name: string): Promise<string 
   else if (action === 'assign-today-mixed') await assignTodayMixed(email);
   else if (action === 'assign-today-sections') await assignTodaySections(email);
   else if (action === 'assign-today-mockup') await assignTodayMockup(email);
+  else if (action === 'assign-today-supersets') await assignTodaySupersets(email);
   else if (action === 'assign-today-progression') await assignTodayProgression(email);
   else if (action === 'cleanup-logs') await cleanupLogs(email);
   // For these two the "email" is the business name and the "name" is the bio.

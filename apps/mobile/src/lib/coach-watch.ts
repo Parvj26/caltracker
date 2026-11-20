@@ -135,7 +135,7 @@ export function rowChangeAction(
   return { pull, check: byOther || row.status !== 'in_progress' || localHeld };
 }
 
-/** The bar's second line: live, or catching up after the connection dropped or a pull failed. */
+/** The bar's one line (approved LT2 board): live, or catching up after the connection dropped or a pull failed. */
 export function watchLine(live: boolean): string {
-  return live ? 'Read only · updates live' : 'Read only · Reconnecting…';
+  return `Read only while your coach logs · ${live ? 'Live' : 'Reconnecting…'}`;
 }

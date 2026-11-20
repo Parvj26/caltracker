@@ -62,26 +62,24 @@ function CoachWatchBar({ coach, top }: { coach: CoachLogging; top: number }) {
       style={[styles.bar, { paddingTop: top + space[2], paddingBottom: space[2], paddingHorizontal: space[4] }]}
     >
       <View testID="coach-logging-banner" style={[styles.column, { gap: space[2] }]}>
-        <Text
-          style={[text('sectionHeading'), styles.ink]}
-          accessibilityRole="header"
-          accessibilityLabel={coach.canReclaim ? undefined : READ_ONLY_NOTE}
-          accessibilityLiveRegion="polite"
-          maxFontSizeMultiplier={1.6}
-        >
-          {coach.canReclaim ? 'Your coach stopped logging' : 'Your coach is logging this session'}
-        </Text>
         {coach.canReclaim ? (
           <>
+            <Text style={[text('sectionHeading'), styles.ink]} accessibilityRole="header" accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.6}>
+              Your coach stopped logging
+            </Text>
             <Text style={[text('body'), styles.ink]}>{`Your coach stopped logging ${idle} min ago. You can carry on here.`}</Text>
             <Button title="Continue on my phone" testID="coach-logging-reclaim" busy={coach.reclaiming} onPress={() => void coach.reclaim()} />
           </>
         ) : (
+          // One line (approved LT2 board); screen readers still hear the full sentence, and "Reconnecting…" when it
+          // changes (Android's live region; iOS reads it on focus).
           <Text
             testID="coach-watch-read-only"
-            style={[text('caption'), styles.ink]}
-            // Said only when it changes to "Reconnecting…" and back (the header already says it is read only).
+            style={[text('sectionHeading'), styles.ink]}
+            accessibilityRole="header"
+            accessibilityLabel={`${READ_ONLY_NOTE}${coach.live ? '' : ' Reconnecting…'}`}
             accessibilityLiveRegion="polite"
+            maxFontSizeMultiplier={1.6}
           >
             {watchLine(coach.live)}
           </Text>

@@ -94,7 +94,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: option-line-0
-      text: 'Only the chosen one’s sets show.*'
+      text: 'Locks after your first set'
     timeout: 10000
 - assertVisible:
     id: pages-sections
@@ -163,9 +163,10 @@ env:
 # Now the squat can't be chosen.
 - extendedWaitUntil:
     visible:
-      id: option-line-0
-      text: 'You’re doing Dumbbell Bicep Curl.*'
+      id: option-locked-0
     timeout: 5000
+- assertNotVisible:
+    id: option-line-0
 - assertVisible:
     id: option-0-0
     enabled: false
@@ -181,7 +182,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: finish-count
-      text: '7 of 7 sets done.'
+      text: '7 of 7 done'
     timeout: 10000
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:

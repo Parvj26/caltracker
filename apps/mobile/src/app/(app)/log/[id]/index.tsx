@@ -22,7 +22,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
 import {
-  addLogDrop,
   addLogExercise,
   addLogSet,
   chooseSubstitute,
@@ -68,6 +67,12 @@ import { fetchWorkoutDetail } from '@/lib/workouts-api';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { coachFirstName } from '@/lib/workouts-plan';
 import {
+  addDropSet,
+  addRound,
+  dropPlan,
+  exerciseDropSetId,
+  exerciseMenu,
+  setMenu as setMenuOf,
   buildPage,
   buildSections,
   deleteChoices,
@@ -275,7 +280,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const [infoFor, setInfoFor] = useState<{ name: string; exerciseId: string } | null>(null);
   const [info, setInfo] = useState<Info | null>(null);
   const [menuFor, setMenuFor] = useState<LogExerciseDoc | null>(null);
-  /** Deleting a set: the long-press sheet on a row, or "Delete a set" from the ⋯ menu. */
+  /** A set's menu (its ··· or a long press: Add drop set, Delete set), or "Delete set" → which set, from the ⋯ menu. */
   const [setMenu, setSetMenu] = useState<{ title: string; items: MenuItem[] } | null>(null);
   const [subFor, setSubFor] = useState<LogExerciseDoc | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
@@ -397,6 +402,24 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     [],
   );
 
+  /**
+   * Add drop set: a ↓ Drop row after the set, its weight at 75% of the set above (rounded down to the plate step),
+   * and the cursor in its reps.
+   */
+  const addDropNow = useCallback(
+    (exId: string, setId: string) => {
+      const dropId = randomUUID();
+      fieldNav.focusWhenReady(`${dropId}:reps`);
+      void op((l) => {
+        const picked = withPick(exId)(l);
+        const doc = picked.blocks.flatMap((b) => b.exercises).find((e) => e.id === exId);
+        if (!doc) return l;
+        return addDropSet(picked, exId, setId, dropId, progressionRef.current.units, prefillSets(doc, lastRef.current, progressionRef.current), nowIso());
+      });
+    },
+    [fieldNav, op, withPick],
+  );
+
   const tableFor = useMemo(() => {
     const cache = new Map<string, TableHandlers>();
     return (ex: ExerciseModel): TableHandlers => {
@@ -424,14 +447,23 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
+        onAddDrop: (row) => addDropNow(exId, row.setId),
         onRowMenu: (row) => {
           Keyboard.dismiss();
           tapHaptic();
           const name = docOf(exId)?.exerciseName;
-          setSetMenu({
-            title: name ? `${row.name} · ${name}` : row.name,
-            items: [{ title: 'Delete set', testID: 'menu-delete-set', destructive: true, onPress: () => confirmDeleteSet(row.name, () => void op((l) => removeLogSet(l, exId, row.setId, nowIso()))) }],
-          });
+          // Add drop set above Delete set (approved SS3 board).
+          const items: MenuItem[] = setMenuOf(row).map((m) =>
+            m.key === 'add-drop'
+              ? { title: m.title, testID: 'menu-row-add-drop', onPress: () => addDropNow(exId, row.setId) }
+              : {
+                  title: m.title,
+                  testID: 'menu-delete-set',
+                  destructive: true,
+                  onPress: () => confirmDeleteSet(row.name, () => void op((l) => removeLogSet(l, exId, row.setId, nowIso()))),
+                },
+          );
+          if (items.length > 0) setSetMenu({ title: name ? `${row.name} · ${name}` : row.name, items });
         },
         onTag: (row) => {
           if (row.tagKind !== 'normal') setInfo(TAG_INFO[row.tagKind]);
@@ -440,12 +472,13 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       cache.set(exId, made);
       return made;
     };
-  }, [withPick, op, tick, markDone, docOf]);
+  }, [withPick, op, tick, markDone, docOf, addDropNow]);
 
   const handlers: PageHandlers = useMemo(
     () => ({
       table: tableFor,
       onAddSet: (ex) => void op((l) => addLogSet(withPick(ex.logExerciseId)(l), ex.logExerciseId, randomUUID, nowIso())),
+      onAddRound: (m) => void op((l) => addRound(l, m.blockId, randomUUID, nowIso())),
       onInfo: (ex) => setInfoFor({ name: ex.name, exerciseId: ex.exerciseId }),
       onMessage: (ex) => {
         const doc = docOf(ex.logExerciseId);
@@ -516,38 +549,44 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const menuItems: MenuItem[] = (() => {
     const ex = menuFor;
     if (!ex) return [];
-    const lastMain = [...ex.sets].reverse().find((s) => s.setType !== 'drop');
-    const items: MenuItem[] = [
-      ...(last[ex.exerciseId] ? [{ title: 'Last time', testID: 'menu-history', onPress: () => showHistory(ex) }] : []),
-      { title: 'How to do it', testID: 'menu-info', onPress: () => setInfoFor({ name: ex.exerciseName, exerciseId: ex.exerciseId }) },
-    ];
-    if (lastMain) {
-      items.push({
-        title: 'Add a drop set',
-        testID: 'menu-add-drop',
-        onPress: () => void op((l) => addLogDrop(withPick(ex.id)(l), ex.id, lastMain.id, randomUUID, nowIso())),
-      });
-    }
+    // Add drop set follows the last ticked working set, else the outlined one, else the last (exerciseDropSetId).
+    const block = blockOf(ex.id);
+    const dropAfter = block ? exerciseDropSetId(block, ex) : null;
+    const canDrop = dropAfter !== null && dropPlan(ex, dropAfter, units, prefillSets(ex, last, { history, units })) !== null;
     const deletable = deleteChoices(ex, units, last[ex.exerciseId]?.sets ?? []);
-    if (deletable.length > 0) {
-      items.push({
-        title: 'Delete a set',
-        testID: 'menu-delete-a-set',
-        destructive: true,
-        onPress: () =>
-          setSetMenu({
-            title: `Delete which set? · ${ex.exerciseName}`,
-            items: deletable.map((c, i) => ({
-              title: c.title,
-              testID: `menu-delete-set-${i}`,
-              destructive: true,
-              onPress: () => confirmDeleteSet(c.title, () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso()))),
-            })),
-          }),
-      });
-    }
-    items.push({ title: 'Remove exercise', testID: 'menu-remove-exercise', destructive: true, onPress: () => confirmRemoveExercise(ex) });
-    return items;
+    // Note for Demo, Last time, How to do it, Add set, Add drop set, Delete set, Remove exercise (approved SS5 board).
+    return exerciseMenu(ex, { coachName, hasLastTime: !!last[ex.exerciseId], deletable: deletable.length > 0, canDrop }).map((m): MenuItem => {
+      switch (m.key) {
+        case 'note':
+          return { title: m.title, testID: 'menu-note', onPress: () => setNoteFor(ex) };
+        case 'history':
+          return { title: m.title, testID: 'menu-history', onPress: () => showHistory(ex) };
+        case 'info':
+          return { title: m.title, testID: 'menu-info', onPress: () => setInfoFor({ name: ex.exerciseName, exerciseId: ex.exerciseId }) };
+        case 'add-set':
+          return { title: m.title, testID: 'menu-add-set', onPress: () => void op((l) => addLogSet(withPick(ex.id)(l), ex.id, randomUUID, nowIso())) };
+        case 'add-drop':
+          return { title: m.title, testID: 'menu-add-drop', onPress: () => dropAfter && addDropNow(ex.id, dropAfter) };
+        case 'delete-set':
+          return {
+            title: m.title,
+            testID: 'menu-delete-a-set',
+            destructive: true,
+            onPress: () =>
+              setSetMenu({
+                title: `Delete which set? · ${ex.exerciseName}`,
+                items: deletable.map((c, i) => ({
+                  title: c.title,
+                  testID: `menu-delete-set-${i}`,
+                  destructive: true,
+                  onPress: () => confirmDeleteSet(c.title, () => void op((l) => removeLogSet(l, ex.id, c.setId, nowIso()))),
+                })),
+              }),
+          };
+        case 'remove':
+          return { title: m.title, testID: 'menu-remove-exercise', destructive: true, onPress: () => confirmRemoveExercise(ex) };
+      }
+    });
   })();
 
   const confirmRemoveExercise = (ex: LogExerciseDoc) => {
@@ -694,6 +733,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
         initialFeel={saved.feel}
         initialNote={saved.note}
         busy={finishing}
+        coachName={coachName}
         onKeepGoing={(feel, note) => {
           // Keep the draft: the feeling and the note are saved with the workout, so closing loses nothing.
           setFinishOpen(false);
@@ -854,7 +894,7 @@ function SectionPages({
   /** The coach logs this workout: the pages only show it (no Mark all or Next); moving around still works. */
   readOnly: boolean;
   recentSetId: string | null;
-  /** "Lower Body · Main" over "Exercise 1 of 5 · All exercises ▾". */
+  /** "Lower Body · Main" over "Exercise 1 of 5 ▾". */
   header: { title: string; subtitle: string };
   coachName: string | null;
   /** The page showing the coach's note (-1: none in this section). */

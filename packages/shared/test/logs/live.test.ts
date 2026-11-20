@@ -72,6 +72,15 @@ describe('whereTheyAre', () => {
     expect(here.rounds).toBe(3);
   });
 
+  it('follows the round after their last tick, like the client’s header', () => {
+    let log = tickAll(fresh(), 0, 1);
+    log = tick(log, 1, 0, 2); // A1
+    log = tick(log, 2, 0, 3); // B1
+    log = tick(log, 1, 1, 4); // A2 (B2 skipped)
+    log = tick(log, 1, 2, 5); // A3
+    expect(whereTheyAre(log)!.round).toBe(3);
+  });
+
   it('has no round for a straight exercise', () => {
     expect(whereTheyAre(fresh())).toMatchObject({ round: null, rounds: null });
   });

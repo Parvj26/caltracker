@@ -175,7 +175,7 @@ describe('rowChangeAction', () => {
 
 describe('watchLine', () => {
   it('says live or reconnecting', () => {
-    expect(watchLine(true)).toBe('Read only · updates live');
-    expect(watchLine(false)).toBe('Read only · Reconnecting…');
+    expect(watchLine(true)).toBe('Read only while your coach logs · Live');
+    expect(watchLine(false)).toBe('Read only while your coach logs · Reconnecting…');
   });
 });

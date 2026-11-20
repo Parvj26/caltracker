@@ -459,7 +459,7 @@ export {
 export type { AwardContext } from './awards/history';
 export { elapsedClock, exerciseProgressLabel, liveSetLine, liveStats, orderTrainingTabs, tickNote, upNext, whereTheyAre } from './logs/live';
 export type { LivePosition, LiveStats, UpNextItem } from './logs/live';
-export { afterDone, blockRoundCount, blockSteps, currentStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
+export { afterDone, blockRoundCount, blockSteps, currentStep, cursorStep, doneLabel, isBlockDone, isChoiceLocked, liveExercises, needsPick, nextOpenBlock, roundRestSeconds } from './logs/flow';
 export type { AfterDone, Step, StepKind } from './logs/flow';
 export {
   COMMON_EXERCISES,
@@ -597,6 +597,7 @@ export {
 } from './community/photos';
 export type { CommunityPhotoExt } from './community/photos';
 export {
+  dropSetWeightKg,
   exerciseRegion,
   nextSuggestion,
   prefillLastTime,

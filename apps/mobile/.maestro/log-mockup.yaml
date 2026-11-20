@@ -164,8 +164,7 @@ env:
     id: tick-0-0-0
 - extendedWaitUntil:
     visible:
-      id: option-line-0
-      text: 'You’re doing Overhead Slam.*'
+      id: option-locked-0
     timeout: 5000
 - takeScreenshot: mock-10-option-picked
 - tapOn:
@@ -178,7 +177,7 @@ env:
     timeout: 10000
 - assertVisible:
     id: finish-count
-    text: '17 of 18 sets done. 1 set of Overhead Slam isn’t ticked; it’ll be saved as not done.'
+    text: '17 of 18 done · 1 unticked won’t count'
 - tapOn:
     id: feel-Good
 - tapOn:

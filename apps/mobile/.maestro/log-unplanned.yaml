@@ -77,7 +77,7 @@ env:
     timeout: 10000
 - assertVisible:
     id: finish-count
-    text: '1 of 3 sets done. 2 sets of .* aren’t ticked; they’ll be saved as not done.'
+    text: '1 of 3 done · 2 unticked won’t count'
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
     visible: '1 of [0-9]+ sets? · .*'

@@ -12,18 +12,24 @@ import { PlaceholderIcon } from './exercise-thumb';
 export const DEMO_SMALL = 64;
 
 /**
- * The exercise's photo with a play button over it. Tap opens the exercise sheet: photos, steps and Watch demo.
+ * The exercise's photo with a play button over it. Tap opens the exercise sheet: photos, steps and Watch demo. On a
+ * superset row (approved SS boards) it is smaller, with its A1 tag in the top-left corner and no play button.
  */
 export function ExerciseDemo({
   name,
   detail,
   testID,
   onPress,
+  tag,
+  size = DEMO_SMALL,
 }: {
   name: string;
   detail: ExerciseDetail | undefined;
   testID: string;
   onPress: () => void;
+  /** "B1": a corner tag instead of the play button. */
+  tag?: string | null;
+  size?: number;
 }) {
   const { radius } = useTheme();
   const first = detail?.imagePaths[0];
@@ -33,10 +39,10 @@ export function ExerciseDemo({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Play the ${name} demo`}
+      accessibilityLabel={tag ? `${tag} ${name}. How to do it` : `Play the ${name} demo`}
       style={({ pressed }) => [
         styles.demo,
-        styles.small,
+        { width: size, height: size },
         { borderRadius: radius.input + 2 },
         pressed && { opacity: pressedOpacity },
       ]}
@@ -46,15 +52,23 @@ export function ExerciseDemo({
       ) : (
         <PlaceholderIcon />
       )}
-      <View style={[styles.play, styles.playSmall]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={[styles.playMark, { fontSize: 14 }]}>▶</Text>
-      </View>
+      {tag ? (
+        <View style={[styles.cornerTag, { borderBottomRightRadius: radius.input - 4 }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text style={styles.cornerText} maxFontSizeMultiplier={1}>
+            {tag}
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.play, styles.playSmall]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text style={[styles.playMark, { fontSize: 14 }]}>▶</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
 
 /** One labelled chip of the tools row (44 pt tall). */
-function Tool({
+export function Tool({
   title,
   label,
   testID,
@@ -83,9 +97,8 @@ function Tool({
 }
 
 /**
- * Labelled chips (approved Logger board): "Note for Luis" (when given), "Swap exercise" (the coach's substitute when
- * there is one, else any exercise) and ··· (more: last time, add a drop set, delete a set, remove). The History chip is
- * gone: the Last time column shows it, and ··· still opens last time's sheet.
+ * Short chips (approved LT1 board): "Note" (when given), "Swap" (dotted when the coach added a substitute; else any
+ * exercise) and ··· (more: last time, add set, add drop set, delete set, remove). Screen readers hear the full words.
  */
 export function ExerciseTools({
   idKey,
@@ -112,11 +125,11 @@ export function ExerciseTools({
   return (
     <View style={[styles.tools, { gap: space[2] }]}>
       {onMessage ? (
-        <Tool title={`Note for ${coachName ?? 'coach'}`} label={`Note for your coach about ${name}`} testID={`message-${idKey}`} onPress={onMessage} />
+        <Tool title="Note" label={`Note for ${coachName ?? 'your coach'} about ${name}`} testID={`message-${idKey}`} onPress={onMessage} />
       ) : null}
       {onSwap ? (
         <Tool
-          title={hasSubstitute ? 'Swap (substitute)' : 'Swap exercise'}
+          title="Swap"
           label={hasSubstitute ? `Substitute available for ${name}` : `Swap ${name}`}
           testID={`swap-${idKey}`}
           dotted={hasSubstitute}
@@ -137,7 +150,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  small: { width: DEMO_SMALL, height: DEMO_SMALL },
+  cornerTag: { position: 'absolute', top: 0, left: 0, backgroundColor: palette.ink, paddingHorizontal: 4, paddingVertical: 1 },
+  cornerText: { color: white, fontFamily: fontFamilyFor('sans', 800), fontSize: 11 },
   image: StyleSheet.absoluteFill,
   play: { position: 'absolute', backgroundColor: white, alignItems: 'center', justifyContent: 'center' },
   playSmall: { width: 34, height: 34, borderRadius: 17 },
