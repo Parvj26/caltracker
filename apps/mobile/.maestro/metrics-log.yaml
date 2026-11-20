@@ -1,0 +1,110 @@
+# Metrics: the client logs a waist (in, their units), it shows as "logged by you"; changes it; a value out of range is
+# refused in plain words; the date stops at today; deletes it again. The coach's InBody scan values have no Edit.
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: seed-scans, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-progress
+- extendedWaitUntil:
+    visible:
+      id: progress-metrics
+    timeout: 20000
+- tapOn:
+    id: progress-metrics
+- extendedWaitUntil:
+    visible:
+      id: metric-row-waist_cm
+    timeout: 20000
+- assertVisible:
+    id: metric-meta-waist_cm
+    text: 'Not logged yet'
+# Log a waist: pick Waist, type 32.5 (inches), Save.
+- tapOn:
+    id: metric-log-open
+- tapOn:
+    id: metric-chip-waist_cm
+- assertVisible:
+    id: metric-save
+    text: 'Save waist'
+# The date steps back and forward but never past today.
+- tapOn:
+    id: metric-date-prev
+- tapOn:
+    id: metric-date-next
+- assertVisible: 'Date .*, today'
+# Out of range is refused in plain words.
+- tapOn:
+    id: metric-input
+- inputText: '5'
+- tapOn:
+    id: metric-save
+- assertVisible:
+    id: metric-error
+    text: 'Enter a waist between .* in\.'
+- eraseText: 3
+- inputText: '32.5'
+- tapOn:
+    id: metric-save
+- extendedWaitUntil:
+    visible:
+      id: metric-value-waist_cm
+      text: '32.5'
+    timeout: 20000
+- assertVisible:
+    id: metric-meta-waist_cm
+    text: 'Today · logged by you'
+- takeScreenshot: metrics-logged
+# Change it: open the row, Edit, type 32.0, Save change.
+- tapOn:
+    id: metric-row-waist_cm
+- tapOn:
+    id: 'metric-edit-.*'
+- assertVisible:
+    id: metric-sheet-title
+    text: 'Change waist from .*'
+- tapOn:
+    id: metric-input
+- eraseText: 6
+- inputText: '32'
+- tapOn:
+    id: metric-save
+- extendedWaitUntil:
+    visible:
+      id: metric-value-waist_cm
+      text: '32.0'
+    timeout: 20000
+# The coach's scan has no Edit.
+- tapOn:
+    id: metric-row-weight_kg
+- assertNotVisible:
+    id: 'metric-edit-.*'
+    childOf:
+      id: metric-history-weight_kg
+- tapOn:
+    id: metric-row-weight_kg
+# Delete the waist again.
+- tapOn:
+    id: 'metric-edit-.*'
+- tapOn:
+    id: metric-delete
+- tapOn: 'Delete entry'
+- extendedWaitUntil:
+    visible:
+      id: metric-meta-waist_cm
+      text: 'Not logged yet'
+    timeout: 20000
+# Tidy up.
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }

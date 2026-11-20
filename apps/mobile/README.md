@@ -121,3 +121,19 @@ New Maestro flows in `.maestro/`:
 - `log-unplanned.yaml`: log a workout that was not on the calendar.
 
 They need the built-in exercises (`pnpm import:exercises`) and run with the rest through `bash scripts/run-e2e.sh`.
+
+## Metrics and Apple Health
+
+Progress › **Metrics** shows six body metrics (weight, body fat, muscle mass, VO2 max, waist, resting heart rate) from
+the `metric_entries` view, in the client's units, with "+ Log" to add one and Edit on the client's own entries (their
+older weigh-ins too). The old `/progress-detail/body` address redirects there.
+
+**Apple Health** (`@kingstinct/react-native-healthkit`, read only, config plugin in `app.json`): Connect on Metrics
+or Settings › Apple Health shows the explainer and, only on Continue, the iOS prompt for the switched-on metrics. While
+connected the app syncs on open and on coming back to the front (`useAppleHealthAutoSync`), using HealthKit anchors
+(first sync goes a year back) and `sync_apple_health_metrics` in batches of 500. Readings are saved on the phone before
+they are sent, so no signal only delays them. The on/off state lives on the phone under the Progress prefix, so Sign
+out forgets it. Devices without HealthKit (Android, older iPads) hide the rows. Pure logic: `src/lib/apple-health-logic.ts`.
+
+Simulator: open the Health app, Browse › Body Measurements › Weight › Add Data, then reopen CalTracker. Maestro:
+`metrics-log.yaml` (log, change, delete) and `apple-health.yaml`.

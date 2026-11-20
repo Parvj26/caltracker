@@ -1,0 +1,91 @@
+# Apple Health import end to end on the iOS Simulator: add a weight in the Health app, connect Apple Health from
+# Metrics (explainer, Continue, the iOS prompt), see the weight arrive "from Apple Health", then turn the import off and
+# remove the imported readings. Needs a simulator whose Health app has been opened once (Maestro handles its welcome).
+# Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }
+# Add 71.2 kg in the Health app (the simulator's Health uses kg by default for a fresh device).
+- launchApp:
+    appId: com.apple.Health
+- runFlow:
+    when:
+      visible: 'Continue'
+    commands:
+      - tapOn: 'Continue'
+- runFlow:
+    when:
+      visible: 'Not Now'
+    commands:
+      - tapOn: 'Not Now'
+- tapOn: 'Browse'
+- tapOn: 'Body Measurements'
+- tapOn: 'Weight'
+- tapOn: 'Add Data'
+- inputText: '71.2'
+- tapOn: 'Add'
+- stopApp: com.apple.Health
+# CalTracker: Progress › Metrics › Connect Apple Health.
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: tab-progress
+- tapOn:
+    id: progress-metrics
+- extendedWaitUntil:
+    visible:
+      id: apple-health-row
+    timeout: 20000
+- tapOn:
+    id: apple-health-row
+- assertVisible: 'Bring in your numbers from Apple Health'
+- assertVisible:
+    id: health-switch-smm_kg
+- takeScreenshot: apple-health-explainer
+- tapOn:
+    id: health-continue
+# The iOS prompt (read only: "Turn On All" then "Allow").
+- extendedWaitUntil:
+    visible: 'Turn On All'
+    timeout: 20000
+- tapOn: 'Turn On All'
+- tapOn: 'Allow'
+- extendedWaitUntil:
+    visible:
+      id: metric-meta-weight_kg
+      text: '.* · from Apple Health'
+    timeout: 30000
+- assertVisible:
+    id: metric-value-weight_kg
+    text: '157.0|71.2'
+- takeScreenshot: apple-health-imported
+# Settings › Apple Health: turn it off and remove what came in.
+- tapOn:
+    id: apple-health-row
+- assertVisible:
+    id: apple-health-status
+- tapOn:
+    id: apple-health-off
+- tapOn: 'Turn off and remove imported readings'
+- extendedWaitUntil:
+    visible:
+      id: health-continue
+    timeout: 20000
+- tapOn:
+    id: apple-health-back
+- extendedWaitUntil:
+    visible:
+      id: metric-meta-weight_kg
+      text: 'Not logged yet'
+    timeout: 20000
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-scans, EMAIL: '${EMAIL}' }
