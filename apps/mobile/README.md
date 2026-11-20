@@ -113,7 +113,10 @@ It checks the Today and Workouts tabs and the calendar. Run just this flow with
 
 ## Workout logging flows
 
-Clients start today's workout, tick sets (a rest timer runs between sets), and finish to see a summary. Closing the app mid-workout offers Resume on reopen. A workout left open is finished automatically by a `pg_cron` job in the database.
+Clients start today's workout (Start goes straight to the first set), tick sets (the coach's rest shows as text; there
+is no rest timer), and finish to see a summary. Closing the app mid-workout leaves it open: Today's card says how far
+along it is, with Continue. A workout left open is finished automatically by a `pg_cron` job in the database.
+`log-keyboard-bar.yaml` needs the simulator's on-screen keypad (I/O → Keyboard → Connect Hardware Keyboard off).
 
 New Maestro flows in `.maestro/`:
 - `log-workout.yaml`: start, tick sets, finish and see the summary.

@@ -1,0 +1,60 @@
+# The ‹ › Done bar above the number pad (approved Logger board). Needs the on-screen keypad: in the simulator turn off
+# I/O → Keyboard → Connect Hardware Keyboard. Tapping a box selects its number (typing replaces it), › moves to the
+# next box on the page, Done closes the keypad. On "E2E Log" (Barbell Squat 3 × 8 @ 60 kg, in pounds).
+# Run via `pnpm --filter mobile e2e .maestro/log-keyboard-bar.yaml`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: assign-today, EMAIL: '${EMAIL}' }
+- launchApp:
+    clearState: true
+    permissions: { notifications: allow }
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
+- tapOn:
+    id: actual-weight-0-0-0
+- extendedWaitUntil:
+    visible:
+      id: keyboard-bar
+    timeout: 5000
+- takeScreenshot: keyboard-bar
+# The pre-filled 132 is selected: typing replaces it.
+- inputText: '135'
+- assertVisible:
+    id: actual-weight-0-0-0
+    text: '135'
+# › goes to the reps box of the same set; the bar stays.
+- tapOn:
+    id: keyboard-next
+- assertVisible:
+    id: keyboard-bar
+- inputText: '6'
+- assertVisible:
+    id: actual-reps-0-0-0
+    text: '6'
+# ‹ goes back.
+- tapOn:
+    id: keyboard-prev
+- assertVisible:
+    id: keyboard-bar
+- tapOn:
+    id: keyboard-done
+- assertNotVisible:
+    id: keyboard-bar
+- tapOn:
+    id: close-section
+- tapOn: 'Discard workout'
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
+- runScript:
+    file: helpers/call.js
+    env: { ACTION: cleanup-workouts, EMAIL: '-' }

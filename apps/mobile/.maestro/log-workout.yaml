@@ -1,8 +1,7 @@
-# The client logs today's planned workout ("E2E Log", Barbell Squat 3 × 8 @ 60 kg, 1:30 rests): Start opens the
-# workout overview, Start workout the section's start page, Start section the exercise. The page shows the demo,
-# the coach's rest as text only (no rest timer), and a set table; ✓ on each set, Done, then the Finish workout?
-# sheet (How did it feel?, a note), the sticker reveal and the summary. Today then shows Done ✓, and View opens
-# the same summary again.
+# The client logs today's planned workout ("E2E Log", Barbell Squat 3 × 8 @ 60 kg, 1:30 rests): Start goes straight
+# to the first set. The page shows the demo thumbnail, the coach's rest as text only (no rest timer), and a set table;
+# ✓ on each set, Finish workout, then the Finish workout? sheet (How did it feel?, a note), the sticker reveal and the
+# summary. Today then shows the done row, which opens the same summary again.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -22,32 +21,12 @@ env:
 - extendedWaitUntil:
     visible: 'E2E Log'
     timeout: 20000
+# Today's card: exercises, sets (every tickable row) and time.
+- assertVisible:
+    id: 'today-meta-.*'
+    text: '1 exercise · 3 sets · .*'
 - tapOn: 'Start workout'
-# ---- Overview, then the (unnamed) section's start page ----
-- extendedWaitUntil:
-    visible:
-      id: workout-overview
-    timeout: 20000
-- assertVisible:
-    id: overview-name
-    text: 'E2E Log'
-- assertVisible:
-    id: start-workout
-    text: 'Start workout'
-- tapOn:
-    id: start-workout
-- extendedWaitUntil:
-    visible:
-      id: section-title
-      text: 'E2E Log'
-    timeout: 10000
-- assertVisible:
-    id: section-count
-    text: '1 exercise'
-# The list: name, the coach's targets in one line, ×3.
-- assertVisible: 'Barbell Squat, 3 sets: 132 lb × 8, 132 lb × 8, 132 lb × 8'
-- tapOn:
-    id: start-section
+# Start goes straight to the first set: no overview, no Start section.
 # ---- The exercise page ----
 - extendedWaitUntil:
     visible:
@@ -56,7 +35,14 @@ env:
     timeout: 10000
 - assertVisible:
     id: rest-line-0-0
-    text: 'Rest 1:30'
+    text: 'Rest 1:30 between sets'
+- assertVisible:
+    id: pages-sections
+    text: 'Exercise 1 of 1 · All exercises ▾'
+- assertVisible: 'Swap exercise'
+# No Finish (or Next) before a set is ticked.
+- assertNotVisible:
+    id: page-done
 - assertNotVisible:
     id: rest-panel
 # Tapping the demo opens the exercise sheet: name, instructions, Close.
@@ -90,7 +76,10 @@ env:
 - assertVisible:
     id: tick-0-0-2
     text: 'checkbox, checked'
-# The only section's last page: Done opens the finish sheet.
+# The last page: Finish workout opens the finish sheet.
+- assertVisible:
+    id: page-done
+    text: 'Finish workout'
 - tapOn:
     id: page-done
 - extendedWaitUntil:
@@ -129,37 +118,43 @@ env:
       text: 'Felt strong today'
     timeout: 10000
 - runFlow: helpers/finish-from-sheet.yaml
+# 3 × 8 × 60 kg = 1,440 kg, shown in this client's pounds.
 - extendedWaitUntil:
-    visible: '3 sets completed'
+    visible:
+      id: summary-sets
+      text: '3 of 3 sets · .* · 3,175 lb lifted'
     timeout: 10000
 - assertVisible: 'E2E Log'
-# 3 × 8 × 60 kg = 1,440 kg, shown in this client's pounds.
 - assertVisible:
-    id: summary-volume
-- assertVisible: '3,175 lb lifted'
-- assertVisible: 'Coach comments'
+    id: summary-effort
+    text: 'You told .*: Good · “Felt strong today”'
+- assertVisible: 'Your progress'
 - assertNotVisible:
     id: summary-changes
 - tapOn:
     id: summary-done
+# Today: the card shrinks to a done row.
 - extendedWaitUntil:
-    visible: 'Done ✓.*'
+    visible: 'E2E Log done'
     timeout: 20000
+- assertVisible: '3 of 3 sets.*'
 - assertNotVisible: 'Start workout'
 # The feeling and the note were saved with the workout (read back from the server here).
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }
 - assertTrue: '${output.call == "Felt: Good | Felt strong today"}'
-# Later, from Today: the workout card's View summary opens the summary again.
+# Later, from Today: the done row opens the summary again; Done comes back to Today.
 - tapOn:
-    id: 'view-log-.*'
+    id: 'today-done-.*'
 - extendedWaitUntil:
-    visible: '3 sets completed'
+    visible:
+      id: summary-sets
+      text: '3 of 3 sets.*'
     timeout: 20000
 - tapOn:
     id: summary-done
-- assertVisible: 'Done ✓.*'
+- assertVisible: 'E2E Log done'
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

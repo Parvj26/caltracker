@@ -1,4 +1,4 @@
-# "E2E Log" (Barbell Squat 3 × 8 @ 60 kg) from Today: start it, tick the three sets and tap Done: the
+# "E2E Log" (Barbell Squat 3 × 8 @ 60 kg) from Today: start it, tick the three sets and tap Finish workout: the
 # Finish workout? sheet opens (the caller taps Finish).
 appId: app.caltracker.client
 ---
@@ -20,6 +20,9 @@ appId: app.caltracker.client
 - assertVisible:
     id: tick-0-0-2
     text: 'checkbox, checked'
+- assertVisible:
+    id: page-done
+    text: 'Finish workout'
 - tapOn:
     id: page-done
 - extendedWaitUntil:

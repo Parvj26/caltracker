@@ -1,9 +1,9 @@
 # The section pages on a mixed workout ("E2E Mixed", no sections, so one section named after the workout):
 #   page 1 Barbell Squat: a warm-up row (W, 20 kg × 10) then 2 × 8 @ 60 kg;
 #   page 2 superset Pullups (A1) + Pushups (A2), 2 rounds, scrolled round by round;
-#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (F).
+#   page 3 Dumbbell Bicep Curl 2 × 12 @ 10 kg, the second followed by two drops to failure (↓ Drop, "max reps").
 # A weight typed on set 1 carries into set 2; a ticked set's numbers stay editable and it stays ticked; ✓ again
-# unticks; Mark all rounds; dots move between pages; the F tag explains itself; Done on the last page
+# unticks; Mark all rounds; "Next: …" moves on; the ↓ Drop tag explains itself; Finish workout on the last page
 # opens the finish sheet, which says what isn't ticked; Keep going returns to the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -78,6 +78,10 @@ env:
     id: tick-0-0-2
     text: 'checkbox, checked'
 - takeScreenshot: flow-01-straight
+# Every set here is ticked: Next goes straight on.
+- assertVisible:
+    id: page-done
+    text: 'Next: A1 Pullups'
 - tapOn:
     id: page-done
 
@@ -85,9 +89,12 @@ env:
 - extendedWaitUntil:
     visible:
       id: superset-heading-1
-      text: 'Superset 1'
+      text: 'Superset A'
     timeout: 10000
-# The title is just "Superset 1"; every round has the same "Round r of R" heading under it.
+- assertVisible:
+    id: pages-sections
+    text: 'Superset A · Round 1 of 2 ▾'
+# The title is just "Superset A"; every round has the same "Round r of R" heading under it.
 - assertVisible:
     id: round-heading-1-1
     text: 'Round 1 of 2, current round'
@@ -96,7 +103,7 @@ env:
     text: 'Round 2 of 2'
 - assertVisible:
     id: exercise-name-1-0
-    text: 'A1 · Pullups'
+    text: 'Pullups'
 - assertVisible:
     id: round-rest-1-1
     text: 'Rest 1:00 after the round'
@@ -114,7 +121,7 @@ env:
     text: 'Round 2 of 2, current round'
 - assertVisible:
     id: superset-heading-1
-    text: 'Superset 1'
+    text: 'Superset A'
 - runFlow:
     file: helpers/mark-all.yaml
     env: { PAGE: '1' }
@@ -122,15 +129,8 @@ env:
     id: tick-1-1-1
     text: 'checkbox, checked'
 - takeScreenshot: flow-02-superset
-# A dot jumps to its page, and back.
 - tapOn:
-    id: dot-0
-- extendedWaitUntil:
-    visible:
-      id: exercise-name-0
-    timeout: 5000
-- tapOn:
-    id: dot-2
+    id: page-done
 - extendedWaitUntil:
     visible:
       id: exercise-name-2
@@ -140,18 +140,23 @@ env:
 # ---- Page 3: drops to failure ----
 - assertVisible:
     id: tag-2-0-2
-    text: 'Drop set to failure. What does F mean.*'
+    text: 'Drop set to failure. What does ↓ Drop mean.*'
+- assertVisible:
+    id: actual-reps-2-0-2
 - tapOn:
     id: tag-2-0-2
 - extendedWaitUntil:
     visible:
       id: tag-info
     timeout: 5000
-- assertVisible: 'F · To failure'
+- assertVisible: '↓ Drop set'
 - tapOn:
     id: tag-info-ok
 - tapOn:
     id: tick-2-0-0
+- assertVisible:
+    id: page-done
+    text: 'Finish workout'
 - tapOn:
     id: page-done
 # The last page of the last section: the finish sheet, which says what isn't ticked.
@@ -168,25 +173,16 @@ env:
     visible:
       id: exercise-name-2
     timeout: 5000
-# Back to the superset by its dot (it is still scrolled to where Mark all rounds was).
-- tapOn:
-    id: dot-1
-- scrollUntilVisible:
-    element:
-      id: superset-heading-1
-    direction: UP
-- tapOn:
-    id: dot-2
-- extendedWaitUntil:
-    visible:
-      id: exercise-name-2
-    timeout: 5000
 - tapOn:
     id: page-done
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
-    visible: '8 sets completed'
+    visible:
+      id: summary-sets
+      text: '8 of 11 sets · 3 skipped.*'
     timeout: 10000
+- assertVisible:
+    id: summary-changes
 - assertVisible: 'E2E Mixed'
 - tapOn:
     id: summary-done

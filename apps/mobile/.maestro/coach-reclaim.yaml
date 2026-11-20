@@ -86,7 +86,7 @@ env:
 - inputText: 'Took it back'
 - hideKeyboard
 - runFlow: helpers/finish-from-sheet.yaml
-- assertVisible: '3 sets completed'
+- assertVisible: '3 of [0-9]+ sets? · .*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }

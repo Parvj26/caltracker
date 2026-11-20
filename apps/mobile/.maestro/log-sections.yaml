@@ -2,10 +2,10 @@
 #   section Upper: an uneven superset, Pullups 3 × 8 (A1, no rest) + Pushups 2 × 8 (A2, 1:00 rest);
 #   section Finisher: pick one of Barbell Squat 2 × 8 @ 60 kg or Dumbbell Bicep Curl 2 × 12 @ 10 kg.
 # The preview shows the section headings, each exercise as one compact "×N" line that expands to its sets, and the
-# Equipment row. Logging: each section opens with its start page; the superset's round 3 is Pullups alone (Pushups
-# has no third set, so it is left out); Done on the section's last page goes to the next section's start page.
-# The finisher's options are pages: logging one picks it (switchable until a set is ticked, then the others are
-# locked out); finish, the reveal, and a summary that counts only the picked option's sets and lists the pick.
+# Equipment row. Logging: Start goes straight to the first set; the superset's round 3 is Pullups alone (Pushups
+# has no third set, so it is left out); Next on the section's last page goes to the next section's first page.
+# The finisher is one page with a switch (switchable until a set is ticked, then locked); finish, the reveal, and a
+# summary that counts only the picked option's sets and lists the pick.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -41,9 +41,8 @@ env:
       id: 'plan-pick-one-.*'
     direction: DOWN
     timeout: 10000
-- assertVisible:
-    id: 'plan-pick-one-.*'
-    text: 'Pick one'
+- assertVisible: 'Pick one · you’ll choose when you get there'
+- assertVisible: 'OR'
 - takeScreenshot: sections-03-preview-pick-one
 - scrollUntilVisible:
     element:
@@ -53,61 +52,31 @@ env:
 - tapOn:
     id: back
 
-# ---- Upper: the uneven superset ----
+# ---- Upper: the uneven superset (Start goes straight to it) ----
 - extendedWaitUntil:
     visible: 'Start workout'
     timeout: 10000
 - tapOn: 'Start workout'
 - extendedWaitUntil:
     visible:
-      id: workout-overview
-    timeout: 20000
-- assertVisible:
-    id: overview-section-0
-    text: 'Upper, 1 superset · 2 exercises.*'
-- assertVisible:
-    id: overview-section-1
-    text: 'Finisher, Pick one of 2 · swipe to choose.*'
-- tapOn:
-    id: start-workout
-- extendedWaitUntil:
-    visible:
-      id: section-title
-      text: 'Upper'
-    timeout: 10000
-- assertVisible:
-    id: section-place
-    text: 'Section 1 of 2'
-- assertVisible:
-    id: section-count
-    text: '1 superset · 2 exercises'
-- assertVisible: 'SUPERSET'
-- takeScreenshot: sections-04-section-start
-- tapOn:
-    id: start-section
-- extendedWaitUntil:
-    visible:
       id: superset-heading-0
-      text: 'Superset 1'
-    timeout: 10000
+      text: 'Superset A'
+    timeout: 20000
 - assertVisible:
     id: round-heading-0-1
     text: 'Round 1 of 3, current round'
 - assertVisible:
     id: pages-title
-    text: 'Upper'
+    text: 'E2E Sections · Upper.*'
 - assertVisible:
     id: pages-sections
-    text: 'Section 1 of 2 · All sections ▾'
+    text: 'Superset A · Round 1 of 3 ▾'
+- takeScreenshot: sections-04-superset
 - runFlow:
     file: helpers/mark-all.yaml
     env: { PAGE: '0' }
-- scrollUntilVisible:
-    element:
-      id: round-heading-0-3
-      text: 'Round 3 of 3 ✓'
-    direction: UP
-# Round 3 is Pullups alone: Pushups has only two sets.
+# Done rounds fold into one line each; round 3 (the last) stays open. Round 3 is Pullups alone: Pushups has only two
+# sets.
 - scrollUntilVisible:
     element:
       id: tick-0-0-2
@@ -115,62 +84,40 @@ env:
     direction: DOWN
 - assertNotVisible:
     id: tick-0-1-2
-# The section's last page: Done goes to the next section's start page.
+# The section's last page: Next goes straight to the next section's first page (no start page).
+- assertVisible:
+    id: page-done
+    text: 'Next: Barbell Squat or Dumbbell Bicep Curl'
 - tapOn:
     id: page-done
 
-# ---- Finisher: pick one by logging it ----
-- extendedWaitUntil:
-    visible:
-      id: section-title
-      text: 'Finisher'
-    timeout: 10000
-- assertVisible:
-    id: section-count
-    text: 'Pick one of 2 · swipe to choose'
-- tapOn:
-    id: start-section
+# ---- Finisher: one page with a switch between the options ----
 - extendedWaitUntil:
     visible:
       id: option-line-0
-      text: 'Option 1 of 2 · log a set to pick it'
+      text: 'Only the chosen one’s sets show.*'
     timeout: 10000
+- assertVisible:
+    id: pages-sections
+    text: 'Pick one · 2 of 2 ▾'
+- assertVisible:
+    id: exercise-name-0
+    text: 'Barbell Squat'
 
-# ---- Moving freely: back to Upper and forward again without Done, nothing logged ----
-# ‹ from the section's first page goes to the previous section's last page.
-- tapOn:
-    id: page-prev
-- extendedWaitUntil:
-    visible:
-      id: pages-title
-      text: 'Upper'
-    timeout: 5000
-- assertVisible:
-    id: superset-heading-0
-    text: 'Superset 1'
-- takeScreenshot: sections-04b-back-to-upper
-# › goes on into the next section's first page (not its start page).
-- tapOn:
-    id: page-next
-- extendedWaitUntil:
-    visible:
-      id: option-line-0
-      text: 'Option 1 of 2 · log a set to pick it'
-    timeout: 5000
-# A swipe past the first page goes back into Upper too (rows have no swipe of their own).
+# ---- Moving freely: a swipe back into Upper and forward again, nothing logged ----
 - swipe:
     direction: RIGHT
 - extendedWaitUntil:
     visible:
       id: pages-title
-      text: 'Upper'
+      text: '.*Upper'
     timeout: 5000
 - swipe:
     direction: LEFT
 - extendedWaitUntil:
     visible:
       id: pages-title
-      text: 'Finisher'
+      text: '.*Finisher'
     timeout: 5000
 # The title opens the overview, which lists every section: jump to Finisher from there.
 - tapOn:
@@ -179,67 +126,55 @@ env:
     visible:
       id: workout-overview
     timeout: 5000
+- assertVisible:
+    id: overview-section-1
+    text: 'Finisher, Pick one of 2.*'
 - tapOn:
     id: overview-section-1
 - extendedWaitUntil:
     visible:
-      id: section-title
-      text: 'Finisher'
+      id: option-line-0
     timeout: 5000
+# The switch: choose the curls (nothing ticked yet), only its sets show.
 - tapOn:
-    id: start-section
+    id: option-0-1
 - extendedWaitUntil:
     visible:
-      id: option-line-0
-      text: 'Option 1 of 2 · log a set to pick it'
-    timeout: 10000
-- assertVisible:
-    id: exercise-name-0
-    text: 'Barbell Squat'
-# Typing a number picks that option.
-- tapOn:
-    id: actual-reps-0-0-0
-- waitForAnimationToEnd
-- inputText: '7'
-# Done typing (Enter ends editing; the simulator has no on-screen keypad, so its Done typing bar can't show).
-- pressKey: Enter
-- extendedWaitUntil:
-    visible:
-      id: option-line-0
-      text: 'Option 1 of 2 · you’re doing this one'
+      id: exercise-name-0
+      text: 'Dumbbell Bicep Curl'
     timeout: 5000
 - takeScreenshot: sections-05-option-picked
-# Swipe to the other option and tick a set: the pick switches (nothing was ticked yet).
+# Switch back and forth is allowed until a set is ticked.
 - tapOn:
-    id: dot-1
+    id: option-0-0
 - extendedWaitUntil:
     visible:
-      id: exercise-name-1
+      id: exercise-name-0
+      text: 'Barbell Squat'
+    timeout: 5000
+- tapOn:
+    id: option-0-1
+- extendedWaitUntil:
+    visible:
+      id: exercise-name-0
       text: 'Dumbbell Bicep Curl'
     timeout: 5000
 - tapOn:
-    id: tick-1-1-0
+    id: tick-0-1-0
+# Now the squat can't be chosen.
 - extendedWaitUntil:
     visible:
-      id: option-line-1
-      text: 'Option 2 of 2 · you’re doing this one'
+      id: option-line-0
+      text: 'You’re doing Dumbbell Bicep Curl.*'
     timeout: 5000
-# The squat can no longer be logged.
+- assertVisible:
+    id: option-0-0
+    enabled: false
 - tapOn:
-    id: dot-0
-- extendedWaitUntil:
-    visible:
-      id: option-locked-0
-      text: 'You’re doing Dumbbell Bicep Curl. Swipe to it to log it.'
-    timeout: 5000
-- tapOn:
-    id: dot-1
-- extendedWaitUntil:
-    visible:
-      id: tick-1-1-1
-    timeout: 5000
-- tapOn:
-    id: tick-1-1-1
+    id: tick-0-1-1
+- assertVisible:
+    id: page-done
+    text: 'Finish workout'
 - tapOn:
     id: page-done
 
@@ -251,10 +186,10 @@ env:
     timeout: 10000
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
-    visible: '7 sets completed'
+    visible: '7 of [0-9]+ sets? · .*'
     timeout: 10000
 - assertVisible: 'E2E Sections'
-- assertVisible: 'Finisher: picked Dumbbell Bicep Curl'
+- assertVisible: '.*Finisher: picked Dumbbell Bicep Curl.*'
 - tapOn:
     id: summary-done
 - runScript:

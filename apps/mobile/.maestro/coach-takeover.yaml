@@ -66,9 +66,9 @@ env:
 - assertVisible:
     id: tick-0-0-1
     text: 'checkbox, unchecked'
-# Exercise info still opens.
+# Exercise info still opens (the demo thumbnail).
 - assertVisible:
-    id: history-0-0
+    id: demo-0-0
 - takeScreenshot: coach-logging-held
 # ---- The coach ticks set 2 (10 reps): it appears on the phone without any tap ----
 - runScript:
@@ -83,11 +83,9 @@ env:
     id: actual-reps-0-0-1
     text: '10'
 - takeScreenshot: coach-logging-live-tick
-# Back to Today and in again: still read only, with the coach's set.
+# The overview (the title) offers no finish or add while the coach logs.
 - tapOn:
-    id: close-section
-- tapOn:
-    id: section-back
+    id: pages-title
 - extendedWaitUntil:
     visible:
       id: overview-close
@@ -98,6 +96,9 @@ env:
     id: add-exercise
 - tapOn:
     id: overview-close
+# Back to Today (read only: × just leaves) and in again: still read only, with the coach's set.
+- tapOn:
+    id: close-section
 - extendedWaitUntil:
     visible: 'E2E Log'
     timeout: 20000
@@ -105,14 +106,12 @@ env:
     id: resume-banner
     optional: true
 - tapOn:
-    text: 'Resume'
+    text: 'Continue'
     optional: true
 - extendedWaitUntil:
     visible:
       id: coach-logging-banner
     timeout: 20000
-- tapOn:
-    id: start-workout
 - extendedWaitUntil:
     visible:
       id: tick-0-0-1
@@ -161,7 +160,7 @@ env:
     id: finish-count
     text: '3 of 3 sets done.'
 - runFlow: helpers/finish-from-sheet.yaml
-- assertVisible: '3 sets completed'
+- assertVisible: '3 of [0-9]+ sets? · .*'
 # Logged on the phone in the end, so no "Logged by coach".
 - assertNotVisible:
     id: logged-by-coach

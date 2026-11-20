@@ -41,7 +41,7 @@ env:
 - runFlow: helpers/reveal-through.yaml
 # Summary: the sticker row with the count.
 - extendedWaitUntil:
-    visible: '3 sets completed'
+    visible: '3 of [0-9]+ sets? · .*'
     timeout: 10000
 - assertVisible:
     id: summary-stickers

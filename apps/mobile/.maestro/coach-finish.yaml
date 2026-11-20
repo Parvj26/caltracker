@@ -65,7 +65,7 @@ env:
 - runFlow: helpers/reveal-through.yaml
 # Then the summary, with the "Logged by coach" pill.
 - extendedWaitUntil:
-    visible: '3 sets completed'
+    visible: '3 of [0-9]+ sets? · .*'
     timeout: 20000
 - assertVisible:
     id: logged-by-coach

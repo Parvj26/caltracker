@@ -56,7 +56,7 @@ env:
 # The new exercise's page opens straight away.
 - extendedWaitUntil:
     visible:
-      id: page-done
+      id: pages-title
     timeout: 10000
 - assertVisible:
     id: exercise-name-0

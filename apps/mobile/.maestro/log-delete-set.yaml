@@ -1,5 +1,5 @@
 # Changing the sets while logging ("E2E Log", 3 sets of Barbell Squat): long-press a row and tap Delete set, + Add
-# set, ••• → Delete a set, and the ••• menu's Add a drop set, whose D tag explains itself. Rows have no swipe: a
+# set, ••• → Delete a set, and the ••• menu's Add a drop set, whose ↓ Drop tag explains itself. Rows have no swipe: a
 # sideways swipe always changes the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -74,7 +74,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: tag-0-0-3
-      text: '.*What does D mean.*'
+      text: '.*What does ↓ Drop mean.*'
     timeout: 5000
 - tapOn:
     id: tag-0-0-3
@@ -82,7 +82,7 @@ env:
     visible:
       id: tag-info
     timeout: 5000
-- assertVisible: 'D · Drop set'
+- assertVisible: '↓ Drop set'
 - tapOn:
     id: tag-info-ok
 # Tidy up.

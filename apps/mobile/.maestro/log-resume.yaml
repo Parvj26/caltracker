@@ -1,6 +1,6 @@
 # Closing the app mid-workout never loses a ticked set. Start, tick set 1, close the app, open it again (same
-# install, no clearState): Today offers Resume, the screen opens on the exercise with set 1 still ticked. ✕ goes
-# back to the section start, ⌄ to the overview, and the workout keeps going until it is discarded there.
+# install, no clearState): Today's card says "1 of 3 sets" with Continue, which opens on the exercise with set 1 still
+# ticked. The title opens the overview; × offers Keep going later or Discard workout.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -26,17 +26,18 @@ env:
     text: 'checkbox, checked'
 - stopApp
 - launchApp
+# Today's card says it is going: progress and Continue.
 - extendedWaitUntil:
     visible:
-      id: resume-banner
+      id: 'today-progress-.*'
+      text: '1 of 3 sets.*'
     timeout: 20000
-- assertVisible: '.*Resume E2E Log.*'
-- tapOn:
-    id: resume-banner
-# Something is ticked, so it opens straight on the first page with an open set.
+- assertVisible: 'Continue'
+- tapOn: 'Continue'
+# It opens straight on the first page with an open set.
 - extendedWaitUntil:
     visible:
-      id: page-done
+      id: pages-title
     timeout: 20000
 # iOS reads a checkbox's state as its value ("checkbox, checked"), which Maestro matches as text.
 - assertVisible:
@@ -45,49 +46,39 @@ env:
 - assertVisible:
     id: tick-0-0-1
     text: 'checkbox, unchecked'
-# ✕: back to the section's start page, which now says Continue.
+# The title opens the whole workout; ⌄ comes back to the sets.
 - tapOn:
-    id: close-section
-- extendedWaitUntil:
-    visible:
-      id: start-section
-      text: 'Continue section'
-    timeout: 10000
-# ⌄: the workout overview, still going.
-- tapOn:
-    id: section-back
-- extendedWaitUntil:
-    visible:
-      id: start-workout
-      text: 'Continue'
-    timeout: 10000
-# ✕ on the overview leaves for Today; the workout keeps going.
-- tapOn:
-    id: overview-close
-- extendedWaitUntil:
-    visible:
-      id: resume-banner
-    timeout: 10000
-- tapOn:
-    id: resume-banner
-# Coming back opens where it was left: the overview.
+    id: pages-title
 - extendedWaitUntil:
     visible:
       id: workout-overview
     timeout: 10000
-# Leave nothing in progress for the next flow.
-- scrollUntilVisible:
-    element:
-      id: discard-workout
-    direction: DOWN
 - tapOn:
-    id: discard-workout
+    id: overview-close
+- extendedWaitUntil:
+    visible:
+      id: pages-title
+    timeout: 10000
+# ×: Keep going later leaves for Today; the workout keeps going.
+- tapOn:
+    id: close-section
+- tapOn: 'Keep going later'
+- extendedWaitUntil:
+    visible: 'Continue'
+    timeout: 10000
+- tapOn: 'Continue'
+- extendedWaitUntil:
+    visible:
+      id: pages-title
+    timeout: 10000
+# Leave nothing in progress for the next flow: × → Discard workout → Discard.
+- tapOn:
+    id: close-section
+- tapOn: 'Discard workout'
 - tapOn: 'Discard'
 - extendedWaitUntil:
     visible: 'Start workout'
     timeout: 20000
-- assertNotVisible:
-    id: resume-banner
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }
