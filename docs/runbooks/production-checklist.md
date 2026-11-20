@@ -43,7 +43,7 @@ How to read this list:
   - Set: site URL `https://caltracker.app`, minimum password 8, email (SMTP) settings and email templates the same as staging, two-step sign-in (TOTP) on for the admin site.
 - [ ] **Resend:** make a new production API key and put it in GitHub plus Supabase email settings.
 - [ ] **Cloudflare:**
-  - check nothing already uses the bare `caltracker.app` address;
+  - free the bare `caltracker.app` address: until go-live the **staging** Worker holds it (custom domain added in #181 so the app's privacy link works). Remove the `caltracker.app` route from `apps/web/wrangler.jsonc` and the `ROOT_HOST` redirect block from `apps/web/src/proxy.ts`, merge so staging redeploys without it, and only then run Deploy production;
   - add the DMARC email record;
   - turn on Email Routing so `support@caltracker.app` forwards to your inbox.
 - [ ] **GitHub secrets:** the `PROD_…` list in the go-live plan (database URL, keys, project ref, password, Resend key, function secret, error email recipients).

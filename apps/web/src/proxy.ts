@@ -8,12 +8,16 @@ const STAGING_HOST = 'staging.caltracker.app';
 export async function proxy(request: NextRequest) {
   // Until go-live the root domain only serves the public privacy policy and terms (left out of the matcher below), so the
   // app's links work. Every other root-domain page goes to the staging site, where sign-in lives. Remove at go-live.
-  if (request.nextUrl.hostname === ROOT_HOST) {
+  // A trailing dot ("caltracker.app.") is the same host, so it is matched too.
+  if (request.nextUrl.hostname.replace(/\.$/, '') === ROOT_HOST) {
     const url = request.nextUrl.clone();
     url.protocol = 'https:';
     url.hostname = STAGING_HOST;
     url.port = '';
-    return NextResponse.redirect(url, 308);
+    // Temporary (307, not cached): browsers must not remember it, or they would keep going to staging after go-live.
+    const res = NextResponse.redirect(url, 307);
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
   }
   return updateSession(request);
 }
