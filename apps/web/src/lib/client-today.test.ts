@@ -19,6 +19,7 @@ const live = (over: Partial<LiveLog> = {}): LiveLog => ({
   lastActivityAt: '2026-11-13T17:30:00Z',
   done: 11,
   total: 18,
+  totalText: '18',
   loggedBy: CLIENT,
   workoutId: 'w1',
   ...over,

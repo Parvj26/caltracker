@@ -51,9 +51,9 @@ describe('workoutPreview', () => {
     expect(p.more).toBe(2);
   });
 
-  it('does not count drop sets, and marks warm-ups and drops as the builder does', () => {
+  it('counts every set (warm-ups and drops too), and marks warm-ups and drops as the builder does', () => {
     const p = workoutPreview({ blocks: [straight(exercise('Bench', [set({ setType: 'warmup', targetWeightKg: 20 }), set({ targetWeightKg: 60 }), set({ setType: 'drop', targetWeightKg: 40 })]))] }, 'kg');
-    expect(p.lines.map((l) => l.text)).toEqual(['2× Bench · W 20 kg × 12, 60 kg × 12, ↓ 40 kg × 12']);
+    expect(p.lines.map((l) => l.text)).toEqual(['3× Bench · W 20 kg × 12, 60 kg × 12, ↓ 40 kg × 12']);
     expect(p.more).toBe(0);
   });
 

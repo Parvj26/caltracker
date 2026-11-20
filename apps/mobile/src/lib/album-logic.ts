@@ -171,6 +171,17 @@ export function formatEarned(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/**
+ * The summary's sticker line: "5,320 kg is about 12 polar bears." (or "less than 1 …"). The multiple is the award's
+ * own (the workout's weight ÷ the animal's weight, the same maths as the reveal and the share card).
+ */
+export function stickerSentence(volumeKg: number, units: Units, multiple: number, animalName: string): string {
+  const lifted = formatLogVolume(volumeKg, units).replace(/ lifted$/, '');
+  const amount = formatMultiple(multiple, animalName);
+  const words = amount.startsWith('<') ? `less than ${amount.slice(2)}` : `about ${amount.replace(/^≈\s*/, '')}`;
+  return `${lifted} is ${words.toLowerCase()}.`;
+}
+
 /** The share card's lines: "3,175 lb ≈ 1.2 Giraffes" for a workout's animal, or the sticker's own fact for one in the book. */
 export function workoutShareLine(volumeKg: number, units: Units, multiple: number, animalName: string): string {
   const lifted = formatLogVolume(volumeKg, units).replace(/ lifted$/, '');

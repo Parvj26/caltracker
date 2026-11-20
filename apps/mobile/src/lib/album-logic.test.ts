@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LANDMARK_JOURNEY, STICKERS } from '@caltracker/shared';
-import { albumCacheKey, albumCachePrefix, albumModel, parseAlbumCache, workoutShareLine, type AlbumAward, type AlbumStats } from './album-logic';
+import { albumCacheKey, albumCachePrefix, albumModel, parseAlbumCache, stickerSentence, workoutShareLine, type AlbumAward, type AlbumStats } from './album-logic';
 
 const stats = (over: Partial<AlbumStats> = {}): AlbumStats => ({
   workouts: 0,
@@ -128,6 +128,12 @@ describe('parseAlbumCache', () => {
     expect(parseAlbumCache('nope')).toBeNull();
     expect(parseAlbumCache(null)).toBeNull();
     expect(parseAlbumCache(JSON.stringify({ awards: 3 }))).toBeNull();
+  });
+});
+
+describe('stickerSentence', () => {
+  it('says the weight and about how many animals', () => {
+    expect(stickerSentence(1440, 'lb', 1.2, 'Giraffe')).toBe('3,175 lb is about 1.2 giraffes.');
   });
 });
 

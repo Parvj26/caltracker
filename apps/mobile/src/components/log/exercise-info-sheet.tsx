@@ -12,8 +12,8 @@ import { useTheme } from '@/theme/use-theme';
 const title = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * What an exercise is: start and end photos, muscles, equipment, numbered steps and a "Watch demo" button (the saved
- * YouTube video, or a YouTube search for the exercise when there is none). Same page-sheet pattern as the note sheet. `detail` is undefined while it loads or when
+ * What an exercise is: start and end photos, a "Watch demo" button under them (the saved YouTube video, or a YouTube
+ * search for the exercise when there is none, opened in the app), muscles, equipment and numbered steps. Same page-sheet pattern as the note sheet. `detail` is undefined while it loads or when
  * it was never loaded and the phone is offline.
  */
 export function ExerciseInfoSheet({
@@ -60,6 +60,16 @@ export function ExerciseInfoSheet({
             </View>
           ) : null}
 
+          {/* Under the photos: opens in the app (Safari's sheet), so Done comes straight back here. */}
+          {videoUrl ? (
+            <Button
+              testID="exercise-sheet-demo"
+              variant="secondary"
+              title="Watch demo"
+              onPress={() => openDemo(videoUrl)}
+            />
+          ) : null}
+
           {!detail ? <Text style={text('body')}>Details aren’t available right now.</Text> : null}
 
           {muscles.length > 0 ? (
@@ -99,14 +109,6 @@ export function ExerciseInfoSheet({
             </View>
           ) : null}
 
-          {videoUrl ? (
-            <Button
-              testID="exercise-sheet-demo"
-              variant="secondary"
-              title="Watch demo"
-              onPress={() => openDemo(videoUrl)}
-            />
-          ) : null}
         </ScrollView>
       </SafeAreaView>
     </Modal>

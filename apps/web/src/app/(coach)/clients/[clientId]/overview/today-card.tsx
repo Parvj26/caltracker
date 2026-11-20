@@ -39,7 +39,7 @@ export function TodayCard({ data, today, coachId }: { data: ClientOverview; toda
           <span className={styles.liveFill} style={{ width: `${pct}%` }} />
         </div>
         <p className={styles.liveSets}>
-          {t.log.done} of {t.log.total} sets done
+          {t.log.done} of {t.log.totalText} sets done
         </p>
         <ButtonLink href={t.action.href} className={cx(styles.todayAction, styles.todayActionLive)}>
           {t.action.label}

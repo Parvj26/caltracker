@@ -1,7 +1,7 @@
 # The sticker reveal after Finish: a seeded workout of 3 x 8 at 60 kg is 1,440 kg, which reaches every animal up
 # to a giraffe. A new client gets one of those at random (seeded by the log id), so the flow doesn't name it.
 # Finish shows the dark reveal (what was lifted, the animal, "NEW for your zoo book", Continue), then the summary
-# with its sticker row ("<Animal> ×1"). The demo client starts with an empty zoo book (cleanup-logs clears it).
+# with its sticker card ("New sticker: <Animal>", "3,175 lb is about …"). The demo client starts with an empty zoo book (cleanup-logs clears it).
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL; the award-workout Edge
 # Function must be served: `supabase functions serve`).
 appId: app.caltracker.client
@@ -41,17 +41,19 @@ env:
 - runFlow: helpers/reveal-through.yaml
 # Summary: the sticker row with the count.
 - extendedWaitUntil:
-    visible: '3 sets completed'
+    visible: '3 of [0-9]+ sets? · .*'
     timeout: 10000
-- assertVisible:
-    id: summary-stickers
 - extendedWaitUntil:
-    visible: '.+ ×1'
-    timeout: 10000
+    visible:
+      id: summary-sticker
+    timeout: 20000
+- assertVisible: 'New sticker: .+'
+- assertVisible: '.+ is about .+'
 - tapOn:
     id: summary-done
 - extendedWaitUntil:
-    visible: 'Done ✓.*'
+    visible:
+      id: 'today-done-.*'
     timeout: 20000
 - runScript:
     file: helpers/call.js

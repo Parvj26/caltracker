@@ -3,6 +3,7 @@ import { Fragment, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import {
+  blockBadges,
   exerciseBadges,
   canStartSessionOn,
   localToday,
@@ -10,6 +11,7 @@ import {
   type Units,
   type WorkoutBlockDoc,
   type WorkoutExerciseDoc,
+  workoutEquipment,
 } from '@caltracker/shared';
 import { ExerciseBadges } from '@/components/exercise-badges';
 import { ExerciseInfoSheet } from '@/components/log/exercise-info-sheet';
@@ -35,13 +37,18 @@ import { formatDayLabel } from '@/lib/workouts';
 import { fetchPlannedWorkout, readCachedPlan } from '@/lib/workouts-api';
 import {
   coachFirstName,
-  exercisePlanLine,
+  exerciseRest,
   lastTimeLine,
+  planLineParts,
+  planLineSpoken,
+  planMeta,
   planTotals,
   previewSubtitle,
+  supersetPlanInfo,
   type PlannedWorkout,
 } from '@/lib/workouts-plan';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { PlanLine } from '@/components/plan/plan-line';
+import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 import { fontFamilyFor } from '@/theme/fonts';
 import { ChevronIcon } from '@/components/ui/icons';
@@ -74,7 +81,10 @@ async function savedLogs(workoutId: string): Promise<LogForDay[]> {
   return (await readCachedTodayLogs(localToday())).filter((l) => l.workoutId === workoutId);
 }
 
-/** Tap a workout on the Workouts tab: what it holds, the coach's note, last time per exercise, and Start. */
+/**
+ * Tap a workout on the Workouts tab (or Preview on Today): what it holds (every set, warm-ups and drops tagged), what
+ * to bring, the coach's note, last time per exercise, and Start pinned at the bottom (approved Preview board).
+ */
 export default function PlanPreview() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -120,6 +130,8 @@ export default function PlanPreview() {
     [workout],
   );
   const details = useExerciseDetails(exerciseIds);
+  const equipment = useMemo(() => workoutEquipment(exerciseIds.map((x) => details[x]?.equipment)), [exerciseIds, details]);
+  const badges = useMemo(() => (workout ? blockBadges(workout.doc.blocks) : []), [workout]);
   const status = workout ? (workoutStatuses(logs, active, finished, pending)[workout.doc.id] ?? null) : null;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/workouts'));
 
@@ -127,7 +139,7 @@ export default function PlanPreview() {
     status?.kind === 'done' ? (
       <Button title="View summary" testID="plan-view-log" onPress={() => openSummary(status.logId)} />
     ) : status?.kind === 'in_progress' ? (
-      <Button title="Resume" testID="plan-start" ph-label="log_start_workout" onPress={() => openLog(status.logId)} />
+      <Button title="Continue" testID="plan-start" ph-label="log_start_workout" onPress={() => openLog(status.logId)} />
     ) : canStartSessionOn(workout.scheduledOn, localToday()) ? (
       <Button
         title="Start workout"
@@ -169,15 +181,19 @@ export default function PlanPreview() {
       {workout ? (
         <>
           <View style={{ gap: space[1] }}>
-            <Text style={[text('body'), styles.bold]}>
+            <Text style={[text('body'), styles.bold, styles.muted]}>
               {previewSubtitle(workout.scheduledOn, workout.programName, workout.programDay)}
             </Text>
             <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header">
               {workout.doc.name}
             </Text>
+            <Text testID="plan-meta" style={[text('body'), styles.bold]}>
+              {planMeta(planTotals(workout.doc), true)}
+            </Text>
+            {equipment.length > 0 ? (
+              <Text testID="plan-equipment" style={text('body')}>{`Bring: ${equipment.join(', ').toLowerCase()}`}</Text>
+            ) : null}
           </View>
-
-          <Stats totals={planTotals(workout.doc)} />
 
           {workout.doc.notes ? (
             <View testID="plan-note" style={[styles.note, { borderRadius: radius.button, padding: space[3], gap: space[1] }]}>
@@ -191,7 +207,7 @@ export default function PlanPreview() {
           {sectionRuns(workout.doc.blocks, workout.doc.sections).map((run, r) => (
             <Fragment key={run.section?.id ?? `none-${r}`}>
               {run.section ? (
-                <Text testID={`plan-section-${r}`} style={text('sectionHeading')} accessibilityRole="header">
+                <Text testID={`plan-section-${r}`} style={[text('sectionHeading'), styles.sectionTitle]} accessibilityRole="header">
                   {run.section.name}
                 </Text>
               ) : null}
@@ -201,6 +217,7 @@ export default function PlanPreview() {
                   <BlockRows
                     key={block.id}
                     block={block}
+                    badges={badges[i] ?? []}
                     units={units}
                     last={last}
                     details={details}
@@ -222,55 +239,70 @@ export default function PlanPreview() {
   );
 }
 
-function Stats({ totals }: { totals: { exercises: number; sets: number; minutes: number } }) {
-  const { text, space, radius } = useTheme();
-  const boxes = [
-    { value: String(totals.exercises), label: totals.exercises === 1 ? 'exercise' : 'exercises' },
-    { value: String(totals.sets), label: totals.sets === 1 ? 'set' : 'sets' },
-    { value: `~${totals.minutes}`, label: 'minutes', spoken: `about ${totals.minutes} minutes` },
-  ];
-  return (
-    <View style={[styles.row, { gap: space[2] }]}>
-      {boxes.map((b) => (
-        <View
-          key={b.label}
-          accessible
-          accessibilityLabel={b.spoken ?? `${b.value} ${b.label}`}
-          style={[styles.stat, { borderRadius: radius.button, padding: space[2.5] }]}
-        >
-          <Text style={[text('bigNumber'), styles.statValue]}>{b.value}</Text>
-          <Text style={[text('caption'), styles.ink, styles.bold]}>{b.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/** A block's exercises as rows; a pick-one group and a superset say so above their rows. */
+/**
+ * A block: a straight exercise as a row; a superset as one grey block (A1, A2, rounds and the rest after each round);
+ * a pick-one group as one dashed block with OR between its options.
+ */
 function BlockRows({
   block,
+  badges,
   units,
   last,
   details,
   onInfo,
 }: {
   block: WorkoutBlockDoc;
+  /** The shared blockBadges for this block ("A1", "A2" for a superset). */
+  badges: string[];
   units: Units;
   last: LastResults | null;
   details: Record<string, ExerciseDetail>;
   onInfo: (e: WorkoutExerciseDoc) => void;
 }) {
-  const { text, space } = useTheme();
-  const label = block.kind === 'choice' ? 'Pick one' : block.kind === 'superset' ? 'Superset' : null;
+  const { text, space, radius } = useTheme();
+  if (block.kind === 'straight') {
+    const e = block.exercises[0];
+    return e ? <ExerciseRow exercise={e} units={units} last={last} detail={details[e.exerciseId]} onInfo={() => onInfo(e)} /> : null;
+  }
+  if (block.kind === 'superset') {
+    const info = supersetPlanInfo(block.exercises);
+    return (
+      <View testID={`plan-superset-${block.id}`} style={[styles.superset, { borderRadius: radius.card, padding: space[3], gap: space[1] }]}>
+        {/* Wraps: at large text the rest goes under the heading instead of squeezing it. */}
+        <View style={[styles.rowTop, styles.wrap, { columnGap: space[2] }]}>
+          <Text style={[text('caption'), styles.overline, styles.grow]}>{info.heading}</Text>
+          {info.rest ? <Text style={[text('caption'), styles.muted, styles.bold]}>{info.rest}</Text> : null}
+        </View>
+        {block.exercises.map((e, i) => (
+          <ExerciseRow
+            key={e.id}
+            exercise={e}
+            badge={badges[i] ?? null}
+            units={units}
+            last={last}
+            detail={details[e.exerciseId]}
+            onInfo={() => onInfo(e)}
+            grouped
+            divider={i > 0}
+          />
+        ))}
+      </View>
+    );
+  }
   return (
-    <View style={{ gap: space[2] }}>
-      {label ? (
-        <Text testID={block.kind === 'choice' ? `plan-pick-one-${block.id}` : undefined} style={[text('caption'), styles.overline]}>
-          {label}
-        </Text>
-      ) : null}
-      {block.exercises.map((e) => (
-        <ExerciseRow key={e.id} exercise={e} units={units} last={last} detail={details[e.exerciseId]} onInfo={() => onInfo(e)} />
+    <View testID={`plan-pick-one-${block.id}`} style={[styles.pickOne, { borderRadius: radius.card, padding: space[3], gap: space[1] }]}>
+      <Text style={[text('caption'), styles.overline]}>Pick one · you’ll choose when you get there</Text>
+      {block.exercises.map((e, i) => (
+        <Fragment key={e.id}>
+          {i > 0 ? (
+            <View style={[styles.rowTop, styles.orRow, { gap: space[2.5] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <View style={styles.orLine} />
+              <Text style={[text('caption'), styles.bold, styles.muted]}>OR</Text>
+              <View style={styles.orLine} />
+            </View>
+          ) : null}
+          <ExerciseRow exercise={e} units={units} last={last} detail={details[e.exerciseId]} onInfo={() => onInfo(e)} grouped />
+        </Fragment>
       ))}
     </View>
   );
@@ -278,49 +310,72 @@ function BlockRows({
 
 function ExerciseRow({
   exercise,
+  badge = null,
   units,
   last,
   detail,
   onInfo,
+  grouped = false,
+  divider = false,
 }: {
   exercise: WorkoutExerciseDoc;
+  /** "A1" in a superset: shown instead of the photo. */
+  badge?: string | null;
   units: Units;
   last: LastResults | null;
   detail: ExerciseDetail | undefined;
   onInfo: () => void;
+  /** Inside a superset or pick-one block: no frame of its own. */
+  grouped?: boolean;
+  divider?: boolean;
 }) {
   const { text, space, radius } = useTheme();
-  const plan = exercisePlanLine(exercise, units);
+  const parts = planLineParts(exercise, units);
   const lastLine = lastTimeLine(exercise, last, units);
+  const rest = grouped ? null : exerciseRest(exercise);
+  const sub = [lastLine, rest].filter(Boolean).join(' · ');
   const badges = exerciseBadges(exercise);
   return (
     <Pressable
       testID={`plan-exercise-${exercise.id}`}
       onPress={onInfo}
       accessibilityRole="button"
-      accessibilityLabel={[exercise.exerciseName, ...badges.badges, plan, badges.help, lastLine].filter(Boolean).join(', ')}
-      accessibilityHint="Opens exercise info"
+      accessibilityLabel={[badge, exercise.exerciseName, ...badges.badges, planLineSpoken(parts), badges.help, sub].filter(Boolean).join(', ')}
+      accessibilityHint="Opens how to do it and the demo"
       style={({ pressed }) => [
-        styles.row,
-        styles.exercise,
-        { borderRadius: radius.button, paddingHorizontal: space[3], paddingVertical: space[2.5], gap: space[3] },
+        styles.rowTop,
+        grouped ? undefined : [styles.exercise, { borderRadius: radius.button, paddingHorizontal: space[3] }],
+        { paddingVertical: space[2.5], gap: space[3] },
+        divider && styles.divider,
         pressed && styles.pressed,
       ]}
     >
-      <ExerciseThumb name={exercise.exerciseName} detail={detail} testID={`plan-thumb-${exercise.id}`} />
+      {badge ? (
+        <View style={[styles.badge, { borderRadius: radius.input - 2 }]}>
+          <Text style={[text('sectionHeading'), styles.badgeText]} maxFontSizeMultiplier={1.2}>
+            {badge}
+          </Text>
+        </View>
+      ) : (
+        <ExerciseThumb name={exercise.exerciseName} detail={detail} testID={`plan-thumb-${exercise.id}`} />
+      )}
       <View style={[styles.flex, { gap: 2 }]}>
         <Text style={text('sectionHeading')}>{exercise.exerciseName}</Text>
-        {plan ? <Text style={text('body')}>{plan}</Text> : null}
+        <PlanLine parts={parts} />
         <ExerciseBadges badges={badges.badges} help={badges.help} testID={`plan-badges-${exercise.id}`} />
-        {lastLine ? <Text style={[text('caption'), styles.last]}>{lastLine}</Text> : null}
+        {sub ? <Text style={[text('caption'), styles.muted]}>{sub}</Text> : null}
       </View>
     </Pressable>
   );
 }
 
+const BADGE = 36;
+
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
+  rowTop: { flexDirection: 'row', alignItems: 'flex-start' },
   flex: { flex: 1 },
+  grow: { flexGrow: 1 },
+  wrap: { flexWrap: 'wrap' },
   pressed: { opacity: pressedOpacity },
   back: {
     width: tapTarget.min,
@@ -330,16 +385,22 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
   },
   title: { fontSize: 30 },
+  sectionTitle: { fontSize: 18, marginTop: 4 },
   bold: { fontFamily: fontFamilyFor('sans', 700) },
   ink: { color: palette.ink },
+  muted: { color: palette.inkMuted },
   centre: { textAlign: 'center' },
-  stat: { flex: 1, alignItems: 'center', borderWidth: borderWidth.card, borderColor: palette.ink },
-  statValue: { fontSize: 22 },
   // The coach's note is in the app's own font, never the handwriting one.
   note: { backgroundColor: palette.drop },
-  noteLabel: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
+  noteLabel: { color: palette.magentaDeep, fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   noteBody: { fontSize: 16, lineHeight: 22 },
-  overline: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), textTransform: 'uppercase', letterSpacing: 0.6 },
+  overline: { color: palette.ink, fontFamily: fontFamilyFor('sans', 800), textTransform: 'uppercase', letterSpacing: 0.6 },
   exercise: { borderWidth: borderWidth.card, borderColor: palette.border },
-  last: { color: palette.magentaDeep, fontFamily: fontFamilyFor('sans', 700) },
+  superset: { backgroundColor: palette.surface },
+  pickOne: { borderWidth: borderWidth.secondaryButton, borderStyle: 'dashed', borderColor: palette.borderStrong },
+  divider: { borderTopWidth: 1, borderTopColor: palette.border },
+  orRow: { alignItems: 'center' },
+  orLine: { flex: 1, height: 1, backgroundColor: palette.border },
+  badge: { width: BADGE, height: BADGE, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: white, fontSize: 14 },
 });

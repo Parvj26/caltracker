@@ -19,6 +19,14 @@ import type { LastResults } from './log-api';
 import { upperCoreLog } from './log-fixtures';
 import {
   afterDone,
+  elapsedLabel,
+  headerLines,
+  lastCellText,
+  nextAction,
+  nextUpLabel,
+  notTickedTitle,
+  openSetsOnPage,
+  startPlace,
   buildPage,
   deleteChoices,
   stepLabel,
@@ -147,13 +155,13 @@ const allSetIds = (log: WorkoutLogDoc, bi: number) => log.blocks[bi].exercises.f
 const tickAll = (log: WorkoutLogDoc, bi: number) => allSetIds(log, bi).reduce((l, id) => completeSetWith(l, id, values, NOW), log);
 
 describe('buildSections', () => {
-  it('turns sections into start pages and pages: a superset is one page, each pick-one option is a page', () => {
+  it('turns sections into pages: a superset is one page, a pick-one group is one page with a switch', () => {
     const sections = buildSections(mockLog());
     expect(sections.map((s) => s.title)).toEqual(['Warm-Up', 'Resistance Training', 'Finisher']);
-    expect(sections.map((s) => s.countLine)).toEqual(['1 exercise', '1 superset · 3 exercises', 'Pick one of 3 · swipe to choose']);
+    expect(sections.map((s) => s.countLine)).toEqual(['1 exercise', '1 superset · 3 exercises', 'Pick one of 3']);
     expect(sections[1].pages.map((p) => p.kind)).toEqual(['superset', 'straight']);
     expect(sections[1].pages[0]).toMatchObject({ kind: 'superset', number: 1 });
-    expect(sections[2].pages.map((p) => p.kind === 'option' && `${p.optionIndex + 1}/${p.options}`)).toEqual(['1/3', '2/3', '3/3']);
+    expect(sections[2].pages.map((p) => [p.kind, p.blockIndex, p.kind === 'option' && p.options])).toEqual([['option', 3, 3]]);
   });
 
   it('a workout without sections is one section named after the workout; an empty log still has one', () => {
@@ -163,7 +171,7 @@ describe('buildSections', () => {
     expect(sections).toHaveLength(1);
     expect(sections[0].name).toBeNull();
     expect(sections[0].title).toBe('Parv - Upper/Core');
-    expect(sections[0].pages).toHaveLength(2 + 1 + 3);
+    expect(sections[0].pages).toHaveLength(2 + 1 + 1);
     const empty = buildSections(emptyLog('Quick lift', uuid, NOW));
     expect(empty).toHaveLength(1);
     expect(empty[0].pages).toEqual([]);
@@ -191,12 +199,10 @@ describe('navigation', () => {
     expect(afterDone(s, { section: 0, page: 0 })).toEqual({ kind: 'section', section: 1 });
     expect(afterDone(s, { section: 1, page: 0 })).toEqual({ kind: 'page', page: 1 });
     expect(afterDone(s, { section: 1, page: 1 })).toEqual({ kind: 'section', section: 2 });
-    // From any option of a pick-one group, Done skips the other options.
     expect(afterDone(s, { section: 2, page: 0 })).toEqual({ kind: 'finish' });
-    expect(afterDone(s, { section: 2, page: 1 })).toEqual({ kind: 'finish' });
   });
 
-  it('steps one page back or forward across sections, without Done (options one by one)', () => {
+  it('steps one page back or forward across sections, without Next', () => {
     const s = buildSections(mockLog());
     expect(stepPlace(s, { section: 0, page: 0 }, -1)).toBeNull();
     expect(stepPlace(s, { section: 0, page: 0 }, 1)).toEqual({ section: 1, page: 0 });
@@ -205,8 +211,7 @@ describe('navigation', () => {
     expect(stepPlace(s, { section: 1, page: 1 }, 1)).toEqual({ section: 2, page: 0 });
     // Back from a section's first page lands on the previous section's last page.
     expect(stepPlace(s, { section: 2, page: 0 }, -1)).toEqual({ section: 1, page: 1 });
-    expect(stepPlace(s, { section: 2, page: 0 }, 1)).toEqual({ section: 2, page: 1 });
-    expect(stepPlace(s, { section: 2, page: 2 }, 1)).toBeNull();
+    expect(stepPlace(s, { section: 2, page: 0 }, 1)).toBeNull();
   });
 
   it('steps over a section with no pages', () => {
@@ -222,7 +227,7 @@ describe('navigation', () => {
     expect(stepLabel(s, { section: 0, page: 0 }, 1)).toBe('Next section: Resistance Training');
     expect(stepLabel(s, { section: 1, page: 0 }, 1)).toBe('Next page');
     expect(stepLabel(s, { section: 1, page: 0 }, -1)).toBe('Previous section: Warm-Up');
-    expect(stepLabel(s, { section: 2, page: 1 }, -1)).toBe('Previous page');
+    expect(stepLabel(s, { section: 1, page: 1 }, -1)).toBe('Previous page');
   });
 
   it('moving never logs anything: stepping leaves the log as it was', () => {
@@ -235,18 +240,18 @@ describe('navigation', () => {
       at = stepPlace(s, at, 1);
       steps += 1;
     }
-    expect(steps).toBe(6); // 1 + 2 + 3 pages, then the end
+    expect(steps).toBe(4); // 1 + 2 + 1 pages, then the end
     expect(JSON.stringify(log)).toBe(before);
     expect(finishModel(log).done).toBe(0);
   });
 
-  it('resumes at the first open page, and at the picked option of a pick-one group', () => {
+  it('resumes at the first open page (a pick-one group is one page, picked or not)', () => {
     let log = mockLog();
     expect(resumePlace(log, buildSections(log))).toEqual({ section: 0, page: 0 });
     log = tickAll(tickAll(tickAll(log, 0), 1), 2);
     expect(resumePlace(log, buildSections(log))).toEqual({ section: 2, page: 0 });
     log = pickChoice(log, log.blocks[3].id, log.blocks[3].exercises[1].id, NOW);
-    expect(resumePlace(log, buildSections(log))).toEqual({ section: 2, page: 1 });
+    expect(resumePlace(log, buildSections(log))).toEqual({ section: 2, page: 0 });
     log = tickAll({ ...log }, 3);
     // completeSetWith refuses the unpicked options' sets, so only Farmers Walk's sets are ticked.
     expect(resumePlace(log, buildSections(log))).toBeNull();
@@ -281,7 +286,7 @@ describe('start page lists', () => {
       ['Dumbbell Bench Press', '35 lb × 12, 45 lb × 12, 35 lb × 12, 35 lb × 12', '×4'],
       ['Alternating DB Curl', '35 lb × 12, 35 lb × 12, 35 lb × 12', '×3'],
     ]);
-    expect(main[1].kind === 'straight' && main[1].item.count).toBe('×2');
+    expect(main[1].kind === 'straight' && main[1].item.count).toBe('×4'); // every tickable row counts, drops too;
     const fin = startGroups(log, s[2], 'lb');
     expect(fin[0].kind === 'choice' && fin[0].items.map((i) => i.name)).toEqual(['Medicine Ball Slam', 'Farmers Walk', 'Overhead Throw']);
     expect(startGroups(log, s[0], 'lb')[0]).toMatchObject({ kind: 'straight', item: { summary: '10 reps', count: '×1', substitute: null } });
@@ -300,18 +305,19 @@ describe('set rows', () => {
     });
     const log = startLogFromWorkout(doc, uuid, NOW);
     const rows = setRows(log.blocks[0].exercises[0], 'lb', []);
-    expect(rows.map((r) => r.tag)).toEqual(['1', 'F', 'D', '3']);
+    expect(rows.map((r) => r.tag)).toEqual(['1', 'F', '↓ Drop', '3']);
     expect(rows.map((r) => r.tagKind)).toEqual(['normal', 'failure', 'drop', 'normal']);
     expect(rows.map((r) => r.name)).toEqual(['Set 1', 'Set 2 to failure', 'Drop set', 'Set 3']);
     expect(rows.map((r) => r.indented)).toEqual([false, false, true, false]);
   });
 
-  it('columns follow the tracking type; warm-up W, drop D, failure F', () => {
+  it('columns follow the tracking type; warm-up W, every drop "↓ Drop" (to failure: "max")', () => {
     const log = mockLog();
     const push = log.blocks[2].exercises[0];
     const rows = setRows(push, 'lb', []);
-    expect(rows.map((r) => r.tag)).toEqual(['W', '1', 'D', 'F']);
-    expect(rows.map((r) => r.tagKind)).toEqual(['warmup', 'normal', 'drop', 'failure']);
+    expect(rows.map((r) => r.tag)).toEqual(['W', '1', '↓ Drop', '↓ Drop']);
+    expect(rows.map((r) => r.tagKind)).toEqual(['warmup', 'normal', 'drop', 'drop']);
+    expect(rows[3].cells[1].placeholder).toBe('max');
     expect(rows[3].cells[0].placeholder).toBe('15');
     expect(rows.map((r) => r.name)).toEqual(['Warm-up 1', 'Set 1', 'Drop set', 'Drop set to failure']);
     expect(rows.map((r) => r.indented)).toEqual([false, false, true, true]);
@@ -367,15 +373,20 @@ describe('pages', () => {
     expect(supersetRounds(block).map((r) => r.entries.map((e) => e.exerciseIndex))).toEqual([[0, 1], [0, 1], [0, 1], [0]]);
     const page = buildSections(log)[1].pages[0];
     let m = buildPage(log, page, 'lb', {});
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    expect(m.kind === 'superset' && m.heading).toBe('Superset A');
     expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
+    // The next set to do is marked: A1's first set.
+    expect(m.kind === 'superset' && m.rounds[0].entries.map((e) => e.rows[0].current)).toEqual([true, false]);
     expect(m.kind === 'superset' && m.exercises.map((e) => e.label)).toEqual(['A1', 'A2']);
     expect(m.kind === 'superset' && m.rounds[0].restLine).toBe('Rest 1:00 after the round');
     log = completeSet(log, block.exercises[0].sets[0].id, NOW);
+    // Ticking A1 moves the mark to A2.
+    m = buildPage(log, page, 'lb', {});
+    expect(m.kind === 'superset' && m.rounds[0].entries.map((e) => e.rows[0].current)).toEqual([false, true]);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     m = buildPage(log, page, 'lb', {});
-    // The title stays "Superset 1"; round 1 is ticked off under it and round 2 is the current one.
-    expect(m.kind === 'superset' && m.heading).toBe('Superset 1');
+    // The title stays "Superset A"; round 1 is ticked off under it and round 2 is the current one.
+    expect(m.kind === 'superset' && m.heading).toBe('Superset A');
     expect(m.kind === 'superset' && m.currentRound).toBe(2);
     expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4 ✓', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
     expect(m.kind === 'superset' && m.rounds[0].done).toBe(true);
@@ -395,18 +406,23 @@ describe('pages', () => {
     expect(historyLines(push, m.exercise.lastTime, 'lb')).toEqual(['1 · 70 lb × 12']);
   });
 
-  it('a pick-one option says whether it is the one being done, and locks out the others after a tick', () => {
+  it('a pick-one page shows the first option until one is chosen, and locks the switch after a tick', () => {
     let log = mockLog();
     const fin = buildSections(log)[2];
     const block = log.blocks[3];
-    expect(buildPage(log, fin.pages[1], 'lb', {})).toMatchObject({ kind: 'option', line: 'Option 2 of 3 · log a set to pick it', picked: false });
+    const names = block.exercises.map((e) => e.exerciseName);
+    let m = buildPage(log, fin.pages[0], 'lb', {});
+    expect(m).toMatchObject({ kind: 'option', picked: false, locked: false });
+    expect(m.kind === 'option' && m.choices.map((c) => [c.name, c.chosen])).toEqual([[names[0], true], [names[1], false], [names[2], false]]);
     log = pickingFirst(log, block.id, block.exercises[1].id, NOW);
-    expect(buildPage(log, fin.pages[1], 'lb', {})).toMatchObject({ line: "Option 2 of 3 · you’re doing this one", picked: true });
+    m = buildPage(log, fin.pages[0], 'lb', {});
+    expect(m).toMatchObject({ picked: true, locked: false });
+    expect(m.kind === 'option' && m.exercise.name).toBe(names[1]);
     // Picked but nothing ticked: another option can still take over.
     expect(pickingFirst(log, block.id, block.exercises[0].id, NOW).blocks[3].pickedExerciseId).toBe(block.exercises[0].id);
     log = completeSet(log, block.exercises[1].sets[0].id, NOW);
     expect(pickingFirst(log, block.id, block.exercises[0].id, NOW)).toBe(log);
-    expect(buildPage(log, fin.pages[0], 'lb', {})).toMatchObject({ lockedOut: "You’re doing Farmers Walk. Swipe to it to log it." });
+    expect(buildPage(log, fin.pages[0], 'lb', {})).toMatchObject({ locked: true });
   });
 });
 
@@ -789,5 +805,78 @@ describe('measurements: chosen columns, each side and tempo', () => {
     const noTarget = measuredLog('weight_reps_time');
     const bare = { ...noTarget, blocks: [{ ...noTarget.blocks[0], exercises: [{ ...noTarget.blocks[0].exercises[0], sets: noTarget.blocks[0].exercises[0].sets.map((s) => ({ ...s, target: { ...s.target, weightKg: null } })) }] }] };
     expect(markAllPlan(bare, [bare.blocks[0].exercises[0].id], {}).noWeight).toBe(2);
+  });
+});
+
+describe('the redesigned logger (approved Logger board)', () => {
+  it('Start lands on the first set to do, the first page when all is done', () => {
+    let log = mockLog();
+    expect(startPlace(log, buildSections(log))).toEqual({ section: 0, page: 0 });
+    log = tickAll(log, 0);
+    expect(startPlace(log, buildSections(log))).toEqual({ section: 1, page: 0 });
+    expect(startPlace(emptyLog('Quick', uuid, NOW), buildSections(emptyLog('Quick', uuid, NOW)))).toBeNull();
+  });
+
+  it('the header says the section, the exercise number, and the superset round', () => {
+    let log = mockLog();
+    const s = buildSections(log);
+    expect(headerLines(log, s, { section: 0, page: 0 })).toEqual({ title: 'Parv - Upper/Core · Warm-Up', subtitle: 'Exercise 1 of 4 · All exercises ▾' });
+    expect(headerLines(log, s, { section: 1, page: 0 }).subtitle).toBe('Superset A · Round 1 of 4 ▾');
+    log = tickAll(log, 1);
+    expect(headerLines(log, buildSections(log), { section: 1, page: 1 }).subtitle).toBe('Exercise 3 of 4 · All exercises ▾');
+    expect(headerLines(log, s, { section: 2, page: 0 }).subtitle).toBe('Pick one · 4 of 4 ▾');
+  });
+
+  it('the bottom button names the next exercise, and Finish on the last page', () => {
+    const log = mockLog();
+    const s = buildSections(log);
+    expect(nextAction(log, s, { section: 0, page: 0 })).toEqual({ kind: 'next', label: 'Next: A1 Dumbbell Bench Press', to: { section: 1, page: 0 } });
+    expect(nextAction(log, s, { section: 1, page: 0 })).toMatchObject({ label: 'Next: Cable Tricep Pushdown' });
+    expect(nextAction(log, s, { section: 1, page: 1 })).toMatchObject({ label: 'Next: Medicine Ball Slam, Farmers Walk or Overhead Throw' });
+    expect(nextAction(log, s, { section: 2, page: 0 })).toEqual({ kind: 'finish' });
+  });
+
+  it('Today says what is next: in a superset the exercise of its next set', () => {
+    let log = tickAll(mockLog(), 0);
+    log = completeSet(log, log.blocks[1].exercises[0].sets[0].id, NOW);
+    expect(nextUpLabel(log)).toBe('A2 Alternating DB Curl');
+  });
+
+  it('counts the unticked sets a page leaves behind', () => {
+    let log = mockLog();
+    const s = buildSections(log);
+    expect(openSetsOnPage(log, s[1].pages[1]).count).toBe(4);
+    log = completeSet(log, log.blocks[2].exercises[0].sets[0].id, NOW);
+    expect(openSetsOnPage(log, s[1].pages[1])).toEqual({ count: 3, logExerciseIds: [log.blocks[2].exercises[0].id] });
+    expect(openSetsOnPage(log, s[2].pages[0]).count).toBe(2);
+    expect(notTickedTitle(2)).toBe('2 sets not ticked');
+    expect(notTickedTitle(1)).toBe('1 set not ticked');
+  });
+
+  it('shows last time per set without units, and time in', () => {
+    const l = { setType: 'normal' as const, actualReps: 8, actualWeightKg: 57.5, actualDurationS: null, actualDistanceM: null };
+    expect(lastCellText(l, 'weight_reps', 'kg')).toBe('57.5 × 8');
+    expect(lastCellText(null, 'weight_reps', 'kg')).toBeNull();
+    const log = mockLog();
+    const push = log.blocks[2].exercises[0];
+    const rows = setRows(push, 'kg', [], undefined, [
+      { setType: 'warmup', actualReps: 10, actualWeightKg: 20, actualDurationS: null, actualDistanceM: null },
+      l,
+    ]);
+    expect(rows.map((r) => r.last)).toEqual(['20 × 10', '57.5 × 8', null, null]);
+    expect(elapsedLabel(NOW, Date.parse(NOW) + 12 * 60_000 + 5000)).toBe('12 min in');
+    expect(elapsedLabel(NOW, Date.parse(NOW) + 20_000)).toBe('Just started');
+    expect(elapsedLabel(NOW, Date.parse(NOW) + 65 * 60_000)).toBe('1 h 5 min in');
+  });
+
+  it('a bodyweight exercise asks for added weight, optional', () => {
+    const doc = WorkoutDoc.parse({
+      id: uuid(),
+      name: 'Pull',
+      notes: null,
+      blocks: [{ id: uuid(), kind: 'straight', exercises: [exercise('Pull Up', [set('normal', { targetWeightKg: null, targetRepsMin: 8, targetRepsMax: 8 })])] }],
+    });
+    const log = startLogFromWorkout(doc, uuid, NOW);
+    expect(setRows(log.blocks[0].exercises[0], 'kg', [])[0].cells.map((c) => c.placeholder)).toEqual(['+ kg', '8']);
   });
 });

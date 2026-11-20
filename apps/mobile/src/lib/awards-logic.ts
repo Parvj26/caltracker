@@ -116,25 +116,18 @@ export function buildRevealCards(
   return cards;
 }
 
+/** "Workout #10": the milestone this workout reached, for its summary (once, never a later surprise); null if none. */
+export function milestoneLine(award: Pick<AwardResult, 'milestone'> | null): string | null {
+  return award?.milestone ? `Workout #${award.milestone}` : null;
+}
+
 /** Every card after the ladder one. `surprise` titles them "Surprise!" (collected on a later app open). */
 function extraCards(award: AwardResult, surprise: boolean): RevealCardView[] {
   const out: RevealCardView[] = [];
   for (const c of revealCards(award)) {
     if (c.type === 'ladder') continue;
-    if (c.type === 'milestone') {
-      out.push({
-        id: `milestone:${c.value}`,
-        type: 'milestone',
-        stickerKey: null,
-        lead: surprise ? 'Surprise!' : 'Milestone!',
-        lead2: null,
-        headline: `Workout #${c.value}!`,
-        pill: null,
-        fact: null,
-        shiny: false,
-      });
-      continue;
-    }
+    // A milestone ("Workout #1") shows once, on the workout's summary: never as a reveal card or a late surprise.
+    if (c.type === 'milestone') continue;
     const key = c.key ?? '';
     out.push({
       id: `${c.type}:${key}`,
@@ -308,6 +301,11 @@ export function summaryStickers(award: AwardResult): SummarySticker[] {
 const PR_KIND: Record<string, string> = { heaviest: 'heaviest', reps_at_weight: 'most reps', e1rm: 'best estimated max' };
 
 /** "Bench press: heaviest" for each personal best this workout set. */
+/** How many exercises set a personal best in this workout (Today's "2 new bests"). */
+export function newBestCount(award: Pick<AwardResult, 'prs'>): number {
+  return new Set(award.prs.map((p) => p.exerciseId)).size;
+}
+
 export function prPills(award: AwardResult, log: WorkoutLogDoc): string[] {
   const names = new Map<string, string>();
   for (const b of log.blocks) for (const ex of b.exercises) names.set(ex.exerciseId, ex.exerciseName);

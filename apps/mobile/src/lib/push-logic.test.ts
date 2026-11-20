@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PUSH_CARD_SNOOZE_MS, badgeTotal, openPushTarget, pushCardText, pushCardSnoozeKey, pushDataOf, showPushCard, tapTarget, unreadCommentCount } from './push-logic';
+import { PUSH_CARD_SNOOZE_MS, afterPushDismiss, badgeTotal, openPushTarget, pushCardText, pushCardSnoozeKey, pushDataOf, showPushCard, tapTarget, unreadCommentCount } from './push-logic';
 
 const L = '0b6f1c2e-6d0a-4a51-9f3e-2a7c1d9e8b40';
 
@@ -61,19 +61,26 @@ describe('showPushCard', () => {
   });
   it('shows for a new client too (approved new-client board)', () =>
     expect(showPushCard({ permission: 'undetermined', snoozedUntil: null, now: 0 })).toBe(true));
+  it('never again after the second "Not now"', () => {
+    const first = afterPushDismiss(0, 0);
+    expect(first).toEqual({ dismissals: 1, snoozedUntil: PUSH_CARD_SNOOZE_MS });
+    expect(showPushCard({ permission: 'undetermined', ...first, now: PUSH_CARD_SNOOZE_MS })).toBe(true);
+    const second = afterPushDismiss(first.dismissals, PUSH_CARD_SNOOZE_MS);
+    expect(showPushCard({ permission: 'undetermined', ...second, now: PUSH_CARD_SNOOZE_MS * 10 })).toBe(false);
+  });
   it('snooze key per user', () => expect(pushCardSnoozeKey('u1')).toBe('caltracker.pushCardSnoozedUntil.u1'));
 });
 
 describe('pushCardText', () => {
   it('names the coach by first name', () =>
-    expect(pushCardText('Luis Bueno')).toBe('Get a ping when Luis assigns a workout or sends you a message.'));
+    expect(pushCardText('Luis Bueno')).toBe('Get a ping when Luis sends a workout or message.'));
   it('"your coach" when the name is unknown', () => {
-    expect(pushCardText(null)).toBe('Get a ping when your coach assigns a workout or sends you a message.');
-    expect(pushCardText('  ')).toBe('Get a ping when your coach assigns a workout or sends you a message.');
+    expect(pushCardText(null)).toBe('Get a ping when your coach sends a workout or message.');
+    expect(pushCardText('  ')).toBe('Get a ping when your coach sends a workout or message.');
   });
   it('speaks of the first workout to a new client', () => {
-    expect(pushCardText('Luis Bueno', true)).toBe('Get a ping when Luis assigns your first workout or messages you.');
-    expect(pushCardText(null, true)).toBe('Get a ping when your coach assigns your first workout or messages you.');
+    expect(pushCardText('Luis Bueno', true)).toBe('Get a ping when Luis sends your first workout or a message.');
+    expect(pushCardText(null, true)).toBe('Get a ping when your coach sends your first workout or a message.');
   });
 });
 

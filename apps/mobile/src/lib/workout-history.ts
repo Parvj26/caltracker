@@ -5,6 +5,7 @@ import {
   toTrackingType,
   logDurationS,
   logVolumeKg,
+  logSetCount,
   formatLogDuration,
   formatLogDurationShort,
   formatLogVolume,
@@ -31,6 +32,8 @@ export type HistoryLog = {
   /** Who logged it (logged_by), so "Logged by Luis" names only the client's current coach. */
   loggedBy: string | null;
   pr: boolean;
+  /** Ticked sets and the total by the shared rule (every tickable row); missing in copies saved before it existed. */
+  sets?: { done: number; total: number };
 };
 
 /**
@@ -103,6 +106,7 @@ export function historyLogFromRow(row: HistoryLogRow, clientId: string, prLogIds
     loggedByCoach: isLoggedByCoach({ loggedBy: row.logged_by, clientId }),
     loggedBy: row.logged_by,
     pr: prLogIds.has(row.id),
+    sets: (({ done, total }) => ({ done, total: total.min }))(logSetCount(doc)),
   };
 }
 
@@ -120,6 +124,8 @@ export function historyRow(log: HistoryLog, units: Units, coach: CurrentCoach | 
   const day = localDateOf(log.finishedAt, timeZone);
   const meta = [
     log.loggedByCoach ? `Logged by ${by}` : null,
+    // The same "17 of 19 sets" as the summary and Today.
+    log.sets ? `${log.sets.done} of ${log.sets.total} ${log.sets.total === 1 ? 'set' : 'sets'}` : null,
     formatLogDuration(log.durationS),
     log.volumeKg > 0 ? formatLogVolume(log.volumeKg, units) : null,
   ]

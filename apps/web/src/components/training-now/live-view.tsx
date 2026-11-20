@@ -237,7 +237,7 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
             </li>
             <li>
               <b>
-                {stats.done} of {stats.total}
+                {stats.done} of {stats.totalText}
               </b>{' '}
               sets
             </li>

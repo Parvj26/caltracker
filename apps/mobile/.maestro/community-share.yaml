@@ -19,26 +19,9 @@ env:
 - runFlow:
     file: helpers/sign-in.yaml
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
-- extendedWaitUntil:
-    visible: 'E2E Log'
-    timeout: 20000
-- tapOn: 'Start workout'
-- extendedWaitUntil:
-    visible:
-      id: start-workout
-    timeout: 20000
-- tapOn:
-    id: start-workout
-- extendedWaitUntil:
-    visible:
-      id: start-section
-    timeout: 10000
-- tapOn:
-    id: start-section
-- extendedWaitUntil:
-    visible:
-      id: tick-0-0-0
-    timeout: 10000
+- runFlow:
+    file: helpers/start-first-section.yaml
+    env: { NAME: 'E2E Log' }
 - tapOn:
     id: tick-0-0-0
 - tapOn:
@@ -49,7 +32,11 @@ env:
     id: page-done
 - runFlow: helpers/finish-from-sheet.yaml
 
-# The workout card, from the summary.
+# The workout card, from the summary: Share works once the award (sticker card) is saved.
+- extendedWaitUntil:
+    visible:
+      id: summary-sticker
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: summary-share

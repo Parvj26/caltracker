@@ -11,7 +11,13 @@ import {
   MONTHS_SHORT,
   muscleChipsOf,
   MUSCLE_CHIPS,
+  formatClock,
+  formatWeight,
+  groupDropSets,
+  planSetRange,
+  setRangeText,
   startOfWeek,
+  type SetRange,
   type IsoDate,
   type MuscleChip,
   type Units,
@@ -43,7 +49,7 @@ export function programDayOf(startDate: IsoDate | null, plannedOn: IsoDate | nul
   return { week: Math.floor(d / 7) + 1, day: (d % 7) + 1 };
 }
 
-export type PlanTotals = { exercises: number; sets: number; minutes: number };
+export type PlanTotals = { exercises: number; sets: SetRange; minutes: number };
 
 /** Work time guessed for a set with no target time. */
 const SET_WORK_S = 40;
@@ -51,32 +57,28 @@ const SET_WORK_S = 40;
 const EXERCISE_SETUP_S = 60;
 
 /**
- * Exercises (a pick-one group counts once), sets (warm-ups and working sets; a drop continues the set before it)
- * and a rough time: each set's work (its target time, else 40 s) plus its rest, plus a minute per exercise, to the
- * nearest 5 minutes and never under 5. A pick-one group counts its first option, the best guess of what is done.
+ * Exercises (a pick-one group counts once), sets (the shared rule: every tickable row, warm-ups and drops too; a
+ * pick-one group as a range) and a rough time: each set's work (its target time, else 40 s) plus its rest, plus a
+ * minute per exercise, to the nearest 5 minutes and never under 5. The time counts a pick-one group's first option.
  */
 export function planTotals(doc: Pick<WorkoutDoc, 'blocks'>): PlanTotals {
-  let sets = 0;
   let seconds = 0;
   for (const b of doc.blocks) {
     const done = b.kind === 'choice' ? b.exercises.slice(0, 1) : b.exercises;
     for (const e of done) {
       seconds += EXERCISE_SETUP_S;
-      for (const s of e.sets) {
-        if (s.setType !== 'drop') sets += 1;
-        seconds += (s.targetDurationS ?? SET_WORK_S) + s.restSeconds;
-      }
+      for (const s of e.sets) seconds += (s.targetDurationS ?? SET_WORK_S) + s.restSeconds;
     }
   }
   const exercises = countExercises(doc.blocks.map((b) => ({ kind: b.kind, exercises: b.exercises.length })));
-  return { exercises, sets, minutes: Math.max(5, Math.round(seconds / 60 / 5) * 5) };
+  return { exercises, sets: planSetRange(doc.blocks), minutes: Math.max(5, Math.round(seconds / 60 / 5) * 5) };
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-/** "6 exercises · 18 sets · about 50 min" (the day card) or "5 exercises · about 45 min" (Coming up). */
+/** "6 exercises · 18–19 sets · about 50 min" (the day card) or "5 exercises · about 45 min" (Coming up). */
 export function planMeta(t: PlanTotals, withSets: boolean): string {
-  return [plural(t.exercises, 'exercise'), withSets ? plural(t.sets, 'set') : null, `about ${t.minutes} min`]
+  return [plural(t.exercises, 'exercise'), withSets ? setRangeText(t.sets) : null, `about ${t.minutes} min`]
     .filter(Boolean)
     .join(' · ');
 }
@@ -165,21 +167,55 @@ export function previewSubtitle(date: IsoDate, programName: string | null, progr
     .join(' · ');
 }
 
-/** "3 × 6–8 reps · 185 lb" when the working sets share one target, else each set ("80 kg × 6–8, 84 kg × 6–8"). */
-export function exercisePlanLine(e: Pick<WorkoutExerciseDoc, 'sets' | 'trackingType'>, units: Units): string {
-  const working = e.sets.filter((s) => s.setType === 'normal');
-  const first = working[0];
-  if (first) {
-    const text = formatSetTarget(first, e.trackingType, units);
-    if (text !== '—' && working.every((s) => formatSetTarget(s, e.trackingType, units) === text)) {
-      return `${working.length} × ${text}`;
-    }
+/** One piece of an exercise's plan line: a warm-up (shown with a W tag), the working sets, or a drop (↓ Drop tag). */
+export type PlanPart = { kind: 'warmup' | 'work' | 'drop'; text: string };
+
+/** "3 × 8 at 60 kg" (weight and reps), "3 × 30 s"; null when the working sets don't share one target. */
+function sharedTarget(sets: readonly WorkoutExerciseDoc['sets'][number][], trackingType: WorkoutExerciseDoc['trackingType'], units: Units): string | null {
+  const first = sets[0];
+  if (!first) return null;
+  const text = formatSetTarget(first, trackingType, units);
+  if (text === '—' || !sets.every((s) => formatSetTarget(s, trackingType, units) === text)) return null;
+  const min = first.targetRepsMin ?? first.targetRepsMax;
+  const max = first.targetRepsMax ?? first.targetRepsMin;
+  if (trackingType === 'weight_reps' && !first.toFailure && first.targetWeightKg !== null && min !== null && max !== null) {
+    return `${sets.length} × ${min === max ? min : `${min}–${max}`} at ${formatWeight(first.targetWeightKg, units)}`;
   }
-  return formatSetsSummary(e.sets, e.trackingType, units).text;
+  return `${sets.length} × ${text}`;
+}
+
+/** A drop's target: "25 kg to failure", "25 kg × 8". */
+function dropText(s: WorkoutExerciseDoc['sets'][number], trackingType: WorkoutExerciseDoc['trackingType'], units: Units): string {
+  if (s.toFailure) return s.targetWeightKg !== null ? `${formatWeight(s.targetWeightKg, units)} to failure` : 'to failure';
+  return formatSetsSummary([{ ...s, setType: 'normal' }], trackingType, units).text;
 }
 
 /**
- * "Last time: 180 lb × 8" from the client's last finished log of this exercise, "New exercise" when there is none,
+ * The preview's line for an exercise, in pieces so warm-ups and drops can carry their tags: "[W] 20 kg × 10 · then 3 × 8
+ * at 60 kg [↓ Drop] 25 kg to failure". Every set shows, so the line agrees with the set count and the logger.
+ */
+export function planLineParts(e: Pick<WorkoutExerciseDoc, 'sets' | 'trackingType'>, units: Units): PlanPart[] {
+  const parts: PlanPart[] = [];
+  for (const s of e.sets.filter((x) => x.setType === 'warmup')) {
+    parts.push({ kind: 'warmup', text: formatSetsSummary([{ ...s, setType: 'normal' }], e.trackingType, units).text });
+  }
+  const working = e.sets.filter((s) => s.setType === 'normal');
+  if (working.length > 0) {
+    const shared = sharedTarget(working, e.trackingType, units);
+    const text = shared ?? formatSetsSummary(working, e.trackingType, units).text;
+    parts.push({ kind: 'work', text: parts.length > 0 ? `then ${text}` : text });
+  }
+  for (const s of e.sets.filter((x) => x.setType === 'drop')) parts.push({ kind: 'drop', text: dropText(s, e.trackingType, units) });
+  return parts;
+}
+
+/** The same line as words, for screen readers: "warm-up 20 kg × 10, then 3 × 8 at 60 kg, drop 25 kg to failure". */
+export function planLineSpoken(parts: readonly PlanPart[]): string {
+  return parts.map((p) => (p.kind === 'warmup' ? `warm-up ${p.text}` : p.kind === 'drop' ? `drop ${p.text}` : p.text)).join(', ');
+}
+
+/**
+ * "Last time: 180 lb × 8" from the client's last finished log of this exercise, "First time" when there is none,
  * null when history couldn't be read (`last` null) or there is nothing worth showing.
  */
 export function lastTimeLine(
@@ -189,8 +225,25 @@ export function lastTimeLine(
 ): string | null {
   if (last === null) return null;
   const entry = last[e.exerciseId];
-  if (!entry) return 'New exercise';
+  if (!entry) return 'First time';
   return formatLastResult(entry.sets, e.trackingType, units);
+}
+
+/** "SUPERSET · 3 ROUNDS" and "Rest 1:00 after each round" for a planned superset (rest: the last exercise's rest). */
+export function supersetPlanInfo(exercises: ReadonlyArray<Pick<WorkoutExerciseDoc, 'sets'>>): { heading: string; rest: string | null } {
+  const rounds = Math.max(0, ...exercises.map((e) => groupDropSets(e.sets).length));
+  const last = exercises[exercises.length - 1];
+  const rest = Math.max(0, ...(last?.sets.filter((s) => s.setType !== 'drop').map((s) => s.restSeconds) ?? []));
+  return {
+    heading: `Superset · ${rounds} ${rounds === 1 ? 'round' : 'rounds'}`,
+    rest: rest > 0 ? `Rest ${formatClock(rest)} after each round` : null,
+  };
+}
+
+/** "Rest 1:30": the longest rest between an exercise's working sets, or null. */
+export function exerciseRest(e: Pick<WorkoutExerciseDoc, 'sets'>): string | null {
+  const secs = Math.max(0, ...e.sets.filter((s) => s.setType !== 'drop').map((s) => s.restSeconds));
+  return secs > 0 ? `Rest ${formatClock(secs)}` : null;
 }
 
 /** The coach's first name for "Note from Luis"; null when there is no name. */

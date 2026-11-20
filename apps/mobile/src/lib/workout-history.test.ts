@@ -115,7 +115,13 @@ describe('historyLogFromRow', () => {
       loggedByCoach: false,
       loggedBy: 'c1',
       pr: true,
+      // Every set counts (the shared rule): 3 ticked of 4.
+      sets: { done: 3, total: 4 },
     });
+  });
+
+  it('says the sets on the row, like the summary', () => {
+    expect(historyRow({ ...historyLogFromRow(row(), 'c1', new Set())!, volumeKg: 0 }, 'kg', null, 'UTC').meta).toBe('3 of 4 sets · 52 min');
   });
 
   it('marks a coach-logged workout and skips an unfinished one', () => {

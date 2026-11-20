@@ -3,7 +3,7 @@
 import type { ErrorCode } from '@caltracker/shared';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { completedSetCount, openSetCount, type Units, type WorkoutLogDoc } from '@caltracker/shared';
+import { logSetCount, setProgressText, type Units, type WorkoutLogDoc } from '@caltracker/shared';
 import { LocalDateTime } from '@/app/(coach)/activity/local-date-time';
 import { Button, Card, ErrorText } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
@@ -34,7 +34,7 @@ export function ClientLogging({
   const [error, setError] = useState<ErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const total = completedSetCount(log) + openSetCount(log);
+  const counts = logSetCount(log);
 
   function takeOver() {
     setError(null);
@@ -60,7 +60,7 @@ export function ClientLogging({
           {holder.kind === 'client' ? `${holder.name} is logging this now on their phone` : `${holder.name} (coach) is logging this session`}
         </p>
         <p className={styles.caption}>
-          {done} of {total} {total === 1 ? 'set' : 'sets'} done · last update <LocalDateTime iso={log.lastActivityAt} />
+          {setProgressText(done, counts.total)} done · last update <LocalDateTime iso={log.lastActivityAt} />
         </p>
         <p className={styles.caption}>
           {holder.kind === 'client'

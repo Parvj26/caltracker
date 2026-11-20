@@ -32,7 +32,7 @@ env:
     visible:
       id: coach-logging-banner
     timeout: 20000
-- assertVisible: 'Your coach is logging this session'
+- assertVisible: 'Your coach is logging this session.*'
 - assertNotVisible:
     id: coach-logging-reclaim
 # ---- 20 minutes without coach activity ----
@@ -45,7 +45,7 @@ env:
     timeout: 20000
 # The heading says the coach stopped too, never "is logging" next to "Continue on my phone".
 - assertVisible: 'Your coach stopped logging'
-- assertNotVisible: 'Your coach is logging this session'
+- assertNotVisible: 'Your coach is logging this session.*'
 - assertVisible: 'Your coach stopped logging 21 min ago. You can carry on here.'
 - assertVisible: 'Continue on my phone'
 - takeScreenshot: coach-logging-reclaim
@@ -86,7 +86,7 @@ env:
 - inputText: 'Took it back'
 - hideKeyboard
 - runFlow: helpers/finish-from-sheet.yaml
-- assertVisible: '3 sets completed'
+- assertVisible: '3 of [0-9]+ sets? · .*'
 - runScript:
     file: helpers/call.js
     env: { ACTION: log-notes, EMAIL: '${EMAIL}' }

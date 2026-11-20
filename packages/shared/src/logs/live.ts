@@ -8,7 +8,8 @@ import { formatSetsSummary, targetFieldsFor } from '../workouts/targets';
 import { blockRoundCount, currentStep, liveExercises, needsPick } from './flow';
 import { formatResult, stepName } from './format';
 import type { LogExerciseDoc, LogSetDoc, WorkoutLogDoc } from './schema';
-import { completedSetCount, logVolumeKg, openSetCount } from './summary';
+import { logVolumeKg } from './summary';
+import { logSetCount, setRangeNumber } from '../workouts/set-count';
 
 /** Where the client is in the workout, for the "ON NOW" section and the "<NAME> IS HERE" exercise. */
 export type LivePosition = {
@@ -113,7 +114,10 @@ export function upNext(log: WorkoutLogDoc, limit = 3): UpNextItem[] {
 
 export type LiveStats = {
   done: number;
+  /** The most it can be (a pick-one group still to choose counts its largest option), for the progress bar. */
   total: number;
+  /** "19" or "18–19" while a pick-one group is still to choose (the shared set-count rule, as the app shows it). */
+  totalText: string;
   /** Volume by the shared rule (logVolumeKg); format it with formatTotalWeight. */
   volumeKg: number;
   /** Lifts with a personal record in the award (once each), when the workout has an award. */
@@ -125,10 +129,19 @@ export type LiveStats = {
 
 /** The live header's numbers. `award` is the stored awards.result (untyped jsonb), or null when there is none. */
 export function liveStats(log: WorkoutLogDoc, award: unknown): LiveStats {
-  const done = completedSetCount(log);
-  const total = done + openSetCount(log);
+  const counts = logSetCount(log);
+  const done = counts.done;
+  const total = counts.total.max;
   const prExerciseIds = [...new Set(awardPrEvents('', award).map((p) => p.exerciseId))];
-  return { done, total, volumeKg: logVolumeKg(log), prCount: prExerciseIds.length, prExerciseIds, fraction: total === 0 ? 0 : done / total };
+  return {
+    done,
+    total,
+    totalText: setRangeNumber(counts.total),
+    volumeKg: logVolumeKg(log),
+    prCount: prExerciseIds.length,
+    prExerciseIds,
+    fraction: total === 0 ? 0 : done / total,
+  };
 }
 
 /** Time since the start as a clock ("32:14", "1:02:05"), never below zero. */
