@@ -2,7 +2,7 @@
 // is guarded, so a phone or iPad without HealthKit, Android, or a build without the native part simply reports
 // "not available" instead of crashing.
 import { Platform } from 'react-native';
-import { HEALTH_TYPES, firstSyncStart, type AppleHealthMetric, type HealthRead } from './apple-health-logic';
+import { HEALTH_TYPES, healthQueryOptions, type AppleHealthMetric, type HealthRead } from './apple-health-logic';
 
 type HealthKitModule = typeof import('@kingstinct/react-native-healthkit');
 
@@ -31,16 +31,17 @@ export function appleHealthAvailable(): boolean {
 
 /**
  * Shows the iOS "allow CalTracker to read" prompt for these metrics (read only). Call it only from a tap. iOS never
- * says whether the client allowed reading, so a resolved promise only means the question was asked.
+ * says whether the client allowed reading, so true only means the question was asked; false or a throw means it failed.
  */
 export async function askAppleHealth(metrics: readonly AppleHealthMetric[]): Promise<boolean> {
   const hk = healthKit();
-  if (!hk || metrics.length === 0) return false;
+  if (!hk) throw new Error('Apple Health is not available.');
+  if (metrics.length === 0) return true;
   try {
     return await hk.requestAuthorization({ toRead: metrics.map((m) => HEALTH_TYPES[m].id) });
   } catch (e) {
     console.warn(`[apple health] ask: ${e instanceof Error ? e.message : String(e)}`);
-    return false;
+    throw e;
   }
 }
 
@@ -52,13 +53,8 @@ export async function readAppleHealth(metric: AppleHealthMetric, anchor: string 
   const hk = healthKit();
   if (!hk) throw new Error('Apple Health is not available.');
   const type = HEALTH_TYPES[metric];
-  const res = await hk.queryQuantitySamplesWithAnchor(type.id, {
-    limit: 0,
-    anchor,
-    // The units HEALTH_TYPES names: kg, %, ml/(kg*min), count/min, cm.
-    unit: type.unit,
-    filter: { date: { startDate: firstSyncStart(now) } },
-  });
+  // The units HEALTH_TYPES names: kg, %, ml/(kg*min), count/min, cm. A year back on the first read only.
+  const res = await hk.queryQuantitySamplesWithAnchor(type.id, { ...healthQueryOptions(anchor, now), unit: type.unit });
   return {
     metric,
     samples: res.samples.map((s) => ({ uuid: s.uuid, quantity: s.quantity, startDate: s.startDate })),

@@ -22,6 +22,11 @@ function warn(what: string, error: { message: string }): void {
   console.warn(`[metrics] ${what}: ${error.message}`);
 }
 
+/** The plain message, keeping the database's error code (so the Apple Health sync can tell a refusal from no signal). */
+function withCode(message: string, error: { code?: string; message: string }): Error & { code?: string; cause?: unknown } {
+  return Object.assign(new Error(message), { code: error.code, cause: error });
+}
+
 async function myId(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const id = data.session?.user.id;
@@ -119,7 +124,7 @@ export async function syncAppleHealthMetrics(workspaceId: string, samples: reado
     const { data, error } = await supabase.rpc('sync_apple_health_metrics', { p_workspace_id: workspaceId, p_samples: batch });
     if (error) {
       warn('apple health sync', error);
-      throw new Error(APPLE_HEALTH_SYNC_FAILED);
+      throw withCode(APPLE_HEALTH_SYNC_FAILED, error);
     }
     changed += data;
   }
@@ -139,7 +144,7 @@ export async function deleteMyAppleHealthMetrics(workspaceId: string, externalId
     const { error } = await q;
     if (error) {
       warn('apple health delete', error);
-      throw new Error(METRIC_DELETE_FAILED);
+      throw withCode(METRIC_DELETE_FAILED, error);
     }
   }
 }

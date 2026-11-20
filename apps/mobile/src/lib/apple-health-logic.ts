@@ -87,6 +87,10 @@ export interface AppleHealthState {
   lastSyncAt: string | null;
   /** True once a sync read at least one reading (to tell "no data or not allowed" apart). */
   sawData: boolean;
+  /** Server refusals in a row (not lost signal), for backing off. */
+  failures: number;
+  /** No sending before this time (ISO), after repeated server refusals. */
+  retryAfter: string | null;
 }
 
 export function defaultAppleHealthState(): AppleHealthState {
@@ -100,6 +104,8 @@ export function defaultAppleHealthState(): AppleHealthState {
     pendingDeletes: [],
     lastSyncAt: null,
     sawData: false,
+    failures: 0,
+    retryAfter: null,
   };
 }
 
@@ -150,6 +156,8 @@ export function parseAppleHealthState(raw: string | null): AppleHealthState {
     pendingDeletes: Array.isArray(x.pendingDeletes) ? x.pendingDeletes.filter((d): d is string => typeof d === 'string') : [],
     lastSyncAt: typeof x.lastSyncAt === 'string' ? x.lastSyncAt : null,
     sawData: x.sawData === true,
+    failures: typeof x.failures === 'number' && Number.isFinite(x.failures) && x.failures > 0 ? Math.floor(x.failures) : 0,
+    retryAfter: typeof x.retryAfter === 'string' ? x.retryAfter : null,
   };
 }
 
@@ -225,7 +233,7 @@ export function addRead(state: AppleHealthState, read: HealthRead, timeZone?: st
 
 /** After the waiting readings and removals reached the server. */
 export function markSent(state: AppleHealthState, now: Date): AppleHealthState {
-  return { ...state, pending: [], pendingDeletes: [], lastSyncAt: now.toISOString() };
+  return { ...state, pending: [], pendingDeletes: [], lastSyncAt: now.toISOString(), failures: 0, retryAfter: null };
 }
 
 /** The earliest sample time the first sync of a metric reads. */
@@ -253,4 +261,90 @@ export const SYNC_MIN_GAP_MS = 2 * 60_000;
 export function shouldAutoSync(state: AppleHealthState, now: Date, lastTry: number | null): boolean {
   if (metricsToRead(state).length === 0) return false;
   return lastTry === null || now.getTime() - lastTry >= SYNC_MIN_GAP_MS;
+}
+
+/**
+ * HealthKit query options for one metric. The first read (no marker) is limited to the last year; later reads pass only
+ * the marker, because a date filter would also hide the deletions HealthKit reports (deleted samples have no date).
+ */
+export function healthQueryOptions(anchor: string | undefined, now: Date): { limit: number; anchor?: string; filter?: { date: { startDate: Date } } } {
+  return anchor ? { limit: 0, anchor } : { limit: 0, filter: { date: { startDate: firstSyncStart(now) } } };
+}
+
+/**
+ * The iOS prompt for `toAsk`, then the connected state. A failed prompt (an error, or iOS answering false) leaves the
+ * import off and throws, so the screen can say so. Nothing to ask (all asked before) connects at once.
+ */
+export async function connectWith(
+  state: AppleHealthState,
+  types: Record<AppleHealthMetric, boolean>,
+  ask: (metrics: AppleHealthMetric[]) => Promise<boolean>,
+): Promise<AppleHealthState> {
+  const toAsk = APPLE_HEALTH_METRICS.filter((m) => types[m] && !state.asked.includes(m));
+  if (toAsk.length > 0 && !(await ask(toAsk))) throw new Error(ASK_FAILED);
+  return connect(state, types, toAsk);
+}
+
+/** One switch, asking iOS first when switching on a metric never asked about. A failed prompt leaves it off and throws. */
+export async function setMetricWith(
+  state: AppleHealthState,
+  metric: AppleHealthMetric,
+  on: boolean,
+  ask: (metrics: AppleHealthMetric[]) => Promise<boolean>,
+): Promise<AppleHealthState> {
+  const needsAsk = on && !state.asked.includes(metric);
+  if (needsAsk && !(await ask([metric]))) throw new Error(ASK_FAILED);
+  return setMetric(state, metric, on, needsAsk);
+}
+
+export const ASK_FAILED = 'Could not ask iPhone for access to Apple Health. Try again.';
+
+/** Longest wait between tries after repeated server refusals. */
+const MAX_BACKOFF_MS = 6 * 60 * 60_000;
+
+/** Wait after `failures` refusals in a row: 2, 4, 8 … minutes, at most 6 hours. */
+export function backoffMs(failures: number): number {
+  return Math.min(MAX_BACKOFF_MS, 2 ** Math.max(1, failures) * 60_000);
+}
+
+/** The database refused for good: no longer this coach's client, or signed out (42501). Retrying never helps. */
+export function isRefusedForGood(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === '42501';
+}
+
+export interface SendDeps {
+  /** Whose readings these are. */
+  userId: string;
+  /** Who is signed in right now (null when signed out). */
+  currentUserId: () => Promise<string | null>;
+  upsert: (samples: readonly AppleHealthSample[]) => Promise<unknown>;
+  remove: (externalIds: readonly string[]) => Promise<unknown>;
+  isNetworkFailure: (e: unknown) => boolean;
+}
+
+export type SendOutcome = 'nothing' | 'sent' | 'waiting' | 'offline' | 'failed' | 'dropped' | 'signed_out';
+
+/**
+ * Sends the waiting readings and removals. Before each request it checks the same person is still signed in, so one
+ * account's readings never go up under another. Lost signal keeps them for next time; a server refusal backs off
+ * (2 min, 4 min … 6 h); a refusal for good (no longer a client) drops them.
+ */
+export async function sendPending(state: AppleHealthState, deps: SendDeps, now: Date): Promise<{ state: AppleHealthState; outcome: SendOutcome }> {
+  if (state.pending.length === 0 && state.pendingDeletes.length === 0) return { state: markSent(state, now), outcome: 'nothing' };
+  if (state.retryAfter && now.getTime() < Date.parse(state.retryAfter)) return { state, outcome: 'waiting' };
+  const steps: Array<() => Promise<unknown>> = [];
+  if (state.pending.length > 0) steps.push(() => deps.upsert(state.pending));
+  if (state.pendingDeletes.length > 0) steps.push(() => deps.remove(state.pendingDeletes));
+  for (const step of steps) {
+    if ((await deps.currentUserId()) !== deps.userId) return { state, outcome: 'signed_out' };
+    try {
+      await step();
+    } catch (e) {
+      if (deps.isNetworkFailure(e)) return { state, outcome: 'offline' };
+      if (isRefusedForGood(e)) return { state: { ...state, pending: [], pendingDeletes: [], failures: 0, retryAfter: null }, outcome: 'dropped' };
+      const failures = state.failures + 1;
+      return { state: { ...state, failures, retryAfter: new Date(now.getTime() + backoffMs(failures)).toISOString() }, outcome: 'failed' };
+    }
+  }
+  return { state: markSent(state, now), outcome: 'sent' };
 }

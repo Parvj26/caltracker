@@ -3,6 +3,13 @@ import {
   APPLE_HEALTH_METRICS,
   HEALTH_TYPES,
   addRead,
+  backoffMs,
+  connectWith,
+  healthQueryOptions,
+  isRefusedForGood,
+  sendPending,
+  setMetricWith,
+  type SendDeps,
   appleHealthStatus,
   connect,
   defaultAppleHealthState,
@@ -190,5 +197,118 @@ describe('status line and automatic sync', () => {
     expect(shouldAutoSync(on, NOW, null)).toBe(true);
     expect(shouldAutoSync(on, NOW, NOW.getTime() - 60_000)).toBe(false);
     expect(shouldAutoSync(on, NOW, NOW.getTime() - 120_000)).toBe(true);
+  });
+});
+
+describe('HealthKit query options', () => {
+  it('limits only the first read to a year; later reads pass just the marker so deletions arrive', () => {
+    expect(healthQueryOptions(undefined, NOW)).toEqual({ limit: 0, filter: { date: { startDate: new Date('2025-11-19T12:00:00Z') } } });
+    expect(healthQueryOptions('A1', NOW)).toEqual({ limit: 0, anchor: 'A1' });
+  });
+});
+
+describe('asking iOS', () => {
+  const types = defaultAppleHealthState().types;
+  it('connects after the prompt, asking only switched-on metrics not asked before', async () => {
+    const asked: string[][] = [];
+    const before = { ...defaultAppleHealthState(), asked: ['weight_kg' as const] };
+    const s = await connectWith(before, { ...types, waist_cm: false }, (m) => (asked.push(m), Promise.resolve(true)));
+    expect(asked).toEqual([['body_fat_pct', 'vo2_max', 'resting_hr_bpm']]);
+    expect(s.enabled).toBe(true);
+    expect(metricsToRead(s)).toEqual(['weight_kg', 'body_fat_pct', 'vo2_max', 'resting_hr_bpm']);
+  });
+  it('stays off when the prompt throws or fails', async () => {
+    await expect(connectWith(defaultAppleHealthState(), types, () => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
+    await expect(connectWith(defaultAppleHealthState(), types, () => Promise.resolve(false))).rejects.toThrow(/Could not ask iPhone/);
+  });
+  it('a switch turned on asks first; a failed prompt leaves it off', async () => {
+    const s0 = connect(defaultAppleHealthState(), { ...types, waist_cm: false }, ['weight_kg']);
+    await expect(setMetricWith(s0, 'waist_cm', true, () => Promise.resolve(false))).rejects.toThrow();
+    const s1 = await setMetricWith(s0, 'waist_cm', true, () => Promise.resolve(true));
+    expect(metricsToRead(s1)).toContain('waist_cm');
+    let calls = 0;
+    await setMetricWith(s1, 'weight_kg', false, () => (calls++, Promise.resolve(true)));
+    expect(calls).toBe(0);
+  });
+});
+
+describe('sending', () => {
+  const base = () =>
+    addRead(connect(defaultAppleHealthState(), defaultAppleHealthState().types, APPLE_HEALTH_METRICS), {
+      metric: 'weight_kg', samples: [{ uuid: 'w1', quantity: 70, startDate: at }], deleted: ['gone'], newAnchor: 'A1',
+    });
+  const deps = (over: Partial<SendDeps> = {}): SendDeps & { calls: string[] } => {
+    const calls: string[] = [];
+    return {
+      calls,
+      userId: 'u1',
+      currentUserId: () => Promise.resolve('u1'),
+      upsert: () => Promise.resolve(calls.push('upsert')),
+      remove: () => Promise.resolve(calls.push('remove')),
+      isNetworkFailure: (e) => (e as { network?: boolean }).network === true,
+      ...over,
+    };
+  };
+
+  it('sends readings then removals, and clears the queue', async () => {
+    const d = deps();
+    const r = await sendPending(base(), d, NOW);
+    expect(d.calls).toEqual(['upsert', 'remove']);
+    expect(r.outcome).toBe('sent');
+    expect(r.state.pending).toEqual([]);
+    expect(r.state.lastSyncAt).toBe(NOW.toISOString());
+  });
+
+  it('never sends under another account', async () => {
+    const d = deps({ currentUserId: () => Promise.resolve('u2') });
+    const r = await sendPending(base(), d, NOW);
+    expect(d.calls).toEqual([]);
+    expect(r.outcome).toBe('signed_out');
+    expect(r.state.pending).toHaveLength(1);
+    let n = 0;
+    const d2 = deps({ currentUserId: () => Promise.resolve(n++ === 0 ? 'u1' : null) });
+    const r2 = await sendPending(base(), d2, NOW);
+    expect(d2.calls).toEqual(['upsert']);
+    expect(r2.outcome).toBe('signed_out');
+  });
+
+  it('keeps everything with no signal, without backing off', async () => {
+    const r = await sendPending(base(), deps({ upsert: () => Promise.reject(Object.assign(new Error('offline'), { network: true })) }), NOW);
+    expect(r.outcome).toBe('offline');
+    expect(r.state.pending).toHaveLength(1);
+    expect(r.state.failures).toBe(0);
+  });
+
+  it('backs off after server refusals, and waits it out', async () => {
+    const fail = deps({ upsert: () => Promise.reject(Object.assign(new Error('bad'), { code: '23514' })) });
+    const r1 = await sendPending(base(), fail, NOW);
+    expect(r1.outcome).toBe('failed');
+    expect(r1.state.failures).toBe(1);
+    expect(r1.state.retryAfter).toBe(new Date(NOW.getTime() + 2 * 60_000).toISOString());
+    const d = deps();
+    const r2 = await sendPending(r1.state, d, new Date(NOW.getTime() + 60_000));
+    expect(r2.outcome).toBe('waiting');
+    expect(d.calls).toEqual([]);
+    const r3 = await sendPending(r1.state, fail, new Date(NOW.getTime() + 3 * 60_000));
+    expect(r3.state.failures).toBe(2);
+    const r4 = await sendPending(r3.state, deps(), new Date(NOW.getTime() + 60 * 60_000));
+    expect(r4.outcome).toBe('sent');
+    expect(r4.state.failures).toBe(0);
+    expect(r4.state.retryAfter).toBe(null);
+  });
+
+  it('drops the queue when the database refuses for good (no longer a client)', async () => {
+    const r = await sendPending(base(), deps({ upsert: () => Promise.reject(Object.assign(new Error('no'), { code: '42501' })) }), NOW);
+    expect(r.outcome).toBe('dropped');
+    expect(r.state.pending).toEqual([]);
+    expect(r.state.pendingDeletes).toEqual([]);
+  });
+
+  it('backoff doubles up to 6 hours', () => {
+    expect(backoffMs(1)).toBe(2 * 60_000);
+    expect(backoffMs(3)).toBe(8 * 60_000);
+    expect(backoffMs(20)).toBe(6 * 60 * 60_000);
+    expect(isRefusedForGood({ code: '42501' })).toBe(true);
+    expect(isRefusedForGood(new Error('x'))).toBe(false);
   });
 });

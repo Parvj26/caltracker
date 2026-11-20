@@ -7,7 +7,7 @@ import { AppleHealthConnect } from '@/components/metrics/apple-health-connect';
 import { HeartTile, SwitchRow } from '@/components/metrics/parts';
 import { Button, ErrorText, Screen, TextButton } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/icons';
-import { APPLE_HEALTH_METRICS, APPLE_HEALTH_NOTES, appleHealthStatus } from '@/lib/apple-health-logic';
+import { APPLE_HEALTH_METRICS, APPLE_HEALTH_NOTES, ASK_FAILED, appleHealthStatus } from '@/lib/apple-health-logic';
 import { useAppleHealth } from '@/lib/apple-health-sync';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -98,7 +98,7 @@ export default function AppleHealthScreen() {
         ) : !state ? null : !state.enabled ? (
           <>
             <AppleHealthConnect coachFirstName={coachFirst} initial={state.types} onContinue={async (types) => void (await health.connect(types))} />
-            {state.asked.length > 0 ? <TextButton testID="apple-health-remove" title="Remove imported readings" onPress={removeImported} /> : null}
+            <TextButton testID="apple-health-remove" title="Remove imported readings" onPress={removeImported} />
           </>
         ) : (
           <>
@@ -128,7 +128,10 @@ export default function AppleHealthScreen() {
                   label={METRIC_CATALOGUE[m].label}
                   note={APPLE_HEALTH_NOTES[m]}
                   on={state.types[m]}
-                  onToggle={() => void health.setMetric(m, !state.types[m])}
+                  onToggle={() => {
+                    setError(null);
+                    health.setMetric(m, !state.types[m]).catch((e: unknown) => setError(e instanceof Error ? e.message : ASK_FAILED));
+                  }}
                 />
               ))}
               <SwitchRow testID="health-switch-smm_kg" label="Muscle mass" note="Comes from InBody scans only" on={false} disabled onToggle={() => undefined} last />

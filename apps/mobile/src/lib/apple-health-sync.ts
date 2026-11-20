@@ -7,13 +7,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import {
   addRead,
-  connect,
+  connectWith,
   defaultAppleHealthState,
   disconnect,
-  markSent,
   metricsToRead,
   parseAppleHealthState,
-  setMetric,
+  sendPending,
+  setMetricWith,
   shouldAutoSync,
   type AppleHealthMetric,
   type AppleHealthState,
@@ -21,6 +21,7 @@ import {
 import { appleHealthAvailable, askAppleHealth, readAppleHealth } from './apple-health';
 import { progressCachePrefix } from './device-cache-keys';
 import { deleteMyAppleHealthMetrics, syncAppleHealthMetrics } from './metrics-api';
+import { isNetworkFailure } from './network-failure';
 import { useSession } from './session';
 import { supabase } from './supabase';
 
@@ -56,16 +57,26 @@ async function save(ids: Ids, state: AppleHealthState, dataChanged = false): Pro
   for (const l of listeners) l(ids, state, dataChanged);
 }
 
-/** Sends what is waiting. Returns the state after, and whether anything reached the server. Never throws. */
+/** Who is signed in right now. */
+async function signedInId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
+/** Sends what is waiting (see sendPending). Never throws. */
 async function send(ids: Ids, state: AppleHealthState): Promise<{ state: AppleHealthState; sent: boolean }> {
-  try {
-    if (state.pending.length > 0) await syncAppleHealthMetrics(ids.workspaceId, state.pending);
-    if (state.pendingDeletes.length > 0) await deleteMyAppleHealthMetrics(ids.workspaceId, state.pendingDeletes);
-    const sent = state.pending.length > 0 || state.pendingDeletes.length > 0;
-    return { state: markSent(state, new Date()), sent };
-  } catch {
-    return { state, sent: false };
-  }
+  const { state: after, outcome } = await sendPending(
+    state,
+    {
+      userId: ids.userId,
+      currentUserId: signedInId,
+      upsert: (samples) => syncAppleHealthMetrics(ids.workspaceId, samples),
+      remove: (externalIds) => deleteMyAppleHealthMetrics(ids.workspaceId, externalIds),
+      isNetworkFailure: (e) => isNetworkFailure((e as { cause?: unknown }).cause ?? e),
+    },
+    new Date(),
+  );
+  return { state: after, sent: outcome === 'sent' };
 }
 
 /** Reads what changed in Apple Health and sends it. Quietly does nothing when off, not allowed, or offline. */
@@ -89,13 +100,13 @@ export function syncAppleHealth(ids: Ids): Promise<AppleHealthState> {
   });
 }
 
-/** Connect: asks iOS (only for the switched-on metrics not asked before), saves the choice and syncs. From a tap only. */
+/**
+ * Connect: asks iOS (only for the switched-on metrics not asked before), saves the choice and syncs. From a tap only.
+ * When the prompt fails the import stays off and this throws.
+ */
 export async function connectAppleHealth(ids: Ids, types: Record<AppleHealthMetric, boolean>): Promise<AppleHealthState> {
   await serial(async () => {
-    const state = await load(ids);
-    const toAsk = (Object.keys(types) as AppleHealthMetric[]).filter((m) => types[m] && !state.asked.includes(m));
-    const asked = toAsk.length > 0 && (await askAppleHealth(toAsk)) ? toAsk : [];
-    await save(ids, connect(state, types, asked));
+    await save(ids, await connectWith(await load(ids), types, askAppleHealth));
   });
   return syncAppleHealth(ids);
 }
@@ -103,9 +114,7 @@ export async function connectAppleHealth(ids: Ids, types: Record<AppleHealthMetr
 /** One metric's switch. Switching one on that iOS was never asked about shows the prompt (this runs from the tap). */
 export async function setAppleHealthMetric(ids: Ids, metric: AppleHealthMetric, on: boolean): Promise<AppleHealthState> {
   const next = await serial(async () => {
-    const state = await load(ids);
-    const askedNow = on && !state.asked.includes(metric) ? await askAppleHealth([metric]) : false;
-    const s = setMetric(state, metric, on, askedNow);
+    const s = await setMetricWith(await load(ids), metric, on, askAppleHealth);
     await save(ids, s);
     return s;
   });

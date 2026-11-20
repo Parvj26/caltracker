@@ -1,6 +1,6 @@
 # Apple Health import end to end on the iOS Simulator: add a weight in the Health app, connect Apple Health from
-# Metrics (explainer, Continue, the iOS prompt), see the weight arrive "from Apple Health", then turn the import off and
-# remove the imported readings. Needs a simulator whose Health app has been opened once (Maestro handles its welcome).
+# Metrics (explainer, Continue, the iOS prompt), see the weight arrive "from Apple Health", delete it in Health and see it
+# go, add another, then turn the import off and remove the imported readings. Needs a simulator whose Health app has been opened once (Maestro handles its welcome).
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -67,6 +67,52 @@ env:
     id: metric-value-weight_kg
     text: '157.0|71.2'
 - takeScreenshot: apple-health-imported
+# Delete the weight in the Health app: the next sync (on coming back to CalTracker) removes it here too.
+- launchApp:
+    appId: com.apple.Health
+- tapOn: 'Browse'
+- tapOn: 'Body Measurements'
+- tapOn: 'Weight'
+- scrollUntilVisible:
+    element: 'Show All Data'
+- tapOn: 'Show All Data'
+- tapOn: 'Edit'
+- tapOn:
+    text: 'Delete.*'
+    index: 0
+- tapOn: 'Delete'
+- tapOn: 'Done'
+- stopApp: com.apple.Health
+# Back in CalTracker (no clearState: the sync marker must be kept). Coming to the front syncs at most every 2 minutes,
+# so use Sync now.
+- launchApp:
+    stopApp: false
+- runFlow:
+    file: helpers/apple-health-sync-now.yaml
+- extendedWaitUntil:
+    visible:
+      id: metric-meta-weight_kg
+      text: 'Not logged yet'
+    timeout: 30000
+# Add another weight so turning off can remove it.
+- launchApp:
+    appId: com.apple.Health
+- tapOn: 'Browse'
+- tapOn: 'Body Measurements'
+- tapOn: 'Weight'
+- tapOn: 'Add Data'
+- inputText: '70.8'
+- tapOn: 'Add'
+- stopApp: com.apple.Health
+- launchApp:
+    stopApp: false
+- runFlow:
+    file: helpers/apple-health-sync-now.yaml
+- extendedWaitUntil:
+    visible:
+      id: metric-meta-weight_kg
+      text: '.* · from Apple Health'
+    timeout: 30000
 # Settings › Apple Health: turn it off and remove what came in.
 - tapOn:
     id: apple-health-row
