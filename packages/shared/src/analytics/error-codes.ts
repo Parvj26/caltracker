@@ -262,6 +262,13 @@ export const ERROR_CODES = {
   request_invalid: 'Something went wrong. Reload the page and try again.',
   measure_add_failed: "Couldn't add the measure. Please try again.",
   meal_photo_invalid: "Couldn't save the photo. Please try again.",
+  library_name_taken: 'That name is already in your Library. Pick another name.',
+  library_save_failed: "Couldn't save it to your Library. Please try again.",
+  exercise_name_taken: 'An exercise with this name already exists. Pick it from the list or use another name.',
+  exercise_create_failed: "Couldn't create the exercise. Please try again.",
+  invite_rename_failed: "Couldn't save the name. Please try again.",
+  invite_plan_save_failed: "Couldn't save the plan. Please try again.",
+  invite_email_same: 'That is the email this invite already went to.',
   missing_code: SERVER_ERROR_MESSAGE,
 } as const;
 
