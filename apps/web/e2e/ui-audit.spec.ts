@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 import type { Database } from '@caltracker/shared';
-import { serviceClient, signInAsCoach } from './helpers';
+import { seedLog, serviceClient, signInAsCoach } from './helpers';
 import { AXE_ALLOW, UI_ALLOW, type AxeAllow, type Size, type UiAllow } from './ui-audit-allowlist';
 
 // The 3-size UI audit (docs/design/ui-audit.md). Opens every main coach page on a phone (390 x 844, touch), an iPad
@@ -22,7 +22,8 @@ const CLIENT = '/clients/00000000-0000-4000-8000-0000000000c2';
 type AuditPage = { name: string; path: string };
 // `communityPost`: a coach post with a comment and a reaction, so Community's reaction chips and comment controls are
 // checked too (an empty feed would hide them).
-type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; signedOut?: AuditPage[] };
+// `strengthLog`: two finished squat workouts for the demo client, so Metrics' Strength rows and the exercise page show.
+type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; signedOut?: AuditPage[] };
 
 const GROUPS: Group[] = [
   {
@@ -45,6 +46,14 @@ const GROUPS: Group[] = [
       { name: 'Client food', path: `${CLIENT}/food` },
       { name: 'Client documents', path: `${CLIENT}/documents` },
       { name: 'Client settings', path: `${CLIENT}/settings` },
+    ],
+  },
+  {
+    name: 'client metrics',
+    strengthLog: true,
+    pages: [
+      { name: 'Client body', path: `${CLIENT}/body` },
+      { name: 'Exercise progress', path: `${CLIENT}/metrics/strength/:squat` },
     ],
   },
   {
@@ -282,6 +291,18 @@ for (const { size, use } of SIZES) {
           if (ex.error) throw ex.error;
           ids.exercise = ex.data.id;
           cleanup.push(() => admin.from('programs').delete().eq('id', ids.program!), () => admin.from('workouts').delete().eq('id', ids.workout!));
+        }
+        if (group.strengthLog) {
+          const ws = await demoWorkspace(admin);
+          const ex = await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single();
+          if (ex.error) throw ex.error;
+          ids.squat = ex.data.id;
+          const clientId = CLIENT.split('/').at(-1)!;
+          const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+          for (const [ago, weightKg] of [[20, 60], [5, 65]] as const) {
+            const logId = await seedLog(admin, { workspaceId: ws, clientId, name: `UI audit ${unique()}`, startedAt: day(ago), sets: 2, weightKg });
+            cleanup.push(() => admin.from('workout_logs').delete().eq('id', logId));
+          }
         }
         if (group.communityPost) {
           const ws = await demoWorkspace(admin);

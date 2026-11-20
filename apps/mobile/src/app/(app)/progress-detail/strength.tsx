@@ -5,19 +5,21 @@ import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import {
   STRENGTH_RANGES,
   STRENGTH_RANGE_LABELS,
+  heaviestSentence,
+  heaviestSessionRows,
+  heaviestSessions,
+  loadStyleOf,
   localToday,
   mostTrained,
   pointsInRange,
-  sessionRows,
-  strengthHeadline,
+  strengthStats,
   type StrengthRange,
 } from '@caltracker/shared';
 import { LineChart } from '@/components/charts/line-chart';
-import { InkCard, LoadState, OfflineNote, Overline, SectionHeader, Segmented } from '@/components/progress/parts';
+import { InkCard, LoadState, OfflineNote, SectionHeader, Segmented } from '@/components/progress/parts';
 import { StrengthPicker } from '@/components/progress/strength-picker';
 import { Screen } from '@/components/ui';
 import { readLastExercise, rememberLastExercise } from '@/lib/progress-hub-api';
-import { prKeys } from '@/lib/progress-hub-logic';
 import { useSession } from '@/lib/session';
 import { chartModel } from '@/lib/strength-logic';
 import { useHub, usePullRefresh } from '@/lib/use-progress-data';
@@ -27,8 +29,9 @@ import { useTheme } from '@/theme/use-theme';
 
 /**
  * Strength: one exercise at a time (picked from a searchable list, or a chip for the three most trained in the last 3
- * months), its estimated max over 1 month, 3 months or all time, one plain sentence, and its recent sessions with PR
- * tags. The last exercise picked is remembered on the phone.
+ * months). It headlines the heaviest weight lifted, with the estimated 1-rep max second (product owner, 2026-11-19,
+ * the same numbers the coach sees), one plain sentence, the heaviest weight per session over 1 month, 3 months or all
+ * time, and the recent sessions with "Heaviest yet" tags. The last exercise picked is remembered on the phone.
  */
 export default function StrengthScreen() {
   const { text, space, radius } = useTheme();
@@ -67,12 +70,15 @@ export default function StrengthScreen() {
 
   const view = useMemo(() => {
     if (!exercise || !hub.data) return null;
-    const points = pointsInRange(exercise.points, range, today);
+    const style = loadStyleOf(exercise.name);
+    // "Heaviest yet" looks at the whole history; the numbers, chart and sentence at the chosen range.
+    const all = heaviestSessions(exercise.points, style);
+    const inRange = pointsInRange(all, range, today);
     return {
-      headline: strengthHeadline(points, units, today),
-      chart: chartModel({ ...exercise, points }, units),
-      points,
-      sessions: sessionRows(exercise.sessions.slice(0, 5), prKeys(hub.data), exercise.exerciseId, units, today),
+      stats: strengthStats(inRange, units, style, today),
+      line: heaviestSentence(exercise.name, inRange, units, style, today, inRange.length === all.length),
+      chart: chartModel(exercise.name, inRange, style, units, today),
+      sessions: heaviestSessionRows(all, units, style, today).slice(0, 5),
     };
   }, [exercise, hub.data, range, units, today]);
   const readout = view && view.chart.points.length > 0 ? (view.chart.points[Math.min(picked ?? view.chart.points.length - 1, view.chart.points.length - 1)]?.label ?? '') : '';
@@ -130,12 +136,37 @@ export default function StrengthScreen() {
               </View>
             ) : null}
 
+            <View style={[styles.tiles, { gap: space[3] }]}>
+              <View
+                testID="strength-value"
+                accessible
+                accessibilityLabel={`Heaviest weight: ${view.stats.heaviest ?? 'none'}${view.stats.change ? `, ${view.stats.change.text}` : ''}`}
+                style={[styles.tile, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
+              >
+                <Text style={text('caption')}>Heaviest weight</Text>
+                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit>
+                  {view.stats.heaviest ?? '–'}
+                </Text>
+                {view.stats.change ? <Text style={[text('sectionHeading'), styles.change]}>{view.stats.change.text}</Text> : null}
+              </View>
+              <View
+                testID="strength-e1rm"
+                accessible
+                accessibilityLabel={`Estimated 1-rep max: ${view.stats.e1rm ?? 'none'}, ${view.stats.e1rmDetail}`}
+                style={[styles.tile, { borderRadius: radius.card, padding: space[3.5], gap: space[1] }]}
+              >
+                <Text style={text('caption')}>Estimated 1-rep max</Text>
+                <Text style={text('bigNumber')} numberOfLines={1} adjustsFontSizeToFit>
+                  {view.stats.e1rm ?? '–'}
+                </Text>
+                <Text style={text('caption')}>{view.stats.e1rmDetail}</Text>
+              </View>
+            </View>
+            <Text style={text('body')} testID="strength-summary">
+              {view.line}
+            </Text>
+
             <InkCard>
-              <Overline>Estimated max</Overline>
-              <Text style={text('bigNumber')} testID="strength-value">
-                {view.headline.value ?? '–'}
-                {view.headline.change ? <Text style={text('sectionHeading')}>{`  ${view.headline.change}`}</Text> : null}
-              </Text>
               {view.chart.points.length > 0 ? (
                 <LineChart
                   key={`${exercise.exerciseId}-${range}`}
@@ -163,26 +194,29 @@ export default function StrengthScreen() {
                 }}
               />
             </InkCard>
-            <Text style={text('body')} testID="strength-summary">
-              {view.headline.line}
-            </Text>
 
             {view.sessions.length > 0 ? (
               <View style={{ gap: space[2] }}>
                 <Text style={text('sectionHeading')} accessibilityRole="header">
-                  {`Recent sessions (${units})`}
+                  Recent sessions
                 </Text>
                 {view.sessions.map((s) => (
                   <View
-                    key={s.logId}
+                    key={s.key}
                     accessible
                     accessibilityLabel={s.label}
-                    testID={`strength-session-${s.logId}`}
+                    testID={`strength-session-${s.key}`}
                     style={[styles.session, { borderRadius: radius.input + 2, paddingHorizontal: space[3.5], paddingVertical: space[2.5], gap: space[2.5] }]}
                   >
-                    <Text style={[text('caption'), styles.when]}>{s.when}</Text>
-                    <Text style={[text('sectionHeading'), styles.grow]}>{s.sets}</Text>
-                    {s.pr ? <Text style={[text('caption'), styles.prTag, { borderRadius: radius.pill, paddingHorizontal: space[2] }]}>PR</Text> : null}
+                    <View style={styles.grow}>
+                      <Text style={text('sectionHeading')}>{s.set}</Text>
+                      <Text style={text('caption')}>{s.meta}</Text>
+                    </View>
+                    {s.heaviestYet ? (
+                      <Text style={[text('caption'), styles.yetTag, { borderRadius: radius.pill, paddingHorizontal: space[2] }]} testID="strength-heaviest-yet">
+                        Heaviest yet
+                      </Text>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -213,7 +247,9 @@ const styles = StyleSheet.create({
   chip: { minHeight: tapTarget.min, justifyContent: 'center', borderWidth: borderWidth.secondaryButton, borderColor: palette.ink, backgroundColor: palette.bg },
   chipOn: { backgroundColor: palette.ink },
   onInk: { color: white },
-  session: { flexDirection: 'row', alignItems: 'center', borderWidth: borderWidth.card, borderColor: palette.border },
-  when: { width: 64 },
-  prTag: { color: palette.ink, backgroundColor: palette.tape, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink, overflow: 'hidden', paddingVertical: 2 },
+  tiles: { flexDirection: 'row' },
+  tile: { flex: 1, minWidth: 0, backgroundColor: palette.surface },
+  change: { color: palette.magentaDeep },
+  session: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget.min, borderWidth: borderWidth.card, borderColor: palette.border },
+  yetTag: { color: palette.magentaDeep, backgroundColor: palette.pink, overflow: 'hidden', paddingVertical: 2 },
 });

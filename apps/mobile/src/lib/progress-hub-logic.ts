@@ -8,7 +8,7 @@ import {
   isPlannedLog,
   localDay,
   strengthExercises,
-  strengthSeries,
+  strengthSeriesAll,
   type HomeWorkout,
   type IsoDate,
   type MacroTargets,
@@ -65,10 +65,11 @@ export function buildHub(input: {
   timeZone: string;
 }): HubData {
   const { logs, timeZone } = input;
+  const series = strengthSeriesAll(logs, timeZone);
   const exercises = strengthExercises(logs).map((e) => ({
     ...e,
     muscle: input.muscles[e.exerciseId] ?? null,
-    points: strengthSeries(logs, e.exerciseId, timeZone),
+    points: series.get(e.exerciseId) ?? [],
     sessions: exerciseSessions(logs, e.exerciseId, timeZone, SESSIONS_KEPT),
   }));
   const finished = logs

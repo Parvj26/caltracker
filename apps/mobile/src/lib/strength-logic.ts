@@ -1,6 +1,6 @@
 // What the Progress tab shows for strength. Presentation only (no network, no React), so it is unit tested.
 // The maths (estimated 1RM, warm-ups, best set) comes from @caltracker/shared.
-import { addDays, diffDays, formatWeight, shortDate, strengthSummary, type StrengthPoint, type Units } from '@caltracker/shared';
+import { addDays, diffDays, formatWeight, heaviestChart, shortDate, type HeaviestSession, type LoadStyle, type StrengthPoint, type Units } from '@caltracker/shared';
 import type { ChartPoint } from '@/components/charts/line-chart';
 
 export type StrengthExercise = { exerciseId: string; name: string; points: StrengthPoint[] };
@@ -26,15 +26,15 @@ export function parseStrengthCache(raw: string | null): StrengthData | null {
 
 const EPOCH = '2000-01-01';
 
-/** Chart points and texts for one exercise, in the client's units. */
-export function chartModel(ex: StrengthExercise, units: Units) {
+/**
+ * Chart points and texts for one exercise's sessions in the range, in the client's units: the heaviest weight per
+ * session (the headline, product owner 2026-11-19), each point's readout also naming the estimated 1-rep max.
+ */
+export function chartModel(name: string, sessions: readonly HeaviestSession[], style: LoadStyle, units: Units, today: string) {
+  const chart = heaviestChart(name, sessions, units, style, today);
   return {
-    points: ex.points.map<ChartPoint>((p) => ({
-      x: diffDays(EPOCH, p.date),
-      y: p.e1rmKg,
-      label: `${shortDate(p.date)}: ${formatWeight(p.e1rmKg, units)} estimated 1RM, from ${formatWeight(p.bestSet.weightKg, units)} × ${p.bestSet.reps}`,
-    })),
-    summary: strengthSummary(ex.name, ex.points, units),
+    points: chart.points.map<ChartPoint>((p) => ({ x: diffDays(EPOCH, p.date), y: p.heaviestKg, label: p.label })),
+    summary: chart.summary,
     yLabel: (y: number) => formatWeight(y, units),
     xLabel: (x: number) => shortDate(addDays(EPOCH, x)),
   };
