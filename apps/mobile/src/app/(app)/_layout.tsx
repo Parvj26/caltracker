@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { useAppleHealthAutoSync } from '@/lib/apple-health-sync';
 import { landingHref } from '@/lib/landing';
 import { useSession } from '@/lib/session';
 import { MessagesProvider } from '@/lib/use-messages';
@@ -22,6 +23,8 @@ export default function AppLayout() {
   const { workspace } = useSession();
   const hasCoach = workspace !== null;
   const landing = landingHref({ signedIn: true, hasCoach });
+  // Apple Health readings come in when the app opens or comes back to the front (only once the client connected it).
+  useAppleHealthAutoSync();
   return (
     <ActiveLogProvider>
     <MessagesProvider>
@@ -49,6 +52,7 @@ export default function AppLayout() {
         <Stack.Screen name="coach-meals/index" />
         <Stack.Screen name="coach-meals/[id]" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="apple-health" />
       </Stack.Protected>
       {/* Reached from Settings, with or without a coach. */}
       <Stack.Screen name="delete-account" />
