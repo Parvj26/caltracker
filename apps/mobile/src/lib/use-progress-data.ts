@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { localToday } from '@caltracker/shared';
 import { fetchAlbum, readCachedAlbum } from './album-api';
 import { fetchMyProgress, readCachedProgress } from './body-api';
+import { fetchMyMetrics, readCachedMetrics } from './metrics-api';
 import { fetchFoodRange, fetchHub, readCachedFoodRange, readCachedHub } from './progress-hub-api';
 import { useSession } from './session';
 import { useCachedLoad } from './use-cached-load';
@@ -41,6 +42,17 @@ export function useAlbum(refreshKey: number) {
 export function useBody(refreshKey: number) {
   const { userId, key } = useIds();
   return useCachedLoad(key, () => (userId ? readCachedProgress(userId) : Promise.resolve(null)), fetchMyProgress, refreshKey);
+}
+
+/** Every Metrics value (own entries, the coach's, scans, old weigh-ins and Apple Health imports), newest first. */
+export function useMetrics(refreshKey: number) {
+  const { userId, workspaceId, key } = useIds();
+  return useCachedLoad(
+    key,
+    () => (userId && workspaceId ? readCachedMetrics(userId, workspaceId) : Promise.resolve(null)),
+    () => fetchMyMetrics(userId!, workspaceId!),
+    refreshKey,
+  );
 }
 
 /** Meals over the last 4 weeks and this week, and the coach's targets. */
