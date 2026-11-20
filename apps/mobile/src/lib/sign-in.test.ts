@@ -23,6 +23,23 @@ describe('signIn', () => {
     expect(await signIn(() => Promise.reject(new TypeError('Network request failed')), 'a@b.co', 'pw')).toBe('network_offline');
   });
   it('gives up with a clear error when the server takes too long', async () => {
-    expect(await signIn(() => new Promise(() => undefined), 'a@b.co', 'pw', 10)).toBe('sign_in_timeout');
+    expect(await signIn(() => new Promise(() => undefined), 'a@b.co', 'pw', undefined, 10)).toBe('sign_in_timeout');
+  });
+  it('signs a late success back out, since the screen already said it failed', async () => {
+    let finish: (v: { error: null }) => void = () => undefined;
+    let undone = 0;
+    const late = new Promise<{ error: null }>((resolve) => (finish = resolve));
+    const undo = () => ((undone += 1), Promise.resolve());
+    expect(await signIn(() => late, 'a@b.co', 'pw', undo, 10)).toBe('sign_in_timeout');
+    finish({ error: null });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(undone).toBe(1);
+    // A late failure needs nothing undone.
+    let fail: (v: { error: { status: number } }) => void = () => undefined;
+    const lateFail = new Promise<{ error: { status: number } }>((resolve) => (fail = resolve));
+    await signIn(() => lateFail, 'a@b.co', 'pw', undo, 10);
+    fail({ error: { status: 400 } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(undone).toBe(1);
   });
 });

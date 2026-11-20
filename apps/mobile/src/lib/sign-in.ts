@@ -29,15 +29,29 @@ export function emailFieldError(email: string): ErrorCode | undefined {
 type AuthError = { code?: string; status?: number } | null;
 export type SignInCall = (email: string, password: string) => Promise<{ error: AuthError }>;
 
-/** Signs in, or says why not: never the raw auth message, the same words for an unknown email and a wrong password. */
-export async function signIn(call: SignInCall, email: string, password: string, timeoutMs = SIGN_IN_TIMEOUT_MS): Promise<ErrorCode | null> {
+/**
+ * Signs in, or says why not: never the raw auth message, the same words for an unknown email and a wrong password.
+ * After a timeout the screen has already said it failed, so a sign-in that still succeeds later is undone with
+ * `undoLate` (sign out), rather than the app jumping in by itself.
+ */
+export async function signIn(
+  call: SignInCall,
+  email: string,
+  password: string,
+  undoLate: () => Promise<unknown> = () => Promise.resolve(),
+  timeoutMs = SIGN_IN_TIMEOUT_MS,
+): Promise<ErrorCode | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<'timeout'>((resolve) => {
     timer = setTimeout(() => resolve('timeout'), timeoutMs);
   });
+  const attempt = call(email.trim(), password);
   try {
-    const result = await Promise.race([call(email.trim(), password), timeout]);
-    if (result === 'timeout') return 'sign_in_timeout';
+    const result = await Promise.race([attempt, timeout]);
+    if (result === 'timeout') {
+      attempt.then((late) => (late.error ? undefined : undoLate())).catch(() => undefined);
+      return 'sign_in_timeout';
+    }
     const err = result.error;
     if (!err) return null;
     if (isNetworkFailure(err)) return 'network_offline';

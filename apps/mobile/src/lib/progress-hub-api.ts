@@ -200,3 +200,19 @@ export async function readLastExercise(userId: string): Promise<string | null> {
 export function rememberLastExercise(userId: string, exerciseId: string): void {
   void AsyncStorage.setItem(lastExerciseKey(userId), exerciseId).catch(() => undefined);
 }
+
+/**
+ * Which of these logs the server has awarded by now: the light check Progress repeats while it says "Updating…"
+ * (only the award rows, not the whole training history). Throws when the server can't be reached.
+ */
+export async function fetchAwardedLogIds(userId: string, workspaceId: string, logIds: readonly string[]): Promise<Set<string>> {
+  if (logIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from('awards')
+    .select('log_id')
+    .eq('client_id', userId)
+    .eq('workspace_id', workspaceId)
+    .in('log_id', [...logIds]);
+  if (error) throw new Error(`awards: ${error.message}`);
+  return new Set(data.map((a) => a.log_id));
+}

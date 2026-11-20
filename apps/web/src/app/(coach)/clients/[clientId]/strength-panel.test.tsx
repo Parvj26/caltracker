@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StrengthPoint } from '@caltracker/shared';
 import { StrengthPanel } from './strength-panel';
 
@@ -13,9 +13,16 @@ const pt = (date: string, weightKg: number, reps: number): StrengthPoint => ({
 });
 
 describe('StrengthPanel', () => {
+  // The panel reads the coach's today; pin the clock so the dates read the same every year.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-19T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('headlines the heaviest weight with the estimated 1-rep max second, like Metrics › Strength', () => {
     const html = renderToStaticMarkup(
-      <StrengthPanel data={[{ exerciseId: 'sq', name: 'Barbell Squat', points: [pt('2026-09-02', 45, 8), pt('2026-11-17', 62.5, 8)] }]} units="kg" today="2026-11-19" />,
+      <StrengthPanel data={[{ exerciseId: 'sq', name: 'Barbell Squat', points: [pt('2026-09-02', 45, 8), pt('2026-11-17', 62.5, 8)] }]} units="kg" />,
     );
     expect(html).toContain('Heaviest weight 62.5 kg · +17.5 kg since 2 Sep');
     expect(html).toContain('Est. 1-rep max 79.2 kg · From 62.5 kg × 8');
@@ -24,6 +31,6 @@ describe('StrengthPanel', () => {
   });
 
   it('says when there is nothing to chart', () => {
-    expect(renderToStaticMarkup(<StrengthPanel data={[]} units="kg" today="2026-11-19" />)).toContain('No lifts to chart yet');
+    expect(renderToStaticMarkup(<StrengthPanel data={[]} units="kg" />)).toContain('No lifts to chart yet');
   });
 });

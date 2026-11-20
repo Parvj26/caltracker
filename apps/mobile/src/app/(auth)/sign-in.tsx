@@ -34,7 +34,13 @@ export default function SignIn() {
     setError(null);
     if (found.email || found.password) return;
     setBusy(true);
-    const code = await signIn((e, p) => supabase.auth.signInWithPassword({ email: e, password: p }), email, password);
+    const code = await signIn(
+      (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
+      email,
+      password,
+      // Arrived after the screen said it timed out: undo it on this phone, so the client signs in on purpose.
+      () => supabase.auth.signOut({ scope: 'local' }),
+    );
     setBusy(false);
     if (code) setError({ code });
     // On success the session listener routes to the app and links the workspace.

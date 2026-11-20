@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { heaviestChart, heaviestSessions, loadStyleOf, strengthStats, type IsoDate, type Units } from '@caltracker/shared';
+import { heaviestChart, heaviestSessions, loadStyleOf, strengthStats, type Units } from '@caltracker/shared';
 import { Card, SelectField } from '@/components/ui';
 import type { ClientStrength } from '@/lib/client-strength';
+import { useLocalToday } from '@/lib/local-today';
 import { ExerciseChart } from './metrics/strength/[exerciseId]/exercise-chart';
 import styles from './stickers-panel.module.css';
 
@@ -12,7 +13,9 @@ import styles from './stickers-panel.module.css';
  * owner 2026-11-19) with the change since its first session, the estimated 1-rep max second, and a chart of both per
  * session. The same shared numbers as Metrics › Strength and the client's own Progress tab.
  */
-export function StrengthPanel({ data, units, today }: { data: ClientStrength; units: Units; today: IsoDate }) {
+export function StrengthPanel({ data, units }: { data: ClientStrength; units: Units }) {
+  // The coach's own today (the browser's calendar), as the rest of the client page uses.
+  const today = useLocalToday();
   const [id, setId] = useState(data[0]?.exerciseId ?? '');
   const chosen = data.find((e) => e.exerciseId === id) ?? data[0];
   const style = chosen ? loadStyleOf(chosen.name) : 'weight';

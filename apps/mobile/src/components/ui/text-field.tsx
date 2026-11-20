@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentRef, type Ref } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type HostInstance, type TextInputProps } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View, type HostInstance, type TextInputProps } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { buttonMinHeight, tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity } from '@/theme/theme';
@@ -90,15 +90,18 @@ export function TextField({ label, hint, testID, style, onFocus, onBlur, error, 
 /** The error under a field: ⚠ and the message in the danger colour, counted like every shown error. */
 function FieldError({ code, testID }: { code: ErrorCode; testID: string }) {
   const { text, space } = useTheme();
+  const message = errorTextContent(code);
   useEffect(() => {
     reportErrorShown(code);
-  }, [code]);
+    // iOS has no live regions: say the new error out loud for VoiceOver (Android uses accessibilityLiveRegion).
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+  }, [code, message]);
   return (
     <View testID={testID} style={[styles.errorRow, { gap: space[1] }]} accessibilityLiveRegion="polite">
       <Text style={[text('sectionHeading'), styles.fieldError]} accessibilityElementsHidden importantForAccessibility="no">
         ⚠
       </Text>
-      <Text style={[text('sectionHeading'), styles.fieldError, styles.errorText]}>{errorTextContent(code)}</Text>
+      <Text style={[text('sectionHeading'), styles.fieldError, styles.errorText]}>{message}</Text>
     </View>
   );
 }

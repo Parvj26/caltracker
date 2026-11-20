@@ -3,6 +3,7 @@ import type { NamedRecord } from '../../src/awards/bests';
 import {
   AWARD_SETTLE_MS,
   awaitingAward,
+  awaitingLogIds,
   bestsRow,
   consistencyRow,
   progressFacts,
@@ -84,6 +85,10 @@ describe('progressFacts', () => {
     expect(zooRow(f)?.value).toBe('Updating…');
     expect(consistencyRow(f, true)?.value).toBe('Updating…');
     expect(progressHeadline(f, true)?.strong).toBe('Updating…');
+    // Offline: the saved numbers, never "Updating…".
+    const offline = progressFacts(base({ hub: waiting, uploading: true, offline: true }));
+    expect(offline.updating).toBe(false);
+    expect(bestsRow(offline)?.value).toBe('2 this month');
   });
 
   it('uses the phone’s finished workouts for the streak until the server stores one, and waits for data', () => {
@@ -102,6 +107,22 @@ describe('awaitingAward', () => {
     expect(awaitingAward([{ day: today, planned: true, at: new Date(now - AWARD_SETTLE_MS - 1).toISOString(), awarded: false }], now)).toBe(false);
     expect(awaitingAward([{ day: today, planned: true }], now)).toBe(false);
     expect(awaitingAward([{ day: today, planned: true, at: new Date(now).toISOString(), awarded: true }], now)).toBe(false);
+  });
+});
+
+describe('awaitingLogIds', () => {
+  it('lists the recent unawarded logs the phone keeps asking about', () => {
+    const recent = new Date(now - 60_000).toISOString();
+    expect(
+      awaitingLogIds(
+        [
+          { day: today, planned: true, at: recent, logId: 'a', awarded: false },
+          { day: today, planned: true, at: recent, logId: 'b', awarded: true },
+          { day: today, planned: true, at: new Date(now - AWARD_SETTLE_MS - 1).toISOString(), logId: 'c', awarded: false },
+        ],
+        now,
+      ),
+    ).toEqual(['a']);
   });
 });
 

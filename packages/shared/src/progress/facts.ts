@@ -39,6 +39,8 @@ export type ProgressFactsInput = {
   album: { stickers: readonly StickerLite[]; stats: StoredStreak | null } | null;
   /** A finished workout is still on this phone, waiting to upload. */
   uploading: boolean;
+  /** The server can't be reached: the saved numbers are shown as they are (with the offline note), never "Updating…". */
+  offline?: boolean;
   userId: string | null;
   today: IsoDate;
   timeZone: string;
@@ -66,9 +68,19 @@ export type ProgressFacts = {
 
 const stickerByKey = new Map(STICKERS.map((s) => [s.key, s]));
 
+/**
+ * The logs finished within AWARD_SETTLE_MS that the server has not awarded yet. After that the server's catch-up job
+ * has had its tries, so the numbers are shown as they are (and the phone stops asking).
+ */
+export function awaitingLogIds(finished: readonly FinishedLite[], nowMs: number): string[] {
+  return finished.flatMap((f) => (waiting(f, nowMs) && f.logId !== undefined ? [f.logId] : []));
+}
+
+const waiting = (f: FinishedLite, nowMs: number) => f.awarded === false && f.at !== undefined && nowMs - Date.parse(f.at) < AWARD_SETTLE_MS;
+
 /** A workout finished within AWARD_SETTLE_MS that the server has not awarded yet. */
 export function awaitingAward(finished: readonly FinishedLite[], nowMs: number): boolean {
-  return finished.some((f) => f.awarded === false && f.at !== undefined && nowMs - Date.parse(f.at) < AWARD_SETTLE_MS);
+  return finished.some((f) => waiting(f, nowMs));
 }
 
 /** The streak now and the best: the stored one as it stands this week, else from the finished workouts' days. */
@@ -80,7 +92,7 @@ export function streakFrom(stats: StoredStreak | null, trainedDays: readonly Iso
 
 export function progressFacts(input: ProgressFactsInput): ProgressFacts {
   const { hub, album, today, timeZone, units } = input;
-  const updating = input.uploading || (hub !== null && awaitingAward(hub.finished, input.nowMs));
+  const updating = !input.offline && (input.uploading || (hub !== null && awaitingAward(hub.finished, input.nowMs)));
   const trained = hub ? hub.finished.map((f) => f.day) : [];
   const streak = hub ? streakFrom(album?.stats ?? null, trained, today) : null;
   const prs = hub && input.userId ? prsThisWeek(hub.prEvents, new Set([input.userId]), today, timeZone) : 0;

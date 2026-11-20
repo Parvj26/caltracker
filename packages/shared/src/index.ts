@@ -722,6 +722,7 @@ export {
   AWARD_SETTLE_MS,
   UPDATING,
   awaitingAward,
+  awaitingLogIds,
   bestsRow,
   consistencyRow,
   progressFacts,
