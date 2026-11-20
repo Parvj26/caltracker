@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { seedLog, serviceClient } from './helpers';
 
-// The client page's tabs and Overview: Training counts, Highlights, Body metrics, Updates, Profile, and the coach's
+// The client page's tabs (Overview, Training, Metrics, Food, Documents) and Overview: Training counts, Highlights,
+// Body metrics, Updates, Profile, and the coach's
 // goal, limitations and notes; plus the Documents tab. Each test gets its own coach, workspace and client, so the
 // numbers are exact. Dates are the machine's local dates, which is what the browser uses too.
 const admin = serviceClient();
@@ -152,14 +153,14 @@ test('Overview is the default tab and shows training, highlights, body metrics, 
   await expect(highlights.locator('dd').nth(2)).toHaveText('4');
 
   const body = card(page, 'Body metrics');
-  await expect(body.getByRole('button', { name: /^Weight: 80\.5 kg, −1\.5 kg over last 4 weeks/ })).toHaveAttribute('aria-pressed', 'true');
-  await expect(body.getByRole('button', { name: /^Body fat: 19\.2%, −0\.8% over last 4 weeks/ })).toBeVisible();
+  await expect(body.getByRole('button', { name: /^Weight\s+80\.5 kg\s+−1\.5 kg over last 4 weeks/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(body.getByRole('button', { name: /^Body fat\s+19\.2%\s+−0\.8% over last 4 weeks/ })).toBeVisible();
   await expect(body.getByRole('group', { name: /^Weight, last 4 weeks chart/ })).toBeVisible();
-  await body.getByRole('button', { name: /^Skeletal muscle mass/ }).click();
+  await body.getByRole('button', { name: /^Muscle mass/ }).click();
   await expect(body.getByRole('group', { name: /^Skeletal muscle mass, last 4 weeks chart/ })).toBeVisible();
   // All time: the same two scans, so the same change.
   await body.getByLabel('Period').selectOption('all');
-  await expect(body.getByRole('button', { name: /^Weight: 80\.5 kg, −1\.5 kg over all time/ })).toBeVisible();
+  await expect(body.getByRole('button', { name: /^Weight\s+80\.5 kg\s+−1\.5 kg over all time/ })).toBeVisible();
 
   const updates = card(page, 'Updates');
   await expect(updates.getByRole('link', { name: /^Tara logged Upper A for / })).toBeVisible();
@@ -228,7 +229,7 @@ test('the coach keeps a goal, limitations and notes; an injury chip tops Overvie
   expect(rows.data?.map((r) => r.body)).toEqual(['Prefers early morning sessions.']);
 });
 
-test('the tabs open Training, Body and Documents, ⋯ opens Settings, and old links still land in the right place', async ({ page }) => {
+test('the tabs open Training, Metrics and Documents, ⋯ opens Settings, and old links still land in the right place', async ({ page }) => {
   const s = await setup();
   await signIn(page, s);
   await page.goto(`/clients/${s.clientId}`);
@@ -241,15 +242,18 @@ test('the tabs open Training, Body and Documents, ⋯ opens Settings, and old li
   await expect(tabs.getByRole('link', { name: 'Training' })).toHaveAttribute('aria-current', 'page');
   await expect(page).toHaveTitle(/^Training · Tara Track · Clients/);
 
-  await tabs.getByRole('link', { name: 'Body' }).click();
-  await expect(page.getByRole('heading', { name: 'Body scans' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add scan' })).toBeVisible();
+  await tabs.getByRole('link', { name: 'Metrics' }).click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/metrics$`));
+  await expect(page.getByRole('heading', { name: 'Body', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '+ Log metric' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'InBody scans' })).toBeVisible();
+  await expect(page).toHaveTitle(/^Metrics · Tara Track · Clients/);
 
   await tabs.getByRole('link', { name: 'Documents' }).click();
   await expect(page.getByRole('heading', { name: 'Add a document' })).toBeVisible();
 
   // Settings is no longer a tab: it is in the bar's ⋯, at its old address.
-  await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Training', 'Body', 'Food', 'Documents']);
+  await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Training', 'Metrics', 'Food', 'Documents']);
   await page.getByRole('button', { name: 'More for this client' }).click();
   await page.getByRole('menuitem', { name: 'Client settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/settings$`));
@@ -266,7 +270,7 @@ test('the tabs open Training, Body and Documents, ⋯ opens Settings, and old li
   await page.goto(`/clients/${s.clientId}?view=2w&from=${dayOffset(0)}`);
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/training\\?view=2w&from=${dayOffset(0)}$`));
   await page.goto(`/clients/${s.clientId}?scan=1`);
-  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/body`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/metrics`));
   await expect(page.getByRole('dialog', { name: 'Add a scan' })).toBeVisible();
 });
 

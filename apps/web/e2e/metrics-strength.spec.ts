@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { deleteCoach, newCoachWithClient, signInAs } from './assign-helpers';
 import { seedLog, serviceClient } from './helpers';
 
-// Metrics › Strength: the section on the client's Body tab (to become Metrics) and one exercise's progress page, at
+// Metrics › Strength: the section on the client's Metrics tab and one exercise's progress page, at
 // phone, iPad and desktop sizes. A fresh coach (in kg) with one client and four squat sessions; nothing else shared.
 const admin = serviceClient();
 const MS_DAY = 86_400_000;
@@ -48,7 +48,7 @@ for (const size of SIZES) {
 
     test('the Strength section headlines the heaviest weight and opens the exercise page', async ({ page }) => {
       await signInAs(page, c.email);
-      await page.goto(`/clients/${c.clientId}/body`);
+      await page.goto(`/clients/${c.clientId}/metrics`);
       const section = page.getByTestId('strength-section');
       await expect(section.getByRole('heading', { name: 'Strength' })).toBeVisible();
       const row = section.getByRole('link', { name: /Barbell Squat: heaviest 82\.5 kg, \+22\.5 kg since start/ });
@@ -89,11 +89,11 @@ for (const size of SIZES) {
   });
 }
 
-test('the back link returns to the client’s metrics (Body tab for now)', async ({ page }) => {
+test('the back link returns to the client’s Metrics tab', async ({ page }) => {
   await signInAs(page, c.email);
   await page.goto(`/clients/${c.clientId}/metrics/strength/${(await admin.from('exercises').select('id').eq('name', 'Barbell Squat').is('workspace_id', null).limit(1).single()).data!.id}?range=all`);
   await page.getByRole('link', { name: /’s metrics$/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/clients/${c.clientId}/body$`));
+  await expect(page).toHaveURL(new RegExp(`/clients/${c.clientId}/metrics$`));
 });
 
 test('an exercise the client never did is not found', async ({ page }) => {
