@@ -2,8 +2,8 @@
 --
 -- 1. create_client_workout: "+ New workout" from a client's "Add a workout" window. The coach builds a workout for
 --    one client's day; it is saved straight onto that client's calendar as a single workout that came from nowhere
---    (no library workout, no program). The workout row is inserted first, then the usual save_workout writes its
---    blocks, exercises and sets, all in one transaction. It is marked customised from the start (like a "Copy to…"
+--    (no library workout, no program). The workout row is inserted first (create_client_workout_row), then the usual
+--    save_workout writes its blocks, exercises and sets as the caller, under RLS, all in one transaction. It is marked customised from the start (like a "Copy to…"
 --    copy), so writing its rows is not a later "hand edit": the client gets one "new workout" push, not a second
 --    "today's workout changed" one.
 -- 2. untouched_library_copies: which of some calendar workouts are still exactly a library workout (a copy nobody has
@@ -16,46 +16,56 @@
 
 -- 1 ----------------------------------------------------------------------------------------------------------------
 
--- p_doc is a workout document as save_workout takes it; its id is made by the browser once per editor, so a retry
--- sends the same id: the same id for the same client (and workspace) saves again; for anything else it raises 23505.
--- Raises 42501 unless the caller coaches p_workspace_id and p_client_id is a current client of it.
-create function public.create_client_workout(p_workspace_id uuid, p_client_id uuid, p_date date, p_doc jsonb)
-returns uuid
+-- The calendar row alone, as a system write (it sets customised_at, which coaches can't write). Definer only for that:
+-- it checks the caller coaches p_workspace_id and p_client_id is a current client of it (42501 otherwise), and writes
+-- nothing but this one row (no blocks: create_client_workout's save_workout, run as the caller under RLS, writes those).
+-- The same id for the same client (and workspace) is fine (a retry); for anything else it raises 23505.
+create function public.create_client_workout_row(p_workspace_id uuid, p_client_id uuid, p_date date, p_id uuid,
+  p_name text, p_notes text)
+returns void
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_id uuid := (p_doc ->> 'id')::uuid;
   v_existing public.workouts%rowtype;
   v_prev text := coalesce(current_setting('caltracker.system_write', true), '');
-  v_out uuid;
   v_rows integer;
 begin
   if not public.is_coach_of(p_workspace_id) or not public.is_client_in(p_workspace_id, p_client_id) then
     raise exception 'Only a coach of this workspace can add workouts for its clients' using errcode = '42501';
   end if;
-  if v_id is null or p_date is null then
+  if p_id is null or p_date is null then
     raise exception 'A workout id and a date are required' using errcode = '22004';
   end if;
-
-  -- The row itself is a system write (it sets customised_at, which coaches can't write).
   perform set_config('caltracker.system_write', 'on', true);
   insert into public.workouts (id, workspace_id, client_id, scheduled_on, assignment_id, source_workout_id, name, notes,
     planned_on, source_hash, customised_at)
-  values (v_id, p_workspace_id, p_client_id, p_date, null, null, coalesce(btrim(p_doc ->> 'name'), ''),
-    p_doc ->> 'notes', null, null, now())
+  values (p_id, p_workspace_id, p_client_id, p_date, null, null, coalesce(btrim(p_name), ''), p_notes, null, null, now())
   on conflict (id) do nothing;
   get diagnostics v_rows = row_count;
   perform set_config('caltracker.system_write', v_prev, true);
   if v_rows = 0 then
-    select * into v_existing from public.workouts w where w.id = v_id;
+    select * into v_existing from public.workouts w where w.id = p_id;
     if v_existing.workspace_id is distinct from p_workspace_id or v_existing.client_id is distinct from p_client_id
        or v_existing.assignment_id is not null then
       raise exception 'This workout id is already used for a different workout' using errcode = '23505';
     end if;
   end if;
+end;
+$$;
+revoke execute on function public.create_client_workout_row(uuid, uuid, date, uuid, text, text) from public, anon;
+grant execute on function public.create_client_workout_row(uuid, uuid, date, uuid, text, text) to authenticated;
 
-  -- The usual save (its document guards, measurements and remembered choices). It checks the coach again.
-  v_out := public.save_workout(p_workspace_id, p_doc);
-  return v_out;
+-- p_doc is a workout document as save_workout takes it; its id is made by the browser once per editor, so a retry
+-- sends the same id. Runs as the caller (security invoker): the row comes from create_client_workout_row, and the
+-- blocks, exercises and sets from the usual save_workout under RLS, so only exercises the workspace may use (and only
+-- its own rows) can be written. Raises 42501 unless the caller coaches p_workspace_id and p_client_id is a current
+-- client of it.
+create function public.create_client_workout(p_workspace_id uuid, p_client_id uuid, p_date date, p_doc jsonb)
+returns uuid
+language plpgsql security invoker set search_path = '' as $$
+begin
+  perform public.create_client_workout_row(p_workspace_id, p_client_id, p_date, (p_doc ->> 'id')::uuid,
+    p_doc ->> 'name', p_doc ->> 'notes');
+  return public.save_workout(p_workspace_id, p_doc);
 end;
 $$;
 revoke execute on function public.create_client_workout(uuid, uuid, date, jsonb) from public, anon;

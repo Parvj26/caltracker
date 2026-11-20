@@ -3306,6 +3306,17 @@ export type Database = {
         }
         Returns: string
       }
+      create_client_workout_row: {
+        Args: {
+          p_client_id: string
+          p_date: string
+          p_id: string
+          p_name: string
+          p_notes: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       create_community_post: {
         Args: {
           p_body: string

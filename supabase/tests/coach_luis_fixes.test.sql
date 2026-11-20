@@ -1,5 +1,5 @@
 begin;
-select plan(30);
+select plan(35);
 
 -- create_client_workout ("+ New workout" on a client's calendar), untouched_library_copies (the ⋯ menu's "In
 -- Library") and rename_invite (the pending-invite window). Nobody outside the workspace can use them on its data.
@@ -60,6 +60,24 @@ select throws_ok(format($$select public.create_client_workout(%L, %L, %L, %L)$$,
   '42501', null, 'coach A can''t add to another workspace''s client');
 select throws_ok(format($$select public.create_client_workout(%L, %L, %L, %L)$$, :'ws_b', :'b1', :'d2', jsonb_set(:'doc'::jsonb, '{id}', to_jsonb(gen_random_uuid()::text))),
   '42501', null, 'or into another workspace');
+-- Another workspace's custom exercise can't be put in (save_workout runs as the coach, under RLS).
+reset role;
+select tests.create_exercise(:'ws_b', 'CLF B custom') as ex_b \gset
+select gen_random_uuid() as w_foreign \gset
+select tests.act_as(:'coach_a');
+select jsonb_build_object('id', :'w_foreign', 'name', 'Foreign', 'notes', null, 'blocks', jsonb_build_array(
+  jsonb_build_object('id', gen_random_uuid(), 'kind', 'straight', 'exercises', jsonb_build_array(
+    jsonb_build_object('id', gen_random_uuid(), 'exerciseId', :'ex_b', 'exerciseName', 'ignored', 'sets', jsonb_build_array(
+      jsonb_build_object('id', gen_random_uuid(), 'setType', 'normal', 'targetRepsMin', 5, 'targetRepsMax', 5))))))) as doc_foreign \gset
+select throws_ok(format($$select public.create_client_workout(%L, %L, %L, %L)$$, :'ws_a', :'a1', :'d2', :'doc_foreign'),
+  '42501', null, 'another workspace''s custom exercise is refused');
+reset role;
+select is((select count(*)::int from public.workouts where id = :'w_foreign'), 0, 'and nothing is left behind');
+select is((select count(*)::int from public.workout_exercises where exercise_id = :'ex_b'), 0, 'the foreign exercise is not used anywhere');
+select is((select prosecdef from pg_proc where proname = 'create_client_workout'), false, 'create_client_workout runs as the caller');
+select tests.act_as(:'coach_b');
+select throws_ok(format($$select public.create_client_workout_row(%L, %L, %L, %L, 'x', null)$$, :'ws_a', :'a1', :'d2', gen_random_uuid()),
+  '42501', null, 'another coach can''t add a calendar row to workspace A');
 select tests.act_as(:'a1');
 select throws_ok(format($$select public.create_client_workout(%L, %L, %L, %L)$$, :'ws_a', :'a1', :'d2', jsonb_set(:'doc'::jsonb, '{id}', to_jsonb(gen_random_uuid()::text))),
   '42501', null, 'a client can''t add workouts');
