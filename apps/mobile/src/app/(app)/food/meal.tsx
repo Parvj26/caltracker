@@ -225,6 +225,7 @@ export default function MealScreen() {
 
   return (
     <Screen
+      inSheet
       footer={
         <View style={styles.footer}>
           <Pressable

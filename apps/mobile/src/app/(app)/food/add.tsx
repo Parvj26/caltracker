@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   IsoDateSchema,
@@ -91,6 +91,8 @@ export default function AddMealScreen() {
   async function log(chosen: MealSearchItem[], message: string) {
     if (!food || logging.current) return;
     logging.current = true;
+    // The Undo bar sits at the bottom: close the keyboard so it is seen.
+    Keyboard.dismiss();
     setIsLogging(true);
     try {
       const meals = await food.logMeals(chosen, picked ?? undefined);

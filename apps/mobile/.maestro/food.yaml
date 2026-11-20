@@ -66,9 +66,7 @@ env:
 - tapOn:
     id: meal-calories
 - inputText: '300'
-# Not hideKeyboard: the number pad has no return key and it can leave the pad up, so Save's tap lands on a key.
-# Tapping plain text closes the keyboard instead.
-- tapOn: 'Only know some numbers\? .*'
+# Save sits above the number pad (which has no return key), so it is tapped with the pad still up.
 - scrollUntilVisible:
     element:
       id: meal-save
@@ -156,9 +154,7 @@ env:
     id: meal-calories
 - eraseText: 5
 - inputText: '350'
-# Not hideKeyboard: the number pad has no return key and it can leave the pad up, so Save's tap lands on a key.
-# Tapping plain text closes the keyboard instead.
-- tapOn: 'Only know some numbers\? .*'
+# Save sits above the number pad (which has no return key), so it is tapped with the pad still up.
 - scrollUntilVisible:
     element:
       id: meal-save
@@ -175,9 +171,18 @@ env:
     element:
       id: food-day-today
     direction: UP
-- tapOn:
-    id: 'food-day-\d{4}-\d{2}-\d{2}'
-    index: 5
+# Just after the edit sheet closes a tap can be lost (the scroll is still settling): tap until the day changes.
+- repeat:
+    while:
+      notVisible:
+        id: food-day
+        text: 'Meals on .*'
+    times: 4
+    commands:
+      - tapOn:
+          id: 'food-day-\d{4}-\d{2}-\d{2}'
+          index: 5
+      - waitForAnimationToEnd
 - assertVisible:
     id: food-day
     text: 'Meals on .*'

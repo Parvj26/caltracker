@@ -23,7 +23,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: coach-strip-meals
-      text: '.*1 from .*'
+      text: 'Meals from .*, 1 meal'
     timeout: 10000
 - tapOn:
     id: coach-strip-meals

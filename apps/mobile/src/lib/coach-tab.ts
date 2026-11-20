@@ -94,7 +94,17 @@ export function showQuickReplies(items: ReadonlyArray<Message | OutboxItem>, me:
   return last.senderId !== me;
 }
 
-export type StripCell = { key: 'goal' | 'meals' | 'community'; label: string; value: string; accessibilityLabel: string };
+export type StripCell = {
+  key: 'goal' | 'meals' | 'community';
+  label: string;
+  value: string;
+  /** A second line (a long goal's countdown, so it is never cut off). */
+  detail?: string;
+  accessibilityLabel: string;
+};
+
+/** Longest "goal · countdown" kept on one line in a third of a phone's width. */
+const GOAL_ONE_LINE = 18;
 
 /**
  * The strip under the chat header: GOAL "5K · 49 days", MEALS "3 from Luis" (or "None yet"), COMMUNITY "2 new" (or
@@ -113,8 +123,15 @@ export function coachStrip(input: {
   if (input.goal && goalText) {
     const c = goalCountdown(input.goal.targetDate, input.today);
     const when = c ? (c.number ? `${c.number} ${c.label.replace(/ to go$/, '')}` : c.label) : null;
-    const value = when ? `${goalText} · ${when}` : goalText;
-    out.push({ key: 'goal', label: 'GOAL', value, accessibilityLabel: `Goal: ${goalText}${c ? `, ${c.number ? `${c.number} ${c.label}` : c.label}` : ''}` });
+    const oneLine = when ? `${goalText} · ${when}` : goalText;
+    const split = when !== null && oneLine.length > GOAL_ONE_LINE;
+    out.push({
+      key: 'goal',
+      label: 'GOAL',
+      value: split ? goalText : oneLine,
+      ...(split && when ? { detail: when } : {}),
+      accessibilityLabel: `Goal: ${goalText}${c ? `, ${c.number ? `${c.number} ${c.label}` : c.label}` : ''}`,
+    });
   }
   const who = input.firstName ?? 'your coach';
   const meals = input.mealCount > 0 ? `${input.mealCount > 99 ? '99+' : input.mealCount} from ${who}` : 'None yet';

@@ -136,6 +136,11 @@ describe('coachStrip', () => {
     expect(coachStrip({ ...base, goal: { goal: '5K', targetDate: '2026-11-09' } })[0]?.value).toBe('5K · Today');
     expect(coachStrip({ ...base, goal: { goal: '5K', targetDate: null } })[0]?.value).toBe('5K');
   });
+  it('puts a long goal’s countdown on its own line, so it is never cut off', () => {
+    const cell = coachStrip({ ...base, goal: { goal: 'Run a 5K under 30 minutes', targetDate: '2026-12-28' } })[0];
+    expect(cell).toMatchObject({ value: 'Run a 5K under 30 minutes', detail: '49 days' });
+    expect(coachStrip(base)[0]?.detail).toBeUndefined();
+  });
   it('drops the community cell without a community', () => {
     expect(coachStrip({ ...base, hasCommunity: false }).map((c) => c.key)).toEqual(['goal', 'meals']);
   });

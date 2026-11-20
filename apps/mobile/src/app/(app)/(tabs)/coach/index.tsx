@@ -109,7 +109,8 @@ export default function CoachChat() {
             style={({ pressed }) => [styles.cell, i < cells.length - 1 && styles.cellDivider, pressed && { opacity: pressedOpacity }]}
           >
             <Text style={[text('caption'), styles.cellLabel]} numberOfLines={1}>{c.label}</Text>
-            <Text style={[text('sectionHeading'), styles.cellValue]} numberOfLines={2}>{c.value}</Text>
+            <Text style={[text('sectionHeading'), styles.cellValue]} numberOfLines={c.detail ? 1 : 2}>{c.value}</Text>
+            {c.detail ? <Text style={[text('sectionHeading'), styles.cellValue]} numberOfLines={1}>{c.detail}</Text> : null}
           </Pressable>
         ))}
       </View>
@@ -119,9 +120,11 @@ export default function CoachChat() {
   if (!chat || chat.status === 'loading') {
     return (
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
+      <View style={styles.column}>
         {header}
         <View style={styles.center}><ActivityIndicator color={palette.ink} accessibilityLabel="Loading messages" /></View>
-      </SafeAreaView>
+      </View>
+    </SafeAreaView>
     );
   }
 
@@ -130,6 +133,7 @@ export default function CoachChat() {
 
   return (
     <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
+      <View style={styles.column}>
       {header}
       {chat.status === 'offline' ? (
         <View style={styles.banner}>
@@ -196,12 +200,15 @@ export default function CoachChat() {
           {openPhoto ? <Image source={{ uri: openPhoto }} style={styles.viewerImage} resizeMode="contain" accessibilityIgnoresInvertColors /> : null}
         </Pressable>
       </Modal>
+    </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
+  // On iPad and wider, the chat keeps a readable centred column (UI rules: chat at most ~760).
+  column: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[2] },
   headerText: { flex: 1 },
   headerName: { fontSize: 20 },
