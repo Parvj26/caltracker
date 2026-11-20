@@ -31,6 +31,7 @@ describe('loadStyleOf', () => {
     expect(loadStyleOf('Barbell Squat')).toBe('weight');
     expect(loadStyleOf('Lat Pulldown')).toBe('weight');
     expect(loadStyleOf('Pull-ups')).toBe('added');
+    expect(loadStyleOf('Pullups')).toBe('added');
     expect(loadStyleOf('Weighted Chin Up')).toBe('added');
     expect(loadStyleOf('Dips')).toBe('added');
     expect(loadStyleOf('Machine Assisted Pull Up')).toBe('assisted');
@@ -88,13 +89,9 @@ describe('heaviestChange and strengthStats', () => {
     expect(heaviestChange(sessions, 'kg', 'weight', today)).toMatchObject({ short: '+17.5 kg', text: '+17.5 kg since 2 Sep', direction: 'up' });
   });
   it('fills both tiles', () => {
-    expect(strengthStats(sessions, 'kg', 'weight', today)).toEqual({
-      heaviest: '82.5 kg',
-      heaviestDetail: '82.5 kg × 3 on 1 Oct',
-      change: expect.objectContaining({ short: '+17.5 kg' }),
-      e1rm: '93.3 kg',
-      e1rmDetail: 'From 80 kg × 5',
-    });
+    const stats = strengthStats(sessions, 'kg', 'weight', today);
+    expect(stats).toMatchObject({ heaviest: '82.5 kg', heaviestDetail: '82.5 kg × 3 on 1 Oct', e1rm: '93.3 kg', e1rmDetail: 'From 80 kg × 5' });
+    expect(stats.change?.short).toBe('+17.5 kg');
   });
   it('works in pounds from the shown numbers', () => {
     expect(heaviestChange(sessions, 'lb', 'weight', today)?.short).toBe('+39 lb');
