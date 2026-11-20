@@ -55,6 +55,10 @@ export type ListRowProps = {
   /** Bold title (an unread conversation). */
   emphasis?: boolean;
   linkProps?: Omit<ComponentProps<typeof Link>, 'href' | 'className' | 'children'> & Record<`data-${string}`, string | number | undefined>;
+  /** Instead of `href`: the whole row is a button that opens something on this page (a pending invite's window). */
+  onOpen?: (() => void) | undefined;
+  /** The row button's name when `onOpen` is set (else its text). */
+  openLabel?: string | undefined;
   /** data-* attributes for the row itself (the <li>), so tests and scripts can find it. */
   itemProps?: Record<`data-${string}`, string | number | undefined>;
   className?: string | undefined;
@@ -65,7 +69,7 @@ export type ListRowProps = {
  * end. The whole row (all but the action and ⋯, which stay their own buttons) is one link, at least 56 px tall, with
  * hover and keyboard focus.
  */
-export function ListRow({ href, title, meta, leading, end, action, more, cells, current = false, emphasis = false, linkProps, itemProps, className }: ListRowProps) {
+export function ListRow({ href, title, meta, leading, end, action, more, cells, current = false, emphasis = false, linkProps, itemProps, onOpen, openLabel, className }: ListRowProps) {
   const inner = (
     <>
       {leading ? <span className={styles.listRowLeading}>{leading}</span> : null}
@@ -87,6 +91,11 @@ export function ListRow({ href, title, meta, leading, end, action, more, cells, 
         <Link href={href} className={styles.listRowLink} aria-current={current ? 'page' : undefined} {...linkProps}>
           {inner}
         </Link>
+      ) : onOpen ? (
+        // The action and ⋯ are siblings of this button (never inside it), so tapping them never opens the row.
+        <button type="button" className={cx(styles.listRowLink, styles.listRowButton)} onClick={onOpen} aria-label={openLabel}>
+          {inner}
+        </button>
       ) : (
         <div className={cx(styles.listRowLink, styles.listRowStatic)}>{inner}</div>
       )}

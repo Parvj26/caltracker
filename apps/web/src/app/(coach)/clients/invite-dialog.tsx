@@ -2,21 +2,17 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
-  INVITE_PLAN_MAX_WORKOUTS,
   InviteInput,
-  IsoDateSchema,
-  addDays,
   codeForMessage,
   invitePlanError,
-  isoWeekday,
   localToday,
   type ErrorCode,
   type InvitePlan,
   type IsoDate,
 } from '@caltracker/shared';
 import { formatShortDay } from '@/components/calendar/format';
-import { WorkoutChoices } from '@/components/assign/workout-choices';
-import { AdaptiveDialog, Button, ButtonLink, ErrorText, notAContact, SelectField, TextField, type AdaptiveDialogHandle } from '@/components/ui';
+import { AdaptiveDialog, Button, ErrorText, notAContact, TextField, type AdaptiveDialogHandle } from '@/components/ui';
+import { InvitePlanStep, useInvitePlan, type LibraryWorkout, type Program } from './invite-plan-step';
 import { failureCode } from '@/lib/action-errors';
 import { useBrowserToday } from '@/lib/local-today';
 import type { PickerHints } from '@/lib/picker-hints';
@@ -29,10 +25,6 @@ import { useAnalyticsTask } from '@/lib/analytics/use-analytics-task';
 import { track } from '@/lib/analytics/client';
 import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 
-type LibraryWorkout = { id: string; name: string };
-type Program = { id: string; name: string; weeks: number };
-type PlanKind = InvitePlan['kind'];
-type Item = { key: string; workoutId: string | null; on: IsoDate };
 
 type FieldError = { field: 'firstName' | 'lastName' | 'email'; code: ErrorCode };
 const FIELD_CODES: Record<FieldError['field'], ErrorCode> = {
@@ -46,10 +38,7 @@ const FIELD_MESSAGES: Record<FieldError['field'], string> = {
   email: 'Enter a valid email address.',
 };
 
-const PLAN_LABEL: Record<PlanKind, string> = { program: 'Program', workouts: 'Single workout', none: 'Nothing yet' };
 
-/** The Monday after `today` (a week on, when today is a Monday): when most programs start. */
-const nextMonday = (today: IsoDate) => addDays(today, 8 - isoWeekday(today));
 const expiryFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
 
 type Sent = {
@@ -253,33 +242,14 @@ function OneClientForm({
   const [result, setResult] = useState<StatusView | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const [kind, setKind] = useState<PlanKind>('none');
-  const [programId, setProgramId] = useState(() => programs.find((p) => p.id === hints.lastProgramId)?.id ?? programs[0]?.id ?? '');
-  const [startOn, setStartOn] = useState<string>(() => nextMonday(today));
-  const [items, setItems] = useState<Item[]>(() => [{ key: 'w0', workoutId: null, on: nextMonday(today) }]);
+  const planState = useInvitePlan({ today, programs, hints });
+  const { kind, program } = planState;
   // Something typed or picked: closing asks "Discard changes?" first.
   const dirty = firstName !== '' || lastName !== '' || email !== '' || kind !== 'none';
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   useEffect(() => onPending(pending), [pending, onPending]);
 
   const nameOf = (id: string | null) => library.find((w) => w.id === id)?.name ?? '';
-  const program = programs.find((p) => p.id === programId) ?? null;
-  const chosen = items.filter((i): i is Item & { workoutId: string } => i.workoutId !== null);
-  const last = items[items.length - 1]!;
-
-  function buildPlan(): InvitePlan | ErrorCode {
-    if (kind === 'program') {
-      if (!program) return 'invite_plan_no_program';
-      if (!IsoDateSchema.safeParse(startOn).success) return 'invite_plan_no_start';
-      return { kind: 'program', programId: program.id, startOn };
-    }
-    if (kind === 'workouts') {
-      if (chosen.length === 0) return 'invite_plan_no_workout';
-      if (chosen.some((i) => !IsoDateSchema.safeParse(i.on).success)) return 'invite_plan_no_day';
-      return { kind: 'workouts', items: chosen.map((i) => ({ workoutId: i.workoutId, on: i.on })) };
-    }
-    return { kind: 'none' };
-  }
 
   function planStep(plan: InvitePlan): Sent['planStep'] {
     if (plan.kind === 'program' && program) return { lead: 'Their', name: program.name, rest: ` program begins ${formatShortDay(plan.startOn)}` };
@@ -302,7 +272,7 @@ function OneClientForm({
       return;
     }
     setFieldError(null);
-    const plan = buildPlan();
+    const plan = planState.build();
     if (typeof plan === 'string') return setError(plan);
     const badPlan = invitePlanError(plan, today);
     if (badPlan) return setError(codeForMessage(badPlan, 'invite_plan_invalid'));
@@ -334,7 +304,6 @@ function OneClientForm({
     fieldError?.field === name ? { 'aria-invalid': true, 'aria-describedby': 'invite-field-error' } : {};
   // "What Ana gets:" once a first name is typed, "What they get:" before.
   const getsLead = firstName.trim() ? `What ${firstName.trim()} gets:` : 'What they get:';
-  const firstChosen = chosen[0];
 
   return (
     <form id={formId} onSubmit={onSubmit} className={styles.inviteForm} noValidate>
@@ -382,116 +351,7 @@ function OneClientForm({
         </ErrorText>
       ) : null}
 
-      <section className={styles.startBox} aria-labelledby="start-heading">
-        <div className={styles.startHeader}>
-          <h3 id="start-heading" className={styles.startHeading}>Optional · give them something to start with</h3>
-          <div role="group" aria-labelledby="start-heading" className={styles.planToggle}>
-            {(['program', 'workouts', 'none'] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={kind === k}
-                className={styles.planOption}
-                onClick={() => {
-                  setKind(k);
-                  setError(null);
-                }}
-              >
-                {PLAN_LABEL[k]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {kind === 'program' ? (
-          programs.length === 0 ? (
-            <div className={styles.startEmpty}>
-              <p className={styles.startNote}>You have no programs yet.</p>
-              <ButtonLink href="/programs/new" variant="secondary" className={styles.rowButton}>Build a program</ButtonLink>
-            </div>
-          ) : (
-            <>
-              <div className={styles.programGrid}>
-                <SelectField label="Program" value={programId} onChange={(e) => setProgramId(e.target.value)}>
-                  {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </SelectField>
-                <TextField label="Start date" type="date" min={today} value={startOn} onChange={(e) => setStartOn(e.target.value)} />
-              </div>
-              <p className={styles.startNote}>
-                Their first workouts will be waiting when they join. If they join after the start date, the program starts the day they join.
-              </p>
-            </>
-          )
-        ) : null}
-
-        {kind === 'workouts' ? (
-          <>
-            {chosen.length > 0 ? (
-              <ul className={styles.chosenList} aria-label="Chosen workouts">
-                {items.map((item, index) =>
-                  item.workoutId ? (
-                    <li key={item.key} className={styles.chosenItem}>
-                      <span className={styles.chosenName}>{nameOf(item.workoutId)}</span>
-                      <TextField
-                        label="Day"
-                        aria-label={`Day for ${nameOf(item.workoutId)}`}
-                        type="date"
-                        min={today}
-                        value={item.on}
-                        className={styles.chosenDay}
-                        onChange={(e) => setItems((list) => list.map((x, i) => (i === index ? { ...x, on: e.target.value } : x)))}
-                      />
-                      <Button
-                        variant="quiet"
-                        size="compact"
-                        className={styles.chosenRemove}
-                        aria-label={`Remove ${nameOf(item.workoutId)}`}
-                        onClick={() =>
-                          setItems((list) => {
-                            const next = list.filter((_, i) => i !== index);
-                            return next.length > 0 ? next : [{ key: `w${Date.now()}`, workoutId: null, on: item.on }];
-                          })
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </li>
-                  ) : null,
-                )}
-              </ul>
-            ) : null}
-            {last.workoutId === null ? (
-              <div className={styles.startPicker}>
-                <WorkoutChoices
-                  library={library}
-                  hints={hints}
-                  chosenIds={new Set(chosen.map((i) => i.workoutId))}
-                  onPick={(w) => {
-                    setError(null);
-                    setItems((list) => list.map((x, i) => (i === list.length - 1 ? { ...x, workoutId: w.id } : x)));
-                  }}
-                />
-              </div>
-            ) : items.length < INVITE_PLAN_MAX_WORKOUTS ? (
-              <button
-                type="button"
-                className={styles.addAnother}
-                onClick={() => setItems((list) => [...list, { key: `w${Date.now()}`, workoutId: null, on: addDays(last.on, 1) }])}
-              >
-                + Add another workout
-              </button>
-            ) : null}
-            {firstChosen ? (
-              <p className={styles.startNote}>
-                {nameOf(firstChosen.workoutId)} will be on their calendar for {formatShortDay(firstChosen.on)} when they join
-                {chosen.length > 1 ? `, with ${chosen.length - 1} more` : ''}.
-              </p>
-            ) : (
-              <p className={styles.startNote}>Pick a workout (Recent and Most used come first), then its day.</p>
-            )}
-          </>
-        ) : null}
-      </section>
+      <InvitePlanStep plan={planState} today={today} library={library} programs={programs} hints={hints} onChange={() => setError(null)} />
 
       <p className={styles.getsLine}>
         <b>{getsLead}</b> an email &ldquo;{coachName} invited you to CalTracker&rdquo; with a Join button. The link works for 14 days.

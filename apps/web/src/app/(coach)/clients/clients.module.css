@@ -336,3 +336,40 @@
 @media (max-width: 520px) {
   .programGrid, .chosenItem { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- A pending invite's window (invite-sheet.tsx) ---------- */
+.inviteSheet { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.inviteWaiting { display: flex; align-items: center; gap: var(--ct-space-2); margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.waitingDot { flex: none; width: 8px; height: 8px; border-radius: var(--ct-radius-pill); background: var(--ct-amber); }
+.inviteSheetChip { align-self: flex-start; }
+.sheetWide { width: 100%; }
+.inviteFields { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.emailChange { display: flex; flex-direction: column; gap: var(--ct-space-1); }
+.startsWith {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-3);
+  padding: var(--ct-space-3) var(--ct-space-3-5);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.startsWithText { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; overflow-wrap: anywhere; }
+.inviteSheetEnd { padding-top: var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.dangerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ct-danger-deep);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.dangerLink:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+/* Desktop: name and email side by side. */
+@media (min-width: 1024px) {
+  .inviteFields { display: grid; grid-template-columns: 1fr 1fr; }
+}

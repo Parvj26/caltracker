@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { COMPLETION_WINDOW_DAYS, formatFullName, localToday } from '@caltracker/shared';
+import { COMPLETION_WINDOW_DAYS, formatFullName, localToday, type InvitePlan } from '@caltracker/shared';
 import { PageHeader, RowList } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { requireCoach } from '@/lib/auth';
@@ -34,7 +34,23 @@ function Avatar({ name, toneKey }: { name: string; toneKey: string }) {
 
 const isExpired = (expiresAt: string) => Date.parse(expiresAt) <= Date.now();
 
-type PlanItemRow = { start_on: string; position: number; programs: { name: string } | null; workouts: { name: string } | null };
+type PlanItemRow = {
+  start_on: string;
+  position: number;
+  program_id: string | null;
+  workout_id: string | null;
+  programs: { name: string } | null;
+  workouts: { name: string } | null;
+};
+
+/** The plan kept with an invite as the invite window's plan step reads it (its "Change plan" starts from this). */
+function planOf(items: PlanItemRow[]): InvitePlan {
+  const sorted = [...items].sort((a, b) => a.position - b.position);
+  const first = sorted[0];
+  if (first?.program_id) return { kind: 'program', programId: first.program_id, startOn: first.start_on };
+  const workouts = sorted.flatMap((i) => (i.workout_id ? [{ workoutId: i.workout_id, on: i.start_on }] : []));
+  return workouts.length > 0 ? { kind: 'workouts', items: workouts } : { kind: 'none' };
+}
 
 /** What an invite will start with, from the plan kept with it (see set_invite_plan). */
 function planSummary(items: PlanItemRow[]): InvitePlanSummary {
@@ -67,7 +83,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     }),
     supabase
       .from('client_invites')
-      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at, client_invite_plan_items(start_on, position, programs(name), workouts(name))')
+      .select('id, email, first_name, last_name, full_name, sent_at, expires_at, accepted_at, accepted_by, created_at, client_invite_plan_items(start_on, position, program_id, workout_id, programs(name), workouts(name))')
       .eq('workspace_id', workspaceId)
       .order('sent_at', { ascending: false }),
     supabase
@@ -97,6 +113,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       sentAt: i.sent_at,
       expired: isExpired(i.expires_at),
       plan: planSummary(i.client_invite_plan_items),
+      planDetail: planOf(i.client_invite_plan_items),
     }));
 
   const invitedCount = pending.length;
@@ -117,7 +134,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <ClientDirectory data={data} invites={pending} lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS} initialQuery={initialQuery} />
+      <ClientDirectory
+        data={data}
+        invites={pending}
+        lookbackDays={LAST_WORKOUT_LOOKBACK_DAYS}
+        initialQuery={initialQuery}
+        planOptions={{ library: library.data, programs: programs.data, hints: pickerHints(pickerHistory, library.data) }}
+      />
 
       {past.data.length > 0 ? (
         <PastClients count={past.data.length}>
