@@ -299,7 +299,6 @@ export function savedTime(
 /** A day and a clock time (minutes after midnight) on the phone's clock. */
 export type When = { day: IsoDate; minutes: number };
 
-const NIGHT_END = 4 * 60;
 const DAY_MINUTES = 24 * 60;
 
 export function whenNow(now: Date = new Date()): When {
@@ -311,14 +310,14 @@ export function whenInstant(when: When): Date {
 }
 
 /**
- * One tap on a meal chip: that meal's usual time on the picked day. Just after midnight (before 04:00) a chip whose
- * usual time is still to come today means the evening before: Dinner tapped at 00:30 is yesterday at 7 pm, while a
- * snack at 00:30 stays on the new day.
+ * One tap on a meal chip: that meal's usual time on the picked day, never a time still to come. On today, a meal whose
+ * usual time hasn't come yet means the last one eaten: Lunch tapped at 9 am is yesterday's lunch, Dinner at 00:30 is
+ * last night's (00:30 itself stays a snack on the new day).
  */
 export function whenForMealType(type: MealType, current: When, now: Date = new Date()): When {
   const at = whenNow(now);
   const minutes = USUAL_MEAL_MINUTES[type];
-  if (current.day === at.day && at.minutes < NIGHT_END && minutes > at.minutes) return { day: addDays(at.day, -1), minutes };
+  if (current.day >= at.day && minutes > at.minutes) return { day: addDays(at.day, -1), minutes };
   return { day: current.day, minutes };
 }
 
@@ -383,4 +382,17 @@ export function whenFromParams(params: Record<string, string | string[] | undefi
   const minutes = typeof params.minutes === 'string' ? Number(params.minutes) : NaN;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today || !Number.isInteger(minutes) || minutes < 0 || minutes >= DAY_MINUTES) return null;
   return { day, minutes };
+}
+
+/** A When moved back to now if it would be later than now (a meal can't be eaten in the future). */
+export function capWhen(when: When, now: Date = new Date()): When {
+  const at = whenNow(now);
+  return when.day > at.day || (when.day === at.day && when.minutes > at.minutes) ? at : when;
+}
+
+/** What VoiceOver says for Add a meal's +: "Log Tuna wrap for lunch today" / "… for dinner on Mon 16 Nov". */
+export function logNowLabel(name: string, when: When, today: IsoDate): string {
+  const label = foodDayLabel(when.day, today);
+  const day = label === 'Today' ? 'today' : label === 'Yesterday' ? 'yesterday' : `on ${label}`;
+  return `Log ${name} for ${mealTypeForMinutes(when.minutes).toLowerCase()} ${day}`;
 }

@@ -44,7 +44,11 @@ export default async function ClientFoodPage({
     zone = validTimeZone(data?.time_zone) ?? 'UTC';
   }
   const monday = weekFromParam(query.week, localToday(zone));
-  const week = await loadFoodWeek(supabase, workspaceId, client.id, monday);
+  // Breakfast / Lunch / Dinner / Snack follow the client's own clock (as on their phone), not the coach's.
+  const [week, clientProfile] = await Promise.all([
+    loadFoodWeek(supabase, workspaceId, client.id, monday),
+    supabase.from('profiles').select('time_zone').eq('id', client.id).maybeSingle(),
+  ]);
   return (
     <FoodView
       key={monday}
@@ -56,6 +60,7 @@ export default async function ClientFoodPage({
       everLogged={week.everLogged}
       readOnly={client.removedAt !== null}
       serverZone={fromBrowser}
+      clientZone={validTimeZone(clientProfile.data?.time_zone)}
       pickedWeek={typeof query.week === 'string'}
     />
   );

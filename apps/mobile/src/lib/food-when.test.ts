@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryMeal } from '@caltracker/shared';
-import { copyItem, copyLabel, logAgainOp, mealsToCopy, pickerDays, stepWhen, whenForMealType, whenFromParams, whenInstant, whenLabel, whenNow, whenParams } from './food-logic';
+import { capWhen, copyItem, copyLabel, logAgainOp, logNowLabel, mealsToCopy, pickerDays, stepWhen, whenForMealType, whenFromParams, whenInstant, whenLabel, whenNow, whenParams } from './food-logic';
 
 const local = (y: number, mo: number, d: number, h: number, mi = 0) => new Date(y, mo - 1, d, h, mi);
 const TODAY = '2026-11-19';
@@ -33,8 +33,9 @@ describe('whenForMealType', () => {
     expect(whenForMealType('Breakfast', { day: TODAY, minutes: 795 }, now)).toEqual({ day: TODAY, minutes: 480 });
     expect(whenForMealType('Dinner', { day: '2026-11-17', minutes: 0 }, now)).toEqual({ day: '2026-11-17', minutes: 1140 });
   });
-  it('lets a later meal today be logged ahead in the daytime', () => {
-    expect(whenForMealType('Dinner', { day: TODAY, minutes: 795 }, now)).toEqual({ day: TODAY, minutes: 1140 });
+  it('never sets a time still to come today: it means the last one eaten', () => {
+    expect(whenForMealType('Dinner', { day: TODAY, minutes: 795 }, now)).toEqual({ day: '2026-11-18', minutes: 1140 });
+    expect(whenForMealType('Lunch', { day: TODAY, minutes: 795 }, now)).toEqual({ day: TODAY, minutes: 750 });
   });
   it('just after midnight, a meal still to come means the evening before', () => {
     const night = local(2026, 11, 20, 0, 30);
@@ -105,5 +106,24 @@ describe('whenParams / whenFromParams', () => {
     expect(whenFromParams({ day: '2026-11-20', minutes: '30' }, TODAY)).toBeNull();
     expect(whenFromParams({ day: TODAY, minutes: '1440' }, TODAY)).toBeNull();
     expect(whenFromParams({ day: TODAY }, TODAY)).toBeNull();
+  });
+});
+
+describe('capWhen', () => {
+  const now = local(2026, 11, 19, 13, 15);
+  it('moves a time still to come back to now', () => {
+    expect(capWhen({ day: TODAY, minutes: 1140 }, now)).toEqual({ day: TODAY, minutes: 795 });
+  });
+  it('keeps past times', () => {
+    expect(capWhen({ day: TODAY, minutes: 600 }, now)).toEqual({ day: TODAY, minutes: 600 });
+    expect(capWhen({ day: '2026-11-18', minutes: 1380 }, now)).toEqual({ day: '2026-11-18', minutes: 1380 });
+  });
+});
+
+describe('logNowLabel', () => {
+  it('says the meal type and the day', () => {
+    expect(logNowLabel('Tuna wrap', { day: TODAY, minutes: 795 }, TODAY)).toBe('Log Tuna wrap for lunch today');
+    expect(logNowLabel('Oats', { day: '2026-11-18', minutes: 480 }, TODAY)).toBe('Log Oats for breakfast yesterday');
+    expect(logNowLabel('Pasta', { day: '2026-11-16', minutes: 1140 }, TODAY)).toBe('Log Pasta for dinner on Mon 16 Nov');
   });
 });

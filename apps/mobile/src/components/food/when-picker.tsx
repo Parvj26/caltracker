@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MEAL_TYPES, foodDayLabel, mealTypeForMinutes, type IsoDate } from '@caltracker/shared';
-import { pickerDays, stepWhen, timeLabel, whenForMealType, whenLabel, type When } from '@/lib/food-logic';
+import { capWhen, pickerDays, stepWhen, timeLabel, whenForMealType, whenLabel, type When } from '@/lib/food-logic';
 import { contentMaxWidth, palette, pressedOpacity, stickerTheme, white } from '@/theme/theme';
 import { font, foodText } from './food-type';
 import { CaretIcon, CloseIcon } from './icons';
@@ -10,7 +10,7 @@ import { CaretIcon, CloseIcon } from './icons';
 /**
  * "Lunch · Today, 1:15 PM ▾": when the meal was eaten (the meal type comes from the time). Tapping it opens the
  * picker: meal chips that set a usual time in one tap, the day (today and the six before) and the time in quarter
- * hours (going past midnight moves the day). Changes apply as they are made; Done closes.
+ * hours (going past midnight moves the day). Never a time still to come. Changes apply as they are made; Done closes.
  */
 export function WhenLine({ when, today, onChange, testID = 'meal-when' }: { when: When; today: IsoDate; onChange: (w: When) => void; testID?: string }) {
   const [open, setOpen] = useState(false);
@@ -63,17 +63,17 @@ function WhenSheet({ visible, when, today, onChange, onClose }: { visible: boole
           <Text style={foodText.overline}>Day</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
             {days.map((d) => (
-              <Chip key={d} label={foodDayLabel(d, today)} selected={d === when.day} testID={`when-day-${d}`} onPress={() => onChange({ ...when, day: d })} />
+              <Chip key={d} label={foodDayLabel(d, today)} selected={d === when.day} testID={`when-day-${d}`} onPress={() => onChange(capWhen({ ...when, day: d }))} />
             ))}
           </ScrollView>
 
           <Text style={foodText.overline}>Time</Text>
           <View style={styles.timeRow}>
-            <Stepper glyph="−" label="15 minutes earlier" testID="when-earlier" onPress={() => onChange(stepWhen(when, -1, today, oldest))} />
+            <Stepper glyph="−" label="15 minutes earlier" testID="when-earlier" onPress={() => onChange(capWhen(stepWhen(when, -1, today, oldest)))} />
             <Text style={[font(800, 20), styles.time]} accessibilityLiveRegion="polite" testID="when-time">
               {timeLabel(when.minutes).toUpperCase()}
             </Text>
-            <Stepper glyph="+" label="15 minutes later" testID="when-later" onPress={() => onChange(stepWhen(when, 1, today, oldest))} />
+            <Stepper glyph="+" label="15 minutes later" testID="when-later" onPress={() => onChange(capWhen(stepWhen(when, 1, today, oldest)))} />
           </View>
           <Text style={[font(500, 13), foodText.muted]} testID="when-summary">
             {whenLabel(when, today)}

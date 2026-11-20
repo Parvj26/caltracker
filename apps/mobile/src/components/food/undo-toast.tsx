@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { font } from './food-type';
@@ -7,18 +7,32 @@ import { font } from './food-type';
 export const UNDO_MS = 5000;
 
 /**
- * The ink bar after a one-tap log: "Logged Chicken rice bowl · 620 kcal" and a white Undo button. It is read out,
- * stays for UNDO_MS, then calls onHide.
+ * The ink bar after a one-tap log: "Logged Chicken rice bowl · 620 kcal" and a white Undo button. It is read out and
+ * stays for UNDO_MS from each log (`id` changes per log, restarting the wait), then calls onHide. With VoiceOver on it
+ * stays until Undo, the next log or leaving the screen, so there is time to reach the button.
  */
-export function UndoToast({ message, onUndo, onHide }: { message: string | null; onUndo: () => void; onHide: () => void }) {
+export function UndoToast({ id, message, onUndo, onHide }: { id: number; message: string | null; onUndo: () => void; onHide: () => void }) {
   const hide = useRef(onHide);
   hide.current = onHide;
+  const [screenReader, setScreenReader] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void AccessibilityInfo.isScreenReaderEnabled().then((on) => alive && setScreenReader(on));
+    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReader);
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
   useEffect(() => {
     if (!message) return;
     AccessibilityInfo.announceForAccessibility(`${message}. Undo available.`);
+  }, [message, id]);
+  useEffect(() => {
+    if (!message || screenReader) return;
     const t = setTimeout(() => hide.current(), UNDO_MS);
     return () => clearTimeout(t);
-  }, [message]);
+  }, [message, id, screenReader]);
   if (!message) return null;
   return (
     <View style={styles.bar} testID="food-undo-toast" accessibilityLiveRegion="polite">

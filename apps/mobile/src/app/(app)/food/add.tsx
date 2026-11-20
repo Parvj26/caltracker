@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -24,14 +24,14 @@ import { coachMealPhotoUrls } from '@/lib/coach-meals-api';
 import { PhotoError } from '@/lib/compress-photo';
 import type { ShownError } from '@/lib/error-shown';
 import { mealPhotoUrls } from '@/lib/food-api';
-import { copyItem, copyLabel, mealsToCopy, whenNow, whenParams, type When } from '@/lib/food-logic';
+import { copyItem, copyLabel, logNowLabel, mealsToCopy, whenNow, whenParams, type When } from '@/lib/food-logic';
 import type { MealRecord } from '@/lib/food-queue';
 import { prefillParams } from '@/lib/meal-prefill';
 import { photoParams, pickMealPhoto } from '@/lib/pick-meal-photo';
 import { useFood } from '@/lib/use-food';
 import { contentMaxWidth, palette, pressedOpacity } from '@/theme/theme';
 
-type Undo = { message: string; meals: MealRecord[] };
+type Undo = { id: number; message: string; meals: MealRecord[] };
 
 /**
  * Add a meal (a sheet over Food): when it was eaten ("Lunch · Today, 1:15 PM ▾", the type comes from the time),
@@ -51,6 +51,10 @@ export default function AddMealScreen() {
   const [undo, setUndo] = useState<Undo | null>(null);
   const [error, setError] = useState<ShownError | null>(null);
   const [busy, setBusy] = useState(false);
+  // One log at a time: a second tap while one is being queued is ignored (no double log).
+  const logging = useRef(false);
+  const [isLogging, setIsLogging] = useState(false);
+  const undoId = useRef(0);
   const [ownUrls, setOwnUrls] = useState<Record<string, string>>({});
   const [coachUrls, setCoachUrls] = useState<Record<string, string>>({});
 
@@ -85,9 +89,17 @@ export default function AddMealScreen() {
   const formParams = () => ({ ...whenParams(when), ...(picked ? { whenTouched: '1' } : {}) });
 
   async function log(chosen: MealSearchItem[], message: string) {
-    if (!food) return;
-    const meals = await food.logMeals(chosen, picked ?? undefined);
-    setUndo({ message, meals });
+    if (!food || logging.current) return;
+    logging.current = true;
+    setIsLogging(true);
+    try {
+      const meals = await food.logMeals(chosen, picked ?? undefined);
+      undoId.current += 1;
+      setUndo({ id: undoId.current, message, meals });
+    } finally {
+      logging.current = false;
+      setIsLogging(false);
+    }
   }
 
   function logOne(item: MealSearchItem) {
@@ -167,7 +179,7 @@ export default function AddMealScreen() {
 
           <View style={styles.actions}>
             {copies.length > 0 ? (
-              <Pill title={copyLabel(when, today)} testID="add-meal-copy" ph="log_meal_copy_yesterday" onPress={copy} />
+              <Pill title={copyLabel(when, today)} testID="add-meal-copy" ph="log_meal_copy_yesterday" disabled={isLogging} onPress={copy} />
             ) : null}
             <Pill title="New meal" testID="add-meal-new" ph="log_add_meal" onPress={() => router.push({ pathname: '/food/meal', params: formParams() })} />
             <Pressable
@@ -217,8 +229,10 @@ export default function AddMealScreen() {
                   </Pressable>
                   <Pressable
                     onPress={() => logOne(m)}
+                    disabled={isLogging}
                     accessibilityRole="button"
-                    accessibilityLabel={`Log ${m.name} now`}
+                    accessibilityLabel={logNowLabel(m.name, when, today)}
+                    accessibilityState={{ disabled: isLogging }}
                     testID={`meal-log-${m.name}`}
                     ph-label="log_meal_one_tap"
                     style={({ pressed }) => [styles.plus, pressed && { opacity: pressedOpacity }]}
@@ -235,15 +249,24 @@ export default function AddMealScreen() {
         </View>
       </ScrollView>
       <View style={[styles.column, styles.toast]} pointerEvents="box-none">
-        <UndoToast message={undo?.message ?? null} onUndo={undoLast} onHide={() => setUndo(null)} />
+        <UndoToast id={undo?.id ?? 0} message={undo?.message ?? null} onUndo={undoLast} onHide={() => setUndo(null)} />
       </View>
     </SafeAreaView>
   );
 }
 
-function Pill({ title, onPress, testID, ph }: { title: string; onPress: () => void; testID: string; ph: string }) {
+function Pill({ title, onPress, testID, ph, disabled = false }: { title: string; onPress: () => void; testID: string; ph: string; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} testID={testID} ph-label={ph} style={({ pressed }) => [styles.pill, pressed && { opacity: pressedOpacity }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled }}
+      testID={testID}
+      ph-label={ph}
+      style={({ pressed }) => [styles.pill, pressed && { opacity: pressedOpacity }]}
+    >
       <Text style={font(700, 14)}>{title}</Text>
     </Pressable>
   );
