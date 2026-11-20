@@ -241,7 +241,7 @@ test('a #heading link from Overview lands below the stuck bar', async ({ page })
   const client = await newClient('Hash');
   await signInAsCoach(page);
   await page.goto(`/clients/${client.id}`);
-  await page.getByRole('link', { name: 'See bests and stickers' }).click();
+  await page.getByRole('link', { name: 'Highlights All time' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/training#bests-heading$`));
   const heading = page.locator('#bests-heading');
   await expect(heading).toBeInViewport({ ratio: 1 });
