@@ -2,7 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CustomExerciseInput, ExerciseOverrideInput, codeForMessage, type Database } from '@caltracker/shared';
+import {
+  CustomExerciseInput,
+  ExerciseOverrideInput,
+  codeForMessage,
+  exerciseNameKey,
+  sameExerciseName,
+  type Database,
+  type LibraryTrackingType,
+} from '@caltracker/shared';
 import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -116,4 +124,55 @@ export async function updateCustomExercise(id: string, input: CustomExerciseInpu
 
   revalidatePath('/exercises');
   revalidatePath(`/exercises/${idCheck.data}`);
+}
+
+export type QuickCreateOutcome =
+  | { ok: true; id: string; name: string; trackingType: LibraryTrackingType }
+  | (ActionFailure & { existing?: { id: string; name: string } });
+
+/** Escapes LIKE's wildcards in typed text. */
+const likeLiteral = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * "+ Create '<query>'" in the exercise search (when nothing matched): a custom exercise for this workspace with just
+ * a name and a tracking type. Refused when a built-in or this workspace's own exercise already has the same name
+ * (case and spacing ignored); `existing` names it, so the search can offer it instead.
+ */
+export async function quickCreateExercise(input: { name: string; trackingType: string }): Promise<QuickCreateOutcome> {
+  const { workspaceId } = await requireCoach();
+  const parsed = CustomExerciseInput.safeParse({ name: input.name, trackingType: input.trackingType, instructions: [] });
+  if (!parsed.success) return fail(codeForMessage(parsed.error.issues[0]?.message, 'field_format'), 'action:exercises.quickCreateExercise');
+  const v = parsed.data;
+  const name = v.name.replace(/\s+/g, ' ');
+
+  const supabase = await createServerSupabase();
+  // Same words in the same order, any case or spacing: the database narrows it down, the shared rule decides.
+  const pattern = exerciseNameKey(name).split(' ').map(likeLiteral).join('%');
+  const { data: found, error: findError } = await supabase
+    .from('exercises')
+    .select('id, name')
+    .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+    .ilike('name', pattern)
+    .limit(20);
+  if (findError) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
+  const existing = found.find((e) => sameExerciseName(e.name, name));
+  if (existing) return { ...fail('exercise_name_taken', 'action:exercises.quickCreateExercise'), existing };
+
+  const { data, error } = await supabase
+    .from('exercises')
+    .insert({
+      workspace_id: workspaceId,
+      source: 'custom',
+      name,
+      tracking_type: v.trackingType,
+      primary_muscles: [],
+      equipment: null,
+      instructions: [],
+      youtube_url: null,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
+  revalidatePath('/exercises');
+  return { ok: true, id: data.id, name, trackingType: v.trackingType };
 }
