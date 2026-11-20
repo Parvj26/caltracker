@@ -68,6 +68,7 @@ env:
     element:
       id: today-settings
     direction: UP
+# Settings is its own screen: the grey ‹ goes back to Today. Sign out asks first; Cancel keeps you signed in.
 - tapOn:
     id: today-settings
 - assertVisible:
@@ -78,8 +79,22 @@ env:
     id: sign-out
 - tapOn:
     id: today-settings
+- scrollUntilVisible:
+    element:
+      id: sign-out
+    direction: DOWN
 - tapOn:
     id: sign-out
+- assertVisible: 'Sign out of CalTracker?'
+- tapOn: 'Cancel'
+- assertVisible:
+    id: sign-out
+- tapOn:
+    id: sign-out
+# The alert's own Sign out button (the screen's button sits behind it).
+- tapOn:
+    text: 'Sign out'
+    index: 1
 - extendedWaitUntil:
     visible:
       id: email-input

@@ -1,5 +1,6 @@
-# Settings (gear on Today) -> Notifications: a switch stays off after leaving and coming back, and a new quiet-hours
-# start shows on the Settings row. The demo client starts with default settings (notification_prefs has no row).
+# Settings (gear on Today) -> Notifications: the three groups on Settings say On / "2 of 3 on"; a switch stays off
+# after leaving and coming back; Back from Notifications returns to Settings (one step, not Today); a new quiet-hours
+# start is kept. The demo client starts with default settings (notification_prefs has no row).
 # Run via `pnpm --filter mobile e2e .maestro/notification-settings.yaml`.
 appId: app.caltracker.client
 env:
@@ -15,10 +16,18 @@ env:
 - tapOn:
     id: today-settings
 - extendedWaitUntil:
-    visible: 'On · Quiet 10 PM – 7 AM'
+    visible:
+      id: settings-notifications
     timeout: 10000
+- assertVisible: 'Workouts & reminders'
+- assertVisible: 'Messages from .*'
+- assertVisible:
+    id: settings-notifications-coach-value
+    text: 'On'
+- assertNotVisible:
+    id: settings-notifications-open
 - tapOn:
-    id: settings-notifications
+    id: settings-notifications-coach
 - assertVisible: 'Notifications'
 - assertNotVisible:
     id: notifications-off-banner
@@ -26,12 +35,14 @@ env:
 - assertNotVisible: 'Comments on your meals'
 - tapOn:
     id: notif-switch-message
+# Back goes one step: to Settings, where the group now says 2 of 3 on.
 - tapOn:
     id: notifications-settings-back
+- assertVisible:
+    id: settings-notifications-coach-value
+    text: '2 of 3 on'
 - tapOn:
-    id: today-settings
-- tapOn:
-    id: settings-notifications
+    id: settings-notifications-coach
 - assertVisible:
     id: notif-switch-message
     checked: false
@@ -45,17 +56,26 @@ env:
 - tapOn:
     id: notifications-settings-back
 - tapOn:
-    id: today-settings
-- assertVisible: 'On · Quiet 11 PM – 7 AM'
-# Put the defaults back for the next run.
-- tapOn:
     id: settings-notifications
-- tapOn:
-    id: notif-switch-message
 - scrollUntilVisible:
     element:
       id: notif-time-quietStart
     direction: DOWN
+- assertVisible:
+    id: notif-time-quietStart
+    text: '.*11:00 PM.*'
+# Put the defaults back for the next run.
 - tapOn:
     id: notif-time-quietStart
 - tapOn: '10:00 PM'
+- scrollUntilVisible:
+    element:
+      id: notif-switch-message
+    direction: UP
+- tapOn:
+    id: notif-switch-message
+- tapOn:
+    id: notifications-settings-back
+- assertVisible:
+    id: settings-notifications-coach-value
+    text: 'On'

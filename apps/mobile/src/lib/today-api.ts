@@ -40,6 +40,20 @@ export async function fetchFirstName(userId: string): Promise<string | null> {
   return name;
 }
 
+/** My full name for the Settings header ("Maya Thompson-Richardson"), saved like the first name. */
+export async function readCachedFullName(userId: string): Promise<string | null> {
+  const v = await readJson(key('fullName', userId));
+  return typeof v === 'string' ? v : null;
+}
+
+export async function fetchFullName(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('profiles').select('first_name, last_name').eq('id', userId).maybeSingle();
+  if (error) throw new Error(`profiles: ${error.message}`);
+  const name = [data?.first_name?.trim(), data?.last_name?.trim()].filter(Boolean).join(' ') || null;
+  if (name) writeJson(key('fullName', userId), name);
+  return name;
+}
+
 // ---- Community ----------------------------------------------------------------------------------------------
 
 const isPost = (v: unknown): v is FeedPost =>

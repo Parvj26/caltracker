@@ -1,0 +1,56 @@
+# Settings (approved Settings board): the account header (email, coached by), ACCOUNT / NOTIFICATIONS / HELP groups,
+# Delete account under Privacy (typing "delete" in any case turns its button on; nothing is deleted here), and Back
+# going exactly one step each time. Run via `pnpm --filter mobile e2e .maestro/settings.yaml`.
+appId: app.caltracker.client
+env:
+  EMAIL: client@demo.local
+  PASSWORD: demo-password-123
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    file: helpers/sign-in.yaml
+    env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
+- tapOn:
+    id: today-settings
+- extendedWaitUntil:
+    visible:
+      id: settings-account
+    timeout: 10000
+- assertVisible:
+    id: settings-workspace
+    text: 'client@demo.local · coached by .+'
+- assertVisible: 'Units'
+- assertVisible:
+    id: units-kg
+- assertVisible:
+    id: units-lb
+- assertNotVisible:
+    id: settings-delete-account
+- tapOn:
+    id: settings-privacy-delete
+- tapOn:
+    id: settings-delete-account
+- tapOn:
+    id: delete-account-input
+- inputText: 'delete'
+- assertVisible:
+    id: delete-account-confirm
+    enabled: true
+- tapOn:
+    id: delete-account-back
+- assertVisible:
+    id: settings-delete-account
+- tapOn:
+    id: privacy-back
+- assertVisible:
+    id: settings-account
+- scrollUntilVisible:
+    element:
+      id: settings-version
+    direction: DOWN
+- assertVisible: 'Terms & privacy policy'
+- tapOn:
+    id: settings-close
+- assertVisible:
+    id: today-settings

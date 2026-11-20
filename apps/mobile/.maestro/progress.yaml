@@ -17,7 +17,7 @@ env:
     env: { EMAIL: '${EMAIL}', PASSWORD: '${PASSWORD}' }
 - tapOn:
     id: tab-progress
-# The goal the coach set, with its countdown, sits on the overview under "This week".
+# The goal the coach set, with its countdown, sits under the streak / this-week line.
 - extendedWaitUntil:
     visible:
       id: goal-text
@@ -32,11 +32,17 @@ env:
 - assertVisible:
     id: progress-week
 - takeScreenshot: progress-overview
-# The Metrics tile shows the latest weight and its 3-month change, and opens Metrics: latest numbers in lb (80 kg =
+# Plain rows as on the approved Progress board: Strength, Metrics, Personal bests, Consistency, Zoo book (and Food).
+- assertVisible:
+    id: progress-consistency-value
+    text: '(.* this week|Updating…)'
+- assertVisible:
+    id: progress-zoo
+# The Metrics row shows the latest weight and its 3-month change, and opens Metrics: latest numbers in lb (80 kg =
 # 176.4 lb, −4.4 lb from 82 kg; 19% body fat; 36 kg = 79.4 lb of muscle), each from the coach's InBody scan.
 - assertVisible:
     id: progress-metrics
-    text: 'Metrics: 176.4 lb, −4.4 lb in 3 months'
+    text: 'Metrics: 176.4 lb, Weight · −4.4 lb in 3 months'
 - tapOn:
     id: progress-metrics
 - extendedWaitUntil:
