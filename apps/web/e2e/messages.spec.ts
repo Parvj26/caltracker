@@ -174,7 +174,7 @@ test('the Message button in the client header, on every tab, opens that conversa
   const client = await makeClient('Deepa');
   await signInAsCoach(page);
   // The header is shared by every client tab.
-  for (const tab of ['', '/training', '/body', '/documents', '/settings']) {
+  for (const tab of ['', '/training', '/metrics', '/documents', '/settings']) {
     await page.goto(`/clients/${client.id}${tab}`);
     // Once per page (the Training tab no longer has its own).
     const message = page.getByRole('link', { name: 'Message', exact: true });

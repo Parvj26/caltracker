@@ -7,7 +7,7 @@ import styles from '../client-page.module.css';
 
 /**
  * The client page's frame: one bar (back to Clients, the client's initials and name, Message, and "⋯" with Client
- * settings and Remove client), then the tabs (Overview, Training, Body, Food, Documents). On a phone the bar and the
+ * settings and Remove client), then the tabs (Overview, Training, Metrics, Food, Documents). On a phone the bar and the
  * tabs stay at the top while the page scrolls. Each tab is its own page below this layout; Settings keeps its own
  * address (/settings), opened from "⋯".
  */

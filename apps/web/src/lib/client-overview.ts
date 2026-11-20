@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { STICKERS, WORKOUT_TREE_SELECT, addDays, workoutPreview, workoutRowToDoc } from '@caltracker/shared';
+import { OVERVIEW_METRICS, STICKERS, WORKOUT_TREE_SELECT, addDays, metricDailyEntries, readAllPages, toMetricEntries, workoutPreview, workoutRowToDoc } from '@caltracker/shared';
 import type { Database, HomeWorkout, IsoDate, OverviewScan, Units, WorkoutPreview, WorkoutTreeRow } from '@caltracker/shared';
 import { loadLiveLogs, type LiveLog } from './home-live';
 
@@ -42,7 +42,6 @@ const TODAY_SELECT = `${WORKOUT_TREE_SELECT}, program_assignments(program_name)`
 type TodayTreeRow = WorkoutTreeRow & { program_assignments: { program_name: string } | null };
 
 const NOTES_LIMIT = 200;
-const SCANS_LIMIT = 500;
 
 export async function loadClientOverview(
   supabase: SupabaseClient<Database>,
@@ -82,14 +81,24 @@ export async function loadClientOverview(
         .eq('client_id', clientId)
         .order('first_earned_at', { ascending: false })
         .limit(UPDATES_SHOWN),
-      supabase
-        .from('body_measurements')
-        .select('id, measured_on, created_at, source, body_measurement_values(metric_key, value)')
-        .eq('workspace_id', workspaceId)
-        .eq('client_id', clientId)
-        .order('measured_on', { ascending: false })
-        // The newest 500 scans (about 40 years of monthly InBody tests): "All time" on the card covers these.
-        .limit(SCANS_LIMIT),
+      // The body card's values from metric_entries: Metrics entries (coach, client, Apple Health) together with InBody
+      // scans and old weigh-ins, read page by page (daily Apple Health values pass the 1000-row cap).
+      readAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from('metric_entries')
+          .select('origin, id, metric_key, value, measured_on, measured_at, created_at, source, entered_by_role, external_id')
+          .eq('workspace_id', workspaceId)
+          .eq('client_id', clientId)
+          .in('metric_key', [...OVERVIEW_METRICS])
+          .order('measured_on', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('origin')
+          .order('id')
+          .order('metric_key')
+          .range(from, to);
+        if (error) throw new Error(`Could not load body metrics: ${error.message}`);
+        return data;
+      }),
       // Updates shows scans by when they were entered, so ask for the newest entries on their own.
       supabase
         .from('body_measurements')
@@ -143,7 +152,6 @@ export async function loadClientOverview(
     ['totals', stats],
     ['stickers', stickerCount],
     ['stickers', recentStickers],
-    ['body scans', scans],
     ['recent body scans', recentScans],
     ['recent workouts', recentLogs],
     ['profile', profile],
@@ -159,11 +167,11 @@ export async function loadClientOverview(
   }
 
   const stickerName = new Map(STICKERS.map((s) => [s.key, s.name]));
-  const scanRows: OverviewScan[] = (scans.data ?? []).map((s) => ({
-    measuredOn: s.measured_on,
-    createdAt: s.created_at,
-    values: Object.fromEntries(s.body_measurement_values.map((v) => [v.metric_key, Number(v.value)])),
-  }));
+  // One value per day per metric (an entered value beats an Apple Health import of the same day: metricDailyEntries).
+  const metricEntries = toMetricEntries(scans);
+  const scanRows: OverviewScan[] = OVERVIEW_METRICS.flatMap((key) =>
+    metricDailyEntries(metricEntries, key).map((e) => ({ measuredOn: e.measuredOn, createdAt: e.createdAt, values: { [key]: e.value } })),
+  );
 
   const events: OverviewEvent[] = [
     ...(recentLogs.data ?? []).flatMap((l): OverviewEvent[] =>

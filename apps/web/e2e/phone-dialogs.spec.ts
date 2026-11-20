@@ -130,7 +130,7 @@ test.describe('iPhone SE (375 x 667)', () => {
 
   test('Add a scan fills the screen with Save in reach, and × closes it', async ({ page }) => {
     await signInAsCoach(page);
-    await page.goto(`${CLIENT}/body`);
+    await page.goto(`${CLIENT}/metrics`);
     await page.getByRole('button', { name: 'Add scan' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add a scan' });
     await expect(dialog).toBeVisible();

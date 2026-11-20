@@ -87,8 +87,8 @@ describe('reasonLine and fixFor', () => {
     [{ kind: 'nothing_planned' }, 'Nothing planned in the next 7 days', 'Assign', '/clients/c/training'],
     [{ kind: 'quiet', days: 8, atLeast: false }, 'No workout in 8 days', 'Message', '/messages/c'],
     [{ kind: 'quiet', days: 30, atLeast: true }, 'No workout in 30+ days', 'Message', '/messages/c'],
-    [{ kind: 'scan_due', lastScanOn: '2026-10-04' }, 'Last body scan 34 days ago', 'Add scan', '/clients/c/body?scan=1'],
-    [{ kind: 'scan_due', lastScanOn: null }, 'No body scan yet', 'Add scan', '/clients/c/body?scan=1'],
+    [{ kind: 'scan_due', lastScanOn: '2026-10-04' }, 'Last body scan 34 days ago', 'Add scan', '/clients/c/metrics?scan=1'],
+    [{ kind: 'scan_due', lastScanOn: null }, 'No body scan yet', 'Add scan', '/clients/c/metrics?scan=1'],
   ];
   it.each(cases)('%j says "%s" and offers %s', (reason, line, label, href) => {
     expect(reasonLine(reason, TODAY)).toBe(line);

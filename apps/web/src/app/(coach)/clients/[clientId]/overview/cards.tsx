@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { metricsTabHref } from '@/lib/metrics-paths';
+import layout from '@/components/ui/layout.module.css';
 import { useState } from 'react';
 import {
   OVERVIEW_PERIODS,
@@ -127,7 +129,7 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
         </div>
       </div>
       {data.scans.length === 0 ? (
-        <p className={styles.caption}>No InBody scans yet.</p>
+        <p className={styles.caption}>Nothing logged yet.</p>
       ) : (
         <>
           <ul className={styles.metrics} aria-label="Pick a measure to chart">
@@ -138,11 +140,18 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
                   className={styles.metric}
                   aria-pressed={m.key === chosen}
                   onClick={() => setChosen(m.key)}
-                  aria-label={`${METRICS[m.key].label}: ${m.latest ? formatMetric(m.key, m.latest.value, units) : 'not measured'}${m.change !== null ? `, ${formatMetricChange(m.key, m.change, units)} over ${OVERVIEW_PERIOD_LABELS[period].toLowerCase()}` : ''}`}
                 >
+                  {/* The visible text is the button's name (no aria-label, so speech and screen readers agree). */}
                   <span className={styles.metricLabel}>{SHORT_LABEL[m.key]}</span>
-                  <span className={styles.metricValue}>{m.latest ? formatMetric(m.key, m.latest.value, units) : '–'}</span>
-                  <span className={styles.metricChange}>{m.change !== null ? formatMetricChange(m.key, m.change, units) : ' '}</span>
+                  <span className={styles.metricValue}>{m.latest ? formatMetric(m.key, m.latest.value, units) : <><span aria-hidden="true">–</span><span className={layout.srOnly}>not measured</span></>}</span>
+                  <span className={styles.metricChange}>
+                    {m.change !== null ? (
+                      <>
+                        {formatMetricChange(m.key, m.change, units)}
+                        <span className={layout.srOnly}> over {OVERVIEW_PERIOD_LABELS[period].toLowerCase()}</span>
+                      </>
+                    ) : ' '}
+                  </span>
                 </button>
               </li>
             ))}
@@ -171,13 +180,13 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
         </>
       )}
       <p className={styles.caption}>
-        <Link href={`/clients/${data.clientId}/body${readOnly ? '' : '?scan=1'}`} className="tap-inline">{readOnly ? 'See all scans' : 'Add scan'}</Link>
         {readOnly ? null : (
           <>
+            <Link href={`${metricsTabHref(data.clientId)}?sheet=log-metric`} className="tap-inline">+ Log metric</Link>
             {' · '}
-            <Link href={`/clients/${data.clientId}/body`} className="tap-inline">All scans</Link>
           </>
         )}
+        <Link href={metricsTabHref(data.clientId)} className="tap-inline">All metrics</Link>
       </p>
     </Card>
   );
@@ -196,7 +205,7 @@ function updateOf(e: OverviewEvent, firstName: string, clientId: string, units: 
     case 'scan':
       return e.source === 'client'
         ? { id: e.id, kind: 'weight', at: e.at, text: `${firstName} logged their weight${e.weightKg !== null ? `: ${formatMetric('weight_kg', e.weightKg, units)}` : ''}` }
-        : { id: e.id, kind: 'scan', at: e.at, text: `Body scan added for ${dayText(e.measuredOn)}`, href: `/clients/${clientId}/body` };
+        : { id: e.id, kind: 'scan', at: e.at, text: `Body scan added for ${dayText(e.measuredOn)}`, href: metricsTabHref(clientId) };
     case 'sticker':
       return { id: e.id, kind: 'sticker', at: e.at, text: `${firstName} earned the ${e.name} sticker` };
   }

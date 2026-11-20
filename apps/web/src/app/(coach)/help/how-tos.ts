@@ -43,7 +43,7 @@ export const HOW_TOS: HowTo[] = [
     title: 'Add a body scan',
     icon: 'scan',
     steps: [
-      'Open the client and go to their Body tab.',
+      'Open the client and go to their Metrics tab.',
       'Tap Add scan and type in the numbers from the InBody printout. You can attach the printout too.',
       'Tap Save scan. Once there are two scans, charts show how each number changed.',
     ],

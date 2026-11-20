@@ -19,7 +19,7 @@ const ROUTES = [
   '/clients',
   CLIENT,
   `${CLIENT}/training`,
-  `${CLIENT}/body`,
+  `${CLIENT}/metrics`,
   `${CLIENT}/food`,
   `${CLIENT}/documents`,
   `${CLIENT}/settings`,
@@ -111,7 +111,7 @@ test('the rail legal links and the clients list are easy to tap', async ({ page 
 test('client overview links, calendar controls and other small links are easy to tap', async ({ page }) => {
   await page.goto(CLIENT);
   await expectTappable(page.getByRole('link', { name: 'See bests and stickers' }));
-  await expectTappable(page.getByRole('link', { name: /^(Add scan|All scans|See all scans)$/ }));
+  await expectTappable(page.getByRole('link', { name: /^(\+ Log metric|All metrics)$/ }));
 
   await page.goto(`${CLIENT}/training`);
   await expectTappable(page.getByRole('navigation', { name: 'Calendar view' }).getByRole('link'));
@@ -149,7 +149,7 @@ test('the invite window fits, has no zooming fields and big enough choices', asy
 });
 
 test('the Add scan window has no zooming fields', async ({ page }) => {
-  await page.goto(`${CLIENT}/body`);
+  await page.goto(`${CLIENT}/metrics`);
   await page.getByRole('button', { name: 'Add scan' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a scan' });
   await expect(dialog).toBeVisible();
