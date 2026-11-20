@@ -9,6 +9,7 @@ import { Pill, type PillTone } from '@/components/pill';
 import { requireAdmin } from '@/lib/admin';
 import { UUID } from '@/lib/actions-shared';
 import { nameOr } from '@/lib/admin-data';
+import { pushOutcome, pushType } from '@/lib/push-labels';
 import { loadPeople } from '@/lib/people';
 import { roleAtLeast } from '@/lib/roles';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -16,11 +17,6 @@ import { cancelInvite, resendInvite } from './actions';
 
 export const metadata: Metadata = { title: 'Logs' };
 
-const OUTCOME: Record<string, { label: string; tone: PillTone }> = {
-  sent: { label: 'Sent', tone: 'lime' },
-  failed: { label: 'Failed', tone: 'tape' },
-  skipped: { label: 'Skipped', tone: 'grey' },
-};
 const STATUS: Record<string, { label: string; tone: PillTone }> = {
   pending: { label: 'Pending', tone: 'blue' },
   expired: { label: 'Expired', tone: 'tape' },
@@ -68,12 +64,12 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
                 </thead>
                 <tbody>
                   {pushes.data.map((p) => {
-                    const outcome = (p.outcome && OUTCOME[p.outcome]) || { label: 'Waiting', tone: 'grey' as const };
+                    const outcome = pushOutcome(p.outcome);
                     return (
                       <tr key={p.id}>
                         <td><LocalTime iso={p.at} kind="datetime" /></td>
                         <td><Link href={`/clients/${p.user_id}`} className={styles.rowLink}>{nameOr(p.name)}</Link></td>
-                        <td>{p.type}</td>
+                        <td>{pushType(p.type)}</td>
                         <td><Pill tone={outcome.tone}>{outcome.label}</Pill></td>
                         <td>{p.attempts}</td>
                         <td>{p.last_error ?? ''}</td>

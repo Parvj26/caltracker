@@ -1,7 +1,7 @@
 -- Admin support actions, the test notification and "View as" data
 -- (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(63);
+select plan(68);
 
 select tests.create_user('aa-owner@t.local', 'Olive Owner') as owner \gset
 select tests.create_user('aa-support@t.local', 'Sue Port') as support \gset
@@ -12,6 +12,8 @@ values (:'owner', 'owner'), (:'support', 'support'), (:'ro', 'readonly');
 
 select tests.create_user('aa-ann@t.local', 'Ann Coach') as ann \gset
 select tests.create_workspace('AA Alpha', :'ann') as ws \gset
+select tests.create_user('aa-bea@t.local', 'Bea Coach') as bea \gset
+select tests.create_workspace('AA Beta', :'bea') as ws_b \gset
 select tests.create_user('aa-sam@t.local', 'Sam Lee') as sam \gset
 select tests.add_client(:'ws', :'sam');
 select tests.create_user('aa-kim@t.local', 'Kim Park') as kim \gset
@@ -43,48 +45,62 @@ select ok(not has_function_privilege('authenticated', 'private.remove_client_cor
 -- readonly is denied for every action (and so are non-admins and aal1 support).
 select tests.act_as_aal(:'ro', 'aal2');
 select throws_ok(q, '42501', 'admin: not authorised', 'readonly denied: ' || q) from unnest(array[
-  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_remove_client(%L)', :'kim'),
+  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'),
   format('select public.admin_log_action(%L, %L, %L)', 'password_reset', :'kim', '{}'),
   format('select public.admin_send_test_push(%L)', :'kim'), format('select public.admin_view_as_snapshot(%L)', :'kim'),
   format('select public.admin_log_timeline_view(%L)', :'kim')]) q;
 reset role;
 select tests.act_as_aal(:'nobody', 'aal2');
 select throws_ok(q, '42501', 'admin: not authorised', 'non-admin denied: ' || q) from unnest(array[
-  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_remove_client(%L)', :'kim'),
+  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'),
   format('select public.admin_log_action(%L, %L, %L)', 'password_reset', :'kim', '{}'),
   format('select public.admin_send_test_push(%L)', :'kim'), format('select public.admin_view_as_snapshot(%L)', :'kim'),
   format('select public.admin_log_timeline_view(%L)', :'kim')]) q;
 reset role;
 select tests.act_as_aal(:'support', 'aal1');
 select throws_ok(q, '42501', 'admin: not authorised', 'aal1 support denied: ' || q) from unnest(array[
-  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_remove_client(%L)', :'kim'),
+  format('select public.admin_cancel_invite(%L)', :'inv_new'), format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'),
   format('select public.admin_log_action(%L, %L, %L)', 'password_reset', :'kim', '{}'),
   format('select public.admin_send_test_push(%L)', :'kim'), format('select public.admin_view_as_snapshot(%L)', :'kim'),
   format('select public.admin_log_timeline_view(%L)', :'kim')]) q;
 reset role;
 select is((select count(*)::int from public.admin_audit_log), 0, 'denied calls write no audit rows');
 
--- admin_remove_client leaves a past_clients row identical to a coach removal (twins Sam and Kim).
+-- admin_move_client removes Kim from the coach named (leaving a past_clients row identical to a coach removal: twins
+-- Sam and Kim) and writes one move_client audit row; the invite that follows is not audited again.
 select tests.act_as(:'ann');
 select lives_ok(format('select public.remove_client(%L, %L)', :'ws', :'sam'), 'Ann removes Sam herself');
 reset role;
 select tests.act_as_aal(:'support', 'aal2');
-select lives_ok(format('select public.admin_remove_client(%L)', :'kim'), 'support removes Kim');
-select throws_ok(format('select public.admin_remove_client(%L)', :'kim'), 'P0002', 'admin: not a client',
-  'someone with no coach cannot be removed');
+select throws_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws'), '22023',
+  'admin: pick a different coach', 'moving to the same coach is refused');
+select lives_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'), 'support moves Kim');
+select throws_ok(format('select public.admin_move_client(%L, %L, %L)', :'kim', :'ws', :'ws_b'), 'P0002',
+  'admin: not a client of that coach', 'someone who is not a client of that coach cannot be moved from it');
 reset role;
 select results_eq(
   format($$select removed_by, joined_at, removed_at::date, split_part(email, '@', 2)
     from public.past_clients where user_id = %L$$, :'kim'),
   format($$select removed_by, joined_at, removed_at::date, split_part(email, '@', 2)
     from public.past_clients where user_id = %L$$, :'sam'),
-  'admin_remove_client leaves the same past_clients record as a coach removal (removed by the workspace owner)');
+  'admin_move_client leaves the same past_clients record as a coach removal (removed by the workspace owner)');
 select results_eq(format('select email, first_name, last_name from public.past_clients where user_id = %L', :'kim'),
   $$values ('aa-kim@t.local'::text, 'Kim'::text, 'Park'::text)$$, 'Kim''s name and email are kept');
 select is((select count(*)::int from public.workspace_members where user_id = :'kim'), 0, 'Kim no longer has a membership');
-select results_eq(format($$select admin_id, target_user_id, details from public.admin_audit_log where action = 'remove_client'$$),
-  format($$values (%L::uuid, %L::uuid, '{"workspace_ids": ["%s"]}'::jsonb)$$, :'support', :'kim', :'ws'),
-  'remove_client writes one audit row');
+select results_eq(format($$select admin_id, target_user_id, details from public.admin_audit_log where action = 'move_client'$$),
+  format($$values (%L::uuid, %L::uuid, '{"from_workspace_id": "%s", "to_workspace_id": "%s",
+    "from_workspace_name": "AA Alpha", "to_workspace_name": "AA Beta"}'::jsonb)$$, :'support', :'kim', :'ws', :'ws_b'),
+  'a move writes one move_client audit row');
+select tests.act_as_aal(:'support', 'aal2');
+select ok(public.admin_can_invite(:'ws_b', '{aa-kim@t.local}'), 'the move''s invite to the new coach is allowed');
+reset role;
+select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite'), 0,
+  'the move''s invite is not audited again');
+select tests.act_as_aal(:'support', 'aal2');
+select ok(public.admin_can_invite(:'ws_b', '{aa-kim@t.local}'), 'a later resend is allowed');
+reset role;
+select is((select count(*)::int from public.admin_audit_log where action = 'resend_invite'), 1,
+  'a later resend is audited as usual');
 
 -- cancel only pending.
 select tests.act_as_aal(:'support', 'aal2');
@@ -178,8 +194,8 @@ select ok((:'snap_removed'::jsonb->'today'->>'date') is not null, 'snapshot for 
 
 -- each action wrote one audit row with the right action.
 select results_eq('select action, count(*)::int from public.admin_audit_log group by action order by action',
-  $$values ('cancel_invite'::text, 1), ('log_timeline_view', 1), ('password_reset', 2), ('remove_client', 1),
-    ('send_test_push', 2), ('view_as_snapshot', 2)$$,
+  $$values ('cancel_invite'::text, 1), ('log_timeline_view', 1), ('move_client', 1), ('password_reset', 2),
+    ('resend_invite', 1), ('send_test_push', 2), ('view_as_snapshot', 2)$$,
   'each action writes one audit row with the right action');
 select results_eq($$select target_user_id from public.admin_audit_log where action = 'log_timeline_view'$$,
   format($$values (%L::uuid)$$, :'lee'), 'the timeline view is logged against the client');

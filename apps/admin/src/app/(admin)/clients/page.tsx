@@ -55,11 +55,11 @@ export default async function ClientsPage() {
         </div>
       ) : (
         groups.map((g, i) =>
-          g.coachName === null ? (
+          g.coachId === null ? (
             <ClientPanel key="no-coach" id="clients-no-coach" title="No coach"
               note={`Removed or their coach was deleted · ${g.clients.length}`} clients={g.clients} />
           ) : (
-            <ClientPanel key={`coach-${g.coachName}`} id={`clients-coach-${i}`} title={g.coachName}
+            <ClientPanel key={`coach-${g.coachId}`} id={`clients-coach-${i}`} title={nameOr(g.coachName)}
               note={plural(g.clients.length, 'client')} clients={g.clients} />
           ),
         )

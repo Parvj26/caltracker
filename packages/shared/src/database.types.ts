@@ -3006,11 +3006,11 @@ export type Database = {
           created_at: string
           health: string
           last_active: string
-          messages_7d: number
           name: string
-          programs_assigned_7d: number
+          programs_assigned_week: number
           role: Database["public"]["Enums"]["member_role"]
           user_id: string
+          workouts_built_week: number
           workspace_id: string
           workspace_name: string
         }[]
@@ -3072,6 +3072,14 @@ export type Database = {
           role: Database["public"]["Enums"]["admin_role"]
         }[]
       }
+      admin_move_client: {
+        Args: {
+          p_from_workspace_id: string
+          p_to_workspace_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       admin_needs_attention: {
         Args: never
         Returns: {
@@ -3087,6 +3095,7 @@ export type Database = {
       admin_people: {
         Args: never
         Returns: {
+          coach_id: string
           coach_name: string
           email: string
           kind: string
@@ -3109,7 +3118,6 @@ export type Database = {
         }[]
       }
       admin_remove_admin: { Args: { p_user_id: string }; Returns: undefined }
-      admin_remove_client: { Args: { p_user_id: string }; Returns: undefined }
       admin_require_owner: { Args: never; Returns: boolean }
       admin_send_test_push: { Args: { p_user_id: string }; Returns: string }
       admin_set_admin: {

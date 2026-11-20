@@ -1,6 +1,6 @@
 -- Admin read functions: Overview, Coaches, Clients and Logs (docs/superpowers/specs/2026-11-09-admin-dashboard-design.md).
 begin;
-select plan(54);
+select plan(61);
 
 -- Admins.
 select tests.create_user('ar-owner@t.local', 'Olive Owner') as owner \gset
@@ -150,14 +150,60 @@ select ok((select bool_and(ok) from (
   from public.admin_needs_attention() with ordinality as t(kind, user_id, name, since, action, invite_id, ord)) x),
   'needs attention is ordered by since');
 
--- coach health tags.
+reset role;
+-- Ann this week: built a library workout, assigned the program (its copy for Sam is not "built").
+insert into public.program_assignments (workspace_id, client_id, program_id, program_name, weeks, start_date, created_by)
+values (:'ws_a', :'sam', :'prog', 'AR Strength', 4, current_date, :'ann') returning id as asg \gset
+insert into public.workouts (workspace_id, name, created_by) values (:'ws_a', 'AR Built', :'ann');
+insert into public.workouts (workspace_id, client_id, scheduled_on, assignment_id, name, created_by)
+values (:'ws_a', :'sam', current_date, :'asg', 'AR Copy', :'ann');
+-- Last week's workout doesn't count this week.
+insert into public.workouts (workspace_id, name, created_by, created_at)
+values (:'ws_a', 'AR Old', :'ann', private.admin_week_start() - interval '1 day');
+
+-- coach health tags, and this week = workouts built + programs assigned.
+select tests.act_as_aal(:'owner', 'aal2');
 select results_eq(
-  format($$select name, workspace_name, clients, programs_assigned_7d, messages_7d, health from public.admin_coaches()
+  format($$select name, workspace_name, clients, workouts_built_week, programs_assigned_week, health from public.admin_coaches()
     where workspace_id in (%L, %L, %L) order by name$$, :'ws_a', :'ws_b', :'ws_c'),
-  $$values ('Ann Coach'::text, 'AR Alpha'::text, 2, 0, 1, 'good'::text),
+  $$values ('Ann Coach'::text, 'AR Alpha'::text, 2, 1, 1, 'good'::text),
     ('Bob Coach', 'AR Beta', 1, 0, 0, 'inactive'),
     ('Cat Coach', 'AR Gamma', 1, 0, 0, 'quiet')$$,
-  'coach health tags: good, inactive, quiet');
+  'coach health tags (good, inactive, quiet) and this week''s workouts built and programs assigned');
+
+reset role;
+-- Health from whole days: Active up to 3 days, Going quiet 4-13, Inactive 14+ or never.
+select results_eq($$select private.admin_coach_health(now() - x) from unnest(array[
+    interval '0', interval '3 days 23 hours', interval '4 days', interval '13 days 23 hours', interval '14 days']) x$$,
+  $$values ('good'::text), ('good'), ('quiet'), ('quiet'), ('inactive')$$, 'health boundaries at 4 and 14 days');
+select is(private.admin_coach_health(null), 'inactive', 'never active: inactive');
+
+-- Last active also counts sign-in sessions, workouts built and invites the coach sent (not ones an admin sent).
+select tests.create_user('ar-dan@t.local', 'Dan Coach') as dan \gset
+select tests.create_workspace('AR Delta', :'dan') as ws_d \gset
+insert into auth.sessions (id, user_id, created_at, updated_at, refreshed_at)
+values (gen_random_uuid(), :'dan', now() - interval '20 days', now() - interval '20 days',
+  (now() - interval '1 day') at time zone 'utc');
+select tests.create_user('ar-eve@t.local', 'Eve Coach') as eve \gset
+select tests.create_workspace('AR Epsilon', :'eve') as ws_e \gset
+insert into public.workouts (workspace_id, name, created_by, created_at) values (:'ws_e', 'AR Eve', :'eve', now() - interval '5 days');
+select tests.create_user('ar-fay@t.local', 'Fay Coach') as fay \gset
+select tests.create_workspace('AR Zeta', :'fay') as ws_f \gset
+select tests.create_invite(:'ws_f', 'ar-fay-c@t.local', 'Fay Client', :'fay', 'tok-ar-fay-0000000000000') as inv_fay \gset
+update public.client_invites set created_at = now() - interval '2 days' where id = :'inv_fay';
+select tests.create_user('ar-gus@t.local', 'Gus Coach') as gus \gset
+select tests.create_workspace('AR Eta', :'gus') as ws_g \gset
+insert into public.admin_audit_log (admin_id, action, details, at)
+values (:'owner', 'resend_invite', jsonb_build_object('workspace_id', :'ws_g'), now() - interval '10 seconds');
+select tests.create_invite(:'ws_g', 'ar-gus-c@t.local', 'Gus Client', :'gus', 'tok-ar-gus-0000000000000');
+select is(date_trunc('minute', private.admin_coach_last_active(:'dan', null)),
+  date_trunc('minute', now() - interval '1 day'), 'last active: the latest session refresh');
+select tests.act_as_aal(:'owner', 'aal2');
+select results_eq(
+  format($$select name, health from public.admin_coaches() where workspace_id in (%L, %L, %L, %L) order by name$$,
+    :'ws_d', :'ws_e', :'ws_f', :'ws_g'),
+  $$values ('Dan Coach'::text, 'good'::text), ('Eve Coach', 'quiet'), ('Fay Coach', 'good'), ('Gus Coach', 'inactive')$$,
+  'last active: a session (Dan), a workout built (Eve), an invite sent (Fay); an admin''s invite does not count (Gus)');
 
 -- admin_coach summary.
 select public.admin_coach(:'ann') as coach_ann \gset
@@ -182,7 +228,22 @@ select ok((:'c_sam'::jsonb->>'joined_at') is not null and (:'c_sam'::jsonb->>'la
 select is((select jsonb_agg(d - 'last_seen_at') from jsonb_array_elements(:'c_sam'::jsonb->'devices') d),
   '[{"app_version": "9.9.9-ar"}]'::jsonb, 'admin_client lists devices');
 select is((select jsonb_agg(e - 'at') from jsonb_array_elements(:'c_sam'::jsonb->'push_errors') e),
-  '[{"type": "message", "error": "BadDeviceToken"}]'::jsonb, 'admin_client lists push errors from the last 7 days');
+  '[{"type": "message", "outcome": "failed", "error": "BadDeviceToken"}]'::jsonb, 'admin_client lists push errors from the last 7 days');
+-- Recent errors are every push that did not reach the phone: no phone, expired, failed (not sent or turned off).
+reset role;
+insert into public.push_outbox (user_id, workspace_id, type, group_key, outcome, sent_at, created_at) values
+  (:'kim', :'ws_a', 'message', 'ar-k1', 'no_device', now(), now() - interval '1 hour'),
+  (:'kim', :'ws_a', 'daily_reminder', 'ar-k2', 'expired', now(), now() - interval '2 hours'),
+  (:'kim', :'ws_a', 'message', 'ar-k3', 'disabled', now(), now() - interval '3 hours'),
+  (:'kim', :'ws_a', 'message', 'ar-k4', 'sent', now(), now() - interval '4 hours'),
+  (:'kim', :'ws_a', 'message', 'ar-k5', 'no_device', now(), now() - interval '8 days');
+insert into public.push_devices (token, user_id, app_version) values (repeat('cd', 32), :'pat', '1.0.0');
+select tests.act_as_aal(:'owner', 'aal2');
+select is((select jsonb_agg(e - 'at') from jsonb_array_elements(public.admin_client(:'kim')->'push_errors') e),
+  '[{"type": "message", "outcome": "no_device", "error": null}, {"type": "daily_reminder", "outcome": "expired", "error": null}]'::jsonb,
+  'admin_client push errors include no phone and expired, newest first, last 7 days only');
+-- Last sync ignores push-token refreshes: Pat has only a device.
+select is(public.admin_client(:'pat')->'last_sync_at', 'null'::jsonb, 'last sync does not count push-token refreshes');
 select is(public.admin_client(:'kim')->'notifications_on', 'false'::jsonb, 'no device: notifications are off');
 select throws_ok(format('select public.admin_client(%L)', gen_random_uuid()), 'P0002', 'admin: no such user', 'unknown user');
 
@@ -191,6 +252,9 @@ select set_has('select user_id, kind, name, email, coach_name from public.admin_
   format($$values (%L::uuid, 'client'::text, 'Sam Lee'::text, 'ar-sam@t.local'::text, 'Ann Coach'::text),
     (%L, 'coach', 'Ann Coach', 'ar-ann@t.local', null)$$, :'sam', :'ann'),
   'people lists clients with their coach, and coaches');
+select set_has('select user_id, kind, coach_id from public.admin_people()',
+  format($$values (%L::uuid, 'client'::text, %L::uuid), (%L, 'account', null), (%L, 'coach', null)$$, :'sam', :'ann', :'nobody', :'ann'),
+  'people: a client''s coach id, and accounts with no coach and no past-client record');
 select results_eq(format($$select type, outcome, attempts, last_error, name from public.admin_push_log(%L) where outcome = 'failed'$$, :'sam'),
   $$values ('message'::text, 'failed'::text, 5, 'BadDeviceToken'::text, 'Sam Lee'::text)$$, 'push log filtered by person');
 select set_eq(format($$select email, status from public.admin_invite_log() where workspace_name = 'AR Alpha'$$),

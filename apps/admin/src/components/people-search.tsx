@@ -5,7 +5,8 @@ import { useId, useMemo, useState } from 'react';
 import { buildSmartIndex, smartMatch } from '@caltracker/shared';
 import styles from './admin.module.css';
 
-export type Person = { user_id: string; kind: string; name: string; email: string; coach_name: string | null };
+/** kind: coach | client (coach_id null = removed or their coach was deleted) | account (never had a coach). */
+export type Person = { user_id: string; kind: string; name: string; email: string; coach_name: string | null; coach_id: string | null };
 
 const MAX_RESULTS = 8;
 
@@ -50,7 +51,7 @@ export function PeopleSearch({ people }: { people: Person[] }) {
           {hits.length === 0 ? <li className={styles.searchEmpty}>Nobody matches.</li> : null}
           {hits.map((item) => {
             const href = item.kind === 'coach' ? `/coaches/${item.user_id}` : `/clients/${item.user_id}`;
-            const what = item.kind === 'coach' ? 'Coach' : item.coach_name ? `Client of ${item.coach_name}` : 'Removed client';
+            const what = item.kind === 'coach' ? 'Coach' : item.kind === 'account' ? 'Account, never had a coach' : item.coach_name ? `Client of ${item.coach_name}` : 'Removed client';
             return (
               <li key={`${item.kind}-${item.user_id}`}>
                 <Link href={href} className={styles.searchResult}>

@@ -35,6 +35,9 @@ test('open client page shows health', async ({ page }) => {
   for (const name of ['Send password reset', 'Move to another coach…', 'Send test notification']) {
     await expect(fix.getByRole('button', { name })).toBeVisible();
   }
+  // No phone registered: nothing to send a test to.
+  await expect(fix.getByRole('button', { name: 'Send test notification' })).toBeDisabled();
+  await expect(fix).toContainText('Test notification: no phone registered yet.');
   await expect(page.getByRole('region', { name: 'Recent errors' })).toContainText('None in the last 7 days.');
   // No PostHog key locally: the timeline still renders, with a note.
   await expect(page.getByRole('region', { name: 'Timeline' })).toContainText('Tracking timeline unavailable');
@@ -71,6 +74,8 @@ test('fix it actions confirm and write audit rows', async ({ page }) => {
   const from = await seedCoach('Luis', `Bueno${t}`, `From Coaching ${t}`);
   const to = await seedCoach('Maya', `Patel${t}`, `To Coaching ${t}`);
   const client = await seedClient(from.workspaceId, 'Sam', `S${t}`);
+  // A registered phone, so the test notification can be sent.
+  sql(`insert into public.push_devices (token, user_id, app_version) values (md5(random()::text) || md5(random()::text), ${lit(client.id)}, '1.0.0')`);
   const support = await createUser({ role: 'support', enrolled: true });
   await signInAdmin(page, support);
   await page.goto(`/clients/${client.id}`);
@@ -97,7 +102,8 @@ test('fix it actions confirm and write audit rows', async ({ page }) => {
   await move.getByRole('button', { name: 'Move' }).click();
   await expect(fix.getByRole('status')).toContainText(`Removed from From Coaching ${t} and invited to To Coaching ${t}`);
 
-  expect(auditActions({ adminId: support.id })).toEqual(['resend_invite', 'remove_client', 'password_reset', 'send_test_push']);
+  // A move is one audit row (the invite to the new coach is not logged again).
+  expect(auditActions({ adminId: support.id })).toEqual(['move_client', 'password_reset', 'send_test_push']);
   expect(sql(`select count(*) from public.client_invites where workspace_id = ${lit(to.workspaceId)} and lower(email) = lower(${lit(client.email)})`)).toBe('1');
 
   // Now a removed client: Restore puts them back in touch with their old coach.
@@ -106,6 +112,20 @@ test('fix it actions confirm and write audit rows', async ({ page }) => {
   await fix.getByRole('button', { name: 'Restore to From Coaching' + ` ${t}` }).click();
   await page.getByRole('dialog', { name: 'Restore this client?' }).getByRole('button', { name: 'Send invite' }).click();
   await expect(fix.getByRole('status')).toContainText('Invite sent');
+});
+
+test('search finds an account that never had a coach', async ({ page }) => {
+  const t = tag();
+  const loner = await createUser({ firstName: 'Lonely', lastName: `Account${t}` });
+  const owner = await createUser({ role: 'owner', enrolled: true });
+  await signInAdmin(page, owner);
+
+  await page.getByLabel('Search anyone').fill(`Lonely Account${t}`);
+  const result = page.getByRole('link', { name: new RegExp(`Lonely Account${t}`) });
+  await expect(result).toContainText('Account, never had a coach');
+  await result.click();
+  await expect(page).toHaveURL(new RegExp(`/clients/${loner.id}$`));
+  await expect(page.getByRole('heading', { level: 1, name: `Lonely Account${t}` })).toBeVisible();
 });
 
 test('owner adds a support admin', async ({ page }) => {
