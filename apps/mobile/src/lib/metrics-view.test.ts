@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MetricEntry } from '@caltracker/shared';
-import { clientEditKind, lastValueLine, metricHistory, metricRows, metricSourceLabel, metricsTile, sparklinePoints } from './metrics-view';
+import { clientEditKind, earlierEntries, lastValueLine, metricHistory, metricRows, metricSourceLabel, metricsTile, sparklinePoints } from './metrics-view';
 
 const TODAY = '2026-11-19';
 const e = (over: Partial<MetricEntry>): MetricEntry => ({
@@ -47,7 +47,7 @@ describe('rows', () => {
     expect(rows[1].meta).toMatch(/InBody scan$/);
     expect(rows[4]).toMatchObject({ value: '30.7', unit: 'in' });
     expect(rows[4].meta).toMatch(/logged by Luis$/);
-    expect(rows[5]).toMatchObject({ value: '—', unit: 'bpm', meta: 'Not logged yet', change: null, latest: null });
+    expect(rows[5]).toMatchObject({ value: '', unit: 'bpm', meta: 'Not logged yet', change: null, latest: null });
   });
   it('keeps the latest value when the range has none', () => {
     const rows = metricRows([e({ value: 70, measuredOn: '2025-01-01' })], '3m', 'kg', TODAY, null);
@@ -80,5 +80,19 @@ describe('sparkline', () => {
     expect(sparklinePoints([{ date: '2026-01-01', value: 10 }, { date: '2026-01-02', value: 20 }], 100, 20, 0)).toBe('0,20 100,0');
     expect(sparklinePoints([{ date: '2026-01-01', value: 5 }, { date: '2026-01-02', value: 5 }], 100, 20, 0)).toBe('0,10 100,10');
     expect(sparklinePoints([{ date: '2026-01-01', value: 5 }], 100, 20)).toBe('');
+  });
+});
+
+describe('earlier entries', () => {
+  it('leaves out the latest, which the row already shows', () => {
+    const latest = e({ id: 'new', measuredOn: '2026-11-19', source: 'apple_health', externalId: 'hk' });
+    const all = [latest, e({ id: 'old', measuredOn: '2026-11-01' }), e({ id: 'bf', metricKey: 'body_fat_pct' })];
+    expect(earlierEntries(all, 'weight_kg', latest).map((x) => x.id)).toEqual(['old']);
+    expect(earlierEntries([latest], 'weight_kg', latest)).toEqual([]);
+  });
+  it('keeps a scan value that shares its id with another metric', () => {
+    const scanWeight = e({ id: 's', origin: 'body_measurements', source: 'inbody_scan', enteredBy: 'coach' });
+    const scanFat = { ...scanWeight, metricKey: 'body_fat_pct' as const };
+    expect(earlierEntries([scanWeight, scanFat], 'body_fat_pct', scanWeight)).toEqual([scanFat]);
   });
 });

@@ -46,7 +46,7 @@ export function metricParts(key: MetricKey, stored: number, units: Units): { val
 export interface MetricRow {
   key: MetricKey;
   label: string;
-  /** "72.3", or "—" with nothing logged. */
+  /** "72.3", or "" with nothing logged (the row then says "Not logged yet" instead). */
   value: string;
   unit: string;
   /** "12 Nov · InBody scan", or "Not logged yet". */
@@ -69,7 +69,7 @@ export function metricRows(
   return METRIC_KEYS.map((key) => {
     const latest = metricDailyEntries(entries, key).at(-1) ?? null;
     const summary = metricSummary(entries, key, range, today);
-    const parts = latest ? metricParts(key, latest.value, units) : { value: '—', unit: metricUnit(key, units) };
+    const parts = latest ? metricParts(key, latest.value, units) : { value: '', unit: metricUnit(key, units) };
     return {
       key,
       label: METRIC_CATALOGUE[key].label,
@@ -95,6 +95,11 @@ export function metricHistory(entries: readonly MetricEntry[], key: MetricKey): 
         ? a.measuredOn < b.measuredOn ? 1 : -1
         : (b.measuredAt ?? b.createdAt).localeCompare(a.measuredAt ?? a.createdAt),
     );
+}
+
+/** A row's entries other than the latest one (which the row itself shows), newest first. */
+export function earlierEntries(entries: readonly MetricEntry[], key: MetricKey, latest: MetricEntry | null): MetricEntry[] {
+  return metricHistory(entries, key).filter((e) => !latest || e.origin !== latest.origin || e.id !== latest.id || e.metricKey !== latest.metricKey);
 }
 
 /** The log sheet's hint: "Last: 70.5 kg on 12 Nov (InBody scan)", or null with nothing logged. */

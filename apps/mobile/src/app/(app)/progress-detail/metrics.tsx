@@ -12,7 +12,7 @@ import { Screen, TextButton } from '@/components/ui';
 import { appleHealthStatus, type AppleHealthMetric } from '@/lib/apple-health-logic';
 import { useAppleHealth, useAppleHealthDataChanged } from '@/lib/apple-health-sync';
 import { PRINTOUT_FAILED, printoutUrl } from '@/lib/body-api';
-import { clientEditKind, metricHistory, metricRows, metricSourceLabel, type MetricRow } from '@/lib/metrics-view';
+import { clientEditKind, earlierEntries, metricRows, metricSourceLabel, type MetricRow } from '@/lib/metrics-view';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useBody, useMetrics, usePullRefresh } from '@/lib/use-progress-data';
 import { useSession } from '@/lib/session';
@@ -126,7 +126,7 @@ export default function MetricsScreen() {
                   row={r}
                   expanded={open === r.key}
                   onToggle={() => (r.latest ? setOpen((k) => (k === r.key ? null : r.key)) : setSheet({ key: r.key, editing: null }))}
-                  history={open === r.key && entries ? metricHistory(entries, r.key) : []}
+                  history={open === r.key && entries ? earlierEntries(entries, r.key, r.latest) : []}
                   onEdit={(e) => setSheet({ key: e.metricKey, editing: e })}
                   coachFirst={coachFirst}
                   today={today}
@@ -217,15 +217,23 @@ function MetricRowView({
       >
         <View style={[styles.flex, { gap: 2 }]}>
           <Text style={[text('sectionHeading'), styles.muted]}>{row.label}</Text>
-          <View style={[styles.baseline, { gap: space[1] }]}>
-            <Text style={text('bigNumber')} testID={`metric-value-${row.key}`}>
-              {row.value}
+          {row.latest ? (
+            <>
+              <View style={[styles.baseline, { gap: space[1] }]}>
+                <Text style={text('bigNumber')} testID={`metric-value-${row.key}`}>
+                  {row.value}
+                </Text>
+                <Text style={[text('sectionHeading'), styles.muted]}>{row.unit}</Text>
+              </View>
+              <Text style={text('caption')} testID={`metric-meta-${row.key}`}>
+                {row.meta}
+              </Text>
+            </>
+          ) : (
+            <Text style={[text('body'), styles.muted]} testID={`metric-meta-${row.key}`}>
+              {row.meta}
             </Text>
-            {row.latest ? <Text style={[text('sectionHeading'), styles.muted]}>{row.unit}</Text> : null}
-          </View>
-          <Text style={text('caption')} testID={`metric-meta-${row.key}`}>
-            {row.meta}
-          </Text>
+          )}
         </View>
         <View style={[styles.right, { gap: space[1] }]}>
           {row.latest ? <Sparkline points={row.points} /> : null}
@@ -236,6 +244,23 @@ function MetricRowView({
       </Pressable>
       {expanded && units ? (
         <View style={{ paddingBottom: space[3], gap: space[1] }} testID={`metric-history-${row.key}`}>
+          {/* The latest reading is the row above; only its Edit shows here. */}
+          {row.latest && clientEditKind(row.latest) ? (
+            <View style={[styles.row, styles.entry, { gap: space[2.5] }]}>
+              <Text style={[text('caption'), styles.flex]}>Your latest entry</Text>
+              <Pressable
+                testID={`metric-edit-${row.latest.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Change or delete your latest ${row.label}`}
+                onPress={() => row.latest && onEdit(row.latest)}
+                style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              >
+                <Text style={[text('body'), styles.underline]}>Edit</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {history.length > 0 ? <Text style={[text('caption'), styles.muted]}>Earlier</Text> : null}
+          {history.length === 0 && !(row.latest && clientEditKind(row.latest)) ? <Text style={text('caption')}>No earlier entries.</Text> : null}
           {shown.map((e) => {
             const mine = clientEditKind(e) !== null;
             const when = e.measuredOn === today ? 'Today' : formatShortDate(e.measuredOn, today);
