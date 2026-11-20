@@ -60,6 +60,7 @@
 .spark { grid-area: spark; justify-self: end; width: 96px; height: 36px; }
 .spark polyline { stroke: var(--ct-magenta); }
 .meta { grid-area: meta; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.notYet { grid-area: value; font-size: var(--ct-size-body); color: var(--ct-ink-muted); }
 .logHint { font-weight: var(--ct-weight-button); color: var(--ct-ink); }
 
 @container (min-width: 560px) {

@@ -155,7 +155,8 @@ export function ProgressSection({
       <div className={styles.head}>
         <h2 id="progress-heading" className={styles.heading}>InBody scans</h2>
         <div className={styles.headActions}>
-          {readOnly ? null : <Button variant="create" onClick={() => setEditing({ scan: null })}>+ Add scan</Button>}
+          {/* Quiet: + Log metric is the page's one lime button (it also offers the full scan). */}
+          {readOnly ? null : <Button variant="quiet" onClick={() => setEditing({ scan: null })}>+ Add scan</Button>}
         </div>
       </div>
 

@@ -159,8 +159,7 @@ function MetricCard({
     const body = (
       <>
         <span className={styles.name}>{label}</span>
-        <span className={styles.value}><span className={styles.number} aria-hidden="true">—</span></span>
-        <span className={styles.meta}>
+        <span className={styles.notYet}>
           Not logged yet{readOnly ? null : <> · <span className={styles.logHint}>+ Log</span></>}
         </span>
       </>
