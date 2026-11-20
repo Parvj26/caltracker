@@ -69,3 +69,15 @@ describe('chunk', () => {
     expect(chunk([], 100)).toEqual([]);
   });
 });
+
+describe('appleHealthBatches dates with a time-zone offset', () => {
+  const s = (measuredOn: string, measuredAt: string) => ({ externalId: 'hk-z', metricKey: 'weight_kg' as const, value: 80, measuredOn, measuredAt });
+  it('compares the UTC date of the time (as the database does), not the text before the T', () => {
+    // 01:00 at +05:00 is 20:00 UTC the day before: 2 days from 2026-11-20, so the database would refuse it.
+    expect(appleHealthBatches([s('2026-11-20', '2026-11-19T01:00:00+05:00')], NOW).flat()).toEqual([]);
+    expect(appleHealthBatches([s('2026-11-18', '2026-11-19T01:00:00+05:00')], NOW).flat()).toHaveLength(1);
+  });
+  it('skips a time it cannot read', () => {
+    expect(appleHealthBatches([s('2026-11-18', 'not a time')], NOW).flat()).toEqual([]);
+  });
+});

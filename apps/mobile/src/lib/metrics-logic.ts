@@ -75,6 +75,12 @@ function latestDate(now: Date): string {
   return new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10);
 }
 
+/** The UTC date of an ISO time, as the database reads it ("2026-11-19T01:00:00+05:00" is 2026-11-18), or "" if unreadable. */
+function utcDate(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? '' : new Date(t).toISOString().slice(0, 10);
+}
+
 /**
  * The samples the database will take, in batches of at most 500 for sync_apple_health_metrics: a known metric that
  * Apple Health can bring, inside its range, with an id, dated from 2000-01-01 to tomorrow (UTC), and a time no more
@@ -98,7 +104,7 @@ export function appleHealthBatches(samples: readonly AppleHealthSample[], now = 
       s.measuredOn > maxDate ||
       (s.measuredAt !== null &&
         !(Date.parse(s.measuredAt) <= maxTime &&
-          Math.abs(Date.parse(s.measuredAt.slice(0, 10)) - Date.parse(s.measuredOn)) <= 86_400_000))
+          Math.abs(Date.parse(utcDate(s.measuredAt)) - Date.parse(s.measuredOn)) <= 86_400_000))
     ) {
       continue;
     }
