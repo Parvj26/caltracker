@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import { deviceSecret } from './device-secret';
 import { pushDataOf } from './push-logic';
 import { supabase } from './supabase';
+import { parseBuild } from './update-gate';
 
 export type PushPermission = 'granted' | 'denied' | 'undetermined';
 
@@ -59,10 +60,13 @@ async function register(token: string): Promise<void> {
   // The install's secret lets the server tell this phone (signing in as someone else) from a stranger who knows
   // the token. Without one (Keychain unavailable) the call is what an older build sends.
   const secret = await deviceSecret();
+  const build = parseBuild(Application.nativeBuildVersion);
   const { error } = await supabase.rpc('register_push_device', {
     p_token: clean,
     p_app_version: (Application.nativeApplicationVersion ?? '').slice(0, 32),
     ...(secret ? { p_secret: secret } : {}),
+    // The build number (CFBundleVersion), so the admin Overview can count people on a build below the minimum.
+    ...(build !== null ? { p_app_build: build } : {}),
   });
   if (error) throw new Error(registerErrorMessage(error, secret !== null));
   currentToken = clean;

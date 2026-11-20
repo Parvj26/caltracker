@@ -17,9 +17,9 @@ select tests.add_client(:'ws', :'eve');
 \set wrong_secret '''attacker-secret-0123456789abcdefghijklm'''
 
 -- Structure.
-select ok(has_function_privilege('authenticated', 'public.register_push_device(text, text, text)', 'execute'),
+select ok(has_function_privilege('authenticated', 'public.register_push_device(text, text, text, integer)', 'execute'),
   'authenticated can register');
-select ok(not has_function_privilege('anon', 'public.register_push_device(text, text, text)', 'execute'), 'anon cannot');
+select ok(not has_function_privilege('anon', 'public.register_push_device(text, text, text, integer)', 'execute'), 'anon cannot');
 select hasnt_function('public', 'register_push_device', array['text', 'text'], 'the two-argument version is gone (no ambiguity)');
 select ok(not has_column_privilege('authenticated', 'public.push_devices', 'secret_hash', 'select'),
   'clients cannot read the secret hash');

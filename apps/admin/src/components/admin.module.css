@@ -44,7 +44,8 @@
 .tileValue { font-size: 34px; font-weight: 800; line-height: 1.1; }
 .tileNote { font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); overflow-wrap: anywhere; }
 
-.tableWrap { overflow-x: auto; }
+/* position: relative keeps visually-hidden (absolute) header text inside the scroll box, so it cannot widen the page. */
+.tableWrap { overflow-x: auto; position: relative; }
 .table { border-collapse: collapse; width: 100%; }
 .table th {
   text-align: left;
@@ -244,3 +245,87 @@
 .searchResultActive { background: var(--ct-surface); }
 li.searchResult { cursor: pointer; }
 .actionButton:disabled, .linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
+
+/* Owner Overview and Coaches (boards AD1-AD3): the test-accounts switch, coach cards on phones, growth and usage. */
+.headerTools { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+.toggleTrack {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: 2px solid var(--ct-ink);
+  background: var(--ct-surface);
+}
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  border: 2px solid var(--ct-ink);
+  background: var(--ct-bg);
+  box-sizing: border-box;
+}
+.toggle[aria-checked='true'] .toggleTrack { background: var(--ct-lime); }
+.toggle[aria-checked='true'] .toggleKnob { left: auto; right: 2px; }
+.toggle:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 4px; border-radius: 8px; }
+
+.coachTable { display: none; }
+.coachCards { display: flex; flex-direction: column; gap: 16px; }
+.coachCard { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.coachCard + .coachCard { border-top: 2px solid var(--ct-border); padding-top: 14px; }
+.coachCardHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.coachLine { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; padding: 3px 0; }
+.coachLineStack { display: flex; flex-direction: column; font-size: 15px; padding: 3px 0; }
+.coachKey { color: var(--ct-ink-muted); font-weight: 500; }
+.coachValue { font-weight: 700; text-align: right; }
+.coachLineStack .coachValue { text-align: left; }
+
+.gridGrowth { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.growthTiles, .usageStats { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.usageStats { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Kept on one line: if it doesn't fit beside the number it moves below it whole, never split mid-phrase. */
+.tileValueSmall { display: inline-block; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--ct-surface); }
+.statLabel { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.statValue { font-size: 26px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.statNote { font-size: 13px; font-weight: 500; color: var(--ct-ink-muted); }
+.healthList { display: flex; flex-direction: column; }
+.healthItem { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 2px solid var(--ct-border); }
+.healthText { display: flex; flex-direction: column; min-width: 0; }
+.healthMain { font-size: 15px; font-weight: 700; }
+.healthSub { font-size: 13px; font-weight: 500; color: var(--ct-ink-muted); }
+.healthOk { padding: 10px 0 0; font-size: 14px; font-weight: 500; color: var(--ct-ink-muted); }
+.healthList > .healthOk:first-child { padding-top: 0; }
+
+@media (max-width: 599px) {
+  .headerTools { width: 100%; }
+  .headerTools .search { max-width: none; }
+}
+@media (min-width: 600px) {
+  .headerTools .search { width: 320px; }
+  .coachTable { display: block; }
+  .coachCards { display: none; }
+  .growthTiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .usageStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .usageStats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* Growth and Product health side by side only when the three growth tiles still have room for "1 sent · 1 joined". */
+@media (min-width: 1400px) {
+  .gridGrowth { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+}

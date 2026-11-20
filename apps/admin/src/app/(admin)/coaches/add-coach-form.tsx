@@ -51,7 +51,7 @@ export function AddCoachForm() {
       </div>
       {error ? <ErrorText>{error}</ErrorText> : null}
       <p className={styles.panelNote}>
-        They get an email to set a password and sign in at caltracker.app. Their workspace starts with the standard exercise library.
+        They get an email to set a password. They start with the standard exercise library.
       </p>
     </form>
   );
