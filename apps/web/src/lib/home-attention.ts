@@ -125,6 +125,6 @@ export function fixFor(r: HomeReason, clientId: string, name: string): FixAction
     case 'nothing_planned':
       return { label: 'Assign', href: `/clients/${clientId}/training`, ariaLabel: `Assign to ${name}` };
     case 'scan_due':
-      return { label: 'Add scan', href: `/clients/${clientId}/body?scan=1`, ariaLabel: `Add a scan for ${name}` };
+      return { label: 'Add scan', href: `/clients/${clientId}/metrics?scan=1`, ariaLabel: `Add a scan for ${name}` };
   }
 }

@@ -1,0 +1,153 @@
+/* Metrics tab (Body cards), a metric's page and the Log metric pop-up. Colours, radii and sizes only via var(--ct-*). */
+
+/* ---------- Body section ---------- */
+.section { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; container-type: inline-size; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); }
+.heading { margin: 0; flex: 1; font-size: var(--ct-size-screen-title); font-weight: var(--ct-weight-screen-title); }
+/* Phone: Body and + Log metric on one line, the range full width under them. */
+.head .ranges { order: 3; flex-basis: 100%; }
+@container (min-width: 560px) {
+  .head .ranges { order: 0; flex-basis: auto; }
+}
+
+/* The range: a segmented control (UI rules §2.3: selected = white pill + ink border). */
+.ranges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-1); margin: 0; padding: var(--ct-space-1); list-style: none; border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.range {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ct-tap-min);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border: 0;
+  border-radius: var(--ct-radius-input);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.range[aria-pressed='true'] { background: var(--ct-bg); box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink); font-weight: var(--ct-weight-button); }
+@media (hover: hover) { .range:not([aria-pressed='true']):hover { background: var(--ct-bg); } }
+
+/* ---------- Metric cards: plain rows on a phone, 2 columns of cards on iPad, 3 on desktop ---------- */
+.cards { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none; border-top: var(--ct-border-width-card) solid var(--ct-border); }
+.cards > li { display: flex; min-width: 0; border-bottom: var(--ct-border-width-card) solid var(--ct-border); }
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name change' 'value spark' 'meta meta';
+  align-items: center;
+  gap: var(--ct-space-1) var(--ct-space-3);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--ct-space-3-5) var(--ct-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+@media (hover: hover) { .card:hover { background: var(--ct-surface); } }
+.name { grid-area: name; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
+.change { grid-area: change; justify-self: end; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.value { grid-area: value; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ct-space-1); min-width: 0; }
+.number { font-size: var(--ct-size-big-number); font-weight: var(--ct-weight-big-number); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.unit { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
+.spark { grid-area: spark; justify-self: end; width: 96px; height: 36px; }
+.spark polyline { stroke: var(--ct-magenta); }
+.meta { grid-area: meta; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.logHint { font-weight: var(--ct-weight-button); color: var(--ct-ink); }
+
+@container (min-width: 560px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-3); border-top: 0; }
+  .cards > li { border-bottom: 0; }
+  .card { min-height: 132px; padding: var(--ct-space-4); border: var(--ct-border-width-secondary-button) solid var(--ct-border); border-radius: var(--ct-radius-card); }
+  .spark { width: 120px; height: 44px; }
+}
+@container (min-width: 900px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ---------- Toast ---------- */
+.toastText { flex: 1; min-width: 0; }
+
+/* ---------- A metric's page ---------- */
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 880px; min-width: 0; }
+.latest { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; padding: var(--ct-space-3-5); border-radius: var(--ct-radius-card); background: var(--ct-surface); }
+.latestRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ct-space-1) var(--ct-space-3); }
+.rangeNav { min-width: 0; }
+.empty { margin: 0; color: var(--ct-ink-muted); }
+.linkButton { min-height: var(--ct-tap-min); padding: 0; border: 0; background: none; color: var(--ct-ink); font: inherit; font-weight: var(--ct-weight-section-heading); text-decoration: underline; cursor: pointer; }
+.entries { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
+.entriesHeading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+@media (min-width: 600px) {
+  .rangeNav { align-self: flex-start; }
+  .rangeNav .ranges { display: flex; }
+}
+
+/* ---------- Log metric pop-up ---------- */
+.form { display: flex; flex-direction: column; gap: var(--ct-space-4-5); }
+.chipsField { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.legend { padding: 0; margin-bottom: var(--ct-space-2); font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+/* Selected = white pill with an ink border (product owner, mockup); unselected = surface. Never lime. */
+.chip {
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-4);
+  border: var(--ct-border-width-secondary-button) solid transparent;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  cursor: pointer;
+}
+.chip[aria-pressed='true'] { background: var(--ct-bg); border-color: var(--ct-ink); font-weight: var(--ct-weight-button); }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-3); }
+.field { display: flex; flex-direction: column; gap: var(--ct-space-1); min-width: 0; }
+.fieldLabel { display: flex; flex-direction: column; gap: var(--ct-space-2); font-size: var(--ct-size-body); font-weight: var(--ct-weight-section-heading); }
+/* The value box with its unit inside, drawn like the kit input (border ≥ 3:1, ink on focus, focus ring). */
+.unitBox {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-button-min-height);
+  padding: 0 var(--ct-space-3-5);
+  border: var(--ct-border-width-secondary-button) solid var(--ct-border-strong);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.unitBox:focus-within { border-color: var(--ct-ink); background: var(--ct-bg); outline: var(--ct-focus-ring-width) solid var(--ct-ink); outline-offset: var(--ct-focus-ring-offset); }
+.unitBox[data-invalid] { border-color: var(--ct-danger); }
+.unitInput { flex: 1; min-width: 0; padding: var(--ct-space-3) 0; border: 0; background: transparent; color: var(--ct-ink); font: inherit; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-button); outline: none; }
+.unitText { flex: none; font-weight: var(--ct-weight-section-heading); color: var(--ct-ink-muted); }
+.last { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.scanRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--ct-space-3) 0;
+  border: 0;
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+  background: transparent;
+  color: var(--ct-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.scanText { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.scanTitle { font-weight: var(--ct-weight-section-heading); }
+.scanSub { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
+.switch { display: flex; flex-direction: column; gap: var(--ct-space-2); padding: var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.switch p { margin: 0; }
+.switchActions { display: flex; flex-wrap: wrap; gap: var(--ct-space-2); }
+@media (max-width: 599.98px) {
+  .unitInput { font-size: max(16px, var(--ct-size-section-heading)); }
+}

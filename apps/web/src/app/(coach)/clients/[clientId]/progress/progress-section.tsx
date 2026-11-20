@@ -2,31 +2,19 @@
 
 import type { ErrorCode } from '@caltracker/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  BUILT_IN_METRIC_KEYS,
-  CHART_RANGES,
-  CHART_RANGE_LABELS,
-  METRICS,
-  changeSince,
-  displayValue,
-  formatMetric,
-  formatShortDate,
-  measurementSeries,
-} from '@caltracker/shared';
-import type { BuiltInMetricKey, ChartRange, IsoDate, Units } from '@caltracker/shared';
+import { BUILT_IN_METRIC_KEYS, METRICS, changeSince, formatMetric, formatShortDate } from '@caltracker/shared';
+import type { BuiltInMetricKey, IsoDate, Units } from '@caltracker/shared';
 import { MoreMenu, type MoreMenuItem } from '@/components/more-menu';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, Chip, ErrorText } from '@/components/ui';
 import { STALE_DEPLOY_MESSAGE, failureCode } from '@/lib/action-errors';
 import { useLocalToday } from '@/lib/local-today';
 import { deleteScan } from './actions';
-import { LineChart } from './line-chart';
 import type { ProgressData, ScanRow } from './load';
 import { MeasuresDialog } from './measures-dialog';
 import { ScanDialog } from './scan-dialog';
 import { customKey } from './scan-form';
 import calendar from '@/components/calendar/calendar.module.css';
-import { useUrlChoice } from '@/lib/url-state';
 import styles from './progress.module.css';
 import { openLayer } from '@/lib/open-layer';
 import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
@@ -34,8 +22,8 @@ import { useSheetOnLoad } from '@/lib/use-sheet-on-load';
 type Editing = { scan: ScanRow | null; presetDate?: IsoDate };
 
 /**
- * A client's body scans: Add scan, one small chart per measure with at least 2 values, and the scan history (newest
- * first). The coach edits or deletes scans; a client's own weight entries can only be deleted (a coach can't change
+ * A client's InBody scans (Metrics tab, under Body and Strength): Add scan and the scan history, newest first, with
+ * printouts. The Body cards above show the trends. The coach edits or deletes scans; a client's own weight entries can only be deleted (a coach can't change
  * what a client entered, so "Add a new scan instead" is offered). A removed client's history is read-only.
  */
 export function ProgressSection({
@@ -45,6 +33,7 @@ export function ProgressSection({
   data,
   readOnly,
   openScan,
+  scanRequest = 0,
 }: {
   workspaceId: string;
   client: { id: string; name: string };
@@ -53,10 +42,10 @@ export function ProgressSection({
   readOnly: boolean;
   /** Open the form on load (the Add scan shortcut on Home, ?scan=1). */
   openScan: boolean;
+  /** Goes up by one each time something else on the page asks for the scan form (+ Log metric's "Add a full InBody scan"). */
+  scanRequest?: number;
 }) {
   const today = useLocalToday();
-  // Kept in the address (?range=), so a reload or Back to this tab keeps the chart's range.
-  const [range, setRange] = useUrlChoice<ChartRange>('range', CHART_RANGES, '1y');
   const [editing, setEditing] = useState<Editing | null>(null);
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState<ScanRow | null>(null);
@@ -78,6 +67,13 @@ export function ProgressSection({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditing({ scan: null });
   }, [openScan, readOnly]);
+
+  useEffect(() => {
+    if (scanRequest === 0 || readOnly) return;
+    // Opened on request from another pop-up that has just closed (never one dialog on top of another).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditing({ scan: null });
+  }, [scanRequest, readOnly]);
 
   useEffect(() => {
     if (!toast || toast === STALE_DEPLOY_MESSAGE) return;
@@ -102,29 +98,6 @@ export function ProgressSection({
   const keys = [...BUILT_IN_METRIC_KEYS, ...customs.map((c) => customKey(c.id))];
   const nameOf = (key: string) => (Object.hasOwn(METRICS, key) ? METRICS[key as BuiltInMetricKey].label : (customByKey.get(key)?.name ?? 'Measure'));
   const format = (key: string, v: number) => formatMetric(key, v, units, customByKey.get(key));
-
-  const chartsFor = (r: ChartRange) =>
-    keys.flatMap((key) => {
-      const rows = scans.flatMap((s) => (s.values[key] !== undefined ? [{ measured_on: s.measuredOn, value: s.values[key], createdAt: s.createdAt }] : []));
-      const series = measurementSeries(rows, r, today);
-      if (series.length === 0) return [];
-      return [
-        {
-          key,
-          title: nameOf(key),
-          change: changeSince(series, key, units, today),
-          points: series.map((p) => ({
-            date: p.date,
-            label: formatShortDate(p.date, today),
-            value: displayValue(key, p.value, units),
-            text: format(key, p.value),
-          })),
-        },
-      ];
-    });
-  const charts = chartsFor(range);
-  // Measures that have a trend over all time but not within the chosen range: say so, and offer all time.
-  const hiddenByRange = range === 'all' ? 0 : chartsFor('all').length - charts.length;
 
   async function confirmDelete(scan: ScanRow) {
     setDeletePending(true);
@@ -180,42 +153,14 @@ export function ProgressSection({
   return (
     <section className={styles.section} aria-labelledby="progress-heading">
       <div className={styles.head}>
-        <h2 id="progress-heading" className={styles.heading}>Body scans</h2>
+        <h2 id="progress-heading" className={styles.heading}>InBody scans</h2>
         <div className={styles.headActions}>
-          <ul className={styles.ranges} aria-label="Chart range">
-            {CHART_RANGES.map((r) => (
-              <li key={r}>
-                <button type="button" className={styles.range} aria-pressed={range === r} onClick={() => setRange(r)}>
-                  {CHART_RANGE_LABELS[r]}
-                </button>
-              </li>
-            ))}
-          </ul>
           {readOnly ? null : <Button variant="create" onClick={() => setEditing({ scan: null })}>+ Add scan</Button>}
         </div>
       </div>
 
       {scans.length === 0 ? (
         <p className={styles.note}>No scans yet.{readOnly ? '' : ' Add the first one from the InBody printout.'}</p>
-      ) : charts.length === 0 && hiddenByRange === 0 ? (
-        <p className={styles.note}>Add another scan to see a trend.</p>
-      ) : charts.length > 0 ? (
-        <ul className={styles.charts} aria-label="Charts">
-          {charts.map((c) => (
-            <li key={c.key} className={styles.chartCard}>
-              <h3 className={styles.chartTitle}>{c.title}</h3>
-              <LineChart title={c.title} points={c.points} axisFormat={(v) => String(v)} />
-              {c.change ? <p className={styles.chartChange}>{c.change}</p> : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {hiddenByRange > 0 ? (
-        <p className={styles.note}>
-          {charts.length === 0 ? 'Not enough scans in this range for a chart.' : `${hiddenByRange} more ${hiddenByRange === 1 ? 'measure has' : 'measures have'} older scans outside this range.`}{' '}
-          <button type="button" className={styles.linkButton} onClick={() => setRange('all')}>Show all</button>
-        </p>
       ) : null}
 
       {scans.length > 0 ? (
