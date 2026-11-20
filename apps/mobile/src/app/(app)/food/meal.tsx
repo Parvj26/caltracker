@@ -296,7 +296,10 @@ export default function MealScreen() {
                 testID={`meal-${k}`}
                 accessibilityLabel={`${MACRO_NAMES[k]} in ${UNIT[k] === 'g' ? 'grams' : 'kcal'}`}
                 value={macroText[k]}
-                onChangeText={(v) => setMacroText((t) => ({ ...t, [k]: v }))}
+                onChangeText={(v) => {
+                  setMacroText((t) => ({ ...t, [k]: v }));
+                  if (problems.length > 0) setProblems([]);
+                }}
                 keyboardType="decimal-pad"
                 placeholder="—"
                 wrapStyle={styles.flex}
@@ -307,6 +310,12 @@ export default function MealScreen() {
           </View>
         ))}
       </View>
+      {/* Under the numbers it is (almost always) about: "Add a photo or at least one of …". */}
+      {problems.map((p) => (
+        <ErrorText key={p} testID="meal-problem" code="meal_details_invalid">
+          {p}
+        </ErrorText>
+      ))}
       {hint ? (
         <Text style={font(500, 14)} testID="meal-kcal-hint">
           {hint}
@@ -328,11 +337,6 @@ export default function MealScreen() {
         />
       </View>
 
-      {problems.map((p) => (
-        <ErrorText key={p} testID="meal-problem" code="meal_details_invalid">
-          {p}
-        </ErrorText>
-      ))}
     </Screen>
   );
 }
