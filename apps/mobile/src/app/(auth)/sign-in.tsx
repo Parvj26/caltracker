@@ -38,8 +38,8 @@ export default function SignIn() {
       (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }),
       email,
       password,
-      // Arrived after the screen said it timed out: undo it on this phone, so the client signs in on purpose.
-      () => supabase.auth.signOut({ scope: 'local' }),
+      // Arrived after the timeout message: it simply goes through, so clear the message (the app opens as usual).
+      () => setError(null),
     );
     setBusy(false);
     if (code) setError({ code });

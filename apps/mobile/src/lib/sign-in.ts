@@ -31,14 +31,14 @@ export type SignInCall = (email: string, password: string) => Promise<{ error: A
 
 /**
  * Signs in, or says why not: never the raw auth message, the same words for an unknown email and a wrong password.
- * After a timeout the screen has already said it failed, so a sign-in that still succeeds later is undone with
- * `undoLate` (sign out), rather than the app jumping in by itself.
+ * A sign-in that still succeeds after the timeout simply goes through (the app opens as usual); `onLateSuccess`
+ * lets the screen clear its timeout message meanwhile.
  */
 export async function signIn(
   call: SignInCall,
   email: string,
   password: string,
-  undoLate: () => Promise<unknown> = () => Promise.resolve(),
+  onLateSuccess: () => void = () => undefined,
   timeoutMs = SIGN_IN_TIMEOUT_MS,
 ): Promise<ErrorCode | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -49,7 +49,7 @@ export async function signIn(
   try {
     const result = await Promise.race([attempt, timeout]);
     if (result === 'timeout') {
-      attempt.then((late) => (late.error ? undefined : undoLate())).catch(() => undefined);
+      attempt.then((late) => (late.error ? undefined : onLateSuccess())).catch(() => undefined);
       return 'sign_in_timeout';
     }
     const err = result.error;
