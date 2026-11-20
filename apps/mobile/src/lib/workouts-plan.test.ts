@@ -3,11 +3,14 @@ import type { WorkoutBlockDoc, WorkoutDoc, WorkoutExerciseDoc, WorkoutSetDoc } f
 import type { ExerciseDetail } from './exercise-detail';
 import {
   coachFirstName,
-  exercisePlanLine,
   firstSelectedDay,
   lastTimeLine,
   muscleTags,
+  planLineParts,
+  planLineSpoken,
   planMeta,
+  supersetPlanInfo,
+  exerciseRest,
   planTotals,
   previewSubtitle,
   programDayOf,
@@ -69,16 +72,16 @@ describe('programDayOf', () => {
 });
 
 describe('planTotals', () => {
-  it('counts exercises and sets, a drop not counted as a set', () => {
-    const d = doc([block('straight', [ex([set(), set(), set({ setType: 'drop', restSeconds: 0 })])]), block('straight', [ex([set()])])]);
+  it('counts exercises and every set, drops and warm-ups too (the shared rule)', () => {
+    const d = doc([block('straight', [ex([set({ setType: 'warmup' }), set(), set({ setType: 'drop', restSeconds: 0 })])]), block('straight', [ex([set()])])]);
     const t = planTotals(d);
     expect(t.exercises).toBe(2);
-    expect(t.sets).toBe(3);
+    expect(t.sets).toEqual({ min: 4, max: 4 });
   });
 
-  it('counts a pick-one group as one exercise with its first option’s sets', () => {
+  it('counts a pick-one group as one exercise and its sets as a range', () => {
     const d = doc([block('choice', [ex([set(), set()]), ex([set(), set(), set(), set()])])]);
-    expect(planTotals(d)).toMatchObject({ exercises: 1, sets: 2 });
+    expect(planTotals(d)).toMatchObject({ exercises: 1, sets: { min: 2, max: 4 } });
   });
 
   it('estimates minutes: 40 s per set (or its target time), its rest, and a minute per exercise, to the nearest 5', () => {
@@ -98,8 +101,9 @@ describe('planTotals', () => {
 
 describe('planMeta', () => {
   it('words the card line and the coming-up line', () => {
-    expect(planMeta({ exercises: 6, sets: 18, minutes: 50 }, true)).toBe('6 exercises · 18 sets · about 50 min');
-    expect(planMeta({ exercises: 1, sets: 1, minutes: 5 }, false)).toBe('1 exercise · about 5 min');
+    expect(planMeta({ exercises: 6, sets: { min: 18, max: 18 }, minutes: 50 }, true)).toBe('6 exercises · 18 sets · about 50 min');
+    expect(planMeta({ exercises: 5, sets: { min: 18, max: 19 }, minutes: 45 }, true)).toBe('5 exercises · 18–19 sets · about 45 min');
+    expect(planMeta({ exercises: 1, sets: { min: 1, max: 1 }, minutes: 5 }, false)).toBe('1 exercise · about 5 min');
   });
 });
 
@@ -175,21 +179,33 @@ describe('previewSubtitle', () => {
   });
 });
 
-describe('exercisePlanLine', () => {
-  it('says "N × target" when the working sets share one target', () => {
-    const e = ex([set({ setType: 'warmup', targetWeightKg: 40 }), set(), set(), set()]);
-    expect(exercisePlanLine(e, 'kg')).toBe('3 × 6–8 reps · 84 kg');
+describe('planLineParts', () => {
+  it('shows warm-ups, then the shared working target, then drops', () => {
+    const e = ex([
+      set({ setType: 'warmup', targetWeightKg: 20, targetRepsMin: 10, targetRepsMax: 10 }),
+      set({ targetWeightKg: 60, targetRepsMin: 8, targetRepsMax: 8 }),
+      set({ targetWeightKg: 60, targetRepsMin: 8, targetRepsMax: 8 }),
+      set({ targetWeightKg: 60, targetRepsMin: 8, targetRepsMax: 8 }),
+      set({ setType: 'drop', targetWeightKg: 25, toFailure: true, targetRepsMin: null, targetRepsMax: null }),
+    ]);
+    const parts = planLineParts(e, 'kg');
+    expect(parts).toEqual([
+      { kind: 'warmup', text: '20 kg × 10' },
+      { kind: 'work', text: 'then 3 × 8 at 60 kg' },
+      { kind: 'drop', text: '25 kg to failure' },
+    ]);
+    expect(planLineSpoken(parts)).toBe('warm-up 20 kg × 10, then 3 × 8 at 60 kg, drop 25 kg to failure');
   });
 
-  it('lists each set when they differ', () => {
+  it('lists each working set when they differ', () => {
     const e = ex([set({ targetWeightKg: 80 }), set({ targetWeightKg: 84 })]);
-    expect(exercisePlanLine(e, 'kg')).toBe('80 kg × 6–8, 84 kg × 6–8');
+    expect(planLineParts(e, 'kg')).toEqual([{ kind: 'work', text: '80 kg × 6–8, 84 kg × 6–8' }]);
   });
 });
 
 describe('lastTimeLine', () => {
   const e = ex([set()]);
-  it('shows the last result, "New exercise" with no history, and nothing when unknown', () => {
+  it('shows the last result, "First time" with no history, and nothing when unknown', () => {
     const last = {
       [e.exerciseId]: {
         finishedAt: '2026-11-02T10:00:00Z',
@@ -197,7 +213,7 @@ describe('lastTimeLine', () => {
       },
     };
     expect(lastTimeLine(e, last, 'kg')).toBe('Last time: 80 kg × 8');
-    expect(lastTimeLine(e, {}, 'kg')).toBe('New exercise');
+    expect(lastTimeLine(e, {}, 'kg')).toBe('First time');
     expect(lastTimeLine(e, null, 'kg')).toBeNull();
   });
 });
@@ -207,5 +223,15 @@ describe('coachFirstName', () => {
     expect(coachFirstName('  Luis  Moreno ')).toBe('Luis');
     expect(coachFirstName('')).toBeNull();
     expect(coachFirstName(null)).toBeNull();
+  });
+});
+
+describe('supersetPlanInfo and exerciseRest', () => {
+  it('counts rounds and says the rest after each round', () => {
+    const a = ex([set(), set(), set({ setType: 'drop', restSeconds: 0 }), set()]);
+    const b = ex([set({ restSeconds: 60 }), set({ restSeconds: 60 }), set({ restSeconds: 60 })]);
+    expect(supersetPlanInfo([a, b])).toEqual({ heading: 'Superset · 3 rounds', rest: 'Rest 1:00 after each round' });
+    expect(exerciseRest(a)).toBe('Rest 1:30');
+    expect(exerciseRest(ex([set({ restSeconds: 0 })]))).toBeNull();
   });
 });

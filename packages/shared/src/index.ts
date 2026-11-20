@@ -134,6 +134,8 @@ export {
   substituteSetProblems,
 } from './workouts/schema';
 export { MAX_CHOICE_OPTIONS, MIN_CHOICE_OPTIONS, SECTION_PRESETS, countExercises, sectionPlace, sectionRuns } from './workouts/sections';
+export { blockSetRange, logBlockSetRange, logSetCount, planSetRange, setProgressText, setRangeNumber, setRangeText, skippedSetCount } from './workouts/set-count';
+export type { SetRange } from './workouts/set-count';
 export type { SectionRun } from './workouts/sections';
 export type { BlockKind, SetType } from './workouts/schema';
 export { groupDropSets, setLabels } from './workouts/drop-sets';
@@ -716,6 +718,8 @@ export type {
   StrengthExerciseRow,
   StrengthStats,
 } from './progress/heaviest';
+export { compareWithLast, sessionBestRows } from './progress/session-best';
+export type { SessionBestRow, SessionCompare } from './progress/session-best';
 export { WEIGHT_TREND_HALF_LIFE_DAYS, bodyTile, smoothedTrend, weightTrendInRange, weightTrendSummary } from './progress/body';
 export { FOOD_PERIOD_LABELS, foodPeriodDays, foodPeriodSummary, foodTile } from './progress/food';
 export type { FoodMacroRow, FoodMealLite, FoodPeriod, FoodPeriodSummary, ProteinDayState } from './progress/food';

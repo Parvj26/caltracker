@@ -16,6 +16,9 @@ import {
   rejectedNote,
   reopenFrom,
   summaryLines,
+  summaryHeadline,
+  effortLine,
+  unfinishedLines,
   foregroundCheck,
   formatTimeOfDay,
   parseActualInput,
@@ -262,6 +265,26 @@ describe('summaryLines', () => {
     const ex = done.blocks[0].exercises[0];
     const bodyweight = { ...done, blocks: [{ ...done.blocks[0], exercises: [{ ...ex, trackingType: 'reps' as const }] }] };
     expect(summaryLines(bodyweight, 'kg').volume).toBeNull();
+  });
+});
+
+describe('summary lines (approved Summary board)', () => {
+  const done = sampleLog({ status: 'completed', startedAt: '2026-11-05T09:00:00.000Z', finishedAt: '2026-11-05T09:46:00.000Z' });
+  const ex = done.blocks[0].exercises[0];
+  const open = { ...ex.sets[0], id: '00000000-0000-4000-8000-000000000099', completedAt: null, actualReps: null };
+  const partial = { ...done, blocks: [{ ...done.blocks[0], exercises: [{ ...ex, sets: [...ex.sets, open] }] }] };
+
+  it('says sets, skipped, time and weight lifted', () => {
+    expect(summaryHeadline(done, 'kg')).toBe('1 of 1 set · 46 min · 480 kg lifted');
+    expect(summaryHeadline(partial, 'kg')).toBe('1 of 2 sets · 1 skipped · 46 min · 480 kg lifted');
+    expect(unfinishedLines(partial)).toEqual(['Bench press: 1 of 2 sets']);
+    expect(unfinishedLines(done)).toEqual([]);
+  });
+
+  it('repeats what the client told the coach', () => {
+    expect(effortLine('Felt: Good\nKnee felt fine', 'Luis')).toBe('You told Luis: Good · “Knee felt fine”');
+    expect(effortLine(null, 'Luis')).toBeNull();
+    expect(effortLine('Knee felt fine', null)).toBe('You told your coach: “Knee felt fine”');
   });
 });
 

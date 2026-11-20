@@ -3,7 +3,7 @@
 import { ParentBackLink } from '@/components/back-link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
-import { completedSetCount, openSetCount, type Units } from '@caltracker/shared';
+import { completedSetCount, logSetCount, setRangeNumber, type SetRange, type Units } from '@caltracker/shared';
 import { InjuryChip } from '@/app/(coach)/clients/[clientId]/injury-chip';
 import { SessionLogger } from '@/app/(coach)/clients/[clientId]/log/[workoutId]/session-logger';
 import sessionStyles from '@/app/(coach)/clients/[clientId]/log/[workoutId]/session.module.css';
@@ -21,8 +21,8 @@ const SWIPE_MIN_PX = 60;
 
 const isTyping = (el: EventTarget | null) => el instanceof HTMLElement && el.closest('input, textarea, select, [contenteditable="true"]') !== null;
 
-function SessionPaneView({ pane, units, coachId, onProgress }: { pane: SessionPane; units: Units; coachId: string; onProgress: (logId: string, done: number, total: number) => void }) {
-  const report = useCallback((done: number, total: number) => onProgress(pane.logId, done, total), [onProgress, pane.logId]);
+function SessionPaneView({ pane, units, coachId, onProgress }: { pane: SessionPane; units: Units; coachId: string; onProgress: (logId: string, done: number, total: SetRange) => void }) {
+  const report = useCallback((done: number, total: SetRange) => onProgress(pane.logId, done, total), [onProgress, pane.logId]);
   return (
     <div className={sessionStyles.wide}>
       <ParentBackLink href={`/clients/${pane.clientId}/training`} label={pane.name} />
@@ -77,7 +77,7 @@ export function TrainingNowHost({
   // Screens are mounted the first time someone is opened and then kept (hidden) while you look at someone else.
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set([activeLogId]));
   // Sets done / in all for the coach's own sessions, as their screens report them (the server copy lags behind).
-  const [sessionCounts, setSessionCounts] = useState<Record<string, { done: number; total: number }>>({});
+  const [sessionCounts, setSessionCounts] = useState<Record<string, { done: number; total: SetRange }>>({});
   // Watched people's done counts as last seen, and who ticked a set since (the lime dot).
   const watchedCounts = Object.fromEntries(panes.filter((p) => p.kind === 'watch').map((p) => [p.logId, completedSetCount(p.log)]));
   const [seenCounts, setSeenCounts] = useState(watchedCounts);
@@ -116,8 +116,11 @@ export function TrainingNowHost({
     window.history.replaceState(window.history.state, '', url);
   }, []);
 
-  const onProgress = useCallback((logId: string, done: number, total: number) => {
-    setSessionCounts((c) => (c[logId]?.done === done && c[logId]?.total === total ? c : { ...c, [logId]: { done, total } }));
+  const onProgress = useCallback((logId: string, done: number, total: SetRange) => {
+    setSessionCounts((c) => {
+      const was = c[logId];
+      return was?.done === done && was.total.min === total.min && was.total.max === total.max ? c : { ...c, [logId]: { done, total } };
+    });
   }, []);
 
   // Swipe left / right between people. Only a clearly sideways swipe counts, so scrolling up and down is untouched.
@@ -179,8 +182,10 @@ export function TrainingNowHost({
             <div className={styles.tabs} role="tablist" aria-labelledby="training-now-label">
               {panes.map((p) => {
                 const counts = p.kind === 'session' ? (sessionCounts[p.logId] ?? null) : null;
-                const done = counts?.done ?? completedSetCount(p.log);
-                const total = counts?.total ?? done + openSetCount(p.log);
+                // The shared rule, as the client's app counts: "6/18–19" while a pick-one group is still to choose.
+                const live = counts ?? logSetCount(p.log);
+                const done = live.done;
+                const total = setRangeNumber(live.total);
                 const selected = p.logId === active;
                 const dot = dots.has(p.logId) && !selected;
                 return (

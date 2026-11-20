@@ -46,7 +46,10 @@ export function CoachIntroCard({ coachName, workspaceName }: { coachName: string
           {coach.bio}
         </Text>
       ) : null}
-      <Text style={[text('sectionHeading'), styles.coming]}>Your first workout is coming!</Text>
+      <View style={{ gap: space[1] / 2 }}>
+        <Text testID="today-building-plan" style={[text('sectionHeading'), styles.coming]}>{`${first ?? 'Your coach'} is building your plan`}</Text>
+        <Text style={text('body')}>You’ll get a message as soon as your first workout is ready.</Text>
+      </View>
       {chat ? (
         <Button variant="secondary" title={first ? `Say hi to ${first}` : 'Say hi to your coach'} testID="today-say-hi" onPress={() => router.navigate(COACH_CHAT_HREF)} />
       ) : null}

@@ -1,10 +1,20 @@
 // The redesigned Today's cards (approved boards 1 and 2: workout day and rest day). Each card below the workout loads
 // its own data (from the phone's copy first), so one slow read never holds up the rest.
 import { useRouter, type Href } from 'expo-router';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
-import { formatLogDuration, localToday, thisWeekSummary, type Units, type WorkoutDoc } from '@caltracker/shared';
+import {
+  formatLogDuration,
+  localToday,
+  logSetCount,
+  setProgressText,
+  thisWeekSummary,
+  type SetRange,
+  type Units,
+  type WorkoutDoc,
+  type WorkoutLogDoc,
+} from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { Sticker } from '@/components/stickers/sticker';
 import { Button, TextButton } from '@/components/ui';
@@ -17,29 +27,36 @@ import {
   agoText,
   coachPreview,
   communityHeadline,
-  foodCard,
+  doneLine,
+  foodLine,
+  goalStripDays,
   newCountLabel,
-  nextUpDay,
   postPreview,
   programChip,
+  restNextLine,
+  restPreviewLabel,
   unreadLabel,
   weekTile,
   workoutMeta,
   zooHref,
   zooSummary,
-  type FoodBar,
 } from '@/lib/today-logic';
+import { fetchAward } from '@/lib/awards';
+import { newBestCount } from '@/lib/awards-logic';
+import { goalCountdown } from '@/lib/coach-tab';
+import { fetchLog } from '@/lib/log-api';
+import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { useCommunity } from '@/lib/use-community';
-import { useExerciseDetails } from '@/lib/use-exercise-details';
 import { useFood } from '@/lib/use-food';
 import { useMessages } from '@/lib/use-messages';
 import { useAlbum, useHub } from '@/lib/use-progress-data';
 import type { WorkoutSummary } from '@/lib/workouts';
-import { muscleTags, planTotals } from '@/lib/workouts-plan';
+import { planTotals } from '@/lib/workouts-plan';
 import { palette, pressedOpacity, radius, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 import { Overline, useStacked } from './parts';
 
 /** The hero cards' corner (a little rounder than the other cards, as on the boards). */
@@ -48,13 +65,12 @@ const HERO_SHADOW = 4;
 const STICKER = 48;
 /** Between the lines of the small tiles (6 pt, as on the boards). */
 const TILE_GAP = 6;
-const ADD_MEAL_HEIGHT = tapTarget.min - 4;
 
-/**
- * The coach chat. The Coach tab redesign (feature/coach-tab-redesign, merging before this) makes /coach the coach's
- * profile and /coach/chat the chat; until it is on this branch the route does not exist yet, hence the cast.
- */
-export const COACH_CHAT_HREF = '/coach/chat' as Href;
+
+/** The coach chat: the Coach tab's first screen. */
+export const COACH_CHAT_HREF = '/coach';
+/** The add-meal sheet. */
+const ADD_MEAL_HREF = '/food/add';
 
 /** Where Preview goes: the Workouts tab's Preview screen (plan, totals and a sticky Start). */
 export const previewHref = (id: string): Href => ({ pathname: '/plan/[id]', params: { id } });
@@ -71,19 +87,26 @@ export function Hero({ tone, children, testID }: { tone: 'lime' | 'blue' | 'drop
 
 // ---- Today's workout ---------------------------------------------------------------------------------------
 
+/** A workout in progress on this phone: "6 of 19 sets · next: A1 Romanian Deadlift" and how far along it is. */
+export type WorkoutProgress = { done: number; total: SetRange; next: string | null };
+
 export function WorkoutCard({
   workout,
   doc,
   status,
+  progress,
   starting,
   onStart,
   onView,
 }: {
   workout: WorkoutSummary;
-  /** The whole plan, once read (for the time and muscle groups); null meanwhile. */
+  /** The whole plan, once read (for the sets and time); null meanwhile. */
   doc: WorkoutDoc | null;
   status: WorkoutStatus | null;
+  /** In progress on this phone: its ticked sets and what is next. */
+  progress: WorkoutProgress | null;
   starting: boolean;
+  /** Start (straight to the first set) or Continue. */
   onStart: () => void;
   /** Opens the finished workout's summary. */
   onView: (logId: string) => void;
@@ -91,19 +114,22 @@ export function WorkoutCard({
   const { text, space } = useTheme();
   const router = useRouter();
   const stacked = useStacked();
-  const exerciseIds = useMemo(() => doc?.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId)) ?? [], [doc]);
-  const details = useExerciseDetails(exerciseIds);
   const totals = doc ? planTotals(doc) : null;
-  const meta = workoutMeta(totals?.exercises ?? workout.exerciseCount, totals?.minutes ?? null, muscleTags(exerciseIds, details));
+  const meta = workoutMeta(totals?.exercises ?? workout.exerciseCount, totals);
   const chip = programChip(workout.programDay ?? null);
 
+  // Done: the card shrinks to one row (approved Today states board) and the food card moves up under it.
+  if (status?.kind === 'done') return <DoneRow workout={workout} logId={status.logId} durationS={status.durationS} onView={onView} />;
+
+  const going = status?.kind === 'in_progress';
+  const fraction = progress ? progress.done / Math.max(1, progress.total.max) : 0;
   return (
     <Hero tone="lime" testID={`today-workout-${workout.id}`}>
       <View style={styles.row}>
         <View style={styles.flex}>
-          <Overline>Today’s workout</Overline>
+          <Overline>{going ? 'Today’s workout · In progress' : 'Today’s workout'}</Overline>
         </View>
-        {chip ? (
+        {chip && !going ? (
           <View style={[styles.chip, { paddingHorizontal: space[2], paddingVertical: space[1] / 2 }]}>
             <Text style={[text('caption'), styles.chipText]} accessibilityLabel={`Program ${workout.programName ?? ''}, ${chip}`}>
               {chip}
@@ -114,51 +140,112 @@ export function WorkoutCard({
       <Text style={[text('screenTitle'), styles.heroTitle]} accessibilityRole="header">
         {workout.name}
       </Text>
-      <Text style={[text('body'), styles.meta]} testID={`today-meta-${workout.id}`}>
-        {meta}
-      </Text>
-      {status?.kind === 'done' ? (
-        <Text testID={`done-${workout.id}`} style={text('sectionHeading')}>
-          {`Done ✓ · ${formatLogDuration(status.durationS)}`}
+      {going && progress ? (
+        <>
+          <View
+            style={styles.progressTrack}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: progress.total.max, now: progress.done }}
+            accessibilityLabel="Sets ticked"
+          >
+            <View style={[styles.progressFill, { width: `${Math.round(Math.min(1, fraction) * 100)}%` }]} />
+          </View>
+          <Text style={[text('body'), styles.meta, styles.bold]} testID={`today-progress-${workout.id}`}>
+            {[setProgressText(progress.done, progress.total), progress.next ? `next: ${progress.next}` : null].filter(Boolean).join(' · ')}
+          </Text>
+        </>
+      ) : (
+        <Text style={[text('body'), styles.meta]} testID={`today-meta-${workout.id}`}>
+          {meta}
         </Text>
-      ) : null}
-      <View style={[stacked ? styles.column : styles.row, { gap: space[2.5], marginTop: space[1] }, !stacked && styles.top]}>
-        <View style={stacked ? undefined : styles.flex}>
-          {status?.kind === 'done' ? (
-            <Button title="View summary" testID={`view-log-${workout.id}`} onPress={() => onView(status.logId)} />
-          ) : (
-            <Button
-              title={status?.kind === 'in_progress' ? 'Resume' : 'Start workout'}
-              testID={`start-${workout.id}`}
-              ph-label="log_start_workout"
-              onPress={onStart}
-              busy={starting}
-            />
-          )}
+      )}
+      <View style={[stacked || going ? styles.column : styles.row, { gap: space[2.5], marginTop: space[1] }, !stacked && !going && styles.top]}>
+        <View style={stacked || going ? undefined : styles.flex}>
+          <Button
+            title={going ? 'Continue' : 'Start workout'}
+            testID={`start-${workout.id}`}
+            ph-label="log_start_workout"
+            onPress={onStart}
+            busy={starting}
+          />
         </View>
-        <Button variant="secondary" title="Preview" testID={`view-workout-${workout.id}`} onPress={() => router.push(previewHref(workout.id))} />
+        {going ? null : (
+          <Button variant="secondary" title="Preview" testID={`view-workout-${workout.id}`} onPress={() => router.push(previewHref(workout.id))} />
+        )}
       </View>
     </Hero>
   );
 }
 
+/** "Lower Body done · 17 of 19 sets · 2 new bests · Summary ›": the finished workout, one tap from its summary. */
+function DoneRow({ workout, logId, durationS, onView }: { workout: WorkoutSummary; logId: string; durationS: number; onView: (logId: string) => void }) {
+  const { text, space } = useTheme();
+  const { finishedLog, pending } = useActiveLog();
+  const local = finishedLog?.id === logId ? finishedLog : (pending.find((p) => p.id === logId) ?? null);
+  const [remote, setRemote] = useState<WorkoutLogDoc | null>(null);
+  const [bests, setBests] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!local) void fetchLog(logId).then((l) => alive && setRemote(l), () => undefined);
+    void fetchAward(logId).then((a) => alive && setBests(a ? newBestCount(a) : null));
+    return () => {
+      alive = false;
+    };
+  }, [logId, local]);
+  const log = local ?? remote;
+  const counts = log ? logSetCount(log) : null;
+  const line = doneLine(counts ? setProgressText(counts.done, { min: counts.total.min, max: counts.total.min }) : null, bests, formatLogDuration(durationS));
+  return (
+    <Pressable
+      testID={`today-done-${workout.id}`}
+      onPress={() => onView(logId)}
+      accessibilityRole="button"
+      accessibilityLabel={`${workout.name} done. ${line}`}
+      accessibilityHint="Opens the workout summary"
+      style={({ pressed }) => [styles.row, styles.quiet, { borderRadius: 18, padding: space[3.5], gap: space[3], minHeight: 64 }, pressed && styles.pressed]}
+    >
+      <View style={styles.doneTick}>
+        <Text style={[text('sectionHeading'), styles.onInk]}>✓</Text>
+      </View>
+      <View style={styles.flex}>
+        <Text testID={`done-${workout.id}`} style={text('sectionHeading')} numberOfLines={2}>{`${workout.name} done`}</Text>
+        <Text style={[text('body'), styles.ink]}>{line}</Text>
+      </View>
+      <Text testID={`view-log-${workout.id}`} style={text('sectionHeading')}>
+        Summary ›
+      </Text>
+    </Pressable>
+  );
+}
+
 // ---- Rest day ----------------------------------------------------------------------------------------------
 
-export function RestCard({ next, today, onLogAnyway }: { next: WorkoutSummary | null; today: string; onLogAnyway: () => void }) {
+export function RestCard({
+  next,
+  today,
+  coachName,
+  onLogAnyway,
+}: {
+  next: WorkoutSummary | null;
+  today: string;
+  /** For "Luis is building your plan" when nothing is planned ahead. */
+  coachName: string | null;
+  onLogAnyway: () => void;
+}) {
   const { text, space } = useTheme();
   const router = useRouter();
+  const first = coachName?.trim().split(/\s+/)[0] || 'Your coach';
   return (
-    <Hero tone="blue" testID="today-rest">
-      <Overline>Rest day</Overline>
-      <Text style={[text('screenTitle'), styles.restTitle]} accessibilityRole="header">Recover well. Muscles grow on rest days.</Text>
-      {next ? (
-        <View style={[styles.row, styles.nextBox, { gap: space[2.5], padding: space[3], marginTop: space[1] }]} testID="today-next">
-          <View style={styles.flex}>
-            <Text style={[text('caption'), styles.nextDay]}>{`Next up · ${nextUpDay(next.scheduledOn, today)}`}</Text>
-            <Text style={[text('sectionHeading'), styles.nextName]} numberOfLines={2}>
-              {next.name}
-            </Text>
-          </View>
+    <View testID="today-rest" style={[styles.restCard, { borderRadius: 18, padding: space[3.5], gap: space[1] }]}>
+      <Text style={[text('sectionHeading'), styles.restTitle]} accessibilityRole="header">
+        {next ? 'Rest day' : `${first} is building your plan`}
+      </Text>
+      <Text testID={next ? 'today-next' : 'today-no-plan'} style={[text('body'), styles.ink]}>
+        {next ? restNextLine(next.name, next.scheduledOn, today) : 'You’ll get a message as soon as your next workout is ready.'}
+      </Text>
+      <View style={[styles.row, styles.wrap, { gap: space[2], marginTop: space[2] }]}>
+        {next ? (
           <Pressable
             testID="today-next-preview"
             onPress={() => router.push(previewHref(next.id))}
@@ -166,14 +253,12 @@ export function RestCard({ next, today, onLogAnyway }: { next: WorkoutSummary | 
             accessibilityLabel={`Preview ${next.name}`}
             style={({ pressed }) => [styles.smallButton, { paddingHorizontal: space[3.5] }, pressed && styles.pressed]}
           >
-            <Text style={text('sectionHeading')}>Preview</Text>
+            <Text style={text('sectionHeading')}>{restPreviewLabel(next.scheduledOn, today)}</Text>
           </Pressable>
-        </View>
-      ) : null}
-      <View style={styles.start}>
+        ) : null}
         <TextButton title="Log a workout anyway" testID="today-log-anyway" onPress={onLogAnyway} />
       </View>
-    </Hero>
+    </View>
   );
 }
 
@@ -189,52 +274,66 @@ export function FoodCard({ refreshKey }: { refreshKey: number }) {
     void loadDay?.(today);
   }, [loadDay, today, refreshKey]);
   const meals = food?.mealsOn(today);
-  const card = useMemo(() => (meals ? foodCard(meals, food?.targets ?? null) : null), [meals, food?.targets]);
-  if (!card) return null;
+  const line = useMemo(() => (meals ? foodLine(meals, food?.targets ?? null) : null), [meals, food?.targets]);
+  const stacked = useStacked();
+  if (!line) return null;
 
   return (
-    <View testID="today-food" style={[styles.outlined, { borderRadius: radius.card, padding: space[4], gap: space[2.5] }]}>
-      <View style={[styles.row, { gap: space[2] }]}>
-        <Text style={[text('sectionHeading'), styles.cardTitle, styles.flex]} accessibilityRole="header">
+    <View testID="today-food" style={[styles.quiet, { borderRadius: 18, paddingHorizontal: space[4], paddingVertical: space[3.5], gap: 6 }]}>
+      {/* Large text: the title and + Add meal stack, so neither is squeezed. */}
+      <View style={[stacked ? styles.foodStack : styles.row, { gap: space[2] }]}>
+        <Text style={[text('sectionHeading'), styles.cardTitle, !stacked && styles.flex]} accessibilityRole="header">
           Food today
         </Text>
         <Pressable
           testID="today-add-meal"
           ph-label="log_add_meal"
-          onPress={() => router.push({ pathname: '/food/meal', params: { day: today } })}
+          onPress={() => router.push(ADD_MEAL_HREF)}
           accessibilityRole="button"
           accessibilityLabel="Add meal"
-          // 40 pt on screen as on the board; the slop makes the tap area 44.
-          hitSlop={2}
-          style={({ pressed }) => [styles.addMeal, { paddingHorizontal: space[3.5] }, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.addMeal, { paddingHorizontal: space[4] }, pressed && styles.pressed]}
         >
           <Text style={text('sectionHeading')}>+ Add meal</Text>
         </Pressable>
       </View>
-      <View style={[styles.row, styles.top, { gap: space[2.5] }]}>
-        <Bar name="Calories" bar={card.calories} testID="today-food-calories" />
-        <Bar name="Protein" bar={card.protein} testID="today-food-protein" />
-      </View>
-      <Text style={[text('caption'), styles.mealsLine]} numberOfLines={2} testID="today-food-meals">
-        {card.meals}
+      <Text testID="today-food-line" style={[text('body'), styles.ink]} accessibilityLabel={line.label}>
+        {line.parts.map((p, i) => (
+          <Text key={i}>
+            {i > 0 ? ' · ' : ''}
+            <Text style={styles.heavy}>{p.strong}</Text>
+            {p.rest}
+          </Text>
+        ))}
       </Text>
     </View>
   );
 }
 
-function Bar({ name, bar, testID }: { name: string; bar: FoodBar; testID: string }) {
+// ---- The coach's goal --------------------------------------------------------------------------------------
+
+/** "GOAL  Run a 5K under 30 min  49 days": the goal the coach set, one tap from the Coach tab. Hidden without one. */
+export function GoalStrip() {
   const { text, space } = useTheme();
+  const router = useRouter();
+  const coach = useCoachProfile();
+  const goal = coach?.goal ?? null;
+  if (!goal) return null;
+  const days = goalStripDays(goalCountdown(goal.targetDate, localToday()));
   return (
-    <View style={[styles.flex, { gap: space[1] }]} testID={testID} accessible accessibilityLabel={bar.label}>
-      <Text style={[text('caption'), styles.barLabel]}>
-        {name} <Text style={[text('caption'), styles.barValue]}>{bar.value}</Text>
+    <Pressable
+      testID="today-goal"
+      onPress={() => router.navigate(COACH_CHAT_HREF)}
+      accessibilityRole="button"
+      accessibilityLabel={`Goal: ${goal.goal}${days ? `, ${days}` : ''}`}
+      accessibilityHint="Opens the Coach tab"
+      style={({ pressed }) => [styles.row, styles.quiet, { borderRadius: 16, paddingHorizontal: space[3.5], paddingVertical: space[3], gap: space[2.5], minHeight: 52 }, pressed && styles.pressed]}
+    >
+      <Text style={[text('caption'), styles.goalLabel]}>GOAL</Text>
+      <Text style={[text('body'), styles.bold, styles.flex]} numberOfLines={2}>
+        {goal.goal}
       </Text>
-      {bar.fraction !== null ? (
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${Math.round(bar.fraction * 100)}%` }]} />
-        </View>
-      ) : null}
-    </View>
+      {days ? <Text style={[text('caption'), styles.goalDays]}>{days}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -428,7 +527,26 @@ const styles = StyleSheet.create({
   },
   // No fixed line height: it would clip the text at large Dynamic Type sizes.
   heroTitle: { fontSize: 30 },
-  restTitle: { fontSize: 26 },
+  restTitle: { fontSize: 18 },
+  restCard: { backgroundColor: palette.surface },
+  foodStack: { flexDirection: 'column', alignItems: 'flex-start' },
+  wrap: { flexWrap: 'wrap' },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
+  heavy: { fontFamily: fontFamilyFor('sans', 800) },
+  onInk: { color: white },
+  doneTick: { width: 40, height: 40, borderRadius: 20, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: palette.bg,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.ink,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  progressFill: { height: '100%', backgroundColor: palette.ink },
+  goalLabel: { color: palette.inkMuted, fontFamily: fontFamilyFor('sans', 800), letterSpacing: 0.4 },
+  goalDays: { color: palette.inkMuted, fontFamily: fontFamilyFor('sans', 700) },
   meta: { color: palette.ink },
   chip: { backgroundColor: palette.bg, borderWidth: borderWidth.secondaryButton, borderColor: palette.ink, borderRadius: radius.pill },
   chipText: { color: palette.ink, fontSize: 12 },
@@ -439,11 +557,11 @@ const styles = StyleSheet.create({
   quiet: { borderWidth: borderWidth.card, borderColor: palette.border },
   cardTitle: { fontSize: 18 },
   addMeal: {
-    minHeight: ADD_MEAL_HEIGHT,
-    borderRadius: 14,
+    minHeight: tapTarget.min,
+    borderRadius: tapTarget.min / 2,
     borderWidth: borderWidth.card,
     borderColor: palette.ink,
-    backgroundColor: palette.drop,
+    backgroundColor: palette.lime,
     alignItems: 'center',
     justifyContent: 'center',
   },

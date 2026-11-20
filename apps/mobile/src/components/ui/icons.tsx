@@ -23,3 +23,12 @@ export function HistoryIcon({ size = 18 }: { size?: number }) {
     </Svg>
   );
 }
+
+/** An ×, for closing and "Not now". */
+export function CloseIcon({ size = 14, color = palette.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" {...hidden}>
+      <Path d="M6 6l12 12M18 6L6 18" />
+    </Svg>
+  );
+}

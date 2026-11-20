@@ -14,6 +14,18 @@ appId: app.caltracker.client
 - tapOn:
     text: Not Now
     optional: true
+# A slow save-password prompt can cover Today while it loads: keep putting it away until Today shows.
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        id: today-greeting
+    commands:
+      - tapOn:
+          text: Not Now
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000
 - extendedWaitUntil:
     visible:
       id: today-greeting

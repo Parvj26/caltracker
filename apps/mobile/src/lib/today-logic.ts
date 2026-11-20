@@ -11,6 +11,8 @@ import {
   type IsoDate,
   type MacroTargets,
   type MealMacros,
+  type SetRange,
+  setRangeText,
   type Units,
   type WeekSummary,
 } from '@caltracker/shared';
@@ -122,18 +124,37 @@ export function welcome(firstName: string | null): string {
   return name ? `Welcome, ${name}` : 'Welcome';
 }
 
-/** Muscle groups shown on the workout card at most. */
-const MUSCLES_SHOWN = 3;
-
-/** "6 exercises · about 50 min · Chest, Back, Shoulders"; only the count until the plan is loaded (`minutes` null). */
-export function workoutMeta(exercises: number, minutes: number | null, muscles: readonly string[]): string {
-  return [
-    plural(exercises, 'exercise'),
-    minutes === null ? null : `about ${minutes} min`,
-    muscles.length > 0 ? muscles.slice(0, MUSCLES_SHOWN).join(', ') : null,
-  ]
+/**
+ * "5 exercises · 18–19 sets · about 45 min" (approved Main board; sets by the shared rule, so Today, the preview and
+ * the logger agree); only the count until the plan is loaded (`plan` null).
+ */
+export function workoutMeta(exercises: number, plan: { sets: SetRange; minutes: number } | null): string {
+  return [plural(exercises, 'exercise'), plan ? setRangeText(plan.sets) : null, plan ? `about ${plan.minutes} min` : null]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** "Next: Upper Push on Saturday" on a rest day (nextUpDay words the day). */
+export function restNextLine(name: string, date: IsoDate, today: IsoDate): string {
+  return `Next: ${name} on ${nextUpDay(date, today)}`;
+}
+
+/** "Preview Saturday" (or "Preview Tue 24 Nov"). */
+export function restPreviewLabel(date: IsoDate, today: IsoDate): string {
+  return `Preview ${nextUpDay(date, today)}`;
+}
+
+/** The goal strip: "49 days", "1 day", or the countdown's words ("Today", "Passed 3 days ago"). */
+export function goalStripDays(countdown: { number: string | null; label: string } | null): string | null {
+  if (!countdown) return null;
+  if (countdown.number === null) return countdown.label;
+  return `${countdown.number} ${countdown.number === '1' ? 'day' : 'days'}`;
+}
+
+/** "17 of 19 sets · 2 new bests" on the done row (the bests only once known, and only when there are some). */
+export function doneLine(sets: string | null, newBests: number | null, duration: string): string {
+  const bests = newBests && newBests > 0 ? `${newBests} new ${newBests === 1 ? 'best' : 'bests'}` : null;
+  return [sets ?? duration, bests].filter(Boolean).join(' · ');
 }
 
 /** "Week 2 · Day 1" for a program workout; null for a one-off. */
@@ -168,6 +189,38 @@ function foodBar(key: 'calories' | 'protein', total: number, target: number | nu
     fraction: Math.max(0, Math.min(1, total / target)),
     label: `${name} ${bare} of ${goal}`,
   };
+}
+
+export type FoodPart = { strong: string; rest: string };
+
+/**
+ * Today's food line (approved Main board): "1,550 kcal left · 92 g protein to go" against the coach's targets, or the
+ * plain numbers with no targets ("1,240 kcal · 86 g protein today"), never empty bars. Totals from shared dailyTotals.
+ */
+export function foodLine(meals: ReadonlyArray<{ macros: MealMacros }>, targets: MacroTargets | null): { parts: FoodPart[]; label: string } {
+  const totals = dailyTotals(meals.map((m) => m.macros));
+  const kcalTarget = targets?.calories ?? null;
+  const proteinTarget = targets?.protein ?? null;
+  const parts: FoodPart[] = [];
+  if (kcalTarget !== null && kcalTarget > 0) {
+    const diff = Math.round(kcalTarget - totals.calories);
+    parts.push(
+      diff === 0
+        ? { strong: 'Calories', rest: ' on target' }
+        : { strong: formatMacro('calories', Math.abs(diff)), rest: diff > 0 ? ' left' : ' over' },
+    );
+  } else {
+    parts.push({ strong: formatMacro('calories', totals.calories), rest: '' });
+  }
+  if (proteinTarget !== null && proteinTarget > 0) {
+    const left = Math.round((proteinTarget - totals.protein) * 10) / 10;
+    parts.push(left > 0 ? { strong: formatMacro('protein', left), rest: ' protein to go' } : { strong: formatMacro('protein', totals.protein), rest: ' protein · target hit' });
+  } else {
+    parts.push({ strong: formatMacro('protein', totals.protein), rest: ' protein' });
+  }
+  const noTargets = !(kcalTarget && kcalTarget > 0) && !(proteinTarget && proteinTarget > 0);
+  if (noTargets) parts[parts.length - 1].rest += ' today';
+  return { parts, label: parts.map((p) => p.strong + p.rest).join(', ') };
 }
 
 /** Today's food card: calories and protein against the coach's targets (totals from shared dailyTotals). */

@@ -150,7 +150,7 @@ describe('liveStats', () => {
     let log = tick(fresh(), 0, 0, 1, { weightKg: 20, reps: 10, durationS: null, distanceM: null }); // warm-up: no volume
     log = tick(log, 0, 1, 2, { weightKg: 60, reps: 10, durationS: null, distanceM: null });
     const award = { prs: [{ logId: log.id, exerciseId: 'a', achievedAt: at(2) }, { logId: log.id, exerciseId: 'a', achievedAt: at(2) }, { logId: log.id, exerciseId: 'b', achievedAt: at(2) }] };
-    expect(liveStats(log, award)).toEqual({ done: 2, total: 11, volumeKg: 600, prCount: 2, prExerciseIds: ['a', 'b'], fraction: 2 / 11 });
+    expect(liveStats(log, award)).toEqual({ done: 2, total: 11, totalText: '11', volumeKg: 600, prCount: 2, prExerciseIds: ['a', 'b'], fraction: 2 / 11 });
   });
 
   it('has no PRs without an award', () => {

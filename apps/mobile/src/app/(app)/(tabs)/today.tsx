@@ -2,12 +2,12 @@ import { useSurpriseReveal } from '@/lib/use-surprise';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
-import { countExercises, localToday, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
+import { countExercises, localToday, logSetCount, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
 import { CoachIntroCard, NextSteps, StickerTeaser } from '@/components/today/new-client';
 import { PushCard } from '@/components/today/push-card';
-import { CoachMessageCard, CommunityPeek, FoodCard, RestCard, WeekAndSticker, WorkoutCard } from '@/components/today/today-cards';
+import { CoachMessageCard, CommunityPeek, FoodCard, GoalStrip, RestCard, WeekAndSticker, WorkoutCard, type WorkoutProgress } from '@/components/today/today-cards';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { TodayHeader } from '@/components/today/today-header';
 import { Button, Card, ErrorText, Screen, TextButton } from '@/components/ui';
@@ -26,6 +26,7 @@ import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
 import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
 import { greeting, headerDate, welcome } from '@/lib/today-logic';
+import { nextUpLabel } from '@/lib/log-flow-model';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
 import { useUnits } from '@/lib/use-units';
@@ -210,6 +211,12 @@ export default function Today() {
 
 
   const inProgress = active?.status === 'in_progress' ? active : null;
+  // "6 of 19 sets · next: A1 Romanian Deadlift" on the card of the workout going (the shared set-count rule).
+  const progress = useMemo<WorkoutProgress | null>(() => {
+    if (!inProgress) return null;
+    const c = logSetCount(inProgress);
+    return { done: c.done, total: c.total, next: nextUpLabel(inProgress) };
+  }, [inProgress]);
   const statuses = useMemo(
     () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active, finished, pending),
     [data, active, finished, pending],
@@ -305,10 +312,10 @@ export default function Today() {
           onSignOut={() => void signOutAndForget()}
         />
 
-        {inProgress ? <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} /> : null}
-
-        {/* Not while Today is loading. A new client sees it under their coach's card (below). */}
-        {data !== null && !firstTime ? pushCard : null}
+        {/* A workout going that isn't one of today's cards (an unplanned one, another day's): the card says it otherwise. */}
+        {inProgress && !(data?.kind === 'today' && data.workouts.some((w) => w.id === inProgress.workoutId)) ? (
+          <ResumeBanner name={inProgress.name} onPress={() => openLog(inProgress.id)} />
+        ) : null}
 
         {banner ? (
           <Card>
@@ -349,6 +356,7 @@ export default function Today() {
                 workout={w}
                 doc={plans[w.id] ?? null}
                 status={statuses[w.id] ?? null}
+                progress={inProgress?.workoutId === w.id ? progress : null}
                 starting={starting === w.id}
                 onStart={() => void startWorkout(w)}
                 onView={openSummary}
@@ -356,13 +364,18 @@ export default function Today() {
             ))
           : null}
 
-        {data?.kind === 'today' && data.workouts.length === 0 ? <RestCard next={data.next} today={today} onLogAnyway={logAnyway} /> : null}
+        {data?.kind === 'today' && data.workouts.length === 0 ? (
+          <RestCard next={data.next} today={today} coachName={coach?.name ?? null} onLogAnyway={logAnyway} />
+        ) : null}
 
-        {/* The cards below load on their own, at the same time as today's workout, each from the phone's copy first. */}
+        {/* The cards below load on their own, at the same time as today's workout, each from the phone's copy first.
+            The notifications banner sits under the workout card, never above it (approved Main board). */}
         {data?.kind === 'today' ? (
           <>
             <FoodCard refreshKey={refreshKey} />
             <CoachMessageCard />
+            {pushCard}
+            <GoalStrip />
             <WeekAndSticker refreshKey={refreshKey} />
             <CommunityPeek units={units} refreshKey={refreshKey} />
           </>

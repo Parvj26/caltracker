@@ -1,5 +1,5 @@
-# From Today: Start, then the workout overview's Start workout, then the first section's Start section. Waits for
-# the first page's Done. Inputs (env): NAME (the workout's name on Today).
+# From Today: Start goes straight to the first set (no overview or Start section in between, approved Today board,
+# 2026-11-19). Waits for the first page. Inputs (env): NAME (the workout's name on Today).
 appId: app.caltracker.client
 ---
 - extendedWaitUntil:
@@ -8,20 +8,10 @@ appId: app.caltracker.client
 - tapOn: 'Start workout'
 - extendedWaitUntil:
     visible:
-      id: start-workout
+      id: pages-title
     timeout: 20000
 - assertVisible:
-    id: start-workout
-    text: 'Start workout'
-- tapOn:
-    id: start-workout
-- extendedWaitUntil:
-    visible:
-      id: start-section
-    timeout: 10000
-- tapOn:
-    id: start-section
-- extendedWaitUntil:
-    visible:
-      id: page-done
-    timeout: 10000
+    id: page-0
+# The bottom button (Next / Finish workout) waits for the first ticked set.
+- assertNotVisible:
+    id: page-done

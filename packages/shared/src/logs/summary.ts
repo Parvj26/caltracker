@@ -29,14 +29,14 @@ export function completedSetCount(log: WorkoutLogDoc): number {
 }
 
 /**
- * Counting rule: sets still to do: not-done sets of the exercises being done, plus for each pick-one group not yet picked from
- * its first option's normal sets (the best guess of what it will turn into).
+ * Counting rule (workouts/set-count.ts): every tickable row counts. Sets still to do: not-done sets of the exercises
+ * being done, plus for each pick-one group not yet picked from its smallest option's sets (the least it will be).
  */
 export function openSetCount(log: WorkoutLogDoc): number {
   let n = 0;
   for (const b of log.blocks) {
     if (needsPick(b)) {
-      n += b.exercises[0]?.sets.filter((s) => s.setType === 'normal').length ?? 0;
+      n += b.exercises.length > 0 ? Math.min(...b.exercises.map((e) => e.sets.length)) : 0;
     } else {
       for (const { exercise } of liveExercises(b)) n += exercise.sets.filter((s) => s.completedAt === null).length;
     }
@@ -128,7 +128,7 @@ export function untickedSets(log: WorkoutLogDoc): { open: number; done: number; 
   const rows: UntickedRow[] = [];
   for (const b of log.blocks) {
     if (needsPick(b)) {
-      const total = b.exercises[0]?.sets.filter((s) => s.setType === 'normal').length ?? 0;
+      const total = b.exercises.length > 0 ? Math.min(...b.exercises.map((e) => e.sets.length)) : 0;
       rows.push({ key: b.id, name: b.exercises.map((e) => e.exerciseName).join(' or '), done: 0, total, needsPick: true });
       continue;
     }

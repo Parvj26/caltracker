@@ -1,7 +1,7 @@
 # Edge cases of the logging pages on "E2E Mixed" (squat W + 2 sets; superset Pullups + Pushups; curls with drops):
 # ✓ with the keyboard still up saves the typed number, a fast double tap on ✓ stays ticked, no "Not synced yet"
-# pill while online, the history and note buttons, Swap and Remove from the ••• menu, + Add exercise from the
-# overview opening the new page, and Discard from the overview.
+# pill while online, the Last time column and the Note chip, the Swap chip and Remove from the ••• menu, + Add
+# exercise from the overview opening the new page, and Discard from the overview.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -76,19 +76,17 @@ env:
 - assertNotVisible:
     id: sync-pill
 
-# ---- History: nothing yet for this client ----
+# ---- Last time: nothing yet for this client (the column shows a dash; ··· has no Last time) ----
+- assertVisible:
+    id: last-0-0-1
+    text: 'No last time'
 - tapOn:
-    id: history-0-0
-- extendedWaitUntil:
-    visible:
-      id: history-sheet
-    timeout: 5000
-- assertVisible: 'Last time · Barbell Squat'
-- assertVisible: 'No history yet.*'
-- tapOn:
-    id: history-sheet-ok
+    id: more-0-0
+- assertNotVisible:
+    id: menu-history
+- tapOn: 'Cancel'
 
-# ---- Note for the coach (✉) shows on the page ----
+# ---- Note for the coach (the labelled chip) shows on the page ----
 - tapOn:
     id: message-0-0
 - extendedWaitUntil:
@@ -104,18 +102,18 @@ env:
       text: 'Note: Knee felt fine'
     timeout: 5000
 
-# ---- ••• → Swap exercise on the curls ----
-- tapOn:
-    id: dot-2
+# ---- Swap exercise (the chip) on the curls ----
+- swipe:
+    direction: LEFT
+- swipe:
+    direction: LEFT
 - extendedWaitUntil:
     visible:
       id: exercise-name-2
       text: 'Dumbbell Bicep Curl'
     timeout: 5000
 - tapOn:
-    id: more-2-0
-- tapOn:
-    id: menu-swap
+    id: swap-2-0
 - extendedWaitUntil:
     visible:
       id: exercise-search
@@ -136,8 +134,8 @@ env:
     timeout: 10000
 
 # ---- ••• → Remove exercise on the superset's A2: the superset becomes a straight Pullups page ----
-- tapOn:
-    id: dot-1
+- swipe:
+    direction: RIGHT
 - extendedWaitUntil:
     visible:
       id: superset-heading-1
@@ -153,11 +151,9 @@ env:
       text: 'Pullups'
     timeout: 10000
 
-# ---- ✕, ⌄, then + Add exercise on the overview: the new exercise's page opens ----
+# ---- The title opens the overview; + Add exercise there opens the new exercise's page ----
 - tapOn:
-    id: close-section
-- tapOn:
-    id: section-back
+    id: pages-title
 - extendedWaitUntil:
     visible:
       id: workout-overview
@@ -195,9 +191,7 @@ env:
 
 # ---- Discard from the overview ----
 - tapOn:
-    id: close-section
-- tapOn:
-    id: section-back
+    id: pages-title
 - scrollUntilVisible:
     element:
       id: discard-workout

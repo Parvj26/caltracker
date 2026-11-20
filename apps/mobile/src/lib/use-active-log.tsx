@@ -48,7 +48,7 @@ import {
   type FinishedNote,
 } from './active-log-logic';
 import { fetchInProgressLog, fetchLog, saveLog } from './log-api';
-import { cancelReminder, ensurePermission, initNotifications, onReminderTapped, scheduleReminder } from './log-notifications';
+import { cancelReminder, hasPermission, initNotifications, onReminderTapped, scheduleReminder } from './log-notifications';
 import { registerDevice } from './push';
 import { adoptCoachCopy } from './coach-watch';
 import { applyEdit, applyLiveEdit, createLogStore, type LogStore, type StoredLog } from './log-store';
@@ -371,8 +371,8 @@ export function ActiveLogProvider({ children }: { children: ReactNode }) {
         if (next !== existing) {
           await me.store.save({ log: next, lastSyncedRevision: 0 });
           me.sync.push();
-          // Asked once, the first time a workout starts; allowing it also turns on push for this iPhone.
-          void ensurePermission().then((ok) => {
+          // Never asked here (the worst moment): only Today's Turn on asks. Already allowed: push is on for this iPhone.
+          void hasPermission().then((ok) => {
             if (ok) void registerDevice();
           });
         }

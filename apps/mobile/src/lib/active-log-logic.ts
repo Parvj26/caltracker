@@ -7,8 +7,13 @@ import {
   formatLogDuration,
   formatLogVolume,
   logDurationS,
+  liveExercises,
+  logSetCount,
   logVolumeKg,
   MONTHS_SHORT,
+  needsPick,
+  readFinishNotes,
+  skippedSetCount,
   parseClock,
   shouldAutoFinish,
   startLogFromWorkout,
@@ -180,6 +185,48 @@ export function summaryLines(log: WorkoutLogDoc, units: Units): SummaryLines {
     volume: kg > 0 ? formatLogVolume(kg, units) : null,
     sets: `${n} ${n === 1 ? 'set' : 'sets'} completed`,
   };
+}
+
+/**
+ * The summary's line under the name (approved Summary board): "17 of 19 sets · 2 skipped · 46 min · 5,320 kg lifted",
+ * sets by the shared rule (a pick-one group nobody chose counts as its smallest option).
+ */
+export function summaryHeadline(log: WorkoutLogDoc, units: Units): string {
+  const { done, total } = logSetCount(log);
+  const skipped = skippedSetCount(log);
+  const kg = logVolumeKg(log);
+  return [
+    `${done} of ${total.min} ${total.min === 1 ? 'set' : 'sets'}`,
+    skipped > 0 ? `${skipped} skipped` : null,
+    formatLogDuration(logDurationS(log)),
+    kg > 0 ? formatLogVolume(kg, units) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** "You told Luis: Just right · “Knee felt fine”" from the finish sheet's answers; null when nothing was said. */
+export function effortLine(notes: string | null, coachFirstName: string | null): string | null {
+  const { feel, note } = readFinishNotes(notes);
+  const said = [feel, note.trim() ? `“${note.trim()}”` : null].filter(Boolean).join(' · ');
+  return said ? `You told ${coachFirstName ?? 'your coach'}: ${said}` : null;
+}
+
+/** "Leg Extension: 2 of 3 sets", "Plank: skipped", for the summary's Changes from the plan. */
+export function unfinishedLines(log: WorkoutLogDoc): string[] {
+  const out: string[] = [];
+  for (const b of log.blocks) {
+    if (needsPick(b)) {
+      out.push(`${b.exercises.map((e) => e.exerciseName).join(' or ')}: skipped`);
+      continue;
+    }
+    for (const { exercise } of liveExercises(b)) {
+      const done = exercise.sets.filter((x) => x.completedAt !== null).length;
+      if (done === exercise.sets.length) continue;
+      out.push(done === 0 ? `${exercise.exerciseName}: skipped` : `${exercise.exerciseName}: ${done} of ${exercise.sets.length} sets`);
+    }
+  }
+  return out;
 }
 
 export type ReopenFrom = { kind: 'local' } | { kind: 'fetch' } | { kind: 'blocked'; name: string };

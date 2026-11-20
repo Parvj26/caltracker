@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -17,6 +17,7 @@ import {
   type HostInstance,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewProps,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tapTarget } from '@caltracker/design-tokens';
@@ -27,6 +28,7 @@ import {
   chooseSubstitute,
   completeSetWith,
   completedSetCount,
+  localToday,
   composeFinishNotes,
   readFinishNotes,
   removeLogExercise,
@@ -54,37 +56,44 @@ import { FinishSheet, InfoSheet, SubstituteSheet } from '@/components/log/log-sh
 import { NoteSheet } from '@/components/log/note-sheet';
 import { SectionStart, WorkoutOverview } from '@/components/log/section-start';
 import type { TableHandlers } from '@/components/log/set-table';
-import { KeyboardBar } from '@/components/log/set-table';
+import { FieldNav, FieldNavContext, KEYBOARD_BAR_HEIGHT, KeyboardBar } from '@/components/log/set-table';
 import { SyncPill } from '@/components/log/sync-pill';
 import { Button, Card, Screen } from '@/components/ui';
+import { CloseIcon } from '@/components/ui/icons';
 import { useCoachLogging } from '@/lib/coach-logging';
 import { coachWatchView, latestTickedSetId, logControls, revealAfterCoachFinish } from '@/lib/coach-watch';
 import { ignoreTick, type LastDone } from '@/lib/done-guard';
-import { fetchLastResults, fetchProgression, type LastResults } from '@/lib/log-api';
+import { fetchLastResults, fetchProgression, readCachedDetail, type LastResults } from '@/lib/log-api';
+import { fetchWorkoutDetail } from '@/lib/workouts-api';
+import { useCoachProfile } from '@/lib/use-coach-profile';
+import { coachFirstName } from '@/lib/workouts-plan';
 import {
-  afterDone,
   buildPage,
   buildSections,
   deleteChoices,
+  elapsedLabel,
   finishModel,
   hasTypedValues,
+  headerLines,
   historyLines,
   markAll,
   markAllPlan,
+  nextAction,
+  notTickedTitle,
+  openSetsOnPage,
   prefillSets,
   type Progression,
   markAllQuestion,
-  pageDots,
   pickingFirst,
   placeAfterChange,
-  resumePlace,
   startGroups,
-  stepLabel,
+  startPlace,
   stepPlace,
   substituteCards,
   substituteOf,
   type ExerciseModel,
   type FlowPage,
+  type FlowPlace,
   type FlowSection,
   type PageModel,
   type RowModel,
@@ -117,8 +126,11 @@ const TAG_INFO: Record<'warmup' | 'drop' | 'failure', Info> = {
     testID: 'tag-info',
   },
   drop: {
-    title: 'D · Drop set',
-    lines: ['Straight after the set above, lower the weight and keep going. No rest in between.'],
+    title: '↓ Drop set',
+    lines: [
+      'Straight after the set above, lower the weight and keep going. No rest in between.',
+      'To failure: do as many reps as you can with good form, then type them in.',
+    ],
     testID: 'tag-info',
   },
   failure: {
@@ -190,13 +202,34 @@ export default function LogScreen() {
   );
 }
 
-/** Where a fresh open lands: the overview before anything is ticked, else the first open page. */
+/**
+ * Where a fresh open lands: straight on the first set to do (Start goes to the first set, approved Today board); the
+ * overview is one tap away in the header. An empty workout (unplanned, before its first exercise) opens its add page.
+ */
 function firstScreen(log: WorkoutLogDoc, sections: FlowSection[]): Screen {
   const remembered = lastScreen.get(log.id);
   if (remembered) return remembered;
-  if (completedSetCount(log) === 0) return { mode: 'overview' };
-  const at = resumePlace(log, sections);
-  return at ? { mode: 'pages', ...at } : { mode: 'overview' };
+  const at = startPlace(log, sections);
+  return at ? { mode: 'pages', ...at } : { mode: 'start', section: 0 };
+}
+
+/** The coach's note on the planned workout (the log doesn't keep it): the copy saved on the phone, then the server's. */
+function usePlanNote(workoutId: string | null): string | null {
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!workoutId) return;
+    let alive = true;
+    void (async () => {
+      const saved = await readCachedDetail(localToday(), workoutId).catch(() => null);
+      if (alive && saved) setNote(saved.doc.notes ?? null);
+      const fresh = await fetchWorkoutDetail(workoutId).catch(() => null);
+      if (alive && fresh) setNote(fresh.doc.notes ?? null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [workoutId]);
+  return note;
 }
 
 function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Units; back: () => void; readOnly: boolean }) {
@@ -214,6 +247,10 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     [tickAll],
   );
   const recentSetId = useMemo(() => (readOnly ? latestTickedSetId(log) : null), [readOnly, log]);
+  const coachName = coachFirstName(useCoachProfile()?.name);
+  const planNote = usePlanNote(log.workoutId);
+  // The number boxes in page order, for ‹ › on the keyboard bar (one per logging screen).
+  const fieldNav = useMemo(() => new FieldNav(), []);
   const sections = useMemo(() => buildSections(log), [log]);
   const [screen, setScreenState] = useState<Screen>(() => firstScreen(log, sections));
   const setScreen = useCallback(
@@ -274,7 +311,9 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     const pageKey = screen.mode === 'pages' ? (before?.pages[screen.page]?.key ?? null) : null;
     const at = placeAfterChange(sections, { sectionKey: before?.key ?? '', pageKey, at: { section: screen.section, page: screen.mode === 'pages' ? screen.page : 0 } });
     if (screen.mode === 'start') {
-      if (at.section !== screen.section) setScreen({ mode: 'start', section: at.section });
+      // An exercise was added to the empty workout: straight to its page.
+      if (sections[at.section]?.pages.length) setScreen({ mode: 'pages', section: at.section, page: 0 });
+      else if (at.section !== screen.section) setScreen({ mode: 'start', section: at.section });
     } else if (sections[at.section].pages.length === 0) {
       setScreen({ mode: 'start', section: at.section });
     } else if (at.section !== screen.section || at.page !== screen.page) {
@@ -400,19 +439,6 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       table: tableFor,
       onAddSet: (ex) => void op((l) => addLogSet(withPick(ex.logExerciseId)(l), ex.logExerciseId, randomUUID, nowIso())),
       onInfo: (ex) => setInfoFor({ name: ex.name, exerciseId: ex.exerciseId }),
-      onHistory: (ex) => {
-        const doc = docOf(ex.logExerciseId);
-        const lines = doc ? historyLines(doc, ex.lastTime, units) : [];
-        const when = lastRef.current[ex.exerciseId]?.finishedAt;
-        setInfo({
-          title: `Last time · ${ex.name}`,
-          lines:
-            lines.length > 0
-              ? [...(when ? [new Date(when).toDateString()] : []), ...lines]
-              : ['No history yet. Your numbers will show here next time.'],
-          testID: 'history-sheet',
-        });
-      },
       onMessage: (ex) => {
         const doc = docOf(ex.logExerciseId);
         if (doc) setNoteFor(doc);
@@ -434,9 +460,24 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
         const doc = docOf(ex.logExerciseId);
         if (doc) setMenuFor(doc);
       },
+      onChoose: (blockId, logExerciseId) => {
+        Keyboard.dismiss();
+        void op((l) => pickingFirst(l, blockId, logExerciseId, nowIso()));
+      },
     }),
-    [tableFor, op, withPick, docOf, units],
+    [tableFor, op, withPick, docOf],
   );
+
+  /** Last time's sheet for an exercise (from ···): the date and each set. */
+  const showHistory = (ex: LogExerciseDoc) => {
+    const lines = historyLines(ex, last[ex.exerciseId]?.sets ?? [], units);
+    const when = last[ex.exerciseId]?.finishedAt;
+    setInfo({
+      title: `Last time · ${ex.exerciseName}`,
+      lines: lines.length > 0 ? [...(when ? [new Date(when).toDateString()] : []), ...lines] : ['First time. Your numbers will show here next time.'],
+      testID: 'history-sheet',
+    });
+  };
 
   /** Mark all: asks first when it ticks more than one set, and says which get no weight and which it leaves. */
   const markAllNow = (logExerciseIds: string[], pickOf: string | null) => {
@@ -469,9 +510,8 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
     if (!ex) return [];
     const lastMain = [...ex.sets].reverse().find((s) => s.setType !== 'drop');
     const items: MenuItem[] = [
-      { title: ex.note ? 'Edit note' : 'Add note', testID: 'menu-note', onPress: () => setNoteFor(ex) },
+      ...(last[ex.exerciseId] ? [{ title: 'Last time', testID: 'menu-history', onPress: () => showHistory(ex) }] : []),
       { title: 'How to do it', testID: 'menu-info', onPress: () => setInfoFor({ name: ex.exerciseName, exerciseId: ex.exerciseId }) },
-      { title: 'Swap exercise', testID: 'menu-swap', onPress: () => setPicker({ mode: 'swap', ex }) },
     ];
     if (lastMain) {
       items.push({
@@ -542,6 +582,38 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       { text: 'Keep going', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: discardNow },
     ]);
+  /** ×: "Keep going later" (the workout stays open, Continue on Today) or "Discard workout". */
+  const askLeave = () => {
+    Keyboard.dismiss();
+    if (!canRef.current.discard) return back();
+    Alert.alert('Leave this workout?', 'Keep going later from Today, or throw it away.', [
+      { text: 'Keep going later', onPress: back },
+      { text: 'Discard workout', style: 'destructive', onPress: () => (completedSetCount(log) > 0 ? confirmDiscard() : discardNow()) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  /** The bottom button: Next (asking first when sets on this page are not ticked) or Finish workout. */
+  const goNext = (at: FlowPlace) => {
+    const action = nextAction(log, sections, at);
+    const move = () => (action.kind === 'finish' ? setFinishOpen(true) : setScreen({ mode: 'pages', ...action.to }));
+    const page = sections[at.section]?.pages[at.page];
+    const open = page && action.kind === 'next' ? openSetsOnPage(log, page) : { count: 0, logExerciseIds: [] };
+    if (open.count === 0) return move();
+    const pickOf = page?.kind === 'option' ? (open.logExerciseIds[0] ?? null) : null;
+    Alert.alert(notTickedTitle(open.count), 'Tick them with the numbers shown, or skip them for today.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Skip them', onPress: move },
+      {
+        text: 'Tick all',
+        onPress: () =>
+          void markDone((l) => markAll(pickOf ? withPick(pickOf)(l) : l, open.logExerciseIds, lastRef.current, nowIso(), progressionRef.current)).then((ticked) => {
+            if (ticked) tapHaptic();
+            move();
+          }),
+      },
+    ]);
+  };
   const saved = readFinishNotes(log.notes);
   const finishNow = async (feel: Feeling | null, note: string) => {
     if (!canRef.current.finish) return;
@@ -605,7 +677,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
       />
       <ActionMenu title={menuFor?.exerciseName ?? null} items={menuItems} onClose={() => setMenuFor(null)} />
       <ActionMenu title={setMenu?.title ?? null} items={setMenu?.items ?? []} onClose={() => setSetMenu(null)} />
-      <KeyboardBar />
+      <KeyboardBar nav={fieldNav} />
       <FinishSheet
         visible={finishOpen}
         model={finishModel(log)}
@@ -634,7 +706,8 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   ) : null;
 
   if (screen.mode === 'overview') {
-    const at = resumePlace(log, sections);
+    const at = startPlace(log, sections);
+    const toPages = () => (at ? setScreen({ mode: 'pages', ...at }) : setScreen({ mode: 'start', section: 0 }));
     return (
       <View style={styles.fill}>
         <WorkoutOverview
@@ -643,11 +716,9 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           sections={sections.map((section) => ({ section, groups: startGroups(log, section, units) }))}
           equipment={equipment}
           details={details}
-          onStart={() =>
-            completedSetCount(log) > 0 && at ? setScreen({ mode: 'pages', ...at }) : setScreen({ mode: 'start', section: at?.section ?? 0 })
-          }
-          onSection={(i) => setScreen({ mode: 'start', section: i })}
-          onClose={back}
+          onStart={toPages}
+          onSection={(i) => (sections[i]?.pages.length ? setScreen({ mode: 'pages', section: i, page: 0 }) : setScreen({ mode: 'start', section: i }))}
+          onClose={toPages}
           onInfo={(item) => setInfoFor({ name: item.name, exerciseId: item.exerciseId })}
           onAddExercise={() => setPicker({ mode: 'add' })}
           onFinish={() => setFinishOpen(true)}
@@ -674,11 +745,8 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           groups={startGroups(log, section, units)}
           details={details}
           started={started}
-          onStart={() => {
-            const at = resumePlace(log, [section]);
-            setScreen({ mode: 'pages', section: sectionIndex, page: at?.page ?? 0 });
-          }}
-          onBack={() => setScreen({ mode: 'overview' })}
+          onStart={() => setScreen({ mode: 'pages', section: sectionIndex, page: 0 })}
+          onBack={askLeave}
           onInfo={(item) => setInfoFor({ name: item.name, exerciseId: item.exerciseId })}
           onAddExercise={() => setPicker({ mode: 'add' })}
           readOnly={readOnly}
@@ -691,57 +759,57 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
 
   const pageIndex = Math.min(screen.page, section.pages.length - 1);
   const here = { section: sectionIndex, page: pageIndex };
-  // Moving never needs Done: ‹ and › step a page (into the next or previous section too), a swipe past the
-  // section's first or last page goes on into the next section, and the title opens the list of sections.
+  // Moving: swipe (into the next or previous section too), the bottom button (Next / Finish), or the title, which
+  // opens the whole workout.
   const go = (to: { section: number; page: number } | null) => to && setScreen({ mode: 'pages', ...to });
   const prevSection = stepPlace(sections, { section: sectionIndex, page: 0 }, -1);
   const nextSection = stepPlace(sections, { section: sectionIndex, page: section.pages.length - 1 }, 1);
+  const action = nextAction(log, sections, here);
+  const firstAt = sections.findIndex((x) => x.pages.length > 0);
   return (
-    <View style={styles.fill}>
-      <SectionPages
-        key={section.key}
-        log={log}
-        section={section}
-        sectionIndex={sectionIndex}
-        sectionCount={sections.length}
-        page={pageIndex}
-        units={units}
-        last={last}
-        history={history}
-        details={details}
-        handlers={handlers}
-        readOnly={readOnly}
-        recentSetId={recentSetId}
-        steps={{ prev: stepLabel(sections, here, -1), next: stepLabel(sections, here, 1) }}
-        edges={{
-          prev: prevSection ? sections[prevSection.section].title : null,
-          next: nextSection ? sections[nextSection.section].title : null,
-        }}
-        onPage={(page) => setScreen({ mode: 'pages', section: sectionIndex, page })}
-        onStep={(delta) => go(stepPlace(sections, here, delta))}
-        onEdge={(delta) => go(delta < 0 ? prevSection : nextSection)}
-        onSections={() => setScreen({ mode: 'overview' })}
-        onClose={() => setScreen({ mode: 'start', section: sectionIndex })}
-        onMarkAll={markAllNow}
-        onDone={(page) => {
-          const next = afterDone(sections, { section: sectionIndex, page });
-          if (next.kind === 'page') setScreen({ mode: 'pages', section: sectionIndex, page: next.page });
-          else if (next.kind === 'section') setScreen({ mode: 'start', section: next.section });
-          else setFinishOpen(true);
-        }}
-      />
-      {pill}
-      {sheets}
-    </View>
+    <FieldNavContext.Provider value={fieldNav}>
+      <View style={styles.fill}>
+        <SectionPages
+          key={section.key}
+          log={log}
+          section={section}
+          page={pageIndex}
+          units={units}
+          last={last}
+          history={history}
+          details={details}
+          handlers={handlers}
+          readOnly={readOnly}
+          recentSetId={recentSetId}
+          header={headerLines(log, sections, here)}
+          coachName={coachName}
+          // The coach's note sits on the workout's first page.
+          coachNoteOn={sectionIndex === firstAt ? 0 : -1}
+          coachNote={planNote}
+          edges={{
+            prev: prevSection ? sections[prevSection.section].title : null,
+            next: nextSection ? sections[nextSection.section].title : null,
+          }}
+          nextLabel={action.kind === 'finish' ? 'Finish workout' : action.label}
+          showNext={!readOnly && completedSetCount(log) > 0}
+          onPage={(page) => setScreen({ mode: 'pages', section: sectionIndex, page })}
+          onEdge={(delta) => go(delta < 0 ? prevSection : nextSection)}
+          onSections={() => setScreen({ mode: 'overview' })}
+          onClose={askLeave}
+          onMarkAll={markAllNow}
+          onNext={(page) => goNext({ section: sectionIndex, page })}
+        />
+        {pill}
+        {sheets}
+      </View>
+    </FieldNavContext.Provider>
   );
 }
 
-/** A section's pages, swiped left and right, with Mark all, Done and the dots fixed under them. */
+/** A section's pages, swiped left and right, under a light header (×, the title that opens the workout, time in). */
 function SectionPages({
   log,
   section,
-  sectionIndex,
-  sectionCount,
   page,
   units,
   last,
@@ -750,20 +818,22 @@ function SectionPages({
   handlers,
   readOnly,
   recentSetId,
-  steps,
+  header,
+  coachName,
+  coachNoteOn,
+  coachNote,
   edges,
+  nextLabel,
+  showNext,
   onPage,
-  onStep,
   onEdge,
   onSections,
   onClose,
   onMarkAll,
-  onDone,
+  onNext,
 }: {
   log: WorkoutLogDoc;
   section: FlowSection;
-  sectionIndex: number;
-  sectionCount: number;
   page: number;
   units: Units;
   last: LastResults;
@@ -771,22 +841,29 @@ function SectionPages({
   history: ProgressionHistory;
   details: Parameters<typeof StraightPage>[0]['details'];
   handlers: PageHandlers;
-  /** The coach logs this workout: the pages only show it (no Mark all or Done); moving around still works. */
+  /** The coach logs this workout: the pages only show it (no Mark all or Next); moving around still works. */
   readOnly: boolean;
   recentSetId: string | null;
-  /** What ‹ and › say ("Next page", "Previous section: Warm-Up"); null at either end of the workout. */
-  steps: { prev: string | null; next: string | null };
+  /** "Lower Body · Main" over "Exercise 1 of 5 · All exercises ▾". */
+  header: { title: string; subtitle: string };
+  coachName: string | null;
+  /** The page showing the coach's note (-1: none in this section). */
+  coachNoteOn: number;
+  coachNote: string | null;
   /** The section a swipe past the first or last page goes on to (its title), or null. */
   edges: { prev: string | null; next: string | null };
+  /** "Next: Leg Extension" or "Finish workout". */
+  nextLabel: string;
+  /** The bottom button shows once a set is ticked (never a Finish before anything is logged). */
+  showNext: boolean;
   onPage: (page: number) => void;
-  onStep: (delta: -1 | 1) => void;
   onEdge: (delta: -1 | 1) => void;
-  /** The title: the workout overview, which lists every section. */
+  /** The title: the workout overview, which lists every exercise. */
   onSections: () => void;
   onClose: () => void;
   /** Ticks every open set of these exercises; `pickOf` is the option a pick-one page picks first. */
   onMarkAll: (logExerciseIds: string[], pickOf: string | null) => void;
-  onDone: (page: number) => void;
+  onNext: (page: number) => void;
 }) {
   const { text, logText, space, radius } = useTheme();
   const { width } = useWindowDimensions();
@@ -796,17 +873,18 @@ function SectionPages({
   const initial = useRef(page).current;
   /** A swipe-through page before the first page when there is a section before this one (and one after the last). */
   const lead = edges.prev ? 1 : 0;
+  const elapsed = useElapsed(log.startedAt);
 
   const models = useMemo(() => section.pages.map((p) => buildPage(log, p, units, last, history)), [log, section, units, last, history]);
 
-  // A page chosen from outside (a dot, Done, a change to the log): scroll there.
+  // A page chosen from outside (Next, a change to the log): scroll there.
   useEffect(() => {
     if (shown.current === page) return;
     shown.current = page;
     listRef.current?.scrollToOffset({ offset: (page + lead) * width, animated: true });
   }, [page, width, lead]);
 
-  // VoiceOver: each page that comes on screen (swiped, a dot, Done) is read from its heading.
+  // VoiceOver: each page that comes on screen (swiped, Next) is read from its heading.
   const headings = useRef(new Map<number, HostInstance>());
   const headingRef = useCallback(
     (index: number) => (node: HostInstance | null) => {
@@ -843,147 +921,150 @@ function SectionPages({
     onPage(i);
   };
 
-  const dots = pageDots(log, section, page);
-  /** Mark all for a page, or null when there is nothing to mark (all ticked, or an option locked out). */
+  /** Mark all for a page, or null when there is nothing to mark (all ticked). */
   const markFor = (m: PageModel): (() => void) | null => {
-    if (readOnly || m.allDone || (m.kind === 'option' && m.lockedOut !== null)) return null;
+    if (readOnly || m.allDone) return null;
     const ids = m.kind === 'superset' ? m.exercises.map((e) => e.logExerciseId) : [m.exercise.logExerciseId];
     return () => onMarkAll(ids, m.kind === 'option' ? m.exercise.logExerciseId : null);
   };
-  const what = (p: FlowPage) => (p.kind === 'superset' ? 'Superset' : p.kind === 'option' ? 'Option' : 'Exercise');
+  const what = (p: FlowPage) => (p.kind === 'superset' ? 'Superset' : p.kind === 'option' ? 'Pick one' : 'Exercise');
 
   return (
-    <View style={[styles.fill, styles.ink]}>
-      <View style={[styles.header, { paddingTop: insets.top + space[1], paddingHorizontal: space[4], paddingBottom: space[3] }]}>
+    <View style={styles.fill}>
+      <View style={[styles.header, { paddingTop: insets.top + space[1], paddingHorizontal: space[3], paddingBottom: space[2], gap: space[2] }]}>
         <Pressable
           testID="close-section"
           onPress={onClose}
           accessibilityRole="button"
-          accessibilityLabel={`Close ${section.title}. The workout keeps going.`}
-          style={({ pressed }) => [styles.headerButton, pressed && { opacity: pressedOpacity }]}
+          accessibilityLabel={readOnly ? 'Back' : 'Leave workout. Asks: keep going later or discard.'}
+          style={({ pressed }) => [styles.closeButton, pressed && { opacity: pressedOpacity }]}
         >
-          <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
+          <CloseIcon size={16} />
         </Pressable>
         <Pressable
           testID="pages-title"
           onPress={onSections}
           accessibilityRole="button"
-          accessibilityLabel={section.title}
-          accessibilityHint="Shows every section, to jump to any of them."
+          accessibilityLabel={`${header.title}. ${header.subtitle.replace(' ▾', '')}`}
+          accessibilityHint="Shows every exercise, to jump to any of them."
           style={({ pressed }) => [styles.headerTitle, pressed && { opacity: pressedOpacity }]}
         >
-          <Text style={[logText('sectionHeading'), styles.onInk, styles.centre]} numberOfLines={2} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
-            {section.title}
+          <Text style={[logText('sectionHeading'), styles.centre]} numberOfLines={1} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
+            {header.title}
           </Text>
-          <Text testID="pages-sections" style={[logText('caption'), styles.onInk, styles.centre]} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
-            {sectionCount > 1 ? `Section ${sectionIndex + 1} of ${sectionCount} · All sections ▾` : 'Overview ▾'}
+          <Text testID="pages-sections" style={[logText('caption'), styles.centre, styles.muted]} numberOfLines={1} maxFontSizeMultiplier={HEADER_MAX_SCALE}>
+            {header.subtitle}
           </Text>
         </Pressable>
-        <View style={styles.headerButton} />
+        <Text testID="log-elapsed" style={[text('caption'), styles.elapsed]} numberOfLines={2} adjustsFontSizeToFit maxFontSizeMultiplier={ELAPSED_MAX_SCALE}>
+          {elapsed}
+        </Text>
       </View>
-      <View style={[styles.sheet, { borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4 }]}>
-        <FlatList
-          ref={listRef}
-          style={styles.fill}
-          data={section.pages}
-          extraData={models}
-          keyExtractor={(p) => p.key}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          windowSize={3}
-          initialNumToRender={1}
-          initialScrollIndex={Math.min(initial, section.pages.length - 1)}
-          getItemLayout={(_, index) => ({ length: width, offset: width * (index + lead), index })}
-          ListHeaderComponent={edges.prev ? <EdgePage width={width} dir={-1} title={edges.prev} /> : undefined}
-          ListFooterComponent={edges.next ? <EdgePage width={width} dir={1} title={edges.next} /> : undefined}
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: (info.index + lead) * width, animated: false })}
-          renderItem={({ item, index }) => {
-            const pageProps = (i: number) => ({ page: i, units, details, handlers, headingRef: refFor[i] ?? null, readOnly, recentSetId });
-            const m = models[index];
-            return (
-              <ScrollView
-                testID={`page-${index}`}
-                style={{ width }}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                automaticallyAdjustKeyboardInsets
-                contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] }]}
-              >
-                <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
-                  {m.kind === 'superset' ? (
-                    <SupersetPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
-                  ) : m.kind === 'option' ? (
-                    <OptionPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
-                  ) : (
-                    <StraightPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
-                  )}
-                </View>
-              </ScrollView>
-            );
-          }}
-        />
-        <View style={[styles.footer, { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: insets.bottom + space[2], gap: space[2] }]}>
-          {readOnly ? null : (
-            <Pressable
-              testID="page-done"
-              onPress={() => onDone(page)}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.done, { borderRadius: radius.pill }, pressed && { opacity: pressedOpacity }]}
+      <FlatList
+        ref={listRef}
+        style={styles.fill}
+        data={section.pages}
+        extraData={models}
+        keyExtractor={(p) => p.key}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        windowSize={3}
+        initialNumToRender={1}
+        initialScrollIndex={Math.min(initial, section.pages.length - 1)}
+        getItemLayout={(_, index) => ({ length: width, offset: width * (index + lead), index })}
+        ListHeaderComponent={edges.prev ? <EdgePage width={width} dir={-1} title={edges.prev} /> : undefined}
+        ListFooterComponent={edges.next ? <EdgePage width={width} dir={1} title={edges.next} /> : undefined}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        onScrollToIndexFailed={(info) => listRef.current?.scrollToOffset({ offset: (info.index + lead) * width, animated: false })}
+        renderItem={({ item, index }) => {
+          const pageProps = (i: number) => ({
+            page: i,
+            units,
+            details,
+            handlers,
+            headingRef: refFor[i] ?? null,
+            readOnly,
+            recentSetId,
+            coachName,
+            coachNote: i === coachNoteOn ? coachNote : null,
+          });
+          const m = models[index];
+          return (
+            <PageScroll
+              page={index}
+              testID={`page-${index}`}
+              style={{ width }}
+              // Room for the ‹ › Done bar above the number pad, so the last rows can scroll clear of it.
+              contentContainerStyle={[styles.pageContent, { padding: space[4], paddingBottom: space[6] + KEYBOARD_BAR_HEIGHT }]}
             >
-              <Text style={[logText('button'), styles.onInk]}>Done</Text>
-            </Pressable>
-          )}
-          <View style={styles.stepRow}>
-            <StepButton testID="page-prev" glyph="‹" label={steps.prev} onPress={() => onStep(-1)} />
-            {dots.length > MAX_DOTS ? (
-              <Text testID="page-count" style={logText('sectionHeading')} accessibilityLabel={`${what(section.pages[page])} ${page + 1} of ${dots.length}. Swipe left and right.`}>
-                {`${page + 1} / ${dots.length}`}
-              </Text>
-            ) : dots.length > 1 ? (
-              <View style={styles.dots} accessibilityRole="tablist">
-                {dots.map((d, i) => (
-                  <Pressable
-                    key={section.pages[i].key}
-                    testID={`dot-${i}`}
-                    onPress={() => onPage(i)}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: d === 'current' }}
-                    accessibilityLabel={`${what(section.pages[i])} ${i + 1} of ${dots.length}${d === 'done' ? ', done' : ''}. Or swipe left and right.`}
-                    style={styles.dotTarget}
-                  >
-                    <View style={[styles.dot, d === 'current' ? styles.dotCurrent : d === 'done' ? styles.dotDone : styles.dotTodo]} />
-                  </Pressable>
-                ))}
+              <View style={styles.column} accessibilityLabel={`${what(item)} ${index + 1} of ${section.pages.length}`}>
+                {m.kind === 'superset' ? (
+                  <SupersetPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
+                ) : m.kind === 'option' ? (
+                  <OptionPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
+                ) : (
+                  <StraightPage {...pageProps(index)} model={m} onMarkAll={markFor(m)} />
+                )}
               </View>
-            ) : null}
-            <StepButton testID="page-next" glyph="›" label={steps.next} onPress={() => onStep(1)} />
-          </View>
+            </PageScroll>
+          );
+        }}
+      />
+      {showNext ? (
+        <View style={[styles.footer, { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: insets.bottom + space[2] }]}>
+          <Pressable
+            testID="page-done"
+            ph-label={nextLabel === 'Finish workout' ? 'log_finish_workout' : undefined}
+            onPress={() => onNext(page)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.done, { borderRadius: radius.pill, paddingHorizontal: space[4] }, pressed && { opacity: pressedOpacity }]}
+          >
+            <Text style={[logText('button'), styles.onInk]} numberOfLines={1}>
+              {nextLabel}
+            </Text>
+          </Pressable>
         </View>
-      </View>
+      ) : null}
     </View>
   );
 }
 
-/** ‹ or › beside the dots: one page back or forward, into the next or previous section too. Dimmed at the ends. */
-function StepButton({ testID, glyph, label, onPress }: { testID: string; glyph: string; label: string | null; onPress: () => void }) {
-  const { logText: text } = useTheme();
+/**
+ * A page's scroll view. It tells the keyboard bar how to scroll a focused box clear of the bar (iOS scrolls it above
+ * the keyboard only).
+ */
+function PageScroll({ page, children, ...props }: { page: number; children: ReactNode } & Pick<ScrollViewProps, 'testID' | 'style' | 'contentContainerStyle'>) {
+  const nav = useContext(FieldNavContext);
+  const ref = useRef<ComponentRef<typeof ScrollView>>(null);
+  const offset = useRef(0);
+  useEffect(() => nav?.registerScroller(page, (dy) => ref.current?.scrollTo({ y: offset.current + dy, animated: true })), [nav, page]);
   return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      disabled={label === null}
-      hitSlop={4}
-      accessibilityRole="button"
-      accessibilityLabel={label ?? (glyph === '‹' ? 'Previous page' : 'Next page')}
-      accessibilityState={{ disabled: label === null }}
-      style={({ pressed }) => [styles.dotTarget, label === null && styles.stepOff, pressed && { opacity: pressedOpacity }]}
+    <ScrollView
+      ref={ref}
+      {...props}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
+      scrollEventThrottle={32}
+      onScroll={(e) => {
+        offset.current = e.nativeEvent.contentOffset.y;
+      }}
     >
-      <Text style={text('screenTitle')}>{glyph}</Text>
-    </Pressable>
+      {children}
+    </ScrollView>
   );
+}
+
+/** "12 min in", updated every half minute. */
+function useElapsed(startedAt: string): string {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return elapsedLabel(startedAt, now);
 }
 
 /** Past a section's first or last page: the section a swipe goes on to. Landing here opens it. */
@@ -997,24 +1078,28 @@ function EdgePage({ width, dir, title }: { width: number; dir: -1 | 1; title: st
   );
 }
 
-const DOT = 8;
 /** The header's title may grow this much with the phone's text size (1.6 at the app's size: same largest size). */
 const HEADER_MAX_SCALE = logMaxFontScale(1.6);
-/** Past this many pages the dots (with ‹ and › beside them) no longer fit a phone's width: "3 / 12" instead. */
-const MAX_DOTS = 6;
+/** "12 min in" sits in a narrow corner: it grows a little, then shrinks to fit (never split mid-word). */
+const ELAPSED_MAX_SCALE = 1.2;
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: palette.bg },
-  ink: { backgroundColor: palette.ink },
   onInk: { color: white },
-  header: { flexDirection: 'row', alignItems: 'center' },
-  headerButton: { width: tapTarget.min, minHeight: tapTarget.min, justifyContent: 'center' },
+  muted: { color: palette.inkMuted },
+  header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: palette.border, backgroundColor: palette.bg },
+  closeButton: {
+    width: tapTarget.min,
+    height: tapTarget.min,
+    borderRadius: tapTarget.min / 2,
+    backgroundColor: palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: { flex: 1, alignItems: 'center', minHeight: tapTarget.min, justifyContent: 'center' },
+  elapsed: { width: 56, textAlign: 'right', color: palette.inkMuted },
   centre: { textAlign: 'center' },
-  stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  stepOff: { opacity: 0.25 },
   edge: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  sheet: { flex: 1, backgroundColor: palette.bg, overflow: 'hidden' },
   pageContent: { alignItems: 'center' },
   column: { width: '100%', maxWidth: contentMaxWidth },
   footer: { alignItems: 'center', borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.bg },
@@ -1026,11 +1111,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: palette.ink,
   },
-  dots: { flexDirection: 'row', justifyContent: 'center' },
-  dotTarget: { width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: DOT, height: DOT, borderRadius: DOT / 2 },
-  dotCurrent: { backgroundColor: palette.ink, width: DOT * 2.5 },
-  dotDone: { backgroundColor: palette.lime, borderWidth: 1, borderColor: palette.ink },
-  dotTodo: { backgroundColor: palette.border },
   syncPill: { position: 'absolute', top: 60, left: 0, right: 0, alignItems: 'center' },
 });

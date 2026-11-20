@@ -1,4 +1,4 @@
-# An unplanned workout: Workouts → Log a workout, name it "Run", add an exercise from the overview, change the
+# An unplanned workout: Workouts → Log a workout, name it "Run", add an exercise from its add page, change the
 # reps on set 1, tick it and finish. The Finish workout? sheet says the other two sets aren't ticked and will be
 # saved as not done; then the reveal and the summary.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
@@ -35,10 +35,10 @@ env:
 - inputText: 'Run'
 - tapOn:
     id: unplanned-start
-# An empty workout opens on its overview, named as typed.
+# An empty workout opens on its add page, named as typed.
 - extendedWaitUntil:
     visible:
-      id: overview-name
+      id: section-title
       text: 'Run'
     timeout: 20000
 - tapOn:
@@ -54,7 +54,7 @@ env:
     id: exercise-result-0
 - extendedWaitUntil:
     visible:
-      id: page-done
+      id: pages-title
     timeout: 10000
 # Pushups count reps only: one REPS column, typed straight into the box.
 - tapOn:
@@ -80,10 +80,9 @@ env:
     text: '1 of 3 sets done. 2 sets of .* aren’t ticked; they’ll be saved as not done.'
 - runFlow: helpers/finish-from-sheet.yaml
 - extendedWaitUntil:
-    visible: '1 set completed'
+    visible: '1 of [0-9]+ sets? · .*'
     timeout: 10000
 - assertVisible: 'Run'
-- assertVisible: 'Coach comments'
 - tapOn:
     id: summary-done
 - runScript:

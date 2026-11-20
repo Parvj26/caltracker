@@ -8,7 +8,7 @@ import { deviceLabel, helpMailto, releaseLabel, type HelpLegalRow } from './help
 export const appRelease = () => releaseLabel(Application.nativeApplicationVersion, Application.nativeBuildVersion);
 
 /**
- * Opens a HELP & LEGAL row: the web page for Privacy and Terms (expo-web-browser isn't a dependency, so Safari opens),
+ * Opens a HELP & LEGAL row: the web page for Privacy and Terms in Safari (the in-app browser is kept for exercise demos),
  * or an email to support for Help. With no mail account set up the email can't open, so the address is shown instead.
  */
 export async function openHelpLegal(row: HelpLegalRow): Promise<void> {

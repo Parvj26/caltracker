@@ -160,7 +160,7 @@ export function FinishSheet({
           ) : (
             <>
               <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="How did it feel?">
-                <Text style={text('sectionHeading')}>How did it feel?</Text>
+                <Text style={text('sectionHeading')}>How did it feel? Your coach sees this.</Text>
                 <View style={[styles.feelings, { gap: space[2] }]}>
                   {FEELINGS.map((f) => {
                     const on = feel === f;
@@ -198,10 +198,9 @@ export function FinishSheet({
                   <Button testID="finish-keep-going" variant="secondary" title="Keep going" onPress={() => onKeepGoing(feel, note)} />
                 </View>
                 <View style={styles.flex}>
-                  <Button testID="finish-confirm" variant="finish" title="Finish" busy={busy} ph-label="log_finish_confirm" onPress={() => onFinish(feel, note)} />
+                  <Button testID="finish-confirm" title="Finish" busy={busy} ph-label="log_finish_confirm" onPress={() => onFinish(feel, note)} />
                 </View>
               </View>
-              <Text style={text('caption')}>Then your stickers and personal bests.</Text>
             </>
           )}
         </ScrollView>

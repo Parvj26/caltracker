@@ -23,7 +23,7 @@ import { useTheme } from '@/theme/use-theme';
 
 /**
  * The big reveal after Finish: a dark full screen showing the sticker this workout's weight earned, then any
- * extra cards (drop, rare find, landmark, milestone) the server awards. Finish -> reveal -> summary.
+ * extra cards (drop, rare find, landmark) the server awards (a milestone shows on the summary instead). Finish -> reveal -> summary.
  *
  *   * the ladder card comes from this phone's own log at once, so it shows with no signal: the same shared rule as
  *     the server, with the client's earlier animals (read from the server for up to 1.5 s, else the phone's copy)

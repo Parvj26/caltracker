@@ -29,7 +29,8 @@ env:
 - tapOn:
     id: summary-done
 - extendedWaitUntil:
-    visible: 'Done ✓.*'
+    visible:
+      id: 'today-done-.*'
     timeout: 20000
 - tapOn:
     id: tab-progress

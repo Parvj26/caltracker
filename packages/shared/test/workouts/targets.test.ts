@@ -135,7 +135,7 @@ describe('formatSetsSummary', () => {
     const sets = [set({ setType: 'warmup', ...reps(10), targetWeightKg: 20 }), set({ ...reps(8), targetWeightKg: 60 })];
     expect(formatSetsSummary(sets, 'weight_reps', 'kg')).toMatchObject({ text: 'W 20 kg × 10, 60 kg × 8', count: 2 });
   });
-  it('marks drops with an arrow and leaves them out of the count', () => {
+  it('marks drops with an arrow and counts them (every tickable row)', () => {
     const sets = [
       set({ ...reps(12), targetWeightKg: lb(35) }),
       set({ setType: 'drop', ...reps(8), targetWeightKg: lb(25) }),
@@ -144,7 +144,7 @@ describe('formatSetsSummary', () => {
     ];
     expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toMatchObject({
       text: '35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb × to failure',
-      count: 1,
+      count: 4,
     });
   });
   it('is empty with no sets', () => {
