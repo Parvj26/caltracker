@@ -67,6 +67,9 @@ insert into public.messages (conversation_id, sender_id, body) values (:'conv', 
 -- Failed push in each workspace.
 insert into public.push_outbox (user_id, workspace_id, type, group_key, attempts, outcome, last_error)
 values (:'sam', :'ws', 'message', 'oo-f1', 5, 'failed', 'x'), (:'tia', :'ws_t', 'message', 'oo-f2', 5, 'failed', 'x');
+-- And with no workspace (test pushes): Ann's counts, Tom's (test gym only) only with test accounts.
+insert into public.push_outbox (user_id, workspace_id, type, group_key, attempts, outcome, last_error)
+values (:'ann', null, 'test', 'oo-f3', 5, 'failed', 'x'), (:'tom', null, 'test', 'oo-f4', 5, 'failed', 'x');
 
 select tests.act_as_aal(:'owner', 'aal2');
 select public.admin_owner_overview(false) as now_o \gset
@@ -102,7 +105,7 @@ select results_eq(format($$select pg_temp.d(%1$L, %2$L, 'usage', 'meals', 'this_
   $$values (2, 5, 2)$$, 'usage with test accounts counts Tia too');
 select results_eq(format($$select pg_temp.d(%1$L, %2$L, 'health', 'push_failed_24h'), pg_temp.d(%3$L, %4$L, 'health', 'push_failed_24h')$$,
     :'now_o', :'base', :'now_t', :'base_t'),
-  $$values (1, 2)$$, 'failed notifications in 24 h: the test gym''s only with test accounts');
+  $$values (2, 4)$$, 'failed notifications in 24 h: the test gym''s (and its coach''s, with no workspace) only with test accounts');
 select ok((:'now_o'::jsonb -> 'health') ?& array['last_push_run_at', 'last_push_status'], 'health has the push sender''s last run');
 
 -- Old builds: none while the minimum is 0; then people whose latest known build is below it.

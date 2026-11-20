@@ -224,7 +224,9 @@ begin
       'last_push_status', v_push_status,
       'push_failed_24h', (select count(*) from public.push_outbox o
         where o.outcome = 'failed' and o.created_at >= now() - interval '24 hours'
-          and private.admin_ws_counts(o.workspace_id, p_show_test)),
+          and private.admin_ws_counts(o.workspace_id, p_show_test)
+          -- A push with no workspace (a coach's, or a test push to someone with no coach) goes by its person.
+          and (o.workspace_id is not null or private.admin_user_counts(o.user_id, p_show_test))),
       'old_builds', (select jsonb_build_object(
           'min_build', coalesce(v_min, 0),
           'people', count(*),

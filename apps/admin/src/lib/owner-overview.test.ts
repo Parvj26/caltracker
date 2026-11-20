@@ -15,13 +15,18 @@ describe('productHealthItems', () => {
     expect(productHealthItems(healthy, now, ago)).toEqual([]);
   });
 
-  it('flags the sender not running for over 2 h, never running, or failing', () => {
+  it('flags the sender not running for over 2 h or never; a recent failed run says so instead', () => {
     expect(productHealthItems({ ...healthy, last_push_run_at: '2026-11-20T09:00:00Z' }, now, ago)).toEqual([
       { tag: 'Not sending', main: 'Notifications not sent in 2 h', sub: 'Last run 3 h ago' },
     ]);
     expect(productHealthItems({ ...healthy, last_push_run_at: '2026-11-20T10:30:00Z' }, now, ago)).toEqual([]);
     expect(productHealthItems({ ...healthy, last_push_run_at: null, last_push_status: null }, now, ago)[0]?.sub).toBe('The sender has not run');
-    expect(productHealthItems({ ...healthy, last_push_status: 'failed' }, now, ago)[0]?.sub).toBe('Last run failed');
+    expect(productHealthItems({ ...healthy, last_push_status: 'failed' }, now, ago)).toEqual([
+      { tag: 'Not sending', main: 'Last notification run failed', sub: 'Ran 0 h ago' },
+    ]);
+    expect(
+      productHealthItems({ ...healthy, last_push_run_at: '2026-11-20T09:00:00Z', last_push_status: 'failed' }, now, ago)[0]?.main,
+    ).toBe('Notifications not sent in 2 h');
   });
 
   it('counts failed notifications', () => {

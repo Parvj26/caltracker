@@ -51,19 +51,23 @@ const PUSH_LATE_MS = 2 * 60 * 60 * 1000;
 
 /**
  * Product health lists only what's wrong. Empty = "Notifications and errors: all good".
- * - Not sending: the push sender (the push-send job) last ran over 2 h ago, never ran, or its last run failed.
+ * - Not sending: the push sender (the push-send job) last ran over 2 h ago or never ran; or it ran recently but failed.
  * - Failed: notifications that failed in the last 24 h.
  * - Old build: people whose latest known build is below the minimum (none until phones send their build).
  */
 export function productHealthItems(h: OwnerOverview['health'], now: Date, agoText: (iso: string) => string): HealthItem[] {
   const items: HealthItem[] = [];
   const ran = h.last_push_run_at ? Date.parse(h.last_push_run_at) : NaN;
-  if (Number.isNaN(ran) || now.getTime() - ran > PUSH_LATE_MS || h.last_push_status === 'failed') {
+  const late = Number.isNaN(ran) || now.getTime() - ran > PUSH_LATE_MS;
+  if (late) {
     items.push({
       tag: 'Not sending',
       main: 'Notifications not sent in 2 h',
-      sub: !h.last_push_run_at ? 'The sender has not run' : h.last_push_status === 'failed' ? 'Last run failed' : `Last run ${agoText(h.last_push_run_at)}`,
+      sub: h.last_push_run_at ? `Last run ${agoText(h.last_push_run_at)}` : 'The sender has not run',
     });
+  } else if (h.last_push_status === 'failed') {
+    // It ran recently, so "not sent in 2 h" would be untrue: say the last run failed.
+    items.push({ tag: 'Not sending', main: 'Last notification run failed', sub: `Ran ${agoText(h.last_push_run_at!)}` });
   }
   if (h.push_failed_24h > 0) {
     items.push({ tag: 'Failed', main: `${plural(h.push_failed_24h, 'notification')} failed`, sub: 'Last 24 h' });

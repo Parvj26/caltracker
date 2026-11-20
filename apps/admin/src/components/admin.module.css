@@ -297,7 +297,8 @@ li.searchResult { cursor: pointer; }
 .gridGrowth { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 .growthTiles, .usageStats { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .usageStats { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tileValueSmall { font-size: 18px; font-weight: 700; }
+/* Kept on one line: if it doesn't fit beside the number it moves below it whole, never split mid-phrase. */
+.tileValueSmall { display: inline-block; font-size: 18px; font-weight: 700; white-space: nowrap; }
 .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--ct-surface); }
 .statLabel { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; overflow-wrap: anywhere; }
 .statValue { font-size: 26px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
@@ -322,6 +323,9 @@ li.searchResult { cursor: pointer; }
   .usageStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (min-width: 1200px) {
-  .gridGrowth { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
   .usageStats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* Growth and Product health side by side only when the three growth tiles still have room for "1 sent · 1 joined". */
+@media (min-width: 1400px) {
+  .gridGrowth { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 }
