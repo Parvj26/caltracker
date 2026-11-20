@@ -5,11 +5,11 @@ import type { ExerciseDetail } from '@/lib/exercise-detail';
 import { exerciseImageUrl } from '@/lib/exercise-detail-api';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 import { PlaceholderIcon } from './exercise-thumb';
 
-/** Height of the big demo area on a straight exercise page; a superset's exercises use the medium square. */
-export const DEMO_HEIGHT = 220;
-export const DEMO_MEDIUM = 96;
+/** The demo's thumbnail on a logging page (approved Logger board): small, so the sets stay on screen. */
+export const DEMO_SMALL = 64;
 
 /**
  * The exercise's photo with a play button over it. Tap opens the exercise sheet: photos, steps and Watch demo.
@@ -17,20 +17,17 @@ export const DEMO_MEDIUM = 96;
 export function ExerciseDemo({
   name,
   detail,
-  size,
   testID,
   onPress,
 }: {
   name: string;
   detail: ExerciseDetail | undefined;
-  size: 'big' | 'medium';
   testID: string;
   onPress: () => void;
 }) {
   const { radius } = useTheme();
   const first = detail?.imagePaths[0];
   const [failed, setFailed] = useState<string | null>(null);
-  const big = size === 'big';
   return (
     <Pressable
       testID={testID}
@@ -39,8 +36,8 @@ export function ExerciseDemo({
       accessibilityLabel={`Play the ${name} demo`}
       style={({ pressed }) => [
         styles.demo,
-        big ? styles.big : styles.medium,
-        { borderRadius: radius.card },
+        styles.small,
+        { borderRadius: radius.input + 2 },
         pressed && { opacity: pressedOpacity },
       ]}
     >
@@ -49,51 +46,52 @@ export function ExerciseDemo({
       ) : (
         <PlaceholderIcon />
       )}
-      <View style={[styles.play, big ? styles.playBig : styles.playSmall]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={[styles.playMark, { fontSize: big ? 24 : 14 }]}>▶</Text>
+      <View style={[styles.play, styles.playSmall]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text style={[styles.playMark, { fontSize: 14 }]}>▶</Text>
       </View>
     </Pressable>
   );
 }
 
-/** One round icon button of the tools row. */
+/** One labelled chip of the tools row (44 pt tall). */
 function Tool({
-  glyph,
+  title,
   label,
   testID,
   dotted,
   onPress,
 }: {
-  glyph: string;
+  title: string;
   label: string;
   testID: string;
   /** A dashed ring: something is waiting here (the coach added a substitute). */
   dotted?: boolean;
   onPress: () => void;
 }) {
-  const { text, radius } = useTheme();
+  const { logText: text, radius, space } = useTheme();
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.tool, { borderRadius: radius.pill }, dotted && styles.dotted, pressed && { opacity: pressedOpacity }]}
+      style={({ pressed }) => [styles.tool, { borderRadius: radius.pill, paddingHorizontal: space[3.5] }, dotted && styles.dotted, pressed && { opacity: pressedOpacity }]}
     >
-      <Text style={[text('sectionHeading'), styles.ink]}>{glyph}</Text>
+      <Text style={[text('caption'), styles.toolText]}>{title}</Text>
     </Pressable>
   );
 }
 
 /**
- * History (last time's numbers), Message coach (a note for the coach, when given), ⇄ (switch to the substitute,
- * or swap the exercise) and ••• (more).
+ * Labelled chips (approved Logger board): "Note for Luis" (when given), "Swap exercise" (the coach's substitute when
+ * there is one, else any exercise) and ··· (more: last time, add a drop set, delete a set, remove). The History chip is
+ * gone: the Last time column shows it, and ··· still opens last time's sheet.
  */
 export function ExerciseTools({
   idKey,
   name,
+  coachName,
   hasSubstitute,
-  onHistory,
   onMessage,
   onSwap,
   onMore,
@@ -101,28 +99,31 @@ export function ExerciseTools({
   /** "<page>-<exercise>", for test ids. */
   idKey: string;
   name: string;
+  /** The coach's first name ("Note for Luis"); null says "your coach". */
+  coachName: string | null;
   hasSubstitute: boolean;
-  onHistory: () => void;
   onMessage: (() => void) | null;
-  /** Null hides ⇄ and ••• (read only, while the coach logs). */
+  /** Null hides Swap and ··· (read only, while the coach logs). */
   onSwap: (() => void) | null;
   onMore: (() => void) | null;
 }) {
   const { space } = useTheme();
+  if (!onMessage && !onSwap && !onMore) return null;
   return (
     <View style={[styles.tools, { gap: space[2] }]}>
-      <Tool glyph="↺" label={`History for ${name}`} testID={`history-${idKey}`} onPress={onHistory} />
-      {onMessage ? <Tool glyph="✉" label={`Note for your coach about ${name}`} testID={`message-${idKey}`} onPress={onMessage} /> : null}
+      {onMessage ? (
+        <Tool title={`Note for ${coachName ?? 'coach'}`} label={`Note for your coach about ${name}`} testID={`message-${idKey}`} onPress={onMessage} />
+      ) : null}
       {onSwap ? (
         <Tool
-          glyph="⇄"
+          title={hasSubstitute ? 'Swap (substitute)' : 'Swap exercise'}
           label={hasSubstitute ? `Substitute available for ${name}` : `Swap ${name}`}
           testID={`swap-${idKey}`}
           dotted={hasSubstitute}
           onPress={onSwap}
         />
       ) : null}
-      {onMore ? <Tool glyph="•••" label={`More for ${name}`} testID={`more-${idKey}`} onPress={onMore} /> : null}
+      {onMore ? <Tool title="···" label={`More for ${name}`} testID={`more-${idKey}`} onPress={onMore} /> : null}
     </View>
   );
 }
@@ -136,21 +137,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  big: { width: '100%', height: DEMO_HEIGHT },
-  medium: { width: DEMO_MEDIUM, height: DEMO_MEDIUM },
+  small: { width: DEMO_SMALL, height: DEMO_SMALL },
   image: StyleSheet.absoluteFill,
   play: { position: 'absolute', backgroundColor: white, alignItems: 'center', justifyContent: 'center' },
-  playBig: { width: 64, height: 64, borderRadius: 32 },
   playSmall: { width: 34, height: 34, borderRadius: 17 },
   playMark: { color: palette.ink, marginLeft: 3 },
   tools: { flexDirection: 'row', flexWrap: 'wrap' },
   tool: {
-    minWidth: tapTarget.min + 8,
+    minWidth: tapTarget.min + 4,
     minHeight: tapTarget.min,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.surface,
+    backgroundColor: palette.bg,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.borderStrong,
   },
+  toolText: { color: palette.ink, fontFamily: fontFamilyFor('sans', 700), fontSize: 14 },
   dotted: { borderWidth: borderWidth.card, borderStyle: 'dashed', borderColor: palette.ink },
   ink: { color: palette.ink },
 });

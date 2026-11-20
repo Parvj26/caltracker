@@ -157,7 +157,10 @@ export function SectionStart({
 
 export type OverviewSection = { section: FlowSection; groups: StartGroup[] };
 
-/** Inside the log: the whole workout, its sections (tap one to start it), add, finish and discard. */
+/**
+ * Inside the log, from the header's "All exercises ▾": the whole workout, its sections (tap one to jump there), add,
+ * finish (once a set is ticked) and discard. Start never comes here: it goes straight to the first set.
+ */
 export function WorkoutOverview({
   name,
   started,
@@ -200,10 +203,10 @@ export function WorkoutOverview({
             testID="overview-close"
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Back to Today. The workout keeps going."
+            accessibilityLabel="Back to your sets"
             style={({ pressed }) => [styles.iconButton, pressed && { opacity: pressedOpacity }]}
           >
-            <Text style={[text('screenTitle'), styles.onInk]}>✕</Text>
+            <Text style={[text('screenTitle'), styles.onInk]}>⌄</Text>
           </Pressable>
           <Text style={[text('caption'), styles.onInk]}>{readOnly ? 'Logged by your coach' : started ? 'Workout in progress' : 'Today’s workout'}</Text>
           <Text testID="overview-name" style={[text('screenTitle'), styles.onInk, styles.title]} accessibilityRole="header">
@@ -216,7 +219,7 @@ export function WorkoutOverview({
               accessibilityRole="button"
               style={({ pressed }) => [styles.startPill, { borderRadius: radius.pill, paddingHorizontal: space[6] }, pressed && { opacity: pressedOpacity }]}
             >
-              <Text style={[text('button'), styles.ink]}>{readOnly ? 'View sets' : started ? 'Continue' : 'Start workout'}</Text>
+              <Text style={[text('button'), styles.ink]}>{readOnly ? 'View sets' : 'Back to your sets'}</Text>
             </Pressable>
           </View>
         </View>
@@ -247,7 +250,8 @@ export function WorkoutOverview({
           </View>
         ))}
         {can.addExercise ? <Button variant="secondary" title="+ Add exercise" testID="add-exercise" onPress={onAddExercise} /> : null}
-        {can.finish ? <Button variant="finish" title="Finish workout" testID="finish-workout" ph-label="log_finish_workout" onPress={onFinish} /> : null}
+        {/* Finish only once something is logged: never a big Finish before the first set. */}
+        {can.finish && started ? <Button title="Finish workout" testID="finish-workout" ph-label="log_finish_workout" onPress={onFinish} /> : null}
         {can.discard ? <TextButton testID="discard-workout" title="Discard workout" onPress={onDiscard} /> : null}
       </View>
     </ScrollView>

@@ -219,7 +219,7 @@ export function foodLine(meals: ReadonlyArray<{ macros: MealMacros }>, targets: 
     parts.push({ strong: formatMacro('protein', totals.protein), rest: ' protein' });
   }
   const noTargets = !(kcalTarget && kcalTarget > 0) && !(proteinTarget && proteinTarget > 0);
-  if (noTargets) parts[parts.length - 1]!.rest += ' today';
+  if (noTargets) parts[parts.length - 1].rest += ' today';
   return { parts, label: parts.map((p) => p.strong + p.rest).join(', ') };
 }
 

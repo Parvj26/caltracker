@@ -1,7 +1,6 @@
-import { memo, useEffect, useState } from 'react';
+import { createContext, memo, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef } from 'react';
 import {
   AccessibilityInfo,
-  InputAccessoryView,
   Keyboard,
   Platform,
   Pressable,
@@ -9,13 +8,14 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type AccessibilityActionEvent,
   type KeyboardTypeOptions,
 } from 'react-native';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import type { ActualPatch, StepField, Units } from '@caltracker/shared';
 import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@/lib/log-flow-model';
-import { palette, pressedOpacity } from '@/theme/theme';
+import { palette, pressedOpacity, white } from '@/theme/theme';
 import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
 
@@ -34,30 +34,108 @@ const SPOKEN: Record<StepField, string> = { weight: 'weight', reps: 'reps', dura
  */
 const MAX_FONT_SCALE = logMaxFontScale(1.4);
 
-/** The bar above the number pad (iOS): number pads have no return key, so this is how the keyboard goes away. */
-export const KEYBOARD_BAR_ID = 'log-number-pad';
+/**
+ * The number boxes of the open workout, in page order, so the bar above the number pad can move between them (‹ ›).
+ * One per logging screen (FieldNavContext). Each box registers itself with its page and its place on the page.
+ */
+export class FieldNav {
+  private fields = new Map<string, { page: number; order: number; focus: () => void }>();
+  private current: string | null = null;
+  private listeners = new Set<() => void>();
+
+  register(key: string, page: number, order: number, focus: () => void): () => void {
+    this.fields.set(key, { page, order, focus });
+    return () => {
+      if (this.fields.get(key)?.focus === focus) this.fields.delete(key);
+    };
+  }
+  focused(key: string | null): void {
+    if (this.current === key) return;
+    this.current = key;
+    this.listeners.forEach((l) => l());
+  }
+  blurred(key: string): void {
+    if (this.current === key) this.focused(null);
+  }
+  /** The box after (+1) or before (-1) the focused one on the same page, or null at either end. */
+  neighbour(delta: -1 | 1): (() => void) | null {
+    const here = this.current ? this.fields.get(this.current) : undefined;
+    if (!here) return null;
+    const same = [...this.fields.values()].filter((f) => f.page === here.page).sort((a, b) => a.order - b.order);
+    const i = same.findIndex((f) => f.order === here.order);
+    return same[i + delta]?.focus ?? null;
+  }
+  subscribe = (l: () => void) => {
+    this.listeners.add(l);
+    return () => this.listeners.delete(l);
+  };
+  snapshot = () => this.current;
+}
+
+export const FieldNavContext = createContext<FieldNav | null>(null);
+
+/** Height of the bar above the number pad. */
+export const KEYBOARD_BAR_HEIGHT = 56;
 
 /**
- * Rendered once and never again: redrawing an input accessory view makes iOS reload the keyboard's views, which
- * can drop the box's focus between two keystrokes (typing 140 saved 1).
+ * The ‹ › Done bar above the number pad (iOS number pads have no return key). Rendered once per logging screen and
+ * drawn by the app itself just above the keyboard, NOT as an InputAccessoryView: in the new architecture an
+ * InputAccessoryView attaches only to the first matching box on screen when it mounts (RCTInputAccessoryComponentView
+ * didMoveToWindow), so the shared bar never showed on the other boxes, and redrawing one drops the box's focus.
+ * ‹ › move focus between the page's boxes through their refs; Done closes the keyboard.
  */
-export const KeyboardBar = memo(function KeyboardBar() {
-  const { logText: text, space } = useTheme();
-  if (Platform.OS !== 'ios') return null;
+export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav }) {
+  const { logText: text, space, radius } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
+  const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
+  const current = useSyncExternalStore(nav.subscribe, nav.snapshot);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => setKeyboardTop(e.endCoordinates.screenY));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardTop(null));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  if (Platform.OS !== 'ios' || keyboardTop === null || keyboardTop >= windowHeight || current === null) return null;
+  const prev = nav.neighbour(-1);
+  const next = nav.neighbour(1);
   return (
-    <InputAccessoryView nativeID={KEYBOARD_BAR_ID}>
-      <View style={[styles.bar, { paddingHorizontal: space[4] }]}>
-        <Pressable
-          testID="keyboard-done"
-          onPress={() => Keyboard.dismiss()}
-          accessibilityRole="button"
-          accessibilityLabel="Done typing"
-          style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}
-        >
-          <Text style={text('sectionHeading')}>Done typing</Text>
-        </Pressable>
-      </View>
-    </InputAccessoryView>
+    <View testID="keyboard-bar" style={[styles.bar, { bottom: windowHeight - keyboardTop, paddingHorizontal: space[2.5] }]}>
+      <Pressable
+        testID="keyboard-prev"
+        onPress={() => prev?.()}
+        disabled={!prev}
+        accessibilityRole="button"
+        accessibilityLabel="Previous box"
+        accessibilityState={{ disabled: !prev }}
+        style={({ pressed }) => [styles.barArrow, !prev && styles.barOff, pressed && styles.pressed]}
+      >
+        <Text style={text('screenTitle')}>‹</Text>
+      </Pressable>
+      <Pressable
+        testID="keyboard-next"
+        onPress={() => next?.()}
+        disabled={!next}
+        accessibilityRole="button"
+        accessibilityLabel="Next box"
+        accessibilityState={{ disabled: !next }}
+        style={({ pressed }) => [styles.barArrow, !next && styles.barOff, pressed && styles.pressed]}
+      >
+        <Text style={text('screenTitle')}>›</Text>
+      </Pressable>
+      <View style={styles.flex} />
+      <Pressable
+        testID="keyboard-done"
+        onPress={() => Keyboard.dismiss()}
+        accessibilityRole="button"
+        accessibilityLabel="Done typing"
+        style={({ pressed }) => [styles.barDone, { borderRadius: radius.pill, paddingHorizontal: space[4.5] }, pressed && styles.pressed]}
+      >
+        <Text style={[text('sectionHeading'), styles.onInk]}>Done</Text>
+      </Pressable>
+    </View>
   );
 });
 
@@ -84,6 +162,9 @@ export type TableHandlers = {
  * reps, 1:75, too heavy, or a blank on a ticked set) shows as invalid with a short reason, and the saved number
  * comes back when the box is left.
  */
+/** A pre-fill that is a number the box can hold ("60", "1:30"), not words like "max reps". */
+const NUMERIC = /^[\d.,:]+$/;
+
 function Cell({
   cell,
   row,
@@ -93,6 +174,7 @@ function Cell({
   unitBelow,
   disabled,
   readOnly,
+  nav,
   onType,
 }: {
   cell: CellModel;
@@ -103,36 +185,60 @@ function Cell({
   unitBelow: boolean;
   disabled: boolean;
   readOnly: boolean;
+  /** Its page and place on the page, for ‹ › on the keyboard bar. */
+  nav: { page: number; order: number } | null;
   onType: (patch: ActualPatch) => void;
 }) {
   const { logText: text, space, radius } = useTheme();
   const [draft, setDraft] = useState(cell.value);
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
+  // Set for one moment as the box is tapped: the number is selected, so typing replaces it.
+  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const fields = useContext(FieldNavContext);
+  const editable = !disabled && !readOnly;
   useEffect(() => {
     if (!focused) setDraft(cell.value);
   }, [cell.value, focused]);
+  useEffect(() => {
+    if (!fields || !nav || !editable) return;
+    return fields.register(testID, nav.page, nav.order, () => input.current?.focus());
+  }, [fields, nav?.page, nav?.order, editable, testID]);
   const label = `${who}${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`;
   return (
     <View style={[styles.cell, { gap: space[1] / 2 }]}>
       <TextInput
+        ref={input}
         testID={testID}
         value={draft}
-        editable={!disabled && !readOnly}
+        editable={editable}
         accessibilityState={{ disabled: disabled || readOnly }}
         keyboardType={KEYBOARD[cell.field]}
         returnKeyType="done"
-        inputAccessoryViewID={KEYBOARD_BAR_ID}
         selectTextOnFocus
+        selection={selection}
+        onSelectionChange={() => {
+          if (selection) setSelection(undefined);
+        }}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         accessibilityLabel={label}
         accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : undefined)}
         placeholder={row.done || readOnly ? '' : cell.placeholder || '–'}
         placeholderTextColor={palette.inkMuted}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true);
+          fields?.focused(testID);
+          // The greyed suggestion becomes the box's number, selected: typing replaces it, leaving keeps it unsaved.
+          const shown = draft === '' && !row.done && NUMERIC.test(cell.placeholder) ? cell.placeholder : draft;
+          if (shown !== draft) setDraft(shown);
+          if (shown !== '') setSelection({ start: 0, end: shown.length });
+        }}
         onBlur={() => {
           setFocused(false);
+          fields?.blurred(testID);
           setInvalid(null);
+          setSelection(undefined);
           setDraft(cell.value);
         }}
         onChangeText={(t) => {
@@ -185,6 +291,11 @@ type RowProps = {
   readOnly?: boolean;
   /** The set the coach ticked last (read only): outlined so the client sees where the coach is. */
   recent?: boolean;
+  /** The Last time column (straight and pick-one pages). */
+  showLast?: boolean;
+  /** Its page and place on the page (for ‹ › on the keyboard bar). */
+  page?: number;
+  order?: number;
   handlers: TableHandlers;
 };
 
@@ -192,7 +303,20 @@ type RowProps = {
  * One set: tag, number boxes, ✓. Long-press the row (its tag or the space around the boxes) for "Delete set". There
  * is no swipe on a row: a sideways swipe always changes the page.
  */
-function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled = false, readOnly = false, recent = false, handlers }: RowProps) {
+function SetRowLineView({
+  row,
+  idKey,
+  unitBelow,
+  exerciseLabel,
+  units,
+  disabled = false,
+  readOnly = false,
+  recent = false,
+  showLast = false,
+  page,
+  order = 0,
+  handlers,
+}: RowProps) {
   const { logText: text, space, radius } = useTheme();
   const tagged = row.tagKind !== 'normal';
   const id = `${idKey}-${row.setIndex}`;
@@ -215,7 +339,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
           { gap: space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
           row.indented && { marginLeft: space[4] },
           row.done && styles.rowDone,
-          recent && styles.rowRecent,
+          (recent || (row.current && !readOnly)) && styles.rowRecent,
         ]}
       >
         <Pressable
@@ -229,11 +353,21 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
           accessibilityLabel={tagged ? `${row.name}. What does ${row.tag} mean?` : row.name}
           style={({ pressed }) => [styles.tag, tagged && [styles.tagChip, { borderRadius: radius.pill }], pressed && styles.pressed]}
         >
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), styles.ink]}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text(row.tagKind === 'drop' ? 'caption' : 'sectionHeading'), styles.ink, styles.centre]}>
             {row.tag}
           </Text>
         </Pressable>
-        {row.cells.map((cell) => (
+        {showLast ? (
+          <Text
+            testID={`last-${id}`}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            accessibilityLabel={row.last ? `Last time ${row.last}` : 'No last time'}
+            style={[text('caption'), styles.lastCol]}
+          >
+            {row.last ?? '–'}
+          </Text>
+        ) : null}
+        {row.cells.map((cell, ci) => (
           <Cell
             key={cell.field}
             cell={cell}
@@ -244,6 +378,7 @@ function SetRowLineView({ row, idKey, unitBelow, exerciseLabel, units, disabled 
             unitBelow={unitBelow}
             disabled={disabled}
             readOnly={readOnly}
+            nav={page === undefined ? null : { page, order: order * 10 + ci }}
             onType={(patch) => handlers.onType(row, patch)}
           />
         ))}
@@ -299,14 +434,20 @@ export const SetRowLine = memo(
     a.row.tag === b.row.tag &&
     a.row.name === b.row.name &&
     a.row.deletable === b.row.deletable &&
+    a.row.last === b.row.last &&
+    a.row.current === b.row.current &&
+    a.showLast === b.showLast &&
+    a.page === b.page &&
+    a.order === b.order &&
     sameCells(a.row.cells, b.row.cells),
 );
 
-/** A straight exercise's sets: SET | LB | REPS | ✓ (columns follow the tracking type), then + Add set. */
+/** A straight exercise's sets: SET | LAST TIME | LB | REPS | ✓ (columns follow the tracking type), then + Add set. */
 export function SetTable({
   rows,
   idKey,
   units,
+  page,
   disabled,
   readOnly = false,
   recentSetId = null,
@@ -316,6 +457,8 @@ export function SetTable({
   rows: RowModel[];
   idKey: string;
   units: Units;
+  /** The page it is on (for ‹ › on the keyboard bar). */
+  page: number;
   disabled?: boolean;
   readOnly?: boolean;
   recentSetId?: string | null;
@@ -330,6 +473,9 @@ export function SetTable({
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.tag, styles.headingText]}>
           SET
         </Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.lastCol, styles.headingText]}>
+          LAST TIME
+        </Text>
         {headings.map((h) => (
           <Text key={h} maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.cell, styles.centre, styles.headingText]}>
             {h}
@@ -337,7 +483,7 @@ export function SetTable({
         ))}
         <View style={styles.tickSpace} />
       </View>
-      {rows.map((row) => (
+      {rows.map((row, i) => (
         <SetRowLine
           key={row.setId}
           row={row}
@@ -348,6 +494,9 @@ export function SetTable({
           disabled={disabled}
           readOnly={readOnly}
           recent={row.setId === recentSetId}
+          showLast
+          page={page}
+          order={i}
           handlers={handlers}
         />
       ))}
@@ -373,23 +522,27 @@ export function AddSetButton({ testID, onPress, title = '+ Add set' }: { testID:
 }
 
 const styles = StyleSheet.create({
-  table: { backgroundColor: palette.surface },
+  table: {},
   row: { flexDirection: 'row', alignItems: 'center' },
-  rowDone: { backgroundColor: palette.lime },
+  // A ticked set: a light grey row with an ink ✓ (no lime: lime is for creating something new).
+  rowDone: { backgroundColor: palette.surface },
+  lastCol: { width: 64, color: palette.inkMuted },
+  flex: { flex: 1 },
+  onInk: { color: white },
   rowRecent: { borderWidth: borderWidth.card * 2, borderColor: palette.ink },
-  tag: { width: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
+  tag: { minWidth: tapTarget.min, minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
   tagChip: { backgroundColor: palette.drop },
   headingText: { minHeight: 0, letterSpacing: 0.6 },
   cell: { flex: 1 },
   input: {
     minHeight: tapTarget.min,
     backgroundColor: palette.bg,
-    borderWidth: borderWidth.card,
-    borderColor: palette.border,
+    borderWidth: borderWidth.secondaryButton,
+    borderColor: palette.borderStrong,
     textAlign: 'center',
   },
-  inputDone: { borderColor: palette.lime },
-  inputFocused: { borderColor: palette.ink },
+  inputDone: { borderColor: palette.border, backgroundColor: palette.surface },
+  inputFocused: { borderColor: palette.ink, borderWidth: 2.5 },
   // Read only: no box to type in, just the number on the row (dashed, so it doesn't look tappable).
   inputReadOnly: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: palette.inkMuted },
   inputInvalid: { borderColor: palette.magentaDeep },
@@ -405,14 +558,26 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.card,
   },
   tickSpace: { width: tapTarget.min },
-  tickOpen: { backgroundColor: palette.bg, borderColor: palette.ink },
+  tickOpen: { backgroundColor: palette.bg, borderColor: palette.borderStrong },
   tickDone: { backgroundColor: palette.ink, borderColor: palette.ink },
   tickReadOnly: { borderStyle: 'dashed', borderColor: palette.inkMuted },
   tickMarkOpen: { color: palette.border },
-  tickMarkDone: { color: palette.lime },
+  tickMarkDone: { color: white },
   pressed: { opacity: pressedOpacity },
   disabled: { opacity: 0.4 },
   addSet: { minHeight: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
-  bar: { flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: palette.surface, borderTopWidth: 1, borderTopColor: palette.border },
-  barButton: { minHeight: tapTarget.min, justifyContent: 'center', paddingHorizontal: 8 },
+  bar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: KEYBOARD_BAR_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: palette.surface,
+    borderTopWidth: 1,
+    borderTopColor: palette.borderStrong,
+  },
+  barArrow: { width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
+  barOff: { opacity: 0.3 },
+  barDone: { minHeight: tapTarget.min, justifyContent: 'center', backgroundColor: palette.ink },
 });

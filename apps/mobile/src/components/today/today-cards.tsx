@@ -67,13 +67,10 @@ const STICKER = 48;
 const TILE_GAP = 6;
 
 
-/**
- * The coach chat. The Coach tab redesign (feature/coach-tab-redesign, merging before this) makes /coach the coach's
- * profile and /coach/chat the chat; until it is on this branch the route does not exist yet, hence the cast.
- */
-export const COACH_CHAT_HREF = '/coach/chat' as Href;
-/** The Coach tab's first screen (the coach's profile and the goal). */
-const COACH_HREF = '/coach' as Href;
+/** The coach chat: the Coach tab's first screen. */
+export const COACH_CHAT_HREF = '/coach';
+/** The add-meal sheet (batch B, PR #176: /food/add); cast until that route is on this branch. */
+const ADD_MEAL_HREF = '/food/add' as Href;
 
 /** Where Preview goes: the Workouts tab's Preview screen (plan, totals and a sticky Start). */
 export const previewHref = (id: string): Href => ({ pathname: '/plan/[id]', params: { id } });
@@ -289,7 +286,7 @@ export function FoodCard({ refreshKey }: { refreshKey: number }) {
         <Pressable
           testID="today-add-meal"
           ph-label="log_add_meal"
-          onPress={() => router.push({ pathname: '/food/meal', params: { day: today } })}
+          onPress={() => router.push(ADD_MEAL_HREF)}
           accessibilityRole="button"
           accessibilityLabel="Add meal"
           style={({ pressed }) => [styles.addMeal, { paddingHorizontal: space[4] }, pressed && styles.pressed]}
@@ -323,7 +320,7 @@ export function GoalStrip() {
   return (
     <Pressable
       testID="today-goal"
-      onPress={() => router.navigate(COACH_HREF)}
+      onPress={() => router.navigate(COACH_CHAT_HREF)}
       accessibilityRole="button"
       accessibilityLabel={`Goal: ${goal.goal}${days ? `, ${days}` : ''}`}
       accessibilityHint="Opens the Coach tab"
