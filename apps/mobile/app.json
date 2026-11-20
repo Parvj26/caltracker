@@ -77,7 +77,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "CalTracker reads the numbers you choose (weight, body fat, VO2 max, resting heart rate and waist) so they show in your Metrics and your coach can see them.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "CalTracker only reads from Apple Health and never writes to it. Apple requires this text because the Health library CalTracker uses includes code that can write.",
           "background": false
         }
       ]
