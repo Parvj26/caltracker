@@ -697,3 +697,35 @@ export { PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL, supportMailto } from './support/
 export type { SupportSurface } from './support/support-mailto';
 export { updateStatus } from './app-update/update-status';
 export type { UpdateConfig, UpdateStatus } from './app-update/update-status';
+export {
+  CM_PER_INCH,
+  METRIC_CATALOGUE,
+  METRIC_ENTERED_BY,
+  METRIC_KEYS,
+  METRIC_SOURCES,
+  METRIC_SOURCE_LABELS,
+  formatMetricDelta,
+  formatMetricValue,
+  isMetricInRange,
+  isMetricKey,
+  isMetricSource,
+  lengthUnitFor,
+  metricAllowsSource,
+  metricFromDisplay,
+  metricInputValue,
+  metricToDisplay,
+  metricUnit,
+  parseMetricInput,
+} from './metrics/catalogue';
+export type { LengthUnit, MetricDefinition, MetricEnteredBy, MetricKey, MetricKind, MetricSource, ParsedMetricInput } from './metrics/catalogue';
+export {
+  METRIC_RANGES,
+  METRIC_RANGE_LABELS,
+  canEditMetricEntry,
+  metricDailyEntries,
+  metricSummary,
+  metricsSummary,
+  toMetricEntries,
+  toMetricEntry,
+} from './metrics/summary';
+export type { MetricEntry, MetricEntryRow, MetricOrigin, MetricRange, MetricSummary } from './metrics/summary';
