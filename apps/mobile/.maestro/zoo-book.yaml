@@ -63,6 +63,8 @@ env:
 - assertVisible: 'First earned.*'
 - tapOn:
     id: sheet-close
+- assertNotVisible:
+    id: sticker-sheet
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-logs, EMAIL: '${EMAIL}' }

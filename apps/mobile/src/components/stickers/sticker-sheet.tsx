@@ -82,7 +82,8 @@ export function StickerSheet({ item, onClose }: { item: AlbumItem | null; onClos
 }
 
 const styles = StyleSheet.create({
-  closeRow: { alignItems: 'flex-end', marginBottom: -44 },
+  // zIndex keeps the × above the sticker row it overlaps, so the whole button takes taps.
+  closeRow: { alignItems: 'flex-end', marginBottom: -44, zIndex: 1, elevation: 1 },
   scrim: { flex: 1, backgroundColor: palette.ink, opacity: stickerTheme.scrimOpacity },
   sheet: { backgroundColor: palette.bg },
   center: { alignItems: 'center' },

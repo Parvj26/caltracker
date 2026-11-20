@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { COMMENT_BODY_MAX, CommentInput, commentCountLabel, postAge, withoutBlocked } from '@caltracker/shared';
 import { CoachAvatar } from '@/components/coach-avatar';
@@ -29,6 +29,8 @@ export default function PostScreen() {
   const units = useUnits() ?? 'lb';
   const { community, coaches, blocked, setBlocked, reported, hideReported } = useCommunity();
   const [post, setPost] = useState<FeedPost | null | undefined>(undefined);
+  // Set once this page has gone back, so a follow-up Block (after Report) doesn't pop a second screen.
+  const left = useRef(false);
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [error, setError] = useState<ShownError | null>(null);
   const [draft, setDraft] = useState('');
@@ -81,11 +83,17 @@ export default function PostScreen() {
         onChanged: () => void load(),
         onBlocked: (uid) => {
           setBlocked(new Set([...blocked, uid]));
-          if (post?.authorId === uid) router.back();
+          if (post?.authorId === uid && !left.current && router.canGoBack()) {
+            left.current = true;
+            router.back();
+          }
         },
         onReported: (postId) => {
           hideReported(postId);
-          if (router.canGoBack()) router.back();
+          if (!left.current && router.canGoBack()) {
+            left.current = true;
+            router.back();
+          }
         },
       }
     : null;
