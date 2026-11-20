@@ -116,25 +116,18 @@ export function buildRevealCards(
   return cards;
 }
 
+/** "Workout #10": the milestone this workout reached, for its summary (once, never a later surprise); null if none. */
+export function milestoneLine(award: Pick<AwardResult, 'milestone'> | null): string | null {
+  return award?.milestone ? `Workout #${award.milestone}` : null;
+}
+
 /** Every card after the ladder one. `surprise` titles them "Surprise!" (collected on a later app open). */
 function extraCards(award: AwardResult, surprise: boolean): RevealCardView[] {
   const out: RevealCardView[] = [];
   for (const c of revealCards(award)) {
     if (c.type === 'ladder') continue;
-    if (c.type === 'milestone') {
-      out.push({
-        id: `milestone:${c.value}`,
-        type: 'milestone',
-        stickerKey: null,
-        lead: surprise ? 'Surprise!' : 'Milestone!',
-        lead2: null,
-        headline: `Workout #${c.value}!`,
-        pill: null,
-        fact: null,
-        shiny: false,
-      });
-      continue;
-    }
+    // A milestone ("Workout #1") shows once, on the workout's summary: never as a reveal card or a late surprise.
+    if (c.type === 'milestone') continue;
     const key = c.key ?? '';
     out.push({
       id: `${c.type}:${key}`,

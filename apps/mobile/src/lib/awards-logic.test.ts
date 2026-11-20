@@ -17,6 +17,7 @@ import {
   prPills,
   summaryStickers,
   surpriseCards,
+  milestoneLine,
 } from './awards-logic';
 import { memoryStorage, sampleLog } from './log-fixtures';
 
@@ -61,10 +62,13 @@ describe('buildRevealCards', () => {
   it('has no ladder card for a log with no weighted sets, and no crash', () => {
     expect(buildRevealCards(cardioLog(), null, 'lb', [])).toEqual([]);
     const award = { ...empty, milestone: 10 };
-    expect(buildRevealCards(cardioLog(), award, 'lb', []).map((c) => c.type)).toEqual(['milestone']);
+    // The milestone is the summary's, never a reveal card.
+    expect(buildRevealCards(cardioLog(), award, 'lb', [])).toEqual([]);
+    expect(milestoneLine(award)).toBe('Workout #10');
+    expect(milestoneLine(empty)).toBeNull();
   });
 
-  it('merges the server award: ladder, drop, rare, landmark, milestone in that order', () => {
+  it('merges the server award: ladder, drop, rare, landmark in that order (no milestone card)', () => {
     const award: AwardResult = {
       ladder: { key: 'giraffe', multiple: 1.4, isNew: true, count: 1, shiny: false },
       drop: 'axolotl',
@@ -74,7 +78,7 @@ describe('buildRevealCards', () => {
       prs: [],
     };
     const cards = buildRevealCards(weightedLog(1440), award, 'lb', []);
-    expect(cards.map((c) => c.type)).toEqual(['ladder', 'drop', 'rare', 'landmark', 'milestone']);
+    expect(cards.map((c) => c.type)).toEqual(['ladder', 'drop', 'rare', 'landmark']);
     expect(cards[0]).toMatchObject({ headline: '1.4 Giraffes!', pill: NEW_PILL });
     expect(cards[1].pill).toBe(NEW_PILL);
   });
@@ -144,6 +148,8 @@ describe('surpriseCards', () => {
     expect(cards[0].lead).toBe('Surprise!');
     const shiny = { ...award, ladder: { ...award.ladder!, shiny: true } };
     expect(surpriseCards(shiny, 'lb', 1440).map((c) => c.type)).toEqual(['ladder', 'drop']);
+    // A milestone alone never comes back later as an unexplained surprise.
+    expect(surpriseCards({ ...empty, milestone: 1 }, 'lb', 1440)).toEqual([]);
   });
 });
 

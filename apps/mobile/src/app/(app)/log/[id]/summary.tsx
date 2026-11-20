@@ -1,16 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { STICKERS, canReopen, logVolumeKg, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
+import { STICKERS, canReopen, logVolumeKg, sessionBestRows, type AwardResult, type WorkoutLogDoc } from '@caltracker/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View, type HostInstance } from 'react-native';
+import { borderWidth } from '@caltracker/design-tokens';
 import { OffScreen, ShareCard } from '@/components/stickers/share-card';
 import { Sticker } from '@/components/stickers/sticker';
-import { Button, Card, ErrorText, Screen, Toast } from '@/components/ui';
-import { workoutShareLine } from '@/lib/album-logic';
+import { Button, Card, ErrorText, Screen, TextButton, Toast } from '@/components/ui';
+import { stickerSentence, workoutShareLine } from '@/lib/album-logic';
 import { fetchAward } from '@/lib/awards';
-import { SHARE_NOT_READY, prShareCard, shareHref, workoutShareCard } from '@/lib/community-share';
+import { SHARE_NOT_READY, shareHref, workoutShareCard } from '@/lib/community-share';
 import { useSaveCard } from '@/lib/use-save-card';
-import { prPills, summaryStickers } from '@/lib/awards-logic';
-import { formatCommentTime, summaryLines } from '@/lib/active-log-logic';
+import { milestoneLine, summaryStickers } from '@/lib/awards-logic';
+import { effortLine, formatCommentTime, summaryHeadline, unfinishedLines } from '@/lib/active-log-logic';
+import { useCoachProfile } from '@/lib/use-coach-profile';
+import { useHub } from '@/lib/use-progress-data';
+import { coachFirstName } from '@/lib/workouts-plan';
+import { fontFamilyFor } from '@/theme/fonts';
 import { LoggedByCoachPill } from '@/components/log/coach-logging-banner';
 import { useCoachLogging } from '@/lib/coach-logging';
 import { fetchComments, fetchLog, type LogComment } from '@/lib/log-api';
@@ -22,14 +27,19 @@ import { palette, stickerTheme } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
 
 const LOAD_FAILED = 'Couldn’t load this workout. Check your connection and try again.';
+/** Saving the stickers usually takes a moment; after this long the summary says it is still saving. */
+const AWARD_SLOW_MS = 10_000;
+const AWARD_RETRY_MS = 3000;
 
 type Remote = { kind: 'loading' } | { kind: 'ok'; log: WorkoutLogDoc | null } | { kind: 'failed' };
 type Comments = { kind: 'loading' } | { kind: 'ok'; comments: LogComment[] } | { kind: 'offline' };
 
 /**
- * A finished workout: name, duration, volume, completed sets and the coach's comments (read only).
- * Right after Finish it shows the log the phone remembers, so it works with no signal; opened later (Today's
- * View) it reads the log from the server. Comments are best effort: without signal they wait.
+ * A finished workout (approved Summary board): sets, skipped, time and weight; what the client told the coach; changes
+ * from the plan; each exercise's best set against last time ("Heaviest yet" by the Strength rule); the sticker with its
+ * maths; a milestone (shown here once, never later as a surprise); the coach's comment; Share and Done. Done goes back
+ * to where the workout was opened from. Right after Finish it shows the log the phone remembers, so it works with no
+ * signal; opened later (Today's done row, History) it reads the log from the server.
  */
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,9 +61,18 @@ export default function SummaryScreen() {
   const [attempt, setAttempt] = useState(0);
   const [reopening, setReopening] = useState(false);
   const card = useRef<HostInstance>(null);
-  const { saving, save: saveImage, toast: saveToast, clearToast } = useSaveCard(card);
+  const { save: saveImage, toast: saveToast, clearToast } = useSaveCard(card);
   const hasLocal = local !== null;
   const coach = useCoachLogging(id, false);
+  const coachFirst = coachFirstName(useCoachProfile()?.name);
+  // Earlier workouts' best sets (the Progress tab's saved series), for "+2.5 kg vs last time" and "Heaviest yet".
+  const hub = useHub(attempt);
+  const history = useMemo(
+    () => (hub.data ? new Map(hub.data.exercises.map((e) => [e.exerciseId, e.points])) : null),
+    [hub.data],
+  );
+  // The award normally arrives within a few seconds; after ~10 s without it, say so and offer Try again.
+  const [slowAward, setSlowAward] = useState(false);
 
   useEffect(() => {
     if (hasLocal) return;
@@ -82,9 +101,22 @@ export default function SummaryScreen() {
   // stored) the row is simply left out.
   useEffect(() => {
     let alive = true;
-    void fetchAward(id).then((a) => alive && setAward(a));
+    setSlowAward(false);
+    const slow = setTimeout(() => alive && setSlowAward(true), AWARD_SLOW_MS);
+    // A few tries while the reveal's request is still saving it on the server.
+    const load = (left: number): void =>
+      void fetchAward(id).then((a) => {
+        if (!alive) return;
+        if (a) {
+          clearTimeout(slow);
+          setSlowAward(false);
+          setAward(a);
+        } else if (left > 0) setTimeout(() => load(left - 1), AWARD_RETRY_MS);
+      });
+    load(3);
     return () => {
       alive = false;
+      clearTimeout(slow);
     };
   }, [id, attempt]);
 
@@ -130,16 +162,17 @@ export default function SummaryScreen() {
     );
   }
 
-  const lines = summaryLines(log, units);
-  const changes = planChanges(log, (exerciseId) => names[exerciseId]?.name ?? null);
+  const changes = [...planChanges(log, (exerciseId) => names[exerciseId]?.name ?? null), ...unfinishedLines(log)];
+  const best = sessionBestRows(log, history, units);
+  const said = effortLine(log.notes, coachFirst);
   // What can be shared: the workout and, when it set any, its PRs. Both need the award on the server (the database
-  // builds the card from the log and its award), so until it arrives the buttons wait.
+  // builds the card from the log and its award), so until it arrives Share says so.
   const workoutCard = workoutShareCard(log, award);
-  const prCard = prShareCard(log, award);
   const mayReopen = canReopen(log, Date.now());
-
   const ladder = award?.ladder ?? null;
   const ladderName = ladder ? (STICKERS.find((s) => s.key === ladder.key)?.name ?? ladder.key) : null;
+  const milestone = milestoneLine(award);
+  const theirComments = comments.kind === 'ok' ? comments.comments : [];
 
   const addMissedSets = async () => {
     setReopening(true);
@@ -153,64 +186,80 @@ export default function SummaryScreen() {
     }
   };
 
+  const share = () => (workoutCard ? router.push(shareHref(workoutCard)) : Alert.alert(SHARE_NOT_READY));
+
+  const footer = (
+    <View style={[styles.row, { gap: space[2.5] }]}>
+      <Button variant="secondary" title="Share" testID="summary-share" onPress={share} />
+      <View style={styles.flex}>
+        <Button title="Done" testID="summary-done" onPress={done} />
+      </View>
+    </View>
+  );
+
   return (
-    <Screen>
+    <Screen footer={footer}>
       <View style={{ gap: space[1] }}>
-        <Text style={text('caption')}>{log.autoFinished ? 'Finished for you' : 'Workout done ✓'}</Text>
-        <Text style={text('screenTitle')} accessibilityRole="header" testID="summary-name">
+        <Text style={[text('sectionHeading'), styles.doneLabel]}>{log.autoFinished ? 'Finished for you' : 'Workout done ✓'}</Text>
+        <Text style={[text('screenTitle'), styles.title]} accessibilityRole="header" testID="summary-name">
           {log.name}
         </Text>
         {coach.byCoach ? <LoggedByCoachPill /> : null}
-      </View>
-
-      {/* Text on the lime pastel is always ink, never muted. */}
-      <View style={[styles.stats, { borderRadius: radius.card, padding: space[4.5], gap: space[2.5] }]}>
-        <Text testID="summary-duration" style={[text('caption'), styles.ink]}>
-          {lines.duration}
+        <Text testID="summary-sets" style={[text('body'), styles.bold]}>
+          {summaryHeadline(log, units)}
         </Text>
-        {lines.volume ? (
-          <Text testID="summary-volume" style={text('bigNumber')}>
-            {lines.volume}
+        {said ? (
+          <Text testID="summary-effort" style={[text('body'), styles.soft]}>
+            {said}
           </Text>
         ) : null}
-        <Text testID="summary-sets" style={text('sectionHeading')}>
-          {lines.sets}
-        </Text>
       </View>
 
       {changes.length > 0 ? (
-        <View style={{ gap: space[2] }} testID="summary-changes">
+        <View testID="summary-changes" style={[styles.grey, { borderRadius: radius.input + 2, padding: space[3], gap: 2 }]}>
           <Text style={text('sectionHeading')} accessibilityRole="header">
             Changes from the plan
           </Text>
-          {changes.map((c, i) => (
-            // Two identical lines are possible (the same swap in two slots), so the key includes the position.
-            <Text key={`${i}-${c}`} style={text('body')}>
-              {c}
-            </Text>
+          <Text style={text('body')}>{changes.join(' · ')}</Text>
+        </View>
+      ) : null}
+
+      {best.length > 0 ? (
+        <View testID="summary-progress" style={{ gap: space[1] }}>
+          <Text style={[text('sectionHeading'), styles.h2]} accessibilityRole="header">
+            Your progress
+          </Text>
+          {best.map((r) => (
+            <View
+              key={r.exerciseId}
+              testID={`summary-best-${r.exerciseId}`}
+              accessible
+              accessibilityLabel={[r.name, `best set ${r.best}`, r.compare?.text, r.heaviestYet ? 'heaviest yet' : null].filter(Boolean).join(', ')}
+              style={[styles.row, styles.bestRow, { paddingVertical: space[3], gap: space[3] }]}
+            >
+              <View style={styles.flex}>
+                <Text style={text('sectionHeading')}>{r.name}</Text>
+                <Text style={[text('body'), styles.soft]}>{`Best set ${r.best}`}</Text>
+              </View>
+              <View style={[styles.end, { gap: space[1] }]}>
+                {r.compare ? <Text style={[text('caption'), styles.bold, r.compare.tone === 'up' ? styles.up : styles.ink]}>{r.compare.text}</Text> : null}
+                {r.heaviestYet ? (
+                  <Text style={[text('caption'), styles.tag, { borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2 }]}>Heaviest yet</Text>
+                ) : null}
+              </View>
+            </View>
           ))}
         </View>
       ) : null}
 
-      {award && summaryStickers(award).length > 0 ? (
-        <View style={{ gap: space[2] }} testID="summary-stickers">
-          <Text style={text('sectionHeading')} accessibilityRole="header">
-            Stickers earned
-          </Text>
-          <View style={[styles.row, { gap: space[3] }]}>
-            {summaryStickers(award).map((s) => (
-              <View key={s.key} style={[styles.sticker, { gap: space[1] }]}>
-                <Sticker stickerKey={s.key} size={stickerTheme.summarySize} shiny={s.shiny} variant="sm" />
-                <Text style={text('caption')}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
-
       {ladder && ladderName ? (
-        <View style={{ gap: space[2] }}>
-          <Button variant="secondary" title="Save image" testID="summary-save-image" busy={saving} onPress={() => void saveImage()} />
+        <View testID="summary-sticker" style={[styles.row, styles.grey, { borderRadius: radius.card, padding: space[3.5], gap: space[3.5] }]}>
+          <Sticker stickerKey={ladder.key} size={64} shiny={ladder.shiny} variant="sm" />
+          <View style={[styles.flex, { gap: 2 }]}>
+            <Text style={text('sectionHeading')}>{ladder.isNew ? `New sticker: ${ladderName}` : `Sticker: ${ladderName}`}</Text>
+            <Text style={[text('body'), styles.soft]}>{stickerSentence(logVolumeKg(log), units, ladder.multiple, ladderName)}</Text>
+            <TextButton title="Save image" testID="summary-save-image" onPress={() => void saveImage()} />
+          </View>
           <Toast message={saveToast} onHide={clearToast} testID="summary-save-toast" />
           <OffScreen>
             <ShareCard
@@ -223,77 +272,67 @@ export default function SummaryScreen() {
           </OffScreen>
         </View>
       ) : null}
-
-      {!workoutCard ? (
-        <Text style={text('caption')} testID="summary-share-waiting">
-          {SHARE_NOT_READY}
-        </Text>
+      {award && summaryStickers(award).filter((x) => x.key !== ladder?.key).length > 0 ? (
+        <View testID="summary-stickers" style={[styles.row, styles.wrap, { gap: space[3] }]}>
+          {summaryStickers(award)
+            .filter((x) => x.key !== ladder?.key)
+            .map((x) => (
+              <View key={x.key} style={[styles.centre, { gap: space[1] }]}>
+                <Sticker stickerKey={x.key} size={stickerTheme.summarySize} shiny={x.shiny} variant="sm" />
+                <Text style={text('caption')}>{x.label}</Text>
+              </View>
+            ))}
+        </View>
       ) : null}
-      {workoutCard || prCard ? (
-        <View style={{ gap: space[2] }}>
-          {workoutCard ? (
-            <Button variant="secondary" title="Share to community" testID="summary-share" onPress={() => router.push(shareHref(workoutCard))} />
-          ) : null}
-          {prCard ? (
-            <Button variant="secondary" title="Share your PRs" testID="summary-share-prs" onPress={() => router.push(shareHref(prCard))} />
-          ) : null}
+      {milestone ? (
+        <View testID="summary-milestone" style={[styles.row, styles.celebrate, { borderRadius: radius.card, padding: space[3.5], gap: space[3] }]}>
+          <Text style={[text('screenTitle'), styles.ink]}>🏆</Text>
+          <Text style={[text('sectionHeading'), styles.flex]}>{`${milestone}! A milestone worth celebrating.`}</Text>
         </View>
       ) : null}
 
-      {award && award.prs.length > 0 ? (
-        <View style={[styles.row, { gap: space[2] }]} testID="summary-prs">
-          {prPills(award, log).map((p) => (
-            <View key={p} style={[styles.pill, { borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] }]}>
-              <Text style={[text('caption'), styles.ink]}>PR · {p}</Text>
+      {theirComments.length > 0 ? (
+        <View testID="summary-comments" style={[styles.outlined, { borderRadius: radius.input + 2, padding: space[3], gap: space[2] }]}>
+          <Text style={text('sectionHeading')}>{`${coachFirst ?? 'Your coach'} commented`}</Text>
+          {theirComments.map((c) => (
+            <View key={c.id} testID={`comment-${c.id}`} style={{ gap: 2 }}>
+              <Text style={text('body')}>{c.body}</Text>
+              <Text style={[text('caption'), styles.soft]}>{formatCommentTime(c.createdAt)}</Text>
             </View>
           ))}
         </View>
       ) : null}
 
-      <Card>
-        <Text style={text('sectionHeading')} accessibilityRole="header">
-          Coach comments
-        </Text>
-        {comments.kind === 'loading' ? <ActivityIndicator color={palette.ink} accessibilityLabel="Loading comments" /> : null}
-        {comments.kind === 'offline' ? (
-          <Text style={text('caption')}>Comments will show when you’re online.</Text>
-        ) : null}
-        {comments.kind === 'ok' && comments.comments.length === 0 ? (
-          <Text style={text('caption')}>No comments from your coach yet.</Text>
-        ) : null}
-        {comments.kind === 'ok'
-          ? comments.comments.map((c) => (
-              <View
-                key={c.id}
-                testID={`comment-${c.id}`}
-                style={[styles.comment, { borderRadius: radius.input, padding: space[3], gap: space[1] }]}
-              >
-                <Text style={text('body')}>{c.body}</Text>
-                <Text style={text('caption')}>{formatCommentTime(c.createdAt)}</Text>
-              </View>
-            ))
-          : null}
-      </Card>
-
-      {mayReopen ? (
-        <Button
-          variant="secondary"
-          title="Add missed sets"
-          testID="summary-reopen"
-          busy={reopening}
-          onPress={() => void addMissedSets()}
-        />
+      {slowAward ? (
+        <View testID="summary-award-slow" style={[styles.row, styles.slow, { borderRadius: radius.input + 2, padding: space[3], gap: space[2.5] }]}>
+          <Text style={[text('body'), styles.flex]}>Still saving your stickers… If this takes long they’ll show here when it’s ready.</Text>
+          <Button variant="secondary" title="Try again" testID="summary-award-retry" onPress={() => setAttempt((n) => n + 1)} />
+        </View>
       ) : null}
-      <Button title="Done" testID="summary-done" onPress={done} />
+
+      {mayReopen ? <TextButton title="Add missed sets" testID="summary-reopen" onPress={() => void addMissedSets()} /> : null}
+      {reopening ? <ActivityIndicator color={palette.ink} accessibilityLabel="Opening" /> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  stats: { backgroundColor: palette.lime },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  wrap: { flexWrap: 'wrap' },
+  flex: { flex: 1 },
+  end: { alignItems: 'flex-end' },
+  centre: { alignItems: 'center' },
+  title: { fontSize: 30 },
+  h2: { fontSize: 18, marginTop: 4 },
+  doneLabel: { color: palette.ink, fontSize: 14 },
+  bold: { fontFamily: fontFamilyFor('sans', 700) },
   ink: { color: palette.ink },
-  comment: { backgroundColor: palette.surface },
-  row: { flexDirection: 'row', flexWrap: 'wrap' },
-  sticker: { alignItems: 'center' },
-  pill: { backgroundColor: palette.pink },
+  soft: { color: palette.inkMuted },
+  up: { color: palette.magentaDeep },
+  grey: { backgroundColor: palette.surface },
+  outlined: { borderWidth: borderWidth.secondaryButton, borderColor: palette.border },
+  bestRow: { borderBottomWidth: 1, borderBottomColor: palette.border, minHeight: 56 },
+  tag: { backgroundColor: palette.pink, color: palette.ink, overflow: 'hidden', fontFamily: fontFamilyFor('sans', 800) },
+  celebrate: { backgroundColor: palette.celebrateBg },
+  slow: { backgroundColor: palette.celebrateBg },
 });
