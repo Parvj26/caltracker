@@ -204,6 +204,14 @@ export default async function ClientPage({
       },
     ];
   });
+  // "In Library" in a workout's ⋯ menu: still exactly a library workout (an untouched copy of one that hasn't changed).
+  // Only uncustomised copies can be; a failed check just offers "Save to Library" (which then asks on a name clash).
+  const maybeInLibrary = (workouts.data as unknown as CalendarRow[]).filter((w) => w.customised_at === null).map((w) => w.id);
+  if (maybeInLibrary.length > 0 && client.removedAt === null) {
+    const { data: inLibrary } = await supabase.rpc('untouched_library_copies', { p_ids: maybeInLibrary });
+    const ids = new Set(inLibrary ?? []);
+    for (const e of entries) if (ids.has(e.id)) e.inLibrary = true;
+  }
   // A log whose planned workout was deleted since also has no workout_id, but its exercises still point at the plan:
   // that one was planned, not added by the client, so it stays off the calendar with the workout the coach deleted.
   const clientLogs: ClientLogEntry[] = unplanned.data.flatMap((l) =>
@@ -248,6 +256,8 @@ export default async function ClientPage({
         upcomingWorkouts={scheduled.data.flatMap((w) => (w.scheduled_on ? [{ date: w.scheduled_on, name: w.name }] : []))}
         {...(hints ? { hints } : {})}
         openOnLoad={query.add === 'workout' || query.add === 'program' ? query.add : null}
+        units={units}
+        workspaceId={workspaceId}
       />
       <StickersPanel data={stickers} units={units} />
       <StrengthPanel data={strength} units={units} />

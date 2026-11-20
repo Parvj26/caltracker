@@ -268,6 +268,25 @@
 .subheading { margin: var(--ct-space-2) 0 0; font-size: var(--ct-size-body); font-weight: var(--ct-weight-button); }
 .caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
 .body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A card's title row as one link: the title, an optional note and a chevron (cards.tsx CardHeadLink). */
+.cardHeadLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  margin: calc(-1 * var(--ct-space-1)) calc(-1 * var(--ct-space-2));
+  padding: var(--ct-space-1) var(--ct-space-2);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  text-decoration: none;
+}
+.cardHeadLink:hover { background: var(--ct-surface); }
+.cardHeadLink:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.cardHeadEnd { display: inline-flex; flex: none; align-items: center; gap: var(--ct-space-2); }
+.emptyRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.cardActions { display: flex; justify-content: flex-end; }
+.cardAction { flex: none; }
 .link { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); font-weight: var(--ct-weight-section-heading); }
 
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ct-space-2); margin: 0; }

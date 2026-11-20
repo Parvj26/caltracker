@@ -1,12 +1,23 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { AssignProgramInput, IsoDateSchema, ScheduleWorkoutInput, scheduleDateError } from '@caltracker/shared';
+import {
+  AssignProgramInput,
+  IsoDateSchema,
+  ScheduleWorkoutInput,
+  WorkoutDoc,
+  clientCopyName,
+  duplicateWorkoutDoc,
+  libraryNameTaken,
+  scheduleDateError,
+} from '@caltracker/shared';
 import type { IsoDate } from '@caltracker/shared';
-import { fail } from '@/lib/action-result';
+import { fail, type ActionFailure } from '@/lib/action-result';
 import { assignOne, dateCode, scheduleOne, todayError, type Outcome } from '@/lib/assign';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { loadWorkoutDoc } from '@/lib/workouts';
+import type { SaveWorkoutOutcome } from '../../workouts/actions';
 
 // Every action starts with requireCoach(). The database does the real authorization: assign_program,
 // schedule_workout and unassign_program check the caller coaches the workspace and the client is a current client
@@ -144,4 +155,135 @@ export async function unassignProgram(input: { assignmentId: string; fromDate: I
   }
   refreshCalendar();
   return { removed: data };
+}
+
+const refreshLibrary = () => {
+  revalidatePath('/workouts');
+  revalidatePath('/clients/[clientId]', 'layout');
+};
+
+/**
+ * "+ New workout" from a client's "Add a workout" window: a workout built in the editor goes straight onto that
+ * client's day (`date`, today or later from the browser's `today`), never into the Library, through
+ * create_client_workout. With `alsoLibrary` the coach ticked "Also save to Library": the workout is saved to the
+ * Library as usual (save_workout) and put on the day the usual calendar way (schedule_workout, with `newId` made once
+ * by the browser), so the calendar copy is linked to it. A retry repeats the same ids, so nothing is saved twice.
+ * The id that comes back is the calendar workout's.
+ */
+export async function createClientWorkout(input: {
+  doc: unknown;
+  clientId: string;
+  date: IsoDate;
+  today: IsoDate;
+  alsoLibrary: boolean;
+  newId: string;
+}): Promise<SaveWorkoutOutcome> {
+  const { workspaceId } = await requireCoach();
+  const parsed = WorkoutDoc.safeParse(input.doc);
+  if (!parsed.success) {
+    return {
+      ...fail('workout_fields_invalid', 'action:clients.createClientWorkout'),
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.filter((p): p is string | number => typeof p !== 'symbol'),
+        message: i.message,
+      })),
+    };
+  }
+  const date = IsoDateSchema.safeParse(input.date);
+  const today = IsoDateSchema.safeParse(input.today);
+  if (!isUuid(input.clientId) || !isUuid(input.newId) || !date.success || !today.success) {
+    return fail('schedule_input_invalid', 'action:clients.createClientWorkout');
+  }
+  const dateError = todayError(today.data) ?? dateCode(scheduleDateError(date.data, today.data));
+  if (dateError) return fail(dateError, 'action:clients.createClientWorkout');
+
+  const supabase = await createServerSupabase();
+  if (!input.alsoLibrary) {
+    const { error } = await supabase.rpc('create_client_workout', {
+      p_workspace_id: workspaceId,
+      p_client_id: input.clientId,
+      p_date: date.data,
+      p_doc: parsed.data,
+    });
+    if (error) {
+      if (error.code === '42501') return fail('client_not_current', 'action:clients.createClientWorkout');
+      if (error.code === '23505') return fail('schedule_conflict', 'action:clients.createClientWorkout');
+      if (error.code === '23514') return fail('workout_invalid', 'action:clients.createClientWorkout');
+      return fail('workout_save_failed', 'action:clients.createClientWorkout');
+    }
+    refreshCalendar();
+    return { ok: true, id: parsed.data.id };
+  }
+
+  const saved = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: parsed.data });
+  if (saved.error) {
+    if (saved.error.code === '23514') return fail('workout_invalid', 'action:clients.createClientWorkout');
+    if (saved.error.code === '42501') return fail('workout_edit_denied', 'action:clients.createClientWorkout');
+    return fail('workout_save_failed', 'action:clients.createClientWorkout');
+  }
+  refreshLibrary();
+  const outcome = await scheduleOne(supabase, {
+    newId: input.newId,
+    workoutId: saved.data,
+    clientId: input.clientId,
+    date: date.data,
+    today: today.data,
+  });
+  if (!outcome.ok) return outcome;
+  refreshCalendar();
+  return { ok: true, id: input.newId };
+}
+
+export type SaveToLibraryOutcome =
+  | { ok: true; id: string; name: string }
+  | (ActionFailure & { suggestion?: string; issues?: { path: (string | number)[]; message: string }[] });
+
+/**
+ * "Save to Library" in a calendar workout's ⋯ menu: its plan (blocks, exercises, sets and targets, never what the
+ * client logged) becomes a new Library workout, with fresh ids. The calendar workout itself doesn't change. `name`
+ * is the one asked for (the workout's own name at first); when the Library already has it, nothing is saved and
+ * `suggestion` offers "<name> (<first name>, <day>)" for the dialog to ask with.
+ */
+export async function saveToLibrary(input: { workoutId: string; name?: string }): Promise<SaveToLibraryOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!isUuid(input.workoutId)) return fail('request_invalid', 'action:clients.saveToLibrary');
+  const supabase = await createServerSupabase();
+  const { data: row, error: rowError } = await supabase
+    .from('workouts')
+    .select('id, scheduled_on, client_id')
+    .eq('id', input.workoutId)
+    .eq('workspace_id', workspaceId)
+    .not('client_id', 'is', null)
+    .maybeSingle();
+  if (rowError) return fail('library_save_failed', 'action:clients.saveToLibrary');
+  if (!row || !row.scheduled_on) return fail('workout_not_found', 'action:clients.saveToLibrary');
+  const loaded = await loadWorkoutDoc(supabase, row.id);
+  if (!loaded) return fail('workout_not_found', 'action:clients.saveToLibrary');
+
+  const name = (input.name ?? loaded.doc.name).trim();
+  const copy = WorkoutDoc.safeParse({ ...duplicateWorkoutDoc(loaded.doc, () => crypto.randomUUID()), name });
+  if (!copy.success) {
+    const nameIssue = copy.error.issues.find((i) => i.path[0] === 'name');
+    return nameIssue
+      ? { ...fail('workout_fields_invalid', 'action:clients.saveToLibrary'), issues: [{ path: ['name'], message: nameIssue.message }] }
+      : fail('workout_invalid', 'action:clients.saveToLibrary');
+  }
+
+  const library = await supabase.from('workouts').select('name').eq('workspace_id', workspaceId).is('client_id', null);
+  if (library.error) return fail('library_save_failed', 'action:clients.saveToLibrary');
+  const names = library.data.map((w) => w.name);
+  if (libraryNameTaken(name, names)) {
+    const profile = await supabase.from('profiles').select('first_name').eq('id', row.client_id).maybeSingle();
+    const firstName = profile.data?.first_name ?? '';
+    return { ...fail('library_name_taken', 'action:clients.saveToLibrary'), suggestion: clientCopyName(loaded.doc.name, firstName, row.scheduled_on) };
+  }
+
+  // Saving a copy is not the coach choosing measurements again, so what new exercises start with stays as it is.
+  const { data, error } = await supabase.rpc('save_workout', { p_workspace_id: workspaceId, p_doc: { ...copy.data, rememberChoices: false } });
+  if (error) {
+    if (error.code === '23514') return fail('workout_invalid', 'action:clients.saveToLibrary');
+    return fail('library_save_failed', 'action:clients.saveToLibrary');
+  }
+  refreshLibrary();
+  return { ok: true, id: data, name };
 }

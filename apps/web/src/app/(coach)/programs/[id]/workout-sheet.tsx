@@ -1,26 +1,35 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
-import { emptyWorkout, type ExercisePrefs, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { emptyWorkout, type ExercisePrefs, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
 import ad from '@/components/ui/adaptive-dialog.module.css';
 import { cx } from '@/components/ui/cx';
 import { saveWorkout, type SaveWorkoutOutcome } from '../../workouts/actions';
 import { saveSlotCopy, type SlotWorkout } from '../actions';
+import { createClientWorkout } from '../../clients/[clientId]/actions';
 import { cellLabel, copyDaySuffix } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
 import { openLayer } from '@/lib/open-layer';
 
-/** What the sheet is for: a new workout for one day, or editing the workout on a placed day. */
-export type SheetTarget = { kind: 'new'; week: number; day: number } | { kind: 'edit'; slot: Slot; workout: SlotWorkout };
+/**
+ * What the sheet is for: a new workout for one program day, editing the workout on a placed day, or a new workout
+ * for one client's calendar day ("+ New workout" in the client's "Add a workout" window).
+ */
+export type SheetTarget =
+  | { kind: 'new'; week: number; day: number }
+  | { kind: 'edit'; slot: Slot; workout: SlotWorkout }
+  | { kind: 'client'; clientId: string; clientName: string; date: IsoDate; today: IsoDate };
 
 /** What a save did, so the grid can show it without reloading. */
 export type SheetSaved =
   | { kind: 'new'; id: string; name: string; week: number; day: number }
   | { kind: 'everywhere'; id: string; name: string }
-  | { kind: 'copy'; slotId: string; id: string; name: string };
+  | { kind: 'copy'; slotId: string; id: string; name: string }
+  | { kind: 'client'; id: string; name: string; date: IsoDate; library: boolean };
 
 type Choice = 'everywhere' | 'copy' | null;
 
@@ -47,7 +56,7 @@ export function usedWhere(name: string, program: string, w: Pick<SlotWorkout, 'd
  * changes asks first.
  */
 export function WorkoutSheet({
-  programName,
+  programName = '',
   target,
   units,
   workspaceId,
@@ -55,7 +64,8 @@ export function WorkoutSheet({
   onSaved,
   onClose,
 }: {
-  programName: string;
+  /** The program's name (program days only). */
+  programName?: string;
   target: SheetTarget;
   units: Units;
   workspaceId: string;
@@ -72,12 +82,17 @@ export function WorkoutSheet({
   const [asking, setAsking] = useState<((c: Choice) => void) | null>(null);
   const saved = useRef<SheetSaved | null>(null);
   const [initial] = useState<WorkoutDoc>(() =>
-    target.kind === 'new' ? emptyWorkout(() => crypto.randomUUID()) : target.workout.doc,
+    target.kind === 'edit' ? target.workout.doc : emptyWorkout(() => crypto.randomUUID()),
   );
-  const week = target.kind === 'new' ? target.week : target.slot.week;
-  const day = target.kind === 'new' ? target.day : target.slot.day;
-  const where = cellLabel(week, day);
+  // A client's new workout: "Also save to Library" (off to start with), and the calendar copy's id when it is ticked
+  // (made once, so a retry adds it only once).
+  const [alsoLibrary, setAlsoLibrary] = useState(false);
+  const [calendarId] = useState(() => crypto.randomUUID());
+  const week = target.kind === 'new' ? target.week : target.kind === 'edit' ? target.slot.week : 0;
+  const day = target.kind === 'new' ? target.day : target.kind === 'edit' ? target.slot.day : 0;
+  const where = target.kind === 'client' ? formatShortDay(target.date) : cellLabel(week, day);
   const original = target.kind === 'edit' ? target.workout.doc.name : '';
+  const isNew = target.kind !== 'edit';
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -125,6 +140,18 @@ export function WorkoutSheet({
   }
 
   async function saveWith(doc: WorkoutDoc): Promise<SaveWorkoutOutcome | null> {
+    if (target.kind === 'client') {
+      const outcome = await createClientWorkout({
+        doc,
+        clientId: target.clientId,
+        date: target.date,
+        today: target.today,
+        alsoLibrary,
+        newId: calendarId,
+      });
+      if (outcome.ok) saved.current = { kind: 'client', id: outcome.id, name: doc.name, date: target.date, library: alsoLibrary };
+      return outcome;
+    }
     if (target.kind === 'new') {
       const outcome = await saveWorkout(doc);
       if (outcome.ok) saved.current = { kind: 'new', id: outcome.id, name: doc.name, week, day };
@@ -153,14 +180,26 @@ export function WorkoutSheet({
       <header className={styles.sheetHeader}>
         <div className={styles.sheetHeading}>
           <span className={styles.eyebrow}>
-            {programName} · {where}
+            {target.kind === 'client' ? target.clientName : programName} · {where}
           </span>
           <h2 id={titleId} className={styles.dialogTitle}>
-            {target.kind === 'new' ? 'New workout' : `Edit ${original}`}
+            {isNew ? 'New workout' : `Edit ${original}`}
           </h2>
         </div>
-        {/* Phones only (CSS): wider screens keep the editor's own save bar in view. */}
-        <Button className={styles.sheetTopSave} onClick={saveFromTop} data-ph-capture-attribute-label="program_sheet_top_save">
+        {target.kind === 'client' ? (
+          // Off to start with: a workout made for one client stays theirs unless the coach wants it in the Library too.
+          <label className={styles.sheetLibraryToggle}>
+            <input type="checkbox" checked={alsoLibrary} onChange={(e) => setAlsoLibrary(e.target.checked)} data-ph-capture-attribute-label="client_new_workout_library" />
+            <span>Also save to Library</span>
+          </label>
+        ) : null}
+        {/* Phones only (CSS) on a program: wider screens keep the editor's own save bar in view. A client's new workout
+            keeps Save here on every size, beside "Also save to Library". */}
+        <Button
+          className={cx(styles.sheetTopSave, target.kind === 'client' && styles.sheetTopSaveAlways)}
+          onClick={saveFromTop}
+          data-ph-capture-attribute-label={target.kind === 'client' ? 'client_new_workout_save' : 'program_sheet_top_save'}
+        >
           Save
         </Button>
         {/* The one close style (rulebook §5.2): a 44 px grey circle with ×, top right. */}
@@ -193,9 +232,10 @@ export function WorkoutSheet({
           units={units}
           workspaceId={workspaceId}
           mode="library"
-          isNew={target.kind === 'new'}
+          isNew={isNew}
           initialPrefs={exercisePrefs}
           saveLabel={target.kind === 'new' ? 'Save and add to day' : 'Save'}
+          {...(target.kind === 'client' ? { hideWideSave: true } : {})}
           saveWith={saveWith}
           onDirtyChange={setDirty}
           embedded
