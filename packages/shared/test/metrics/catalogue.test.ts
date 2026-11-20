@@ -91,6 +91,11 @@ describe('parseMetricInput', () => {
     expect(parseMetricInput('weight_kg', ' 80,5 ', 'kg')).toEqual({ ok: true, value: 80.5 });
     expect(parseMetricInput('waist_cm', '32', 'lb')).toEqual({ ok: true, value: 81.28 });
     expect(parseMetricInput('resting_hr_bpm', '58', 'lb')).toEqual({ ok: true, value: 58 });
+    expect(parseMetricInput('body_fat_pct', '.5', 'kg')).toEqual({ ok: false, error: 'Enter a body fat between 2.0 and 75.0%.' });
+    expect(parseMetricInput('body_fat_pct', '18.', 'kg')).toEqual({ ok: true, value: 18 });
+    expect(parseMetricInput('weight_kg', '80.', 'kg')).toEqual({ ok: true, value: 80 });
+    expect(parseMetricInput('vo2_max', '42,', 'kg')).toEqual({ ok: true, value: 42 });
+    expect(parseMetricInput('waist_cm', '.', 'kg')).toMatchObject({ ok: false, error: 'Enter the waist as a number.' });
   });
 
   it('explains what is wrong', () => {

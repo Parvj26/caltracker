@@ -729,3 +729,4 @@ export {
   toMetricEntry,
 } from './metrics/summary';
 export type { MetricEntry, MetricEntryRow, MetricOrigin, MetricRange, MetricSummary } from './metrics/summary';
+export { readAllPages } from './metrics/pages';

@@ -5,9 +5,9 @@
 // instead of adding duplicates.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
-import { toMetricEntries, type IsoDate, type MetricEntry, type MetricKey } from '@caltracker/shared';
+import { readAllPages, toMetricEntries, type IsoDate, type MetricEntry, type MetricKey } from '@caltracker/shared';
 import { progressCachePrefix } from './device-cache-keys';
-import { appleHealthBatches, parseCachedMetrics, serializeMetrics, type AppleHealthSample } from './metrics-logic';
+import { DELETE_CHUNK, appleHealthBatches, chunk, parseCachedMetrics, serializeMetrics, type AppleHealthSample } from './metrics-logic';
 import { supabase } from './supabase';
 
 export const METRICS_LOAD_FAILED = 'Something went wrong. Pull down to try again.';
@@ -15,7 +15,6 @@ export const METRIC_SAVE_FAILED = 'Could not save that. Check your connection an
 export const METRIC_DELETE_FAILED = 'Could not delete that entry. Check your connection and try again.';
 export const APPLE_HEALTH_SYNC_FAILED = 'Could not bring in your Apple Health data. Try again later.';
 
-const LIMIT = 5000;
 // Under the Progress prefix, so Sign out forgets it (keysToForget).
 const cacheKey = (userId: string, workspaceId: string) => `${progressCachePrefix(userId)}metrics.${workspaceId}`;
 
@@ -41,19 +40,26 @@ export async function readCachedMetrics(userId: string, workspaceId: string): Pr
 
 /** Every Metrics value of the signed-in client with this coach, newest first. Saves a copy on the phone. */
 export async function fetchMyMetrics(userId: string, workspaceId: string): Promise<MetricEntry[]> {
-  const { data, error } = await supabase
-    .from('metric_entries')
-    .select('origin, id, metric_key, value, measured_on, measured_at, created_at, source, entered_by_role, external_id')
-    .eq('client_id', userId)
-    .eq('workspace_id', workspaceId)
-    .order('measured_on', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(LIMIT);
-  if (error) {
-    warn('load', error);
-    throw new Error(METRICS_LOAD_FAILED);
-  }
-  const entries = toMetricEntries(data);
+  // Page by page: the server returns at most 1000 rows per request (see readAllPages).
+  const rows = await readAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from('metric_entries')
+      .select('origin, id, metric_key, value, measured_on, measured_at, created_at, source, entered_by_role, external_id')
+      .eq('client_id', userId)
+      .eq('workspace_id', workspaceId)
+      .order('measured_on', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('origin')
+      .order('id')
+      .order('metric_key')
+      .range(from, to);
+    if (error) {
+      warn('load', error);
+      throw new Error(METRICS_LOAD_FAILED);
+    }
+    return data;
+  });
+  const entries = toMetricEntries(rows);
   void AsyncStorage.setItem(cacheKey(userId, workspaceId), serializeMetrics(entries)).catch(() => undefined);
   return entries;
 }
@@ -125,11 +131,15 @@ export async function syncAppleHealthMetrics(workspaceId: string, samples: reado
  * chooses to remove it, or a sample was deleted in Apple Health: pass its ids).
  */
 export async function deleteMyAppleHealthMetrics(workspaceId: string, externalIds?: readonly string[]): Promise<void> {
-  let q = supabase.from('body_metrics').delete().eq('workspace_id', workspaceId).eq('source', 'apple_health');
-  if (externalIds) q = q.in('external_id', [...externalIds]);
-  const { error } = await q;
-  if (error) {
-    warn('apple health delete', error);
-    throw new Error(METRIC_DELETE_FAILED);
+  // Ids go in the request address, so at most 100 per request.
+  const groups = externalIds ? chunk(externalIds, DELETE_CHUNK) : [null];
+  for (const ids of groups) {
+    let q = supabase.from('body_metrics').delete().eq('workspace_id', workspaceId).eq('source', 'apple_health');
+    if (ids) q = q.in('external_id', ids);
+    const { error } = await q;
+    if (error) {
+      warn('apple health delete', error);
+      throw new Error(METRIC_DELETE_FAILED);
+    }
   }
 }

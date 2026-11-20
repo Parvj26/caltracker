@@ -156,7 +156,7 @@ export function parseMetricInput(key: MetricKey, input: string, units: Units): P
   // "the waist", but "the VO2 max" (an abbreviation keeps its capitals).
   const name = /^[A-Z0-9]{2,}/.test(def.label) ? def.label : def.label.toLowerCase();
   if (t === '') return { ok: false, error: `Enter the ${name}.` };
-  if (!/^\d+(\.\d+)?$/.test(t)) return { ok: false, error: `Enter the ${name} as a number.` };
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return { ok: false, error: `Enter the ${name} as a number.` };
   const value = metricFromDisplay(key, Number(t), units);
   if (value < def.min || value > def.max) {
     // The shown limits are rounded inwards, so typing exactly what the message says is always accepted.
