@@ -40,8 +40,7 @@ export default function ZooScreen() {
 
   return (
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
-      <SectionHeader title="Zoo book" backTestID="zoo-back" backLabel="Back" />
-      {album.status === 'offline' ? <Text style={text('caption')}>Showing your saved book. It updates when you’re online.</Text> : null}
+      <SectionHeader title="Zoo book" backTestID="zoo-back" backLabel="Back" offline={album.status === 'offline'} />
       {facts.updating ? (
         <Text style={text('body')} testID="zoo-updating" accessibilityLiveRegion="polite">
           Updating… your latest workout is still syncing.

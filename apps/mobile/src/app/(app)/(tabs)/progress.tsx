@@ -13,8 +13,7 @@ import {
   strengthTile,
   zooRow,
 } from '@caltracker/shared';
-import { OfflineNote } from '@/components/progress/parts';
-import { Screen } from '@/components/ui';
+import { OfflineTitle, Screen } from '@/components/ui';
 import { buildProgress } from '@/lib/progress';
 import { useCoachProfile } from '@/lib/use-coach-profile';
 import { metricsTile } from '@/lib/metrics-view';
@@ -78,9 +77,11 @@ export default function ProgressScreen() {
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={onRefresh}>
       <View style={{ gap: space[1] }}>
-        <Text style={text('screenTitle')} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-          Progress
-        </Text>
+        <OfflineTitle offline={offline}>
+          <Text style={text('screenTitle')} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            Progress
+          </Text>
+        </OfflineTitle>
         <Text style={text('body')} testID="progress-week" accessibilityLiveRegion="polite">
           {model.headline ? (
             <>
@@ -92,7 +93,6 @@ export default function ProgressScreen() {
           )}
         </Text>
       </View>
-      <OfflineNote show={offline} />
 
       {model.goal ? (
         <View testID="progress-goal" style={[styles.goal, { borderRadius: radius.card - 2, padding: space[3], gap: space[2.5] }]}>

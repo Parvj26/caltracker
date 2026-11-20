@@ -110,7 +110,14 @@ export default function NewPostScreen() {
     <Screen
       inSheet
       // Post stays pinned above the keyboard, so it is always reachable while typing.
-      footer={<Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />}
+      footer={
+        <View style={{ gap: space[2] }}>
+          <Text style={[text('caption'), styles.centre]} testID="new-post-audience">
+            Only your coach’s group sees this
+          </Text>
+          <Button title={failed ? 'Retry' : 'Post'} testID="new-post-submit" busy={posting} disabled={preparing} onPress={() => void submit()} />
+        </View>
+      }
     >
       {/* A sheet: title on the left, the grey × on the right. */}
       <View style={[styles.row, { gap: space[2] }]}>
@@ -184,6 +191,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
   flex: { flex: 1 },
+  centre: { textAlign: 'center' },
   input: { borderWidth: 2, borderColor: palette.borderStrong, textAlignVertical: 'top', color: palette.ink },
   inputInvalid: { borderColor: palette.danger },
   thumb: { width: 80, height: 80 },

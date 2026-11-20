@@ -55,13 +55,13 @@ describe('mealTitle and mealTypeTag', () => {
 describe('macroSumHint', () => {
   const m = (calories: number | null, protein: number | null, carbs: number | null, fat: number | null) => ({ calories, protein, carbs, fat });
   it('adds protein, carbs and fat (4/4/9)', () => {
-    expect(macroSumHint(m(450, 40, 30, 18))).toBe('Protein, carbs and fat add up to 442 kcal.');
-    expect(macroSumHint(m(null, 10, null, null))).toBe('Protein, carbs and fat add up to 40 kcal.');
+    expect(macroSumHint(m(450, 40, 30, 18))).toBe('≈ 442 kcal from macros');
+    expect(macroSumHint(m(null, 10, null, null))).toBe('≈ 40 kcal from macros');
   });
   it('says nothing until one of the three is filled', () => {
     expect(macroSumHint(m(450, null, null, null))).toBeNull();
   });
   it('groups thousands', () => {
-    expect(macroSumHint(m(null, 100, 200, 50))).toBe('Protein, carbs and fat add up to 1,650 kcal.');
+    expect(macroSumHint(m(null, 100, 200, 50))).toBe('≈ 1,650 kcal from macros');
   });
 });

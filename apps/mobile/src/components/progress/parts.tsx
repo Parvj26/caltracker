@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Button, ErrorText } from '@/components/ui';
+import { Button, ErrorText, OfflineTitle } from '@/components/ui';
 import { PROGRESS_LOAD_FAILED } from '@/lib/body-api';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
@@ -10,7 +10,20 @@ import { ChevronIcon } from '@/components/ui/icons';
 import { fontFamilyFor } from '@/theme/fonts';
 
 /** A Progress section's top row: a round back button (to Progress), the title, and an optional action on the right. */
-export function SectionHeader({ title, right, backTestID = 'section-back', backLabel = 'Back to Progress' }: { title: string; right?: ReactNode; backTestID?: string; backLabel?: string }) {
+export function SectionHeader({
+  title,
+  right,
+  backTestID = 'section-back',
+  backLabel = 'Back to Progress',
+  offline = false,
+}: {
+  title: string;
+  right?: ReactNode;
+  backTestID?: string;
+  backLabel?: string;
+  /** The grey Offline pill beside the title while the screen shows its saved copy. */
+  offline?: boolean;
+}) {
   const { text, space } = useTheme();
   const router = useRouter();
   return (
@@ -24,9 +37,13 @@ export function SectionHeader({ title, right, backTestID = 'section-back', backL
       >
         <ChevronIcon direction="left" />
       </Pressable>
-      <Text style={[text('screenTitle'), styles.flex]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-        {title}
-      </Text>
+      <View style={styles.flex}>
+        <OfflineTitle offline={offline}>
+          <Text style={text('screenTitle')} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            {title}
+          </Text>
+        </OfflineTitle>
+      </View>
       {right}
     </View>
   );
@@ -112,11 +129,6 @@ export function Overline({ children }: { children: string }) {
       {children}
     </Text>
   );
-}
-
-export function OfflineNote({ show }: { show: boolean }) {
-  const { text } = useTheme();
-  return show ? <Text style={text('caption')}>Showing your saved progress. It updates when you’re online.</Text> : null;
 }
 
 /** Shown until something is on screen: a spinner while loading, or what went wrong and Try again when offline with no saved copy. */

@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { countExercises, localToday, logSetCount, type IsoDate, type WorkoutDoc } from '@caltracker/shared';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
-import { CoachIntroCard, NextSteps, StickerTeaser } from '@/components/today/new-client';
+import { CoachIntroCard, StickerTeaser } from '@/components/today/new-client';
 import { PushCard } from '@/components/today/push-card';
 import { CoachMessageCard, CommunityPeek, FoodCard, GoalStrip, RestCard, WeekAndSticker, WorkoutCard, type WorkoutProgress } from '@/components/today/today-cards';
 import { useCoachProfile } from '@/lib/use-coach-profile';
@@ -304,7 +304,7 @@ export default function Today() {
   }
 
   const firstTime = data?.kind === 'first-time';
-  const pushCard = userId ? <PushCard userId={userId} coachName={coach?.name ?? null} firstTime={firstTime} /> : null;
+  const pushCard = userId ? <PushCard userId={userId} coachName={coach?.name ?? null} /> : null;
 
   return (
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
@@ -313,6 +313,7 @@ export default function Today() {
           date={headerDate(today)}
           greeting={firstTime ? welcome(firstName.data) : greeting(firstName.data)}
           workspaceName={workspace?.workspaceName ?? ''}
+          offline={data?.kind === 'today' && data.offline}
           onSignOut={() => void signOutAndForget()}
         />
 
@@ -346,13 +347,8 @@ export default function Today() {
           <>
             <CoachIntroCard coachName={data.coachName} workspaceName={workspace?.workspaceName ?? ''} />
             {pushCard}
-            <NextSteps coachName={data.coachName} />
             <StickerTeaser />
           </>
-        ) : null}
-
-        {data?.kind === 'today' && data.offline ? (
-          <Text style={text('caption')}>No connection. These are today’s workouts saved on your phone.</Text>
         ) : null}
 
         {/* More than one workout today: one card each, stacked. */}

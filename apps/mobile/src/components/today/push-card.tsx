@@ -23,7 +23,7 @@ async function readStored(userId: string): Promise<Stored> {
  * has never asked. iOS asks only from its Turn on button (never on Start, never on first launch). × (Not now) hides it
  * for a week; after the second time it never comes back (Settings -> Notifications still turns them on).
  */
-export function PushCard({ userId, coachName, firstTime }: { userId: string; coachName: string | null; firstTime: boolean }) {
+export function PushCard({ userId, coachName }: { userId: string; coachName: string | null }) {
   const { text, space } = useTheme();
   const { permission, requestPermission, refreshPermission } = usePush();
   // undefined until read from the phone, so the banner never flashes before a snooze is known.
@@ -60,7 +60,7 @@ export function PushCard({ userId, coachName, firstTime }: { userId: string; coa
   return (
     <View testID="push-card" style={[styles.banner, { paddingLeft: space[3.5], paddingRight: space[1], paddingVertical: space[2], gap: space[3] }]}>
       <BellIcon size={22} />
-      <Text style={[text('body'), styles.line]}>{pushCardText(coachName, firstTime)}</Text>
+      <Text style={[text('body'), styles.line]}>{pushCardText(coachName)}</Text>
       <Pressable
         testID="push-card-allow"
         onPress={() => {

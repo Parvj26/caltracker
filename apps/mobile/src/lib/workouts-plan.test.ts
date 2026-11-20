@@ -5,6 +5,7 @@ import {
   coachFirstName,
   firstSelectedDay,
   lastTimeLine,
+  planRowLabel,
   muscleTags,
   planLineParts,
   planLineSpoken,
@@ -203,9 +204,24 @@ describe('planLineParts', () => {
   });
 });
 
+describe('planLineParts weight and time', () => {
+  it('reads "3 × 30 s at 12 lb" when the sets share a weight and a time', () => {
+    const s = () => set({ targetWeightKg: 5.443, targetDurationS: 30, targetRepsMin: null, targetRepsMax: null });
+    expect(planLineParts({ ...ex([s(), s(), s()]), trackingType: 'weight_time' }, 'lb')).toEqual([{ kind: 'work', text: '3 × 30 s at 12 lb' }]);
+  });
+
+  it('keeps "90 lb to failure" with no × for a weighted set to failure', () => {
+    const e = ex([
+      set({ targetWeightKg: 31.751, targetRepsMin: 12, targetRepsMax: 12 }),
+      set({ targetWeightKg: 40.823, toFailure: true, targetRepsMin: null, targetRepsMax: null }),
+    ]);
+    expect(planLineParts(e, 'lb')).toEqual([{ kind: 'work', text: '70 lb × 12, 90 lb to failure' }]);
+  });
+});
+
 describe('lastTimeLine', () => {
   const e = ex([set()]);
-  it('shows the last result, "First time" with no history, and nothing when unknown', () => {
+  it('shows the last result, and nothing with no history or when unknown', () => {
     const last = {
       [e.exerciseId]: {
         finishedAt: '2026-11-02T10:00:00Z',
@@ -213,7 +229,7 @@ describe('lastTimeLine', () => {
       },
     };
     expect(lastTimeLine(e, last, 'kg')).toBe('Last time: 80 kg × 8');
-    expect(lastTimeLine(e, {}, 'kg')).toBe('First time');
+    expect(lastTimeLine(e, {}, 'kg')).toBeNull();
     expect(lastTimeLine(e, null, 'kg')).toBeNull();
   });
 });
@@ -230,8 +246,17 @@ describe('supersetPlanInfo and exerciseRest', () => {
   it('counts rounds and says the rest after each round', () => {
     const a = ex([set(), set(), set({ setType: 'drop', restSeconds: 0 }), set()]);
     const b = ex([set({ restSeconds: 60 }), set({ restSeconds: 60 }), set({ restSeconds: 60 })]);
-    expect(supersetPlanInfo([a, b])).toEqual({ heading: 'Superset · 3 rounds', rest: 'Rest 1:00 after each round' });
+    expect(supersetPlanInfo([a, b])).toEqual({ heading: 'Superset · 3 rounds', rest: 'Back to back, then rest 1:00' });
     expect(exerciseRest(a)).toBe('Rest 1:30');
     expect(exerciseRest(ex([set({ restSeconds: 0 })]))).toBeNull();
+  });
+});
+
+describe('planRowLabel', () => {
+  it('keeps the superset tag and the help line the row no longer shows', () => {
+    expect(
+      planRowLabel({ tag: 'A1', name: 'Bench Press', badges: ['Each side'], spokenLine: '3 × 8 at 60 kg', help: 'Do every set on each side', sub: null }),
+    ).toBe('A1, Bench Press, Each side, 3 × 8 at 60 kg, Do every set on each side');
+    expect(planRowLabel({ tag: null, name: 'Squat', badges: [], spokenLine: '3 × 5', help: null, sub: 'Rest 2:00' })).toBe('Squat, 3 × 5, Rest 2:00');
   });
 });

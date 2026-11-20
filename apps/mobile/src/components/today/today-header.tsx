@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { tapTarget } from '@caltracker/design-tokens';
 import { palette, pressedOpacity, TITLE_MAX_SCALE } from '@/theme/theme';
+import { OfflineTitle } from '@/components/ui';
 import { useTheme } from '@/theme/use-theme';
 
 const GEAR =
@@ -11,14 +12,17 @@ const GEAR =
 /**
  * Today's header: the date, "Hi <name>", and a gear that opens Settings (a screen of its own, so Back from
  * Settings › Notifications comes back to Settings). `workspaceName` and `onSignOut` are no longer used here: Settings
- * reads the coach and signs out itself (kept so Today's call stays as it is).
+ * reads the coach and signs out itself (kept so Today's call stays as it is). `offline`: the grey Offline pill beside
+ * the greeting while Today shows the workouts saved on the phone.
  */
 export function TodayHeader({
   date,
   greeting,
+  offline = false,
 }: {
   date: string;
   greeting: string;
+  offline?: boolean;
   workspaceName?: string;
   onSignOut?: () => void;
 }) {
@@ -30,9 +34,11 @@ export function TodayHeader({
         <Text style={[text('caption'), styles.date]} testID="today-date">
           {date}
         </Text>
-        <Text style={[text('screenTitle'), styles.greeting]} accessibilityRole="header" testID="today-greeting" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-          {greeting}
-        </Text>
+        <OfflineTitle offline={offline}>
+          <Text style={[text('screenTitle'), styles.greeting]} accessibilityRole="header" testID="today-greeting" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+            {greeting}
+          </Text>
+        </OfflineTitle>
       </View>
       <Pressable
         testID="today-settings"

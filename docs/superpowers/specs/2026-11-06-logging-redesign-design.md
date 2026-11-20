@@ -157,7 +157,7 @@ Exact labels (`{clock}` is m:ss, e.g. 1:30):
 ### Drop sets (mockup `DropSet.dc.html`)
 - When the current set has drops (or is a drop), the set heading adds a "DROP SET" chip and "No rest between drops".
 - The main set and its drops are listed as steps: ticked ones show their result ("20 lb × 12 ✓"), the current one
-  holds the steppers, later ones show the coach's plan ("Drop 2 · 10 lb × to failure").
+  holds the steppers, later ones show the coach's plan ("Drop 2 · 10 lb to failure").
 - **+ Add another drop** under the steps adds a drop after the last one (shared `addLogDrop`, parent = the main set).
   Adding the first drop to a set stays in Edit sets (⋯ → + Drop).
 

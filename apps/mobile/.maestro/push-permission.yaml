@@ -23,7 +23,7 @@ env:
     element:
       id: push-card
     direction: DOWN
-- assertVisible: 'Get a ping when .* sends a workout or message.'
+- assertVisible: 'Get a ping from .*'
 - takeScreenshot: push-card-phone
 - tapOn:
     id: push-card-allow

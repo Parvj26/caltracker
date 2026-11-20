@@ -71,8 +71,7 @@ export default function NotificationsSettingsScreen() {
           testID="notifications-off-banner"
           style={[styles.banner, { borderRadius: radius.button, padding: space[4], gap: space[2] }]}
         >
-          <Text style={text('sectionHeading')}>Notifications are off for CalTracker on this iPhone.</Text>
-          <Text style={text('body')}>Your choices below are paused until you turn them on in iPhone Settings.</Text>
+          <Text style={text('sectionHeading')}>Notifications are off · choices paused</Text>
           <View style={styles.start}>
             <Button
               variant="secondary"
@@ -116,7 +115,7 @@ export default function NotificationsSettingsScreen() {
       ))}
 
       <Text style={[text('caption'), { paddingHorizontal: space[1] }]}>
-        During quiet hours, notifications wait until the morning. Lock-screen alerts say who and what, never the message itself.
+        Lock-screen alerts say who and what, never the message itself.
       </Text>
 
       <TimeOptionsSheet

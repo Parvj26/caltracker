@@ -240,7 +240,7 @@ export function RestCard({
         {next ? 'Rest day' : `${first} is building your plan`}
       </Text>
       <Text testID={next ? 'today-next' : 'today-no-plan'} style={[text('body'), styles.ink]}>
-        {next ? restNextLine(next.name, next.scheduledOn, today) : 'You’ll get a message as soon as your next workout is ready.'}
+        {next ? restNextLine(next.name, next.scheduledOn, today) : 'Next workout coming soon'}
       </Text>
       <View style={[styles.row, styles.wrap, { gap: space[2], marginTop: space[2] }]}>
         {next ? (
@@ -444,7 +444,7 @@ export function WeekAndSticker({ refreshKey }: { refreshKey: number }) {
             </Text>
           </View>
         ) : facts.stickers ? (
-          <Text style={[text('caption'), styles.ink]}>None yet. Finish a workout to earn one.</Text>
+          <Text style={[text('caption'), styles.ink]}>None yet</Text>
         ) : album.status === 'loading' ? (
           <ActivityIndicator color={palette.ink} accessibilityLabel="Loading your stickers" />
         ) : (

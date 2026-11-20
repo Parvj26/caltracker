@@ -31,7 +31,7 @@ export default function AppleHealthScreen() {
     Alert.alert('Turn off Apple Health?', 'New readings stop coming in. Readings already brought in stay, unless you remove them too.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Turn off', onPress: () => void off(false) },
-      { text: 'Turn off and remove imported readings', style: 'destructive', onPress: () => void off(true) },
+      { text: 'Turn off and remove data', style: 'destructive', onPress: () => void off(true) },
     ]);
   }
 

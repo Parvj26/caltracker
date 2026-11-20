@@ -6,13 +6,14 @@ import { CoachAvatar } from '@/components/coach-avatar';
 import { BellIcon, PhotoIcon } from '@/components/community/icons';
 import { PostItem, type PostContext } from '@/components/community/post-item';
 import { usePostMedia } from '@/components/community/use-post-media';
-import { Card, ErrorText, Screen } from '@/components/ui';
+import { Card, ErrorText, OfflineTitle, Screen } from '@/components/ui';
 import { CountBadge } from '@/components/ui/count-badge';
 import { BackButton } from '@/components/ui/nav-buttons';
 import { loadFeed, memberCount, myProfile, namesOf, type FeedPost } from '@/lib/community-api';
 import { useLive } from '@/lib/community-live';
 import { useCommunity } from '@/lib/use-community';
 import { useSession } from '@/lib/session';
+import { COMMUNITY_OFFLINE_EMPTY, communityOfflineState, offlinePillA11y } from '@/lib/offline-pill';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -118,6 +119,7 @@ export default function CommunityScreen() {
     { key: 'wins', label: 'Wins' },
   ];
   const circle = [styles.circle, { borderRadius: radius.pill }];
+  const offlineState = communityOfflineState({ ready, offline, hasCommunity: community !== null });
 
   return (
     <Screen
@@ -130,10 +132,18 @@ export default function CommunityScreen() {
     >
       <View style={[styles.row, { gap: space[2.5] }]}>
         <BackButton testID="community-back" fallback="/coach" />
-        <View style={styles.flex} accessibilityRole="header" accessible accessibilityLabel={subtitle ? `Community, ${subtitle}` : 'Community'}>
-          <Text style={text('screenTitle')} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-            Community
-          </Text>
+        <View style={styles.flex} accessibilityRole="header" accessible accessibilityLabel={[
+            'Community',
+            subtitle,
+            offlineState === 'pill' ? offlinePillA11y(false).label : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}>
+          <OfflineTitle offline={offlineState === 'pill'}>
+            <Text style={text('screenTitle')} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+              Community
+            </Text>
+          </OfflineTitle>
           {subtitle ? (
             <Text style={text('caption')} testID="community-subtitle" numberOfLines={1}>
               {subtitle}
@@ -163,7 +173,11 @@ export default function CommunityScreen() {
           <Text style={text('body')}>Your coach has taken you out of the group. You can still train and message your coach as usual.</Text>
         </Card>
       ) : null}
-      {ready && !community && offline ? <Text style={text('caption')}>You’re offline. The community shows when you’re back online.</Text> : null}
+      {offlineState === 'empty' ? (
+        <Text style={text('body')} testID="community-offline">
+          {COMMUNITY_OFFLINE_EMPTY}
+        </Text>
+      ) : null}
 
       {community && ctx ? (
         <View style={{ gap: space[3.5] }}>
@@ -188,7 +202,7 @@ export default function CommunityScreen() {
               <PhotoIcon />
             </Pressable>
           </View>
-          <Text style={text('caption')}>Only you, your coach and their clients can see this. Members see your name and photo.</Text>
+          <Text style={text('caption')}>Your coach’s clients see your name and photo.</Text>
 
           <View style={[styles.row, styles.wrap, { gap: space[2] }]} accessibilityRole="tablist" accessibilityLabel="Filter posts">
             {filters.map((f) => {

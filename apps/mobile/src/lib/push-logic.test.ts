@@ -72,15 +72,10 @@ describe('showPushCard', () => {
 });
 
 describe('pushCardText', () => {
-  it('names the coach by first name', () =>
-    expect(pushCardText('Luis Bueno')).toBe('Get a ping when Luis sends a workout or message.'));
+  it('names the coach by first name', () => expect(pushCardText('Luis Bueno')).toBe('Get a ping from Luis'));
   it('"your coach" when the name is unknown', () => {
-    expect(pushCardText(null)).toBe('Get a ping when your coach sends a workout or message.');
-    expect(pushCardText('  ')).toBe('Get a ping when your coach sends a workout or message.');
-  });
-  it('speaks of the first workout to a new client', () => {
-    expect(pushCardText('Luis Bueno', true)).toBe('Get a ping when Luis sends your first workout or a message.');
-    expect(pushCardText(null, true)).toBe('Get a ping when your coach sends your first workout or a message.');
+    expect(pushCardText(null)).toBe('Get a ping from your coach');
+    expect(pushCardText('  ')).toBe('Get a ping from your coach');
   });
 });
 

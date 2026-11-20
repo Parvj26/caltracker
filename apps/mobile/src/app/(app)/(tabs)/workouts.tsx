@@ -5,7 +5,7 @@ import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { addDays, canStartSessionOn, formatLogDuration, localToday, startOfWeek, type IsoDate } from '@caltracker/shared';
 import { NameSheet } from '@/components/log/name-sheet';
 import { ResumeBanner } from '@/components/log/resume-banner';
-import { Button, Card, ErrorText, Screen } from '@/components/ui';
+import { Button, Card, ErrorText, OfflineTitle, Screen } from '@/components/ui';
 import { workoutStatuses, type WorkoutStatus } from '@/lib/active-log-logic';
 import { fetchLogsForDays, type LogForDay } from '@/lib/log-api';
 import { logsForWeek } from '@/lib/plan-cache';
@@ -148,9 +148,13 @@ export default function Workouts() {
     <Screen inTabs refreshing={refreshing} onRefresh={() => void refresh()}>
       {/* At large text sizes History moves under the title instead of squeezing it letter by letter. */}
       <View style={[styles.row, styles.wrapRow, { gap: space[2] }]}>
-        <Text style={[text('screenTitle'), styles.titleGrow]} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
-          Workouts
-        </Text>
+        <View style={styles.titleGrow}>
+          <OfflineTitle offline={!!shown?.offline}>
+            <Text style={text('screenTitle')} accessibilityRole="header" maxFontSizeMultiplier={TITLE_MAX_SCALE}>
+              Workouts
+            </Text>
+          </OfflineTitle>
+        </View>
         <HistoryButton onPress={() => router.push('/history')} />
       </View>
 
@@ -170,8 +174,6 @@ export default function Workouts() {
           ))}
         </View>
       </View>
-
-      {shown?.offline ? <Text style={text('caption')}>No connection. This is the plan saved on your phone.</Text> : null}
 
       {error ? (
         <Card>

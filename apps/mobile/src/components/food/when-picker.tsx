@@ -75,9 +75,6 @@ function WhenSheet({ visible, when, today, onChange, onClose }: { visible: boole
             </Text>
             <Stepper glyph="+" label="15 minutes later" testID="when-later" onPress={() => onChange(capWhen(stepWhen(when, 1, today, oldest)))} />
           </View>
-          <Text style={[font(500, 13), foodText.muted]} testID="when-summary">
-            {whenLabel(when, today)}
-          </Text>
 
           <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Done" testID="when-done" style={({ pressed }) => [styles.done, pressed && { opacity: pressedOpacity }]}>
             <Text style={[font(800, 17), styles.onInk]}>Done</Text>

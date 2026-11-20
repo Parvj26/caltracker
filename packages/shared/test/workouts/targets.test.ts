@@ -76,8 +76,8 @@ describe('formatSetTarget', () => {
   });
   it('puts the weight before to failure', () => {
     const drop = { ...base, setType: 'drop' as const, toFailure: true, targetWeightKg: 40 };
-    expect(formatSetTarget(drop, 'weight_reps', 'kg')).toBe('40 kg × to failure');
-    expect(formatSetTarget(drop, 'weight_reps', 'lb')).toBe('88 lb × to failure');
+    expect(formatSetTarget(drop, 'weight_reps', 'kg')).toBe('40 kg to failure');
+    expect(formatSetTarget(drop, 'weight_reps', 'lb')).toBe('88 lb to failure');
     expect(formatSetTarget(drop, 'reps', 'kg')).toBe('To failure');
   });
   it('shows a dash with no targets', () => {
@@ -143,7 +143,7 @@ describe('formatSetsSummary', () => {
       set({ setType: 'drop', toFailure: true, targetWeightKg: lb(15) }),
     ];
     expect(formatSetsSummary(sets, 'weight_reps', 'lb')).toMatchObject({
-      text: '35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb × to failure',
+      text: '35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb to failure',
       count: 4,
     });
   });
@@ -159,9 +159,9 @@ describe('formatSetsSummary', () => {
       set({ setType: 'drop', toFailure: true, targetWeightKg: lb(15) }),
     ];
     const summary = formatSetsSummary(sets, 'weight_reps', 'lb');
-    expect(summary.text).toBe('W 20 lb × 10, 35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb × to failure');
+    expect(summary.text).toBe('W 20 lb × 10, 35 lb × 12, ↓ 25 lb × 8, ↓ To failure, ↓ 15 lb to failure');
     expect(summary.spoken).toBe(
-      'warm-up 20 lb × 10, 35 lb × 12, drop 25 lb × 8, drop to failure, drop 15 lb × to failure',
+      'warm-up 20 lb × 10, 35 lb × 12, drop 25 lb × 8, drop to failure, drop 15 lb to failure',
     );
   });
   it('speaks a set with no target as no target', () => {

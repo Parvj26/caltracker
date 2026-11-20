@@ -88,9 +88,7 @@ export function afterPushDismiss(dismissals: number, now: number): { dismissals:
 }
 
 /** The Today banner's line, naming the coach by first name ("your coach" when unknown); a new client's names the first workout. */
-export function pushCardText(coachName: string | null, firstTime = false): string {
+export function pushCardText(coachName: string | null): string {
   const first = coachName?.trim().split(/\s+/)[0] || 'your coach';
-  return firstTime
-    ? `Get a ping when ${first} sends your first workout or a message.`
-    : `Get a ping when ${first} sends a workout or message.`;
+  return `Get a ping from ${first}`;
 }

@@ -280,11 +280,3 @@ export function newCountLabel(unread: number): string | null {
   return unread > 0 ? `${unread > 99 ? '99+' : unread} new` : null;
 }
 
-/** "What happens next" for a new client, naming the coach by first name. */
-export function nextSteps(coachName: string | null): [string, string, string] {
-  return [
-    `${firstWord(coachName) ?? 'Your coach'} builds your plan and it appears here and in Workouts.`,
-    'Tap Start, log each set, and finish. It takes a few taps.',
-    'Earn stickers and watch your progress grow.',
-  ];
-}

@@ -16,7 +16,7 @@ import {
   type StrengthRange,
 } from '@caltracker/shared';
 import { LineChart } from '@/components/charts/line-chart';
-import { InkCard, LoadState, OfflineNote, SectionHeader, Segmented } from '@/components/progress/parts';
+import { InkCard, LoadState, SectionHeader, Segmented } from '@/components/progress/parts';
 import { StrengthPicker } from '@/components/progress/strength-picker';
 import { Screen } from '@/components/ui';
 import { readLastExercise, rememberLastExercise } from '@/lib/progress-hub-api';
@@ -88,8 +88,7 @@ export default function StrengthScreen() {
   return (
     <Screen refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={{ gap: space[3.5] }}>
-        <SectionHeader title="Strength" />
-        <OfflineNote show={hub.status === 'offline' && hub.data !== null} />
+        <SectionHeader title="Strength" offline={hub.status === 'offline' && hub.data !== null} />
         <LoadState status={hub.status} hasData={hub.data !== null} onRetry={pull.onRefresh} busy={pull.refreshing} />
 
         {hub.data && !exercise ? (
