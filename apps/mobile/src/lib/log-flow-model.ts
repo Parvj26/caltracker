@@ -585,7 +585,7 @@ export function setRows(
       deletable: deletableSets(ex).has(set.id),
       last: lastCellText(lastBySet[si] ?? null, ex.trackingType, units),
       current: false,
-      canDrop: fields.includes('weight') && tagKind !== 'warmup',
+      canDrop: dropPlan(ex, set.id, units, lastSets) !== null,
     };
   });
 }
@@ -937,9 +937,47 @@ export function addRound(log: WorkoutLogDoc, blockId: string, makeId: () => stri
 }
 
 /**
- * "Add drop set" on a set (or the exercise's last set): a ↓ Drop row after it (after its drops, if any), its weight
- * started at 75% of the set above (done, else as planned), rounded down to the plate step (shared dropSetWeightKg).
- * `dropId` is the new set's id, so the screen can put the cursor in its reps. A warm-up gets no drop.
+ * Where a drop for this set would go and the weight it starts at: after the set's own drops, at 75% of the set above
+ * it (done, else as planned), rounded down to the plate step (shared dropSetWeightKg). Null when it can have none: no
+ * weight logged, a warm-up, or too light to drop (75% under one step). An unknown weight still allows one, empty.
+ */
+export function dropPlan(
+  ex: LogExerciseDoc,
+  setId: string,
+  units: Units,
+  lastSets: readonly LastResultSet[],
+): { parentId: string; weightKg: number | null } | null {
+  if (!fieldsFor(ex).includes('weight')) return null;
+  let parentAt = ex.sets.findIndex((s) => s.id === setId);
+  while (parentAt > 0 && ex.sets[parentAt].setType === 'drop') parentAt -= 1;
+  const parent = ex.sets[parentAt];
+  if (!parent || parent.setType !== 'normal') return null;
+  let aboveAt = parentAt;
+  while (ex.sets[aboveAt + 1]?.setType === 'drop') aboveAt += 1;
+  const above = ex.sets[aboveAt];
+  const baseKg = above.actualWeightKg ?? resolveSetValues(ex, above.id, lastSets).weightKg;
+  if (baseKg === null || baseKg <= 0) return { parentId: parent.id, weightKg: null };
+  const weightKg = dropSetWeightKg(baseKg, units);
+  return weightKg === null ? null : { parentId: parent.id, weightKg };
+}
+
+/**
+ * The set the exercise ··· menu's "Add drop set" follows: the last ticked working set, else the set the outline is
+ * on (cursorStep) when it is this exercise's, else the exercise's last working set.
+ */
+export function exerciseDropSetId(block: LogBlockDoc, ex: LogExerciseDoc): string | null {
+  const ticked = ex.sets
+    .filter((s) => s.setType === 'normal' && s.completedAt !== null)
+    .reduce<LogSetDoc | null>((a, s) => (a === null || Date.parse(s.completedAt!) >= Date.parse(a.completedAt!) ? s : a), null);
+  if (ticked) return ticked.id;
+  const cursor = cursorStep(block);
+  if (cursor && block.exercises[cursor.exerciseIndex]?.id === ex.id) return cursor.setId;
+  return [...ex.sets].reverse().find((s) => s.setType === 'normal')?.id ?? null;
+}
+
+/**
+ * "Add drop set": a ↓ Drop row after the set (after its drops, if any), its weight started as dropPlan says. `dropId`
+ * is the new set's id, so the screen can put the cursor in its reps. Nothing changes when the set can't have a drop.
  */
 export function addDropSet(
   log: WorkoutLogDoc,
@@ -951,39 +989,30 @@ export function addDropSet(
   nowIso: string,
 ): WorkoutLogDoc {
   const ex = log.blocks.flatMap((b) => b.exercises).find((e) => e.id === logExerciseId);
-  if (!ex) return log;
-  let parentAt = ex.sets.findIndex((s) => s.id === setId);
-  while (parentAt > 0 && ex.sets[parentAt].setType === 'drop') parentAt -= 1;
-  const parent = ex.sets[parentAt];
-  if (!parent || parent.setType !== 'normal') return log;
-  let aboveAt = parentAt;
-  while (ex.sets[aboveAt + 1]?.setType === 'drop') aboveAt += 1;
-  const above = ex.sets[aboveAt];
-  const baseKg = above.actualWeightKg ?? resolveSetValues(ex, above.id, lastSets).weightKg;
-  const added = addLogDrop(log, logExerciseId, parent.id, () => dropId, nowIso);
+  const plan = ex ? dropPlan(ex, setId, units, lastSets) : null;
+  if (!plan) return log;
+  const added = addLogDrop(log, logExerciseId, plan.parentId, () => dropId, nowIso);
   if (added === log) return log;
-  const weightKg = fieldsFor(ex).includes('weight') ? dropSetWeightKg(baseKg, units) : null;
-  return weightKg === null ? added : updateActual(added, dropId, { actualWeightKg: weightKg });
+  return plan.weightKg === null ? added : updateActual(added, dropId, { actualWeightKg: plan.weightKg });
 }
 
 export type MenuKey = 'note' | 'history' | 'info' | 'add-set' | 'add-drop' | 'delete-set' | 'remove';
 
 /**
  * An exercise's ··· menu, in order (approved SS5 board): Note for Demo, Last time, How to do it, Add set, Add drop
- * set, Delete set, Remove exercise. Last time only with a last time; Add drop set only with weight and a working set;
- * Delete set only when a set may go.
+ * set, Delete set, Remove exercise. Last time only with a last time; Add drop set only when its set can have one
+ * (dropPlan); Delete set only when a set may go.
  */
 export function exerciseMenu(
   ex: LogExerciseDoc,
-  o: { coachName: string | null; hasLastTime: boolean; deletable: boolean },
+  o: { coachName: string | null; hasLastTime: boolean; deletable: boolean; canDrop: boolean },
 ): Array<{ key: MenuKey; title: string; destructive?: boolean }> {
-  const canDrop = fieldsFor(ex).includes('weight') && ex.sets.some((s) => s.setType === 'normal');
   return [
     { key: 'note' as const, title: `Note for ${o.coachName ?? 'your coach'}` },
     ...(o.hasLastTime ? [{ key: 'history' as const, title: 'Last time' }] : []),
     { key: 'info' as const, title: 'How to do it' },
     { key: 'add-set' as const, title: 'Add set' },
-    ...(canDrop ? [{ key: 'add-drop' as const, title: 'Add drop set' }] : []),
+    ...(o.canDrop ? [{ key: 'add-drop' as const, title: 'Add drop set' }] : []),
     ...(o.deletable ? [{ key: 'delete-set' as const, title: 'Delete set', destructive: true }] : []),
     { key: 'remove' as const, title: 'Remove exercise', destructive: true },
   ];

@@ -69,6 +69,8 @@ import { coachFirstName } from '@/lib/workouts-plan';
 import {
   addDropSet,
   addRound,
+  dropPlan,
+  exerciseDropSetId,
   exerciseMenu,
   setMenu as setMenuOf,
   buildPage,
@@ -445,6 +447,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
           }).then((ticked) => ticked && tapHaptic());
         },
         onDelete: (row) => void op((l) => removeLogSet(l, exId, row.setId, nowIso())),
+        onAddDrop: (row) => addDropNow(exId, row.setId),
         onRowMenu: (row) => {
           Keyboard.dismiss();
           tapHaptic();
@@ -546,10 +549,13 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
   const menuItems: MenuItem[] = (() => {
     const ex = menuFor;
     if (!ex) return [];
-    const lastMain = [...ex.sets].reverse().find((s) => s.setType === 'normal');
+    // Add drop set follows the last ticked working set, else the outlined one, else the last (exerciseDropSetId).
+    const block = blockOf(ex.id);
+    const dropAfter = block ? exerciseDropSetId(block, ex) : null;
+    const canDrop = dropAfter !== null && dropPlan(ex, dropAfter, units, prefillSets(ex, last, { history, units })) !== null;
     const deletable = deleteChoices(ex, units, last[ex.exerciseId]?.sets ?? []);
     // Note for Demo, Last time, How to do it, Add set, Add drop set, Delete set, Remove exercise (approved SS5 board).
-    return exerciseMenu(ex, { coachName, hasLastTime: !!last[ex.exerciseId], deletable: deletable.length > 0 }).map((m): MenuItem => {
+    return exerciseMenu(ex, { coachName, hasLastTime: !!last[ex.exerciseId], deletable: deletable.length > 0, canDrop }).map((m): MenuItem => {
       switch (m.key) {
         case 'note':
           return { title: m.title, testID: 'menu-note', onPress: () => setNoteFor(ex) };
@@ -560,7 +566,7 @@ function OpenLog({ log, units, back, readOnly }: { log: WorkoutLogDoc; units: Un
         case 'add-set':
           return { title: m.title, testID: 'menu-add-set', onPress: () => void op((l) => addLogSet(withPick(ex.id)(l), ex.id, randomUUID, nowIso())) };
         case 'add-drop':
-          return { title: m.title, testID: 'menu-add-drop', onPress: () => lastMain && addDropNow(ex.id, lastMain.id) };
+          return { title: m.title, testID: 'menu-add-drop', onPress: () => dropAfter && addDropNow(ex.id, dropAfter) };
         case 'delete-set':
           return {
             title: m.title,

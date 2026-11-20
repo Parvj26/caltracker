@@ -88,16 +88,16 @@ const DROP_SHARE = 0.75;
 
 /**
  * The weight a new drop set starts at: 75% of the set just done (or its planned weight), rounded DOWN to the plate
- * step in the client's units (5 lb / 2.5 kg), never below one step. 60 lb → 45 lb, 15 lb → 10 lb, 30 kg → 22.5 kg.
- * Null when there is no weight to start from.
+ * step in the client's units (5 lb / 2.5 kg). 60 lb → 45 lb, 15 lb → 10 lb, 30 kg → 22.5 kg. Always lighter than the
+ * set before it: null when 75% is below one step (nothing lighter to drop to), or there is no weight to start from.
  */
 export function dropSetWeightKg(baseKg: number | null, units: Units): number | null {
   if (baseKg === null || !(baseKg > 0)) return null;
   const plate = PLATE[units];
   const shown = kgToInput(baseKg, units) * DROP_SHARE;
   // A hair of tolerance so 45.000000001 (float maths from a kg round trip) stays 45, not 40.
-  const steps = Math.max(1, Math.floor(shown / plate + 1e-9));
-  return toKg(steps * plate, units);
+  const steps = Math.floor(shown / plate + 1e-9);
+  return steps >= 1 ? toKg(steps * plate, units) : null;
 }
 
 function missedBottom(s: ProgressionSession, r: Range[]): boolean {

@@ -53,6 +53,8 @@ import {
   substituteOf,
   supersetRounds,
   typedPatch,
+  dropPlan,
+  exerciseDropSetId,
   addDropSet,
   addRound,
   exerciseMenu,
@@ -1025,10 +1027,36 @@ describe('the superset page (approved SS1–SS5 boards)', () => {
     expect(setRows(push, 'lb', []).map((r) => r.canDrop)).toEqual([false, true, true, true]);
   });
 
+  it('a drop is never heavier than its set: none when 75% is under one plate step', () => {
+    let log = mockLog();
+    const bench = log.blocks[1].exercises[0];
+    log = tickAt(log, a(log, 0), 5, 12, 1);
+    const ex = log.blocks[1].exercises[0];
+    expect(dropPlan(ex, a(log, 0), 'lb', [])).toBeNull();
+    expect(setRows(ex, 'lb', [])[0].canDrop).toBe(false);
+    expect(addDropSet(log, bench.id, a(log, 0), 'x', 'lb', [], NOW)).toBe(log);
+    // A planned 45 lb set still can.
+    expect(dropPlan(ex, a(log, 1), 'lb', [])).not.toBeNull();
+  });
+
+  it('the exercise ··· "Add drop set" follows the last ticked set, else the outlined one, else the last', () => {
+    let log = mockLog();
+    const block = () => log.blocks[1];
+    // Nothing ticked: the outline is on A1's first set.
+    expect(exerciseDropSetId(block(), block().exercises[0])).toBe(a(log, 0));
+    // A2 is not under the outline: its last working set.
+    expect(exerciseDropSetId(block(), block().exercises[1])).toBe(b(log, 2));
+    log = tickAt(log, a(log, 0), 45, 12, 1);
+    log = tickAt(log, a(log, 1), 55, 10, 3);
+    log = tickAt(log, b(log, 0), 15, 12, 2);
+    expect(exerciseDropSetId(block(), block().exercises[0])).toBe(a(log, 1));
+    expect(exerciseDropSetId(block(), block().exercises[1])).toBe(b(log, 0));
+  });
+
   it('the menus: the exercise ··· in the approved order, the set ··· with Add drop set above Delete set', () => {
     const log = mockLog();
     const bench = log.blocks[1].exercises[0];
-    expect(exerciseMenu(bench, { coachName: 'Demo', hasLastTime: true, deletable: true }).map((m) => m.title)).toEqual([
+    expect(exerciseMenu(bench, { coachName: 'Demo', hasLastTime: true, deletable: true, canDrop: true }).map((m) => m.title)).toEqual([
       'Note for Demo',
       'Last time',
       'How to do it',
@@ -1038,7 +1066,7 @@ describe('the superset page (approved SS1–SS5 boards)', () => {
       'Remove exercise',
     ]);
     const arms = log.blocks[0].exercises[0];
-    expect(exerciseMenu(arms, { coachName: null, hasLastTime: false, deletable: false }).map((m) => m.title)).toEqual([
+    expect(exerciseMenu(arms, { coachName: null, hasLastTime: false, deletable: false, canDrop: false }).map((m) => m.title)).toEqual([
       'Note for your coach',
       'How to do it',
       'Add set',

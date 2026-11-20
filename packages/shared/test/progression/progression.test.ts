@@ -490,9 +490,12 @@ describe('dropSetWeightKg', () => {
     expect(shown(dropSetWeightKg(20, 'kg'), 'kg')).toBe(15);
     expect(shown(dropSetWeightKg(25, 'kg'), 'kg')).toBe(17.5);
   });
-  it('never goes below one step', () => {
-    expect(shown(dropSetWeightKg(lb(5), 'lb'), 'lb')).toBe(5);
-    expect(shown(dropSetWeightKg(2.5, 'kg'), 'kg')).toBe(2.5);
+  it('is always lighter than the set before; nothing when 75% is under one step', () => {
+    expect(shown(dropSetWeightKg(lb(10), 'lb'), 'lb')).toBe(5);
+    expect(shown(dropSetWeightKg(lb(7.5), 'lb'), 'lb')).toBe(5);
+    expect(dropSetWeightKg(lb(5), 'lb')).toBeNull();
+    expect(dropSetWeightKg(2.5, 'kg')).toBeNull();
+    expect(shown(dropSetWeightKg(5, 'kg'), 'kg')).toBe(2.5);
   });
   it('has nothing without a weight to start from', () => {
     expect(dropSetWeightKg(null, 'lb')).toBeNull();

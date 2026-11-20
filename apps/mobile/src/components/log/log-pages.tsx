@@ -249,6 +249,7 @@ export function OptionPage({ model, ...common }: Common & { model: OptionPageMod
         {model.locked ? (
           <View
             testID={`option-locked-${common.page}`}
+            accessible
             accessibilityLabel="Locked: the pick can’t change once a set is ticked"
             style={[styles.rowCentre, styles.lockedChip, { borderRadius: radius.pill, paddingHorizontal: space[2], gap: 4 }]}
           >

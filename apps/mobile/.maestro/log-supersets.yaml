@@ -129,6 +129,20 @@ env:
 - assertVisible:
     id: tick-1-0-3
     text: 'checkbox, checked'
+# Typing across the width ("95" → "100" lb each) keeps the box, its unit and the keyboard where they are.
+- tapOn:
+    id: actual-weight-1-0-4
+- inputText: '95'
+- takeScreenshot: ss-typing-95
+- eraseText
+- inputText: '100'
+- assertVisible:
+    id: actual-weight-1-0-4
+    text: '100'
+- assertVisible:
+    id: keyboard-bar
+- takeScreenshot: ss-typing-100
+- pressKey: Enter
 
 # ---- The exercise ··· menu, in order (SS5) ----
 - scrollUntilVisible:
